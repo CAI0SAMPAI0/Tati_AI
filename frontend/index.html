@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <input id="msg" placeholder="Digite uma mensagem">
+    <button onclick="send()">Enviar</button>
+    <div id="output"></div>
+
+    <script>
+        const ws = new WebSocket("ws://localhost:8000/chat/ws")
+        
+        ws.onmessage = (event) => {
+            document.getElementById("output").innerHTML += `<p>${event.data}</p>`
+        }
+
+        function send() {
+            const msg = document.getElementById("msg").value
+            ws.send(msg)
+        }
+    </script>
+</body>
+</html>
