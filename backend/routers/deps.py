@@ -1,18 +1,18 @@
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, OAuth2PasswordBearer
 from jose import jwt, JWTError
 import os
 
 ALGORITHM = "HS256"
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 
-bearer = HTTPBearer()
+#bearer = HTTPBearer()
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer)
+    token: str = Depends(oauth2_scheme)
 ) -> dict:
-    token = credentials.credentials
     secret = os.getenv("JWT_SECRET_KEY")
 
     try:
@@ -25,3 +25,16 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido ou expirado"
         )
+        
+# criando regra admin
+class RoleChecker:
+    def __init__(self, allowed_roles: list):
+        self.allowed_roles = allowed_roles
+
+    def __call__(self, user: dict = Depends(get_current_user)):
+        if user["role"] not in self.allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acesso negado: permissão insuficiente"
+            )
+        return user

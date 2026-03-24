@@ -1,19 +1,20 @@
 from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import jwt
 from pydantic import BaseModel
-from routers.deps import get_current_user
+from routers.deps import get_current_user, RoleChecker
 from services.database import authenticate_user, get_client
+from google.oauth2 import id_token
+from google.auth.transport import requests
 import datetime as dt
 import os
 import hashlib
 import bcrypt
-
-
 router = APIRouter()
 
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 ALGORITHM = "HS256"
-
+admin_required = RoleChecker(["admin"])
 
 class LoginRequest(BaseModel):
     username: str
@@ -30,13 +31,65 @@ class PasswordUpdate(BaseModel):
     current_password: str
     new_password: str
 
+class GoogleToken(BaseModel):
+    token: str
+    
+@router.post("/google")
+async def google_login(body: GoogleToken):
+    try:
+        #valida o token vindo do frontend
+        idinfo = id_token.verify_oauth2_token(body.token, requests.Request(), os.getenv("GOOGLE_CLIENT_ID"))
+        # Extrai o email do token
+        email = idinfo.get("email")
+        name = idinfo.get("name", "User")
+        db = get_client()
+        user_query = db.table("users").select("*").eq("username", email.lower()).execute()
+        user_data = user_query.data
+
+        if not user_data:
+            # Se não existe, cria um novo (padrão student)
+            new_user = {
+                "username": email.lower(),
+                "name": name,
+                "password": "google_authenticated", # Senha dummy
+                "role": "student",
+                "created_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+            }
+            db.table("users").insert(new_user).execute()
+            user = new_user
+        else:
+            user = user_data[0]
+
+        # 3. Gera o SEU JWT (exatamente como você fez no seu login)
+        payload = {
+            "sub": user["username"],
+            "role": user["role"], # Aqui o 'admin' será respeitado se estiver no banco
+            "exp": dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=24),
+        }
+        
+        my_token = jwt.encode(payload, JWT_SECRET_KEY, algorithm=ALGORITHM)
+
+        return {
+            "access_token": my_token,
+            "token_type": "bearer",
+            "user": user
+        }
+
+    except ValueError:
+        # Se o token do Google for forjado ou expirado
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token do Google inválido"
+        )
+
 @router.post("/login")
-async def login(body: LoginRequest):
-    user = await authenticate_user(body.username, body.password)
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = await authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuário ou senha incorretos"
+            detail="Usuário ou senha incorretos",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     payload = {
@@ -45,7 +98,11 @@ async def login(body: LoginRequest):
         "exp": dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=24),
     }
     token = jwt.encode(payload, JWT_SECRET_KEY, algorithm=ALGORITHM)
-    return {"token": token, "user": user}
+    return {
+        "access_token": token, 
+        "token_type": "bearer",
+        "user": user 
+    }
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(body: RegisterRequest):
@@ -127,6 +184,9 @@ async def change_password(body: PasswordUpdate, current_user: dict = Depends(get
 
     return {"ok": True}
 
+@router.get("/config-do-sistema")
+async def get_system_config(current_user: dict = Depends(admin_required)):
+    return {"message": f"Bem-vindo ao painel de controle, {current_user['username']}!"}
 
 @router.get("/me")
 async def me(current_user: dict = Depends(get_current_user)):
