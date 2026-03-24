@@ -15,6 +15,15 @@
     --shadow:        0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
+/* Seleciona o input quando autocompletado */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus {
+    box-shadow: 0 0 0px 1000px var(--input-bg) inset;
+    -webkit-text-fill-color: var(--text);
+    transition: background-color 5000s ease-in-out 0s;
+}
+
 [data-theme="light"] {
     --bg:            #f5f3ff;
     --bg-secondary:  #ede9fe;
