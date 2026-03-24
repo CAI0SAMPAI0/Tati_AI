@@ -1,430 +1,122 @@
 <!DOCTYPE html>
-<html lang="pt-br">
-
+<html lang="pt-br" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tati AI - Sua Professora de Inglês</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Tati AI — Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles/global.css">
+    <link rel="stylesheet" href="styles/login.css">
 </head>
-
 <body>
-    <div class="app-container">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <h2 style="margin-bottom: 2rem; color: var(--primary);">Tati AI</h2>
-            <button onclick="newChat()" id="btn-new-chat" class="send-btn" style="width: 100%; margin-bottom: 1.5rem;">
-                <i class="fas fa-plus"></i> Nova Conversa
-            </button>
-            <div id="conv-list" style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1; overflow-y: auto;">
-                <p style="color: var(--text-dim); font-size: 0.9rem;">Carregando...</p>
-            </div>
 
-            <!-- Dashboard Button (Visible for Prof/Prog) -->
-            <button id="btn-dash" onclick="toggleDashboard()" class="conv-item"
-                style="margin-top: 1rem; display: none; text-align: center; border-color: #ffd666; color: #ffd666;">
-                <i class="fas fa-chart-line"></i> Dashboard
-            </button>
-        </aside>
+    <button class="theme-toggle" onclick="toggleTheme()">
+        <span id="theme-icon">☀️</span>
+    </button>
 
-        <!-- Main Chat Area -->
-        <main class="main-chat">
-            <!-- Dashboard View -->
-            <div id="dashboard" class="dashboard-view">
-                <span class="close-dash" onclick="toggleDashboard()">&times;</span>
-                <h2 id="dash-title">Painel de Controle</h2>
-                <div class="stats-grid" id="stats-container">
-                    <!-- Stats appear here -->
+    <div class="login-page">
+
+        <!-- ── Lado esquerdo ── -->
+        <div class="login-left">
+            <div class="login-left-content">
+                <img
+                    src="images/tati_logo.jpg"
+                    alt="Teacher Tati"
+                    class="login-avatar"
+                    onerror="this.style.display='none'; document.getElementById('avatar-fallback').style.display='flex';"
+                >
+                <div id="avatar-fallback" class="login-avatar-fallback" style="display:none;">🧑‍🏫</div>
+                <h1>Teacher Tati</h1>
+                <p>Sua professora de inglês com inteligência artificial. Pratique quando quiser, no seu ritmo.</p>
+                <div class="login-dots">
+                    <span></span><span></span><span></span>
                 </div>
             </div>
+        </div>
 
-            <header class="chat-header">
-                <div class="tati-info">
-                    <div class="avatar">T</div>
-                    <div>
-                        <h3 id="tati-name" style="font-size: 1.1rem;">Teacher Tati</h3>
-                        <p id="status-online" style="font-size: 0.8rem; color: #10b981;">● Online</p>
+        <!-- ── Lado direito ── -->
+        <div class="login-right">
+            <div class="login-form-wrap">
+
+                <h2>Bem-vindo</h2>
+                <p class="subtitle">Entre na sua conta ou crie uma nova</p>
+
+                <!-- Abas -->
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="login" onclick="switchTab('login')">
+                        Entrar
+                    </button>
+                    <button class="tab-btn" data-tab="register" onclick="switchTab('register')">
+                        Criar Conta
+                    </button>
+                </div>
+
+                <!-- Mensagens -->
+                <div class="error-msg"   id="error-msg"></div>
+                <div class="success-msg" id="success-msg"></div>
+
+                <!-- Google -->
+                <button class="btn-google" onclick="handleGoogle()">
+                    <svg width="18" height="18" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Continuar com Google
+                </button>
+
+                <div class="divider">ou</div>
+
+                <!-- Form Login -->
+                <form id="form-login" onsubmit="handleLogin(event)">
+                    <div class="field">
+                        <label>Username</label>
+                        <input id="login-username" type="text" placeholder="seu.usuario" autocomplete="username">
                     </div>
-                </div>
-                <div class="header-actions">
-                    <button onclick="toggleSettings()" title="Configurações"
-                        style="background:none; border:none; color:var(--text-dim); cursor:pointer; margin-right: 1rem;">
-                        <i class="fas fa-cog"></i>
-                    </button>
-                    <button onclick="logout()" title="Sair"
-                        style="background:none; border:none; color:var(--text-dim); cursor:pointer;">
-                        <i class="fas fa-sign-out-alt"></i>
-                    </button>
-                </div>
-            </header>
+                    <div class="field">
+                        <label>Senha</label>
+                        <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password">
+                    </div>
+                    <button type="submit" class="btn-primary" id="btn-login">Entrar</button>
+                </form>
 
-            <div id="messages" class="messages-container">
-                <div class="message message-assistant" id="welcome-msg">
-                    Hello! I'm Tati. Ready to practice some English today?
-                </div>
-            </div>
+                <!-- Form Cadastro -->
+                <form id="form-register" style="display:none;" onsubmit="handleRegister(event)">
+                    <div class="field">
+                        <label>Nome completo</label>
+                        <input id="reg-name" type="text" placeholder="João Silva">
+                    </div>
+                    <div class="field">
+                        <label>E-mail</label>
+                        <input id="reg-email" type="email" placeholder="joao@email.com">
+                    </div>
+                    <div class="field">
+                        <label>Username</label>
+                        <input id="reg-username" type="text" placeholder="joao.silva">
+                    </div>
+                    <div class="field">
+                        <label>Senha</label>
+                        <input id="reg-password" type="password" placeholder="mínimo 6 caracteres">
+                    </div>
+                    <div class="field">
+                        <label>Nível de inglês</label>
+                        <select id="reg-level">
+                            <option value="Beginner">Beginner</option>
+                            <option value="Pre-Intermediate">Pre-Intermediate</option>
+                            <option value="Intermediate">Intermediate</option>
+                            <option value="Business English">Business English</option>
+                            <option value="Advanced">Advanced</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary" id="btn-register">Criar Conta</button>
+                </form>
 
-            <div id="file-preview" class="file-preview-bar">
-                <div id="file-thumb-container"><i class="fas fa-file-alt"></i></div>
-                <span id="file-name">Arquivo.pdf</span>
-                <span class="remove-file-btn" onclick="clearFile()">&times;</span>
-            </div>
-
-            <div class="chat-input-area">
-                <button id="file-btn" class="mic-btn" style="background:none; border:none; color:var(--text-dim);"
-                    title="Anexar Arquivo" onclick="document.getElementById('file-input').click()">
-                    <i class="fas fa-paperclip"></i>
-                </button>
-                <input type="file" id="file-input" style="display:none;" onchange="handleFile(event)">
-                <button id="mic-btn" class="mic-btn" title="Gravar Áudio">
-                    <i class="fas fa-microphone"></i>
-                </button>
-                <div class="input-wrapper">
-                    <input type="text" id="user-input" placeholder="Digite sua mensagem..."
-                        onkeypress="handleKey(event)">
-                </div>
-                <button onclick="sendMessage()" class="send-btn">
-                    <i class="fas fa-paper-plane"></i>
-                </button>
-            </div>
-        </main>
-    </div>
-
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="modal-overlay" onclick="toggleSettings()">
-        <div class="modal-content" onclick="event.stopPropagation()">
-            <h2 id="settings-title" style="margin-bottom: 1.5rem;">Configurações</h2>
-            <div class="setting-row">
-                <span id="lang-label">Idioma do Site</span>
-                <select id="lang-select" onchange="changeLang(this.value)"
-                    style="background:var(--card-bg); color:white; border:1px solid var(--glass-border); padding:0.5rem; border-radius:0.5rem;">
-                    <option value="pt">Português</option>
-                    <option value="en">English</option>
-                </select>
-            </div>
-            <div class="setting-row" style="margin-top: 2rem;">
-                <button onclick="toggleSettings()" class="send-btn" style="width: 100%;"
-                    id="btn-close-settings">Fechar</button>
             </div>
         </div>
     </div>
 
-    <script>
-        let ws;
-        let token = localStorage.getItem("token");
-        let userData = JSON.parse(localStorage.getItem("user") || "{}");
-        let currentConvId = null;
-        let mediaRecorder;
-        let audioChunks = [];
-        let isRecording = false;
-        let currentAssistantBubble = null;
-        let currentAudio = null;
-        let currentAudioBtn = null;
-        let pendingFile = null;
-        let siteLang = localStorage.getItem("siteLang") || "pt";
-
-        const i18n = {
-            pt: {
-                welcome: "Olá! Sou a Tati. Pronta para praticar inglês hoje?",
-                settings: "Configurações",
-                lang: "Idioma do Site",
-                newChat: "Nova Conversa",
-                placeholder: "Digite sua mensagem...",
-                status: "● Online",
-                close: "Fechar",
-                loaded: "Conversa carregada.",
-                dashboard: "Painel",
-                dashTitle: "Estatísticas de "
-            },
-            en: {
-                welcome: "Hello! I'm Tati. Ready to practice some English today?",
-                settings: "Settings",
-                lang: "Site Language",
-                newChat: "New Conversation",
-                placeholder: "Type your message...",
-                status: "● Online",
-                close: "Close",
-                loaded: "Conversation loaded.",
-                dashboard: "Dashboard",
-                dashTitle: "Stats for "
-            }
-        };
-
-        // Login Check
-        if (!token) {
-            const user = prompt("Username:");
-            const pass = prompt("Password:");
-            if (user && pass) {
-                fetch("http://localhost:8000/auth/login", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ username: user, password: pass })
-                })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.token) {
-                            localStorage.setItem("token", data.token);
-                            localStorage.setItem("user", JSON.stringify(data.user));
-                            location.reload();
-                        } else alert("Erro no login");
-                    });
-            }
-        }
-
-        function updateUI() {
-            const texts = i18n[siteLang];
-            document.getElementById("settings-title").innerText = texts.settings;
-            document.getElementById("lang-label").innerText = texts.lang;
-            document.getElementById("status-online").innerText = texts.status;
-            document.getElementById("user-input").placeholder = texts.placeholder;
-            document.getElementById("btn-new-chat").innerHTML = `<i class="fas fa-plus"></i> ${texts.newChat}`;
-            document.getElementById("btn-close-settings").innerText = texts.close;
-            document.getElementById("welcome-msg").innerText = texts.welcome;
-
-            // Show Dashboard button if Prof/Prog
-            const role = userData.role;
-            if (role === "professor" || role === "programador") {
-                const btn = document.getElementById("btn-dash");
-                btn.style.display = "block";
-                btn.innerHTML = `<i class="fas fa-chart-line"></i> ${texts.dashboard}`;
-                document.getElementById("dash-title").innerText = texts.dashTitle + role.toUpperCase();
-                renderStats(role);
-            }
-        }
-
-        function renderStats(role) {
-            const container = document.getElementById("stats-container");
-            container.innerHTML = "";
-            const stats = role === "professor" ? [
-                { label: "Total Alunos", val: "12" },
-                { label: "Prática Hoje", val: "4h" },
-                { label: "Satisfação", val: "98%" }
-            ] : [
-                { label: "Uso de Tokens", val: "15.4k" },
-                { label: "Latência Média", val: "1.2s" },
-                { label: "Erros API", val: "2" }
-            ];
-            stats.forEach(s => {
-                container.innerHTML += `<div class="stat-card"><h4>${s.label}</h4><p>${s.val}</p></div>`;
-            });
-        }
-
-        function changeLang(val) {
-            siteLang = val;
-            localStorage.setItem("siteLang", val);
-            updateUI();
-        }
-
-        function toggleSettings() {
-            const modal = document.getElementById("settings-modal");
-            modal.style.display = modal.style.display === "flex" ? "none" : "flex";
-            document.getElementById("lang-select").value = siteLang;
-        }
-
-        function toggleDashboard() {
-            const dash = document.getElementById("dashboard");
-            dash.style.display = dash.style.display === "block" ? "none" : "block";
-        }
-
-        function logout() {
-            localStorage.clear();
-            location.reload();
-        }
-
-        // WebSocket & Chat Logic
-        function initWS() {
-            if (!token) return;
-            ws = new WebSocket(`ws://127.0.0.1:8000/chat/ws?token=${token}`);
-
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                if (data.type === "transcription") addMessage(data.text, 'user', true);
-                else if (data.type === "stream_start") createAssistantBubble(data.conversation_id);
-                else if (data.type === "stream_token") {
-                    if (currentAssistantBubble) {
-                        currentAssistantBubble.innerHTML += data.token;
-                        document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
-                    }
-                } else if (data.type === "audio_response") {
-                    const bubble = currentAssistantBubble ? currentAssistantBubble.parentElement : null;
-                    if (bubble) {
-                        bubble.dataset.audio = data.audio;
-                        const btn = bubble.querySelector(".play-msg-btn");
-                        if (btn) playAudio(data.audio, btn);
-                    }
-                }
-            };
-        }
-
-        function addMessage(text, role, isTemp = false) {
-            const container = document.getElementById("messages");
-            if (isTemp) { const old = document.getElementById("temp-user-msg"); if (old) old.remove(); }
-            const div = document.createElement("div");
-            div.className = `message message-${role}`;
-            div.innerText = text;
-            if (isTemp) div.id = "temp-user-msg";
-            container.appendChild(div);
-            container.scrollTop = container.scrollHeight;
-        }
-
-        function createAssistantBubble(convId) {
-            const container = document.getElementById("messages");
-            const div = document.createElement("div");
-            div.className = "message message-assistant";
-            const content = document.createElement("div");
-            content.className = "msg-text";
-            div.appendChild(content);
-            const playBtn = document.createElement("button");
-            playBtn.className = "play-msg-btn";
-            playBtn.innerHTML = '<i class="fas fa-play"></i>';
-            playBtn.onclick = () => { const audio = div.dataset.audio; if (audio) playAudio(audio, playBtn); };
-            div.appendChild(playBtn);
-            container.appendChild(div);
-            currentAssistantBubble = content;
-            container.scrollTop = container.scrollHeight;
-        }
-
-        function sendMessage() {
-            const input = document.getElementById("user-input");
-            const text = input.value.trim();
-            if ((!text && !pendingFile) || !currentConvId) return;
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                if (pendingFile) {
-                    ws.send(JSON.stringify({ type: "file", filename: pendingFile.name, content: pendingFile.base64, conversation_id: currentConvId }));
-                    addMessage(`File: ${pendingFile.name}`, 'user');
-                    clearFile();
-                }
-                if (text) {
-                    ws.send(JSON.stringify({ type: "text", content: text, conversation_id: currentConvId }));
-                    addMessage(text, 'user');
-                }
-                input.value = "";
-            }
-        }
-
-        function handleKey(e) { if (e.key === "Enter") sendMessage(); }
-
-        function playAudio(base64, btn) {
-            if (currentAudio && currentAudioBtn === btn) {
-                if (!currentAudio.paused) { currentAudio.pause(); btn.innerHTML = '<i class="fas fa-play"></i>'; return; }
-                else { currentAudio.play(); btn.innerHTML = '<i class="fas fa-pause"></i>'; return; }
-            }
-            if (currentAudio) { currentAudio.pause(); if (currentAudioBtn) currentAudioBtn.innerHTML = '<i class="fas fa-play"></i>'; }
-            const blob = b64toBlob(base64, "audio/mpeg");
-            const url = URL.createObjectURL(blob);
-            currentAudio = new Audio(url);
-            currentAudioBtn = btn;
-            currentAudio.onplay = () => btn.innerHTML = '<i class="fas fa-pause"></i>';
-            currentAudio.onended = () => { btn.innerHTML = '<i class="fas fa-play"></i>'; currentAudio = null; currentAudioBtn = null; };
-            currentAudio.play();
-        }
-
-        function b64toBlob(b64Data, contentType = '', sliceSize = 512) {
-            const byteCharacters = atob(b64Data);
-            const byteArrays = [];
-            for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
-                const slice = byteCharacters.slice(offset, offset + sliceSize);
-                const byteNumbers = new Array(slice.length);
-                for (let i = 0; i < slice.length; i++) byteNumbers[i] = slice.charCodeAt(i);
-                byteArrays.push(new Uint8Array(byteNumbers));
-            }
-            return new Blob(byteArrays, { type: contentType });
-        }
-
-        // File & Media
-        const micBtn = document.getElementById("mic-btn");
-        micBtn.onclick = async () => {
-            if (!isRecording) {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream);
-                    audioChunks = [];
-                    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-                    mediaRecorder.onstop = () => {
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                        const reader = new FileReader();
-                        reader.readAsDataURL(audioBlob);
-                        reader.onloadend = () => {
-                            const base64 = reader.result.split(',')[1];
-                            if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "audio", audio: base64, conversation_id: currentConvId }));
-                        };
-                    };
-                    mediaRecorder.start();
-                    micBtn.classList.add("recording");
-                    isRecording = true;
-                } catch (err) { alert("Mic error: " + err); }
-            } else { mediaRecorder.stop(); micBtn.classList.remove("recording"); isRecording = false; }
-        };
-
-        function handleFile(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = e => {
-                pendingFile = { name: file.name, base64: e.target.result.split(',')[1] };
-                document.getElementById("file-name").innerText = file.name;
-                const thumbContainer = document.getElementById("file-thumb-container");
-                if (file.type.startsWith("image/")) thumbContainer.innerHTML = `<img src="${e.target.result}" class="file-thumb">`;
-                else thumbContainer.innerHTML = `<i class="fas fa-file-alt"></i>`;
-                document.getElementById("file-preview").style.display = "flex";
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function clearFile() {
-            pendingFile = null;
-            document.getElementById("file-input").value = "";
-            document.getElementById("file-preview").style.display = "none";
-        }
-
-        // Conv List
-        async function loadConversations() {
-            try {
-                const res = await fetch("http://127.0.0.1:8000/chat/conversations", { headers: { "Authorization": `Bearer ${token}` } });
-                const data = await res.json();
-                const list = document.getElementById("conv-list");
-                list.innerHTML = "";
-                data.forEach(c => {
-                    const b = document.createElement("div");
-                    b.className = "conv-item" + (c.id === currentConvId ? " active" : "");
-                    b.innerText = c.title;
-                    b.onclick = () => selectConv(c.id);
-                    list.appendChild(b);
-                });
-                if (data.length > 0 && !currentConvId) selectConv(data[0].id);
-            } catch (e) { }
-        }
-
-        function selectConv(id) {
-            currentConvId = id;
-            const msgContainer = document.getElementById("messages");
-            msgContainer.innerHTML = `<small id="hint" style="color:var(--text-dim)">${i18n[siteLang].loaded}</small>`;
-            loadConversations();
-            setTimeout(() => { const h = document.getElementById("hint"); if (h) h.remove(); }, 1500);
-        }
-
-        async function newChat() {
-            const res = await fetch("http://127.0.0.1:8000/chat/conversations", {
-                method: "POST", headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-                body: JSON.stringify({ title: "Nova Prática" })
-            });
-            const data = await res.json();
-            currentConvId = data.id;
-            document.getElementById("messages").innerHTML = "";
-            await loadConversations();
-        }
-
-        // verifica se está logado antes de inicializar
-        if (token) {
-            updateUI();
-            initWS();
-            loadConversations();
-        } else {
-            updateUI();
-        }
-    </script>
+    <script src="js/auth.js"></script>
 </body>
-
 </html>
