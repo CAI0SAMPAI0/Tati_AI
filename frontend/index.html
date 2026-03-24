@@ -1,21 +1,415 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tati AI - Sua Professora de Inglês</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
 <body>
-    <input id="msg" placeholder="Digite uma mensagem">
-    <button onclick="send()">Enviar</button>
-    <div id="output"></div>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <h2 style="margin-bottom: 2rem; color: var(--primary);">Tati AI</h2>
+            <button onclick="newChat()" id="btn-new-chat" class="send-btn" style="width: 100%; margin-bottom: 1.5rem;">
+                <i class="fas fa-plus"></i> Nova Conversa
+            </button>
+            <div id="conv-list" style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1; overflow-y: auto;">
+                <p style="color: var(--text-dim); font-size: 0.9rem;">Carregando...</p>
+            </div>
+            
+            <!-- Dashboard Button (Visible for Prof/Prog) -->
+            <button id="btn-dash" onclick="toggleDashboard()" class="conv-item" style="margin-top: 1rem; display: none; text-align: center; border-color: #ffd666; color: #ffd666;">
+                <i class="fas fa-chart-line"></i> Dashboard
+            </button>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="main-chat">
+            <!-- Dashboard View -->
+            <div id="dashboard" class="dashboard-view">
+                <span class="close-dash" onclick="toggleDashboard()">&times;</span>
+                <h2 id="dash-title">Painel de Controle</h2>
+                <div class="stats-grid" id="stats-container">
+                    <!-- Stats appear here -->
+                </div>
+            </div>
+
+            <header class="chat-header">
+                <div class="tati-info">
+                    <div class="avatar">T</div>
+                    <div>
+                        <h3 id="tati-name" style="font-size: 1.1rem;">Teacher Tati</h3>
+                        <p id="status-online" style="font-size: 0.8rem; color: #10b981;">● Online</p>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button onclick="toggleSettings()" title="Configurações" style="background:none; border:none; color:var(--text-dim); cursor:pointer; margin-right: 1rem;">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    <button onclick="logout()" title="Sair" style="background:none; border:none; color:var(--text-dim); cursor:pointer;">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </header>
+
+            <div id="messages" class="messages-container">
+                <div class="message message-assistant" id="welcome-msg">
+                    Hello! I'm Tati. Ready to practice some English today?
+                </div>
+            </div>
+
+            <div id="file-preview" class="file-preview-bar">
+                <div id="file-thumb-container"><i class="fas fa-file-alt"></i></div>
+                <span id="file-name">Arquivo.pdf</span>
+                <span class="remove-file-btn" onclick="clearFile()">&times;</span>
+            </div>
+
+            <div class="chat-input-area">
+                <button id="file-btn" class="mic-btn" style="background:none; border:none; color:var(--text-dim);" title="Anexar Arquivo" onclick="document.getElementById('file-input').click()">
+                    <i class="fas fa-paperclip"></i>
+                </button>
+                <input type="file" id="file-input" style="display:none;" onchange="handleFile(event)">
+                <button id="mic-btn" class="mic-btn" title="Gravar Áudio">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <div class="input-wrapper">
+                    <input type="text" id="user-input" placeholder="Digite sua mensagem..." onkeypress="handleKey(event)">
+                </div>
+                <button onclick="sendMessage()" class="send-btn">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay" onclick="toggleSettings()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <h2 id="settings-title" style="margin-bottom: 1.5rem;">Configurações</h2>
+            <div class="setting-row">
+                <span id="lang-label">Idioma do Site</span>
+                <select id="lang-select" onchange="changeLang(this.value)" style="background:var(--card-bg); color:white; border:1px solid var(--glass-border); padding:0.5rem; border-radius:0.5rem;">
+                    <option value="pt">Português</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+            <div class="setting-row" style="margin-top: 2rem;">
+                <button onclick="toggleSettings()" class="send-btn" style="width: 100%;" id="btn-close-settings">Fechar</button>
+            </div>
+        </div>
+    </div>
 
     <script>
-        const ws = new WebSocket("ws://localhost:8000/chat/ws")
-        
-        ws.onmessage = (event) => {
-            document.getElementById("output").innerHTML += `<p>${event.data}</p>`
+        let ws;
+        let token = localStorage.getItem("token");
+        let userData = JSON.parse(localStorage.getItem("user") || "{}");
+        let currentConvId = null;
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        let currentAssistantBubble = null;
+        let currentAudio = null;
+        let currentAudioBtn = null;
+        let pendingFile = null;
+        let siteLang = localStorage.getItem("siteLang") || "pt";
+
+        const i18n = {
+            pt: {
+                welcome: "Olá! Sou a Tati. Pronta para praticar inglês hoje?",
+                settings: "Configurações",
+                lang: "Idioma do Site",
+                newChat: "Nova Conversa",
+                placeholder: "Digite sua mensagem...",
+                status: "● Online",
+                close: "Fechar",
+                loaded: "Conversa carregada.",
+                dashboard: "Painel",
+                dashTitle: "Estatísticas de "
+            },
+            en: {
+                welcome: "Hello! I'm Tati. Ready to practice some English today?",
+                settings: "Settings",
+                lang: "Site Language",
+                newChat: "New Conversation",
+                placeholder: "Type your message...",
+                status: "● Online",
+                close: "Close",
+                loaded: "Conversation loaded.",
+                dashboard: "Dashboard",
+                dashTitle: "Stats for "
+            }
+        };
+
+        // Login Check
+        if (!token) {
+            const user = prompt("Username:");
+            const pass = prompt("Password:");
+            if (user && pass) {
+                fetch("http://localhost:8000/auth/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username: user, password: pass })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.token) {
+                        localStorage.setItem("token", data.token);
+                        localStorage.setItem("user", JSON.stringify(data.user));
+                        location.reload();
+                    } else alert("Erro no login");
+                });
+            }
         }
 
-        function send() {
-            const msg = document.getElementById("msg").value
-            ws.send(msg)
+        function updateUI() {
+            const texts = i18n[siteLang];
+            document.getElementById("settings-title").innerText = texts.settings;
+            document.getElementById("lang-label").innerText = texts.lang;
+            document.getElementById("status-online").innerText = texts.status;
+            document.getElementById("user-input").placeholder = texts.placeholder;
+            document.getElementById("btn-new-chat").innerHTML = `<i class="fas fa-plus"></i> ${texts.newChat}`;
+            document.getElementById("btn-close-settings").innerText = texts.close;
+            document.getElementById("welcome-msg").innerText = texts.welcome;
+            
+            // Show Dashboard button if Prof/Prog
+            const role = userData.role;
+            if (role === "professor" || role === "programador") {
+                const btn = document.getElementById("btn-dash");
+                btn.style.display = "block";
+                btn.innerHTML = `<i class="fas fa-chart-line"></i> ${texts.dashboard}`;
+                document.getElementById("dash-title").innerText = texts.dashTitle + role.toUpperCase();
+                renderStats(role);
+            }
         }
+
+        function renderStats(role) {
+            const container = document.getElementById("stats-container");
+            container.innerHTML = "";
+            const stats = role === "professor" ? [
+                { label: "Total Alunos", val: "12" },
+                { label: "Prática Hoje", val: "4h" },
+                { label: "Satisfação", val: "98%" }
+            ] : [
+                { label: "Uso de Tokens", val: "15.4k" },
+                { label: "Latência Média", val: "1.2s" },
+                { label: "Erros API", val: "2" }
+            ];
+            stats.forEach(s => {
+                container.innerHTML += `<div class="stat-card"><h4>${s.label}</h4><p>${s.val}</p></div>`;
+            });
+        }
+
+        function changeLang(val) {
+            siteLang = val;
+            localStorage.setItem("siteLang", val);
+            updateUI();
+        }
+
+        function toggleSettings() {
+            const modal = document.getElementById("settings-modal");
+            modal.style.display = modal.style.display === "flex" ? "none" : "flex";
+            document.getElementById("lang-select").value = siteLang;
+        }
+
+        function toggleDashboard() {
+            const dash = document.getElementById("dashboard");
+            dash.style.display = dash.style.display === "block" ? "none" : "block";
+        }
+
+        function logout() {
+            localStorage.clear();
+            location.reload();
+        }
+
+        // WebSocket & Chat Logic
+        function initWS() {
+            if (!token) return;
+            ws = new WebSocket(`ws://localhost:8000/chat/ws?token=${token}`);
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === "transcription") addMessage(data.text, 'user', true);
+                else if (data.type === "stream_start") createAssistantBubble(data.conversation_id);
+                else if (data.type === "stream_token") {
+                    if (currentAssistantBubble) {
+                        currentAssistantBubble.innerHTML += data.token;
+                        document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
+                    }
+                } else if (data.type === "audio_response") {
+                    const bubble = currentAssistantBubble ? currentAssistantBubble.parentElement : null;
+                    if (bubble) {
+                        bubble.dataset.audio = data.audio;
+                        const btn = bubble.querySelector(".play-msg-btn");
+                        if (btn) playAudio(data.audio, btn);
+                    }
+                }
+            };
+        }
+
+        function addMessage(text, role, isTemp = false) {
+            const container = document.getElementById("messages");
+            if (isTemp) { const old = document.getElementById("temp-user-msg"); if (old) old.remove(); }
+            const div = document.createElement("div");
+            div.className = `message message-${role}`;
+            div.innerText = text;
+            if (isTemp) div.id = "temp-user-msg";
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function createAssistantBubble(convId) {
+            const container = document.getElementById("messages");
+            const div = document.createElement("div");
+            div.className = "message message-assistant";
+            const content = document.createElement("div");
+            content.className = "msg-text";
+            div.appendChild(content);
+            const playBtn = document.createElement("button");
+            playBtn.className = "play-msg-btn";
+            playBtn.innerHTML = '<i class="fas fa-play"></i>';
+            playBtn.onclick = () => { const audio = div.dataset.audio; if (audio) playAudio(audio, playBtn); };
+            div.appendChild(playBtn);
+            container.appendChild(div);
+            currentAssistantBubble = content;
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function sendMessage() {
+            const input = document.getElementById("user-input");
+            const text = input.value.trim();
+            if ((!text && !pendingFile) || !currentConvId) return;
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                if (pendingFile) {
+                    ws.send(JSON.stringify({ type: "file", filename: pendingFile.name, content: pendingFile.base64, conversation_id: currentConvId }));
+                    addMessage(`File: ${pendingFile.name}`, 'user');
+                    clearFile();
+                }
+                if (text) {
+                    ws.send(JSON.stringify({ type: "text", content: text, conversation_id: currentConvId }));
+                    addMessage(text, 'user');
+                }
+                input.value = "";
+            }
+        }
+
+        function handleKey(e) { if (e.key === "Enter") sendMessage(); }
+
+        function playAudio(base64, btn) {
+            if (currentAudio && currentAudioBtn === btn) {
+                if (!currentAudio.paused) { currentAudio.pause(); btn.innerHTML = '<i class="fas fa-play"></i>'; return; }
+                else { currentAudio.play(); btn.innerHTML = '<i class="fas fa-pause"></i>'; return; }
+            }
+            if (currentAudio) { currentAudio.pause(); if (currentAudioBtn) currentAudioBtn.innerHTML = '<i class="fas fa-play"></i>'; }
+            const blob = b64toBlob(base64, "audio/mpeg");
+            const url = URL.createObjectURL(blob);
+            currentAudio = new Audio(url);
+            currentAudioBtn = btn;
+            currentAudio.onplay = () => btn.innerHTML = '<i class="fas fa-pause"></i>';
+            currentAudio.onended = () => { btn.innerHTML = '<i class="fas fa-play"></i>'; currentAudio = null; currentAudioBtn = null; };
+            currentAudio.play();
+        }
+
+        function b64toBlob(b64Data, contentType = '', sliceSize = 512) {
+            const byteCharacters = atob(b64Data);
+            const byteArrays = [];
+            for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+                const slice = byteCharacters.slice(offset, offset + sliceSize);
+                const byteNumbers = new Array(slice.length);
+                for (let i = 0; i < slice.length; i++) byteNumbers[i] = slice.charCodeAt(i);
+                byteArrays.push(new Uint8Array(byteNumbers));
+            }
+            return new Blob(byteArrays, { type: contentType });
+        }
+
+        // File & Media
+        const micBtn = document.getElementById("mic-btn");
+        micBtn.onclick = async () => {
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const reader = new FileReader();
+                        reader.readAsDataURL(audioBlob);
+                        reader.onloadend = () => {
+                            const base64 = reader.result.split(',')[1];
+                            if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "audio", audio: base64, conversation_id: currentConvId }));
+                        };
+                    };
+                    mediaRecorder.start();
+                    micBtn.classList.add("recording");
+                    isRecording = true;
+                } catch (err) { alert("Mic error: " + err); }
+            } else { mediaRecorder.stop(); micBtn.classList.remove("recording"); isRecording = false; }
+        };
+
+        function handleFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = e => {
+                pendingFile = { name: file.name, base64: e.target.result.split(',')[1] };
+                document.getElementById("file-name").innerText = file.name;
+                const thumbContainer = document.getElementById("file-thumb-container");
+                if (file.type.startsWith("image/")) thumbContainer.innerHTML = `<img src="${e.target.result}" class="file-thumb">`;
+                else thumbContainer.innerHTML = `<i class="fas fa-file-alt"></i>`;
+                document.getElementById("file-preview").style.display = "flex";
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearFile() {
+            pendingFile = null;
+            document.getElementById("file-input").value = "";
+            document.getElementById("file-preview").style.display = "none";
+        }
+
+        // Conv List
+        async function loadConversations() {
+            try {
+                const res = await fetch("http://localhost:8000/chat/conversations", { headers: { "Authorization": `Bearer ${token}` } });
+                const data = await res.json();
+                const list = document.getElementById("conv-list");
+                list.innerHTML = "";
+                data.forEach(c => {
+                    const b = document.createElement("div");
+                    b.className = "conv-item" + (c.id === currentConvId ? " active" : "");
+                    b.innerText = c.title;
+                    b.onclick = () => selectConv(c.id);
+                    list.appendChild(b);
+                });
+                if (data.length > 0 && !currentConvId) selectConv(data[0].id);
+            } catch (e) {}
+        }
+
+        function selectConv(id) {
+            currentConvId = id;
+            const msgContainer = document.getElementById("messages");
+            msgContainer.innerHTML = `<small id="hint" style="color:var(--text-dim)">${i18n[siteLang].loaded}</small>`;
+            loadConversations();
+            setTimeout(() => { const h = document.getElementById("hint"); if (h) h.remove(); }, 1500);
+        }
+
+        async function newChat() {
+            const res = await fetch("http://localhost:8000/chat/conversations", {
+                method: "POST", headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ title: "Nova Prática" })
+            });
+            const data = await res.json();
+            currentConvId = data.id;
+            document.getElementById("messages").innerHTML = "";
+            await loadConversations();
+        }
+
+        updateUI();
+        initWS();
+        loadConversations();
     </script>
 </body>
 </html>
