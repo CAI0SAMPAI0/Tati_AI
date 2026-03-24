@@ -1,0 +1,70 @@
+:root {
+    /* Roxo base */
+    --primary:       #7c3aed;
+    --primary-hover: #6d28d9;
+    --primary-light: #ede9fe;
+
+    /* Modo escuro (padrão) */
+    --bg:            #0f0a1e;
+    --bg-secondary:  #1a1030;
+    --card:          #1e1535;
+    --border:        rgba(124, 58, 237, 0.2);
+    --text:          #f1f0f5;
+    --text-muted:    #9ca3af;
+    --input-bg:      #150e28;
+    --shadow:        0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="light"] {
+    --bg:            #f5f3ff;
+    --bg-secondary:  #ede9fe;
+    --card:          #ffffff;
+    --border:        rgba(124, 58, 237, 0.25);
+    --text:          #1a1030;
+    --text-muted:    #6b7280;
+    --input-bg:      #f9f7ff;
+    --shadow:        0 8px 32px rgba(124, 58, 237, 0.12);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    transition: background 0.3s, color 0.3s;
+}
+
+/* Botão tema claro/escuro */
+.theme-toggle {
+    position: fixed;
+    top: 1.25rem;
+    right: 1.25rem;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    transition: all 0.2s;
+    z-index: 100;
+}
+
+.theme-toggle:hover {
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
+html{
+    scroll-behavior: smooth;
+    scroll-padding-top: 80px;
+}
