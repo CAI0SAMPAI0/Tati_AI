@@ -17,7 +17,9 @@ def get_current_user(
 
     try:
         payload = jwt.decode(token, secret, algorithms=[ALGORITHM])
-        return {"username": payload["sub"]}
+        return {"username": payload["sub"],
+                "role": payload.get("role", "student"),
+        }
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -114,8 +114,7 @@ async def stream_claude(system: str, history: list[Message]) -> AsyncIterator[st
 
 async def stream_gemini(system: str, history: list[Message]) -> AsyncIterator[str]:
     """Gera tokens via Google Gemini streaming."""
-    # Nota: a lib genai 1.0+ tem configuração diferente
-    # Aqui assumimos que GOOGLE_API_KEY está correto
+    import asyncio
     client = genai.Client(api_key=GOOGLE_API_KEY)
     
     # Converte para o formato do Gemini
@@ -125,18 +124,23 @@ async def stream_gemini(system: str, history: list[Message]) -> AsyncIterator[st
         gemini_history.append({"role": role, "parts": [{"text": msg["content"]}]})
 
     last_message = history[-1]["content"] if history else ""
-
-    response = client.models.generate_content_stream(
-        model=GEMINI_MODEL,
-        contents=gemini_history + [{"role": "user", "parts": [{"text": last_message}]}],
-        config=types.GenerateContentConfig(
-            system_instruction=system,
+    def _sync_stream():
+        chunks = []
+        response = client.models.generate_content_stream(
+            model=GEMINI_MODEL,
+            contents=gemini_history + [{"role": "user", "parts": [{"text": last_message}]}],
+            config=types.GenerateContentConfig(system_instruction=system)
         )
-    )
+        for chunk in response:
+            if chunk.text:
+                chunks.append(chunk.text)
+        return chunks
+    
+    loop = asyncio.get_event_loop()
+    chunks = await loop.run_in_executor(None, _sync_stream)
 
-    for chunk in response:
-        if chunk.text:
-            yield chunk.text
+    for chunk in chunks:
+        yield chunk
 
 
 from groq import AsyncGroq

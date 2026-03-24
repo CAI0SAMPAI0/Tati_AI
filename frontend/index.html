@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
+
 <body>
     <div class="app-container">
         <!-- Sidebar -->
@@ -19,9 +21,10 @@
             <div id="conv-list" style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1; overflow-y: auto;">
                 <p style="color: var(--text-dim); font-size: 0.9rem;">Carregando...</p>
             </div>
-            
+
             <!-- Dashboard Button (Visible for Prof/Prog) -->
-            <button id="btn-dash" onclick="toggleDashboard()" class="conv-item" style="margin-top: 1rem; display: none; text-align: center; border-color: #ffd666; color: #ffd666;">
+            <button id="btn-dash" onclick="toggleDashboard()" class="conv-item"
+                style="margin-top: 1rem; display: none; text-align: center; border-color: #ffd666; color: #ffd666;">
                 <i class="fas fa-chart-line"></i> Dashboard
             </button>
         </aside>
@@ -46,10 +49,12 @@
                     </div>
                 </div>
                 <div class="header-actions">
-                    <button onclick="toggleSettings()" title="Configurações" style="background:none; border:none; color:var(--text-dim); cursor:pointer; margin-right: 1rem;">
+                    <button onclick="toggleSettings()" title="Configurações"
+                        style="background:none; border:none; color:var(--text-dim); cursor:pointer; margin-right: 1rem;">
                         <i class="fas fa-cog"></i>
                     </button>
-                    <button onclick="logout()" title="Sair" style="background:none; border:none; color:var(--text-dim); cursor:pointer;">
+                    <button onclick="logout()" title="Sair"
+                        style="background:none; border:none; color:var(--text-dim); cursor:pointer;">
                         <i class="fas fa-sign-out-alt"></i>
                     </button>
                 </div>
@@ -68,7 +73,8 @@
             </div>
 
             <div class="chat-input-area">
-                <button id="file-btn" class="mic-btn" style="background:none; border:none; color:var(--text-dim);" title="Anexar Arquivo" onclick="document.getElementById('file-input').click()">
+                <button id="file-btn" class="mic-btn" style="background:none; border:none; color:var(--text-dim);"
+                    title="Anexar Arquivo" onclick="document.getElementById('file-input').click()">
                     <i class="fas fa-paperclip"></i>
                 </button>
                 <input type="file" id="file-input" style="display:none;" onchange="handleFile(event)">
@@ -76,7 +82,8 @@
                     <i class="fas fa-microphone"></i>
                 </button>
                 <div class="input-wrapper">
-                    <input type="text" id="user-input" placeholder="Digite sua mensagem..." onkeypress="handleKey(event)">
+                    <input type="text" id="user-input" placeholder="Digite sua mensagem..."
+                        onkeypress="handleKey(event)">
                 </div>
                 <button onclick="sendMessage()" class="send-btn">
                     <i class="fas fa-paper-plane"></i>
@@ -91,13 +98,15 @@
             <h2 id="settings-title" style="margin-bottom: 1.5rem;">Configurações</h2>
             <div class="setting-row">
                 <span id="lang-label">Idioma do Site</span>
-                <select id="lang-select" onchange="changeLang(this.value)" style="background:var(--card-bg); color:white; border:1px solid var(--glass-border); padding:0.5rem; border-radius:0.5rem;">
+                <select id="lang-select" onchange="changeLang(this.value)"
+                    style="background:var(--card-bg); color:white; border:1px solid var(--glass-border); padding:0.5rem; border-radius:0.5rem;">
                     <option value="pt">Português</option>
                     <option value="en">English</option>
                 </select>
             </div>
             <div class="setting-row" style="margin-top: 2rem;">
-                <button onclick="toggleSettings()" class="send-btn" style="width: 100%;" id="btn-close-settings">Fechar</button>
+                <button onclick="toggleSettings()" class="send-btn" style="width: 100%;"
+                    id="btn-close-settings">Fechar</button>
             </div>
         </div>
     </div>
@@ -153,14 +162,14 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ username: user, password: pass })
                 })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.token) {
-                        localStorage.setItem("token", data.token);
-                        localStorage.setItem("user", JSON.stringify(data.user));
-                        location.reload();
-                    } else alert("Erro no login");
-                });
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.token) {
+                            localStorage.setItem("token", data.token);
+                            localStorage.setItem("user", JSON.stringify(data.user));
+                            location.reload();
+                        } else alert("Erro no login");
+                    });
             }
         }
 
@@ -173,7 +182,7 @@
             document.getElementById("btn-new-chat").innerHTML = `<i class="fas fa-plus"></i> ${texts.newChat}`;
             document.getElementById("btn-close-settings").innerText = texts.close;
             document.getElementById("welcome-msg").innerText = texts.welcome;
-            
+
             // Show Dashboard button if Prof/Prog
             const role = userData.role;
             if (role === "professor" || role === "programador") {
@@ -227,8 +236,8 @@
         // WebSocket & Chat Logic
         function initWS() {
             if (!token) return;
-            ws = new WebSocket(`ws://localhost:8000/chat/ws?token=${token}`);
-            
+            ws = new WebSocket(`ws://127.0.0.1:8000/chat/ws?token=${token}`);
+
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 if (data.type === "transcription") addMessage(data.text, 'user', true);
@@ -373,7 +382,7 @@
         // Conv List
         async function loadConversations() {
             try {
-                const res = await fetch("http://localhost:8000/chat/conversations", { headers: { "Authorization": `Bearer ${token}` } });
+                const res = await fetch("http://127.0.0.1:8000/chat/conversations", { headers: { "Authorization": `Bearer ${token}` } });
                 const data = await res.json();
                 const list = document.getElementById("conv-list");
                 list.innerHTML = "";
@@ -385,7 +394,7 @@
                     list.appendChild(b);
                 });
                 if (data.length > 0 && !currentConvId) selectConv(data[0].id);
-            } catch (e) {}
+            } catch (e) { }
         }
 
         function selectConv(id) {
@@ -397,7 +406,7 @@
         }
 
         async function newChat() {
-            const res = await fetch("http://localhost:8000/chat/conversations", {
+            const res = await fetch("http://127.0.0.1:8000/chat/conversations", {
                 method: "POST", headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
                 body: JSON.stringify({ title: "Nova Prática" })
             });
@@ -407,9 +416,15 @@
             await loadConversations();
         }
 
-        updateUI();
-        initWS();
-        loadConversations();
+        // verifica se está logado antes de inicializar
+        if (token) {
+            updateUI();
+            initWS();
+            loadConversations();
+        } else {
+            updateUI();
+        }
     </script>
 </body>
+
 </html>
