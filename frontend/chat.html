@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles/global.css">
     <link rel="stylesheet" href="styles/chat.css">
+    <link rel="stylesheet" href="styles/word-tooltip.css">
 </head>
 
 <body>
@@ -64,7 +65,6 @@
 
         <!-- ── Main ── -->
         <main class="chat-main">
-
             <header class="chat-topbar">
                 <div class="topbar-left">
                     <button class="btn-icon" onclick="toggleSidebar()" title="Menu">
@@ -76,6 +76,15 @@
                     <span class="topbar-title">Teacher Tati</span>
                 </div>
                 <div class="topbar-right">
+                    <!-- Voice mode button -->
+                    <a href="voice.html" class="btn-voice-mode" title="Modo Voz">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />
+                        </svg>
+                        Modo Voz
+                    </a>
                     <button class="theme-toggle" onclick="toggleTheme()" title="Tema">
                         <span id="theme-icon">☀️</span>
                     </button>
@@ -83,7 +92,6 @@
             </header>
 
             <div class="chat-messages" id="chat-messages">
-
                 <!-- Welcome screen -->
                 <div class="chat-welcome" id="chat-welcome" style="display:none;">
                     <div class="welcome-avatar">
@@ -93,6 +101,8 @@
                     </div>
                     <h2>Olá! Eu sou a Teacher Tati 👋</h2>
                     <p>Sua professora de inglês com IA. Vamos praticar juntos?</p>
+                    <p class="welcome-tip">💡 Clique em qualquer palavra inglesa para ver tradução e ouvir a pronúncia
+                    </p>
                     <div class="welcome-suggestions">
                         <button class="suggestion-chip" onclick="useSuggestion(this)">How do I introduce
                             myself?</button>
@@ -117,12 +127,11 @@
                         </div>
                     </div>
                 </div>
-
             </div>
 
             <div class="chat-input-area">
                 <div class="chat-input-wrap">
-                    <button class="btn-attach" title="Anexar arquivo">
+                    <button class="btn-attach" title="Anexar arquivo (PDF, DOCX, TXT)">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
                             <path
@@ -145,13 +154,13 @@
                         </svg>
                     </button>
                 </div>
-                <p class="input-hint">Teacher Tati pratica inglês com você · Enter para enviar · Shift+Enter para nova
-                    linha</p>
+                <p class="input-hint">Teacher Tati pratica inglês com você · Enter para enviar · Clique em palavras para
+                    tradução</p>
             </div>
-
         </main>
     </div>
 
+    <script src="js/word-tooltip.js"></script>
     <script src="js/chat.js"></script>
 </body>
 
