@@ -175,7 +175,7 @@ body {
 /* ── Conversation bubbles ───────────────────────────────────── */
 .voice-history {
   width: 100%;
-  max-width: 680px;
+  /*max-width: px;*/
   flex: 1;
   min-height: 0;
   overflow-y: auto;

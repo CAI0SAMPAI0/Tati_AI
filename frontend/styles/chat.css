@@ -918,6 +918,96 @@
     min-width: 50px;
 }
 
+.message-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.3rem;
+}
+ 
+/* container dos controles inline no meta */
+.message-meta .msg-audio-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+    margin-left: 0;        /* sem deslocamento extra */
+}
+ 
+/* play e rewind */
+.message-meta .btn-tts-play,
+.message-meta .btn-tts-rewind {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    border: 1px solid rgba(124,58,237,0.35);
+    background: rgba(124,58,237,0.1);
+    color: var(--primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    padding: 0;
+}
+.message-meta .btn-tts-play:hover,
+.message-meta .btn-tts-rewind:hover {
+    background: rgba(124,58,237,0.22);
+    border-color: var(--primary);
+}
+ 
+/* vol inline */
+.message-meta .msg-vol-control,
+.message-meta .msg-spd-control {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+}
+.message-meta .msg-vol-control label,
+.message-meta .msg-spd-control label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    white-space: nowrap;
+}
+.message-meta .msg-vol-value {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    min-width: 28px;
+    text-align: right;
+}
+.message-meta .msg-vol-slider {
+    width: 58px;
+    height: 3px;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(124,58,237,0.25);
+    border-radius: 2px;
+    outline: none;
+}
+.message-meta .msg-vol-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    background: var(--primary);
+    cursor: pointer;
+}
+.message-meta .msg-spd-select {
+    background: rgba(124,58,237,0.08);
+    border: 1px solid rgba(124,58,237,0.25);
+    color: var(--primary);
+    border-radius: 5px;
+    font-size: 0.67rem;
+    font-weight: 600;
+    padding: 0.15rem 0.3rem;
+    cursor: pointer;
+    outline: none;
+    font-family: inherit;
+}
+
 /* ══════════════════════════════════════
    RESPONSIVO
 ══════════════════════════════════════ */

@@ -16,13 +16,13 @@ function getSettings() {
   try { return JSON.parse(localStorage.getItem('tati_settings') || '{}'); } catch { return {}; }
 }
 
-// ── Read conv_id from URL (passed by chat.js when switching to voice)
+// ── Read conv_id from URL
 const urlParams    = new URLSearchParams(window.location.search);
 const urlConvId    = urlParams.get('conv_id') || null;
 
 // ── State ──────────────────────────────────────────────────────────
 let ws            = null;
-let currentConvId = urlConvId; // use existing convo if passed, else create new
+let currentConvId = urlConvId;
 let isRecording   = false;
 let isProcessing  = false;
 let mediaRecorder = null;
@@ -31,14 +31,13 @@ let currentAudio  = null;
 let lastAudioB64  = null;
 let pendingUserBubble = null;
 
-// ── DOM refs ───────────────────────────────────────────────────────
+// ── DOM refs — FIX: guard against null to prevent crash ───────────
 const avatarWrap = document.getElementById('avatar-wrap');
 const statusText = document.getElementById('status-text');
 const micBtn     = document.getElementById('mic-btn');
 const micHint    = document.getElementById('mic-hint');
 const history    = document.getElementById('voice-history');
 const vtyping    = document.getElementById('vtyping');
-const transcEl   = document.getElementById('voice-transcription');
 
 const vacPlayBtn = document.getElementById('vac-play-btn');
 const vacRewBtn  = document.getElementById('vac-rewind-btn');
@@ -47,25 +46,31 @@ const vacVolVal  = document.getElementById('vac-vol-val');
 const vacSpd     = document.getElementById('vac-spd');
 const vacSpdVal  = document.getElementById('vac-spd-val');
 
-// ── Avatar states ──────────────────────────────────────────────────
+// FIX: Check that all critical DOM elements exist before proceeding
+if (!micBtn || !history || !vtyping) {
+  console.error('[Voice] Critical DOM elements missing. Aborting.');
+}
+
+// ── Avatar states — FIX: use i18n for status labels ───────────────
 function setAvatarState(state) {
+  if (!avatarWrap || !statusText || !micHint) return;
   avatarWrap.className = 'avatar-wrap ' + state;
   switch (state) {
     case 'listening':
-      statusText.textContent = '🎙 Ouvindo…';
-      micHint.textContent    = 'Toque para parar';
+      statusText.textContent = (typeof t === 'function') ? t('voice.listening')  : '🎙 Ouvindo…';
+      micHint.textContent    = (typeof t === 'function') ? t('voice.tap_stop')   : 'Toque para parar';
       break;
     case 'processing':
-      statusText.textContent = '⏳ Processando…';
-      micHint.textContent    = 'Aguarde…';
+      statusText.textContent = (typeof t === 'function') ? t('voice.processing') : '⏳ Processando…';
+      micHint.textContent    = (typeof t === 'function') ? t('voice.wait')       : 'Aguarde…';
       break;
     case 'speaking':
-      statusText.textContent = '🗣 Falando…';
-      micHint.textContent    = 'Toque para falar';
+      statusText.textContent = (typeof t === 'function') ? t('voice.speaking')   : '🗣 Falando…';
+      micHint.textContent    = (typeof t === 'function') ? t('voice.tap_speak')  : 'Toque para falar';
       break;
     default:
-      statusText.textContent = 'Online';
-      micHint.textContent    = 'Toque para falar';
+      statusText.textContent = (typeof t === 'function') ? t('voice.online')     : 'Online';
+      micHint.textContent    = (typeof t === 'function') ? t('voice.tap_speak')  : 'Toque para falar';
   }
 }
 
@@ -118,29 +123,28 @@ function handleWSMessage(msg) {
       hideTyping();
       setAvatarState('idle');
       isProcessing    = false;
-      micBtn.disabled = false;
-      micBtn.classList.remove('processing');
-      micBtn.textContent = '🎤';
+      if (micBtn) {
+        micBtn.disabled = false;
+        micBtn.classList.remove('processing');
+        micBtn.textContent = '🎤';
+      }
       addBubble('bot', '⚠️ ' + (msg.detail || 'Erro'));
       break;
   }
 }
 
 async function ensureConversation() {
-  // If we already have a conv_id from the URL, just use it
   if (currentConvId) {
     loadExistingMessages(currentConvId);
     return;
   }
 
-  // Otherwise create a new one or use the most recent
   try {
     const res = await fetch(`${API}/chat/conversations`, { headers:{ Authorization:`Bearer ${token}` } });
     if (res.ok) {
       const convs = await res.json();
       if (convs.length) { currentConvId = convs[0].id; loadExistingMessages(currentConvId); return; }
     }
-    // Create brand new
     const res2 = await fetch(`${API}/chat/conversations`, {
       method: 'POST',
       headers: { Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
@@ -148,11 +152,10 @@ async function ensureConversation() {
     });
     const conv = await res2.json();
     currentConvId = conv.id;
-  } catch(e) { console.error(e); }
+  } catch(e) { console.error('[Voice] ensureConversation error:', e); }
 }
 
 async function loadExistingMessages(convId) {
-  // Show the conversation title
   try {
     const res = await fetch(`${API}/chat/conversations`, { headers:{ Authorization:`Bearer ${token}` } });
     if (res.ok) {
@@ -165,7 +168,6 @@ async function loadExistingMessages(convId) {
     }
   } catch(e) {}
 
-  // Load existing messages into the voice bubbles
   try {
     const res = await fetch(`${API}/chat/conversations/${convId}/messages`, {
       headers: { Authorization:`Bearer ${token}` }
@@ -174,19 +176,21 @@ async function loadExistingMessages(convId) {
     const msgs = await res.json();
     msgs.forEach(m => addBubble(m.role === 'user' ? 'user' : 'bot', m.content));
     scrollBottom();
-  } catch(e) { console.error(e); }
+  } catch(e) { console.error('[Voice] loadExistingMessages error:', e); }
 }
 
 // ── Mic ────────────────────────────────────────────────────────────
-micBtn.addEventListener('click', async () => {
-  if (isProcessing) return;
-  if (isRecording) {
-    stopRecording();
-  } else {
-    if (currentAudio) { currentAudio.pause(); currentAudio = null; setAvatarState('idle'); }
-    await startRecording();
-  }
-});
+if (micBtn) {
+  micBtn.addEventListener('click', async () => {
+    if (isProcessing) return;
+    if (isRecording) {
+      stopRecording();
+    } else {
+      if (currentAudio) { currentAudio.pause(); currentAudio = null; setAvatarState('idle'); }
+      await startRecording();
+    }
+  });
+}
 
 async function startRecording() {
   try {
@@ -197,8 +201,7 @@ async function startRecording() {
     mediaRecorder.onstop = sendAudio;
     mediaRecorder.start();
     isRecording = true;
-    micBtn.classList.add('recording');
-    micBtn.textContent = '⏹';
+    if (micBtn) { micBtn.classList.add('recording'); micBtn.textContent = '⏹'; }
     setAvatarState('listening');
     pendingUserBubble = addBubble('user', '🎙 transcrevendo…');
     scrollBottom();
@@ -210,11 +213,13 @@ async function startRecording() {
 function stopRecording() {
   if (mediaRecorder) mediaRecorder.stop();
   isRecording = false;
-  micBtn.classList.remove('recording');
-  micBtn.classList.add('processing');
-  micBtn.textContent  = '⏳';
-  micBtn.disabled     = true;
-  isProcessing        = true;
+  if (micBtn) {
+    micBtn.classList.remove('recording');
+    micBtn.classList.add('processing');
+    micBtn.textContent  = '⏳';
+    micBtn.disabled     = true;
+  }
+  isProcessing = true;
   setAvatarState('processing');
 }
 
@@ -227,6 +232,14 @@ async function sendAudio() {
     showTyping();
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type:'audio', audio:b64, conversation_id:currentConvId }));
+    } else {
+      // FIX: If WS not ready, reconnect and retry once
+      connectWS();
+      setTimeout(() => {
+        if (ws?.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type:'audio', audio:b64, conversation_id:currentConvId }));
+        }
+      }, 1500);
     }
   };
   reader.readAsDataURL(blob);
@@ -297,28 +310,42 @@ function finalizeBotBubble() {
   currentBotWrap   = null;
   botBuffer        = '';
   isProcessing     = false;
-  micBtn.disabled  = false;
-  micBtn.classList.remove('processing');
-  micBtn.textContent = '🎤';
+  if (micBtn) {
+    micBtn.disabled  = false;
+    micBtn.classList.remove('processing');
+    micBtn.textContent = '🎤';
+  }
 }
 
 // ── Audio playback ─────────────────────────────────────────────────
 function playAudio(b64) {
   if (currentAudio) { currentAudio.pause(); currentAudio = null; }
   const s     = getSettings();
-  const speed = parseFloat(s.defaultSpeed || vacSpd.value || '1');
+  const speed = parseFloat(s.defaultSpeed || (vacSpd ? vacSpd.value : '1') || '1');
   const audio = new Audio('data:audio/mp3;base64,' + b64);
-  audio.volume       = parseFloat(vacVol.value);
+  audio.volume       = vacVol ? parseFloat(vacVol.value) : 1;
   audio.playbackRate = speed;
   currentAudio       = audio;
 
   setAvatarState('speaking');
-  vacPlayBtn.textContent = '⏹ Parar';
+  if (vacPlayBtn) vacPlayBtn.textContent = (typeof t === 'function') ? t('voice.stop') : '⏹ Parar';
 
-  audio.onended = () => { currentAudio = null; setAvatarState('idle'); vacPlayBtn.textContent = '▶ Ouvir'; };
-  audio.onerror = () => { currentAudio = null; setAvatarState('idle'); vacPlayBtn.textContent = '▶ Ouvir'; };
-  audio.play().catch(() => { setAvatarState('idle'); vacPlayBtn.textContent = '▶ Ouvir'; });
+  audio.onended = () => {
+    currentAudio = null;
+    setAvatarState('idle');
+    if (vacPlayBtn) vacPlayBtn.textContent = (typeof t === 'function') ? t('voice.play') : '▶ Ouvir';
+  };
+  audio.onerror = () => {
+    currentAudio = null;
+    setAvatarState('idle');
+    if (vacPlayBtn) vacPlayBtn.textContent = (typeof t === 'function') ? t('voice.play') : '▶ Ouvir';
+  };
+  audio.play().catch(() => {
+    setAvatarState('idle');
+    if (vacPlayBtn) vacPlayBtn.textContent = (typeof t === 'function') ? t('voice.play') : '▶ Ouvir';
+  });
 
+  // Attach controls to last bubble's audio row
   const rows = document.querySelectorAll('.vbubble-audio');
   if (rows.length) {
     const lastRow = rows[rows.length - 1];
@@ -337,7 +364,7 @@ function attachBubbleAudio(row, b64) {
     <button class="btn-tts-rewind" title="Voltar 5s">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.56"/></svg>
     </button>
-    <input type="range" class="msg-vol-slider" min="0" max="1" step="0.05" value="${vacVol.value}">
+    <input type="range" class="msg-vol-slider" min="0" max="1" step="0.05" value="${vacVol ? vacVol.value : 1}">
     <select class="msg-spd-select">
       <option value="0.75">0.75×</option>
       <option value="1" ${defaultSpeed === '1' ? 'selected' : ''}>1×</option>
@@ -354,6 +381,7 @@ function attachBubbleAudio(row, b64) {
   let bubAudio = currentAudio;
 
   function updateIcon(playing) {
+    if (!playB) return;
     playB.innerHTML = playing
       ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
       : `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
@@ -365,7 +393,7 @@ function attachBubbleAudio(row, b64) {
     bubAudio.addEventListener('play',  () => updateIcon(true));
   }
 
-  playB.onclick = () => {
+  if (playB) playB.onclick = () => {
     if (!bubAudio || bubAudio.ended) {
       bubAudio = new Audio('data:audio/mp3;base64,' + b64);
       bubAudio.volume = parseFloat(volS.value);
@@ -376,40 +404,59 @@ function attachBubbleAudio(row, b64) {
     if (bubAudio.paused) {
       if (currentAudio && currentAudio !== bubAudio) currentAudio.pause();
       bubAudio.play(); updateIcon(true); setAvatarState('speaking');
-      vacPlayBtn.textContent = '⏹ Parar';
-      bubAudio.onended = () => { setAvatarState('idle'); vacPlayBtn.textContent = '▶ Ouvir'; updateIcon(false); };
+      if (vacPlayBtn) vacPlayBtn.textContent = (typeof t === 'function') ? t('voice.stop') : '⏹ Parar';
+      bubAudio.onended = () => {
+        setAvatarState('idle');
+        if (vacPlayBtn) vacPlayBtn.textContent = (typeof t === 'function') ? t('voice.play') : '▶ Ouvir';
+        updateIcon(false);
+      };
     } else {
       bubAudio.pause(); updateIcon(false); setAvatarState('idle');
-      vacPlayBtn.textContent = '▶ Ouvir';
+      if (vacPlayBtn) vacPlayBtn.textContent = (typeof t === 'function') ? t('voice.play') : '▶ Ouvir';
     }
   };
-  rewB.onclick  = () => { if (bubAudio) bubAudio.currentTime = Math.max(0, bubAudio.currentTime - 5); };
-  volS.oninput  = () => { if (bubAudio) bubAudio.volume = parseFloat(volS.value); };
-  spdS.onchange = () => { if (bubAudio) bubAudio.playbackRate = parseFloat(spdS.value); };
+  if (rewB)  rewB.onclick  = () => { if (bubAudio) bubAudio.currentTime = Math.max(0, bubAudio.currentTime - 5); };
+  if (volS)  volS.oninput  = () => { if (bubAudio) bubAudio.volume = parseFloat(volS.value); };
+  if (spdS)  spdS.onchange = () => { if (bubAudio) bubAudio.playbackRate = parseFloat(spdS.value); };
 }
 
 // ── Global audio controls ──────────────────────────────────────────
-vacPlayBtn.addEventListener('click', () => {
-  if (currentAudio && !currentAudio.paused) {
-    currentAudio.pause(); vacPlayBtn.textContent = '▶ Ouvir'; setAvatarState('idle');
-  } else if (lastAudioB64) { playAudio(lastAudioB64); }
-});
-vacRewBtn.addEventListener('click', () => {
-  if (currentAudio) currentAudio.currentTime = Math.max(0, currentAudio.currentTime - 5);
-});
-vacVol.addEventListener('input', () => {
-  vacVolVal.textContent = Math.round(vacVol.value * 100) + '%';
-  if (currentAudio) currentAudio.volume = parseFloat(vacVol.value);
-});
-vacSpd.addEventListener('input', () => {
-  vacSpdVal.textContent = parseFloat(vacSpd.value).toFixed(1) + '×';
-  if (currentAudio) currentAudio.playbackRate = parseFloat(vacSpd.value);
-});
+if (vacPlayBtn) {
+  vacPlayBtn.addEventListener('click', () => {
+    if (currentAudio && !currentAudio.paused) {
+      currentAudio.pause();
+      vacPlayBtn.textContent = (typeof t === 'function') ? t('voice.play') : '▶ Ouvir';
+      setAvatarState('idle');
+    } else if (lastAudioB64) {
+      playAudio(lastAudioB64);
+    }
+  });
+}
+
+if (vacRewBtn) {
+  vacRewBtn.addEventListener('click', () => {
+    if (currentAudio) currentAudio.currentTime = Math.max(0, currentAudio.currentTime - 5);
+  });
+}
+
+if (vacVol) {
+  vacVol.addEventListener('input', () => {
+    if (vacVolVal) vacVolVal.textContent = Math.round(vacVol.value * 100) + '%';
+    if (currentAudio) currentAudio.volume = parseFloat(vacVol.value);
+  });
+}
+
+if (vacSpd) {
+  vacSpd.addEventListener('input', () => {
+    if (vacSpdVal) vacSpdVal.textContent = parseFloat(vacSpd.value).toFixed(1) + '×';
+    if (currentAudio) currentAudio.playbackRate = parseFloat(vacSpd.value);
+  });
+}
 
 // ── Typing indicator ───────────────────────────────────────────────
-function showTyping()  { vtyping.style.display = 'flex'; scrollBottom(); }
-function hideTyping()  { vtyping.style.display = 'none'; }
-function scrollBottom() { history.scrollTop = history.scrollHeight; }
+function showTyping()  { if (vtyping) { vtyping.style.display = 'flex'; scrollBottom(); } }
+function hideTyping()  { if (vtyping) vtyping.style.display = 'none'; }
+function scrollBottom() { if (history) history.scrollTop = history.scrollHeight; }
 
 function formatMarkdown(text) {
   return text
@@ -420,5 +467,21 @@ function formatMarkdown(text) {
     .replace(/\n/g,'<br>');
 }
 
+// ── Apply i18n to static elements ─────────────────────────────────
+function applyVoiceI18n() {
+  if (typeof I18n === 'undefined') return;
+  if (vacPlayBtn) vacPlayBtn.textContent = t('voice.play');
+  if (vacRewBtn)  vacRewBtn.textContent  = t('voice.rewind');
+  if (micHint)    micHint.textContent    = t('voice.tap_speak');
+  if (statusText) statusText.textContent = t('voice.online');
+  I18n.applyToDOM();
+}
+
 // ── Init ───────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  applyVoiceI18n();
+  // Apply i18n when language changes
+  window.addEventListener('langchange', applyVoiceI18n);
+});
+
 connectWS();

@@ -32,6 +32,17 @@ async function loadProfile() {
         if (!res.ok) { logout(); return; }
         const data = await res.json();
         populateProfile(data);
+
+        // FIX: Always sync full profile data to localStorage so sidebar/dashboard read fresh data
+        const current = JSON.parse(localStorage.getItem('user') || '{}');
+        const updated = {
+            ...current,
+            name: data.name || current.name,
+            level: data.level || current.level,
+            role: data.role || current.role,
+            avatar_url: data.avatar_url || null,
+        };
+        localStorage.setItem('user', JSON.stringify(updated));
     } catch (e) {
         console.error('loadProfile error', e);
     }
@@ -107,7 +118,7 @@ async function saveAll() {
     if (labelSpan) labelSpan.textContent = t('profile.saving');
 
     let profileOk = false;
-    let pwOk      = true; // assume ok se campos vazios
+    let pwOk      = true;
 
     // 1. Salvar dados do perfil
     const body = {
@@ -127,7 +138,9 @@ async function saveAll() {
         });
         if (res.ok) {
             profileOk = true;
-            const updated = { ...userLocal, ...body };
+            // FIX: Merge changes into localStorage preserving avatar_url
+            const current = JSON.parse(localStorage.getItem('user') || '{}');
+            const updated = { ...current, ...body };
             localStorage.setItem('user', JSON.stringify(updated));
         } else {
             const data = await res.json();
@@ -171,7 +184,7 @@ async function saveAll() {
     // 3. Feedback final
     if (profileOk && pwOk) {
         showFeedback(feedback, t('profile.saved'), 'success');
-        loadProfile();
+        loadProfile(); // This will also sync localStorage again
     }
 
     btn.disabled = false;
@@ -207,19 +220,23 @@ async function handleAvatarUpload(event) {
         const res = await fetch(`${API}/profile/avatar`, {
             method:  'POST',
             headers: { Authorization: `Bearer ${token}` },
-            // NÃO setar Content-Type — o browser define multipart/form-data automaticamente
             body: formData
         });
         const data = await res.json();
         if (res.ok) {
             statusEl.textContent = '✓ Foto atualizada!';
             statusEl.className   = 'avatar-status success';
-            const updated = { ...JSON.parse(localStorage.getItem('user') || '{}'), avatar_url: data.avatar_url };
+
+            // FIX: Persist avatar_url in localStorage so sidebar and dashboard update immediately
+            const current = JSON.parse(localStorage.getItem('user') || '{}');
+            const updated = { ...current, avatar_url: data.avatar_url };
             localStorage.setItem('user', JSON.stringify(updated));
+
+            // Refresh profile display
+            loadProfile();
         } else {
             statusEl.textContent = data.detail || 'Erro ao enviar foto.';
             statusEl.className   = 'avatar-status error';
-            // Reverter preview
             loadProfile();
         }
     } catch (err) {
