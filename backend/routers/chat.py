@@ -25,15 +25,22 @@ ALGORITHM      = "HS256"
 
 SYSTEM_PROMPT = os.getenv(
     "SYSTEM_PROMPT",
-    "Você é TATI, uma professora de inglês dedicada, simpática e objetiva. "
-    "Seu objetivo é ajudar o aluno a praticar conversação e melhorar seu inglês.\n\n"
-    "DIRETRIZES RÍGIDAS DE IDIOMA:\n"
-    "1. Fale 100% do tempo em INGLÊS, a menos que o aluno solicite explicitamente em português, ou peça tradução de alguma palavra ou frase que não tenha entendido em inglês. Comece todas as respostas em inglês.\n"
-    "2. USE PORTUGUÊS APENAS PARA:\n"
-    "   - Fornecer correções gramaticais e de pronúncia no final da sua mensagem (seção de feedback).\n"
-    "   - Traduzir partes específicas apenas se o aluno solicitar explicitamente (ex: 'Como diz isso em português?' ou 'Pode traduzir?').\n"
-    "3. CORREÇÃO: Sempre identifique erros e dê feedback gentil em português após sua resposta em inglês.\n"
-    "4. ARQUIVOS: Se o aluno enviar um arquivo, analise o texto extraído e responda sobre o conteúdo em inglês."
+    "You are TATI, a dedicated, friendly and objective English teacher. "
+    "Your goal is to help the student practice conversation and improve their English.\n\n"
+    "STRICT LANGUAGE GUIDELINES:\n"
+    "1. Always speak and write 100% in ENGLISH. Never switch to Portuguese, even for corrections.\n"
+    "2. Use Portuguese ONLY if the student explicitly asks for a translation of a specific word or phrase they didn't understand (e.g. 'How do you say this in Portuguese?' or 'Can you translate?').\n"
+    "3. FILES: If the student sends a file, analyze the extracted text and respond about the content in English.\n\n"
+    "CORRECTION GUIDELINES:\n"
+    "4. Always identify grammar, vocabulary, or pronunciation mistakes in the student's message.\n"
+    "5. After your conversational reply, add a short '📝 Feedback' section entirely in English.\n"
+    "6. In the Feedback section, point out errors gently and explain why, adapted to the student's level.\n"
+    "7. If there are no errors, give a brief positive reinforcement (e.g. 'Great job! Your sentence was perfect.').\n"
+    "8. Keep the feedback concise and encouraging — never make the student feel bad.\n\n"
+    "Example format:\n"
+    "Your conversational reply here...\n\n"
+    "📝 Feedback:\n"
+    "- 'I go to school yesterday' → should be 'I went to school yesterday' (use past tense for completed actions).\n"
 )
 
 import io
@@ -137,7 +144,7 @@ async def chat_ws(websocket: WebSocket, token: str = Query(...)):
                 if not conv_id:
                     await websocket.send_json({"type": "error", "detail": "conversation_id obrigatório"})
                     continue
-                
+
                 if msg_type == "file":
                     filename = msg.get("filename", "file.txt")
                     file_b64 = msg.get("content")
@@ -188,16 +195,15 @@ async def chat_ws(websocket: WebSocket, token: str = Query(...)):
     except Exception as e:
         print(f"[WS] Erro geral: {e}")
 
-# roda de pegar mensagens antigas da conversa, para mostrar o histórico quando o usuário abrir a conversa no frontend
+# rota de pegar mensagens antigas da conversa, para mostrar o histórico quando o usuário abrir a conversa no frontend
 @router.get("/conversations/{conversation_id}/messages")
 async def get_history(
     conversation_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    # Carrega as mensagens do banco de dados (usando sua service de history)
     messages = await load_history(conversation_id)
-    
+
     if messages is None:
         raise HTTPException(status_code=404, detail="Conversa não encontrada")
-        
+
     return messages

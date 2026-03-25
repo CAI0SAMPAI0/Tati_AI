@@ -762,6 +762,91 @@
     text-align: center;
 }
 
+/* ── Sidebar footer actions row ── */
+.sidebar-footer {
+    border-top: 1px solid var(--border);
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.sidebar-user {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.5rem;
+    border-radius: 10px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.15s;
+    flex: 1;
+}
+.sidebar-user:hover { background: rgba(124,58,237,0.08); }
+
+.sidebar-footer-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0 0.25rem;
+}
+
+.btn-footer-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    text-decoration: none;
+    font-family: inherit;
+}
+.btn-footer-icon:hover {
+    background: rgba(124,58,237,0.1);
+    color: var(--primary);
+    border-color: rgba(124,58,237,0.3);
+}
+.btn-danger-icon:hover {
+    background: rgba(239,68,68,0.1) !important;
+    color: #f87171 !important;
+    border-color: rgba(239,68,68,0.3) !important;
+}
+
+/* ── Voice mode button in topbar ── */
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-voice-mode {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.875rem;
+    background: rgba(124,58,237,0.12);
+    border: 1px solid rgba(124,58,237,0.3);
+    border-radius: 8px;
+    color: var(--primary);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+.btn-voice-mode:hover {
+    background: rgba(124,58,237,0.22);
+    border-color: var(--primary);
+}
+
 /* ══════════════════════════════════════
    RESPONSIVO
 ══════════════════════════════════════ */
