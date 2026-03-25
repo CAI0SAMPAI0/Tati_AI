@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-br" data-theme="dark">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -10,7 +11,9 @@
   <link rel="stylesheet" href="styles/voice.css">
   <link rel="stylesheet" href="styles/word_tooltip.css">
   <link rel="icon" type="image/x-icon" href="images/tati_logo.jpg">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
+
 <body>
 
   <!-- Topbar -->
@@ -18,7 +21,7 @@
     <div class="voice-topbar-left">
       <a href="chat.html" class="btn-back-chat" id="btn-back-chat">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
         Chat
       </a>
@@ -26,9 +29,7 @@
     </div>
     <div style="display:flex;gap:0.5rem;align-items:center;">
       <a href="settings.html" class="btn-back-chat" title="Configurações">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
+        <i class="fa-solid fa-gear"></i>
         </svg>
       </a>
     </div>
@@ -84,8 +85,9 @@
     </div>
 
   </div>
-
+  <script src="js/i18n.js"></script>
   <script src="js/word_tooltip.js"></script>
   <script src="js/voice.js"></script>
 </body>
+
 </html>

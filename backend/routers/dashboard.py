@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from routers.deps import get_current_user
 from services.database import get_client
 from pydantic import BaseModel
-import anthropic
 import os
 
 router = APIRouter()
@@ -119,11 +118,12 @@ async def update_student(
 
 @router.get("/students/{username}/insight")
 async def get_student_insight(username: str, current_user: dict = Depends(_require_staff)):
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
+    # FIX: Use Gemini instead of Anthropic — reads GEMINI_API_KEY or GOOGLE_API_KEY
+    google_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if not google_api_key:
         raise HTTPException(
             status_code=503,
-            detail="ANTHROPIC_API_KEY não configurada. Configure a variável de ambiente para usar esta funcionalidade."
+            detail="GEMINI_API_KEY não configurada. Configure a variável de ambiente para usar esta funcionalidade."
         )
 
     db = get_client()
@@ -185,24 +185,36 @@ Please provide a concise pedagogical report in Portuguese for the teacher, cover
 Be specific and cite examples from the conversation when possible. Keep the tone professional but warm."""
 
     try:
-        client = anthropic.Anthropic(api_key=api_key)
-        response = client.messages.create(
-            model="claude-sonnet-4-5",   # modelo disponível e mais custo-eficiente
-            max_tokens=1024,
-            messages=[{"role": "user", "content": prompt}]
+        # FIX: Use google-generativeai (same lib already used in llm.py)
+        from google import genai
+        from google.genai import types
+
+        client = genai.Client(api_key=google_api_key)
+        gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+
+        response = client.models.generate_content(
+            model=gemini_model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                max_output_tokens=1500,
+                temperature=0.4,
+            )
         )
-        return {"insight": response.content[0].text}
-    except anthropic.AuthenticationError:
-        raise HTTPException(
-            status_code=401,
-            detail="Chave da API Anthropic inválida. Verifique a variável ANTHROPIC_API_KEY."
-        )
-    except anthropic.RateLimitError:
-        raise HTTPException(
-            status_code=429,
-            detail="Limite de requisições atingido. Tente novamente em alguns instantes."
-        )
+        insight_text = response.text
+        return {"insight": insight_text}
+
     except Exception as e:
+        error_msg = str(e).lower()
+        if "api_key" in error_msg or "invalid" in error_msg or "unauthorized" in error_msg:
+            raise HTTPException(
+                status_code=401,
+                detail="Chave da API Gemini inválida. Verifique a variável GEMINI_API_KEY."
+            )
+        if "quota" in error_msg or "rate" in error_msg or "429" in error_msg:
+            raise HTTPException(
+                status_code=429,
+                detail="Limite de requisições atingido. Tente novamente em alguns instantes."
+            )
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao gerar insight: {str(e)}"

@@ -23,20 +23,25 @@ router = APIRouter()
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 ALGORITHM      = "HS256"
 
+# FIX: Stronger language enforcement — prevents AI from translating student messages
 SYSTEM_PROMPT = os.getenv(
     "SYSTEM_PROMPT",
     "You are TATI, a dedicated, friendly and objective English teacher. "
     "Your goal is to help the student practice conversation and improve their English.\n\n"
-    "STRICT LANGUAGE GUIDELINES:\n"
-    "1. Always speak and write 100% in ENGLISH. Never switch to Portuguese, even for corrections.\n"
-    "2. Use Portuguese ONLY if the student explicitly asks for a translation of a specific word or phrase they didn't understand (e.g. 'How do you say this in Portuguese?' or 'Can you translate?').\n"
-    "3. FILES: If the student sends a file, analyze the extracted text and respond about the content in English.\n\n"
+    "CRITICAL LANGUAGE RULE — READ CAREFULLY:\n"
+    "1. You MUST ALWAYS write your ENTIRE response in ENGLISH ONLY. No exceptions.\n"
+    "2. Do NOT translate the student's message into Portuguese under any circumstance.\n"
+    "3. Do NOT repeat the student's message back to them in another language.\n"
+    "4. Even if the student writes in Portuguese, you respond ONLY in English — gently remind them to write in English.\n"
+    "5. The ONLY time you may use a Portuguese word is when the student explicitly asks: 'how do you say X in Portuguese?' — in that case, give only the translation word/phrase, then continue in English.\n"
+    "6. Never switch to Portuguese to 'help' the student understand. Always use simple English appropriate to their level instead.\n\n"
+    "FILES: If the student sends a file, analyze the extracted text and respond about the content in English.\n\n"
     "CORRECTION GUIDELINES:\n"
-    "4. Always identify grammar, vocabulary, or pronunciation mistakes in the student's message.\n"
-    "5. After your conversational reply, add a short '📝 Feedback' section entirely in English.\n"
-    "6. In the Feedback section, point out errors gently and explain why, adapted to the student's level.\n"
-    "7. If there are no errors, give a brief positive reinforcement (e.g. 'Great job! Your sentence was perfect.').\n"
-    "8. Keep the feedback concise and encouraging — never make the student feel bad.\n\n"
+    "7. Always identify grammar, vocabulary, or pronunciation mistakes in the student's message.\n"
+    "8. After your conversational reply, add a short '📝 Feedback' section entirely in English.\n"
+    "9. In the Feedback section, point out errors gently and explain why, adapted to the student's level.\n"
+    "10. If there are no errors, give brief positive reinforcement (e.g. 'Great job! Your sentence was perfect.').\n"
+    "11. Keep the feedback concise and encouraging — never make the student feel bad.\n\n"
     "Example format:\n"
     "Your conversational reply here...\n\n"
     "📝 Feedback:\n"
@@ -68,7 +73,7 @@ async def extract_text_from_file(filename: str, content_b64: str) -> str:
     except Exception as e:
         return f"[Erro ao ler arquivo {filename}: {str(e)}]"
 
-# ─── REST 
+# ─── REST
 
 class CreateConversationBody(BaseModel):
     title: str = "Nova conversa"
@@ -112,25 +117,25 @@ async def update_title(
     return conv
 
 # ─── TTS endpoint para palavras individuais (word_tooltip) no frontend
- 
+
 from fastapi import Query as FastAPIQuery
- 
+
 class TTSRequest(BaseModel):
     text: str
- 
+
 @router.post("/tts")
 async def tts_word(body: TTSRequest, current_user: dict = Depends(get_current_user)):
     """Converte uma palavra/frase curta em áudio usando o mesmo TTS da IA."""
     if not body.text or len(body.text) > 200:
         raise HTTPException(status_code=400, detail="Texto inválido ou muito longo")
-    
+
     audio_b64 = await text_to_speech(body.text)
     if not audio_b64:
         raise HTTPException(status_code=503, detail="TTS indisponível")
-    
+
     return {"audio": audio_b64}
 
-# ─── WebSocket 
+# ─── WebSocket
 
 @router.websocket("/ws")
 async def chat_ws(websocket: WebSocket, token: str = Query(...)):
@@ -224,7 +229,7 @@ async def chat_ws(websocket: WebSocket, token: str = Query(...)):
     except Exception as e:
         print(f"[WS] Erro geral: {e}")
 
-# rota de pegar mensagens antigas da conversa, para mostrar o histórico quando o usuário abrir a conversa no frontend
+# rota de pegar mensagens antigas da conversa
 @router.get("/conversations/{conversation_id}/messages")
 async def get_history(
     conversation_id: str,

@@ -6,11 +6,12 @@
     <title>Tati AI — Chat</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
     <link rel="stylesheet" href="styles/global.css">
     <link rel="stylesheet" href="styles/chat.css">
     <link rel="stylesheet" href="styles/word_tooltip.css">
+    <!-- FIX: audio controls override — deve vir DEPOIS de chat.css e word_tooltip.css -->
+    <link rel="stylesheet" href="styles/chat_audio_controls.css">
     <link rel="icon" type="image/x-icon" href="images/tati_logo.jpg">
 </head>
 <body>
@@ -25,7 +26,7 @@
                     <div id="brand-fallback" class="brand-avatar-fallback" style="display:none;">🧑‍🏫</div>
                     <span class="brand-name">Teacher Tati</span>
                 </div>
-                <button class="btn-icon sidebar-close" onclick="toggleSidebar()" data-i18n-title="nav.settings">
+                <button class="btn-icon sidebar-close" onclick="toggleSidebar()">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
@@ -43,7 +44,6 @@
 
             <div class="sidebar-footer">
                 <a href="profile.html" class="sidebar-user">
-                    <!-- Avatar: photo or initials -->
                     <div class="user-avatar" id="sidebar-user-avatar">??</div>
                     <div class="user-info">
                         <span class="user-name" id="sidebar-user-name">Usuário</span>
@@ -53,26 +53,17 @@
                 </a>
 
                 <div class="sidebar-footer-actions">
-                    <!-- Dashboard — only shown for staff roles via JS -->
                     <a href="dashboard.html" class="btn-footer-icon" id="btn-dashboard"
-                       data-i18n-title="nav.dashboard" title="Painel" style="display:none;">
+                       title="Painel" style="display:none;">
                         <i class="fa-solid fa-chart-line"></i>
                     </a>
-
-                    <!-- Settings -->
-                    <a href="settings.html" class="btn-footer-icon" data-i18n-title="nav.settings" title="Configurações">
+                    <a href="settings.html" class="btn-footer-icon" title="Configurações">
                         <i class="fa-solid fa-gear"></i>
                     </a>
-
-                    <!-- Delete all -->
-                    <button class="btn-footer-icon btn-danger-icon" onclick="deleteAllConversations()"
-                            data-i18n-title="nav.delete_all" title="Deletar todas as conversas">
+                    <button class="btn-footer-icon btn-danger-icon" onclick="deleteAllConversations()" title="Deletar todas">
                         <i class="fa-solid fa-trash-can"></i>
                     </button>
-
-                    <!-- Logout -->
-                    <button class="btn-footer-icon btn-danger-icon" onclick="logout()"
-                            data-i18n-title="nav.logout" title="Sair">
+                    <button class="btn-footer-icon btn-danger-icon" onclick="logout()" title="Sair">
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
                 </div>
@@ -130,7 +121,7 @@
 
             <div class="chat-input-area">
                 <div class="chat-input-wrap">
-                    <button class="btn-attach" data-i18n-title="chat.placeholder" title="Anexar arquivo">
+                    <button class="btn-attach" title="Anexar arquivo">
                         <i class="fa-solid fa-paperclip"></i>
                     </button>
                     <textarea id="message-input" class="message-textarea" rows="1"
