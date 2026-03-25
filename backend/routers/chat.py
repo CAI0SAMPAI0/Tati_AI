@@ -5,7 +5,7 @@ import base64
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, Query, status
 from jose import jwt, JWTError
 from pydantic import BaseModel
-
+from services.database import get_client
 from routers.deps import get_current_user
 from services.history import (
     create_conversation,

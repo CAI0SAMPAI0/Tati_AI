@@ -20,7 +20,7 @@ window.addEventListener('DOMContentLoaded', () => {
     loadStudents();
 });
 
-// ── Navigation ─────────────────────────────────────────────────────
+// ── Navigation ─
 const sections = {
     overview: { title: 'Visão Geral', sub: 'Resumo da plataforma' },
     students: { title: 'Alunos', sub: 'Gerenciamento de alunos' },
@@ -39,7 +39,7 @@ function setSection(name, el) {
     document.getElementById('page-sub').textContent   = sections[name]?.sub   || '';
 }
 
-// ── Stats ──────────────────────────────────────────────────────────
+// ── Stats ──────
 async function loadStats() {
     try {
         const res  = await fetch(`${API}/dashboard/stats`, { headers: { Authorization: `Bearer ${token}` } });
@@ -51,7 +51,7 @@ async function loadStats() {
     } catch (e) { console.error('loadStats', e); }
 }
 
-// ── Students ───────────────────────────────────────────────────────
+// ── Students ───
 async function loadStudents() {
     try {
         const res = await fetch(`${API}/dashboard/students`, { headers: { Authorization: `Bearer ${token}` } });
@@ -115,7 +115,7 @@ function renderStudentsTable(containerId, students, compact = false) {
         </div>`;
 }
 
-// ── Student Modal ──────────────────────────────────────────────────
+// ── Student Modal ─
 let currentModalUsername = null;
 
 async function openStudentModal(username) {
@@ -228,7 +228,7 @@ function switchModalTab(tab, btn) {
     document.getElementById('tab-' + tab).style.display = 'block';
 }
 
-// ── Save level ─────────────────────────────────────────────────────
+// ── Save level ─
 async function saveStudentLevel() {
     const level    = document.getElementById('modal-level').value;
     const feedback = document.getElementById('modal-edit-feedback');
@@ -250,7 +250,7 @@ async function saveStudentLevel() {
     }
 }
 
-// ── Save prompt ────────────────────────────────────────────────────
+// ── Save prompt 
 async function saveStudentPrompt() {
     const custom_prompt = document.getElementById('modal-prompt').value.trim();
     const feedback      = document.getElementById('modal-prompt-feedback');
@@ -274,7 +274,7 @@ async function clearStudentPrompt() {
     await saveStudentPrompt();
 }
 
-// ── Delete student ─────────────────────────────────────────────────
+// ── Delete student 
 function confirmDeleteStudent(username) {
     const existing = document.getElementById('delete-confirm');
     if (existing) existing.remove();
@@ -321,7 +321,7 @@ async function deleteStudent(username) {
     }
 }
 
-// ── AI Insight ─────────────────────────────────────────────────────
+// ── AI Insight ─
 async function generateInsight() {
     const btn     = document.getElementById('btn-generate-insight');
     const content = document.getElementById('insight-content');
@@ -366,7 +366,7 @@ function showModalFeedback(el, msg, type) {
     setTimeout(() => { el.style.display = 'none'; }, 4000);
 }
 
-// ── Helpers ────────────────────────────────────────────────────────
+// ── Helpers ────
 function getInitials(name) {
     return (name || '?').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
 }

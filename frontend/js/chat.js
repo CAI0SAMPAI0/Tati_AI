@@ -108,7 +108,10 @@ function handleWSMessage(msg) {
     switch (msg.type) {
         case 'pong': break;
         case 'transcription':
-            document.getElementById('message-input').value = msg.text;
+            // Renderiza a mensagem do usuário no chat
+            renderMessage('user', msg.text);
+            // Limpa o input pois a mensagem já foi enviada
+            document.getElementById('message-input').value = '';
             autoResize(document.getElementById('message-input'));
             break;
         case 'status':
@@ -561,63 +564,151 @@ function finalizeStreamBubble(bubble) {
 // ── Audio controls HTML ───────────────────────────────────────────
 function audioControlsHTML() {
     return `
-        <div class="msg-audio-controls" style="display:none">
+        <div class="msg-audio-controls">
             <button class="btn-tts-play" title="Reproduzir">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             </button>
             <button class="btn-tts-rewind" title="Voltar 5s">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.56"/></svg>
             </button>
-            <input type="range" class="msg-vol-slider" min="0" max="1" step="0.05" value="1" title="Volume">
-            <select class="msg-spd-select" title="Velocidade">
-                <option value="0.75">0.75×</option>
-                <option value="1" selected>1×</option>
-                <option value="1.25">1.25×</option>
-                <option value="1.5">1.5×</option>
-                <option value="2">2×</option>
-            </select>
+            <div class="msg-vol-control">
+                <label>Vol</label>
+                <input type="range" class="msg-vol-slider" min="0" max="1" step="0.05" value="1" title="Volume">
+                <span class="msg-vol-value">100%</span>
+            </div>
+            <div class="msg-spd-control">
+                <label>Vel</label>
+                <select class="msg-spd-select" title="Velocidade">
+                    <option value="0.75">0.75×</option>
+                    <option value="1" selected>1×</option>
+                    <option value="1.25">1.25×</option>
+                    <option value="1.5">1.5×</option>
+                    <option value="2">2×</option>
+                </select>
+                <span class="msg-spd-value">1.0×</span>
+            </div>
         </div>`;
 }
 
 // ── Attach audio to last assistant bubble ─────────────────────────
 function attachAudioToLastBubble(b64) {
+    console.log('🎵 attachAudioToLastBubble iniciando...');
+    
     const msgs = document.querySelectorAll('.message-assistant');
-    if (!msgs.length) return;
-    const last     = msgs[msgs.length - 1];
-    const controls = last.querySelector('.msg-audio-controls');
-    if (!controls) return;
+    if (!msgs.length) { console.log('❌ Nenhuma mensagem assistente'); return; }
+    
+    const last = msgs[msgs.length - 1];
+    let controls = last.querySelector('.msg-audio-controls');
+    
+    if (!controls) {
+        let meta = last.querySelector('.message-meta');
+        if (!meta) {
+            meta = document.createElement('div');
+            meta.className = 'message-meta';
+            meta.innerHTML = `<span class="message-time">${nowTime()}</span>${audioControlsHTML()}`;
+            last.querySelector('.message-body').appendChild(meta);
+        } else {
+            if (!meta.querySelector('.msg-audio-controls')) {
+                const controlsDiv = document.createElement('div');
+                controlsDiv.innerHTML = audioControlsHTML();
+                meta.appendChild(controlsDiv.firstChild);
+            }
+        }
+        controls = last.querySelector('.msg-audio-controls');
+    }
 
-    controls.style.display = 'flex';
+    console.log('✅ Controls encontrados:', !!controls);
+    
+    // Buscar elementos
+    const playBtn    = controls?.querySelector('.btn-tts-play');
+    const rewBtn     = controls?.querySelector('.btn-tts-rewind');
+    const volSlider  = controls?.querySelector('.msg-vol-slider');
+    const spdSelect  = controls?.querySelector('.msg-spd-select');
+    const volValue   = controls?.querySelector('.msg-vol-value');
+    const spdValue   = controls?.querySelector('.msg-spd-value');
+    
+    console.log('🔍 Play btn:', !!playBtn, 'Rew btn:', !!rewBtn, 'Vol:', !!volSlider, 'Spd:', !!spdSelect);
+    
+    if (!playBtn || !rewBtn || !volSlider || !spdSelect) {
+        console.error('❌ Elementos não encontrados!');
+        return;
+    }
 
-    const s     = getSettings();
+    const s = getSettings();
     const speed = parseFloat(s.defaultSpeed || '1');
     const audio = new Audio('data:audio/mp3;base64,' + b64);
-    audio.volume       = 1;
+    
+    console.log('🔊 Audio criado, speed:', speed);
+    
+    audio.volume = 1;
     audio.playbackRate = speed;
+    
+    if (volValue) volValue.textContent = '100%';
+    if (spdValue) {
+        spdSelect.value = speed;
+        spdValue.textContent = parseFloat(speed).toFixed(1) + '×';
+    }
 
-    const playBtn  = controls.querySelector('.btn-tts-play');
-    const rewBtn   = controls.querySelector('.btn-tts-rewind');
-    const volSlider = controls.querySelector('.msg-vol-slider');
-    const spdSelect = controls.querySelector('.msg-spd-select');
-
-    // Set speed selector to match setting
-    if (spdSelect) spdSelect.value = String(speed);
-
-    // Auto-play if enabled in settings
-    if (s.autoPlay) {
-        audio.play().catch(() => {});
+    // Auto-play
+    if (s.autoPlay === true || s.autoPlay === 'true') {
+        console.log('▶️ Auto-play ativado');
+        audio.play().catch(e => console.log('Play error:', e));
         updatePlayBtn(playBtn, true);
     }
 
-    playBtn.onclick = () => {
-        if (audio.paused) { audio.play(); updatePlayBtn(playBtn, true); }
-        else              { audio.pause(); updatePlayBtn(playBtn, false); }
-    };
-    rewBtn.onclick      = () => { audio.currentTime = Math.max(0, audio.currentTime - 5); };
-    volSlider.oninput   = () => { audio.volume = parseFloat(volSlider.value); };
-    spdSelect.onchange  = () => { audio.playbackRate = parseFloat(spdSelect.value); };
-    audio.onended       = () => updatePlayBtn(playBtn, false);
-    audio.onerror       = () => updatePlayBtn(playBtn, false);
+    // Play/Pause com addEventListener
+    playBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        console.log('▶️ Play button clicado, paused:', audio.paused);
+        if (audio.paused) {
+            console.log('▶️ Reproduzindo...');
+            audio.play().catch(e => console.log('Play error:', e));
+            updatePlayBtn(playBtn, true);
+        } else {
+            console.log('⏸ Pausando...');
+            audio.pause();
+            updatePlayBtn(playBtn, false);
+        }
+    });
+
+    // Rewind com addEventListener
+    rewBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        console.log('⏪ Rewind clicado, currentTime antes:', audio.currentTime);
+        audio.currentTime = Math.max(0, audio.currentTime - 5);
+        console.log('⏪ Rewind clicado, currentTime depois:', audio.currentTime);
+    });
+
+    // Volume com addEventListener
+    volSlider.addEventListener('input', (e) => {
+        e.stopPropagation();
+        const vol = parseFloat(volSlider.value);
+        audio.volume = vol;
+        if (volValue) volValue.textContent = Math.round(vol * 100) + '%';
+        console.log('🔊 Volume mudado para:', vol);
+    });
+
+    // Speed com addEventListener
+    spdSelect.addEventListener('change', (e) => {
+        e.stopPropagation();
+        const spd = parseFloat(spdSelect.value);
+        audio.playbackRate = spd;
+        if (spdValue) spdValue.textContent = spd.toFixed(1) + '×';
+        console.log('⚡ Speed mudada para:', spd);
+    });
+
+    // Event listeners de áudio
+    audio.addEventListener('ended', () => {
+        console.log('✅ Audio ended');
+        updatePlayBtn(playBtn, false);
+    });
+    
+    audio.addEventListener('pause', () => {
+        console.log('⏸ Audio paused');
+        updatePlayBtn(playBtn, false);
+    });
+    
+    console.log('✅ Todos os handlers anexados com sucesso!');
 }
 
 function updatePlayBtn(btn, playing) {
