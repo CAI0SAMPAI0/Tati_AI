@@ -6,7 +6,6 @@
     <title>Tati AI — Meu Perfil</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
     <link rel="stylesheet" href="styles/global.css">
     <link rel="stylesheet" href="styles/profile.css">
@@ -15,7 +14,6 @@
 <body>
     <div class="profile-layout">
 
-        <!-- Topbar -->
         <header class="profile-topbar">
             <a href="chat.html" class="btn-back">
                 <i class="fa-solid fa-arrow-left"></i>
@@ -29,17 +27,13 @@
 
         <div class="profile-content">
 
-            <!-- Hero — avatar com upload -->
+            <!-- Hero -->
             <div class="profile-hero">
                 <div class="profile-avatar-wrap">
-                    <!-- Photo (hidden until loaded) -->
                     <img id="profile-avatar-img" class="profile-avatar-photo" src="" alt=""
                          style="display:none;" onerror="this.style.display='none'; document.getElementById('profile-avatar').style.display='flex';">
-                    <!-- Initials fallback -->
                     <div class="profile-avatar" id="profile-avatar">??</div>
                     <div class="avatar-ring"></div>
-
-                    <!-- Upload overlay -->
                     <label class="avatar-upload-overlay" title="Trocar foto" for="avatar-file-input">
                         <i class="fa-solid fa-camera"></i>
                     </label>
@@ -53,7 +47,6 @@
                         <span class="badge badge-level" id="badge-level">Beginner</span>
                         <span class="badge badge-role" id="badge-role">Student</span>
                     </div>
-                    <!-- Upload status -->
                     <div id="avatar-upload-status" style="display:none;" class="avatar-status"></div>
                 </div>
             </div>
@@ -74,10 +67,10 @@
                 </div>
             </div>
 
-            <!-- Formulário -->
+            <!-- Form -->
             <div class="profile-sections">
 
-                <!-- Info pessoal -->
+                <!-- Dados pessoais -->
                 <section class="profile-section">
                     <h2 class="section-title">
                         <i class="fa-solid fa-user"></i>
@@ -113,11 +106,11 @@
                         <div class="field">
                             <label data-i18n="profile.level">Nível de inglês</label>
                             <select id="field-level">
-                                <option value="Beginner"        data-i18n="level.beginner">Beginner</option>
+                                <option value="Beginner"         data-i18n="level.beginner">Beginner</option>
                                 <option value="Pre-Intermediate" data-i18n="level.pre_int">Pre-Intermediate</option>
-                                <option value="Intermediate"    data-i18n="level.intermediate">Intermediate</option>
+                                <option value="Intermediate"     data-i18n="level.intermediate">Intermediate</option>
                                 <option value="Business English" data-i18n="level.business">Business English</option>
-                                <option value="Advanced"        data-i18n="level.advanced">Advanced</option>
+                                <option value="Advanced"         data-i18n="level.advanced">Advanced</option>
                             </select>
                         </div>
                         <div class="field">
@@ -131,11 +124,6 @@
                             </select>
                         </div>
                     </div>
-                    <div id="save-feedback" class="save-feedback" style="display:none;"></div>
-                    <button class="btn-save" id="btn-save" onclick="saveProfile()">
-                        <i class="fa-solid fa-floppy-disk"></i>
-                        <span data-i18n="profile.save">Salvar alterações</span>
-                    </button>
                 </section>
 
                 <!-- Segurança -->
@@ -144,6 +132,9 @@
                         <i class="fa-solid fa-lock"></i>
                         <span data-i18n="profile.security">Segurança</span>
                     </h2>
+                    <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem;">
+                        Preencha apenas se quiser alterar sua senha. Deixe em branco para manter a atual.
+                    </p>
                     <div class="form-grid">
                         <div class="field">
                             <label data-i18n="profile.current_pw">Senha atual</label>
@@ -164,12 +155,14 @@
                             </div>
                         </div>
                     </div>
-                    <div id="pw-feedback" class="save-feedback" style="display:none;"></div>
-                    <button class="btn-save btn-save-secondary" id="btn-pw" onclick="changePassword()">
-                        <i class="fa-solid fa-shield"></i>
-                        <span data-i18n="profile.update_pw">Atualizar senha</span>
-                    </button>
                 </section>
+
+                <!-- Botão único de salvar -->
+                <div id="save-feedback" class="save-feedback" style="display:none;"></div>
+                <button class="btn-save" id="btn-save" onclick="saveAll()" style="width:100%;justify-content:center;">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span data-i18n="profile.save">Salvar alterações</span>
+                </button>
 
                 <!-- Zona de perigo -->
                 <section class="profile-section danger-zone">

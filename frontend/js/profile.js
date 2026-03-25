@@ -41,8 +41,7 @@ function populateProfile(data) {
     const name     = data.name || data.username;
     const initials = name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
 
-    // Avatar: photo takes priority, then initials
-    const photoImg  = document.getElementById('profile-avatar-img');
+    const photoImg   = document.getElementById('profile-avatar-img');
     const initialsEl = document.getElementById('profile-avatar');
 
     if (data.avatar_url) {
@@ -50,12 +49,11 @@ function populateProfile(data) {
         photoImg.style.display = 'block';
         initialsEl.style.display = 'none';
     } else {
-        initialsEl.textContent  = initials;
+        initialsEl.textContent   = initials;
         initialsEl.style.display = 'flex';
-        photoImg.style.display  = 'none';
+        photoImg.style.display   = 'none';
     }
 
-    // Also update sidebar avatar on this page if present
     document.getElementById('profile-name').textContent     = name;
     document.getElementById('profile-username').textContent = '@' + data.username;
     document.getElementById('badge-level').textContent      = data.level || 'Beginner';
@@ -99,14 +97,19 @@ async function loadStats() {
     } catch (e) { console.error('loadStats error', e); }
 }
 
-// ── Save profile ──────────────────────────────────────────────────
-async function saveProfile() {
+// ── Save ALL — perfil + senha (se preenchida) ─────────────────────
+async function saveAll() {
     const btn      = document.getElementById('btn-save');
     const feedback = document.getElementById('save-feedback');
-    btn.disabled   = true;
     const labelSpan = btn.querySelector('span');
+
+    btn.disabled = true;
     if (labelSpan) labelSpan.textContent = t('profile.saving');
 
+    let profileOk = false;
+    let pwOk      = true; // assume ok se campos vazios
+
+    // 1. Salvar dados do perfil
     const body = {
         name:       document.getElementById('field-name').value.trim()       || undefined,
         email:      document.getElementById('field-email').value.trim()      || undefined,
@@ -122,21 +125,57 @@ async function saveProfile() {
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
             body:    JSON.stringify(body)
         });
-        const data = await res.json();
         if (res.ok) {
-            showFeedback(feedback, t('profile.saved'), 'success');
+            profileOk = true;
             const updated = { ...userLocal, ...body };
             localStorage.setItem('user', JSON.stringify(updated));
-            loadProfile();
         } else {
-            showFeedback(feedback, data.detail || 'Erro ao salvar.', 'error');
+            const data = await res.json();
+            showFeedback(feedback, data.detail || 'Erro ao salvar perfil.', 'error');
         }
     } catch {
         showFeedback(feedback, 'Erro de conexão.', 'error');
-    } finally {
-        btn.disabled = false;
-        if (labelSpan) labelSpan.textContent = t('profile.save');
     }
+
+    // 2. Alterar senha — só se algum campo de senha foi preenchido
+    const currentPw = document.getElementById('field-current-pw').value;
+    const newPw     = document.getElementById('field-new-pw').value;
+
+    if (currentPw || newPw) {
+        pwOk = false;
+        if (!currentPw || !newPw) {
+            showFeedback(feedback, 'Para alterar a senha, preencha os dois campos.', 'error');
+        } else if (newPw.length < 6) {
+            showFeedback(feedback, 'A nova senha deve ter pelo menos 6 caracteres.', 'error');
+        } else {
+            try {
+                const res = await fetch(`${API}/auth/password`, {
+                    method:  'PUT',
+                    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ current_password: currentPw, new_password: newPw })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    pwOk = true;
+                    document.getElementById('field-current-pw').value = '';
+                    document.getElementById('field-new-pw').value     = '';
+                } else {
+                    showFeedback(feedback, data.detail || 'Erro ao atualizar senha.', 'error');
+                }
+            } catch {
+                showFeedback(feedback, 'Erro de conexão ao atualizar senha.', 'error');
+            }
+        }
+    }
+
+    // 3. Feedback final
+    if (profileOk && pwOk) {
+        showFeedback(feedback, t('profile.saved'), 'success');
+        loadProfile();
+    }
+
+    btn.disabled = false;
+    if (labelSpan) labelSpan.textContent = t('profile.save');
 }
 
 // ── Avatar upload ─────────────────────────────────────────────────
@@ -149,18 +188,18 @@ async function handleAvatarUpload(event) {
     statusEl.className   = 'avatar-status uploading';
     statusEl.style.display = 'block';
 
-    // Preview immediately
+    // Preview imediato
     const reader = new FileReader();
     reader.onload = (e) => {
         const photoImg   = document.getElementById('profile-avatar-img');
         const initialsEl = document.getElementById('profile-avatar');
         photoImg.src = e.target.result;
-        photoImg.style.display = 'block';
+        photoImg.style.display   = 'block';
         initialsEl.style.display = 'none';
     };
     reader.readAsDataURL(file);
 
-    // Upload to backend
+    // Upload para o backend
     const formData = new FormData();
     formData.append('file', file);
 
@@ -168,25 +207,28 @@ async function handleAvatarUpload(event) {
         const res = await fetch(`${API}/profile/avatar`, {
             method:  'POST',
             headers: { Authorization: `Bearer ${token}` },
-            body:    formData
+            // NÃO setar Content-Type — o browser define multipart/form-data automaticamente
+            body: formData
         });
         const data = await res.json();
         if (res.ok) {
             statusEl.textContent = '✓ Foto atualizada!';
             statusEl.className   = 'avatar-status success';
-            // Update cached user
             const updated = { ...JSON.parse(localStorage.getItem('user') || '{}'), avatar_url: data.avatar_url };
             localStorage.setItem('user', JSON.stringify(updated));
         } else {
             statusEl.textContent = data.detail || 'Erro ao enviar foto.';
             statusEl.className   = 'avatar-status error';
+            // Reverter preview
+            loadProfile();
         }
-    } catch {
+    } catch (err) {
+        console.error('Avatar upload error:', err);
         statusEl.textContent = 'Erro de conexão.';
         statusEl.className   = 'avatar-status error';
+        loadProfile();
     } finally {
-        setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
-        // Reset input so same file can be re-selected
+        setTimeout(() => { statusEl.style.display = 'none'; }, 3500);
         event.target.value = '';
     }
 }
@@ -196,54 +238,18 @@ function togglePwVisibility(inputId, btn) {
     const input = document.getElementById(inputId);
     const icon  = btn.querySelector('i');
     if (input.type === 'password') {
-        input.type    = 'text';
+        input.type     = 'text';
         icon.className = 'fa-solid fa-eye-slash';
     } else {
-        input.type    = 'password';
+        input.type     = 'password';
         icon.className = 'fa-solid fa-eye';
-    }
-}
-
-// ── Change password ───────────────────────────────────────────────
-async function changePassword() {
-    const btn      = document.getElementById('btn-pw');
-    const feedback = document.getElementById('pw-feedback');
-    const current  = document.getElementById('field-current-pw').value;
-    const newPw    = document.getElementById('field-new-pw').value;
-
-    if (!current || !newPw) {
-        showFeedback(feedback, 'Preencha os dois campos.', 'error'); return;
-    }
-    if (newPw.length < 6) {
-        showFeedback(feedback, 'A nova senha deve ter pelo menos 6 caracteres.', 'error'); return;
-    }
-
-    btn.disabled = true;
-    try {
-        const res = await fetch(`${API}/auth/password`, {
-            method:  'PUT',
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ current_password: current, new_password: newPw })
-        });
-        const data = await res.json();
-        if (res.ok) {
-            showFeedback(feedback, 'Senha atualizada com sucesso! ✓', 'success');
-            document.getElementById('field-current-pw').value = '';
-            document.getElementById('field-new-pw').value     = '';
-        } else {
-            showFeedback(feedback, data.detail || 'Erro ao atualizar senha.', 'error');
-        }
-    } catch {
-        showFeedback(feedback, 'Erro de conexão.', 'error');
-    } finally {
-        btn.disabled = false;
     }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
 function showFeedback(el, msg, type) {
-    el.textContent  = msg;
-    el.className    = 'save-feedback show ' + type;
+    el.textContent   = msg;
+    el.className     = 'save-feedback show ' + type;
     el.style.display = 'block';
     setTimeout(() => { el.style.display = 'none'; el.classList.remove('show'); }, 4000);
 }
