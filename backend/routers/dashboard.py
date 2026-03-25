@@ -31,7 +31,6 @@ async def get_stats(current_user: dict = Depends(_require_staff)):
         .eq("role", "student")
         .execute()
     )
-
     messages = (
         db.table("messages")
         .select("id")
@@ -120,15 +119,27 @@ async def update_student(
 
 @router.get("/students/{username}/insight")
 async def get_student_insight(username: str, current_user: dict = Depends(_require_staff)):
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="ANTHROPIC_API_KEY não configurada. Configure a variável de ambiente para usar esta funcionalidade."
+        )
+
     db = get_client()
 
-    # Busca dados do aluno
-    user_rows = db.table("users").select("name, level, focus, created_at").eq("username", username).limit(1).execute().data
+    user_rows = (
+        db.table("users")
+        .select("name, level, focus, created_at")
+        .eq("username", username)
+        .limit(1)
+        .execute()
+        .data
+    )
     if not user_rows:
         raise HTTPException(status_code=404, detail="Aluno não encontrado")
     student = user_rows[0]
 
-    # Busca as últimas 40 mensagens do aluno (somente as do usuário, não as da IA)
     messages = (
         db.table("messages")
         .select("role, content, date")
@@ -138,12 +149,13 @@ async def get_student_insight(username: str, current_user: dict = Depends(_requi
         .execute()
         .data
     )
-    messages.reverse()  # ordem cronológica
+    messages.reverse()
 
     if not messages:
-        return {"insight": "Este aluno ainda não enviou nenhuma mensagem. Não há dados suficientes para gerar um insight."}
+        return {
+            "insight": "Este aluno ainda não enviou nenhuma mensagem. Não há dados suficientes para gerar um insight."
+        }
 
-    # Monta o histórico para a IA
     history_text = ""
     for m in messages:
         role_label = "Student" if m["role"] == "user" else "Teacher Tati"
@@ -172,11 +184,26 @@ Please provide a concise pedagogical report in Portuguese for the teacher, cover
 
 Be specific and cite examples from the conversation when possible. Keep the tone professional but warm."""
 
-    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-    response = client.messages.create(
-        model="claude-opus-4-5",
-        max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}]
-    )
-
-    return {"insight": response.content[0].text}
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-sonnet-4-5",   # modelo disponível e mais custo-eficiente
+            max_tokens=1024,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return {"insight": response.content[0].text}
+    except anthropic.AuthenticationError:
+        raise HTTPException(
+            status_code=401,
+            detail="Chave da API Anthropic inválida. Verifique a variável ANTHROPIC_API_KEY."
+        )
+    except anthropic.RateLimitError:
+        raise HTTPException(
+            status_code=429,
+            detail="Limite de requisições atingido. Tente novamente em alguns instantes."
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao gerar insight: {str(e)}"
+        )
