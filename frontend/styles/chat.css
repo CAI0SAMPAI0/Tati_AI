@@ -847,6 +847,77 @@
     border-color: var(--primary);
 }
 
+/*AUDIO CONTROLS (msg-audio-controls) */
+
+/* Audio controls container */
+.msg-audio-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: 0.8rem;
+}
+
+/* Play/Pause and Rewind buttons */
+.btn-tts-play,
+.btn-tts-rewind {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s;
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+}
+
+.btn-tts-play:hover,
+.btn-tts-rewind:hover {
+    color: var(--primary);
+    background: rgba(124, 58, 237, 0.1);
+}
+
+.msg-vol-control, .msg-spd-control {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.msg-vol-control label, .msg-spd-control label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    min-width: 25px;
+    font-weight: 600;
+}
+
+.msg-vol-value, .msg-spd-value {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    min-width: 35px;
+    text-align: right;
+}
+
+.msg-vol-slider {
+    width: 80px;
+    height: 4px;
+    cursor: pointer;
+}
+
+.msg-spd-select {
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 0.8rem;
+    cursor: pointer;
+    min-width: 50px;
+}
+
 /* ══════════════════════════════════════
    RESPONSIVO
 ══════════════════════════════════════ */
