@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles/global.css">
   <link rel="stylesheet" href="styles/voice.css">
-  <link rel="stylesheet" href="styles/word-tooltip.css">
+  <link rel="stylesheet" href="styles/word_tooltip.css">
   <link rel="icon" type="image/x-icon" href="images/tati_logo.jpg">
 </head>
 
@@ -53,21 +53,21 @@
       </div>
     </div>
 
-    <!-- Conversation -->
+    <!-- Conversation bubbles -->
     <div class="voice-history" id="voice-history">
       <div class="vtyping" id="vtyping">
         <span></span><span></span><span></span>
       </div>
     </div>
 
-    <!-- Live transcription -->
+    <!-- Transcription (oculta via CSS, só mantida para compatibilidade com voice.js) -->
     <div class="voice-transcription" id="voice-transcription"></div>
 
     <!-- Footer -->
     <div class="voice-footer">
       <!-- Audio controls -->
       <div class="voice-audio-bar">
-        <button class="vac-btn" id="vac-play-btn">▶ Listen</button>
+        <button class="vac-btn" id="vac-play-btn">▶ Ouvir</button>
         <button class="vac-btn" id="vac-rewind-btn">↩ 5s</button>
         <div class="vac-sep"></div>
         <span class="vac-label">Vol</span>
@@ -82,13 +82,13 @@
       <!-- Mic -->
       <div class="mic-wrap">
         <button class="mic-btn" id="mic-btn">🎤</button>
-        <span class="mic-hint" id="mic-hint">Press to talk</span>
+        <span class="mic-hint" id="mic-hint">Toque para falar</span>
       </div>
     </div>
 
   </div>
 
-  <script src="js/word-tooltip.js"></script>
+  <script src="js/word_tooltip.js"></script>
   <script src="js/voice.js"></script>
 </body>
 

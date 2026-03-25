@@ -49,7 +49,7 @@ let streamingBubble = null;
 let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
-let pendingFile = [];   // { name, b64, size, type } e envia mais que 1 arquivo
+let pendingFiles = [];   // FIX: era "pendingFile" em alguns lugares — agora sempre "pendingFiles"
 let streamBuffer = '';
 
 // ── Audio player state ─────────────────────────────────────────────
@@ -57,13 +57,30 @@ let currentMsgAudio = null;
 
 // ── WebSocket ─────────────────────────────────────────────────────
 function connectWS() {
-    if (ws && ws.readyState === WebSocket.OPEN) return;
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
     ws = new WebSocket(`${WS_URL}/chat/ws?token=${token}`);
     ws.onopen = () => console.log('[WS] connected');
     ws.onmessage = e => handleWSMessage(JSON.parse(e.data));
     ws.onerror = e => console.error('[WS] error', e);
     ws.onclose = () => { ws = null; setTimeout(connectWS, 3000); };
     setInterval(() => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' })); }, 20000);
+}
+
+// FIX: espera WS abrir com polling ao invés de sleep fixo
+function waitForWS(timeout = 5000) {
+    return new Promise((resolve, reject) => {
+        if (ws && ws.readyState === WebSocket.OPEN) { resolve(); return; }
+        const start = Date.now();
+        const interval = setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                clearInterval(interval);
+                resolve();
+            } else if (Date.now() - start > timeout) {
+                clearInterval(interval);
+                reject(new Error('WebSocket timeout'));
+            }
+        }, 100);
+    });
 }
 
 function handleWSMessage(msg) {
@@ -87,7 +104,7 @@ function handleWSMessage(msg) {
             streamingBubble = null;
             isStreaming = false;
             setInputEnabled(true);
-            loadConversations();
+            loadConversations(); // recarrega para atualizar título
             break;
         case 'audio_response':
             attachAudioToLastBubble(msg.audio);
@@ -182,12 +199,14 @@ async function openConversation(id, title) {
 async function loadMessages(convId) {
     const area = document.getElementById('chat-messages');
     const typingEl = document.getElementById('typing-indicator');
-    [...area.children].forEach(el => { if (el.id !== 'typing-indicator') el.remove(); });
-    area.appendChild(typingEl);
+    const welcomeEl = document.getElementById('chat-welcome');
+    [...area.children].forEach(el => { if (el.id !== 'typing-indicator' && el.id !== 'chat-welcome') el.remove(); });
     typingEl.style.display = 'none';
 
-    if (!convId) { document.getElementById('chat-welcome').style.display = 'flex'; return; }
-    const welcomeEl = document.getElementById('chat-welcome');
+    if (!convId) {
+        if (welcomeEl) welcomeEl.style.display = 'flex';
+        return;
+    }
     if (welcomeEl) welcomeEl.style.display = 'none';
 
     try {
@@ -195,14 +214,13 @@ async function loadMessages(convId) {
         if (!res.ok) return;
         const msgs = await res.json();
         msgs.forEach(m => renderMessage(m.role, m.content));
-    } catch (e) { }
+    } catch (e) { console.error(e); }
     scrollBottom();
 }
 
 async function deleteConv(e, id) {
     e.stopPropagation();
 
-    // Cria confirm inline (evita bloqueio do navegador)
     const existing = document.getElementById('confirm-delete-popup');
     if (existing) existing.remove();
 
@@ -239,6 +257,52 @@ async function deleteConv(e, id) {
     };
 }
 
+// ── Delete ALL conversations ───────────────────────────────────────
+async function deleteAllConversations() {
+    const existing = document.getElementById('confirm-delete-popup');
+    if (existing) existing.remove();
+
+    const popup = document.createElement('div');
+    popup.id = 'confirm-delete-popup';
+    popup.style.cssText = `
+        position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+        background:var(--card); border:1px solid rgba(239,68,68,0.4);
+        border-radius:12px; padding:1rem 1.25rem; z-index:999;
+        display:flex; flex-direction:column; gap:0.5rem; min-width:260px;
+        box-shadow:0 8px 24px rgba(0,0,0,0.4);
+    `;
+    popup.innerHTML = `
+        <p style="font-size:0.85rem;color:var(--text);margin:0;font-weight:600;">⚠️ Deletar TODAS as conversas?</p>
+        <p style="font-size:0.75rem;color:var(--text-muted);margin:0;">Esta ação é irreversível.</p>
+        <div style="display:flex;gap:0.5rem;">
+            <button id="confirm-all-yes" style="flex:1;padding:0.4rem;background:#ef4444;color:white;border:none;border-radius:8px;cursor:pointer;font-size:0.8rem;">Deletar tudo</button>
+            <button id="confirm-all-no" style="flex:1;padding:0.4rem;background:var(--border);color:var(--text);border:none;border-radius:8px;cursor:pointer;font-size:0.8rem;">Cancelar</button>
+        </div>
+    `;
+    document.body.appendChild(popup);
+
+    document.getElementById('confirm-all-no').onclick = () => popup.remove();
+    document.getElementById('confirm-all-yes').onclick = async () => {
+        popup.remove();
+        try {
+            const res = await fetch(`${API}/chat/conversations`, { headers: { Authorization: `Bearer ${token}` } });
+            if (!res.ok) return;
+            const convs = await res.json();
+            await Promise.all(convs.map(c =>
+                fetch(`${API}/chat/conversations/${c.id}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` }
+                })
+            ));
+            currentConvId = null;
+            clearMessages();
+            await loadConversations();
+        } catch (e) {
+            appendErrorMsg('Erro ao deletar conversas: ' + e.message);
+        }
+    };
+}
+
 // ── File handling ──────────────────────────────────────────────────
 function setupFileInput() {
     const attachBtn = document.querySelector('.btn-attach');
@@ -248,36 +312,33 @@ function setupFileInput() {
 function triggerFileInput() {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.pdf,.docx,.txt,.md,.pptx,.xlsx,png,jpg,webm'; // tipos permitidos
-    input.multiple = true; // permitir vários arquivos por vez
+    input.accept = '.pdf,.docx,.txt,.md,.pptx,.xlsx,image/*,audio/*';
+    input.multiple = true;
     input.onchange = async () => {
         const files = Array.from(input.files);
         if (!files.length) return;
 
-        const MAX = 10 * 1024 * 1024; // 10MB
+        const MAX = 10 * 1024 * 1024;
         for (const file of files) {
             if (file.size > MAX) {
-                appendErrorMsg(`${file.name} muito grande (máx 10MB).`); continue;
+                appendErrorMsg(`${file.name} muito grande (máx 10MB).`);
+                continue;
             }
+            // FIX: lê cada arquivo e adiciona a pendingFiles
+            await new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const b64 = reader.result.split(',')[1];
+                    pendingFiles.push({ name: file.name, b64, size: file.size, type: file.type });
+                    resolve();
+                };
+                reader.readAsDataURL(file);
+            });
         }
-
-        await new Promise(resolve => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const b64 = reader.result.split(',')[1];
-                const ext = file.name.split('.').pop().toLowerCase();
-                const previewText = (ext === 'txt' || ext === 'md')
-                    ? atob(b64).substring(0, 300)
-                    : `Arquivo ${ext.toUpperCase()} — conteúdo extraído pela Tati.`;
-                pendingFiles.push({ name: file.name, b64, size: file.size, type: file.type });
-                resolve();
-            };
-            reader.readAsDataURL(file);
-        });
-    }
-    renderFilePreviewBar();
-};
-
+        renderFilePreviewBar();
+    };
+    input.click();
+}
 
 function renderFilePreviewBar() {
     const old = document.getElementById('file-preview-bar');
@@ -307,13 +368,8 @@ function renderFilePreviewBar() {
     inputArea.insertBefore(bar, inputArea.firstChild);
 }
 
-// mantém compatibilidade com chamadas antigas
-function showFilePreview(name, size, extractedText = '') {
-    renderFilePreviewBar();
-}
-
 function removePendingFile(index) {
-    if (index === undefined) {
+    if (index === undefined || index === null) {
         pendingFiles = [];
     } else {
         pendingFiles.splice(index, 1);
@@ -322,8 +378,8 @@ function removePendingFile(index) {
 }
 
 function getFileIcon(name) {
-    const ext = name.split('.').pop().toLowerCase();
-    const icons = { pdf: '📄', docx: '📝', doc: '📝', txt: '📃', md: '📋' };
+    const ext = (name.split('.').pop() || '').toLowerCase();
+    const icons = { pdf: '📄', docx: '📝', doc: '📝', txt: '📃', md: '📋', xlsx: '📊', pptx: '📽️' };
     return icons[ext] || '📎';
 }
 
@@ -336,25 +392,49 @@ function formatFileSize(bytes) {
 // ── Send message ───────────────────────────────────────────────────
 async function sendMessage() {
     if (isStreaming) return;
+
     const input = document.getElementById('message-input');
     const text = input.value.trim();
-    if (!text && !pendingFile) return;
-    if (!currentConvId) { await newChat(); }
-    if (!ws || ws.readyState !== WebSocket.OPEN) { connectWS(); await sleep(500); }
+
+    // FIX: precisa de texto OU arquivos pendentes
+    if (!text && !pendingFiles.length) return;
+
+    // Garante que há uma conversa ativa
+    if (!currentConvId) {
+        await newChat();
+        // newChat já chama openConversation, que chama connectWS
+        await sleep(300);
+    }
+
+    // Garante WS conectado
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        connectWS();
+    }
+    try {
+        await waitForWS(6000);
+    } catch (e) {
+        appendErrorMsg('Não foi possível conectar ao servidor. Tente novamente.');
+        return;
+    }
+
+    // Limpa input imediatamente
+    input.value = '';
+    autoResize(input);
 
     if (pendingFiles.length) {
         const files = [...pendingFiles];
-        removePendingFile(); // limpa tudo
+        pendingFiles = [];
+        renderFilePreviewBar();
 
         for (const file of files) {
             appendFileMsg(file.name, file.size);
         }
+
         showTyping();
         isStreaming = true;
         setInputEnabled(false);
         scrollBottom();
 
-        // Envia cada arquivo sequencialmente
         for (const file of files) {
             ws.send(JSON.stringify({
                 type: 'file',
@@ -363,17 +443,13 @@ async function sendMessage() {
                 conversation_id: currentConvId,
                 caption: text || ''
             }));
-            await sleep(100); // pequena pausa entre arquivos
+            await sleep(100);
         }
-
-        input.value = '';
-        autoResize(input);
         return;
     }
 
+    // Mensagem de texto normal
     renderMessage('user', text);
-    input.value = '';
-    autoResize(input);
     showTyping();
     isStreaming = true;
     setInputEnabled(false);
@@ -382,8 +458,13 @@ async function sendMessage() {
     ws.send(JSON.stringify({ type: 'text', content: text, conversation_id: currentConvId }));
 }
 
+// FIX: Enter envia, Shift+Enter quebra linha
 function handleKey(e) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        sendMessage();
+    }
 }
 
 function autoResize(el) {
@@ -392,12 +473,15 @@ function autoResize(el) {
 }
 
 function setInputEnabled(enabled) {
-    document.getElementById('btn-send').disabled = !enabled;
-    document.getElementById('message-input').disabled = !enabled;
+    const btn = document.getElementById('btn-send');
+    const input = document.getElementById('message-input');
+    if (btn) btn.disabled = !enabled;
+    if (input) input.disabled = !enabled;
 }
 
 function useSuggestion(btn) {
-    document.getElementById('message-input').value = btn.textContent;
+    const input = document.getElementById('message-input');
+    input.value = btn.textContent;
     sendMessage();
 }
 
@@ -424,6 +508,10 @@ function stopRecording() {
 
 async function sendAudio() {
     if (!currentConvId) await newChat();
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        connectWS();
+        await waitForWS(5000).catch(() => {});
+    }
     const blob = new Blob(audioChunks, { type: 'audio/webm' });
     const reader = new FileReader();
     reader.onload = () => {
@@ -455,7 +543,7 @@ function appendUserMsg(text) {
 function appendFileMsg(name, size) {
     const div = document.createElement('div');
     div.className = 'message message-user';
-    const ext = name.split('.').pop().toUpperCase();
+    const ext = (name.split('.').pop() || '').toUpperCase();
     div.innerHTML = `
     <div class="message-body">
       <div class="message-bubble file-bubble">
@@ -506,7 +594,6 @@ function appendAssistantMsg(text) {
     </div>`;
 
     insertBeforeTyping(div);
-    // Make words clickable
     if (window.WordTooltip) WordTooltip.makeClickable(div);
     scrollBottom();
 }
@@ -559,13 +646,11 @@ function finalizeStreamBubble(bubble) {
     </div>`;
     body.appendChild(meta);
 
-    // Make words clickable after stream finishes
     if (window.WordTooltip) WordTooltip.makeClickable(bubble.closest('.message'));
 }
 
 // ── Audio attached to message ──────────────────────────────────────
 function attachAudioToLastBubble(b64) {
-    // Find last assistant message
     const msgs = document.querySelectorAll('.message-assistant');
     if (!msgs.length) return;
     const last = msgs[msgs.length - 1];
@@ -583,26 +668,16 @@ function attachAudioToLastBubble(b64) {
     const volSlider = controls.querySelector('.msg-vol-slider');
     const spdSelect = controls.querySelector('.msg-spd-select');
 
-    // Auto-play
     audio.play().catch(() => { });
     updatePlayBtn(playBtn, true);
 
     playBtn.onclick = () => {
-        if (audio.paused) {
-            audio.play();
-            updatePlayBtn(playBtn, true);
-        } else {
-            audio.pause();
-            updatePlayBtn(playBtn, false);
-        }
+        if (audio.paused) { audio.play(); updatePlayBtn(playBtn, true); }
+        else { audio.pause(); updatePlayBtn(playBtn, false); }
     };
-
     rewBtn.onclick = () => { audio.currentTime = Math.max(0, audio.currentTime - 5); };
-
     volSlider.oninput = () => { audio.volume = parseFloat(volSlider.value); };
-
     spdSelect.onchange = () => { audio.playbackRate = parseFloat(spdSelect.value); };
-
     audio.onended = () => updatePlayBtn(playBtn, false);
     audio.onerror = () => updatePlayBtn(playBtn, false);
 }
@@ -638,7 +713,8 @@ function clearMessages() {
     const typing = document.getElementById('typing-indicator');
     const welcome = document.getElementById('chat-welcome');
     [...area.children].forEach(el => { if (el.id !== 'typing-indicator' && el.id !== 'chat-welcome') el.remove(); });
-    if (welcome) welcome.style.display = 'flex'; typing.style.display = 'none';
+    if (welcome) welcome.style.display = 'flex';
+    if (typing) typing.style.display = 'none';
     document.querySelector('.topbar-title').textContent = 'Teacher Tati';
 }
 
@@ -654,7 +730,7 @@ function formatMarkdown(text) {
         .replace(/\n/g, '<br>');
 }
 
-function escHtml(str) { return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function escHtml(str) { return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function nowTime() { return new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
 function scrollBottom() { const a = document.getElementById('chat-messages'); a.scrollTop = a.scrollHeight; }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -668,10 +744,20 @@ function logout() {
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-send').addEventListener('click', sendMessage);
     document.getElementById('btn-mic').addEventListener('click', toggleMic);
+
+    // FIX: garante que o onkeydown do textarea está vinculado via JS também
+    const textarea = document.getElementById('message-input');
+    textarea.addEventListener('keydown', handleKey);
+    textarea.addEventListener('input', () => autoResize(textarea));
+
     connectWS();
     loadConversations().then(() => {
         const convs = document.querySelectorAll('.conv-item');
-        if (convs.length) convs[0].click();
-        else document.getElementById('chat-welcome').style.display = 'flex';
+        if (convs.length) {
+            convs[0].click();
+        } else {
+            const welcomeEl = document.getElementById('chat-welcome');
+            if (welcomeEl) welcomeEl.style.display = 'flex';
+        }
     });
 });
