@@ -37,7 +37,7 @@ SYSTEM_PROMPT = os.getenv(
 )
 
 import io
-import pdfplumber
+import pypdf
 import docx
 
 def verify_token(token: str) -> dict | None:
@@ -51,8 +51,8 @@ async def extract_text_from_file(filename: str, content_b64: str) -> str:
     try:
         file_bytes = base64.b64decode(content_b64)
         if filename.lower().endswith(".pdf"):
-            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-                return "\n".join([page.extract_text() for page in pdf.pages if page.extract_text()])
+            reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+            return "\n".join([page.extract_text() for page in reader.pages if page.extract_text()])
         elif filename.lower().endswith(".docx"):
             doc = docx.Document(io.BytesIO(file_bytes))
             return "\n".join([p.text for p in doc.paragraphs])
@@ -187,3 +187,17 @@ async def chat_ws(websocket: WebSocket, token: str = Query(...)):
         print(f"[WS] {username} desconectou")
     except Exception as e:
         print(f"[WS] Erro geral: {e}")
+
+# roda de pegar mensagens antigas da conversa, para mostrar o histórico quando o usuário abrir a conversa no frontend
+@router.get("/conversations/{conversation_id}/messages")
+async def get_history(
+    conversation_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    # Carrega as mensagens do banco de dados (usando sua service de history)
+    messages = await load_history(conversation_id)
+    
+    if messages is None:
+        raise HTTPException(status_code=404, detail="Conversa não encontrada")
+        
+    return messages
