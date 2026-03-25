@@ -2,17 +2,14 @@
 const token = localStorage.getItem('token');
 if (!token) { window.location.href = '/'; }
 
-// ── Apply theme on load (before render) ───────────────────────────
+// ── Apply theme on load ────────────────────────────────────────────
 const savedTheme = localStorage.getItem('theme') || 'dark';
 document.documentElement.setAttribute('data-theme', savedTheme);
 
 // ── Settings helpers ──────────────────────────────────────────────
 function getSettings() {
-  try {
-    return JSON.parse(localStorage.getItem('tati_settings') || '{}');
-  } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem('tati_settings') || '{}'); } catch { return {}; }
 }
-
 function saveSetting(key, value) {
   const s = getSettings();
   s[key] = value;
@@ -27,58 +24,65 @@ function setTheme(theme) {
   document.getElementById('theme-light').classList.toggle('active', theme === 'light');
 }
 
-// ── Init UI from saved settings ───────────────────────────────────
+// ── Language ──────────────────────────────────────────────────────
+function setLanguage(lang) {
+  I18n.setLang(lang);
+  // Highlight active button
+  document.querySelectorAll('.lang-option').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.lang === lang);
+  });
+}
+
+// ── Init UI ───────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  // Theme buttons
+  // Theme
   const theme = localStorage.getItem('theme') || 'dark';
   document.getElementById('theme-dark').classList.toggle('active', theme === 'dark');
   document.getElementById('theme-light').classList.toggle('active', theme === 'light');
 
+  // Language buttons — highlight current
+  const currentLang = I18n.getLang();
+  document.querySelectorAll('.lang-option').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.lang === currentLang);
+  });
+
   const s = getSettings();
 
-  // Auto play
-  const autoPlay = document.getElementById('auto-play')?.addEventListener('change', (e) => saveSetting('autoPlay', e.target.checked === true));
-  if (autoPlay) autoPlay.checked = s.autoPlay === true;
-
   // Default speed
-  const speed = document.getElementById('default-speed')
+  const speed = document.getElementById('default-speed');
   if (speed && s.defaultSpeed) speed.value = s.defaultSpeed;
 
   // Word tooltip
-  const wordTooltip = document.getElementById('word-tooltip-toggle')?.addEventListener('change', (e) => saveSetting('wordTooltip', e.target.checked === true));
-  if (wordTooltip) wordTooltip.checked = s.wordTooltip !== false; // default ON
+  const wt = document.getElementById('word-tooltip-toggle');
+  if (wt) wt.checked = s.wordTooltip !== false;
 
   // Enter to send
-  const enterSend = document.getElementById('enter-send')?.addEventListener('change', (e) => saveSetting('enterSend', e.target.checked === true));
-  if (enterSend) enterSend.checked = s.enterSend !== false; // default ON
+  const es = document.getElementById('enter-send');
+  if (es) es.checked = s.enterSend !== false;
 });
 
 function saveAllSettings() {
   const s = {};
-  
-  // Auto play como boolean
-  const autoPlay = document.getElementById('auto-play');
-  if (autoPlay) s.autoPlay = autoPlay.checked === true;
-  
+
   // Default speed
   const speed = document.getElementById('default-speed');
   if (speed) s.defaultSpeed = speed.value;
-  
-  // Word tooltip como boolean
-  const wordTooltip = document.getElementById('word-tooltip-toggle');
-  if (wordTooltip) s.wordTooltip = wordTooltip.checked === true;
-  
-  // Enter to send como boolean
-  const enterSend = document.getElementById('enter-send');
-  if (enterSend) s.enterSend = enterSend.checked === true;
-  
-  // Salvar tudo
+
+  // Word tooltip
+  const wt = document.getElementById('word-tooltip-toggle');
+  if (wt) s.wordTooltip = wt.checked === true;
+
+  // Enter to send
+  const es = document.getElementById('enter-send');
+  if (es) s.enterSend = es.checked === true;
+
   localStorage.setItem('tati_settings', JSON.stringify(s));
-  
-  // Feedback visual
+
+  // Feedback
   const btn = document.getElementById('btn-settings-save');
   if (btn) {
-    btn.textContent = '✅ Salvo!';
-    setTimeout(() => btn.textContent = '💾 Salvar Alterações', 2000);
+    const original = btn.textContent;
+    btn.textContent = t('settings.saved');
+    setTimeout(() => btn.textContent = original, 2000);
   }
 }

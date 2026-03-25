@@ -1,9 +1,12 @@
 // js/word_tooltip.js
-// Click a word → tooltip with translation + EN-US/EN-UK pronunciation
-// Uses Free Dictionary API (no key needed) + MyMemory for translation
+// Click a word → tooltip with translation + pronunciation via the same TTS as the AI
+// Translation: MyMemory API (free, no key)
+// Pronunciation: backend /chat/tts endpoint (ElevenLabs or gTTS fallback — same voice as Tati)
 
 (function () {
   'use strict';
+
+  const API = 'http://127.0.0.1:8000';
 
   const tooltip = document.createElement('div');
   tooltip.id = 'word-tooltip';
@@ -14,13 +17,13 @@
       <button class="wt-close" title="Fechar">✕</button>
     </div>
     <div class="wt-phonetics">
-      <button class="wt-pron" data-accent="us" title="Pronúncia US">
+      <button class="wt-pron" id="wt-btn-tati" title="Ouvir com a voz da Tati">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-        EN-US
+        Tati
       </button>
-      <button class="wt-pron" data-accent="uk" title="Pronúncia UK">
+      <button class="wt-pron wt-pron-dict" id="wt-btn-dict" title="Pronúncia do dicionário (EN-US)">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
-        EN-UK
+        Dict
       </button>
       <span class="wt-phonetic-text"></span>
     </div>
@@ -36,12 +39,12 @@
   `;
   document.body.appendChild(tooltip);
 
-  let currentWord = '';
-  let audioUS = null;
-  let audioUK = null;
+  let currentWord  = '';
+  let dictAudioSrc = null;   // URL from Free Dictionary API
   let currentAudio = null;
   const cache = {};
 
+  // ── Position ──────────────────────────────────────────────────────
   function positionTooltip(x, y) {
     tooltip.style.display = 'block';
     const tw = tooltip.offsetWidth;
@@ -56,149 +59,183 @@
     tooltip.style.top  = Math.max(8, top)  + 'px';
   }
 
+  // ── Dictionary lookup ─────────────────────────────────────────────
   async function lookupWord(word) {
-    if (cache[word]) return cache[word];
+    const key = 'dict_' + word;
+    if (cache[key] !== undefined) return cache[key];
     try {
       const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
-      if (!res.ok) return null;
+      if (!res.ok) { cache[key] = null; return null; }
       const data = await res.json();
-      cache[word] = data[0];
+      cache[key] = data[0];
       return data[0];
-    } catch { return null; }
+    } catch { cache[key] = null; return null; }
   }
 
+  // ── Translation ───────────────────────────────────────────────────
   async function translateWord(word) {
     const key = 'tr_' + word;
-    if (cache[key]) return cache[key];
+    if (cache[key] !== undefined) return cache[key];
     try {
-      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|pt-BR`);
+      const res  = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|pt-BR`);
       const data = await res.json();
-      const t = data?.responseData?.translatedText;
-      if (t && t.toLowerCase() !== word.toLowerCase()) {
-        cache[key] = t;
-        return t;
-      }
-      return null;
-    } catch { return null; }
+      const t    = data?.responseData?.translatedText;
+      const result = (t && t.toLowerCase() !== word.toLowerCase()) ? t : null;
+      cache[key] = result;
+      return result;
+    } catch { cache[key] = null; return null; }
   }
 
-  async function showTooltip(word, x, y) {
-    word = word.toLowerCase().replace(/[^a-z'-]/g, '');
-    if (!word || word.length < 2) return;
-    currentWord = word;
-    audioUS = null;
-    audioUK = null;
+  // ── TTS via backend (same voice as Tati) ──────────────────────────
+  async function fetchTatiAudio(word) {
+    const key = 'tts_' + word;
+    if (cache[key] !== undefined) return cache[key]; // could be null if failed
 
-    tooltip.querySelector('.wt-word').textContent = word;
-    tooltip.querySelector('.wt-pos').textContent  = '';
-    tooltip.querySelector('.wt-phonetic-text').textContent = '';
-    tooltip.querySelector('.wt-trans-text').textContent = 'Carregando...';
-    tooltip.querySelector('.wt-definition').textContent = '';
-    tooltip.querySelectorAll('.wt-pron').forEach(b => b.classList.remove('playing', 'no-audio'));
+    const token = localStorage.getItem('token');
+    if (!token) { cache[key] = null; return null; }
 
-    positionTooltip(x, y);
-
-    const [dictData, translation] = await Promise.all([
-      lookupWord(word),
-      translateWord(word)
-    ]);
-
-    if (currentWord !== word) return;
-
-    tooltip.querySelector('.wt-trans-text').textContent = translation || '(no translation found)';
-
-    if (!dictData) {
-      tooltip.querySelector('.wt-definition').textContent = 'Word not found in dictionary.';
-      return;
-    }
-
-    const meanings = dictData.meanings || [];
-    if (meanings[0]) {
-      tooltip.querySelector('.wt-pos').textContent = meanings[0].partOfSpeech || '';
-    }
-
-    const def = meanings[0]?.definitions?.[0]?.definition;
-    if (def) {
-      const defEl = tooltip.querySelector('.wt-definition');
-      defEl.textContent = def.length > 120 ? def.slice(0, 120) + '…' : def;
-    }
-
-    const phonetics = dictData.phonetics || [];
-    let phonTextSet = false;
-
-    phonetics.forEach(ph => {
-      const src = ph.audio || '';
-      const txt = ph.text || '';
-      if (!phonTextSet && txt) {
-        tooltip.querySelector('.wt-phonetic-text').textContent = txt;
-        phonTextSet = true;
-      }
-      if (src.includes('-us.') || src.includes('_us') || src.includes('/us')) {
-        audioUS = src;
-      } else if (src.includes('-uk.') || src.includes('_uk') || src.includes('/uk')) {
-        audioUK = src;
-      } else if (src && !audioUS) {
-        audioUS = src;
-      }
-    });
-
-    tooltip.querySelector('[data-accent="us"]').classList.toggle('no-audio', !audioUS);
-    tooltip.querySelector('[data-accent="uk"]').classList.toggle('no-audio', !audioUK);
-
-    positionTooltip(x, y);
+    try {
+      const res = await fetch(`${API}/chat/tts`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body:    JSON.stringify({ text: word }),
+      });
+      if (!res.ok) { cache[key] = null; return null; }
+      const data = await res.json();
+      cache[key] = data.audio || null;
+      return cache[key];
+    } catch { cache[key] = null; return null; }
   }
 
-  function playAudio(src, btn) {
-    if (!src) return;
+  // ── Play helpers ──────────────────────────────────────────────────
+  function stopCurrent() {
     if (currentAudio) { currentAudio.pause(); currentAudio = null; }
     tooltip.querySelectorAll('.wt-pron').forEach(b => b.classList.remove('playing'));
+  }
 
-    const vol = parseFloat(tooltip.querySelector('.wt-vol').value);
-    const audio = new Audio(src);
-    audio.volume = vol;
+  function playAudio(src, isBase64, btn) {
+    stopCurrent();
+    const url   = isBase64 ? 'data:audio/mp3;base64,' + src : src;
+    const audio = new Audio(url);
+    audio.volume = parseFloat(tooltip.querySelector('.wt-vol').value);
     currentAudio = audio;
     btn.classList.add('playing');
-
-    audio.onended = () => { btn.classList.remove('playing'); currentAudio = null; };
-    audio.onerror = () => { btn.classList.remove('playing'); currentAudio = null; };
+    audio.onended = () => { btn.classList.remove('playing'); if (currentAudio === audio) currentAudio = null; };
+    audio.onerror = () => { btn.classList.remove('playing'); if (currentAudio === audio) currentAudio = null; };
     audio.play().catch(() => btn.classList.remove('playing'));
   }
 
-  tooltip.querySelectorAll('.wt-pron').forEach(btn => {
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      const accent = btn.dataset.accent;
-      const src = accent === 'us' ? audioUS : audioUK;
-      if (src) playAudio(src, btn);
-    });
+  // ── Show tooltip ──────────────────────────────────────────────────
+  async function showTooltip(word, x, y) {
+    word = word.toLowerCase().replace(/[^a-z'-]/g, '');
+    if (!word || word.length < 2) return;
+    currentWord  = word;
+    dictAudioSrc = null;
+
+    // Reset UI
+    tooltip.querySelector('.wt-word').textContent        = word;
+    tooltip.querySelector('.wt-pos').textContent         = '';
+    tooltip.querySelector('.wt-phonetic-text').textContent = '';
+    tooltip.querySelector('.wt-trans-text').textContent  = 'Carregando...';
+    tooltip.querySelector('.wt-definition').textContent  = '';
+
+    const tatiBtn = tooltip.querySelector('#wt-btn-tati');
+    const dictBtn = tooltip.querySelector('#wt-btn-dict');
+    tatiBtn.classList.remove('playing', 'no-audio', 'loading');
+    dictBtn.classList.remove('playing', 'no-audio', 'loading');
+    tatiBtn.classList.add('loading');
+    dictBtn.classList.add('loading');
+
+    positionTooltip(x, y);
+
+    // Fetch all in parallel
+    const [dictData, translation, tatiB64] = await Promise.all([
+      lookupWord(word),
+      translateWord(word),
+      fetchTatiAudio(word),
+    ]);
+
+    if (currentWord !== word) return; // user clicked another word
+
+    // Translation
+    tooltip.querySelector('.wt-trans-text').textContent = translation || '(sem tradução)';
+
+    // Dictionary data
+    if (dictData) {
+      const meanings = dictData.meanings || [];
+      if (meanings[0]) tooltip.querySelector('.wt-pos').textContent = meanings[0].partOfSpeech || '';
+      const def = meanings[0]?.definitions?.[0]?.definition || '';
+      const defEl = tooltip.querySelector('.wt-definition');
+      defEl.textContent = def.length > 120 ? def.slice(0, 120) + '…' : def;
+
+      // Find dict audio URL
+      const phonetics = dictData.phonetics || [];
+      let phonText = '';
+      phonetics.forEach(ph => {
+        if (!phonText && ph.text) phonText = ph.text;
+        const src = ph.audio || '';
+        if (src && !dictAudioSrc) dictAudioSrc = src;
+      });
+      tooltip.querySelector('.wt-phonetic-text').textContent = phonText;
+    }
+
+    // Update button states
+    tatiBtn.classList.remove('loading');
+    dictBtn.classList.remove('loading');
+
+    tatiBtn.classList.toggle('no-audio', !tatiB64);
+    dictBtn.classList.toggle('no-audio', !dictAudioSrc);
+
+    positionTooltip(x, y);
+  }
+
+  // ── Button handlers ───────────────────────────────────────────────
+  tooltip.querySelector('#wt-btn-tati').addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const btn   = tooltip.querySelector('#wt-btn-tati');
+    if (btn.classList.contains('no-audio') || btn.classList.contains('loading')) return;
+
+    const b64 = cache['tts_' + currentWord];
+    if (b64) {
+      playAudio(b64, true, btn);
+    } else {
+      // Shouldn't happen (loaded in showTooltip), but fetch on demand as fallback
+      btn.classList.add('loading');
+      const fetched = await fetchTatiAudio(currentWord);
+      btn.classList.remove('loading');
+      if (fetched) playAudio(fetched, true, btn);
+      else btn.classList.add('no-audio');
+    }
+  });
+
+  tooltip.querySelector('#wt-btn-dict').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const btn = tooltip.querySelector('#wt-btn-dict');
+    if (btn.classList.contains('no-audio') || btn.classList.contains('loading')) return;
+    if (dictAudioSrc) playAudio(dictAudioSrc, false, btn);
   });
 
   tooltip.querySelector('.wt-vol').addEventListener('input', function () {
     if (currentAudio) currentAudio.volume = parseFloat(this.value);
-    const icon = tooltip.querySelector('.wt-vol-icon');
-    icon.textContent = this.value > 0.5 ? '🔊' : this.value > 0 ? '🔉' : '🔇';
+    tooltip.querySelector('.wt-vol-icon').textContent = this.value > 0.5 ? '🔊' : this.value > 0 ? '🔉' : '🔇';
   });
 
-  tooltip.querySelector('.wt-close').addEventListener('click', e => {
+  tooltip.querySelector('.wt-close').addEventListener('click', (e) => {
     e.stopPropagation();
     hideTooltip();
   });
 
+  // ── Hide ──────────────────────────────────────────────────────────
   function hideTooltip() {
     tooltip.style.display = 'none';
-    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+    stopCurrent();
     currentWord = '';
   }
 
-  document.addEventListener('click', e => {
-    if (!tooltip.contains(e.target)) hideTooltip();
-  });
+  document.addEventListener('click', e => { if (!tooltip.contains(e.target)) hideTooltip(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') hideTooltip(); });
 
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') hideTooltip();
-  });
-
-  // Works for both .message-bubble (chat) and .vbubble (voice)
+  // ── Make words clickable ──────────────────────────────────────────
   function makeClickable(container) {
     const selector = '.message-bubble, .vbubble';
     const bubbles = container

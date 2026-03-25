@@ -1,28 +1,25 @@
 <!DOCTYPE html>
 <html lang="pt-br" data-theme="dark">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tati AI — Meu Perfil</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
     <link rel="stylesheet" href="styles/global.css">
     <link rel="stylesheet" href="styles/profile.css">
     <link rel="icon" type="image/x-icon" href="images/tati_logo.jpg">
 </head>
-
 <body>
-
     <div class="profile-layout">
 
         <!-- Topbar -->
         <header class="profile-topbar">
             <a href="chat.html" class="btn-back">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M19 12H5M12 5l-7 7 7 7" />
-                </svg>
-                Voltar ao Chat
+                <i class="fa-solid fa-arrow-left"></i>
+                <span data-i18n="nav.back_chat">Voltar ao Chat</span>
             </a>
             <span class="topbar-brand">Teacher Tati</span>
             <button class="theme-toggle-inline" onclick="toggleTheme()" title="Tema">
@@ -32,11 +29,22 @@
 
         <div class="profile-content">
 
-            <!-- Card do avatar / header -->
+            <!-- Hero — avatar com upload -->
             <div class="profile-hero">
                 <div class="profile-avatar-wrap">
+                    <!-- Photo (hidden until loaded) -->
+                    <img id="profile-avatar-img" class="profile-avatar-photo" src="" alt=""
+                         style="display:none;" onerror="this.style.display='none'; document.getElementById('profile-avatar').style.display='flex';">
+                    <!-- Initials fallback -->
                     <div class="profile-avatar" id="profile-avatar">??</div>
                     <div class="avatar-ring"></div>
+
+                    <!-- Upload overlay -->
+                    <label class="avatar-upload-overlay" title="Trocar foto" for="avatar-file-input">
+                        <i class="fa-solid fa-camera"></i>
+                    </label>
+                    <input type="file" id="avatar-file-input" accept="image/jpeg,image/png,image/webp"
+                           style="display:none;" onchange="handleAvatarUpload(event)">
                 </div>
                 <div class="profile-hero-info">
                     <h1 id="profile-name">Carregando...</h1>
@@ -45,6 +53,8 @@
                         <span class="badge badge-level" id="badge-level">Beginner</span>
                         <span class="badge badge-role" id="badge-role">Student</span>
                     </div>
+                    <!-- Upload status -->
+                    <div id="avatar-upload-status" style="display:none;" class="avatar-status"></div>
                 </div>
             </div>
 
@@ -52,46 +62,43 @@
             <div class="profile-stats" id="profile-stats">
                 <div class="stat-card">
                     <div class="stat-value" id="stat-messages">—</div>
-                    <div class="stat-label">Mensagens</div>
+                    <div class="stat-label" data-i18n="profile.msgs">Mensagens</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="stat-conversations">—</div>
-                    <div class="stat-label">Conversas</div>
+                    <div class="stat-label" data-i18n="profile.convs">Conversas</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="stat-days">—</div>
-                    <div class="stat-label">Dias ativo</div>
+                    <div class="stat-label" data-i18n="profile.days">Dias ativo</div>
                 </div>
             </div>
 
-            <!-- Formulário de edição -->
+            <!-- Formulário -->
             <div class="profile-sections">
 
                 <!-- Info pessoal -->
                 <section class="profile-section">
                     <h2 class="section-title">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
-                        </svg>
-                        Informações Pessoais
+                        <i class="fa-solid fa-user"></i>
+                        <span data-i18n="profile.personal">Informações Pessoais</span>
                     </h2>
                     <div class="form-grid">
                         <div class="field">
-                            <label>Nome completo</label>
+                            <label data-i18n="profile.full_name">Nome completo</label>
                             <input id="field-name" type="text" placeholder="Seu nome">
                         </div>
                         <div class="field">
-                            <label>Apelido</label>
-                            <input id="field-nickname" type="text" placeholder="Como prefere ser chamado">
+                            <label data-i18n="profile.nickname">Apelido</label>
+                            <input id="field-nickname" type="text" data-i18n-placeholder="profile.nickname_ph" placeholder="Como prefere ser chamado">
                         </div>
                         <div class="field">
-                            <label>E-mail</label>
+                            <label data-i18n="profile.email">E-mail</label>
                             <input id="field-email" type="email" placeholder="seu@email.com">
                         </div>
                         <div class="field">
-                            <label>Profissão</label>
-                            <input id="field-occupation" type="text" placeholder="Ex: Desenvolvedor, Estudante...">
+                            <label data-i18n="profile.occupation">Profissão</label>
+                            <input id="field-occupation" type="text" data-i18n-placeholder="profile.occupation_ph" placeholder="Ex: Desenvolvedor, Estudante...">
                         </div>
                     </div>
                 </section>
@@ -99,96 +106,81 @@
                 <!-- Preferências de estudo -->
                 <section class="profile-section">
                     <h2 class="section-title">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path
-                                d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                        </svg>
-                        Preferências de Estudo
+                        <i class="fa-solid fa-star"></i>
+                        <span data-i18n="profile.study">Preferências de Estudo</span>
                     </h2>
                     <div class="form-grid">
                         <div class="field">
-                            <label>Nível de inglês</label>
+                            <label data-i18n="profile.level">Nível de inglês</label>
                             <select id="field-level">
-                                <option value="Beginner">Beginner</option>
-                                <option value="Pre-Intermediate">Pre-Intermediate</option>
-                                <option value="Intermediate">Intermediate</option>
-                                <option value="Business English">Business English</option>
-                                <option value="Advanced">Advanced</option>
+                                <option value="Beginner"        data-i18n="level.beginner">Beginner</option>
+                                <option value="Pre-Intermediate" data-i18n="level.pre_int">Pre-Intermediate</option>
+                                <option value="Intermediate"    data-i18n="level.intermediate">Intermediate</option>
+                                <option value="Business English" data-i18n="level.business">Business English</option>
+                                <option value="Advanced"        data-i18n="level.advanced">Advanced</option>
                             </select>
                         </div>
                         <div class="field">
-                            <label>Foco de aprendizado</label>
+                            <label data-i18n="profile.focus">Foco de aprendizado</label>
                             <select id="field-focus">
-                                <option value="General Conversation">General Conversation</option>
-                                <option value="Business English">Business English</option>
-                                <option value="Travel English">Travel English</option>
-                                <option value="Academic English">Academic English</option>
-                                <option value="Job Interviews">Job Interviews</option>
+                                <option value="General Conversation" data-i18n="focus.general">General Conversation</option>
+                                <option value="Business English"     data-i18n="focus.business">Business English</option>
+                                <option value="Travel English"       data-i18n="focus.travel">Travel English</option>
+                                <option value="Academic English"     data-i18n="focus.academic">Academic English</option>
+                                <option value="Job Interviews"       data-i18n="focus.interviews">Job Interviews</option>
                             </select>
                         </div>
                     </div>
                     <div id="save-feedback" class="save-feedback" style="display:none;"></div>
                     <button class="btn-save" id="btn-save" onclick="saveProfile()">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2.5">
-                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                            <polyline points="17 21 17 13 7 13 7 21" />
-                            <polyline points="7 3 7 8 15 8" />
-                        </svg>
-                        Salvar alterações
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span data-i18n="profile.save">Salvar alterações</span>
                     </button>
                 </section>
 
                 <!-- Segurança -->
                 <section class="profile-section">
                     <h2 class="section-title">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                        </svg>
-                        Segurança
+                        <i class="fa-solid fa-lock"></i>
+                        <span data-i18n="profile.security">Segurança</span>
                     </h2>
                     <div class="form-grid">
                         <div class="field">
-                            <label>Senha atual</label>
-                            <input id="field-current-pw" type="password" placeholder="••••••••">
+                            <label data-i18n="profile.current_pw">Senha atual</label>
+                            <div class="pw-input-wrap">
+                                <input id="field-current-pw" type="password" placeholder="••••••••">
+                                <button type="button" class="btn-pw-eye" onclick="togglePwVisibility('field-current-pw', this)" tabindex="-1">
+                                    <i class="fa-solid fa-eye"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="field">
-                            <label>Nova senha</label>
-                            <input id="field-new-pw" type="password" placeholder="mínimo 6 caracteres">
+                            <label data-i18n="profile.new_pw">Nova senha</label>
+                            <div class="pw-input-wrap">
+                                <input id="field-new-pw" type="password" data-i18n-placeholder="profile.new_pw_ph" placeholder="mínimo 6 caracteres">
+                                <button type="button" class="btn-pw-eye" onclick="togglePwVisibility('field-new-pw', this)" tabindex="-1">
+                                    <i class="fa-solid fa-eye"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <div id="pw-feedback" class="save-feedback" style="display:none;"></div>
                     <button class="btn-save btn-save-secondary" id="btn-pw" onclick="changePassword()">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2.5">
-                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                        </svg>
-                        Atualizar senha
+                        <i class="fa-solid fa-shield"></i>
+                        <span data-i18n="profile.update_pw">Atualizar senha</span>
                     </button>
                 </section>
 
                 <!-- Zona de perigo -->
                 <section class="profile-section danger-zone">
                     <h2 class="section-title danger">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path
-                                d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                            <line x1="12" y1="9" x2="12" y2="13" />
-                            <line x1="12" y1="17" x2="12.01" y2="17" />
-                        </svg>
-                        Zona de Perigo
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span data-i18n="profile.danger">Zona de Perigo</span>
                     </h2>
-                    <p class="danger-desc">Estas ações são irreversíveis. Prossiga com cuidado.</p>
+                    <p class="danger-desc" data-i18n="profile.danger_desc">Estas ações são irreversíveis. Prossiga com cuidado.</p>
                     <button class="btn-danger" onclick="logout()">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-                        </svg>
-                        Sair da conta
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span data-i18n="nav.logout">Sair da conta</span>
                     </button>
                 </section>
 
@@ -196,7 +188,7 @@
         </div>
     </div>
 
+    <script src="js/i18n.js"></script>
     <script src="js/profile.js"></script>
 </body>
-
 </html>

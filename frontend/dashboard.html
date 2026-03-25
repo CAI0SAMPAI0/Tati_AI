@@ -1,161 +1,131 @@
 <!DOCTYPE html>
 <html lang="pt-br" data-theme="dark">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tati AI — Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
     <link rel="stylesheet" href="styles/global.css">
     <link rel="stylesheet" href="styles/dashboard.css">
+    <link rel="stylesheet" href="styles/modal.css">
     <link rel="icon" type="image/x-icon" href="images/tati_logo.jpg">
 </head>
-
 <body>
+<div class="dash-layout">
 
-    <div class="dash-layout">
+    <!-- Sidebar -->
+    <aside class="dash-sidebar">
+        <div class="dash-sidebar-brand">
+            <img src="images/tati_logo.jpg" alt="Tati" class="brand-avatar"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <div class="brand-avatar-fallback" style="display:none;">🧑‍🏫</div>
+            <div>
+                <span class="brand-name">Teacher Tati</span>
+                <span class="brand-sub" data-i18n="nav.dashboard">Dashboard</span>
+            </div>
+        </div>
 
-        <!-- Sidebar -->
-        <aside class="dash-sidebar">
-            <div class="dash-sidebar-brand">
-                <img src="images/tati_logo.jpg" alt="Tati" class="brand-avatar"
-                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                <div class="brand-avatar-fallback" style="display:none;">🧑‍🏫</div>
-                <div>
-                    <span class="brand-name">Teacher Tati</span>
-                    <span class="brand-sub">Dashboard</span>
+        <nav class="dash-nav">
+            <a href="#overview" class="dash-nav-item active" onclick="setSection('overview',this)">
+                <i class="fa-solid fa-chart-pie"></i>
+                <span data-i18n="dash.overview">Visão Geral</span>
+            </a>
+            <a href="#students" class="dash-nav-item" onclick="setSection('students',this)">
+                <i class="fa-solid fa-users"></i>
+                <span data-i18n="dash.students">Alunos</span>
+            </a>
+        </nav>
+
+        <div class="dash-sidebar-footer">
+            <a href="chat.html" class="dash-nav-item">
+                <i class="fa-solid fa-comments"></i>
+                <span data-i18n="dash.go_chat">Ir ao Chat</span>
+            </a>
+            <a href="settings.html" class="dash-nav-item">
+                <i class="fa-solid fa-gear"></i>
+                <span data-i18n="nav.settings">Configurações</span>
+            </a>
+            <button class="dash-nav-item btn-flat" onclick="logout()">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span data-i18n="nav.logout">Sair</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="dash-main">
+
+        <!-- Topbar -->
+        <header class="dash-topbar">
+            <div>
+                <h1 class="dash-page-title" id="page-title" data-i18n="dash.overview">Visão Geral</h1>
+                <p class="dash-page-sub" id="page-sub" data-i18n="dash.overview_sub">Resumo da plataforma</p>
+            </div>
+        </header>
+
+        <!-- Section: Overview -->
+        <section id="section-overview" class="dash-section">
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fa-solid fa-users"></i></div>
+                    <div class="stat-body">
+                        <div class="stat-value" id="stat-total-students">—</div>
+                        <div class="stat-label" data-i18n="dash.total_students">Total de Alunos</div>
+                    </div>
+                    <div class="stat-trend up">↑ Ativo</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fa-solid fa-comments"></i></div>
+                    <div class="stat-body">
+                        <div class="stat-value" id="stat-total-messages">—</div>
+                        <div class="stat-label" data-i18n="dash.total_msgs">Total de Mensagens</div>
+                    </div>
+                </div>
+                <div class="stat-card highlight">
+                    <div class="stat-icon"><i class="fa-solid fa-bolt"></i></div>
+                    <div class="stat-body">
+                        <div class="stat-value" id="stat-active-today">—</div>
+                        <div class="stat-label" data-i18n="dash.active_today">Ativos Hoje</div>
+                    </div>
+                    <div class="stat-trend up">Hoje</div>
                 </div>
             </div>
 
-            <nav class="dash-nav">
-                <a href="#overview" class="dash-nav-item active" onclick="setSection('overview',this)">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="7" height="7" />
-                        <rect x="14" y="3" width="7" height="7" />
-                        <rect x="14" y="14" width="7" height="7" />
-                        <rect x="3" y="14" width="7" height="7" />
-                    </svg>
-                    Visão Geral
-                </a>
-                <a href="#students" class="dash-nav-item" onclick="setSection('students',this)">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                        <circle cx="9" cy="7" r="4" />
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
-                    Alunos
-                </a>
-            </nav>
-
-            <div class="dash-sidebar-footer">
-                <a href="chat.html" class="dash-nav-item">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                    </svg>
-                    Ir ao Chat
-                </a>
-                <button class="dash-nav-item btn-flat" onclick="logout()">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-                    </svg>
-                    Sair
-                </button>
+            <div class="dash-card">
+                <div class="dash-card-header">
+                    <h3 data-i18n="dash.recent">Alunos Recentes</h3>
+                    <button class="btn-link" onclick="setSection('students', document.querySelector('[onclick*=students]'))">
+                        <span data-i18n="dash.see_all">Ver todos →</span>
+                    </button>
+                </div>
+                <div id="recent-students-table"></div>
             </div>
-        </aside>
+        </section>
 
-        <!-- Main -->
-        <main class="dash-main">
-
-            <!-- Topbar -->
-            <header class="dash-topbar">
-                <div>
-                    <h1 class="dash-page-title" id="page-title">Visão Geral</h1>
-                    <p class="dash-page-sub" id="page-sub">Resumo da plataforma</p>
-                </div>
-
-            </header>
-
-            <!-- Section: Overview -->
-            <section id="section-overview" class="dash-section">
-                <div class="stat-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                                <circle cx="9" cy="7" r="4" />
-                                <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-                            </svg>
-                        </div>
-                        <div class="stat-body">
-                            <div class="stat-value" id="stat-total-students">—</div>
-                            <div class="stat-label">Total de Alunos</div>
-                        </div>
-                        <div class="stat-trend up">↑ Ativo</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                            </svg>
-                        </div>
-                        <div class="stat-body">
-                            <div class="stat-value" id="stat-total-messages">—</div>
-                            <div class="stat-label">Total de Mensagens</div>
-                        </div>
-                    </div>
-                    <div class="stat-card highlight">
-                        <div class="stat-icon">
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <circle cx="12" cy="12" r="10" />
-                                <path d="M12 8v4M12 16h.01" />
-                            </svg>
-                        </div>
-                        <div class="stat-body">
-                            <div class="stat-value" id="stat-active-today">—</div>
-                            <div class="stat-label">Ativos Hoje</div>
-                        </div>
-                        <div class="stat-trend up">Hoje</div>
+        <!-- Section: Students -->
+        <section id="section-students" class="dash-section" style="display:none;">
+            <div class="dash-card">
+                <div class="dash-card-header">
+                    <h3 data-i18n="dash.all_students">Todos os Alunos</h3>
+                    <div class="search-wrap">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input id="student-search" type="text"
+                               data-i18n-placeholder="dash.search_ph"
+                               placeholder="Pesquisar aluno..."
+                               oninput="filterStudents()">
                     </div>
                 </div>
+                <div id="students-table"></div>
+            </div>
+        </section>
 
-                <div class="dash-card">
-                    <div class="dash-card-header">
-                        <h3>Alunos Recentes</h3>
-                        <button class="btn-link"
-                            onclick="setSection('students', document.querySelector('[onclick*=students]'))">Ver todos
-                            →</button>
-                    </div>
-                    <div id="recent-students-table"></div>
-                </div>
-            </section>
+    </main>
+</div>
 
-            <!-- Section: Students -->
-            <section id="section-students" class="dash-section" style="display:none;">
-                <div class="dash-card">
-                    <div class="dash-card-header">
-                        <h3>Todos os Alunos</h3>
-                        <div class="search-wrap">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <circle cx="11" cy="11" r="8" />
-                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                            </svg>
-                            <input id="student-search" type="text" placeholder="Pesquisar aluno..."
-                                oninput="filterStudents()">
-                        </div>
-                    </div>
-                    <div id="students-table"></div>
-                </div>
-            </section>
-
-        </main>
-    </div>
-
-    <script src="js/dashboard.js"></script>
+<script src="js/i18n.js"></script>
+<script src="js/dashboard.js"></script>
 </body>
-
 </html>

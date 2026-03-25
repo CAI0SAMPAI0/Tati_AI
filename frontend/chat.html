@@ -6,6 +6,8 @@
     <title>Tati AI — Chat</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
     <link rel="stylesheet" href="styles/global.css">
     <link rel="stylesheet" href="styles/chat.css">
     <link rel="stylesheet" href="styles/word_tooltip.css">
@@ -23,66 +25,55 @@
                     <div id="brand-fallback" class="brand-avatar-fallback" style="display:none;">🧑‍🏫</div>
                     <span class="brand-name">Teacher Tati</span>
                 </div>
-                <button class="btn-icon sidebar-close" onclick="toggleSidebar()" title="Fechar menu">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M18 6L6 18M6 6l12 12"/>
-                    </svg>
+                <button class="btn-icon sidebar-close" onclick="toggleSidebar()" data-i18n-title="nav.settings">
+                    <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
 
             <button class="btn-new-chat" onclick="newChat()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <path d="M12 5v14M5 12h14"/>
-                </svg>
-                Nova conversa
+                <i class="fa-solid fa-plus"></i>
+                <span data-i18n="nav.new_chat">Nova conversa</span>
             </button>
 
             <div class="conversations-list" id="conversations-list">
-                <p class="list-empty" style="padding:1rem 0.75rem; font-size:0.8rem; color:var(--text-muted);">Carregando...</p>
+                <p class="list-empty" style="padding:1rem 0.75rem; font-size:0.8rem; color:var(--text-muted);">
+                    <span data-i18n="chat.loading">Carregando...</span>
+                </p>
             </div>
 
             <div class="sidebar-footer">
                 <a href="profile.html" class="sidebar-user">
+                    <!-- Avatar: photo or initials -->
                     <div class="user-avatar" id="sidebar-user-avatar">??</div>
                     <div class="user-info">
                         <span class="user-name" id="sidebar-user-name">Usuário</span>
                         <span class="user-level" id="sidebar-user-level">Student</span>
                     </div>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="user-arrow">
-                        <path d="M9 18l6-6-6-6"/>
-                    </svg>
+                    <i class="fa-solid fa-chevron-right user-arrow"></i>
                 </a>
 
                 <div class="sidebar-footer-actions">
                     <!-- Dashboard — only shown for staff roles via JS -->
-                    <a href="dashboard.html" class="btn-footer-icon" id="btn-dashboard" title="Dashboard" style="display:none;">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-                            <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-                        </svg>
+                    <a href="dashboard.html" class="btn-footer-icon" id="btn-dashboard"
+                       data-i18n-title="nav.dashboard" title="Painel" style="display:none;">
+                        <i class="fa-solid fa-chart-line"></i>
                     </a>
 
                     <!-- Settings -->
-                    <a href="settings.html" class="btn-footer-icon" title="Configurações">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="3"/>
-                            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
-                        </svg>
+                    <a href="settings.html" class="btn-footer-icon" data-i18n-title="nav.settings" title="Configurações">
+                        <i class="fa-solid fa-gear"></i>
                     </a>
 
                     <!-- Delete all -->
-                    <button class="btn-footer-icon btn-danger-icon" onclick="deleteAllConversations()" title="Deletar todas as conversas">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="3 6 5 6 21 6"/>
-                            <path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/>
-                        </svg>
+                    <button class="btn-footer-icon btn-danger-icon" onclick="deleteAllConversations()"
+                            data-i18n-title="nav.delete_all" title="Deletar todas as conversas">
+                        <i class="fa-solid fa-trash-can"></i>
                     </button>
 
                     <!-- Logout -->
-                    <button class="btn-footer-icon btn-danger-icon" onclick="logout()" title="Sair">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
-                        </svg>
+                    <button class="btn-footer-icon btn-danger-icon" onclick="logout()"
+                            data-i18n-title="nav.logout" title="Sair">
+                        <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
                 </div>
             </div>
@@ -92,21 +83,15 @@
         <main class="chat-main">
             <header class="chat-topbar">
                 <div class="topbar-left">
-                    <button class="btn-icon" onclick="toggleSidebar()" title="Menu">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 12h18M3 6h18M3 18h18"/>
-                        </svg>
+                    <button class="btn-icon" onclick="toggleSidebar()">
+                        <i class="fa-solid fa-bars"></i>
                     </button>
                     <span class="topbar-title" id="topbar-title">Teacher Tati</span>
                 </div>
-                <!-- Voice mode button — shown when a conversation is open -->
                 <div class="topbar-right">
-                    <button class="btn-voice-mode" id="btn-switch-voice" onclick="switchToVoice()" title="Modo Voz" style="display:none;">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                            <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
-                        </svg>
-                        Modo Voz
+                    <button class="btn-voice-mode" id="btn-switch-voice" onclick="switchToVoice()" style="display:none;">
+                        <i class="fa-solid fa-microphone"></i>
+                        <span data-i18n="chat.voice_mode">Modo Voz</span>
                     </button>
                 </div>
             </header>
@@ -118,14 +103,14 @@
                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                         <div class="welcome-avatar-fallback" style="display:none;">🧑‍🏫</div>
                     </div>
-                    <h2>Olá! Eu sou a Teacher Tati 👋</h2>
-                    <p>Sua professora de inglês com IA. Vamos praticar juntos?</p>
-                    <p class="welcome-tip">💡 Clique em qualquer palavra inglesa para ver tradução e ouvir a pronúncia</p>
+                    <h2 data-i18n="chat.welcome_title">Olá! Eu sou a Teacher Tati 👋</h2>
+                    <p data-i18n="chat.welcome_sub">Sua professora de inglês com IA. Vamos praticar juntos?</p>
+                    <p class="welcome-tip" data-i18n="chat.welcome_tip">💡 Clique em qualquer palavra inglesa para ver tradução e ouvir a pronúncia</p>
                     <div class="welcome-suggestions">
-                        <button class="suggestion-chip" onclick="useSuggestion(this)">How do I introduce myself?</button>
-                        <button class="suggestion-chip" onclick="useSuggestion(this)">Correct my English, please</button>
-                        <button class="suggestion-chip" onclick="useSuggestion(this)">Let's practice conversation</button>
-                        <button class="suggestion-chip" onclick="useSuggestion(this)">Explain past tense to me</button>
+                        <button class="suggestion-chip" onclick="useSuggestion(this)" data-i18n="chat.sugg_1">How do I introduce myself?</button>
+                        <button class="suggestion-chip" onclick="useSuggestion(this)" data-i18n="chat.sugg_2">Correct my English, please</button>
+                        <button class="suggestion-chip" onclick="useSuggestion(this)" data-i18n="chat.sugg_3">Let's practice conversation</button>
+                        <button class="suggestion-chip" onclick="useSuggestion(this)" data-i18n="chat.sugg_4">Explain past tense to me</button>
                     </div>
                 </div>
 
@@ -145,29 +130,25 @@
 
             <div class="chat-input-area">
                 <div class="chat-input-wrap">
-                    <button class="btn-attach" title="Anexar arquivo (PDF, DOCX, TXT)">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-                        </svg>
+                    <button class="btn-attach" data-i18n-title="chat.placeholder" title="Anexar arquivo">
+                        <i class="fa-solid fa-paperclip"></i>
                     </button>
-                    <textarea id="message-input" class="message-textarea" placeholder="Digite sua mensagem em inglês..." rows="1"></textarea>
+                    <textarea id="message-input" class="message-textarea" rows="1"
+                        data-i18n-placeholder="chat.placeholder"
+                        placeholder="Digite sua mensagem em inglês..."></textarea>
                     <button class="btn-mic" id="btn-mic" title="Gravar áudio">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                            <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
-                        </svg>
+                        <i class="fa-solid fa-microphone"></i>
                     </button>
                     <button class="btn-send" id="btn-send" title="Enviar">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                            <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/>
-                        </svg>
+                        <i class="fa-solid fa-paper-plane"></i>
                     </button>
                 </div>
-                <p class="input-hint">Teacher Tati pratica inglês com você · Enter para enviar · Shift+Enter para nova linha</p>
+                <p class="input-hint" data-i18n="chat.hint">Teacher Tati pratica inglês com você · Enter para enviar · Shift+Enter para nova linha</p>
             </div>
         </main>
     </div>
 
+    <script src="js/i18n.js"></script>
     <script src="js/word_tooltip.js"></script>
     <script src="js/chat.js"></script>
 </body>

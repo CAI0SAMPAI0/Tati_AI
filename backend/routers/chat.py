@@ -111,6 +111,25 @@ async def update_title(
         raise HTTPException(status_code=404, detail="Conversa não encontrada")
     return conv
 
+# ─── TTS endpoint para palavras individuais (word_tooltip) no frontend
+ 
+from fastapi import Query as FastAPIQuery
+ 
+class TTSRequest(BaseModel):
+    text: str
+ 
+@router.post("/tts")
+async def tts_word(body: TTSRequest, current_user: dict = Depends(get_current_user)):
+    """Converte uma palavra/frase curta em áudio usando o mesmo TTS da IA."""
+    if not body.text or len(body.text) > 200:
+        raise HTTPException(status_code=400, detail="Texto inválido ou muito longo")
+    
+    audio_b64 = await text_to_speech(body.text)
+    if not audio_b64:
+        raise HTTPException(status_code=503, detail="TTS indisponível")
+    
+    return {"audio": audio_b64}
+
 # ─── WebSocket 
 
 @router.websocket("/ws")
