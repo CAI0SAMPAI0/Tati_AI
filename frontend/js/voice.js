@@ -19,31 +19,35 @@ function toggleTheme() {
 document.getElementById('theme-icon').textContent = savedTheme === 'dark' ? '☀️' : '🌙';
 
 // ── State ──────────────────────────────────────────────────────────
-let ws           = null;
+let ws            = null;
 let currentConvId = null;
-let isRecording  = false;
-let isProcessing = false;
+let isRecording   = false;
+let isProcessing  = false;
 let mediaRecorder = null;
-let audioChunks  = [];
-let currentAudio = null;
-let lastAudioB64 = null;
+let audioChunks   = [];
+let currentAudio  = null;
+let lastAudioB64  = null;
+
+// bolha de usuário pendente (criada ao iniciar gravação,
+// preenchida com o texto transcrito quando o servidor responde)
+let pendingUserBubble = null;
 
 // ── DOM refs ───────────────────────────────────────────────────────
-const avatarWrap   = document.getElementById('avatar-wrap');
-const statusText   = document.getElementById('status-text');
-const micBtn       = document.getElementById('mic-btn');
-const micHint      = document.getElementById('mic-hint');
-const history      = document.getElementById('voice-history');
-const vtyping      = document.getElementById('vtyping');
-const transcEl     = document.getElementById('voice-transcription');
+const avatarWrap = document.getElementById('avatar-wrap');
+const statusText = document.getElementById('status-text');
+const micBtn     = document.getElementById('mic-btn');
+const micHint    = document.getElementById('mic-hint');
+const history    = document.getElementById('voice-history');
+const vtyping    = document.getElementById('vtyping');
+const transcEl   = document.getElementById('voice-transcription'); // mantido mas oculto via CSS
 
 // Audio controls
-const vacPlayBtn   = document.getElementById('vac-play-btn');
-const vacRewBtn    = document.getElementById('vac-rewind-btn');
-const vacVol       = document.getElementById('vac-vol');
-const vacVolVal    = document.getElementById('vac-vol-val');
-const vacSpd       = document.getElementById('vac-spd');
-const vacSpdVal    = document.getElementById('vac-spd-val');
+const vacPlayBtn = document.getElementById('vac-play-btn');
+const vacRewBtn  = document.getElementById('vac-rewind-btn');
+const vacVol     = document.getElementById('vac-vol');
+const vacVolVal  = document.getElementById('vac-vol-val');
+const vacSpd     = document.getElementById('vac-spd');
+const vacSpdVal  = document.getElementById('vac-spd-val');
 
 // ── Avatar states ──────────────────────────────────────────────────
 function setAvatarState(state) {
@@ -51,30 +55,30 @@ function setAvatarState(state) {
   switch (state) {
     case 'listening':
       statusText.textContent = '🎙 Ouvindo…';
-      micHint.textContent = 'Toque para parar';
+      micHint.textContent    = 'Toque para parar';
       break;
     case 'processing':
       statusText.textContent = '⏳ Processando…';
-      micHint.textContent = 'Aguarde…';
+      micHint.textContent    = 'Aguarde…';
       break;
     case 'speaking':
       statusText.textContent = '🗣 Falando…';
-      micHint.textContent = 'Toque para falar';
+      micHint.textContent    = 'Toque para falar';
       break;
     default:
       statusText.textContent = 'Online';
-      micHint.textContent = 'Toque para falar';
+      micHint.textContent    = 'Toque para falar';
   }
 }
 
 // ── WebSocket ──────────────────────────────────────────────────────
 function connectWS() {
-  if (ws?.readyState === WebSocket.OPEN) return;
+  if (ws?.readyState === WebSocket.OPEN || ws?.readyState === WebSocket.CONNECTING) return;
   ws = new WebSocket(`${WS_URL}/chat/ws?token=${token}`);
-  ws.onopen  = () => { console.log('[Voice WS] connected'); ensureConversation(); };
+  ws.onopen    = () => { console.log('[Voice WS] connected'); ensureConversation(); };
   ws.onmessage = e => handleWSMessage(JSON.parse(e.data));
-  ws.onerror = e => console.error('[Voice WS]', e);
-  ws.onclose = () => { ws = null; setTimeout(connectWS, 3000); };
+  ws.onerror   = e => console.error('[Voice WS]', e);
+  ws.onclose   = () => { ws = null; setTimeout(connectWS, 3000); };
   setInterval(() => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type:'ping'})); }, 20000);
 }
 
@@ -83,7 +87,16 @@ function handleWSMessage(msg) {
     case 'pong': break;
 
     case 'transcription':
-      transcEl.textContent = '🎙 ' + msg.text;
+      // FIX: preenche a bolha do usuário que foi criada ao iniciar a gravação
+      if (pendingUserBubble) {
+        const bub = pendingUserBubble.querySelector('.vbubble.user');
+        if (bub) bub.textContent = msg.text;
+        pendingUserBubble = null;
+      } else {
+        // fallback: cria bolha nova caso não haja pendente
+        addBubble('user', msg.text);
+      }
+      scrollBottom();
       break;
 
     case 'stream_start':
@@ -110,6 +123,8 @@ function handleWSMessage(msg) {
       setAvatarState('idle');
       isProcessing = false;
       micBtn.disabled = false;
+      micBtn.classList.remove('processing');
+      micBtn.textContent = '🎤';
       addBubble('bot', '⚠️ ' + (msg.detail || 'Erro'));
       break;
   }
@@ -118,13 +133,11 @@ function handleWSMessage(msg) {
 async function ensureConversation() {
   if (currentConvId) return;
   try {
-    // Try to reuse latest conversation
     const res = await fetch(`${API}/chat/conversations`, { headers:{ Authorization:`Bearer ${token}` } });
     if (res.ok) {
       const convs = await res.json();
       if (convs.length) { currentConvId = convs[0].id; return; }
     }
-    // Create new
     const res2 = await fetch(`${API}/chat/conversations`, {
       method:'POST',
       headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
@@ -141,7 +154,6 @@ micBtn.addEventListener('click', async () => {
   if (isRecording) {
     stopRecording();
   } else {
-    // Stop any playing audio when user starts speaking
     if (currentAudio) { currentAudio.pause(); currentAudio = null; setAvatarState('idle'); }
     await startRecording();
   }
@@ -159,7 +171,11 @@ async function startRecording() {
     micBtn.classList.add('recording');
     micBtn.textContent = '⏹';
     setAvatarState('listening');
-    transcEl.textContent = '';
+
+    // FIX: cria a bolha do usuário imediatamente com placeholder
+    // será preenchida com o texto real quando a transcrição chegar
+    pendingUserBubble = addBubble('user', '🎙 transcrevendo…');
+    scrollBottom();
   } catch(e) {
     alert('Microfone não disponível: ' + e.message);
   }
@@ -191,10 +207,11 @@ async function sendAudio() {
 }
 
 // ── Bubbles ────────────────────────────────────────────────────────
-let currentBotWrap = null;
+let currentBotWrap   = null;
 let currentBotBubble = null;
-let botBuffer = '';
+let botBuffer        = '';
 
+// Retorna o wrap criado (para permitir referência futura)
 function addBubble(role, text) {
   const wrap = document.createElement('div');
   wrap.className = 'vbubble-wrap';
@@ -214,20 +231,28 @@ function addBubble(role, text) {
   if (role === 'bot' && window.WordTooltip) WordTooltip.makeClickable(wrap);
 
   scrollBottom();
-  return { wrap, bub };
-}
-
-function addUserBubble(text) {
-  addBubble('user', text);
-  // Show transcription cleared
-  transcEl.textContent = '';
+  return wrap;
 }
 
 function startBotBubble() {
   botBuffer = '';
-  const { wrap, bub } = addBubble('bot', '');
-  currentBotWrap = wrap;
+  const wrap = document.createElement('div');
+  wrap.className = 'vbubble-wrap';
+
+  const label = document.createElement('div');
+  label.className = 'vbubble-label';
+  label.textContent = 'Teacher Tati';
+
+  const bub = document.createElement('div');
+  bub.className = 'vbubble bot';
+
+  wrap.appendChild(label);
+  wrap.appendChild(bub);
+  history.insertBefore(wrap, vtyping);
+
+  currentBotWrap   = wrap;
   currentBotBubble = bub;
+  scrollBottom();
 }
 
 function appendBotToken(token) {
@@ -243,7 +268,7 @@ function finalizeBotBubble() {
     WordTooltip.makeClickable(currentBotWrap);
   }
 
-  // Add audio controls placeholder under bot bubble
+  // Adiciona controles de áudio sob a bolha
   if (currentBotWrap) {
     const audioRow = document.createElement('div');
     audioRow.className = 'vbubble-audio msg-audio-controls';
@@ -271,23 +296,12 @@ function playAudio(b64) {
   setAvatarState('speaking');
   vacPlayBtn.textContent = '⏹ Parar';
 
-  audio.onended = () => {
-    currentAudio = null;
-    setAvatarState('idle');
-    vacPlayBtn.textContent = '▶ Ouvir';
-  };
-  audio.onerror = () => {
-    currentAudio = null;
-    setAvatarState('idle');
-    vacPlayBtn.textContent = '▶ Ouvir';
-  };
+  audio.onended = () => { currentAudio = null; setAvatarState('idle'); vacPlayBtn.textContent = '▶ Ouvir'; };
+  audio.onerror = () => { currentAudio = null; setAvatarState('idle'); vacPlayBtn.textContent = '▶ Ouvir'; };
 
-  audio.play().catch(() => {
-    setAvatarState('idle');
-    vacPlayBtn.textContent = '▶ Ouvir';
-  });
+  audio.play().catch(() => { setAvatarState('idle'); vacPlayBtn.textContent = '▶ Ouvir'; });
 
-  // Also attach controls to last bot audio row
+  // Anexa controles à última bolha de áudio
   const rows = document.querySelectorAll('.vbubble-audio');
   if (rows.length) {
     const lastRow = rows[rows.length - 1];
@@ -319,7 +333,6 @@ function attachBubbleAudio(row, b64) {
   const volS  = row.querySelector('.msg-vol-slider');
   const spdS  = row.querySelector('.msg-spd-select');
 
-  // This bubble's audio object (shared initially with currentAudio)
   let bubAudio = currentAudio;
 
   function updateIcon(playing) {
@@ -328,15 +341,14 @@ function attachBubbleAudio(row, b64) {
       : `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
   }
 
-  // track ended from current audio
   if (bubAudio) {
-    bubAudio.addEventListener('ended',  () => updateIcon(false));
-    bubAudio.addEventListener('pause',  () => updateIcon(false));
-    bubAudio.addEventListener('play',   () => updateIcon(true));
+    bubAudio.addEventListener('ended', () => updateIcon(false));
+    bubAudio.addEventListener('pause', () => updateIcon(false));
+    bubAudio.addEventListener('play',  () => updateIcon(true));
   }
 
   playB.onclick = () => {
-    if (!bubAudio || bubAudio.ended || bubAudio.src !== 'data:audio/mp3;base64,' + b64) {
+    if (!bubAudio || bubAudio.ended) {
       bubAudio = new Audio('data:audio/mp3;base64,' + b64);
       bubAudio.volume = parseFloat(volS.value);
       bubAudio.playbackRate = parseFloat(spdS.value);
