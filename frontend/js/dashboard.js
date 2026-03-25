@@ -6,30 +6,22 @@ const userRaw = localStorage.getItem('user');
 if (!token || !userRaw) { window.location.href = '/'; }
 const userLocal = JSON.parse(userRaw);
 
-// Staff role check
 const STAFF_ROLES = ['professor', 'professora', 'programador', 'Tatiana', 'Tati'];
 if (!STAFF_ROLES.includes(userLocal.role)) {
     alert('Acesso negado. Esta área é restrita a professores.');
     window.location.href = '/chat.html';
 }
 
-// Tema
+// Tema vem das configurações — sem toggle inline
 const savedTheme = localStorage.getItem('theme') || 'dark';
 document.documentElement.setAttribute('data-theme', savedTheme);
-function toggleTheme() {
-    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
-    document.getElementById('theme-icon').textContent = next === 'dark' ? '☀️' : '🌙';
-}
 
 window.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('theme-icon').textContent = savedTheme === 'dark' ? '☀️' : '🌙';
     loadStats();
     loadStudents();
 });
 
-// ── Navigation ────────────────────────────────────────────────────
+// ── Navigation ─────────────────────────────────────────────────────
 const sections = {
     overview: { title: 'Visão Geral', sub: 'Resumo da plataforma' },
     students: { title: 'Alunos', sub: 'Gerenciamento de alunos' },
@@ -45,38 +37,34 @@ function setSection(name, el) {
     const sec = document.getElementById('section-' + name);
     if (sec) sec.style.display = 'block';
     document.getElementById('page-title').textContent = sections[name]?.title || name;
-    document.getElementById('page-sub').textContent = sections[name]?.sub || '';
+    document.getElementById('page-sub').textContent   = sections[name]?.sub   || '';
 }
 
-// ── Load stats ────────────────────────────────────────────────────
+// ── Stats ──────────────────────────────────────────────────────────
 async function loadStats() {
     try {
-        const res = await fetch(`${API}/dashboard/stats`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) { console.error('stats error', res.status); return; }
+        const res  = await fetch(`${API}/dashboard/stats`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) return;
         const data = await res.json();
         document.getElementById('stat-total-students').textContent = data.total_students ?? '—';
         document.getElementById('stat-total-messages').textContent = data.total_messages ?? '—';
-        document.getElementById('stat-active-today').textContent = data.active_today ?? '—';
+        document.getElementById('stat-active-today').textContent   = data.active_today   ?? '—';
     } catch (e) { console.error('loadStats', e); }
 }
 
-// ── Load students ─────────────────────────────────────────────────
+// ── Students ───────────────────────────────────────────────────────
 async function loadStudents() {
     try {
-        const res = await fetch(`${API}/dashboard/students`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) { console.error('students error', res.status); return; }
+        const res = await fetch(`${API}/dashboard/students`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) return;
         allStudents = await res.json();
-        renderStudentsTable('students-table', allStudents);
+        renderStudentsTable('students-table',        allStudents);
         renderStudentsTable('recent-students-table', allStudents.slice(0, 5), true);
     } catch (e) { console.error('loadStudents', e); }
 }
 
 function filterStudents() {
-    const q = document.getElementById('student-search').value.toLowerCase();
+    const q        = document.getElementById('student-search').value.toLowerCase();
     const filtered = allStudents.filter(s =>
         s.name?.toLowerCase().includes(q) ||
         s.username?.toLowerCase().includes(q) ||
@@ -92,7 +80,7 @@ function renderStudentsTable(containerId, students, compact = false) {
         return;
     }
     const rows = students.map(s => `
-        <tr>
+        <tr onclick="openStudentModal('${esc(s.username)}')" style="cursor:pointer">
             <td>
                 <div class="student-name-cell">
                     <div class="student-avatar">${getInitials(s.name || s.username)}</div>
@@ -128,7 +116,258 @@ function renderStudentsTable(containerId, students, compact = false) {
         </div>`;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────
+// ── Student Modal ──────────────────────────────────────────────────
+let currentModalUsername = null;
+
+async function openStudentModal(username) {
+    currentModalUsername = username;
+    const student = allStudents.find(s => s.username === username);
+    if (!student) return;
+
+    // Remove modal anterior se existir
+    document.getElementById('student-modal')?.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'student-modal';
+    modal.innerHTML = `
+        <div class="modal-backdrop" onclick="closeStudentModal()"></div>
+        <div class="modal-panel">
+
+            <!-- Header -->
+            <div class="modal-header">
+                <div class="modal-student-info">
+                    <div class="modal-avatar">${getInitials(student.name || student.username)}</div>
+                    <div>
+                        <div class="modal-student-name">${esc(student.name || student.username)}</div>
+                        <div class="modal-student-meta">@${esc(student.username)} · ${esc(student.level || '—')} · ${student.total_messages ?? 0} msgs</div>
+                    </div>
+                </div>
+                <button class="modal-close" onclick="closeStudentModal()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Tabs -->
+            <div class="modal-tabs">
+                <button class="modal-tab active" onclick="switchModalTab('edit', this)">✏️ Editar</button>
+                <button class="modal-tab" onclick="switchModalTab('prompt', this)">🧩 Prompt</button>
+                <button class="modal-tab" onclick="switchModalTab('insight', this)">🧠 Insight</button>
+            </div>
+
+            <!-- Tab: Editar -->
+            <div class="modal-tab-content" id="tab-edit">
+                <div class="modal-field">
+                    <label>Nível de inglês</label>
+                    <select id="modal-level">
+                        <option value="Beginner"        ${student.level === 'Beginner'         ? 'selected' : ''}>Beginner</option>
+                        <option value="Pre-Intermediate"${student.level === 'Pre-Intermediate'  ? 'selected' : ''}>Pre-Intermediate</option>
+                        <option value="Intermediate"    ${student.level === 'Intermediate'      ? 'selected' : ''}>Intermediate</option>
+                        <option value="Business English"${student.level === 'Business English'  ? 'selected' : ''}>Business English</option>
+                        <option value="Advanced"        ${student.level === 'Advanced'          ? 'selected' : ''}>Advanced</option>
+                    </select>
+                </div>
+                <div id="modal-edit-feedback" class="modal-feedback" style="display:none"></div>
+                <div class="modal-actions">
+                    <button class="btn-modal-save" onclick="saveStudentLevel()">Salvar nível</button>
+                    <button class="btn-modal-danger" onclick="confirmDeleteStudent('${esc(username)}')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/>
+                        </svg>
+                        Excluir aluno
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tab: Prompt personalizado -->
+            <div class="modal-tab-content" id="tab-prompt" style="display:none">
+                <p class="modal-hint">Adicione instruções extras para a Tati seguir <strong>somente com este aluno</strong>. Ex: foco em business English, evitar correções muito técnicas, mencionar que o aluno tem dislexia, etc.</p>
+                <textarea id="modal-prompt" class="modal-textarea" placeholder="Ex: This student is preparing for a job interview at a tech company. Focus on professional vocabulary and formal email writing. Avoid correcting minor article errors as they distract the student...">${esc(student.custom_prompt || '')}</textarea>
+                <div id="modal-prompt-feedback" class="modal-feedback" style="display:none"></div>
+                <div class="modal-actions">
+                    <button class="btn-modal-save" onclick="saveStudentPrompt()">Salvar prompt</button>
+                    <button class="btn-modal-secondary" onclick="clearStudentPrompt()">Limpar prompt</button>
+                </div>
+            </div>
+
+            <!-- Tab: Insight IA -->
+            <div class="modal-tab-content" id="tab-insight" style="display:none">
+                <div id="insight-content">
+                    <div class="insight-placeholder">
+                        <p>Clique em <strong>Gerar Insight</strong> para a IA analisar o histórico de conversas deste aluno e dar recomendações pedagógicas.</p>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn-modal-save" id="btn-generate-insight" onclick="generateInsight()">
+                        🧠 Gerar Insight
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    // Pequeno delay para o CSS de entrada funcionar
+    requestAnimationFrame(() => modal.querySelector('.modal-panel').classList.add('modal-panel-open'));
+}
+
+function closeStudentModal() {
+    const modal = document.getElementById('student-modal');
+    if (!modal) return;
+    modal.querySelector('.modal-panel')?.classList.remove('modal-panel-open');
+    setTimeout(() => modal.remove(), 200);
+    currentModalUsername = null;
+}
+
+function switchModalTab(tab, btn) {
+    document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.modal-tab-content').forEach(c => c.style.display = 'none');
+    btn.classList.add('active');
+    document.getElementById('tab-' + tab).style.display = 'block';
+}
+
+// ── Save level ─────────────────────────────────────────────────────
+async function saveStudentLevel() {
+    const level    = document.getElementById('modal-level').value;
+    const feedback = document.getElementById('modal-edit-feedback');
+    try {
+        const res = await fetch(`${API}/dashboard/students/${currentModalUsername}`, {
+            method:  'PUT',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ level })
+        });
+        if (!res.ok) throw new Error('Erro ao salvar');
+        showModalFeedback(feedback, '✓ Nível atualizado com sucesso!', 'success');
+        // Atualiza localmente
+        const s = allStudents.find(s => s.username === currentModalUsername);
+        if (s) s.level = level;
+        renderStudentsTable('students-table',        allStudents);
+        renderStudentsTable('recent-students-table', allStudents.slice(0, 5), true);
+    } catch (e) {
+        showModalFeedback(feedback, '✗ Erro ao salvar. Tente novamente.', 'error');
+    }
+}
+
+// ── Save prompt ────────────────────────────────────────────────────
+async function saveStudentPrompt() {
+    const custom_prompt = document.getElementById('modal-prompt').value.trim();
+    const feedback      = document.getElementById('modal-prompt-feedback');
+    try {
+        const res = await fetch(`${API}/dashboard/students/${currentModalUsername}`, {
+            method:  'PUT',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ custom_prompt })
+        });
+        if (!res.ok) throw new Error('Erro ao salvar');
+        showModalFeedback(feedback, '✓ Prompt salvo! Entrará em vigor na próxima mensagem do aluno.', 'success');
+        const s = allStudents.find(s => s.username === currentModalUsername);
+        if (s) s.custom_prompt = custom_prompt;
+    } catch (e) {
+        showModalFeedback(feedback, '✗ Erro ao salvar. Tente novamente.', 'error');
+    }
+}
+
+async function clearStudentPrompt() {
+    document.getElementById('modal-prompt').value = '';
+    await saveStudentPrompt();
+}
+
+// ── Delete student ─────────────────────────────────────────────────
+function confirmDeleteStudent(username) {
+    const existing = document.getElementById('delete-confirm');
+    if (existing) existing.remove();
+
+    const popup = document.createElement('div');
+    popup.id = 'delete-confirm';
+    popup.style.cssText = `
+        position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+        background:var(--card);border:1px solid rgba(239,68,68,0.4);
+        border-radius:14px;padding:1.5rem;z-index:10000;
+        display:flex;flex-direction:column;gap:0.75rem;min-width:280px;
+        box-shadow:0 16px 40px rgba(0,0,0,0.5);
+    `;
+    popup.innerHTML = `
+        <p style="font-size:0.9rem;font-weight:700;color:var(--text);margin:0;">⚠️ Excluir @${esc(username)}?</p>
+        <p style="font-size:0.8rem;color:var(--text-muted);margin:0;">Esta ação é irreversível. Todas as mensagens e conversas serão apagadas.</p>
+        <div style="display:flex;gap:0.5rem;">
+            <button id="del-yes" style="flex:1;padding:0.5rem;background:#ef4444;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:0.85rem;">Excluir</button>
+            <button id="del-no"  style="flex:1;padding:0.5rem;background:var(--border);color:var(--text);border:none;border-radius:8px;cursor:pointer;font-size:0.85rem;">Cancelar</button>
+        </div>
+    `;
+    document.body.appendChild(popup);
+    document.getElementById('del-no').onclick  = () => popup.remove();
+    document.getElementById('del-yes').onclick = async () => {
+        popup.remove();
+        await deleteStudent(username);
+    };
+}
+
+async function deleteStudent(username) {
+    try {
+        const res = await fetch(`${API}/dashboard/students/${username}`, {
+            method:  'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error();
+        closeStudentModal();
+        allStudents = allStudents.filter(s => s.username !== username);
+        renderStudentsTable('students-table',        allStudents);
+        renderStudentsTable('recent-students-table', allStudents.slice(0, 5), true);
+        loadStats(); // atualiza contadores
+    } catch (e) {
+        alert('Erro ao excluir aluno. Tente novamente.');
+    }
+}
+
+// ── AI Insight ─────────────────────────────────────────────────────
+async function generateInsight() {
+    const btn     = document.getElementById('btn-generate-insight');
+    const content = document.getElementById('insight-content');
+
+    btn.disabled     = true;
+    btn.textContent  = '⏳ Analisando...';
+    content.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;padding:2rem;color:var(--text-muted);">
+            <div class="insight-spinner"></div>
+            <p style="font-size:0.85rem;">A IA está analisando o histórico de conversas...</p>
+        </div>`;
+
+    try {
+        const res = await fetch(`${API}/dashboard/students/${currentModalUsername}/insight`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Erro ao gerar insight');
+        const data = await res.json();
+        content.innerHTML = `<div class="insight-text">${formatInsight(data.insight)}</div>`;
+    } catch (e) {
+        content.innerHTML = `<div class="modal-feedback error" style="display:block;">✗ Não foi possível gerar o insight. Verifique se o aluno tem mensagens.</div>`;
+    } finally {
+        btn.disabled    = false;
+        btn.textContent = '🔄 Gerar Novamente';
+    }
+}
+
+function formatInsight(text) {
+    return text
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/^#{1,3} (.+)$/gm, '<h4>$1</h4>')
+        .replace(/\n/g, '<br>');
+}
+
+// ── Modal feedback helper ──────────────────────────────────────────
+function showModalFeedback(el, msg, type) {
+    el.textContent   = msg;
+    el.className     = `modal-feedback ${type}`;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+// ── Helpers ────────────────────────────────────────────────────────
 function getInitials(name) {
     return (name || '?').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
 }

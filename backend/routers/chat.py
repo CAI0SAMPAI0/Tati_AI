@@ -68,7 +68,7 @@ async def extract_text_from_file(filename: str, content_b64: str) -> str:
     except Exception as e:
         return f"[Erro ao ler arquivo {filename}: {str(e)}]"
 
-# ─── REST ─────────────────────────────────────────────────────────────────────
+# ─── REST 
 
 class CreateConversationBody(BaseModel):
     title: str = "Nova conversa"
@@ -111,7 +111,7 @@ async def update_title(
         raise HTTPException(status_code=404, detail="Conversa não encontrada")
     return conv
 
-# ─── WebSocket ────────────────────────────────────────────────────────────────
+# ─── WebSocket 
 
 @router.websocket("/ws")
 async def chat_ws(websocket: WebSocket, token: str = Query(...)):
@@ -175,8 +175,18 @@ async def chat_ws(websocket: WebSocket, token: str = Query(...)):
 
                 await websocket.send_json({"type": "stream_start", "conversation_id": conv_id})
                 full_response = ""
+                # busca custom prompt do usuário, se tiver, senão usa o SYSTEM_PROMPT padrão
+                user_rows = get_client().table("users") \
+                    .select("custom_prompt") \
+                    .eq("username", username) \
+                    .limit(1) \
+                    .execute().data
+                extra = (user_rows[0].get("custom_prompt") or "").strip() if user_rows else ""
+                effective_prompt = SYSTEM_PROMPT
+                if extra:
+                    effective_prompt += f"\n\nExtra instructions from user:\n{extra}"
                 try:
-                    async for token_chunk in stream_llm(SYSTEM_PROMPT, history):
+                    async for token_chunk in stream_llm(effective_prompt, history):
                         full_response += token_chunk
                         await websocket.send_json({"type": "stream_token", "token": token_chunk})
                 except Exception as e:
