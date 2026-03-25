@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="pt-br" data-theme="dark">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -12,25 +11,26 @@
   <link rel="stylesheet" href="styles/word_tooltip.css">
   <link rel="icon" type="image/x-icon" href="images/tati_logo.jpg">
 </head>
-
 <body>
 
   <!-- Topbar -->
   <header class="voice-topbar">
     <div class="voice-topbar-left">
-      <a href="chat.html" class="btn-back-chat">
+      <a href="chat.html" class="btn-back-chat" id="btn-back-chat">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
         Chat
       </a>
-      <span class="voice-title">Voice Mode</span>
+      <span class="voice-title" id="voice-conv-title">Voice Mode</span>
     </div>
     <div style="display:flex;gap:0.5rem;align-items:center;">
-      <button class="theme-toggle" onclick="toggleTheme()" title="Tema"
-        style="position:static;width:36px;height:36px;font-size:1rem;">
-        <span id="theme-icon">☀️</span>
-      </button>
+      <a href="settings.html" class="btn-back-chat" title="Configurações">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
+        </svg>
+      </a>
     </div>
   </header>
 
@@ -60,12 +60,10 @@
       </div>
     </div>
 
-    <!-- Transcription (oculta via CSS, só mantida para compatibilidade com voice.js) -->
     <div class="voice-transcription" id="voice-transcription"></div>
 
     <!-- Footer -->
     <div class="voice-footer">
-      <!-- Audio controls -->
       <div class="voice-audio-bar">
         <button class="vac-btn" id="vac-play-btn">▶ Ouvir</button>
         <button class="vac-btn" id="vac-rewind-btn">↩ 5s</button>
@@ -79,7 +77,6 @@
         <span class="vac-val" id="vac-spd-val">1.0×</span>
       </div>
 
-      <!-- Mic -->
       <div class="mic-wrap">
         <button class="mic-btn" id="mic-btn">🎤</button>
         <span class="mic-hint" id="mic-hint">Toque para falar</span>
@@ -91,5 +88,4 @@
   <script src="js/word_tooltip.js"></script>
   <script src="js/voice.js"></script>
 </body>
-
 </html>

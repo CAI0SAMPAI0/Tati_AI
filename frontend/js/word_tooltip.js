@@ -1,11 +1,10 @@
-// js/word-tooltip.js
-// Shared: click a word → tooltip with translation + EN-US/EN-UK pronunciation
+// js/word_tooltip.js
+// Click a word → tooltip with translation + EN-US/EN-UK pronunciation
 // Uses Free Dictionary API (no key needed) + MyMemory for translation
 
 (function () {
   'use strict';
 
-  // ── Tooltip DOM ────────────────────────────────────────────────
   const tooltip = document.createElement('div');
   tooltip.id = 'word-tooltip';
   tooltip.innerHTML = `
@@ -37,14 +36,12 @@
   `;
   document.body.appendChild(tooltip);
 
-  // ── State ──────────────────────────────────────────────────────
   let currentWord = '';
   let audioUS = null;
   let audioUK = null;
   let currentAudio = null;
   const cache = {};
 
-  // ── Position tooltip near click ────────────────────────────────
   function positionTooltip(x, y) {
     tooltip.style.display = 'block';
     const tw = tooltip.offsetWidth;
@@ -59,7 +56,6 @@
     tooltip.style.top  = Math.max(8, top)  + 'px';
   }
 
-  // ── Fetch dictionary data ──────────────────────────────────────
   async function lookupWord(word) {
     if (cache[word]) return cache[word];
     try {
@@ -86,7 +82,6 @@
     } catch { return null; }
   }
 
-  // ── Populate tooltip ───────────────────────────────────────────
   async function showTooltip(word, x, y) {
     word = word.toLowerCase().replace(/[^a-z'-]/g, '');
     if (!word || word.length < 2) return;
@@ -94,7 +89,6 @@
     audioUS = null;
     audioUK = null;
 
-    // Reset UI
     tooltip.querySelector('.wt-word').textContent = word;
     tooltip.querySelector('.wt-pos').textContent  = '';
     tooltip.querySelector('.wt-phonetic-text').textContent = '';
@@ -104,37 +98,31 @@
 
     positionTooltip(x, y);
 
-    // Fetch in parallel
     const [dictData, translation] = await Promise.all([
       lookupWord(word),
       translateWord(word)
     ]);
 
-    if (currentWord !== word) return; // stale
+    if (currentWord !== word) return;
 
-    // Translation
-    const transEl = tooltip.querySelector('.wt-trans-text');
-    transEl.textContent = translation || '(sem tradução)';
+    tooltip.querySelector('.wt-trans-text').textContent = translation || '(no translation found)';
 
     if (!dictData) {
-      tooltip.querySelector('.wt-definition').textContent = 'Palavra não encontrada no dicionário.';
+      tooltip.querySelector('.wt-definition').textContent = 'Word not found in dictionary.';
       return;
     }
 
-    // POS
     const meanings = dictData.meanings || [];
     if (meanings[0]) {
       tooltip.querySelector('.wt-pos').textContent = meanings[0].partOfSpeech || '';
     }
 
-    // Definition (first)
     const def = meanings[0]?.definitions?.[0]?.definition;
     if (def) {
       const defEl = tooltip.querySelector('.wt-definition');
       defEl.textContent = def.length > 120 ? def.slice(0, 120) + '…' : def;
     }
 
-    // Phonetics & audio
     const phonetics = dictData.phonetics || [];
     let phonTextSet = false;
 
@@ -150,18 +138,16 @@
       } else if (src.includes('-uk.') || src.includes('_uk') || src.includes('/uk')) {
         audioUK = src;
       } else if (src && !audioUS) {
-        audioUS = src; // fallback: use whatever we get
+        audioUS = src;
       }
     });
 
-    // Mark buttons with/without audio
     tooltip.querySelector('[data-accent="us"]').classList.toggle('no-audio', !audioUS);
     tooltip.querySelector('[data-accent="uk"]').classList.toggle('no-audio', !audioUK);
 
-    positionTooltip(x, y); // reposition after content loaded
+    positionTooltip(x, y);
   }
 
-  // ── Audio playback ─────────────────────────────────────────────
   function playAudio(src, btn) {
     if (!src) return;
     if (currentAudio) { currentAudio.pause(); currentAudio = null; }
@@ -178,7 +164,6 @@
     audio.play().catch(() => btn.classList.remove('playing'));
   }
 
-  // ── Event: pronunciation buttons ───────────────────────────────
   tooltip.querySelectorAll('.wt-pron').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
@@ -188,14 +173,12 @@
     });
   });
 
-  // ── Event: volume slider ───────────────────────────────────────
   tooltip.querySelector('.wt-vol').addEventListener('input', function () {
     if (currentAudio) currentAudio.volume = parseFloat(this.value);
     const icon = tooltip.querySelector('.wt-vol-icon');
     icon.textContent = this.value > 0.5 ? '🔊' : this.value > 0 ? '🔉' : '🔇';
   });
 
-  // ── Event: close ──────────────────────────────────────────────
   tooltip.querySelector('.wt-close').addEventListener('click', e => {
     e.stopPropagation();
     hideTooltip();
@@ -207,7 +190,6 @@
     currentWord = '';
   }
 
-  // ── Click outside to close ─────────────────────────────────────
   document.addEventListener('click', e => {
     if (!tooltip.contains(e.target)) hideTooltip();
   });
@@ -216,27 +198,22 @@
     if (e.key === 'Escape') hideTooltip();
   });
 
-  // ── Make message bubbles word-clickable ────────────────────────
-  // Called after new messages are rendered
+  // Works for both .message-bubble (chat) and .vbubble (voice)
   function makeClickable(container) {
-    // Only process text nodes inside .message-bubble
+    const selector = '.message-bubble, .vbubble';
     const bubbles = container
-      ? container.querySelectorAll('.message-bubble')
-      : document.querySelectorAll('.message-bubble:not([data-wt-ready])');
+      ? container.querySelectorAll(selector)
+      : document.querySelectorAll(`${selector}:not([data-wt-ready])`);
 
     bubbles.forEach(bubble => {
       if (bubble.dataset.wtReady) return;
       bubble.dataset.wtReady = '1';
-
-      // Wrap each word in a span
       wrapWords(bubble);
     });
   }
 
   function wrapWords(el) {
-    // Only wrap text in leaf text nodes, skip code/pre
     if (el.tagName === 'CODE' || el.tagName === 'PRE') return;
-
     Array.from(el.childNodes).forEach(node => {
       if (node.nodeType === Node.TEXT_NODE) {
         const text = node.textContent;
@@ -261,7 +238,6 @@
     });
   }
 
-  // ── Delegated click on word spans ─────────────────────────────
   document.addEventListener('click', e => {
     const span = e.target.closest('.wt-word-span');
     if (!span) return;
@@ -270,7 +246,6 @@
     showTooltip(word, e.clientX, e.clientY);
   });
 
-  // ── Public API ─────────────────────────────────────────────────
   window.WordTooltip = { makeClickable, hide: hideTooltip };
 
-})();*/
+})();
