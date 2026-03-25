@@ -358,6 +358,26 @@
     font-size: 0.875rem;
 }
 
+/* ── Student photo avatar in table ── */
+.student-avatar-img {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    object-position: center top;
+    flex-shrink: 0;
+}
+
+/* ── Modal photo avatar ── */
+.modal-avatar-img {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    object-position: center top;
+    flex-shrink: 0;
+}
+
 /* Responsive */
 @media (max-width: 900px) {
     .stat-grid { grid-template-columns: 1fr 1fr; }

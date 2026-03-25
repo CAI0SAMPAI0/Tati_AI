@@ -31,6 +31,9 @@ let isRecording     = false;
 let pendingFiles    = [];
 let streamBuffer    = '';
 
+// ── Audio state (per-message, like voice.js) ──────────────────────
+let currentAudio    = null;  // globally tracks the one playing audio
+
 // ── DOMContentLoaded ──────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
     initUserInfo();
@@ -66,7 +69,6 @@ function initUserInfo() {
         avatarEl.textContent = initials;
     }
 
-    // Show dashboard link only for staff
     if (STAFF_ROLES.includes(user.role)) {
         const dashBtn = document.getElementById('btn-dashboard');
         if (dashBtn) dashBtn.style.display = 'flex';
@@ -108,9 +110,7 @@ function handleWSMessage(msg) {
     switch (msg.type) {
         case 'pong': break;
         case 'transcription':
-            // Renderiza a mensagem do usuário no chat
             renderMessage('user', msg.text);
-            // Limpa o input pois a mensagem já foi enviada
             document.getElementById('message-input').value = '';
             autoResize(document.getElementById('message-input'));
             break;
@@ -133,7 +133,8 @@ function handleWSMessage(msg) {
             loadConversations();
             break;
         case 'audio_response':
-            attachAudioToLastBubble(msg.audio);
+            // Attach audio to the last assistant message
+            attachAudioToLastMessage(msg.audio);
             break;
         case 'error':
             hideTyping();
@@ -218,7 +219,6 @@ async function openConversation(id, title) {
     document.querySelectorAll('.conv-item').forEach(el => el.classList.toggle('active', el.dataset.id === id));
     document.getElementById('topbar-title').textContent = title;
 
-    // Show "Modo Voz" button in topbar
     const voiceBtn = document.getElementById('btn-switch-voice');
     if (voiceBtn) voiceBtn.style.display = 'flex';
 
@@ -414,7 +414,7 @@ async function sendMessage() {
 
 function handleKey(e) {
     const s = getSettings();
-    const enterSends = s.enterSend !== false; // default true
+    const enterSends = s.enterSend !== false;
     if (e.key === 'Enter' && !e.shiftKey && enterSends) {
         e.preventDefault(); e.stopPropagation(); sendMessage();
     }
@@ -519,7 +519,6 @@ function appendAssistantMsg(text) {
             <div class="message-bubble">${formatMarkdown(text)}</div>
             <div class="message-meta">
                 <span class="message-time">${nowTime()}</span>
-                ${audioControlsHTML()}
             </div>
         </div>`;
     insertBeforeTyping(div);
@@ -528,6 +527,7 @@ function appendAssistantMsg(text) {
     scrollBottom();
 }
 
+// ── Stream bubbles ────────────────────────────────────────────────
 function appendStreamBubble() {
     const div = document.createElement('div');
     div.className = 'message message-assistant';
@@ -550,172 +550,139 @@ function appendToken(bubble, token) {
 }
 
 function finalizeStreamBubble(bubble) {
-    const fullText = streamBuffer;
-    streamBuffer   = '';
+    const s = getSettings();
+    if (s.wordTooltip !== false && window.WordTooltip) WordTooltip.makeClickable(bubble.closest('.message'));
+
+    // Add meta row with time — audio controls added later via attachAudioToLastMessage
     const body = bubble.closest('.message-body');
     const meta = document.createElement('div');
     meta.className = 'message-meta';
-    meta.innerHTML = `<span class="message-time">${nowTime()}</span>${audioControlsHTML()}`;
+    meta.innerHTML = `<span class="message-time">${nowTime()}</span>`;
     body.appendChild(meta);
-    const s = getSettings();
-    if (s.wordTooltip !== false && window.WordTooltip) WordTooltip.makeClickable(bubble.closest('.message'));
+
+    streamBuffer = '';
 }
 
-// ── Audio controls HTML ───────────────────────────────────────────
-function audioControlsHTML() {
-    return `
-        <div class="msg-audio-controls">
-            <button class="btn-tts-play" title="Reproduzir">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            </button>
-            <button class="btn-tts-rewind" title="Voltar 5s">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.56"/></svg>
-            </button>
-            <div class="msg-vol-control">
-                <label>Vol</label>
-                <input type="range" class="msg-vol-slider" min="0" max="1" step="0.05" value="1" title="Volume">
-                <span class="msg-vol-value">100%</span>
-            </div>
-            <div class="msg-spd-control">
-                <label>Vel</label>
-                <select class="msg-spd-select" title="Velocidade">
-                    <option value="0.75">0.75×</option>
-                    <option value="1" selected>1×</option>
-                    <option value="1.25">1.25×</option>
-                    <option value="1.5">1.5×</option>
-                    <option value="2">2×</option>
-                </select>
-                <span class="msg-spd-value">1.0×</span>
-            </div>
-        </div>`;
-}
-
-// ── Attach audio to last assistant bubble ─────────────────────────
-function attachAudioToLastBubble(b64) {
-    console.log('🎵 attachAudioToLastBubble iniciando...');
-    
+// ── Audio: attach to last assistant message ───────────────────────
+//
+// Pattern mirrors voice.js: we create the Audio object once,
+// wire every control to it, and swap play/pause icons reactively.
+// currentAudio tracks the globally-playing audio so new plays stop old ones.
+//
+function attachAudioToLastMessage(b64) {
     const msgs = document.querySelectorAll('.message-assistant');
-    if (!msgs.length) { console.log('❌ Nenhuma mensagem assistente'); return; }
-    
-    const last = msgs[msgs.length - 1];
-    let controls = last.querySelector('.msg-audio-controls');
-    
-    if (!controls) {
-        let meta = last.querySelector('.message-meta');
-        if (!meta) {
-            meta = document.createElement('div');
-            meta.className = 'message-meta';
-            meta.innerHTML = `<span class="message-time">${nowTime()}</span>${audioControlsHTML()}`;
-            last.querySelector('.message-body').appendChild(meta);
-        } else {
-            if (!meta.querySelector('.msg-audio-controls')) {
-                const controlsDiv = document.createElement('div');
-                controlsDiv.innerHTML = audioControlsHTML();
-                meta.appendChild(controlsDiv.firstChild);
-            }
-        }
-        controls = last.querySelector('.msg-audio-controls');
-    }
+    if (!msgs.length) return;
+    const lastMsg = msgs[msgs.length - 1];
 
-    console.log('✅ Controls encontrados:', !!controls);
-    
-    // Buscar elementos
-    const playBtn    = controls?.querySelector('.btn-tts-play');
-    const rewBtn     = controls?.querySelector('.btn-tts-rewind');
-    const volSlider  = controls?.querySelector('.msg-vol-slider');
-    const spdSelect  = controls?.querySelector('.msg-spd-select');
-    const volValue   = controls?.querySelector('.msg-vol-value');
-    const spdValue   = controls?.querySelector('.msg-spd-value');
-    
-    console.log('🔍 Play btn:', !!playBtn, 'Rew btn:', !!rewBtn, 'Vol:', !!volSlider, 'Spd:', !!spdSelect);
-    
-    if (!playBtn || !rewBtn || !volSlider || !spdSelect) {
-        console.error('❌ Elementos não encontrados!');
-        return;
-    }
+    // Build controls and append to meta row
+    const meta = lastMsg.querySelector('.message-meta');
+    if (!meta) return;
 
+    const controls = document.createElement('div');
+    controls.className = 'msg-audio-controls';
+    controls.innerHTML = `
+        <button class="btn-tts-play" title="Reproduzir">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </button>
+        <button class="btn-tts-rewind" title="Voltar 5s">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.56"/></svg>
+        </button>
+        <div class="msg-vol-control">
+            <label>Vol</label>
+            <input type="range" class="msg-vol-slider" min="0" max="1" step="0.05" value="1" title="Volume">
+            <span class="msg-vol-value">100%</span>
+        </div>
+        <div class="msg-spd-control">
+            <label>Vel</label>
+            <select class="msg-spd-select" title="Velocidade">
+                <option value="0.75">0.75×</option>
+                <option value="1" selected>1×</option>
+                <option value="1.25">1.25×</option>
+                <option value="1.5">1.5×</option>
+                <option value="2">2×</option>
+            </select>
+        </div>`;
+    meta.appendChild(controls);
+
+    const playBtn   = controls.querySelector('.btn-tts-play');
+    const rewBtn    = controls.querySelector('.btn-tts-rewind');
+    const volSlider = controls.querySelector('.msg-vol-slider');
+    const spdSelect = controls.querySelector('.msg-spd-select');
+    const volValue  = controls.querySelector('.msg-vol-value');
+
+    // Read saved speed preference
     const s = getSettings();
-    const speed = parseFloat(s.defaultSpeed || '1');
+    const defaultSpeed = parseFloat(s.defaultSpeed || '1');
+    spdSelect.value = defaultSpeed;
+
+    // Create the Audio object — single source of truth
     const audio = new Audio('data:audio/mp3;base64,' + b64);
-    
-    console.log('🔊 Audio criado, speed:', speed);
-    
-    audio.volume = 1;
-    audio.playbackRate = speed;
-    
-    if (volValue) volValue.textContent = '100%';
-    if (spdValue) {
-        spdSelect.value = speed;
-        spdValue.textContent = parseFloat(speed).toFixed(1) + '×';
+    audio.volume       = parseFloat(volSlider.value);
+    audio.playbackRate = defaultSpeed;
+
+    function setPlayIcon(playing) {
+        playBtn.innerHTML = playing
+            ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
+            : `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+        playBtn.title = playing ? 'Pausar' : 'Reproduzir';
     }
 
-    // Auto-play
+    function playAudio() {
+        // Stop any other playing audio first
+        if (currentAudio && currentAudio !== audio) {
+            currentAudio.pause();
+            // Reset the icon on the other message (find its play button)
+            document.querySelectorAll('.btn-tts-play').forEach(btn => {
+                if (btn !== playBtn) {
+                    btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+                    btn.title = 'Reproduzir';
+                }
+            });
+        }
+        currentAudio = audio;
+        audio.play().catch(err => console.warn('Play error:', err));
+        setPlayIcon(true);
+    }
+
+    // Auto-play if setting is on
     if (s.autoPlay === true || s.autoPlay === 'true') {
-        console.log('▶️ Auto-play ativado');
-        audio.play().catch(e => console.log('Play error:', e));
-        updatePlayBtn(playBtn, true);
+        playAudio();
     }
 
-    // Play/Pause com addEventListener
+    // Play / Pause toggle
     playBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        console.log('▶️ Play button clicado, paused:', audio.paused);
         if (audio.paused) {
-            console.log('▶️ Reproduzindo...');
-            audio.play().catch(e => console.log('Play error:', e));
-            updatePlayBtn(playBtn, true);
+            playAudio();
         } else {
-            console.log('⏸ Pausando...');
             audio.pause();
-            updatePlayBtn(playBtn, false);
+            setPlayIcon(false);
         }
     });
 
-    // Rewind com addEventListener
+    // Rewind 5s
     rewBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        console.log('⏪ Rewind clicado, currentTime antes:', audio.currentTime);
         audio.currentTime = Math.max(0, audio.currentTime - 5);
-        console.log('⏪ Rewind clicado, currentTime depois:', audio.currentTime);
     });
 
-    // Volume com addEventListener
+    // Volume
     volSlider.addEventListener('input', (e) => {
         e.stopPropagation();
-        const vol = parseFloat(volSlider.value);
-        audio.volume = vol;
-        if (volValue) volValue.textContent = Math.round(vol * 100) + '%';
-        console.log('🔊 Volume mudado para:', vol);
+        audio.volume = parseFloat(volSlider.value);
+        if (volValue) volValue.textContent = Math.round(audio.volume * 100) + '%';
     });
 
-    // Speed com addEventListener
+    // Speed
     spdSelect.addEventListener('change', (e) => {
         e.stopPropagation();
-        const spd = parseFloat(spdSelect.value);
-        audio.playbackRate = spd;
-        if (spdValue) spdValue.textContent = spd.toFixed(1) + '×';
-        console.log('⚡ Speed mudada para:', spd);
+        audio.playbackRate = parseFloat(spdSelect.value);
     });
 
-    // Event listeners de áudio
-    audio.addEventListener('ended', () => {
-        console.log('✅ Audio ended');
-        updatePlayBtn(playBtn, false);
-    });
-    
-    audio.addEventListener('pause', () => {
-        console.log('⏸ Audio paused');
-        updatePlayBtn(playBtn, false);
-    });
-    
-    console.log('✅ Todos os handlers anexados com sucesso!');
-}
-
-function updatePlayBtn(btn, playing) {
-    btn.innerHTML = playing
-        ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
-        : `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
-    btn.title = playing ? 'Pausar' : 'Reproduzir';
+    // Sync icon on natural end / external pause
+    audio.addEventListener('ended', () => { setPlayIcon(false); if (currentAudio === audio) currentAudio = null; });
+    audio.addEventListener('pause', () => setPlayIcon(false));
+    audio.addEventListener('play',  () => setPlayIcon(true));
 }
 
 // ── Misc helpers ──────────────────────────────────────────────────
@@ -738,8 +705,8 @@ function insertBeforeTyping(el) {
 }
 
 function clearMessages() {
-    const area    = document.getElementById('chat-messages');
-    const typing  = document.getElementById('typing-indicator');
+    const area   = document.getElementById('chat-messages');
+    const typing = document.getElementById('typing-indicator');
     [...area.children].forEach(el => {
         if (el.id !== 'typing-indicator' && el.id !== 'chat-welcome') el.remove();
     });

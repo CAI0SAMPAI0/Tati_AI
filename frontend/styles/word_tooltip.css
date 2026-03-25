@@ -427,3 +427,34 @@
   background: rgba(124, 58, 237, 0.22);
   border-color: var(--primary);
 }
+
+/* ── Adicionar ao final de word_tooltip.css ── */
+
+/* Loading state for pronunciation buttons */
+.wt-pron.loading {
+  opacity: 0.5;
+  cursor: wait;
+  animation: wt-pulse 1s ease-in-out infinite;
+}
+@keyframes wt-pulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 0.8; }
+}
+
+/* Tati button gets a slightly different accent to stand out */
+#wt-btn-tati {
+  background: rgba(124, 58, 237, 0.18);
+  border-color: rgba(124, 58, 237, 0.4);
+}
+#wt-btn-tati:hover:not(.no-audio):not(.loading) {
+  background: rgba(124, 58, 237, 0.3);
+}
+#wt-btn-tati.playing {
+  background: var(--primary, #7c3aed);
+  color: white;
+}
+
+/* Dict button stays the existing style */
+.wt-pron-dict {
+  background: rgba(124, 58, 237, 0.08);
+}
