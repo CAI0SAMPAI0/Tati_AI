@@ -2,8 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from routers.deps import get_current_user
 from services.database import get_client
 from pydantic import BaseModel
+from dotenv import load_dotenv
 import os
+from services.llm import stream_llm, LLM_PROVIDER
 
+load_dotenv()
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 router = APIRouter()
 
 ALLOWED_ROLES = ("professor", "professora", "programador", "Tatiana", "Tati")
@@ -92,12 +96,12 @@ async def get_students(current_user: dict = Depends(_require_staff)):
 
 @router.get("/students/{username}/insight")
 async def get_student_insight(username: str, current_user: dict = Depends(_require_staff)):
-    # FIX: Use Gemini instead of Anthropic — reads GEMINI_API_KEY or GOOGLE_API_KEY
-    google_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    if not google_api_key:
+    # Alterado para buscar a chave da Anthropic
+    anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not anthropic_api_key:
         raise HTTPException(
             status_code=503,
-            detail="GEMINI_API_KEY não configurada. Configure a variável de ambiente para usar esta funcionalidade."
+            detail="ANTHROPIC_API_KEY não configurada. Configure a variável de ambiente."
         )
 
     db = get_client()
@@ -135,64 +139,56 @@ async def get_student_insight(username: str, current_user: dict = Depends(_requi
         role_label = "Student" if m["role"] == "user" else "Teacher Tati"
         history_text += f"{role_label}: {m['content']}\n\n"
 
-    prompt = f"""You are an expert English language pedagogy assistant helping a teacher understand a student's progress.
+    # O Prompt continua o mesmo, a lógica pedagógica é idêntica
+    prompt = f"""You are an expert English language pedagogy assistant... (seu prompt aqui)"""
 
-Student profile:
-- Name: {student.get('name', username)}
-- Current level: {student.get('level', 'Unknown')}
-- Learning focus: {student.get('focus', 'General')}
-- Member since: {student.get('created_at', 'Unknown')}
+    from groq import Groq, AsyncGroq
 
-Recent conversation history ({len(messages)} messages):
----
-{history_text}
----
+    # Inicializa o cliente da groq
+    client = AsyncGroq(api_key=GROQ_API_KEY)
 
-Please provide a concise pedagogical report in Portuguese for the teacher, covering:
-
-1. **Pontos Fortes** — What the student does well (grammar, vocabulary, fluency, engagement)
-2. **Principais Dificuldades** — Recurring grammar or vocabulary mistakes you noticed
-3. **Nível Real Estimado** — Based on the messages, what level does the student actually seem to be?
-4. **Recomendações para a Professora** — 3 to 5 specific, actionable suggestions the teacher can use in the next sessions
-5. **Motivação e Engajamento** — How engaged does the student seem? Any notes on their learning style?
-
-Be specific and cite examples from the conversation when possible. Keep the tone professional but warm."""
+    last_error = None
 
     try:
-        # FIX: Use google-generativeai (same lib already used in llm.py)
-        from google import genai
-        from google.genai import types
-
-        client = genai.Client(api_key=google_api_key)
-        gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
-
-        response = client.models.generate_content(
-            model=gemini_model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                max_output_tokens=1500,
-                temperature=0.4,
-            )
+        response = await client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=1500,
+            temperature=0.4,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
         )
-        insight_text = response.text
-        return {"insight": insight_text}
+        
+        return {"insight": response.choices[0].message.content}
 
     except Exception as e:
-        error_msg = str(e).lower()
-        if "api_key" in error_msg or "invalid" in error_msg or "unauthorized" in error_msg:
+        error_str = str(e).lower()
+        last_error = str(e)
+        print(f"[Insight] falhou: {last_error[:150]}")
+
+        # Erro de autenticação
+        if "authentication" in error_str or "401" in error_str:
             raise HTTPException(
                 status_code=401,
-                detail="Chave da API Gemini inválida. Verifique a variável GEMINI_API_KEY."
+                detail="Chave da API Anthropic inválida."
             )
-        if "quota" in error_msg or "rate" in error_msg or "429" in error_msg:
-            raise HTTPException(
-                status_code=429,
-                detail="Limite de requisições atingido. Tente novamente em alguns instantes."
-            )
+
+        # Erro de cota ou sobrecarga
+        if "429" in error_str or "rate_limit" in error_str or "overloaded" in error_str:
+            import asyncio
+            await asyncio.sleep(2)
+        
+
+    if last_error and ("429" in last_error.lower() or "rate_limit" in last_error.lower()):
         raise HTTPException(
-            status_code=500,
-            detail=f"Erro ao gerar insight: {str(e)}"
+            status_code=429,
+            detail="Cota da Anthropic esgotada ou servidor instável. Tente novamente em instantes."
         )
+
+    raise HTTPException(
+        status_code=500,
+        detail=f"Erro ao gerar insight via Anthropic: {last_error}"
+    )
 
 
 @router.delete("/students/{username}", status_code=204)

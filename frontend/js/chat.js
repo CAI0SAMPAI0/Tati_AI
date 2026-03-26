@@ -1,4 +1,3 @@
-// js/chat.js
 const API    = 'http://127.0.0.1:8000';
 const WS_URL = 'ws://127.0.0.1:8000';
 

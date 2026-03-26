@@ -1,6 +1,3 @@
-// js/i18n.js — Tati AI internationalization system
-// Supports: pt-BR (default), en-US, en-UK
-
 const TRANSLATIONS = {
   'pt-BR': {
     // ── Global / Nav ──────────────────────────────────────────────

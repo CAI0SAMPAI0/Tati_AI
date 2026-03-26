@@ -11,7 +11,7 @@ from gtts import gTTS
 
 # ─── Configuração ────────────────────────────────────────────────────────────
 
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini").lower()  # "claude" | "gemini"
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq").lower()  # "claude" | "gemini" | "groq"
 
 CLAUDE_MODEL  = os.getenv("CLAUDE_MODEL",  "claude-3-5-sonnet-20241022")
 GEMINI_MODEL  = os.getenv("GEMINI_MODEL",  "gemini-2.0-flash")
