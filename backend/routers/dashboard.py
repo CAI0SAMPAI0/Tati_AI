@@ -90,32 +90,6 @@ async def get_students(current_user: dict = Depends(_require_staff)):
 
     return result
 
-
-@router.delete("/students/{username}", status_code=204)
-async def delete_student(username: str, current_user: dict = Depends(_require_staff)):
-    db = get_client()
-    user = db.table("users").select("username").eq("username", username).execute()
-    if not user.data:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
-    db.table("messages").delete().eq("username", username).execute()
-    db.table("conversations").delete().eq("username", username).execute()
-    db.table("users").delete().eq("username", username).execute()
-
-
-@router.put("/students/{username}")
-async def update_student(
-    username: str,
-    body: StudentUpdate,
-    current_user: dict = Depends(_require_staff)
-):
-    db = get_client()
-    update_data = {k: v for k, v in body.model_dump().items() if v is not None}
-    if not update_data:
-        raise HTTPException(status_code=400, detail="Nenhum campo para atualizar")
-    db.table("users").update(update_data).eq("username", username).execute()
-    return {"ok": True}
-
-
 @router.get("/students/{username}/insight")
 async def get_student_insight(username: str, current_user: dict = Depends(_require_staff)):
     # FIX: Use Gemini instead of Anthropic — reads GEMINI_API_KEY or GOOGLE_API_KEY
@@ -219,3 +193,28 @@ Be specific and cite examples from the conversation when possible. Keep the tone
             status_code=500,
             detail=f"Erro ao gerar insight: {str(e)}"
         )
+
+
+@router.delete("/students/{username}", status_code=204)
+async def delete_student(username: str, current_user: dict = Depends(_require_staff)):
+    db = get_client()
+    user = db.table("users").select("username").eq("username", username).execute()
+    if not user.data:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    db.table("messages").delete().eq("username", username).execute()
+    db.table("conversations").delete().eq("username", username).execute()
+    db.table("users").delete().eq("username", username).execute()
+
+
+@router.put("/students/{username}")
+async def update_student(
+    username: str,
+    body: StudentUpdate,
+    current_user: dict = Depends(_require_staff)
+):
+    db = get_client()
+    update_data = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Nenhum campo para atualizar")
+    db.table("users").update(update_data).eq("username", username).execute()
+    return {"ok": True}

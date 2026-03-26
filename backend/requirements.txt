@@ -36,3 +36,4 @@ httpx==0.27.0              # para testar endpoints
 
 google-generativeai
 pypdf
+docx
