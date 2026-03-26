@@ -1,8 +1,3 @@
-// js/word_tooltip.js
-// Click a word → tooltip with translation + pronunciation via the same TTS as the AI
-// Translation: MyMemory API (free, no key)
-// Pronunciation: backend /chat/tts endpoint (ElevenLabs or gTTS fallback — same voice as Tati)
-
 (function () {
   'use strict';
 

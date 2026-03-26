@@ -1,4 +1,3 @@
-// js/dashboard.js
 const API = 'http://127.0.0.1:8000';
 
 const token   = localStorage.getItem('token');
@@ -39,7 +38,6 @@ function setSection(name, el) {
     document.getElementById('page-sub').textContent   = sections[name]?.sub()   || '';
 }
 
-// Update section titles on lang change
 window.addEventListener('langchange', () => {
     const active = document.querySelector('.dash-nav-item.active');
     if (active) {
@@ -195,10 +193,9 @@ function openStudentModal(username) {
             <div class="modal-tab-content" id="tab-prompt" style="display:none">
                 <p class="modal-hint">
                     Adicione instruções extras para a Tati seguir <strong>somente com este aluno</strong>.
-                    Ex: foco em business English, evitar correções técnicas, mencionar que o aluno tem dislexia, etc.
                 </p>
                 <textarea id="modal-prompt" class="modal-textarea"
-                    placeholder="Ex: This student is preparing for a job interview at a tech company. Focus on professional vocabulary..."
+                    placeholder="Ex: This student is preparing for a job interview at a tech company..."
                 >${esc(student.custom_prompt || '')}</textarea>
                 <div id="modal-prompt-feedback" class="modal-feedback" style="display:none"></div>
                 <div class="modal-actions">
@@ -216,7 +213,7 @@ function openStudentModal(username) {
                 <div id="insight-content">
                     <div class="insight-placeholder">
                         <i class="fa-solid fa-brain" style="font-size:1.5rem;color:var(--primary);margin-bottom:0.75rem;display:block;"></i>
-                        <p>Clique em <strong>${t('dash.generate_insight')}</strong> para a IA analisar o histórico de conversas deste aluno e gerar recomendações pedagógicas.</p>
+                        <p>Clique em <strong>${t('dash.generate_insight')}</strong> para a IA analisar o histórico de conversas deste aluno.</p>
                     </div>
                 </div>
                 <div class="modal-actions">
@@ -229,7 +226,6 @@ function openStudentModal(username) {
         </div>`;
 
     document.body.appendChild(modal);
-    // CSS enter animation
     requestAnimationFrame(() => modal.querySelector('.modal-panel').classList.add('modal-panel-open'));
 }
 
@@ -253,7 +249,7 @@ async function saveStudentLevel() {
     const level    = document.getElementById('modal-level').value;
     const feedback = document.getElementById('modal-edit-feedback');
     try {
-        const res = await fetch(`${API}/dashboard/students/${currentModalUsername}`, {
+        const res = await fetch(`${API}/dashboard/students/${encodeURIComponent(currentModalUsername)}`, {
             method:  'PUT',
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
             body:    JSON.stringify({ level })
@@ -274,7 +270,7 @@ async function saveStudentPrompt() {
     const custom_prompt = document.getElementById('modal-prompt').value.trim();
     const feedback      = document.getElementById('modal-prompt-feedback');
     try {
-        const res = await fetch(`${API}/dashboard/students/${currentModalUsername}`, {
+        const res = await fetch(`${API}/dashboard/students/${encodeURIComponent(currentModalUsername)}`, {
             method:  'PUT',
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
             body:    JSON.stringify({ custom_prompt })
@@ -309,7 +305,7 @@ function confirmDeleteStudent(username) {
             <i class="fa-solid fa-triangle-exclamation" style="color:#f87171;margin-right:0.4rem;"></i>
             Excluir @${esc(username)}?
         </p>
-        <p style="font-size:0.8rem;color:var(--text-muted);margin:0;">Esta ação é irreversível. Todas as mensagens e conversas serão apagadas.</p>
+        <p style="font-size:0.8rem;color:var(--text-muted);margin:0;">Esta ação é irreversível.</p>
         <div style="display:flex;gap:0.5rem;">
             <button id="del-yes" style="flex:1;padding:0.5rem;background:#ef4444;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:0.85rem;">${t('dash.confirm_delete')}</button>
             <button id="del-no"  style="flex:1;padding:0.5rem;background:var(--border);color:var(--text);border:none;border-radius:8px;cursor:pointer;font-size:0.85rem;">${t('chat.cancel')}</button>
@@ -321,7 +317,7 @@ function confirmDeleteStudent(username) {
 
 async function deleteStudent(username) {
     try {
-        const res = await fetch(`${API}/dashboard/students/${username}`, {
+        const res = await fetch(`${API}/dashboard/students/${encodeURIComponent(username)}`, {
             method:  'DELETE',
             headers: { Authorization: `Bearer ${token}` }
         });
@@ -350,14 +346,43 @@ async function generateInsight() {
         </div>`;
 
     try {
-        const res = await fetch(`${API}/dashboard/students/${currentModalUsername}/insight`, {
+        // FIX: encodeURIComponent garante que "Caio Sampaio" → "Caio%20Sampaio" corretamente
+        const url = `${API}/dashboard/students/${encodeURIComponent(currentModalUsername)}/insight`;
+        console.log('[Insight] Chamando:', url);
+
+        const res  = await fetch(url, {
             headers: { Authorization: `Bearer ${token}` }
         });
-        if (!res.ok) throw new Error();
+
+        // FIX: lê o JSON antes de verificar res.ok para capturar a mensagem de erro real
         const data = await res.json();
+
+        if (!res.ok) {
+            let userMsg = '';
+            if (res.status === 429) {
+                userMsg = '⏳ Cota da Anthropic esgotada. Aguarde 1 minuto e tente novamente.';
+            } else if (res.status === 404) {
+                userMsg = `❌ Aluno não encontrado: "${currentModalUsername}"`;
+            } else if (res.status === 401) {
+                userMsg = '🔑 Chave da API Anthropic inválida. Verifique o .env';
+            } else if (res.status === 503) {
+                userMsg = '⚙️ ANTHROPIC_API_KEY não configurada no servidor.';
+            } else {
+                userMsg = `❌ Erro ${res.status}: ${data.detail || 'Tente novamente.'}`;
+            }
+            content.innerHTML = `<div class="modal-feedback error" style="display:block;">${userMsg}</div>`;
+            return;
+        }
+
         content.innerHTML = `<div class="insight-text">${formatInsight(data.insight)}</div>`;
-    } catch {
-        content.innerHTML = `<div class="modal-feedback error" style="display:block;">${t('dash.err_save')}</div>`;
+
+    } catch (err) {
+        console.error('[Insight] Erro de rede:', err);
+        content.innerHTML = `
+            <div class="modal-feedback error" style="display:block;">
+                ❌ Erro de conexão: ${err.message}<br>
+                <small style="opacity:0.7">API: ${API} · Verifique se o servidor está rodando</small>
+            </div>`;
     } finally {
         btn.disabled    = false;
         btn.textContent = t('dash.regenerate');
