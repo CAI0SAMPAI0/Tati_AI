@@ -1,6 +1,6 @@
 const API = 'http://127.0.0.1:8000';
 
-const token   = localStorage.getItem('token');
+const token = localStorage.getItem('token');
 const userRaw = localStorage.getItem('user');
 if (!token || !userRaw) { window.location.href = '/'; }
 const userLocal = JSON.parse(userRaw);
@@ -35,7 +35,7 @@ function setSection(name, el) {
     const sec = document.getElementById('section-' + name);
     if (sec) sec.style.display = 'block';
     document.getElementById('page-title').textContent = sections[name]?.title() || name;
-    document.getElementById('page-sub').textContent   = sections[name]?.sub()   || '';
+    document.getElementById('page-sub').textContent = sections[name]?.sub() || '';
 }
 
 window.addEventListener('langchange', () => {
@@ -45,7 +45,7 @@ window.addEventListener('langchange', () => {
         const name = href.replace('#', '');
         if (sections[name]) {
             document.getElementById('page-title').textContent = sections[name].title();
-            document.getElementById('page-sub').textContent   = sections[name].sub();
+            document.getElementById('page-sub').textContent = sections[name].sub();
         }
     }
 });
@@ -53,12 +53,12 @@ window.addEventListener('langchange', () => {
 // ── Stats ─────────────────────────────────────────────────────────
 async function loadStats() {
     try {
-        const res  = await fetch(`${API}/dashboard/stats`, { headers: { Authorization: `Bearer ${token}` } });
+        const res = await fetch(`${API}/dashboard/stats`, { headers: { Authorization: `Bearer ${token}` } });
         if (!res.ok) return;
         const data = await res.json();
         document.getElementById('stat-total-students').textContent = data.total_students ?? '—';
         document.getElementById('stat-total-messages').textContent = data.total_messages ?? '—';
-        document.getElementById('stat-active-today').textContent   = data.active_today   ?? '—';
+        document.getElementById('stat-active-today').textContent = data.active_today ?? '—';
     } catch (e) { console.error('loadStats', e); }
 }
 
@@ -68,7 +68,7 @@ async function loadStudents() {
         const res = await fetch(`${API}/dashboard/students`, { headers: { Authorization: `Bearer ${token}` } });
         if (!res.ok) return;
         allStudents = await res.json();
-        renderStudentsTable('students-table',        allStudents);
+        renderStudentsTable('students-table', allStudents);
         renderStudentsTable('recent-students-table', allStudents.slice(0, 5), true);
     } catch (e) { console.error('loadStudents', e); }
 }
@@ -95,8 +95,8 @@ function renderStudentsTable(containerId, students, compact = false) {
             <td>
                 <div class="student-name-cell">
                     ${s.avatar_url
-                        ? `<img src="${s.avatar_url}" class="student-avatar-img" alt="">`
-                        : `<div class="student-avatar">${getInitials(s.name || s.username)}</div>`}
+            ? `<img src="${s.avatar_url}" class="student-avatar-img" alt="">`
+            : `<div class="student-avatar">${getInitials(s.name || s.username)}</div>`}
                     <div>
                         <div class="student-name">${esc(s.name || s.username)}</div>
                         <div class="student-username">@${esc(s.username)}</div>
@@ -148,8 +148,8 @@ function openStudentModal(username) {
             <div class="modal-header">
                 <div class="modal-student-info">
                     ${student.avatar_url
-                        ? `<img src="${student.avatar_url}" class="modal-avatar-img" alt="">`
-                        : `<div class="modal-avatar">${getInitials(student.name || student.username)}</div>`}
+            ? `<img src="${student.avatar_url}" class="modal-avatar-img" alt="">`
+            : `<div class="modal-avatar">${getInitials(student.name || student.username)}</div>`}
                     <div>
                         <div class="modal-student-name">${esc(student.name || student.username)}</div>
                         <div class="modal-student-meta">@${esc(student.username)} · ${esc(student.level || '—')} · ${student.total_messages ?? 0} msgs</div>
@@ -171,11 +171,11 @@ function openStudentModal(username) {
                 <div class="modal-field">
                     <label>${t('dash.col_level')}</label>
                     <select id="modal-level">
-                        <option value="Beginner"         ${student.level === 'Beginner'          ? 'selected' : ''}>${t('level.beginner')}</option>
-                        <option value="Pre-Intermediate" ${student.level === 'Pre-Intermediate'  ? 'selected' : ''}>${t('level.pre_int')}</option>
-                        <option value="Intermediate"     ${student.level === 'Intermediate'      ? 'selected' : ''}>${t('level.intermediate')}</option>
-                        <option value="Business English" ${student.level === 'Business English'  ? 'selected' : ''}>${t('level.business')}</option>
-                        <option value="Advanced"         ${student.level === 'Advanced'          ? 'selected' : ''}>${t('level.advanced')}</option>
+                        <option value="Beginner"         ${student.level === 'Beginner' ? 'selected' : ''}>${t('level.beginner')}</option>
+                        <option value="Pre-Intermediate" ${student.level === 'Pre-Intermediate' ? 'selected' : ''}>${t('level.pre_int')}</option>
+                        <option value="Intermediate"     ${student.level === 'Intermediate' ? 'selected' : ''}>${t('level.intermediate')}</option>
+                        <option value="Business English" ${student.level === 'Business English' ? 'selected' : ''}>${t('level.business')}</option>
+                        <option value="Advanced"         ${student.level === 'Advanced' ? 'selected' : ''}>${t('level.advanced')}</option>
                     </select>
                 </div>
                 <div id="modal-edit-feedback" class="modal-feedback" style="display:none"></div>
@@ -219,6 +219,9 @@ function openStudentModal(username) {
                     <button class="btn-modal-save" id="btn-generate-insight" onclick="generateInsight()">
                         ${t('dash.generate_insight')}
                     </button>
+                    <button class="btn-modal-secondary" id="btn-generate-grammar" onclick="generateGrammarErrors()">
+                       🧩 ${t('dash.grammar_errors')}
+                    </button>
                 </div>
             </div>
 
@@ -245,19 +248,19 @@ function switchModalTab(tab, btn) {
 
 // ── Save level ────────────────────────────────────────────────────
 async function saveStudentLevel() {
-    const level    = document.getElementById('modal-level').value;
+    const level = document.getElementById('modal-level').value;
     const feedback = document.getElementById('modal-edit-feedback');
     try {
         const res = await fetch(`${API}/dashboard/students/${encodeURIComponent(currentModalUsername)}`, {
-            method:  'PUT',
+            method: 'PUT',
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ level })
+            body: JSON.stringify({ level })
         });
         if (!res.ok) throw new Error();
         showModalFeedback(feedback, t('dash.level_updated'), 'success');
         const s = allStudents.find(s => s.username === currentModalUsername);
         if (s) s.level = level;
-        renderStudentsTable('students-table',        allStudents);
+        renderStudentsTable('students-table', allStudents);
         renderStudentsTable('recent-students-table', allStudents.slice(0, 5), true);
     } catch {
         showModalFeedback(feedback, t('dash.err_save'), 'error');
@@ -267,12 +270,12 @@ async function saveStudentLevel() {
 // ── Save prompt ───────────────────────────────────────────────────
 async function saveStudentPrompt() {
     const custom_prompt = document.getElementById('modal-prompt').value.trim();
-    const feedback      = document.getElementById('modal-prompt-feedback');
+    const feedback = document.getElementById('modal-prompt-feedback');
     try {
         const res = await fetch(`${API}/dashboard/students/${encodeURIComponent(currentModalUsername)}`, {
-            method:  'PUT',
+            method: 'PUT',
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ custom_prompt })
+            body: JSON.stringify({ custom_prompt })
         });
         if (!res.ok) throw new Error();
         showModalFeedback(feedback, t('dash.prompt_saved'), 'success');
@@ -310,20 +313,20 @@ function confirmDeleteStudent(username) {
             <button id="del-no"  style="flex:1;padding:0.5rem;background:var(--border);color:var(--text);border:none;border-radius:8px;cursor:pointer;font-size:0.85rem;">${t('chat.cancel')}</button>
         </div>`;
     document.body.appendChild(popup);
-    document.getElementById('del-no').onclick  = () => popup.remove();
+    document.getElementById('del-no').onclick = () => popup.remove();
     document.getElementById('del-yes').onclick = async () => { popup.remove(); await deleteStudent(username); };
 }
 
 async function deleteStudent(username) {
     try {
         const res = await fetch(`${API}/dashboard/students/${encodeURIComponent(username)}`, {
-            method:  'DELETE',
+            method: 'DELETE',
             headers: { Authorization: `Bearer ${token}` }
         });
         if (!res.ok) throw new Error();
         closeStudentModal();
         allStudents = allStudents.filter(s => s.username !== username);
-        renderStudentsTable('students-table',        allStudents);
+        renderStudentsTable('students-table', allStudents);
         renderStudentsTable('recent-students-table', allStudents.slice(0, 5), true);
         loadStats();
     } catch {
@@ -335,10 +338,10 @@ async function deleteStudent(username) {
 // ── SUBSTITUIR a função generateInsight em frontend/js/dashboard.js ──────────
 
 async function generateInsight() {
-    const btn     = document.getElementById('btn-generate-insight');
+    const btn = document.getElementById('btn-generate-insight');
     const content = document.getElementById('insight-content');
 
-    btn.disabled    = true;
+    btn.disabled = true;
     btn.textContent = t('dash.analyzing');
     content.innerHTML = `
         <div style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;padding:2rem;color:var(--text-muted);">
@@ -352,14 +355,14 @@ async function generateInsight() {
         const url = `${API}/dashboard/students/${encodeURIComponent(currentModalUsername)}/insight?lang=${encodeURIComponent(lang)}`;
         console.log('[Insight] Chamando:', url);
 
-        const res  = await fetch(url, {
+        const res = await fetch(url, {
             headers: { Authorization: `Bearer ${token}` }
         });
 
         const data = await res.json();
 
         if (!res.ok) {
-            let userMsg = '';
+            /*let userMsg = '';
             if (res.status === 429) {
                 userMsg = '⏳ Cota esgotada. Aguarde 1 minuto e tente novamente.';
             } else if (res.status === 404) {
@@ -370,7 +373,8 @@ async function generateInsight() {
                 userMsg = '⚙️ Nenhuma chave de API configurada no servidor.';
             } else {
                 userMsg = `❌ Erro ${res.status}: ${data.detail || 'Tente novamente.'}`;
-            }
+            }*/ // mensagens de erro detalhadas comentadas para evitar custo de chamadas durante desenvolvimento
+            const userMsg = mapDashboardApiError(res.status, data?.detail);
             content.innerHTML = `<div class="modal-feedback error" style="display:block;">${userMsg}</div>`;
             return;
         }
@@ -385,24 +389,101 @@ async function generateInsight() {
                 <small style="opacity:0.7">API: ${API} · Verifique se o servidor está rodando</small>
             </div>`;
     } finally {
-        btn.disabled    = false;
+        btn.disabled = false;
         btn.textContent = t('dash.regenerate');
     }
 }
 
+// erros gramaticais
+
+async function generateGrammarErrors() {
+    const btn = document.getElementById('btn-generate-grammar');
+    const content = document.getElementById('insight-content');
+    if (!btn || !content) return;
+
+    btn.disabled = true;
+    const oldLabel = btn.textContent;
+    btn.textContent = 'Analisando...';
+    content.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;padding:2rem;color:var(--text-muted);">
+            <div class="insight-spinner"></div>
+            <p style="font-size:0.85rem;">${t('dash.mapping_errors')}</p>
+        </div>`;
+
+    try {
+        const lang = I18n.getLang();
+        const url = `${API}/dashboard/students/${encodeURIComponent(currentModalUsername)}/grammar-errors?lang=${encodeURIComponent(lang)}`;
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+
+        if (!res.ok) {
+            const userMsg = mapDashboardApiError(res.status, data?.detail);
+            content.innerHTML = `<div class="modal-feedback error" style="display:block;">${userMsg}</div>`;
+            return;
+        }
+
+        const errors = Array.isArray(data?.errors) ? data.errors : [];
+        if (!errors.length) {
+            content.innerHTML = `
+                <div class="insight-placeholder">
+                    <i class="fa-solid fa-circle-check" style="font-size:1.4rem;color:#22c55e;margin-bottom:0.75rem;display:block;"></i>
+                    <p>${t('dash.no_grammar_errors')}</p>
+                </div>`;
+            return;
+        }
+
+        const items = errors
+            .sort((a, b) => (b.count || 0) - (a.count || 0))
+            .map((e, idx) => `
+                <div style="padding:0.75rem 0;border-bottom:1px solid var(--border);">
+                    <div style="display:flex;justify-content:space-between;gap:1rem;">
+                        <strong>${idx + 1}. ${esc(e.category || 'Unknown')}</strong>
+                        <span class="level-badge">${Number(e.count || 0)}x</span>
+                    </div>
+                    ${e.example ? `<div style="margin-top:0.45rem;font-size:0.9rem;color:var(--text-muted);"><em>Exemplo:</em> ${esc(e.example)}</div>` : ''}
+                </div>
+            `)
+            .join('');
+
+        content.innerHTML = `
+            <div class="insight-text">
+                <h4>🧩 ${t('dash.grammar_errors')}</h4>
+                ${items}
+            </div>`;
+    } catch (err) {
+        console.error('[GrammarErrors] Erro de rede:', err);
+        content.innerHTML = `
+            <div class="modal-feedback error" style="display:block;">
+                ❌ Erro de conexão: ${err.message}<br>
+                <small style="opacity:0.7">API: ${API} · Verifique se o servidor está rodando</small>
+            </div>`;
+    } finally {
+        btn.disabled = false;
+        btn.textContent = oldLabel;
+    }
+}
+
+function mapDashboardApiError(status, detail) {
+    if (status === 429) return '⏳ Cota esgotada. Aguarde 1 minuto e tente novamente.';
+    if (status === 404) return `❌ Aluno não encontrado: "${currentModalUsername}"`;
+    if (status === 401) return '🔑 Chave(s) da API inválida(s). Verifique o .env';
+    if (status === 503) return '⚙️ Nenhuma chave de API configurada no servidor.';
+    return `❌ Erro ${status}: ${detail || 'Tente novamente.'}`;
+}
+
 function formatInsight(text) {
     return text
-        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-        .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
-        .replace(/\*(.*?)\*/g,'<em>$1</em>')
-        .replace(/^#{1,3} (.+)$/gm,'<h4>$1</h4>')
-        .replace(/\n/g,'<br>');
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/^#{1,3} (.+)$/gm, '<h4>$1</h4>')
+        .replace(/\n/g, '<br>');
 }
 
 // ── Modal feedback helper ─────────────────────────────────────────
 function showModalFeedback(el, msg, type) {
-    el.textContent   = msg;
-    el.className     = `modal-feedback ${type}`;
+    el.textContent = msg;
+    el.className = `modal-feedback ${type}`;
     el.style.display = 'block';
     setTimeout(() => { el.style.display = 'none'; }, 4000);
 }
@@ -412,7 +493,7 @@ function getInitials(name) {
     return (name || '?').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
 }
 function esc(str) {
-    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 function formatDate(iso) {
     if (!iso) return '—';

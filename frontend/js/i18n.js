@@ -138,6 +138,9 @@ const TRANSLATIONS = {
     'dash.prompt_saved':     '✓ Prompt salvo! Entrará em vigor na próxima mensagem.',
     'dash.err_save':         '✗ Erro ao salvar. Tente novamente.',
     'dash.prompt_hint':      'Adicione instruções extras para a Tati seguir <strong>somente com este aluno</strong>.',
+    'dash.grammar_errors':   'Erros Gramaticais',
+    'dash.mapping_errors':   'Mapeando erros gramaticais recorrentes...',
+    'dash.no_grammar_errors':'Sem erros detectados nas últimas mensagens analisadas.',
 
     // ── Voice ─────────────────────────────────────────────────────
     'voice.online':          'Online',
@@ -301,6 +304,9 @@ const TRANSLATIONS = {
     'dash.prompt_saved':     '✓ Prompt saved! Takes effect on next message.',
     'dash.err_save':         '✗ Error saving. Please try again.',
     'dash.prompt_hint':      'Add extra instructions for Tati to follow <strong>only with this student</strong>.',
+    'dash.grammar_errors':   'Grammar Errors',
+    'dash.mapping_errors':   'Mapping recurring grammar mistakes...',
+    'dash.no_grammar_errors':'No grammar errors detected in the latest analyzed messages.',
 
     'voice.online':          'Online',
     'voice.listening':       '🎙 Listening…',
