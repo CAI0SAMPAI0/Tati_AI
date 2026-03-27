@@ -77,3 +77,24 @@ html{
     scroll-behavior: smooth;
     scroll-padding-top: 80px;
 }
+/* ── Performance global ── */
+* {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+/* Reduz animações pesadas para usuários que preferem menos movimento */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+/* GPU acceleration nas transições mais usadas */
+.sidebar,
+.message,
+.conv-item,
+.modal-panel,
+.message-bubble {
+    will-change: transform;
+    transform: translateZ(0);
+}

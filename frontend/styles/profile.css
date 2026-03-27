@@ -135,7 +135,7 @@
     inset: -4px;
     border-radius: 50%;
     border: 2px solid rgba(124,58,237,0.4);
-    animation: spin 8s linear infinite;
+    /* animation: spin 8s linear infinite; */
     z-index: 0;
 }
 @keyframes spin { to { transform: rotate(360deg); } }

@@ -58,18 +58,34 @@ def verify_token(token: str) -> dict | None:
     except JWTError:
         return None
 
+def _clean_text(text: str) -> str:
+    """Remove caracteres nulos e outros caracteres problemáticos para o Supabase."""
+    return text.replace("\x00", "").replace("\u0000", "")
+
 async def extract_text_from_file(filename: str, content_b64: str) -> str:
     """Extrai texto de PDF, Docx ou Texto puro."""
+    ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
     try:
         file_bytes = base64.b64decode(content_b64)
-        if filename.lower().endswith(".pdf"):
+
+        if ext == "pdf":
             reader = pypdf.PdfReader(io.BytesIO(file_bytes))
-            return "\n".join([page.extract_text() for page in reader.pages if page.extract_text()])
-        elif filename.lower().endswith(".docx"):
+            text = "\n".join([page.extract_text() for page in reader.pages if page.extract_text()])
+            return _clean_text(text) or "[PDF sem texto extraível]"
+
+        elif ext == "docx":
             doc = docx.Document(io.BytesIO(file_bytes))
-            return "\n".join([p.text for p in doc.paragraphs])
+            text = "\n".join([p.text for p in doc.paragraphs])
+            return _clean_text(text) or "[Documento sem texto]"
+
+        elif ext in ("png", "jpg", "jpeg", "gif", "webp", "bmp"):
+            # Imagens não têm texto — avisa a IA para descrever pelo contexto
+            return f"[Imagem enviada: {filename}. Descreva que recebeu uma imagem e peça ao aluno para explicar o que é ou o que quer sobre ela.]"
+
         else:
-            return file_bytes.decode("utf-8", errors="ignore")
+            text = file_bytes.decode("utf-8", errors="ignore")
+            return _clean_text(text) or "[Arquivo sem conteúdo legível]"
+
     except Exception as e:
         return f"[Erro ao ler arquivo {filename}: {str(e)}]"
 
@@ -172,8 +188,10 @@ async def chat_ws(websocket: WebSocket, token: str = Query(...)):
                 if msg_type == "file":
                     filename = msg.get("filename", "file.txt")
                     file_b64 = msg.get("content")
+                    caption = msg.get("caption", "").strip()
                     extracted_text = await extract_text_from_file(filename, file_b64)
-                    content = f"[Arquivo: {filename}]\n{extracted_text}"
+                    file_part = f"[Arquivo: {filename}]\n{extracted_text}"
+                    content = f"{caption}\n\n{file_part}" if caption else file_part
                     await websocket.send_json({"type": "status", "text": f"Arquivo {filename} lido."})
 
                 elif msg_type == "audio":

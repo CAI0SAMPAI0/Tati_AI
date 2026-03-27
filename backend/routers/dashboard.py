@@ -5,6 +5,8 @@ from services.llm import groq_chat, GroqKeyError, GROQ_KEYS
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
+import json
+
 
 load_dotenv()
 router = APIRouter()
@@ -24,6 +26,11 @@ class StudentUpdate(BaseModel):
     level: str | None = None
     custom_prompt: str | None = None
 
+# class para erros gramaticais
+class GrammarError(BaseModel):
+    category: str
+    count: int
+    example: str | None = None
 
 def _require_staff(current_user: dict = Depends(get_current_user)):
     if current_user["role"] not in ALLOWED_ROLES:
@@ -223,3 +230,101 @@ async def update_student(
         raise HTTPException(status_code=400, detail="Nenhum campo para atualizar")
     db.table("users").update(update_data).eq("username", username).execute()
     return {"ok": True}
+
+
+
+# mapa de frequencia de erros comuns (ex: "confundindo past simple e present perfect") —> contagem de mensagens que apresentam esse erro
+@router.get("/students/{username}/grammar-errors")
+async def get_gramar_errors(username: str,
+                            current_user: dict = Depends(_require_staff),
+                            lang: str = Query(default=DEFAULT_LANG)):
+    db = get_client()
+    messages = (
+        db.table("messages")
+        .select("content")
+        .eq("username", username)
+        .eq("role", "user")
+        .limit(40)
+        .execute()
+        .data
+    )
+
+    user_rows = (
+        db.table("users")
+        .select("name, level, focus, created_at")
+        .eq("username", username)
+        .limit(1)
+        .execute()
+        .data
+    )
+    if not user_rows:
+        raise HTTPException(status_code=404, detail="Aluno não encontrado")
+    student = user_rows[0]
+    
+    if not messages:
+        return {
+            "insight": "Este aluno ainda não enviou nenhuma mensagem. Não há dados suficientes para analisar o desempenho."
+        }
+        
+    history_text = ""
+    for m in messages:
+        history_text += f"{m['content']}\n\n"
+        
+    # Instrução de idioma — fallback para pt-BR se lang desconhecida
+    lang_instruction = LANG_INSTRUCTION.get(lang, LANG_INSTRUCTION[DEFAULT_LANG])
+        
+    prompt = f"""You are an expert English language pedagogy assistant helping a teacher understand a student's progress.
+
+LANGUAGE RULE: {lang_instruction}
+
+Student profile:
+- Name: {student.get('name', username)}
+- Current level: {student.get('level', 'Unknown')}
+- Learning focus: {student.get('focus', 'General')}
+- Member since: {student.get('created_at', 'Unknown')}
+
+Recent conversation history ({len(messages)} messages):
+---
+{history_text}
+---
+
+Please analyze the student's messages and identify common grammar mistakes or confusion patterns (e.g., mixing past simple and present perfect). Provide a frequency map of these errors, indicating how many messages contain each type of mistake.
+
+Be specific and cite examples from the conversation. Keep the tone professional but warm.
+Remember: {lang_instruction}
+
+Return the result as a JSON object where keys are error descriptions and values are counts, like this:
+{{
+  "errors": [
+    {{
+      "category": "Past Simple vs Present Perfect",
+      "count": 5,
+      "example": "I have went there yesterday"
+    }}
+  ]
+}}"""
+
+# try para o json
+    result = await groq_chat(
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    clean = result.replace("```json", "").replace("```", "").strip()
+
+    try:
+        data = json.loads(clean)
+        return data
+    except json.JSONDecodeError:
+        # Lida com o caso de erro no parse
+        return {"error": "Failed to parse JSON"}
+
+    # extraindo erros gramaticaus do resultado do modelo e retornando como lista de GrammarError
+    erros = []
+    if "errors" in data:
+        for error in data['errors']:
+            gramar_error = GrammarError(
+                category=error.get("category", "Unknown"),
+                count=error.get("count", 0),
+                example=error.get("example")
+            )
+            erros.append(gramar_error.dict())

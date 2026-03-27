@@ -1,13 +1,8 @@
-// ─── FIXES APLICADAS ───────────────────────────────────────────────────────
-// 1. FIX: showWelcome() agora verifica corretamente se há conversas
-// 2. FIX: Nova conversa abre com welcome screen visível
-// 3. FIX: Arquivo agora espera conversa ser criada antes de enviar
-
-const API    = 'http://127.0.0.1:8000';
+const API = 'http://127.0.0.1:8000';
 const WS_URL = 'ws://127.0.0.1:8000';
 
 // ── Auth guard ────────────────────────────────────────────────
-const token   = localStorage.getItem('token');
+const token = localStorage.getItem('token');
 const userRaw = localStorage.getItem('user');
 if (!token || !userRaw) { window.location.href = '/'; }
 const user = JSON.parse(userRaw);
@@ -22,18 +17,18 @@ function getSettings() {
 const STAFF_ROLES = ['professor', 'professora', 'programador', 'Tatiana', 'Tati', 'admin'];
 
 // ── State ─────────────────────────────────────────────────────
-let currentConvId    = null;
-let ws               = null;
-let isStreaming      = false;
-let streamingBubble  = null;
-let streamingMsgEl   = null;
-let mediaRecorder    = null;
-let audioChunks      = [];
-let isRecording      = false;
-let pendingFiles     = [];
-let streamBuffer     = '';
-let pendingAudioB64  = null;
-let currentAudio     = null;
+let currentConvId = null;
+let ws = null;
+let isStreaming = false;
+let streamingBubble = null;
+let streamingMsgEl = null;
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+let pendingFiles = [];
+let streamBuffer = '';
+let pendingAudioB64 = null;
+let currentAudio = null;
 
 // ── DOMContentLoaded ──────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
@@ -53,11 +48,11 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // ── User info ────────────────────────────────────────────────
 function initUserInfo() {
-    const nameEl   = document.getElementById('sidebar-user-name');
-    const levelEl  = document.getElementById('sidebar-user-level');
+    const nameEl = document.getElementById('sidebar-user-name');
+    const levelEl = document.getElementById('sidebar-user-level');
     const avatarEl = document.getElementById('sidebar-user-avatar');
 
-    if (nameEl)  nameEl.textContent  = user.name || user.username;
+    if (nameEl) nameEl.textContent = user.name || user.username;
     if (levelEl) levelEl.textContent = user.level || 'Student';
 
     if (avatarEl) {
@@ -85,10 +80,10 @@ function switchToVoice() {
 function connectWS() {
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
     ws = new WebSocket(`${WS_URL}/chat/ws?token=${token}`);
-    ws.onopen    = () => console.log('[WS] connected');
+    ws.onopen = () => console.log('[WS] connected');
     ws.onmessage = e => handleWSMessage(JSON.parse(e.data));
-    ws.onerror   = e => console.error('[WS] error', e);
-    ws.onclose   = () => { ws = null; setTimeout(connectWS, 3000); };
+    ws.onerror = e => console.error('[WS] error', e);
+    ws.onclose = () => { ws = null; setTimeout(connectWS, 3000); };
     setInterval(() => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' })); }, 20000);
 }
 
@@ -119,11 +114,11 @@ function handleWSMessage(msg) {
 
         case 'stream_start':
             hideTyping();
-            streamBuffer     = '';
-            pendingAudioB64  = null;
-            const result     = appendStreamBubble();
-            streamingBubble  = result.bubble;
-            streamingMsgEl   = result.msgEl;
+            streamBuffer = '';
+            pendingAudioB64 = null;
+            const result = appendStreamBubble();
+            streamingBubble = result.bubble;
+            streamingMsgEl = result.msgEl;
             break;
 
         case 'stream_token':
@@ -139,10 +134,14 @@ function handleWSMessage(msg) {
                 }
             }
             streamingBubble = null;
-            streamingMsgEl  = null;
-            isStreaming      = false;
+            streamingMsgEl = null;
+            isStreaming = false;
             setInputEnabled(true);
-            loadConversations();
+            // Só recarrega sidebar se o título ainda for "Nova conversa"
+            const activeConv = document.querySelector('.conv-item.active .conv-title');
+            if (!activeConv || activeConv.textContent === 'Nova conversa') {
+                loadConversations();
+            }
             break;
 
         case 'audio_response':
@@ -169,9 +168,9 @@ async function loadConversations() {
         if (!res.ok) { if (res.status === 401) logout(); return; }
         const convs = await res.json();
         renderConversations(convs);
-        
-        // FIX #1: Mostrar welcome screen APENAS se não houver conversa ativa
-        if (convs.length === 0 && !currentConvId) {
+
+        // Só mostra welcome se não tiver conversa ativa aberta
+        if (!currentConvId) {
             showWelcome();
         }
     } catch (e) { console.error(e); }
@@ -181,13 +180,13 @@ function renderConversations(convs) {
     const list = document.getElementById('conversations-list');
     list.innerHTML = '';
     if (!convs.length) {
-        list.innerHTML = '<p class="list-empty">Nenhuma conversa ainda</p>'; 
+        list.innerHTML = '<p class="list-empty">Nenhuma conversa ainda</p>';
         return;
     }
     const groups = groupByDate(convs);
     for (const [label, items] of Object.entries(groups)) {
         const lbl = document.createElement('p');
-        lbl.className = 'list-label'; 
+        lbl.className = 'list-label';
         lbl.textContent = label;
         list.appendChild(lbl);
         items.forEach(c => list.appendChild(buildConvItem(c)));
@@ -195,7 +194,7 @@ function renderConversations(convs) {
 }
 
 function groupByDate(convs) {
-    const today     = new Date().toDateString();
+    const today = new Date().toDateString();
     const yesterday = new Date(Date.now() - 86400000).toDateString();
     const g = { 'Hoje': [], 'Ontem': [], 'Anteriores': [] };
     convs.forEach(c => {
@@ -226,48 +225,40 @@ function buildConvItem(c) {
 }
 
 async function newChat() {
-    try {
-        const res = await fetch(`${API}/chat/conversations`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: 'Nova conversa' })
-        });
-        const conv = await res.json();
-        await loadConversations();
-        // FIX #2: Abre a conversa e mostra welcome screen
-        openConversation(conv.id, conv.title);
-    } catch (e) { console.error(e); }
+    // Não cria conversa ainda — apenas mostra a welcome screen
+    // A conversa será criada no primeiro envio de mensagem
+    document.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'));
+    showWelcome();
 }
 
 async function openConversation(id, title) {
     currentConvId = id;
     document.querySelectorAll('.conv-item').forEach(el => el.classList.toggle('active', el.dataset.id === id));
     document.getElementById('topbar-title').textContent = title;
-    const voiceBtn = document.getElementById('btn-switch-voice');
-    if (voiceBtn) voiceBtn.style.display = 'flex';
-    
-    // FIX #2: Mostrar welcome screen ao abrir nova conversa
-    showWelcome();
-    
+
+    // Esconde welcome ao abrir conversa existente
+    const welcomeEl = document.getElementById('chat-welcome');
+    if (welcomeEl) welcomeEl.style.display = 'none';
+
     await loadMessages(id);
     connectWS();
     if (window.innerWidth < 768) document.getElementById('sidebar').classList.add('collapsed');
 }
 
 async function loadMessages(convId) {
-    const area      = document.getElementById('chat-messages');
-    const typingEl  = document.getElementById('typing-indicator');
+    const area = document.getElementById('chat-messages');
+    const typingEl = document.getElementById('typing-indicator');
     const welcomeEl = document.getElementById('chat-welcome');
+    const voiceBtn = document.getElementById('btn-switch-voice');
 
+    // Limpa mensagens anteriores
     [...area.children].forEach(el => {
         if (el.id !== 'typing-indicator' && el.id !== 'chat-welcome') el.remove();
     });
-    typingEl.style.display = 'none';
+    if (typingEl) typingEl.style.display = 'none';
+    if (welcomeEl) welcomeEl.style.display = 'none';
 
     if (!convId) { showWelcome(); return; }
-    
-    // FIX #2: Esconder welcome após carregar mensagens antigas
-    if (welcomeEl) welcomeEl.style.display = 'none';
 
     try {
         const res = await fetch(`${API}/chat/conversations/${convId}/messages`, {
@@ -275,11 +266,17 @@ async function loadMessages(convId) {
         });
         if (!res.ok) return;
         const msgs = await res.json();
-        msgs.forEach(m => renderMessage(m.role, m.content));
-        
-        // Se houver mensagens, esconder welcome
-        if (msgs.length > 0 && welcomeEl) {
-            welcomeEl.style.display = 'none';
+
+        if (msgs.length === 0) {
+            // Conversa vazia — mostra welcome mas mantém conv ativa
+            if (welcomeEl) {
+                welcomeEl.style.display = 'flex';
+                if (area.firstChild !== welcomeEl) area.insertBefore(welcomeEl, area.firstChild);
+            }
+            if (voiceBtn) voiceBtn.style.display = 'none';
+        } else {
+            msgs.forEach(m => renderMessage(m.role, m.content));
+            if (voiceBtn) voiceBtn.style.display = 'flex';
         }
     } catch (e) { console.error(e); }
     scrollBottom();
@@ -287,17 +284,28 @@ async function loadMessages(convId) {
 
 function showWelcome() {
     const welcomeEl = document.getElementById('chat-welcome');
-    const area      = document.getElementById('chat-messages');
-    
+    const area = document.getElementById('chat-messages');
+    const voiceBtn = document.getElementById('btn-switch-voice');
+    const typing = document.getElementById('typing-indicator');
+
+    // Limpa mensagens mas mantém os elementos fixos
+    [...area.children].forEach(el => {
+        if (el.id !== 'typing-indicator' && el.id !== 'chat-welcome') el.remove();
+    });
+
+    if (typing) typing.style.display = 'none';
+
     if (welcomeEl) {
         welcomeEl.style.display = 'flex';
-        // Move welcome para o início
-        area.insertBefore(welcomeEl, area.firstChild);
+        // Garante que welcome está no início
+        if (area.firstChild !== welcomeEl) {
+            area.insertBefore(welcomeEl, area.firstChild);
+        }
     }
-    
-    const voiceBtn = document.getElementById('btn-switch-voice');
+
     if (voiceBtn) voiceBtn.style.display = 'none';
     document.getElementById('topbar-title').textContent = 'Teacher Tati';
+    currentConvId = null;
 }
 
 async function deleteConv(e, id) {
@@ -311,7 +319,7 @@ async function deleteConv(e, id) {
 
 async function deleteAllConversations() {
     showConfirmPopup('⚠️ Deletar TODAS as conversas?', async () => {
-        const res   = await fetch(`${API}/chat/conversations`, { headers: { Authorization: `Bearer ${token}` } });
+        const res = await fetch(`${API}/chat/conversations`, { headers: { Authorization: `Bearer ${token}` } });
         if (!res.ok) return;
         const convs = await res.json();
         await Promise.all(convs.map(c => fetch(`${API}/chat/conversations/${c.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })));
@@ -331,7 +339,7 @@ function showConfirmPopup(message, onConfirm) {
             <button id="pop-no"  style="flex:1;padding:0.4rem;background:var(--border);color:var(--text);border:none;border-radius:8px;cursor:pointer;font-size:0.8rem;">Cancelar</button>
         </div>`;
     document.body.appendChild(popup);
-    document.getElementById('pop-no').onclick  = () => popup.remove();
+    document.getElementById('pop-no').onclick = () => popup.remove();
     document.getElementById('pop-yes').onclick = async () => { popup.remove(); await onConfirm(); };
 }
 
@@ -377,22 +385,38 @@ function renderFilePreviewBar() {
 }
 
 function removePendingFile(i) { pendingFiles.splice(i, 1); renderFilePreviewBar(); }
-function getFileIcon(name) { return ({pdf:'📄',docx:'📝',doc:'📝',txt:'📃',md:'📋',xlsx:'📊',pptx:'📽️'}[(name.split('.').pop()||'').toLowerCase()])||'📎'; }
-function formatFileSize(b) { return b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB'; }
+function getFileIcon(name) { return ({ pdf: '📄', docx: '📝', doc: '📝', txt: '📃', md: '📋', xlsx: '📊', pptx: '📽️' }[(name.split('.').pop() || '').toLowerCase()]) || '📎'; }
+function formatFileSize(b) { return b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(1) + ' KB' : (b / 1048576).toFixed(1) + ' MB'; }
 
 // ── Send message ──────────────────────────────────────────────
 async function sendMessage() {
     if (isStreaming) return;
     const input = document.getElementById('message-input');
-    const text  = input.value.trim();
+    const text = input.value.trim();
     if (!text && !pendingFiles.length) return;
 
     // FIX #3: Criar conversa se não existir (aguarda conclusão)
-    if (!currentConvId) { 
-        await newChat(); 
-        await sleep(300); 
+    if (!currentConvId) {
+        // Cria a conversa só agora, no primeiro envio
+        try {
+            const res = await fetch(`${API}/chat/conversations`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: 'Nova conversa' })
+            });
+            const conv = await res.json();
+            currentConvId = conv.id;
+            await loadConversations();
+            // Marca como ativa na sidebar
+            document.querySelectorAll('.conv-item').forEach(el =>
+                el.classList.toggle('active', el.dataset.id === conv.id)
+            );
+        } catch (e) {
+            appendErrorMsg('Erro ao criar conversa.');
+            return;
+        }
     }
-    
+
     if (!ws || ws.readyState !== WebSocket.OPEN) connectWS();
     try { await waitForWS(6000); } catch { appendErrorMsg('Não foi possível conectar ao servidor.'); return; }
 
@@ -400,48 +424,51 @@ async function sendMessage() {
     autoResize(input);
 
     if (pendingFiles.length) {
-        const files = [...pendingFiles]; 
-        pendingFiles = []; 
+        const files = [...pendingFiles];
+        pendingFiles = [];
         renderFilePreviewBar();
+        if (text) renderMessage('user', text);
         files.forEach(f => appendFileMsg(f.name, f.size));
-        showTyping(); 
-        isStreaming = true; 
-        setInputEnabled(false); 
+        //files.forEach((f, i) => appendFileMsg(f.name, f.size, i === 0 ? text : '')); deu bug, mudei para o de cima (if text) para evitar enviar legenda vazia
+        showTyping();
+        isStreaming = true;
+        setInputEnabled(false);
         scrollBottom();
-        
+
         // FIX #3: Enviar arquivos um por um com delay
-        for (const file of files) { 
-            ws.send(JSON.stringify({ 
-                type:'file', 
-                filename:file.name, 
-                content:file.b64, 
-                conversation_id:currentConvId, 
-                caption:text||'' 
-            })); 
-            await sleep(100); 
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            ws.send(JSON.stringify({
+                type: 'file',
+                filename: file.name,
+                content: file.b64,
+                conversation_id: currentConvId,
+                caption: 1 === 0 ? (text || '') : ''
+            }));
+            await sleep(100);
         }
         return;
     }
 
     renderMessage('user', text);
-    showTyping(); 
-    isStreaming = true; 
-    setInputEnabled(false); 
+    showTyping();
+    isStreaming = true;
+    setInputEnabled(false);
     scrollBottom();
-    ws.send(JSON.stringify({ type:'text', content:text, conversation_id:currentConvId }));
+    ws.send(JSON.stringify({ type: 'text', content: text, conversation_id: currentConvId }));
 }
 
 function handleKey(e) {
     if (e.key === 'Enter' && !e.shiftKey && getSettings().enterSend !== false) { e.preventDefault(); sendMessage(); }
 }
-function autoResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,140)+'px'; }
+function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 140) + 'px'; }
 function setInputEnabled(on) {
-    const b = document.getElementById('btn-send'); 
+    const b = document.getElementById('btn-send');
     const i = document.getElementById('message-input');
-    if (b) b.disabled=!on; 
-    if (i) i.disabled=!on;
+    if (b) b.disabled = !on;
+    if (i) i.disabled = !on;
 }
-function useSuggestion(btn) { document.getElementById('message-input').value=btn.textContent; sendMessage(); }
+function useSuggestion(btn) { document.getElementById('message-input').value = btn.textContent; sendMessage(); }
 
 // ── Audio recording ───────────────────────────────────────────
 async function toggleMic() {
@@ -449,7 +476,7 @@ async function toggleMic() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-        audioChunks   = [];
+        audioChunks = [];
         mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
         mediaRecorder.onstop = sendAudio;
         mediaRecorder.start();
@@ -458,22 +485,22 @@ async function toggleMic() {
     } catch (e) { alert('Microfone não disponível: ' + e.message); }
 }
 function stopRecording() {
-    mediaRecorder?.stop(); 
+    mediaRecorder?.stop();
     isRecording = false;
     document.getElementById('btn-mic').classList.remove('recording');
 }
 async function sendAudio() {
     if (!currentConvId) await newChat();
-    if (!ws || ws.readyState !== WebSocket.OPEN) { connectWS(); await waitForWS(5000).catch(()=>{}); }
-    const blob = new Blob(audioChunks, { type:'audio/webm' });
+    if (!ws || ws.readyState !== WebSocket.OPEN) { connectWS(); await waitForWS(5000).catch(() => { }); }
+    const blob = new Blob(audioChunks, { type: 'audio/webm' });
     const reader = new FileReader();
-    reader.onload = () => { showTyping(); ws.send(JSON.stringify({ type:'audio', audio:reader.result.split(',')[1], conversation_id:currentConvId })); };
+    reader.onload = () => { showTyping(); ws.send(JSON.stringify({ type: 'audio', audio: reader.result.split(',')[1], conversation_id: currentConvId })); };
     reader.readAsDataURL(blob);
 }
 
 // ── Render messages ───────────────────────────────────────────
 function renderMessage(role, content) {
-    if (role === 'user') appendUserMsg(content); 
+    if (role === 'user') appendUserMsg(content);
     else appendAssistantMsg(content);
 }
 
@@ -481,7 +508,7 @@ function appendUserMsg(text) {
     const div = document.createElement('div');
     div.className = 'message message-user';
     div.innerHTML = `<div class="message-body"><div class="message-bubble"><p>${escHtml(text)}</p></div><span class="message-time">${nowTime()}</span></div>`;
-    insertBeforeTyping(div); 
+    insertBeforeTyping(div);
     scrollBottom();
 }
 
@@ -489,7 +516,7 @@ function appendFileMsg(name, size) {
     const div = document.createElement('div');
     div.className = 'message message-user';
     div.innerHTML = `<div class="message-body"><div class="message-bubble file-bubble"><div class="file-attach-preview"><div class="file-attach-icon">${getFileIcon(name)}</div><div class="file-attach-info"><span class="file-attach-name">${escHtml(name)}</span><span class="file-attach-size">${formatFileSize(size)}</span></div></div></div><span class="message-time">${nowTime()}</span></div>`;
-    insertBeforeTyping(div); 
+    insertBeforeTyping(div);
     scrollBottom();
 }
 
@@ -522,7 +549,7 @@ function appendStreamBubble() {
         <div class="message-body">
             <div class="message-bubble stream-bubble"></div>
         </div>`;
-    insertBeforeTyping(div); 
+    insertBeforeTyping(div);
     scrollBottom();
     return { bubble: div.querySelector('.stream-bubble'), msgEl: div };
 }
@@ -582,18 +609,18 @@ function buildAudioControls(meta, b64) {
         </div>`;
     meta.appendChild(controls);
 
-    const playBtn   = controls.querySelector('.btn-tts-play');
-    const rewBtn    = controls.querySelector('.btn-tts-rewind');
+    const playBtn = controls.querySelector('.btn-tts-play');
+    const rewBtn = controls.querySelector('.btn-tts-rewind');
     const volSlider = controls.querySelector('.msg-vol-slider');
     const spdSelect = controls.querySelector('.msg-spd-select');
-    const volValue  = controls.querySelector('.msg-vol-value');
+    const volValue = controls.querySelector('.msg-vol-value');
 
     const s = getSettings();
     const defaultSpeed = parseFloat(s.defaultSpeed || '1');
     spdSelect.value = String(defaultSpeed);
 
     const audio = new Audio('data:audio/mp3;base64,' + b64);
-    audio.volume       = 1;
+    audio.volume = 1;
     audio.playbackRate = defaultSpeed;
 
     function setPlayIcon(playing) {
@@ -617,32 +644,32 @@ function buildAudioControls(meta, b64) {
     if (s.autoPlay === true || s.autoPlay === 'true') playThis();
 
     playBtn.addEventListener('click', e => { e.stopPropagation(); audio.paused ? playThis() : (audio.pause(), setPlayIcon(false)); });
-    rewBtn.addEventListener('click',  e => { e.stopPropagation(); audio.currentTime = Math.max(0, audio.currentTime - 5); });
+    rewBtn.addEventListener('click', e => { e.stopPropagation(); audio.currentTime = Math.max(0, audio.currentTime - 5); });
     volSlider.addEventListener('input', e => { e.stopPropagation(); audio.volume = parseFloat(volSlider.value); volValue.textContent = Math.round(audio.volume * 100) + '%'; });
     spdSelect.addEventListener('change', e => { e.stopPropagation(); audio.playbackRate = parseFloat(spdSelect.value); });
     audio.addEventListener('ended', () => { setPlayIcon(false); if (currentAudio === audio) currentAudio = null; });
     audio.addEventListener('pause', () => setPlayIcon(false));
-    audio.addEventListener('play',  () => setPlayIcon(true));
+    audio.addEventListener('play', () => setPlayIcon(true));
 }
 
 // ── Misc helpers ──────────────────────────────────────────────
-function appendStatus(text) { const d=document.createElement('div'); d.className='status-msg'; d.textContent=text; insertBeforeTyping(d); }
-function appendErrorMsg(text) { const d=document.createElement('div'); d.className='error-banner'; d.textContent='⚠️ '+text; insertBeforeTyping(d); scrollBottom(); }
-function insertBeforeTyping(el) { const a=document.getElementById('chat-messages'); a.insertBefore(el, document.getElementById('typing-indicator')); }
+function appendStatus(text) { const d = document.createElement('div'); d.className = 'status-msg'; d.textContent = text; insertBeforeTyping(d); }
+function appendErrorMsg(text) { const d = document.createElement('div'); d.className = 'error-banner'; d.textContent = '⚠️ ' + text; insertBeforeTyping(d); scrollBottom(); }
+function insertBeforeTyping(el) { const a = document.getElementById('chat-messages'); a.insertBefore(el, document.getElementById('typing-indicator')); }
 function clearMessages() {
-    const area=document.getElementById('chat-messages');
-    [...area.children].forEach(el => { if (el.id!=='typing-indicator'&&el.id!=='chat-welcome') el.remove(); });
-    document.getElementById('typing-indicator').style.display='none';
+    const area = document.getElementById('chat-messages');
+    [...area.children].forEach(el => { if (el.id !== 'typing-indicator' && el.id !== 'chat-welcome') el.remove(); });
+    document.getElementById('typing-indicator').style.display = 'none';
 }
-function showTyping()  { document.getElementById('typing-indicator').style.display='flex'; scrollBottom(); }
-function hideTyping()  { document.getElementById('typing-indicator').style.display='none'; }
+function showTyping() { document.getElementById('typing-indicator').style.display = 'flex'; scrollBottom(); }
+function hideTyping() { document.getElementById('typing-indicator').style.display = 'none'; }
 function formatMarkdown(t) {
-    return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-            .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\*(.*?)\*/g,'<em>$1</em>')
-            .replace(/`(.*?)`/g,'<code>$1</code>').replace(/\n/g,'<br>');
+    return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`(.*?)`/g, '<code>$1</code>').replace(/\n/g, '<br>');
 }
-function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function nowTime()   { return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
-function scrollBottom() { const a=document.getElementById('chat-messages'); a.scrollTop=a.scrollHeight; }
-function sleep(ms)   { return new Promise(r=>setTimeout(r,ms)); }
-function logout()    { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href='/'; }
+function escHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function nowTime() { return new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
+function scrollBottom() { const a = document.getElementById('chat-messages'); a.scrollTop = a.scrollHeight; }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function logout() { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/'; }

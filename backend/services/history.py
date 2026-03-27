@@ -95,6 +95,8 @@ async def load_history(conversation_id: str) -> list[dict]:
 async def save_message(conversation_id: str, username: str, role: str, content: str) -> dict:
     db = get_client()
     now = datetime.now(timezone.utc)
+    # Removendo null bytes que o Supabase/Postgres não aceita
+    content = content.replace("\x00", "").replace("\u0000", "")
     msg = {
         "conv_id": conversation_id,
         "username": username,
