@@ -401,9 +401,7 @@ async def get_grammar_errors(
     if not user_rows:
         raise HTTPException(status_code=404, detail="Aluno não encontrado")
     student = user_rows[0]
-    
-    return {"errors": []}  # resposta temporária para evitar custo de chamadas durante desenvolvimento
-        
+            
     history_text = ""
     for m in messages:
         history_text += f"{m['content']}\n\n"
@@ -442,11 +440,6 @@ Return the result as a JSON object where keys are error descriptions and values 
     }}
   ]
 }}
-
-# try para o json
-    result = await groq_chat(
-        messages=[{"role": "user", "content": prompt}],
-    )
 Return valid JSON only. No markdown fences, comments or extra text."""
 
     try:
@@ -487,4 +480,4 @@ Return valid JSON only. No markdown fences, comments or extra text."""
         return {"errors": from_feedback}
 
     # fallback 2: heurísticas locais para casos básicos
-    return {"errors": _heuristic_grammar_errors(user_messages)}
+    return {"errors": _heuristic_grammar_errors(messages)}
