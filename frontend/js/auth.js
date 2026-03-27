@@ -25,13 +25,18 @@ function togglePw(inputId, btn) {
     }
 }
 
-// ── Abas login / cadastro ─────────────────────────────────────────
+// ── Abas login / cadastro / forgot ────────────────────────────────
 function switchTab(tab) {
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === tab);
     });
     document.getElementById('form-login').style.display    = tab === 'login'    ? 'block' : 'none';
     document.getElementById('form-register').style.display = tab === 'register' ? 'block' : 'none';
+    document.getElementById('form-forgot').style.display   = tab === 'forgot'   ? 'block' : 'none';
+
+    // Esconde/mostra as abas principais quando está em "forgot"
+    document.querySelector('.tabs').style.display = tab === 'forgot' ? 'none' : 'flex';
+
     clearMessages();
 }
 
@@ -127,6 +132,90 @@ async function handleRegister(e) {
     }
 }
 
+// ── Esqueci minha senha ───────────────────────────────────────────
+function showForgotForm() {
+    switchTab('forgot');
+    document.getElementById('forgot-identifier').value = '';
+    document.getElementById('forgot-result').style.display = 'none';
+}
+
+function backToLogin() {
+    switchTab('login');
+}
+
+async function handleForgotPassword(e) {
+    e.preventDefault();
+    clearMessages();
+
+    const identifier = document.getElementById('forgot-identifier').value.trim();
+    const btn        = document.getElementById('btn-forgot');
+    const btnSpan    = btn.querySelector('span');
+    const resultEl   = document.getElementById('forgot-result');
+
+    if (!identifier) { showError('Informe seu username ou e-mail.'); return; }
+
+    btn.disabled = true;
+    if (btnSpan) btnSpan.textContent = 'Enviando...';
+    resultEl.style.display = 'none';
+
+    try {
+        const res  = await fetch(`${API}/auth/forgot-password`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ identifier }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            showError(data.detail || 'Erro ao processar pedido.');
+            return;
+        }
+
+        // Conta Google
+        if (data.ok === false) {
+            resultEl.className = 'forgot-result error';
+            resultEl.innerHTML = `🔵 ${data.message}`;
+            resultEl.style.display = 'block';
+            return;
+        }
+
+        // Modo dev: SMTP não configurado, mostra senha na tela
+        if (data.dev_mode) {
+            resultEl.className = 'forgot-result dev';
+            resultEl.innerHTML = `
+                <strong>⚙️ Modo desenvolvimento (SMTP não configurado)</strong><br><br>
+                Sua senha temporária:<br>
+                <code style="font-size:1.3rem;letter-spacing:0.1em;color:#7c3aed;">
+                    ${data.temp_password}
+                </code><br><br>
+                <span style="color:#f87171;font-size:0.82rem;">
+                    ⚠️ Após entrar, vá em Perfil → Segurança e crie uma nova senha.
+                </span>
+            `;
+            resultEl.style.display = 'block';
+            return;
+        }
+
+        // Sucesso: e-mail enviado
+        resultEl.className = 'forgot-result success';
+        resultEl.innerHTML = `
+            ✅ <strong>E-mail enviado!</strong><br>
+            Verifique sua caixa de entrada (e o spam).<br>
+            <span style="font-size:0.82rem;color:#9ca3af;">
+                A senha temporária expira quando você criar uma nova.
+                Após entrar, vá em <strong>Perfil → Segurança</strong> e atualize sua senha.
+            </span>
+        `;
+        resultEl.style.display = 'block';
+
+    } catch {
+        showError(t('auth.err_connection'));
+    } finally {
+        btn.disabled = false;
+        if (btnSpan) btnSpan.textContent = 'Enviar senha temporária';
+    }
+}
+
 // ── Google OAuth ──────────────────────────────────────────────────
 window.handleGoogleCredential = async function(response) {
     clearMessages();
@@ -164,11 +253,11 @@ function initGoogleAuth() {
     if (typeof google === 'undefined' || !google?.accounts?.id) return;
 
     google.accounts.id.initialize({
-        client_id: clientId,
-        callback:  window.handleGoogleCredential,
-        auto_select: false,
+        client_id:    clientId,
+        callback:     window.handleGoogleCredential,
+        auto_select:  false,
         cancel_on_tap_outside: true,
-        ux_mode: 'popup',
+        ux_mode:      'popup',
     });
 
     const wrap = document.getElementById('google-btn-wrap');

@@ -56,16 +56,13 @@
             height: 100% !important;
         }
 
-        /* Password eye button inside input */
+        /* Password eye */
         .pw-field-wrap {
             position: relative;
             display: flex;
             align-items: center;
         }
-        .pw-field-wrap input {
-            padding-right: 2.75rem !important;
-            width: 100%;
-        }
+        .pw-field-wrap input { padding-right: 2.75rem !important; width: 100%; }
         .btn-pw-eye {
             position: absolute;
             right: 0.75rem;
@@ -80,6 +77,88 @@
             transition: color 0.15s;
         }
         .btn-pw-eye:hover { color: var(--primary); }
+
+        /* Link "Esqueci minha senha" */
+        .btn-forgot-link {
+            background: none;
+            border: none;
+            color: var(--primary);
+            font-size: 0.78rem;
+            font-weight: 500;
+            cursor: pointer;
+            padding: 0;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+            opacity: 0.8;
+            transition: opacity 0.15s;
+            font-family: inherit;
+        }
+        .btn-forgot-link:hover { opacity: 1; }
+
+        /* Formulário de recuperação */
+        #form-forgot { display: none; }
+
+        .forgot-back-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            font-weight: 500;
+            cursor: pointer;
+            padding: 0;
+            margin-bottom: 1.25rem;
+            font-family: inherit;
+            transition: color 0.15s;
+        }
+        .forgot-back-btn:hover { color: var(--primary); }
+
+        .forgot-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 0.35rem;
+        }
+        .forgot-desc {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-bottom: 1.25rem;
+            line-height: 1.5;
+        }
+
+        /* Resultado do forgot */
+        .forgot-result {
+            margin-top: 1rem;
+            padding: 0.875rem 1rem;
+            border-radius: 10px;
+            font-size: 0.83rem;
+            line-height: 1.6;
+        }
+        .forgot-result.success {
+            background: rgba(16,185,129,0.1);
+            border: 1px solid rgba(16,185,129,0.3);
+            color: #d1fae5;
+        }
+        .forgot-result.error {
+            background: rgba(59,130,246,0.1);
+            border: 1px solid rgba(59,130,246,0.3);
+            color: #bfdbfe;
+        }
+        .forgot-result.dev {
+            background: rgba(124,58,237,0.1);
+            border: 1px solid rgba(124,58,237,0.35);
+            color: var(--text);
+            text-align: center;
+        }
+        .forgot-result code {
+            display: inline-block;
+            margin-top: 0.5rem;
+            background: rgba(124,58,237,0.15);
+            padding: 0.35rem 0.75rem;
+            border-radius: 8px;
+        }
     </style>
 </head>
 
@@ -110,6 +189,7 @@
                 <h2 data-i18n="auth.welcome">Bem-vindo</h2>
                 <p class="subtitle" data-i18n="auth.subtitle">Entre na sua conta ou crie uma nova</p>
 
+                <!-- Abas (escondidas no forgot) -->
                 <div class="tabs">
                     <button class="tab-btn active" data-tab="login" onclick="switchTab('login')">
                         <span data-i18n="auth.tab_login">Entrar</span>
@@ -122,8 +202,8 @@
                 <div class="error-msg" id="error-msg"></div>
                 <div class="success-msg" id="success-msg"></div>
 
-                <!-- Google -->
-                <div class="google-btn-container">
+                <!-- Google (visível apenas em login/register) -->
+                <div class="google-btn-container" id="google-section">
                     <button class="btn-google" tabindex="-1" aria-hidden="true">
                         <svg width="18" height="18" viewBox="0 0 24 24">
                             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -135,10 +215,9 @@
                     </button>
                     <div id="google-btn-wrap"></div>
                 </div>
+                <div class="divider" id="divider-section"><span data-i18n="auth.or">ou</span></div>
 
-                <div class="divider"><span data-i18n="auth.or">ou</span></div>
-
-                <!-- Form Login -->
+                <!-- ── Form Login ── -->
                 <form id="form-login" onsubmit="handleLogin(event)">
                     <div class="field">
                         <label data-i18n="auth.username_email">Username ou E-mail</label>
@@ -157,12 +236,18 @@
                             </button>
                         </div>
                     </div>
+                    <!-- Link esqueci minha senha -->
+                    <div style="text-align:right;margin-top:-0.4rem;margin-bottom:0.75rem;">
+                        <button type="button" class="btn-forgot-link" onclick="showForgotForm()">
+                            Esqueci minha senha
+                        </button>
+                    </div>
                     <button type="submit" class="btn-primary" id="btn-login">
                         <span data-i18n="auth.btn_login">Entrar</span>
                     </button>
                 </form>
 
-                <!-- Form Cadastro -->
+                <!-- ── Form Cadastro ── -->
                 <form id="form-register" style="display:none;" onsubmit="handleRegister(event)">
                     <div class="field">
                         <label data-i18n="auth.name">Nome completo</label>
@@ -200,6 +285,28 @@
                     <button type="submit" class="btn-primary" id="btn-register">
                         <span data-i18n="auth.btn_register">Criar Conta</span>
                     </button>
+                </form>
+
+                <!-- ── Form Esqueci minha senha ── -->
+                <form id="form-forgot" onsubmit="handleForgotPassword(event)">
+                    <button type="button" class="forgot-back-btn" onclick="backToLogin()">
+                        <i class="fa-solid fa-arrow-left"></i> Voltar ao login
+                    </button>
+                    <p class="forgot-title">🔑 Esqueci minha senha</p>
+                    <p class="forgot-desc">
+                        Informe seu <strong>username</strong> ou <strong>e-mail</strong>.
+                        Vamos gerar uma senha temporária e enviar para você.
+                    </p>
+                    <div class="field">
+                        <label>Username ou E-mail</label>
+                        <input id="forgot-identifier" type="text"
+                               placeholder="usuario ou email@exemplo.com"
+                               autocomplete="username">
+                    </div>
+                    <button type="submit" class="btn-primary" id="btn-forgot">
+                        <span>Enviar senha temporária</span>
+                    </button>
+                    <div id="forgot-result" class="forgot-result" style="display:none;"></div>
                 </form>
 
             </div>

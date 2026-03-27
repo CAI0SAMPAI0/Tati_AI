@@ -333,6 +333,8 @@ async function deleteStudent(username) {
 }
 
 // ── AI Insight ────────────────────────────────────────────────────
+// ── SUBSTITUIR a função generateInsight em frontend/js/dashboard.js ──────────
+
 async function generateInsight() {
     const btn     = document.getElementById('btn-generate-insight');
     const content = document.getElementById('insight-content');
@@ -346,27 +348,27 @@ async function generateInsight() {
         </div>`;
 
     try {
-        // FIX: encodeURIComponent garante que "Caio Sampaio" → "Caio%20Sampaio" corretamente
-        const url = `${API}/dashboard/students/${encodeURIComponent(currentModalUsername)}/insight`;
+        // Passa o idioma atual da interface para o backend
+        const lang = I18n.getLang();  // ex: "pt-BR", "en-US", "en-UK"
+        const url = `${API}/dashboard/students/${encodeURIComponent(currentModalUsername)}/insight?lang=${encodeURIComponent(lang)}`;
         console.log('[Insight] Chamando:', url);
 
         const res  = await fetch(url, {
             headers: { Authorization: `Bearer ${token}` }
         });
 
-        // FIX: lê o JSON antes de verificar res.ok para capturar a mensagem de erro real
         const data = await res.json();
 
         if (!res.ok) {
             let userMsg = '';
             if (res.status === 429) {
-                userMsg = '⏳ Cota da Anthropic esgotada. Aguarde 1 minuto e tente novamente.';
+                userMsg = '⏳ Cota esgotada. Aguarde 1 minuto e tente novamente.';
             } else if (res.status === 404) {
                 userMsg = `❌ Aluno não encontrado: "${currentModalUsername}"`;
             } else if (res.status === 401) {
-                userMsg = '🔑 Chave da API Anthropic inválida. Verifique o .env';
+                userMsg = '🔑 Chave(s) da API inválida(s). Verifique o .env';
             } else if (res.status === 503) {
-                userMsg = '⚙️ ANTHROPIC_API_KEY não configurada no servidor.';
+                userMsg = '⚙️ Nenhuma chave de API configurada no servidor.';
             } else {
                 userMsg = `❌ Erro ${res.status}: ${data.detail || 'Tente novamente.'}`;
             }

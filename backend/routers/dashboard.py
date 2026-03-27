@@ -1,16 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from routers.deps import get_current_user
 from services.database import get_client
+from services.llm import groq_chat, GroqKeyError, GROQ_KEYS
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
-from services.llm import stream_llm, LLM_PROVIDER
 
 load_dotenv()
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 router = APIRouter()
 
 ALLOWED_ROLES = ("professor", "professora", "programador", "Tatiana", "Tati")
+
+# Mapeamento lang → instrução de idioma para o modelo
+LANG_INSTRUCTION = {
+    "pt-BR": "Respond entirely in Brazilian Portuguese (pt-BR).",
+    "en-US": "Respond entirely in English (US).",
+    "en-UK": "Respond entirely in English (UK).",
+}
+DEFAULT_LANG = "pt-BR"
 
 
 class StudentUpdate(BaseModel):
@@ -94,15 +101,21 @@ async def get_students(current_user: dict = Depends(_require_staff)):
 
     return result
 
+
 @router.get("/students/{username}/insight")
-async def get_student_insight(username: str, current_user: dict = Depends(_require_staff)):
-    # Alterado para buscar a chave da Anthropic
-    anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not anthropic_api_key:
+async def get_student_insight(
+    username: str,
+    lang: str = Query(default=DEFAULT_LANG),
+    current_user: dict = Depends(_require_staff),
+):
+    if not GROQ_KEYS:
         raise HTTPException(
             status_code=503,
-            detail="ANTHROPIC_API_KEY não configurada. Configure a variável de ambiente."
+            detail="Nenhuma GROQ_API_KEY configurada. Adicione ao .env e reinicie o servidor."
         )
+
+    # Instrução de idioma — fallback para pt-BR se lang desconhecida
+    lang_instruction = LANG_INSTRUCTION.get(lang, LANG_INSTRUCTION[DEFAULT_LANG])
 
     db = get_client()
 
@@ -122,12 +135,11 @@ async def get_student_insight(username: str, current_user: dict = Depends(_requi
         db.table("messages")
         .select("role, content, date")
         .eq("username", username)
-        .order("id", desc=True)
+        .order("id", desc=False)
         .limit(40)
         .execute()
         .data
     )
-    messages.reverse()
 
     if not messages:
         return {
@@ -139,56 +151,53 @@ async def get_student_insight(username: str, current_user: dict = Depends(_requi
         role_label = "Student" if m["role"] == "user" else "Teacher Tati"
         history_text += f"{role_label}: {m['content']}\n\n"
 
-    # O Prompt continua o mesmo, a lógica pedagógica é idêntica
-    prompt = f"""You are an expert English language pedagogy assistant... (seu prompt aqui)"""
+    prompt = f"""You are an expert English language pedagogy assistant helping a teacher understand a student's progress.
 
-    from groq import Groq, AsyncGroq
+LANGUAGE RULE: {lang_instruction}
 
-    # Inicializa o cliente da groq
-    client = AsyncGroq(api_key=GROQ_API_KEY)
+Student profile:
+- Name: {student.get('name', username)}
+- Current level: {student.get('level', 'Unknown')}
+- Learning focus: {student.get('focus', 'General')}
+- Member since: {student.get('created_at', 'Unknown')}
 
-    last_error = None
+Recent conversation history ({len(messages)} messages):
+---
+{history_text}
+---
+
+Please provide a concise pedagogical report for the teacher, covering:
+
+1. **Pontos Fortes / Strong Points** — What the student does well
+2. **Principais Dificuldades / Main Difficulties** — Recurring grammar or vocabulary mistakes
+3. **Nível Real Estimado / Estimated Real Level** — What level does the student actually seem to be?
+4. **Recomendações / Recommendations** — 3 to 5 specific, actionable suggestions
+5. **Motivação e Engajamento / Motivation & Engagement** — How engaged does the student seem?
+
+Be specific and cite examples from the conversation. Keep the tone professional but warm.
+Remember: {lang_instruction}"""
 
     try:
-        response = await client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+        result = await groq_chat(
+            messages=[{"role": "user", "content": prompt}],
             max_tokens=1500,
             temperature=0.4,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
         )
-        
-        return {"insight": response.choices[0].message.content}
+        return {"insight": result}
 
-    except Exception as e:
-        error_str = str(e).lower()
-        last_error = str(e)
-        print(f"[Insight] falhou: {last_error[:150]}")
-
-        # Erro de autenticação
-        if "authentication" in error_str or "401" in error_str:
+    except GroqKeyError as e:
+        err = str(e).lower()
+        if "invalid_api_key" in err or "401" in err:
             raise HTTPException(
                 status_code=401,
-                detail="Chave da API Anthropic inválida."
+                detail="Chave(s) GROQ inválida(s). Verifique o .env e gere novas chaves em console.groq.com"
             )
-
-        # Erro de cota ou sobrecarga
-        if "429" in error_str or "rate_limit" in error_str or "overloaded" in error_str:
-            import asyncio
-            await asyncio.sleep(2)
-        
-
-    if last_error and ("429" in last_error.lower() or "rate_limit" in last_error.lower()):
-        raise HTTPException(
-            status_code=429,
-            detail="Cota da Anthropic esgotada ou servidor instável. Tente novamente em instantes."
-        )
-
-    raise HTTPException(
-        status_code=500,
-        detail=f"Erro ao gerar insight via Anthropic: {last_error}"
-    )
+        if "rate" in err or "429" in err:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Todas as {len(GROQ_KEYS)} chave(s) atingiram o limite. Aguarde e tente novamente."
+            )
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/students/{username}", status_code=204)
