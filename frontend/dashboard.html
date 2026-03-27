@@ -126,6 +126,24 @@
 
         </main>
     </div>
+    <!-- Template base do modal de aluno (referência/estrutura de UI) -->
+    <template id="student-modal-template">
+        <div class="modal-backdrop"></div>
+        <div class="modal-panel">
+            <div class="modal-tabs">
+                <button class="modal-tab active">✏️ Editar</button>
+                <button class="modal-tab">🧩 Prompt</button>
+                <button class="modal-tab">🧠 Insight</button>
+            </div>
+            <div class="modal-tab-content" id="tab-insight-template">
+                <div class="modal-actions">
+                    <button class="btn-modal-save" type="button">🧠 Gerar Insight</button>
+                    <button class="btn-modal-secondary" type="button" data-i18n="dash.grammar_errors">Erros
+                        Gramaticais</button>
+                </div>
+            </div>
+        </div>
+    </template>
 
     <script src="js/i18n.js"></script>
     <script src="js/dashboard.js"></script>
