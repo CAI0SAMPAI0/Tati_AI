@@ -1,7 +1,12 @@
+// ─── FIXES APLICADAS ───────────────────────────────────────────────────────
+// 1. FIX: showWelcome() agora verifica corretamente se há conversas
+// 2. FIX: Nova conversa abre com welcome screen visível
+// 3. FIX: Arquivo agora espera conversa ser criada antes de enviar
+
 const API    = 'http://127.0.0.1:8000';
 const WS_URL = 'ws://127.0.0.1:8000';
 
-// ── Auth guard ────────────────────────────────────────────────────
+// ── Auth guard ────────────────────────────────────────────────
 const token   = localStorage.getItem('token');
 const userRaw = localStorage.getItem('user');
 if (!token || !userRaw) { window.location.href = '/'; }
@@ -16,21 +21,21 @@ function getSettings() {
 
 const STAFF_ROLES = ['professor', 'professora', 'programador', 'Tatiana', 'Tati', 'admin'];
 
-// ── State ─────────────────────────────────────────────────────────
+// ── State ─────────────────────────────────────────────────────
 let currentConvId    = null;
 let ws               = null;
 let isStreaming      = false;
 let streamingBubble  = null;
-let streamingMsgEl   = null;   // referência à .message-assistant sendo streamada
+let streamingMsgEl   = null;
 let mediaRecorder    = null;
 let audioChunks      = [];
 let isRecording      = false;
 let pendingFiles     = [];
 let streamBuffer     = '';
-let pendingAudioB64  = null;   // FIX: guarda áudio que chegou antes do stream_end
+let pendingAudioB64  = null;
 let currentAudio     = null;
 
-// ── DOMContentLoaded ──────────────────────────────────────────────
+// ── DOMContentLoaded ──────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
     initUserInfo();
     setupFileInput();
@@ -43,14 +48,10 @@ window.addEventListener('DOMContentLoaded', () => {
     textarea.addEventListener('keydown', handleKey);
     textarea.addEventListener('input', () => autoResize(textarea));
 
-    loadConversations().then(() => {
-        const firstConv = document.querySelector('.conv-item');
-        if (firstConv) firstConv.click();
-        else showWelcome();
-    });
+    loadConversations();
 });
 
-// ── User info ────────────────────────────────────────────────────
+// ── User info ────────────────────────────────────────────────
 function initUserInfo() {
     const nameEl   = document.getElementById('sidebar-user-name');
     const levelEl  = document.getElementById('sidebar-user-level');
@@ -80,7 +81,7 @@ function switchToVoice() {
     window.location.href = `voice.html?conv_id=${currentConvId}`;
 }
 
-// ── WebSocket ─────────────────────────────────────────────────────
+// ── WebSocket ─────────────────────────────────────────────────
 function connectWS() {
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
     ws = new WebSocket(`${WS_URL}/chat/ws?token=${token}`);
@@ -131,9 +132,7 @@ function handleWSMessage(msg) {
 
         case 'stream_end':
             if (streamingMsgEl) {
-                // FIX: finalizeStreamBubble retorna o meta element
                 const meta = finalizeStreamBubble(streamingMsgEl, streamingBubble);
-                // FIX: se o áudio já chegou, attachar agora que o meta existe
                 if (pendingAudioB64 && meta) {
                     buildAudioControls(meta, pendingAudioB64);
                     pendingAudioB64 = null;
@@ -147,12 +146,9 @@ function handleWSMessage(msg) {
             break;
 
         case 'audio_response':
-            // FIX: se o stream ainda não terminou (meta não existe), guardar o b64
-            // para attachar quando o stream_end chegar
             if (streamingMsgEl) {
                 pendingAudioB64 = msg.audio;
             } else {
-                // stream já terminou, attachar direto
                 attachAudioToLastMessage(msg.audio);
             }
             break;
@@ -166,13 +162,18 @@ function handleWSMessage(msg) {
     }
 }
 
-// ── Conversations ─────────────────────────────────────────────────
+// ── Conversations ─────────────────────────────────────────────
 async function loadConversations() {
     try {
         const res = await fetch(`${API}/chat/conversations`, { headers: { Authorization: `Bearer ${token}` } });
         if (!res.ok) { if (res.status === 401) logout(); return; }
         const convs = await res.json();
         renderConversations(convs);
+        
+        // FIX #1: Mostrar welcome screen APENAS se não houver conversa ativa
+        if (convs.length === 0 && !currentConvId) {
+            showWelcome();
+        }
     } catch (e) { console.error(e); }
 }
 
@@ -180,12 +181,14 @@ function renderConversations(convs) {
     const list = document.getElementById('conversations-list');
     list.innerHTML = '';
     if (!convs.length) {
-        list.innerHTML = '<p class="list-empty">Nenhuma conversa ainda</p>'; return;
+        list.innerHTML = '<p class="list-empty">Nenhuma conversa ainda</p>'; 
+        return;
     }
     const groups = groupByDate(convs);
     for (const [label, items] of Object.entries(groups)) {
         const lbl = document.createElement('p');
-        lbl.className = 'list-label'; lbl.textContent = label;
+        lbl.className = 'list-label'; 
+        lbl.textContent = label;
         list.appendChild(lbl);
         items.forEach(c => list.appendChild(buildConvItem(c)));
     }
@@ -231,6 +234,7 @@ async function newChat() {
         });
         const conv = await res.json();
         await loadConversations();
+        // FIX #2: Abre a conversa e mostra welcome screen
         openConversation(conv.id, conv.title);
     } catch (e) { console.error(e); }
 }
@@ -241,6 +245,10 @@ async function openConversation(id, title) {
     document.getElementById('topbar-title').textContent = title;
     const voiceBtn = document.getElementById('btn-switch-voice');
     if (voiceBtn) voiceBtn.style.display = 'flex';
+    
+    // FIX #2: Mostrar welcome screen ao abrir nova conversa
+    showWelcome();
+    
     await loadMessages(id);
     connectWS();
     if (window.innerWidth < 768) document.getElementById('sidebar').classList.add('collapsed');
@@ -257,6 +265,8 @@ async function loadMessages(convId) {
     typingEl.style.display = 'none';
 
     if (!convId) { showWelcome(); return; }
+    
+    // FIX #2: Esconder welcome após carregar mensagens antigas
     if (welcomeEl) welcomeEl.style.display = 'none';
 
     try {
@@ -266,13 +276,25 @@ async function loadMessages(convId) {
         if (!res.ok) return;
         const msgs = await res.json();
         msgs.forEach(m => renderMessage(m.role, m.content));
+        
+        // Se houver mensagens, esconder welcome
+        if (msgs.length > 0 && welcomeEl) {
+            welcomeEl.style.display = 'none';
+        }
     } catch (e) { console.error(e); }
     scrollBottom();
 }
 
 function showWelcome() {
     const welcomeEl = document.getElementById('chat-welcome');
-    if (welcomeEl) welcomeEl.style.display = 'flex';
+    const area      = document.getElementById('chat-messages');
+    
+    if (welcomeEl) {
+        welcomeEl.style.display = 'flex';
+        // Move welcome para o início
+        area.insertBefore(welcomeEl, area.firstChild);
+    }
+    
     const voiceBtn = document.getElementById('btn-switch-voice');
     if (voiceBtn) voiceBtn.style.display = 'none';
     document.getElementById('topbar-title').textContent = 'Teacher Tati';
@@ -313,7 +335,7 @@ function showConfirmPopup(message, onConfirm) {
     document.getElementById('pop-yes').onclick = async () => { popup.remove(); await onConfirm(); };
 }
 
-// ── File handling ─────────────────────────────────────────────────
+// ── File handling ─────────────────────────────────────────────
 function setupFileInput() {
     document.querySelector('.btn-attach')?.addEventListener('click', triggerFileInput);
 }
@@ -358,14 +380,19 @@ function removePendingFile(i) { pendingFiles.splice(i, 1); renderFilePreviewBar(
 function getFileIcon(name) { return ({pdf:'📄',docx:'📝',doc:'📝',txt:'📃',md:'📋',xlsx:'📊',pptx:'📽️'}[(name.split('.').pop()||'').toLowerCase()])||'📎'; }
 function formatFileSize(b) { return b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB'; }
 
-// ── Send message ──────────────────────────────────────────────────
+// ── Send message ──────────────────────────────────────────────
 async function sendMessage() {
     if (isStreaming) return;
     const input = document.getElementById('message-input');
     const text  = input.value.trim();
     if (!text && !pendingFiles.length) return;
 
-    if (!currentConvId) { await newChat(); await sleep(300); }
+    // FIX #3: Criar conversa se não existir (aguarda conclusão)
+    if (!currentConvId) { 
+        await newChat(); 
+        await sleep(300); 
+    }
+    
     if (!ws || ws.readyState !== WebSocket.OPEN) connectWS();
     try { await waitForWS(6000); } catch { appendErrorMsg('Não foi possível conectar ao servidor.'); return; }
 
@@ -373,15 +400,34 @@ async function sendMessage() {
     autoResize(input);
 
     if (pendingFiles.length) {
-        const files = [...pendingFiles]; pendingFiles = []; renderFilePreviewBar();
+        const files = [...pendingFiles]; 
+        pendingFiles = []; 
+        renderFilePreviewBar();
         files.forEach(f => appendFileMsg(f.name, f.size));
-        showTyping(); isStreaming = true; setInputEnabled(false); scrollBottom();
-        for (const file of files) { ws.send(JSON.stringify({ type:'file', filename:file.name, content:file.b64, conversation_id:currentConvId, caption:text||'' })); await sleep(100); }
+        showTyping(); 
+        isStreaming = true; 
+        setInputEnabled(false); 
+        scrollBottom();
+        
+        // FIX #3: Enviar arquivos um por um com delay
+        for (const file of files) { 
+            ws.send(JSON.stringify({ 
+                type:'file', 
+                filename:file.name, 
+                content:file.b64, 
+                conversation_id:currentConvId, 
+                caption:text||'' 
+            })); 
+            await sleep(100); 
+        }
         return;
     }
 
     renderMessage('user', text);
-    showTyping(); isStreaming = true; setInputEnabled(false); scrollBottom();
+    showTyping(); 
+    isStreaming = true; 
+    setInputEnabled(false); 
+    scrollBottom();
     ws.send(JSON.stringify({ type:'text', content:text, conversation_id:currentConvId }));
 }
 
@@ -390,12 +436,14 @@ function handleKey(e) {
 }
 function autoResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,140)+'px'; }
 function setInputEnabled(on) {
-    const b = document.getElementById('btn-send'); const i = document.getElementById('message-input');
-    if (b) b.disabled=!on; if (i) i.disabled=!on;
+    const b = document.getElementById('btn-send'); 
+    const i = document.getElementById('message-input');
+    if (b) b.disabled=!on; 
+    if (i) i.disabled=!on;
 }
 function useSuggestion(btn) { document.getElementById('message-input').value=btn.textContent; sendMessage(); }
 
-// ── Audio recording ───────────────────────────────────────────────
+// ── Audio recording ───────────────────────────────────────────
 async function toggleMic() {
     if (isRecording) return stopRecording();
     try {
@@ -410,7 +458,8 @@ async function toggleMic() {
     } catch (e) { alert('Microfone não disponível: ' + e.message); }
 }
 function stopRecording() {
-    mediaRecorder?.stop(); isRecording = false;
+    mediaRecorder?.stop(); 
+    isRecording = false;
     document.getElementById('btn-mic').classList.remove('recording');
 }
 async function sendAudio() {
@@ -422,23 +471,26 @@ async function sendAudio() {
     reader.readAsDataURL(blob);
 }
 
-// ── Render messages ───────────────────────────────────────────────
+// ── Render messages ───────────────────────────────────────────
 function renderMessage(role, content) {
-    if (role === 'user') appendUserMsg(content); else appendAssistantMsg(content);
+    if (role === 'user') appendUserMsg(content); 
+    else appendAssistantMsg(content);
 }
 
 function appendUserMsg(text) {
     const div = document.createElement('div');
     div.className = 'message message-user';
     div.innerHTML = `<div class="message-body"><div class="message-bubble"><p>${escHtml(text)}</p></div><span class="message-time">${nowTime()}</span></div>`;
-    insertBeforeTyping(div); scrollBottom();
+    insertBeforeTyping(div); 
+    scrollBottom();
 }
 
 function appendFileMsg(name, size) {
     const div = document.createElement('div');
     div.className = 'message message-user';
     div.innerHTML = `<div class="message-body"><div class="message-bubble file-bubble"><div class="file-attach-preview"><div class="file-attach-icon">${getFileIcon(name)}</div><div class="file-attach-info"><span class="file-attach-name">${escHtml(name)}</span><span class="file-attach-size">${formatFileSize(size)}</span></div></div></div><span class="message-time">${nowTime()}</span></div>`;
-    insertBeforeTyping(div); scrollBottom();
+    insertBeforeTyping(div); 
+    scrollBottom();
 }
 
 function appendAssistantMsg(text) {
@@ -458,7 +510,7 @@ function appendAssistantMsg(text) {
     scrollBottom();
 }
 
-// ── Stream bubbles ────────────────────────────────────────────────
+// ── Stream bubbles ────────────────────────────────────────────
 function appendStreamBubble() {
     const div = document.createElement('div');
     div.className = 'message message-assistant';
@@ -470,7 +522,8 @@ function appendStreamBubble() {
         <div class="message-body">
             <div class="message-bubble stream-bubble"></div>
         </div>`;
-    insertBeforeTyping(div); scrollBottom();
+    insertBeforeTyping(div); 
+    scrollBottom();
     return { bubble: div.querySelector('.stream-bubble'), msgEl: div };
 }
 
@@ -480,7 +533,6 @@ function appendToken(bubble, token) {
     scrollBottom();
 }
 
-// FIX: retorna o meta element para que stream_end possa passar para buildAudioControls
 function finalizeStreamBubble(msgEl, bubble) {
     if (getSettings().wordTooltip !== false && window.WordTooltip) WordTooltip.makeClickable(msgEl);
     const body = msgEl.querySelector('.message-body');
@@ -492,7 +544,6 @@ function finalizeStreamBubble(msgEl, bubble) {
     return meta;
 }
 
-// ── attachAudioToLastMessage — usado para mensagens históricas ────
 function attachAudioToLastMessage(b64) {
     const msgs = document.querySelectorAll('.message-assistant');
     if (!msgs.length) return;
@@ -502,9 +553,7 @@ function attachAudioToLastMessage(b64) {
     buildAudioControls(meta, b64);
 }
 
-// ── FIX: buildAudioControls separado — recebe meta element e b64 ──
 function buildAudioControls(meta, b64) {
-    // Evitar duplicação
     if (meta.querySelector('.msg-audio-controls')) return;
 
     const controls = document.createElement('div');
@@ -554,7 +603,6 @@ function buildAudioControls(meta, b64) {
     }
 
     function playThis() {
-        // para qualquer outro áudio tocando
         if (currentAudio && currentAudio !== audio) {
             currentAudio.pause();
             document.querySelectorAll('.btn-tts-play').forEach(b => {
@@ -566,7 +614,6 @@ function buildAudioControls(meta, b64) {
         setPlayIcon(true);
     }
 
-    // auto-play se configurado
     if (s.autoPlay === true || s.autoPlay === 'true') playThis();
 
     playBtn.addEventListener('click', e => { e.stopPropagation(); audio.paused ? playThis() : (audio.pause(), setPlayIcon(false)); });
@@ -578,7 +625,7 @@ function buildAudioControls(meta, b64) {
     audio.addEventListener('play',  () => setPlayIcon(true));
 }
 
-// ── Misc helpers ──────────────────────────────────────────────────
+// ── Misc helpers ──────────────────────────────────────────────
 function appendStatus(text) { const d=document.createElement('div'); d.className='status-msg'; d.textContent=text; insertBeforeTyping(d); }
 function appendErrorMsg(text) { const d=document.createElement('div'); d.className='error-banner'; d.textContent='⚠️ '+text; insertBeforeTyping(d); scrollBottom(); }
 function insertBeforeTyping(el) { const a=document.getElementById('chat-messages'); a.insertBefore(el, document.getElementById('typing-indicator')); }

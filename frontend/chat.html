@@ -1,19 +1,21 @@
 <!DOCTYPE html>
 <html lang="pt-br" data-theme="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tati AI — Chat</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+        crossorigin="anonymous">
     <link rel="stylesheet" href="styles/global.css">
     <link rel="stylesheet" href="styles/chat.css">
     <link rel="stylesheet" href="styles/word_tooltip.css">
-    <!-- FIX: audio controls override — deve vir DEPOIS de chat.css e word_tooltip.css -->
     <link rel="stylesheet" href="styles/chat_audio_controls.css">
     <link rel="icon" type="image/x-icon" href="images/tati_logo.jpg">
 </head>
+
 <body>
     <div class="app-layout">
 
@@ -53,14 +55,15 @@
                 </a>
 
                 <div class="sidebar-footer-actions">
-                    <a href="dashboard.html" class="btn-footer-icon" id="btn-dashboard"
-                       title="Painel" style="display:none;">
+                    <a href="dashboard.html" class="btn-footer-icon" id="btn-dashboard" title="Painel"
+                        style="display:none;">
                         <i class="fa-solid fa-chart-line"></i>
                     </a>
                     <a href="settings.html" class="btn-footer-icon" title="Configurações">
                         <i class="fa-solid fa-gear"></i>
                     </a>
-                    <button class="btn-footer-icon btn-danger-icon" onclick="deleteAllConversations()" title="Deletar todas">
+                    <button class="btn-footer-icon btn-danger-icon" onclick="deleteAllConversations()"
+                        title="Deletar todas">
                         <i class="fa-solid fa-trash-can"></i>
                     </button>
                     <button class="btn-footer-icon btn-danger-icon" onclick="logout()" title="Sair">
@@ -80,7 +83,8 @@
                     <span class="topbar-title" id="topbar-title">Teacher Tati</span>
                 </div>
                 <div class="topbar-right">
-                    <button class="btn-voice-mode" id="btn-switch-voice" onclick="switchToVoice()" style="display:none;">
+                    <button class="btn-voice-mode" id="btn-switch-voice" onclick="switchToVoice()"
+                        style="display:none;">
                         <i class="fa-solid fa-microphone"></i>
                         <span data-i18n="chat.voice_mode">Modo Voz</span>
                     </button>
@@ -96,12 +100,17 @@
                     </div>
                     <h2 data-i18n="chat.welcome_title">Olá! Eu sou a Teacher Tati 👋</h2>
                     <p data-i18n="chat.welcome_sub">Sua professora de inglês com IA. Vamos praticar juntos?</p>
-                    <p class="welcome-tip" data-i18n="chat.welcome_tip">💡 Clique em qualquer palavra inglesa para ver tradução e ouvir a pronúncia</p>
+                    <p class="welcome-tip" data-i18n="chat.welcome_tip">💡 Clique em qualquer palavra inglesa para ver
+                        tradução e ouvir a pronúncia</p>
                     <div class="welcome-suggestions">
-                        <button class="suggestion-chip" onclick="useSuggestion(this)" data-i18n="chat.sugg_1">How do I introduce myself?</button>
-                        <button class="suggestion-chip" onclick="useSuggestion(this)" data-i18n="chat.sugg_2">Correct my English, please</button>
-                        <button class="suggestion-chip" onclick="useSuggestion(this)" data-i18n="chat.sugg_3">Let's practice conversation</button>
-                        <button class="suggestion-chip" onclick="useSuggestion(this)" data-i18n="chat.sugg_4">Explain past tense to me</button>
+                        <button class="suggestion-chip" onclick="useSuggestion(this)" data-i18n="chat.sugg_1">How do I
+                            introduce myself?</button>
+                        <button class="suggestion-chip" onclick="useSuggestion(this)" data-i18n="chat.sugg_2">Correct my
+                            English, please</button>
+                        <button class="suggestion-chip" onclick="useSuggestion(this)" data-i18n="chat.sugg_3">Let's
+                            practice conversation</button>
+                        <button class="suggestion-chip" onclick="useSuggestion(this)" data-i18n="chat.sugg_4">Explain
+                            past tense to me</button>
                     </div>
                 </div>
 
@@ -134,7 +143,8 @@
                         <i class="fa-solid fa-paper-plane"></i>
                     </button>
                 </div>
-                <p class="input-hint" data-i18n="chat.hint">Teacher Tati pratica inglês com você · Enter para enviar · Shift+Enter para nova linha</p>
+                <p class="input-hint" data-i18n="chat.hint">Teacher Tati pratica inglês com você · Enter para enviar ·
+                    Shift+Enter para nova linha</p>
             </div>
         </main>
     </div>
@@ -143,4 +153,5 @@
     <script src="js/word_tooltip.js"></script>
     <script src="js/chat.js"></script>
 </body>
+
 </html>

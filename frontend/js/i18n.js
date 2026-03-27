@@ -299,6 +299,7 @@ const TRANSLATIONS = {
     'dash.level_updated':    '✓ Level updated successfully!',
     'dash.prompt_saved':     '✓ Prompt saved! Takes effect on next message.',
     'dash.err_save':         '✗ Error saving. Please try again.',
+    
 
     'voice.online':          'Online',
     'voice.listening':       '🎙 Listening…',
