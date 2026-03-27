@@ -191,8 +191,7 @@ function openStudentModal(username) {
 
             <!-- Tab: Custom Prompt -->
             <div class="modal-tab-content" id="tab-prompt" style="display:none">
-                <p class="modal-hint">
-                    Adicione instruções extras para a Tati seguir <strong>somente com este aluno</strong>.
+                <p class="modal-hint">${t('dash.prompt_hint')}
                 </p>
                 <textarea id="modal-prompt" class="modal-textarea"
                     placeholder="Ex: This student is preparing for a job interview at a tech company..."

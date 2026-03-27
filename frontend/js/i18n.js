@@ -137,6 +137,7 @@ const TRANSLATIONS = {
     'dash.level_updated':    '✓ Nível atualizado com sucesso!',
     'dash.prompt_saved':     '✓ Prompt salvo! Entrará em vigor na próxima mensagem.',
     'dash.err_save':         '✗ Erro ao salvar. Tente novamente.',
+    'dash.prompt_hint':      'Adicione instruções extras para a Tati seguir <strong>somente com este aluno</strong>.',
 
     // ── Voice ─────────────────────────────────────────────────────
     'voice.online':          'Online',
@@ -299,7 +300,7 @@ const TRANSLATIONS = {
     'dash.level_updated':    '✓ Level updated successfully!',
     'dash.prompt_saved':     '✓ Prompt saved! Takes effect on next message.',
     'dash.err_save':         '✗ Error saving. Please try again.',
-    
+    'dash.prompt_hint':      'Add extra instructions for Tati to follow <strong>only with this student</strong>.',
 
     'voice.online':          'Online',
     'voice.listening':       '🎙 Listening…',
