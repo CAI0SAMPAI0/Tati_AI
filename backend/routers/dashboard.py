@@ -481,3 +481,123 @@ Return valid JSON only. No markdown fences, comments or extra text."""
 
     # fallback 2: heurísticas locais para casos básicos
     return {"errors": _heuristic_grammar_errors(messages)}
+
+
+@router.get("/students/{username}/recommendations")
+async def get_recommendations(username: str, current_user: dict = Depends(_require_staff), lang: str = Query(default=DEFAULT_LANG)):
+    """
+    criando objetivos dos alunos (ex: "focar em verbos irregulares", "melhorar escrita formal") e mapeando para recomendações específicas (ex: "praticar com exercícios de verbos irregulares", "escrever um email formal para a professora")
+     
+    js vai receber o JSON com os objetivos do aluno e as recomendações específicas para cada objetivo como um array de strings, e exibir na interface
+    
+    primeiro pegamos o usuário no banco de dados, depois analisamos as mensagens recentes para identificar os objetivos de aprendizado do aluno, e então retornamos as recomendações específicas para cada objetivo"""
+    
+    db = get_client()
+    user_rows = (
+        db.table("users")
+        .select("name, level, focus, created_at")
+        .eq("username", username)
+        .limit(1)
+        .execute()
+        .data
+    )
+    
+    messages = (
+        db.table("messages")
+        .select("content")
+        .eq("username", username)
+        .eq("role", "user")
+        .limit(40)
+        .execute()
+        .data
+    )
+    
+    if not user_rows:
+        raise HTTPException(status_code=404, detail="Aluno não encontrado.")
+    student = user_rows[0]
+    
+    history_text = ""
+    for m in messages:
+        history_text += f"{m['content']}\n\n"
+        
+    # Instrução de idioma — fallback para pt-BR se lang desconhecida
+    lang_instruction = LANG_INSTRUCTION.get(lang, LANG_INSTRUCTION[DEFAULT_LANG])
+        
+    prompt = f"""You are an expert English language pedagogy assistant helping a teacher understand a student's progress and provide personalized recommendations.
+
+LANGUAGE RULE: {lang_instruction}
+
+Student profile:
+- Name: {student.get('name', username)}
+- Level: {student.get('level', 'Nível não especificado')}
+- Focus: {student.get('focus', 'Foco não especificado')}
+- Created at: {student.get('created_at', 'Data de criação não especificada')}
+
+Recent conversation history ({len(messages)} messages):
+---
+{history_text}
+---
+
+"Please analyze the student's messages to understand their current struggles, goals, and personal interests/hobbies."
+
+Be specific and cite examples from the conversation. Keep the tone professional but warm.
+Remember: {lang_instruction}
+
+Based on the identified mistakes and confusion patterns, provide 3 to 5 specific, actionable recommendations for the teacher to help the student improve. For each recommendation, include a brief explanation and, if possible, an example of an exercise or activity that the teacher can assign to the student.
+{{
+    "recommendations": [
+        "Focar em verbos irregulares → praticar com exercícios de verbos irregulares",
+        "Melhorar escrita formal → escrever um email formal para a professora",
+        "Aprimorar compreensão auditiva → ouvir podcasts em inglês e resumir os principais pontos",
+        "Expandir vocabulário → aprender 5 palavras novas por semana e usá-las em frases"],
+    "interests": [
+        "Viagens",
+        "Música",
+        "Tecnologia"]
+}}
+
+Return valid JSON only. No markdown fences, comments or extra text."""
+
+    try:
+        result = await groq_chat(
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=1200,
+            temperature=0.2,
+        )
+    except GroqKeyError as e:
+        err = str(e).lower()
+        if "invalid_api_key" in err or "401" in err:
+            raise HTTPException(
+                status_code=401,
+                detail="Chave(s) GROQ inválida(s). Verifique o .env e gere novas chaves"
+            )
+        if "rate" in err or "429" in err:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Todas as {len(GROQ_KEYS)} chave(s) atingiram o limite. Aguarde e tente novamente."
+            )
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    try:
+        data = json.loads(_sanitize_json_block(result))
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=502,
+            detail="A IA retornou um formato inválido para as recomendações e interesses dos alunos."
+        )
+        
+    try:
+        recommendations = data.get("recommendations", [])
+        interests = data.get("interests", [])
+        if not isinstance(recommendations, list) or not isinstance(interests, list):
+            raise ValueError("Campos 'recommendations' e 'interests' devem ser listas.")
+    except (ValueError, KeyError) as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"O formato do JSON retornado pela IA é inválido: {str(e)}"
+        )
+        
+    return {
+        "recommendations": recommendations,
+        "interests": interests
+    }
