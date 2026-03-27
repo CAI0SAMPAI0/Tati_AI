@@ -1,16 +1,19 @@
 <!DOCTYPE html>
 <html lang="pt-br" data-theme="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tati AI — Meu Perfil</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+        crossorigin="anonymous">
     <link rel="stylesheet" href="styles/global.css">
     <link rel="stylesheet" href="styles/profile.css">
     <link rel="icon" type="image/x-icon" href="images/tati_logo.jpg">
 </head>
+
 <body>
     <div class="profile-layout">
 
@@ -30,15 +33,15 @@
             <!-- Hero -->
             <div class="profile-hero">
                 <div class="profile-avatar-wrap">
-                    <img id="profile-avatar-img" class="profile-avatar-photo" src="" alt=""
-                         style="display:none;" onerror="this.style.display='none'; document.getElementById('profile-avatar').style.display='flex';">
+                    <img id="profile-avatar-img" class="profile-avatar-photo" src="" alt="" style="display:none;"
+                        onerror="this.style.display='none'; document.getElementById('profile-avatar').style.display='flex';">
                     <div class="profile-avatar" id="profile-avatar">??</div>
                     <div class="avatar-ring"></div>
                     <label class="avatar-upload-overlay" title="Trocar foto" for="avatar-file-input">
                         <i class="fa-solid fa-camera"></i>
                     </label>
                     <input type="file" id="avatar-file-input" accept="image/jpeg,image/png,image/webp"
-                           style="display:none;" onchange="handleAvatarUpload(event)">
+                        style="display:none;" onchange="handleAvatarUpload(event)">
                 </div>
                 <div class="profile-hero-info">
                     <h1 id="profile-name">Carregando...</h1>
@@ -83,7 +86,8 @@
                         </div>
                         <div class="field">
                             <label data-i18n="profile.nickname">Apelido</label>
-                            <input id="field-nickname" type="text" data-i18n-placeholder="profile.nickname_ph" placeholder="Como prefere ser chamado">
+                            <input id="field-nickname" type="text" data-i18n-placeholder="profile.nickname_ph"
+                                placeholder="Como prefere ser chamado">
                         </div>
                         <div class="field">
                             <label data-i18n="profile.email">E-mail</label>
@@ -91,7 +95,8 @@
                         </div>
                         <div class="field">
                             <label data-i18n="profile.occupation">Profissão</label>
-                            <input id="field-occupation" type="text" data-i18n-placeholder="profile.occupation_ph" placeholder="Ex: Desenvolvedor, Estudante...">
+                            <input id="field-occupation" type="text" data-i18n-placeholder="profile.occupation_ph"
+                                placeholder="Ex: Desenvolvedor, Estudante...">
                         </div>
                     </div>
                 </section>
@@ -106,21 +111,22 @@
                         <div class="field">
                             <label data-i18n="profile.level">Nível de inglês</label>
                             <select id="field-level">
-                                <option value="Beginner"         data-i18n="level.beginner">Beginner</option>
+                                <option value="Beginner" data-i18n="level.beginner">Beginner</option>
                                 <option value="Pre-Intermediate" data-i18n="level.pre_int">Pre-Intermediate</option>
-                                <option value="Intermediate"     data-i18n="level.intermediate">Intermediate</option>
+                                <option value="Intermediate" data-i18n="level.intermediate">Intermediate</option>
                                 <option value="Business English" data-i18n="level.business">Business English</option>
-                                <option value="Advanced"         data-i18n="level.advanced">Advanced</option>
+                                <option value="Advanced" data-i18n="level.advanced">Advanced</option>
                             </select>
                         </div>
                         <div class="field">
                             <label data-i18n="profile.focus">Foco de aprendizado</label>
                             <select id="field-focus">
-                                <option value="General Conversation" data-i18n="focus.general">General Conversation</option>
-                                <option value="Business English"     data-i18n="focus.business">Business English</option>
-                                <option value="Travel English"       data-i18n="focus.travel">Travel English</option>
-                                <option value="Academic English"     data-i18n="focus.academic">Academic English</option>
-                                <option value="Job Interviews"       data-i18n="focus.interviews">Job Interviews</option>
+                                <option value="General Conversation" data-i18n="focus.general">General Conversation
+                                </option>
+                                <option value="Business English" data-i18n="focus.business">Business English</option>
+                                <option value="Travel English" data-i18n="focus.travel">Travel English</option>
+                                <option value="Academic English" data-i18n="focus.academic">Academic English</option>
+                                <option value="Job Interviews" data-i18n="focus.interviews">Job Interviews</option>
                             </select>
                         </div>
                     </div>
@@ -140,7 +146,8 @@
                             <label data-i18n="profile.current_pw">Senha atual</label>
                             <div class="pw-input-wrap">
                                 <input id="field-current-pw" type="password" placeholder="••••••••">
-                                <button type="button" class="btn-pw-eye" onclick="togglePwVisibility('field-current-pw', this)" tabindex="-1">
+                                <button type="button" class="btn-pw-eye"
+                                    onclick="togglePwVisibility('field-current-pw', this)" tabindex="-1">
                                     <i class="fa-solid fa-eye"></i>
                                 </button>
                             </div>
@@ -148,8 +155,10 @@
                         <div class="field">
                             <label data-i18n="profile.new_pw">Nova senha</label>
                             <div class="pw-input-wrap">
-                                <input id="field-new-pw" type="password" data-i18n-placeholder="profile.new_pw_ph" placeholder="mínimo 6 caracteres">
-                                <button type="button" class="btn-pw-eye" onclick="togglePwVisibility('field-new-pw', this)" tabindex="-1">
+                                <input id="field-new-pw" type="password" data-i18n-placeholder="profile.new_pw_ph"
+                                    placeholder="mínimo 6 caracteres">
+                                <button type="button" class="btn-pw-eye"
+                                    onclick="togglePwVisibility('field-new-pw', this)" tabindex="-1">
                                     <i class="fa-solid fa-eye"></i>
                                 </button>
                             </div>
@@ -170,7 +179,8 @@
                         <i class="fa-solid fa-triangle-exclamation"></i>
                         <span data-i18n="profile.danger">Zona de Perigo</span>
                     </h2>
-                    <p class="danger-desc" data-i18n="profile.danger_desc">Estas ações são irreversíveis. Prossiga com cuidado.</p>
+                    <p class="danger-desc" data-i18n="profile.danger_desc">Estas ações são irreversíveis. Prossiga com
+                        cuidado.</p>
                     <button class="btn-danger" onclick="logout()">
                         <i class="fa-solid fa-right-from-bracket"></i>
                         <span data-i18n="nav.logout">Sair da conta</span>
@@ -184,4 +194,5 @@
     <script src="js/i18n.js"></script>
     <script src="js/profile.js"></script>
 </body>
+
 </html>
