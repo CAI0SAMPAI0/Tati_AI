@@ -141,6 +141,8 @@ const TRANSLATIONS = {
     'dash.grammar_errors':   'Erros Gramaticais',
     'dash.mapping_errors':   'Mapeando erros gramaticais recorrentes...',
     'dash.no_grammar_errors':'Sem erros detectados nas últimas mensagens analisadas.',
+    'dash.exemples':          'Exemplos',
+    'dash.click':            "Clique em 🧠 Gerar Insight para a IA analisar o histórico de conversas deste aluno ou em Erros Gramaticais para ver erros recorrentes.",
 
     // ── Voice ─────────────────────────────────────────────────────
     'voice.online':          'Online',
@@ -307,6 +309,8 @@ const TRANSLATIONS = {
     'dash.grammar_errors':   'Grammar Errors',
     'dash.mapping_errors':   'Mapping recurring grammar mistakes...',
     'dash.no_grammar_errors':'No grammar errors detected in the latest analyzed messages.',
+    'dash.exemples':          'Examples',
+    'dash.click':            "Click in 🧠 Generate Insight for AI to analyze this student's conversation history or in Grammar Errors to see recurring mistakes.",
 
     'voice.online':          'Online',
     'voice.listening':       '🎙 Listening…',

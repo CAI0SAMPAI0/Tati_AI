@@ -212,7 +212,7 @@ function openStudentModal(username) {
                 <div id="insight-content">
                     <div class="insight-placeholder">
                         <i class="fa-solid fa-brain" style="font-size:1.5rem;color:var(--primary);margin-bottom:0.75rem;display:block;"></i>
-                        <p>Clique em <strong>${t('dash.generate_insight')}</strong> para a IA analisar o histórico de conversas deste aluno.</p>
+                        <p>${t('dash.click')}</p>
                     </div>
                 </div>
                 <div class="modal-actions">
@@ -440,7 +440,7 @@ async function generateGrammarErrors() {
                         <strong>${idx + 1}. ${esc(e.category || 'Unknown')}</strong>
                         <span class="level-badge">${Number(e.count || 0)}x</span>
                     </div>
-                    ${e.example ? `<div style="margin-top:0.45rem;font-size:0.9rem;color:var(--text-muted);"><em>Exemplo:</em> ${esc(e.example)}</div>` : ''}
+                    ${e.example ? `<div style="margin-top:0.45rem;font-size:0.9rem;color:var(--text-muted);"><em>${t('dash.exemples')}:</em> ${esc(e.example)}</div>` : ''}
                 </div>
             `)
             .join('');
