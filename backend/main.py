@@ -8,7 +8,7 @@ import os
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-from routers import auth, chat, profile, dashboard
+from routers import auth, chat, profile, dashboard, avatar
 
 app = FastAPI()
 
@@ -24,6 +24,7 @@ app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(chat.router, prefix="/chat", tags=["chat"])
 app.include_router(profile.router, prefix="/profile", tags=["profile"])
 app.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
+app.include_router(avatar.router, prefix="/avatar", tags=["avatar"])
 
 # Servir Frontend
 FRONTEND_PATH = Path(__file__).parent.parent / "frontend"
