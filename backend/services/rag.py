@@ -1,56 +1,44 @@
-# lógica rag para alimentar a IA
+# RAG - Recuperação de Informação + Geração de Resposta
 import os
-from langchain_community.document_loaders import PyPDFDirectoryLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
+import json
+from dotenv import load_dotenv
+from langchain_community.document_loaders import GoogleDriveLoader
 
-# caminho de onde o banco de dados de vetores será armazenado
-CROMA_PATH = "./chroma_db"
-DRIVE_PATH = "./data/apostilas" # -> EXEMPLO: "./drive" -> pasta onde estão os PDFs
-embeddings_model=HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+load_dotenv()
 
-async def ingest_documents():
-    # Carrega os documentos PDF
-    print("Carregando documentos PDF...")
-    loader = PyPDFDirectoryLoader(DRIVE_PATH)
-    documents = loader.load()
+def obter_loader_seguro():
+    # 1. Monta o dicionário das credenciais em memória (RAM)
+    creds_dict = {
+        "installed": {
+            "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+            "project_id": os.getenv("GOOGLE_PROJECT_ID"),
+            "auth_uri": os.getenv("GOOGLE_AUTH_URI"),
+            "token_uri": os.getenv("GOOGLE_TOKEN_URI"),
+            "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
+            "redirect_uris": ["http://localhost"]
+        }
+    }
 
-    # Dividir os documentos em pedaços menores
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50, length_function=len)
-    chunks = text_splitter.create_documents([doc.page_content for doc in documents])
+    # 2. Cria o arquivo temporário necessário para a biblioteca
+    temp_path = "credentials_temp.json"
+    with open(temp_path, "w") as f:
+        json.dump(creds_dict, f)
 
-    # Criar o banco de dados de vetores usando Chroma
-    print(f'Salvando {len(chunks)} chunks no banco de dados de vetores...')
-    vectorstore = Chroma.from_documents(chunks, embeddings_model, persist_directory=CROMA_PATH)
-    vectorstore.persist()
-    print("✅ Ingestão concluída com sucesso!")
-    return len(chunks)
+    try:
+        # 3. Inicializa o loader usando o arquivo temporário
+        loader = GoogleDriveLoader(
+            folder_id=os.getenv("GOOGLE_DRIVE_FOLDER_ID"),
+            credentials_path=temp_path,
+            token_path="token.json", # Este arquivo guarda o login da sua conta
+            file_types=["pdf"]
+        )
+        return loader
+    finally:
+        # 4. DELETA o arquivo de credenciais assim que o loader carregar
+        # Isso garante que a senha (client_secret) suma do seu PC
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
-async def search_context(query: str, k: int = 3):
-    """Função para buscar o contexto relevante usando o banco de dados de vetores."""
-    vectorstore = Chroma(persist_directory=CROMA_PATH, embedding_function=embeddings_model)
-    results = vectorstore.similarity_search(query, k=k)
-    contexto = "\n\n".join([result.page_content for result in results])
-    return contexto
-
-def teste_leitura():
-    """Função de teste para verificar se os documentos foram ingeridos corretamente."""
-    vectorstore = Chroma(persist_directory=CROMA_PATH, embedding_function=embeddings_model)
-    count = vectorstore._collection.count()
-    loader = PyPDFDirectoryLoader(DRIVE_PATH)
-    documentos = loader.load()
-    print(f"Total de chunks no banco de dados: {count}")
-    
-    if len(documentos) == 0:
-        print("Nenhum documento encontrado. Verifique o caminho e os arquivos PDF.")
-
-    print('\nFatiando os primeiros 5 chunks para verificação:')
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50, length_function=len)
-    
-    chunks = text_splitter.split_documents(documentos)
-    if chunks:
-        print(chunks[0].page_content)
-        
-if __name__ == "__main__":
-    teste_leitura()
+# Para usar:
+loader = obter_loader_seguro()
+documentos = loader.load()
