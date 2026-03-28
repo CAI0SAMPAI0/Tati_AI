@@ -663,7 +663,6 @@ async def get_overview_difficulties(current_user: dict = Depends(_require_staff)
             db.table("users")
             .select("username, current_difficulty")
             .eq("role", "student")
-            #.limit(10) # -> para evitar sobrecarga
             .execute()
         )
         alerts = []
