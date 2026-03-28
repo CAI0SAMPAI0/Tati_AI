@@ -549,11 +549,13 @@ Based on the identified mistakes and confusion patterns, provide 3 to 5 specific
         "Focar em verbos irregulares → praticar com exercícios de verbos irregulares",
         "Melhorar escrita formal → escrever um email formal para a professora",
         "Aprimorar compreensão auditiva → ouvir podcasts em inglês e resumir os principais pontos",
-        "Expandir vocabulário → aprender 5 palavras novas por semana e usá-las em frases"],
+        "Expandir vocabulário → aprender 5 palavras novas por semana e usá-las em frases"
+    ],
     "interests": [
         "Viagens",
         "Música",
-        "Tecnologia"]
+        "Tecnologia"
+    ]
 }}
 
 Return valid JSON only. No markdown fences, comments or extra text."""
@@ -601,3 +603,76 @@ Return valid JSON only. No markdown fences, comments or extra text."""
         "recommendations": recommendations,
         "interests": interests
     }
+    
+# Reports 
+from collections import Counter
+@router.get("/reports/overview")
+async def get_overview_report(current_user: dict = Depends(_require_staff)):
+    db = get_client()
+
+    students = (
+        db.table("users")
+        .select("username")
+        .eq("role", "student")
+        .execute()
+    )
+    messages = (
+        db.table("messages")
+        .select("id")
+        .eq("role", "user")
+        .execute()
+    )
+
+    from datetime import date
+    today = date.today().isoformat()
+    active_today = (
+        db.table("messages")
+        .select("username")
+        .eq("role", "user")
+        .eq("date", today)
+        .execute()
+    )
+    
+    # contagem de níveis dos alunos para o gráfico de distribuição
+    levels_list = [student.get("level", "unknown").lower() for student in students.data if student.get("level")]
+    level_counts = dict(Counter(levels_list))
+    
+    final_levels = {
+        "beginner": level_counts.get("beginner", 0),
+        "pre-intermediate": level_counts.get("pre-intermediate", 0),
+        "intermediate": level_counts.get("intermediate", 0),
+        "business_english": level_counts.get("business_english", 0),
+        "advanced": level_counts.get("advanced", 0),
+        # nivel não mapeado:
+        "outros": level_counts.get("unknown", 0)
+    }
+
+    return {
+        "total_students": len(students.data),
+        "total_messages": len(messages.data),
+        "active_today":   len(set(m["username"] for m in active_today.data)),
+        "level_distribution": final_levels
+    }
+
+@router.get("/difficulties")
+async def get_overview_difficulties(current_user: dict = Depends(_require_staff)):
+    try:
+        print("A rota foi acessada!")
+        db = get_client()
+        students_with_difficulties = (
+            db.table("users")
+            .select("username, current_difficulty")
+            .eq("role", "student")
+            #.limit(10) # -> para evitar sobrecarga
+            .execute()
+        )
+        alerts = []
+        for student in students_with_difficulties.data:
+            diff = student.get("current_difficulty")
+            if diff and str(diff).lower() != "null" and str(diff).strip() != "":
+                alerts.append(student)
+        print(f"Alunos com dificuldades identificadas: {len(alerts)}")
+        return {"alerts": alerts[:10]}  # limitando a 10 para evitar sobrecarga
+    except Exception as e:
+        print(f"Erro ao buscar dificuldades: {e}")
+        return {"alerts": []}
