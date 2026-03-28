@@ -7,7 +7,6 @@
     <title>Tati AI — Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
         crossorigin="anonymous">
     <link rel="stylesheet" href="styles/global.css">
@@ -19,7 +18,6 @@
 <body>
     <div class="dash-layout">
 
-        <!-- Sidebar -->
         <aside class="dash-sidebar">
             <div class="dash-sidebar-brand">
                 <img src="images/tati_logo.jpg" alt="Tati" class="brand-avatar"
@@ -40,6 +38,9 @@
                     <i class="fa-solid fa-users"></i>
                     <span data-i18n="dash.students">Alunos</span>
                 </a>
+                <a href="#reports" class="dash-nav-item" id="nav-reports" onclick="setSection('reports',this)">
+                    <i class="fa-solid fa-chart-line"></i> <span data-i18n="dash.reports">Relatórios</span>
+                </a>
             </nav>
 
             <div class="dash-sidebar-footer">
@@ -58,10 +59,8 @@
             </div>
         </aside>
 
-        <!-- Main -->
         <main class="dash-main">
 
-            <!-- Topbar -->
             <header class="dash-topbar">
                 <div>
                     <h1 class="dash-page-title" id="page-title" data-i18n="dash.overview">Visão Geral</h1>
@@ -69,7 +68,6 @@
                 </div>
             </header>
 
-            <!-- Section: Overview -->
             <section id="section-overview" class="dash-section">
                 <div class="stat-grid">
                     <div class="stat-card">
@@ -107,9 +105,35 @@
                     </div>
                     <div id="recent-students-table"></div>
                 </div>
+
+                <div class="overview-content" style="margin-top: 2rem;">
+                    <h3 style="color: var(--text-muted); font-size: 1.1rem; margin-bottom: 1rem;">Alertas de Dificuldade
+                        da Turma</h3>
+
+                    <div
+                        style="background: var(--surface); border-radius: 8px; border: 1px solid var(--border); overflow: hidden;">
+                        <table style="width: 100%; text-align: left; border-collapse: collapse;">
+                            <thead style="background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--border);">
+                                <tr>
+                                    <th style="padding: 1rem; color: var(--text-muted); font-weight: 600;">🧑‍🎓 Aluno
+                                    </th>
+                                    <th style="padding: 1rem; color: var(--text-muted); font-weight: 600;">⚠️ Foco de
+                                        Atenção</th>
+                                </tr>
+                            </thead>
+                            <tbody id="difficulties-tbody">
+                                <tr>
+                                    <td colspan="2"
+                                        style="padding: 1rem; text-align: center; color: var(--text-muted);">
+                                        Carregando alertas...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </section>
 
-            <!-- Section: Students -->
             <section id="section-students" class="dash-section" style="display:none;">
                 <div class="dash-card">
                     <div class="dash-card-header">
@@ -124,9 +148,53 @@
                 </div>
             </section>
 
+            <section id="section-reports" class="dash-section" style="display: none;">
+                <header class="section-header">
+                    <h2 data-i18n="dash.reports_title">Relatórios de Desempenho</h2>
+                    <p data-i18n="dash.reports_desc">Acompanhe a evolução e as métricas da turma.</p>
+                </header>
+
+                <div class="reports-content">
+                    <div
+                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                        <div
+                            style="background: var(--surface); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border); text-align: center;">
+                            <h3 style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Total de
+                                Alunos</h3>
+                            <div id="metric-students"
+                                style="font-size: 2.5rem; font-weight: bold; color: var(--primary);">--</div>
+                        </div>
+                        <div
+                            style="background: var(--surface); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border); text-align: center;">
+                            <h3 style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Mensagens
+                                Trocadas</h3>
+                            <div id="metric-messages"
+                                style="font-size: 2.5rem; font-weight: bold; color: var(--primary);">--</div>
+                        </div>
+                        <div
+                            style="background: var(--surface); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border); text-align: center;">
+                            <h3 style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Alunos
+                                Ativos Hoje</h3>
+                            <div id="metric-active"
+                                style="font-size: 2.5rem; font-weight: bold; color: var(--success, #10b981);">--</div>
+                        </div>
+                    </div>
+
+                    <div
+                        style="background: var(--surface); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border);">
+                        <h3 style="color: var(--text-muted); font-size: 1rem; margin-bottom: 1rem; text-align: center;">
+                            Distribuição de Níveis (Inglês)</h3>
+                        
+                        <div style="position: relative; height: 300px; max-width: 400px; margin: 0 auto;">
+                            <canvas id="levelChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
         </main>
     </div>
-    <!-- Template base do modal de aluno (referência/estrutura de UI) -->
+    
     <template id="student-modal-template">
         <div class="modal-backdrop"></div>
         <div class="modal-panel">
@@ -134,7 +202,9 @@
                 <button class="modal-tab active">✏️ Editar</button>
                 <button class="modal-tab">🧩 Prompt</button>
                 <button class="modal-tab">🧠 Insight</button>
+                <button class="modal-tab">🎯 Interesses do Aluno</button>
             </div>
+            
             <div class="modal-tab-content" id="tab-insight-template">
                 <div class="modal-actions">
                     <button class="btn-modal-save" type="button">🧠 Gerar Insight</button>
@@ -142,10 +212,33 @@
                         Gramaticais</button>
                 </div>
             </div>
+
+            <div class="modal-tab-content" id="tab-interests-template" style="display: none;">
+
+                <div class="modal-actions">
+                    <button class="btn-modal-save" id="btn-generate-interests" type="button">
+                        🎯 Analisar Interesses e Recomendações
+                    </button>
+                </div>
+
+                <div class="interests-section">
+                    <h4>Interesses do Aluno</h4>
+                    <div id="interests-container">
+                    </div>
+                </div>
+
+                <div class="recommendations-section">
+                    <h4>Plano de Ação (Recomendações)</h4>
+                    <div id="recommendations-container">
+                    </div>
+                </div>
+
+            </div>
         </div>
     </template>
 
     <script src="js/i18n.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="js/dashboard.js"></script>
 </body>
 

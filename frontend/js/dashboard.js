@@ -17,12 +17,14 @@ document.documentElement.setAttribute('data-theme', savedTheme);
 window.addEventListener('DOMContentLoaded', () => {
     loadStats();
     loadStudents();
+    loadOverview();
 });
 
 // ── Navigation ────────────────────────────────────────────────────
 const sections = {
     overview: { title: () => t('dash.overview'), sub: () => t('dash.overview_sub') },
     students: { title: () => t('dash.students'), sub: () => t('dash.students_sub') },
+    reports: { title: () => t('dash.reports'), sub: () => t('dash.reports_sub') },
 };
 let allStudents = [];
 
@@ -36,6 +38,12 @@ function setSection(name, el) {
     if (sec) sec.style.display = 'block';
     document.getElementById('page-title').textContent = sections[name]?.title() || name;
     document.getElementById('page-sub').textContent = sections[name]?.sub() || '';
+
+    if (name === 'reports') {
+        loadReports();
+    } else if (name === 'overview') {
+        loadOverview();
+    }
 }
 
 window.addEventListener('langchange', () => {
@@ -50,7 +58,7 @@ window.addEventListener('langchange', () => {
     }
 });
 
-// ── Stats ─────────────────────────────────────────────────────────
+// ── Stats 
 async function loadStats() {
     try {
         const res = await fetch(`${API}/dashboard/stats`, { headers: { Authorization: `Bearer ${token}` } });
@@ -62,7 +70,7 @@ async function loadStats() {
     } catch (e) { console.error('loadStats', e); }
 }
 
-// ── Students ──────────────────────────────────────────────────────
+// ── Students 
 async function loadStudents() {
     try {
         const res = await fetch(`${API}/dashboard/students`, { headers: { Authorization: `Bearer ${token}` } });
@@ -164,6 +172,7 @@ function openStudentModal(username) {
                 <button class="modal-tab active" onclick="switchModalTab('edit', this)">${t('dash.edit')}</button>
                 <button class="modal-tab"        onclick="switchModalTab('prompt', this)">${t('dash.prompt')}</button>
                 <button class="modal-tab"        onclick="switchModalTab('insight', this)">${t('dash.insight')}</button>
+                <button class="modal-tab"        onclick="switchModalTab('interests', this)">${t('dash.interests')}</button>
             </div>
 
             <!-- Tab: Edit -->
@@ -225,10 +234,107 @@ function openStudentModal(username) {
                 </div>
             </div>
 
+            <div class="modal-tab-content" id="tab-insight" style="display:none">
+                </div>
+
+            <div class="modal-tab-content" id="tab-interests" style="display:none">
+                <div class="modal-actions" style="justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <p style="margin: 0; font-size: 0.9rem; color: var(--text-muted);">
+                        ${t('dash.interests_hint')}
+                    </p>
+                    <button class="btn-modal-save" id="btn-generate-interests" onclick="fetchStudentInterests()">
+                        ${t('dash.analyze_interests')}
+                    </button>
+                </div>
+                
+                <div id="interests-feedback" class="modal-feedback" style="display:none"></div>
+
+                <div id="interests-content">
+                    <div style="margin-bottom: 1.5rem;">
+                        <h4 style="margin-bottom: 0.5rem; color: var(--primary);">${t('dash.interests_focus')}</h4>
+                        <div id="interests-container" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                            <span style="color: var(--text-muted); font-size: 0.85rem;">${t('dash.click_to_load')}</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 style="margin-bottom: 0.5rem; color: var(--primary);">${t('dash.practical_rec')}</h4>
+                        <div id="recommendations-container" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <span style="color: var(--text-muted); font-size: 0.85rem;">${t('dash.click_to_load')}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>`;
 
     document.body.appendChild(modal);
     requestAnimationFrame(() => modal.querySelector('.modal-panel').classList.add('modal-panel-open'));
+}
+
+// refazer analise
+async function fetchStudentInterests() {
+    const btn = document.getElementById('btn-generate-interests');
+    const feedback = document.getElementById('interests-feedback');
+    const intContainer = document.getElementById('interests-container');
+    const recContainer = document.getElementById('recommendations-container');
+
+    if (!currentModalUsername) return;
+
+    // Estado de Loading
+    btn.disabled = true;
+    btn.innerHTML = `${t('dash.analyzing')}`;
+    feedback.style.display = 'none';
+
+    try {
+        const res = await fetch(`${API}/dashboard/students/${currentModalUsername}/recommendations`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+            // Limpa as mensagens padrão
+            intContainer.innerHTML = `<span style="color: var(--text-muted);">${t('dash.no_interests')}</span>`;
+            recContainer.innerHTML = '';
+
+            // 1. Renderiza os Interesses (Tags)
+            if (data.interests && data.interests.length > 0) {
+                data.interests.forEach(interest => {
+                    // Criei um estilo inline de badge para ficar bonito rápido, 
+                    // mas o ideal é jogar essa classe pro seu CSS depois!
+                    const badge = document.createElement('span');
+                    badge.textContent = interest;
+                    badge.style.cssText = 'background: var(--surface-hover); color: var(--text); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.85rem; border: 1px solid var(--border);';
+                    intContainer.appendChild(badge);
+                });
+            } else {
+                intContainer.innerHTML = '<span style="color: var(--text-muted);">Nenhum interesse mapeado ainda.</span>';
+            }
+
+            // 2. Renderiza as Recomendações (Lista)
+            if (data.recommendations && data.recommendations.length > 0) {
+                data.recommendations.forEach(rec => {
+                    const item = document.createElement('div');
+                    item.innerHTML = `<strong>${t('dash.action')}</strong> ${rec}`;
+                    item.style.cssText = 'background: var(--surface); padding: 0.75rem; border-radius: 6px; font-size: 0.9rem; border-left: 3px solid var(--primary);';
+                    recContainer.appendChild(item);
+                });
+            } else {
+                recContainer.innerHTML = '<span style="color: var(--text-muted);">Nenhuma recomendação disponível.</span>';
+            }
+
+        } else {
+            showModalFeedback(feedback, data.detail || 'Erro ao gerar análise.', 'error');
+        }
+
+    } catch (e) {
+        showModalFeedback(feedback, 'Erro de conexão.', 'error');
+    } finally {
+        // Restaura o botão
+        btn.disabled = false;
+        btn.innerHTML = '🎯 Refazer Análise';
+    }
 }
 
 function closeStudentModal() {
@@ -503,4 +609,160 @@ function logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.href = '/';
+}
+
+// ── Aba de Relatórios ────────────────────────────────────────────────────────
+let reportsChartInstance = null; 
+
+async function loadReports() {
+    try {
+        // Mostra que está carregando os números de cima
+        document.getElementById('metric-students').textContent = '...';
+        document.getElementById('metric-messages').textContent = '...';
+        document.getElementById('metric-active').textContent = '...';
+
+        // Puxa as métricas do backend
+        const response = await fetch(`${API}/dashboard/reports/overview`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById('metric-students').textContent = data.total_students ?? 0;
+            document.getElementById('metric-messages').textContent = data.total_messages ?? 0;
+            document.getElementById('metric-active').textContent = data.active_today ?? 0;
+        } else {
+            document.getElementById('metric-students').textContent = allStudents.length;
+        }
+
+        // CORREÇÃO: Conta os níveis a partir da lista local, ignorando maiúsculas/minúsculas
+        const contagemNiveis = {
+            'Beginner': 0,
+            'Pre-Intermediate': 0,
+            'Intermediate': 0,
+            'Business English': 0,
+            'Advanced': 0,
+            'Sem Nível': 0
+        };
+
+        allStudents.forEach(aluno => {
+            const nivel = (aluno.level || '').trim().toLowerCase();
+            
+            if (nivel === 'beginner') contagemNiveis['Beginner']++;
+            else if (nivel === 'pre-intermediate' || nivel === 'pre intermediate') contagemNiveis['Pre-Intermediate']++;
+            else if (nivel === 'intermediate') contagemNiveis['Intermediate']++;
+            else if (nivel === 'business english' || nivel === 'business') contagemNiveis['Business English']++;
+            else if (nivel === 'advanced') contagemNiveis['Advanced']++;
+            else contagemNiveis['Sem Nível']++; 
+        });
+
+        // Prepara apenas os dados que têm número maior que 0
+        const labels = [];
+        const values = [];
+        const backgroundColors = [];
+        
+        const cores = {
+            'Beginner': '#3b82f6',
+            'Pre-Intermediate': '#0ea5e9',
+            'Intermediate': '#8b5cf6',
+            'Business English': '#d946ef',
+            'Advanced': '#f59e0b',
+            'Sem Nível': '#64748b'
+        };
+
+        for (const [nivel, qtd] of Object.entries(contagemNiveis)) {
+            if (qtd > 0) {
+                labels.push(nivel);
+                values.push(qtd);
+                backgroundColors.push(cores[nivel]);
+            }
+        }
+
+        // Se todo mundo for 0 (banco vazio), cria uma rosca falsa para não sumir
+        if (values.length === 0) {
+            labels.push('Sem Dados');
+            values.push(1);
+            backgroundColors.push('#3f3f46');
+        }
+
+        // Desenha o Gráfico Mágico
+        const ctx = document.getElementById('levelChart').getContext('2d');
+        if (reportsChartInstance) {
+            reportsChartInstance.destroy(); // Apaga o velho para não bugar
+        }
+
+        reportsChartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: backgroundColors,
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: '#a1a1aa' } }
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error("Erro ao carregar relatórios:", error);
+    }
+}
+
+// ── Aba de Overview ─────────────────────────────────────────────────────────
+async function loadOverview() {
+    const tbody = document.getElementById('difficulties-tbody');
+    const token = localStorage.getItem('token');
+
+    try {
+        // Bate na sua rota nova do Python
+        const response = await fetch(`${API}/dashboard/difficulties`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        console.log("Resposta recebida para overview:", response.status);
+        if (!response.ok) throw new Error('Falha ao buscar alertas');
+
+        const data = await response.json();
+        const alerts = data.alerts || [];
+
+        // Limpa a mensagem de "Carregando..."
+        tbody.innerHTML = '';
+
+        // Se ninguém tiver dificuldade, mostramos uma mensagem de sucesso!
+        if (alerts.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="2" style="padding: 2rem 1rem; text-align: center; color: #10b981;">
+                        <i class="fa-solid fa-check-circle" style="font-size: 2rem; margin-bottom: 0.5rem; display: block;"></i>
+                        Tudo certo! Nenhum aluno com dificuldade registrada no momento.
+                    </td>
+                </tr>`;
+            return;
+        }
+
+        // Se tiver dificuldades, cria uma linha (tr) para cada aluno
+        alerts.forEach(student => {
+            const row = document.createElement('tr');
+            row.style.borderBottom = '1px solid var(--border)';
+
+            // Aqui usamos um amarelo/laranja (#fbbf24) para dar cara de "Atenção"
+            row.innerHTML = `
+                <td style="padding: 1rem; font-weight: 500;">${student.username}</td>
+                <td style="padding: 1rem; color: #fbbf24;">${student.current_difficulty}</td>
+            `;
+            tbody.appendChild(row);
+        });
+
+    } catch (error) {
+        console.error("Erro ao carregar overview:", error);
+        tbody.innerHTML = `<tr><td colspan="2" style="padding: 1rem; text-align: center; color: #ef4444;">Erro ao carregar os dados.</td></tr>`;
+    }
 }
