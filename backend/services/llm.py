@@ -264,3 +264,45 @@ async def groq_chat(messages: list[dict], max_tokens: int = 1500, temperature: f
             break
 
     raise GroqKeyError(f"Todas as chaves Groq falharam. Último erro: {str(last_error)}")
+
+# criando animação labial
+
+import subprocess, json, uuid
+# ─── Animação labial (visemas)
+async def generate_visemes(audio_b64: str) -> list:
+    """Gera visemas usando o modelo de animação labial da ElevenLabs."""
+    file_id = str(uuid.uuid4())
+    temp_audio = f"/tmp/{file_id}.mp3"
+    temp_json = f"/tmp/{file_id}.json"
+    
+    # salva o áudio base64 como arquivo de áudio
+    try:
+        audio_bytes = base64.b64decode(audio_b64)
+        with open(temp_audio, "wb") as f:
+            f.write(audio_bytes)
+    except Exception as e:
+        print(f"Erro ao decodificar áudio para Rhubarb: {e}")
+        return []
+    
+    # chama o Rhubarb para gerar os visemas
+    try:
+        subprocess.run([
+            "rhubarb.exe", 
+            "-f", "json", 
+            temp_audio, 
+            "-o", temp_json
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        # 3. Lê o JSON que o Rhubarb gerou
+        with open(temp_json, "r") as f:
+            data = json.load(f)
+            return data.get("mouthCues", [])
+            
+    except Exception as e:
+        print(f"Erro na extração de visemas pelo Rhubarb: {e}")
+        return []
+        
+    finally:
+        # 4. Limpeza: apaga os arquivos temporários para não lotar o PC
+        if os.path.exists(temp_audio): os.remove(temp_audio)
+        if os.path.exists(temp_json): os.remove(temp_json)

@@ -25,6 +25,7 @@ app.include_router(chat.router, prefix="/chat", tags=["chat"])
 app.include_router(profile.router, prefix="/profile", tags=["profile"])
 app.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 app.include_router(avatar.router, prefix="/avatar", tags=["avatar"])
+app.include_router(chat.router, prefix="/voice", tags=["voice"])
 
 # Servir Frontend
 FRONTEND_PATH = Path(__file__).parent.parent / "frontend"
