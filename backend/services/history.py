@@ -1,15 +1,3 @@
-"""
-Gerencia histórico de conversas no Supabase.
-
-Schema real:
-  conversations: id (text PK), username (text PK), created_at (text),
-                 title (text), model (text), updated_at (text)
-
-  messages: id (int8 PK autoincrement), conv_id (text), username (text),
-            role (text), content (text), audio (bool), is_file (bool),
-            tts_b64 (text), time (text), date (text), timestamp (text)
-"""
-
 from datetime import datetime, timezone
 from services.database import get_client
 

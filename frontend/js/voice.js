@@ -1,16 +1,3 @@
-/**
- * voice.js — Modo Voz com Avatar Animado
- *
- * Máquina de estados:
- *   idle       → normal + piscar aleatório
- *   listening  → frame ouvindo + ring verde
- *   processing → piscar lento (aguardando IA)
- *   speaking   → análise de volume real via Web Audio API
- *                → alterna entre normal / meio / bem_aberta
- *
- * Requer: GET /avatar/frames retornando { normal, meio, bem_aberta, ouvindo, piscando, has_frames }
- */
-
 const API    = 'http://127.0.0.1:8000';
 const WS_URL = 'ws://127.0.0.1:8000';
 
@@ -50,6 +37,17 @@ const FRAMES = {
   piscando:   '',
   has_frames: false,
 };
+
+const VISEME_MAP = {
+  'A': 'frame_A',
+  'B': 'frame_B',
+  'C': 'frame_C',
+  'D': 'frame_D',
+  'E': 'frame_E',
+  'F': 'frame_F',
+  'X': 'frame_A'
+};
+
 let _avatarState   = 'idle';     // idle | listening | processing | speaking
 let _lastFrame     = '';
 let _blinkTimer    = null;
@@ -212,34 +210,44 @@ function _enterProcessing() {
   }
 }
 
-// ── ESTADO: speaking — com análise de volume real ─────────────────
+// ── ESTADO: speaking — com sincronia labial
 function _enterSpeaking(audioElement) {
   _stopAnimations();
   _avatarState = 'speaking';
 
-  if (avatarWrap) {
-    avatarWrap.className = 'avatar-wrap speaking';
-  }
-  if (statusText) {
-    statusText.textContent = typeof t === 'function' ? t('voice.speaking') : '🗣 Falando…';
-  }
-  if (micHint) {
-    micHint.textContent = typeof t === 'function' ? t('voice.tap_speak') : 'Toque para falar';
-  }
+  if (avatarWrap) avatarWrap.className = 'avatar-wrap speaking';
+  if (statusText) statusText.textContent = typeof t === 'function' ? t('voice.speaking') : '🗣 Falando…';
+  if (micHint) micHint.textContent = typeof t === 'function' ? t('voice.tap_speak') : 'Toque para falar';
 
   if (!FRAMES.has_frames) return;
 
-  // Tenta análise de volume real via Web Audio API
+  // Se um dia o backend passar a enviar 'visemes', usa eles
+  if (typeof visemes !== 'undefined' && visemes && visemes.length > 0) {
+    function animationLoop() {
+      if (_avatarState !== 'speaking' || audioElement.paused) return;
+      const currentTime = audioElement.currentTime;
+      const currentCue = visemes.find(c => c.start <= currentTime && c.end >= currentTime);
+      if (currentCue) {
+        const frameKey = VISEME_MAP[currentCue.value] || 'frame_A';
+        _setFrame(FRAMES[frameKey] || FRAMES.normal);
+      }
+      _animFrameId = requestAnimationFrame(animationLoop);
+    }
+    _animFrameId = requestAnimationFrame(animationLoop);
+    return;
+  }
+
+  // === SOLUÇÃO: Análise de volume em tempo real (Web Audio API) ===
   try {
     if (!_audioCtx) {
       _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
 
-    // Cria analyser novo a cada fala (para não reutilizar source já desconectado)
     _analyser = _audioCtx.createAnalyser();
-    _analyser.fftSize = 1024;
-    _analyser.smoothingTimeConstant = 0.15;
+    _analyser.fftSize = 256; // Resolução menor para focar nas frequências gerais
+    _analyser.smoothingTimeConstant = 0.2; // Deixa o movimento da boca menos "tremido"
 
+    // Conecta o áudio atual no analisador
     const source = _audioCtx.createMediaElementSource(audioElement);
     source.connect(_analyser);
     _analyser.connect(_audioCtx.destination);
@@ -247,37 +255,46 @@ function _enterSpeaking(audioElement) {
     const freqData = new Uint8Array(_analyser.frequencyBinCount);
 
     _mouthTimer = setInterval(() => {
-      if (_avatarState !== 'speaking') return;
+      // Se parou de falar ou pausou, fecha a boca
+      if (_avatarState !== 'speaking' || audioElement.paused) {
+        _setFrame(FRAMES.normal);
+        return;
+      }
 
       _analyser.getByteFrequencyData(freqData);
 
-      // Calcula energia média nas frequências vocais (índices 4–100)
+      // Calcula a energia média (volume real do áudio nesse exato milissegundo)
       let sum = 0;
-      const start = 4, end = Math.min(100, freqData.length);
-      for (let i = start; i < end; i++) sum += freqData[i];
-      const avg = sum / (end - start);
-
-      // Decide o frame baseado no volume (igual ao Streamlit)
-      if (avg < 15) {
-        _setFrame(FRAMES.normal);
-      } else if (avg < 45) {
-        _setFrame(FRAMES.meio);
-      } else {
-        _setFrame(FRAMES.bem_aberta);
+      for (let i = 0; i < freqData.length; i++) {
+        sum += freqData[i];
       }
-    }, 60); // 60ms ≈ 16fps — suave e performático
+      const avgVolume = sum / freqData.length;
+
+      // Decide o frame baseado na força do som
+      if (avgVolume < 15) { 
+        // Silêncio ou pausas na respiração
+        _setFrame(FRAMES.normal);
+      } else if (avgVolume < 70) { 
+        // Som médio
+        _setFrame(FRAMES.meio || FRAMES.frame_C);
+      } else { 
+        // Som alto (vogais abertas)
+        _setFrame(FRAMES.bem_aberta || FRAMES.frame_E);
+      }
+    }, 50); // Roda a cada 50ms para ficar bem fluido
 
   } catch (err) {
-    // Fallback: alterna meio/normal sem análise de volume
-    console.warn('[Avatar] Web Audio API falhou, usando fallback:', err.message);
+    console.warn('[Avatar] Web Audio API falhou, usando fallback cego:', err.message);
+    // Fallback caso o navegador bloqueie a leitura de áudio
     let _f = false;
     _mouthTimer = setInterval(() => {
       if (_avatarState !== 'speaking') return;
-      _setFrame(_f ? FRAMES.meio : FRAMES.normal);
+      _setFrame(_f ? (FRAMES.meio || FRAMES.frame_C) : (FRAMES.normal || FRAMES.frame_A));
       _f = !_f;
     }, 250);
   }
 }
+
 
 // ── Callback: fim da fala ──────────────────────────────────────────
 function _onSpeakingEnded() {
