@@ -5,3 +5,5 @@
 .vscode/
 metas.txt
 setup.txt
+frontend/js/voice1.js
+frontend/styles/voice1.css

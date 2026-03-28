@@ -97,7 +97,6 @@ async def transcribe_audio(audio_bytes: bytes, filename: str = "temp.wav") -> st
 
 
 # ─── Text-to-Speech (TTS) ────────────────────────────────────────────────────
-
 async def text_to_speech(text: str) -> str:
     """Converte texto em áudio (base64). ElevenLabs como principal, gTTS como fallback."""
     if ELEVENLABS_API_KEY:
