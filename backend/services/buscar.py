@@ -4,78 +4,117 @@ from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
 
-from langchain_classic.chains import create_retrieval_chain
-from langchain_classic.chains.combine_documents import create_stuff_documents_chain
-
-from langchain_core.prompts import ChatPromptTemplate
-
 # Carrega as variáveis do arquivo .env
 load_dotenv()
 
-CROMA_PATH = "./backend/data/chroma_db"
+# Configuração Global da "Memória" da Tati
+DIRETORIO_ATUAL = os.path.dirname(os.path.abspath(__file__))
+DIRETORIO_BACKEND = os.path.dirname(DIRETORIO_ATUAL)
 
-def conversar_com_tati():
-    print("⏳ Acordando a Tati...")
+# Aponta para backend/data/chroma_db
+PASTA_RAIZ = os.getcwd()
+CHROMA_PATH = os.path.join(PASTA_RAIZ,"backend", "data", "chroma_db")
+
+embeddings_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+vectorstore = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings_model)
+
+def consultar_tati_com_rag(pergunta: str):
+    """
+    Busca a resposta no banco vetorial e gera a resposta usando o Groq (Llama 3).
+    """
+    print(f"🔍 Buscando nos livros de Tati por: '{pergunta}'...\n")
     
-    # 1. Carrega o Banco de Dados (A memória dela)
-    embeddings_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    vectorstore = Chroma(persist_directory=CROMA_PATH, embedding_function=embeddings_model)
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 2})
+    # --- PASSO 1: A BUSCA NO CHROMA ---
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+    docs_encontrados = retriever.invoke(pergunta)
     
-    # 2. Conecta o Cérebro Tagarela (Groq / Llama 3)
+    # --- PASSO 2: EXTRAÇÃO DE CONTEXTO E FONTES ---
+    contexto_formatado = ""
+    fontes_usadas = set()
+    
+    if docs_encontrados:
+        for i, doc in enumerate(docs_encontrados):
+            contexto_formatado += f"\n--- Trecho {i+1} ---\n{doc.page_content}\n"
+            nome_arquivo = doc.metadata.get('title', doc.metadata.get('source', 'Arquivo Desconhecido'))
+            pagina = doc.metadata.get('page', 'N/A')
+            fontes_usadas.add(f"📄 {nome_arquivo} (Pág: {pagina})")
+    else:
+        contexto_formatado = "Nenhum trecho específico encontrado nos PDFs para esta pergunta."
+
+    # --- PASSO 3: CONFIGURAÇÃO DA IA (Groq) ---
     llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.3)
     
-    # 3. Dá a personalidade para a Tati
-    system_prompt = (
-        "Você é a Professora Tati, uma assistente virtual didática, amigável e prestativa. "
-        "Use APENAS os pedaços de texto abaixo (retirados da apostila) para responder à pergunta do aluno. "
-        "Se a resposta não estiver no texto, busque na internet."
-        "Não invente informações. Responda sempre em Inglês de forma clara e em Português do Brasil apenas se o aluno fizer uma pergunta em português e peça para responder em português, mas inclua a resposta em ambos os idiomas e incentive o aprendizado fazendo o aluno repetir a resposta em inglês.\n\n"
-        "Apostila:\n{context}"
-    )
-    
-    prompt = ChatPromptTemplate.from_messages([
+    # --- PASSO 4: O NOVO PROMPT MESTRE (Mente Aberta) ---
+    system_prompt = f"""Você é a Professora Tati, uma assistente virtual didática, amigável e muito prestativa.
+    Abaixo, você receberá trechos de documentos da nossa biblioteca (Contexto).
+
+    INSTRUÇÕES IMPORTANTES:
+    1. Primeiro, busque a resposta nos trechos de Contexto fornecidos. Se a resposta estiver lá, use-a e mencione os materiais.
+    2. Se o Contexto não tiver a resposta completa ou não mencionar o assunto, NÃO diga apenas que não sabe. Use o seu próprio conhecimento geral e inteligência artificial para dar uma resposta completa, educativa e segura para o aluno.
+    3. Responda a pergunta detalhadamente em Inglês de forma clara e empática. Fale em português apenas se o aluno pedir ou se for necessário para explicar algo específico. A Tati é fluente em ambos os idiomas, mas prefere usar o Inglês para ensinar.
+    4. No final, como você é uma professora de idiomas, traduza um resumo da sua explicação para o Inglês e peça de forma animada para o aluno repetir a frase e praticar a pronúncia.
+
+    MATERIAL DA AULA (Contexto da Biblioteca):
+    {contexto_formatado}
+    """
+
+    # --- PASSO 5: A GERAÇÃO ---
+    print("🧠 Tati está processando a resposta...\n")
+    messages = [
         ("system", system_prompt),
-        ("human", "{input}"),
-    ])
+        ("human", pergunta)
+    ]
     
-    # 4. Junta tudo: O buscador + O leitor (LLM)
-    question_answer_chain = create_stuff_documents_chain(llm, prompt)
-    rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+    resposta_ia = llm.invoke(messages)
+    texto_final = resposta_ia.content
     
-    # 5. A Pergunta!
-    pergunta = "Qual o objetivo deste módulo em relação à viabilidade econômica?"
-    print(f"\n🗣️ Aluno: '{pergunta}'\n")
-    print("👩‍🏫 Tati está digitando...\n")
-    
-    # 6. A Mágica Acontece
-    print("🔍 Buscando na apostila...")
-    # Linha nova para debugar:
-    docs_encontrados = retriever.invoke(pergunta)
-    print(f"DEBUG: Encontrei {len(docs_encontrados)} pedaços de texto.")
-
-    resposta = rag_chain.invoke({"input": pergunta})
-    
-    print(f"🌟 Resposta da Tati:\n{resposta['answer']}")
-
-# buscar fontes
-from services.database import get_client
-def buscar_fontes(pergunta):
-    # busca no banco de dados e traz os pedaços de texto mais relevantes
-    db = get_client()
-    busca = db.similarity_search(pergunta, k=3)
-    print(f"\n Tati está analisando {len(busca)} pedaços de texto encontrados na apostila...")
-    fontes = []
-    for item in busca:
-        nome_arquivo = item.metadata.get('title', 'Arquivo desconhecido')
-        pagina = item.metadata.get('page', 'Página desconhecida')
-        fontes.append(f"{nome_arquivo} - {pagina}")
+    # --- PASSO 6: ANEXAR AS FONTES NO FINAL ---
+    if fontes_usadas:
+        lista_fontes = "\n".join(fontes_usadas)
+        resposta_completa = f"{texto_final}\n\n**📚 Fontes consultadas na biblioteca:**\n{lista_fontes}"
+    else:
+        resposta_completa = f"{texto_final}\n\n*(Resposta gerada pelo conhecimento geral da Tati, sem uso direto dos PDFs)*"
         
-    print("Fontes utilizadas:")
-    for fonte in set(fontes):
-        print(f"- {fonte}")
+    return resposta_completa
 
-    return busca
-
+# ==========================================
+# ÁREA DE CHAT NO TERMINAL
+# ==========================================
 if __name__ == "__main__":
-    conversar_com_tati()
+    print("⏳ Acordando a Tati...\n")
+    print(f"📂 O banco de dados está apontado para: {CHROMA_PATH}")
+    print(f"📦 Total de pedaços de texto no banco de dados: {vectorstore._collection.count()}\n")
+    print("💬 O chat está aberto! (Digite 'sair' para encerrar)\n")
+    
+    # Loop infinito para você fazer várias perguntas sem precisar rodar o script de novo
+    while True:
+        pergunta_usuario = input("🗣️ Você: ")
+        
+        # Condição de parada
+        if pergunta_usuario.lower() in ['sair', 'exit', 'quit', 'tchau']:
+            print("👋 Tati: Foi um prazer! Até a próxima aula!")
+            break
+            
+        if not pergunta_usuario.strip():
+            continue
+            
+        print("-" * 50)
+        resposta = consultar_tati_com_rag(pergunta_usuario)
+        
+        print("\n🌟 RESPOSTA DA TATI:\n")
+        print(resposta)
+        print("\n" + "=" * 50 + "\n")
+        
+# função para usar no voice e chat
+def obter_contexto_rag(pergunta: str):
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+    docs_encontrados = retriever.invoke(pergunta)
+    
+    contexto_formatado = ""
+    if docs_encontrados:
+        for i, doc in enumerate(docs_encontrados):
+            contexto_formatado += f"\n--- Trecho {i+1} ---\n{doc.page_content}\n"
+    else:
+        contexto_formatado = "Nenhum trecho específico encontrado nos PDFs para esta pergunta."
+        
+    return contexto_formatado

@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 
 # Importando do seu arquivo de serviços (llm.py)
 from services.llm import transcribe_audio, text_to_speech, groq_chat, generate_visemes
+from services.rag_search import obter_contexto_rag
 
 router = APIRouter()
 
@@ -21,10 +22,15 @@ async def process_voice_chat(
         if "[Erro" in user_text:
             return JSONResponse(status_code=500, content={"error": user_text})
 
-        # 3. LLM: Manda pro Groq gerar a resposta da Tati
-        # Aqui montamos um histórico simples. Depois você pode puxar do banco de dados!
+        contexto_rag, _ = obter_contexto_rag(user_text)
+        system_msg = (
+            "You are Tati, a friendly English teacher. Reply in a short, conversational, and encouraging way. "
+            "Use the provided context from our library if it answers the student's question.\n\n"
+            f"LIBRARY CONTEXT:\n{contexto_rag}"
+        )
+        # 3. LLM: Gera a resposta da Tati usando o texto do usuário e o contexto RAG
         messages = [
-            {"role": "system", "content": "You are Tati, a friendly English teacher. Reply in a short, conversational, and encouraging way."},
+            {"role": "system", "content": system_msg},
             {"role": "user", "content": user_text}
         ]
         reply_text = await groq_chat(messages, max_tokens=150)

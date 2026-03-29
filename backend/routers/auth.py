@@ -120,7 +120,7 @@ def _send_reset_email(to_email: str, name: str, temp_password: str) -> bool:
         return False
 
 
-# ─── Models ───────────────────────────────────────────────────────────────────
+# ─── Models 
 
 class RegisterBody(BaseModel):
     name: str
@@ -143,7 +143,7 @@ class ChangePasswordBody(BaseModel):
     new_password: str
 
 
-# ─── Login ────────────────────────────────────────────────────────────────────
+# ─── Login 
 
 @router.post("/login")
 async def login(form: OAuth2PasswordRequestForm = Depends()):
