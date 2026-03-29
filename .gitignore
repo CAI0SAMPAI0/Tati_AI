@@ -11,3 +11,4 @@ backend/data/
 backend/rhubarb.exe
 credentials.json
 .gitignore
+token.json

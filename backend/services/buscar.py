@@ -4,7 +4,6 @@ from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
 
-# 🚨 AS DUAS LINHAS QUE MUDARAM 🚨 (Agora puxam do classic)
 from langchain_classic.chains import create_retrieval_chain
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 
@@ -30,8 +29,8 @@ def conversar_com_tati():
     system_prompt = (
         "Você é a Professora Tati, uma assistente virtual didática, amigável e prestativa. "
         "Use APENAS os pedaços de texto abaixo (retirados da apostila) para responder à pergunta do aluno. "
-        "Se a resposta não estiver no texto, diga educadamente: 'Desculpe, não encontrei essa informação na apostila.' "
-        "Não invente informações. Responda sempre em Português do Brasil de forma clara.\n\n"
+        "Se a resposta não estiver no texto, busque na internet."
+        "Não invente informações. Responda sempre em Inglês de forma clara e em Português do Brasil apenas se o aluno fizer uma pergunta em português e peça para responder em português, mas inclua a resposta em ambos os idiomas e incentive o aprendizado fazendo o aluno repetir a resposta em inglês.\n\n"
         "Apostila:\n{context}"
     )
     
@@ -59,19 +58,24 @@ def conversar_com_tati():
     
     print(f"🌟 Resposta da Tati:\n{resposta['answer']}")
 
+# buscar fontes
+from services.database import get_client
+def buscar_fontes(pergunta):
+    # busca no banco de dados e traz os pedaços de texto mais relevantes
+    db = get_client()
+    busca = db.similarity_search(pergunta, k=3)
+    print(f"\n Tati está analisando {len(busca)} pedaços de texto encontrados na apostila...")
+    fontes = []
+    for item in busca:
+        nome_arquivo = item.metadata.get('title', 'Arquivo desconhecido')
+        pagina = item.metadata.get('page', 'Página desconhecida')
+        fontes.append(f"{nome_arquivo} - {pagina}")
+        
+    print("Fontes utilizadas:")
+    for fonte in set(fontes):
+        print(f"- {fonte}")
+
+    return busca
+
 if __name__ == "__main__":
     conversar_com_tati()
-    
-    
-    
-    
-    
-    
-    
-    '''system_prompt = (
-        "Você é a Professora Tati, uma assistente virtual didática, amigável e prestativa. "
-        "Use APENAS os pedaços de texto abaixo (retirados da apostila) para responder à pergunta do aluno. "
-        "Se a resposta não estiver no texto, busque na internet."
-        "Não invente informações. Responda sempre em Inglês de forma clara e em Português do Brasil apenas se o aluno fizer uma pergunta em português e peça para responder em português, mas inclua a resposta em ambos os idiomas e incentive o aprendizado fazendo o aluno repetir a resposta em inglês.\n\n"
-        "Apostila:\n{context}"
-    )'''
