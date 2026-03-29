@@ -17,6 +17,7 @@ from services.history import (
     auto_title,
 )
 from services.llm import stream_llm, transcribe_audio, text_to_speech, LLM_PROVIDER
+from services.rag_search import obter_contexto_rag
 
 router = APIRouter()
 
@@ -218,13 +219,28 @@ async def chat_ws(websocket: WebSocket, token: str = Query(...)):
                 await websocket.send_json({"type": "stream_start", "conversation_id": conv_id})
                 full_response = ""
                 # busca custom prompt do usuário, se tiver, senão usa o SYSTEM_PROMPT padrão
+                # Puxa o custom prompt do usuário
                 user_rows = get_client().table("users") \
                     .select("custom_prompt") \
                     .eq("username", username) \
                     .limit(1) \
                     .execute().data
                 extra = (user_rows[0].get("custom_prompt") or "").strip() if user_rows else ""
-                effective_prompt = SYSTEM_PROMPT
+                
+                # --- A MÁGICA DO RAG AQUI (Versão Segura) ---
+                resultado_rag = obter_contexto_rag(content)
+                contexto_rag = resultado_rag["contexto"]
+                fontes_rag = resultado_rag["fontes"]
+                
+                instrucao_rag = (
+                    "\n\n--- INSTRUÇÕES DA BIBLIOTECA (RAG) ---\n"
+                    "Use o contexto abaixo, retirado dos livros e materiais de aula, para embasar sua resposta. "
+                    "Se a resposta estiver lá, use-a. Se não estiver, use seu conhecimento geral para ajudar o aluno, mas seja educativa.\n\n"
+                    f"CONTEXTO:\n{contexto_rag}\n"
+                )
+
+                # Monta o super prompt invisível
+                effective_prompt = SYSTEM_PROMPT + instrucao_rag
                 if extra:
                     effective_prompt += f"\n\nExtra instructions from user:\n{extra}"
                 try:
@@ -234,7 +250,12 @@ async def chat_ws(websocket: WebSocket, token: str = Query(...)):
                 except Exception as e:
                     await websocket.send_json({"type": "error", "detail": f"Erro na LLM: {str(e)}"})
                     continue
+                # Se usou fontes, anexa no final da resposta da IA
+                if fontes_rag:
+                    full_response += f"\n\n**📚 Fontes consultadas:**\n{fontes_rag}"
+                    await websocket.send_json({"type": "stream_token", "token": f"\n\n**📚 Fontes consultadas:**\n{fontes_rag}"})
 
+                await save_message(conv_id, username, "assistant", full_response)
                 await save_message(conv_id, username, "assistant", full_response)
                 audio_response_b64 = await text_to_speech(full_response)
                 if audio_response_b64:
