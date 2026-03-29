@@ -237,6 +237,7 @@ async def google_login(body: GoogleBody):
             body.token,
             google_requests.Request(),
             GOOGLE_CLIENT_ID,
+            clock_skew_in_seconds=60,  # tolerância de 1 minuto para evitar erros de tempo
         )
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Token Google inválido: {str(e)}")
