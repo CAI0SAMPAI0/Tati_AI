@@ -221,12 +221,23 @@ async def chat_ws(websocket: WebSocket, token: str = Query(...)):
                 # busca custom prompt do usuário, se tiver, senão usa o SYSTEM_PROMPT padrão
                 # Puxa o custom prompt do usuário
                 user_rows = get_client().table("users") \
-                    .select("custom_prompt") \
+                    .select("custom_prompt", "level", "focus") \
                     .eq("username", username) \
                     .limit(1) \
                     .execute().data
                 extra = (user_rows[0].get("custom_prompt") or "").strip() if user_rows else ""
-                
+                # puxando o nível e foco do aluno para dar instruções extras à IA
+                nivel = user_rows[0].get("level")
+                foco = user_rows[0].get("focus")
+                instrucao_perfil = (f"\n\n--- STUDENT PROFILE ---\n"
+                    f"English Level: {nivel}\n"
+                    f"Main Focus: {foco}\n\n"
+                    "ADAPTATION RULES:\n"
+                    "- If the level is 'beginner' or 'Beginner': Use extremely simple words, short sentences, and avoid complex grammar. Explain things very slowly.\n"
+                    "- If the level is 'Intermediate' or 'intermediate': Speak naturally but avoid overly complex slang. Introduce useful phrasal verbs.\n"
+                    "- If the level is 'Advanced' or 'advanced': Talk like a native speaker, use idioms, complex vocabulary, and correct even minor stylistic errors.\n"
+                    "- Always align your examples and conversation topics with their Main Focus."
+                )
                 # --- A MÁGICA DO RAG AQUI (Versão Segura) ---
                 resultado_rag = obter_contexto_rag(content)
                 contexto_rag = resultado_rag["contexto"]
@@ -240,7 +251,7 @@ async def chat_ws(websocket: WebSocket, token: str = Query(...)):
                 )
 
                 # Monta o super prompt invisível
-                effective_prompt = SYSTEM_PROMPT + instrucao_rag
+                effective_prompt = SYSTEM_PROMPT + instrucao_perfil+instrucao_rag
                 if extra:
                     effective_prompt += f"\n\nExtra instructions from user:\n{extra}"
                 try:
@@ -253,9 +264,7 @@ async def chat_ws(websocket: WebSocket, token: str = Query(...)):
                 # Se usou fontes, anexa no final da resposta da IA
                 if fontes_rag:
                     full_response += f"\n\n**📚 Fontes consultadas:**\n{fontes_rag}"
-                    await websocket.send_json({"type": "stream_token", "token": f"\n\n**📚 Fontes consultadas:**\n{fontes_rag}"})
 
-                await save_message(conv_id, username, "assistant", full_response)
                 await save_message(conv_id, username, "assistant", full_response)
                 audio_response_b64 = await text_to_speech(full_response)
                 if audio_response_b64:
