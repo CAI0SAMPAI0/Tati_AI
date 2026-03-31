@@ -44,14 +44,20 @@ async def process_voice_chat(
             "- If the level is 'Advanced' or 'advanced': Talk like a native speaker, use idioms and complex vocabulary.\n"
             "- Always align the conversation with their Main Focus."
         )
-        
-        contexto_rag, _ = obter_contexto_rag(user_text)
+        resultado_rag = obter_contexto_rag(user_text)
+        contexto_rag, _ = resultado_rag['contexto']
         system_msg = (
             "You are Tati, a friendly English teacher. Reply in a short, conversational, and encouraging way. "
             "Always respond in English.\n"
             f"{instrucao_perfil}\n\n"
             f"--- LIBRARY CONTEXT (RAG) ---\n"
             f"Use this context if it answers the user's question:\n{contexto_rag}"
+            "REGRAS ESTRITAS DE COMPORTAMENTO:\n"
+            "1. NUNCA mencione que você tem acesso a um livro, documento ou \"conhecimento de base\".\n"
+            "2. NUNCA leia, copie ou repita o texto do livro palavra por palavra.\n"
+            "3. Use o texto do livro APENAS como inspiração silenciosa para saber qual vocabulário ou gramática ensinar.\n"
+            "4. Suas respostas devem ser curtas, naturais e parecer uma pessoa conversando, e não um áudio-livro.\n"
+            "5. Fale diretamente com o aluno focando na prática do idioma."
         )
         
         if extra:
