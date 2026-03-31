@@ -472,7 +472,7 @@ async function startRecording() {
     _enterListening();
 
     // Bolha "transcrevendo" pendente
-    pendingUserBubble = addBubble('user', '🎙 transcrevendo…');
+    pendingUserBubble = addBubble('user', '');
     scrollBottom();
   } catch (e) {
     alert('Microfone não disponível: ' + e.message);

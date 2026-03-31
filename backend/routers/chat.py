@@ -248,6 +248,12 @@ async def chat_ws(websocket: WebSocket, token: str = Query(...)):
                     "Use o contexto abaixo, retirado dos livros e materiais de aula, para embasar sua resposta. "
                     "Se a resposta estiver lá, use-a. Se não estiver, use seu conhecimento geral para ajudar o aluno, mas seja educativa.\n\n"
                     f"CONTEXTO:\n{contexto_rag}\n"
+                    "REGRAS ESTRITAS DE COMPORTAMENTO:\n"
+                    "1. NUNCA mencione que você tem acesso a um livro, documento ou \"conhecimento de base\".\n"
+                    "2. NUNCA leia, copie ou repita o texto do livro palavra por palavra.\n"
+                    "3. Use o texto do livro APENAS como inspiração silenciosa para saber qual vocabulário ou gramática ensinar.\n"
+                    "4. Suas respostas devem ser curtas, naturais e parecer uma pessoa conversando, e não um áudio-livro.\n"
+                    "5. Fale diretamente com o aluno focando na prática do idioma."
                 )
 
                 # Monta o super prompt invisível
@@ -262,6 +268,7 @@ async def chat_ws(websocket: WebSocket, token: str = Query(...)):
                     await websocket.send_json({"type": "error", "detail": f"Erro na LLM: {str(e)}"})
                     continue
                 # Se usou fontes, anexa no final da resposta da IA
+                texto_para_falar = full_response
                 if fontes_rag:
                     full_response += f"\n\n**📚 Fontes consultadas:**\n{fontes_rag}"
 

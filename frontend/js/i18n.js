@@ -178,6 +178,7 @@ const TRANSLATIONS = {
     'voice.rewind':          '↩ 5s',
     'voice.vol':             'Vol',
     'voice.speed':           'Vel',
+    'voice.transcribing':    '🎙 transcrevendo…',
 
     // ── Levels ────────────────────────────────────────────────────
     'level.beginner':        'Beginner',
@@ -365,6 +366,7 @@ const TRANSLATIONS = {
     'voice.rewind':          '↩ 5s',
     'voice.vol':             'Vol',
     'voice.speed':           'Spd',
+    'voice.transcribing':    '🎙 transcribing…',
 
     'level.beginner':        'Beginner',
     'level.pre_int':         'Pre-Intermediate',

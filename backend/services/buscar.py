@@ -53,6 +53,7 @@ def consultar_tati_com_rag(pergunta: str):
     2. Se o Contexto não tiver a resposta completa ou não mencionar o assunto, NÃO diga apenas que não sabe. Use o seu próprio conhecimento geral e inteligência artificial para dar uma resposta completa, educativa e segura para o aluno.
     3. Responda a pergunta detalhadamente em Inglês de forma clara e empática. Fale em português apenas se o aluno pedir ou se for necessário para explicar algo específico. A Tati é fluente em ambos os idiomas, mas prefere usar o Inglês para ensinar.
     4. No final, como você é uma professora de idiomas, traduza um resumo da sua explicação para o Inglês e peça de forma animada para o aluno repetir a frase e praticar a pronúncia.
+    5. Nunca cite os trechos do livro, nomes de arquivos, fontes ou link. Use-os apenas como inspiração para saber qual vocabulário ou gramática ensinar. Suas respostas devem ser curtas, naturais e parecer uma pessoa conversando, e não um áudio-livro.
 
     MATERIAL DA AULA (Contexto da Biblioteca):
     {contexto_formatado}
@@ -67,15 +68,8 @@ def consultar_tati_com_rag(pergunta: str):
     
     resposta_ia = llm.invoke(messages)
     texto_final = resposta_ia.content
-    
-    # --- PASSO 6: ANEXAR AS FONTES NO FINAL ---
-    if fontes_usadas:
-        lista_fontes = "\n".join(fontes_usadas)
-        resposta_completa = f"{texto_final}\n\n**📚 Fontes consultadas na biblioteca:**\n{lista_fontes}"
-    else:
-        resposta_completa = f"{texto_final}\n\n*(Resposta gerada pelo conhecimento geral da Tati, sem uso direto dos PDFs)*"
         
-    return resposta_completa
+    return texto_final
 
 # ==========================================
 # ÁREA DE CHAT NO TERMINAL
