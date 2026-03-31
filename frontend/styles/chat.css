@@ -851,6 +851,24 @@
     border-color: var(--primary);
 }
 
+.btn-summary-mode {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.875rem;
+    background: rgba(124,58,237,0.12);
+    border: 1px solid rgba(124,58,237,0.3);
+    border-radius: 8px;
+    color: var(--primary);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    white-space: nowrap;
+    
+}
 /*AUDIO CONTROLS (msg-audio-controls) */
 
 /* Audio controls container */
@@ -1011,6 +1029,70 @@
     outline: none;
     font-family: inherit;
 }
+
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+/* A caixa do relatório */
+.modal-content {
+    background: #1e1e2e; /* Cor escura do seu tema */
+    color: #cdd6f4;
+    width: 90%;
+    max-width: 600px;
+    border-radius: 12px;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    max-height: 85vh;
+}
+
+/* O Cabeçalho */
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #313244;
+}
+
+.modal-header h2 { 
+    margin: 0; 
+    font-size: 1.3rem; 
+    color: #cba6f7; /* Um roxo bonito para o título */
+}
+
+/* Botão de Fechar (o X) */
+.close-btn {
+    background: none; 
+    border: none; 
+    color: #a6adc8; 
+    font-size: 1.8rem;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.close-btn:hover { color: #f38ba8; } /* Fica vermelho ao passar o mouse */
+
+/* O Corpo do texto (com rolagem) */
+.modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    line-height: 1.6;
+    font-size: 1rem;
+}
+
+/* Como o Markdown gerado pela IA vai ficar */
+.modal-body h3 { color: #89b4fa; margin-top: 15px; } /* Azul nos subtítulos */
+.modal-body strong { color: #a6e3a1; } /* Verde nos pontos fortes */
+.modal-body ul { margin-left: 20px; }
+.modal-body p { margin-bottom: 15px; }
 
 /* ══════════════════════════════════════
    RESPONSIVO

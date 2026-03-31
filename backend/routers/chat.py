@@ -16,7 +16,7 @@ from services.history import (
     save_message,
     auto_title,
 )
-from services.llm import stream_llm, transcribe_audio, text_to_speech, LLM_PROVIDER
+from services.llm import stream_llm, transcribe_audio, text_to_speech, LLM_PROVIDER, groq_chat
 from services.rag_search import obter_contexto_rag
 
 router = APIRouter()
@@ -289,3 +289,42 @@ async def get_history(
         raise HTTPException(status_code=404, detail="Conversa não encontrada")
 
     return messages
+
+# gerando resumo de aula
+@router.get("/conversations/{conversation_id}/summary")
+async def get_summary(
+    conversation_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    # pegando o histórico da conversa
+    history = await load_history(conversation_id)
+    print(f"Identificando conversa {conversation_id} para resumo. Total mensagens: {len(history) if history else 0}")
+    if not history or len(history) < 5:  # precisa de pelo menos 5 mensagens para um resumo decente
+        raise HTTPException(status_code=400, detail="Conversa sem mensagens suficientes para gerar resumo")
+    
+    # formatando o histórico
+    texto_conv = ""
+    for msg in history:
+        papel = "TATI (Teacher)" if msg["role"] == "assistant" else "STUDENT"
+        texto_conv += f"{papel}: {msg['content']}\n\n"
+        
+    # prompt para gerar o resumo
+    prompt_resumo = (
+        "Você é um coordenador pedagógico de inglês. Sua tarefa é analisar a transcrição "
+        "de uma conversa entre a professora Tati e um aluno. "
+        "Escreva um relatório direto para o aluno (em português, para facilitar o estudo), "
+        "com a seguinte estrutura:\n\n"
+        "🌟 **Pontos Fortes:** (Elogie o que o aluno fez bem)\n"
+        "🛠️ **Para Melhorar:** (Liste 2 ou 3 erros gramaticais ou de estrutura que o aluno cometeu, explicando a correção)\n"
+        "📚 **Vocabulário Novo:** (Extraia 3 a 5 palavras ou expressões úteis que apareceram na conversa, com tradução)\n\n"
+        "Seja encorajador, didático e use formatação Markdown."
+    )
+    messages = [
+        {"role": "system", "content": prompt_resumo},
+        {"role": "user", "content": f'Aqui está a conversa para analisar:\n\n{texto_conv}'}
+    ]
+    try:
+        resumo = await groq_chat(messages, max_tokens=1500)
+        return {"summary": resumo}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Erro ao gerar resumo: {str(e)}")

@@ -55,6 +55,7 @@ const TRANSLATIONS = {
     'chat.cancel':          'Cancelar',
     'chat.err_connect':     'Não foi possível conectar ao servidor.',
     'chat.err_unknown':     'Erro desconhecido',
+    'chat.summary_mode':    'Modo Resumo',
 
     // ── Settings ──────────────────────────────────────────────────
     'settings.title':        'Configurações',
@@ -246,6 +247,7 @@ const TRANSLATIONS = {
     'chat.cancel':          'Cancel',
     'chat.err_connect':     'Could not connect to the server.',
     'chat.err_unknown':     'Unknown error',
+    'chat.summary_mode':    'Summary Mode',
 
     'settings.title':        'Settings',
     'settings.appearance':   'Appearance',

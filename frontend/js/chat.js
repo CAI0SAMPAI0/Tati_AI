@@ -250,6 +250,7 @@ async function loadMessages(convId) {
     const typingEl = document.getElementById('typing-indicator');
     const welcomeEl = document.getElementById('chat-welcome');
     const voiceBtn = document.getElementById('btn-switch-voice');
+    const summaryBtn = document.getElementById('btn-switch-summary');
 
     // Limpa mensagens anteriores
     [...area.children].forEach(el => {
@@ -304,6 +305,7 @@ function showWelcome() {
     }
 
     if (voiceBtn) voiceBtn.style.display = 'none';
+    verificarResumo();
     document.getElementById('topbar-title').textContent = 'Teacher Tati';
     currentConvId = null;
 }
@@ -510,6 +512,7 @@ function appendUserMsg(text) {
     div.innerHTML = `<div class="message-body"><div class="message-bubble"><p>${escHtml(text)}</p></div><span class="message-time">${nowTime()}</span></div>`;
     insertBeforeTyping(div);
     scrollBottom();
+    verificarResumo();
 }
 
 function appendFileMsg(name, size) {
@@ -518,6 +521,7 @@ function appendFileMsg(name, size) {
     div.innerHTML = `<div class="message-body"><div class="message-bubble file-bubble"><div class="file-attach-preview"><div class="file-attach-icon">${getFileIcon(name)}</div><div class="file-attach-info"><span class="file-attach-name">${escHtml(name)}</span><span class="file-attach-size">${formatFileSize(size)}</span></div></div></div><span class="message-time">${nowTime()}</span></div>`;
     insertBeforeTyping(div);
     scrollBottom();
+    verificarResumo();
 }
 
 function appendAssistantMsg(text) {
@@ -673,3 +677,69 @@ function nowTime() { return new Date().toLocaleTimeString('pt-BR', { hour: '2-di
 function scrollBottom() { const a = document.getElementById('chat-messages'); a.scrollTop = a.scrollHeight; }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function logout() { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/'; }
+
+// resumo
+function verificarResumo(){
+    const studentMessages = document.querySelectorAll('.message-user');
+    const bntSummary = document.getElementById('btn-switch-summary');
+
+    if (studentMessages.length > 5) {
+        bntSummary.style.display = 'flex';
+    } else {
+        bntSummary.style.display = 'none';
+    }
+}
+
+document.getElementById('btn-switch-summary').addEventListener('click', async () => {
+    const btnSummary = document.getElementById('btn-switch-summary');
+    const originalText = btnSummary.innerHTML;
+    btnSummary.innerHTML = 'Gerando resumo...';
+    btnSummary.disabled = true;
+
+    try {
+        const response = await fetch(`${API}/chat/conversations/${currentConvId}/summary`, {
+            method: 'GET',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json' 
+            }
+        });
+        const data = await response.json();
+        if (response.ok) {
+            console.log(data.summary);
+            document.getElementById('summary-text').innerHTML = marked.parse(data.summary);
+            document.getElementById('summary-modal').style.display = 'flex';
+        } else {
+            alert('Erro ao gerar resumo: ' + (data.detail || 'Erro desconhecido'));
+        }
+    } catch (error) {
+        console.error('Erro na requisição:', error);
+        alert('Erro ao gerar resumo. Tente novamente mais tarde.');
+    } finally {
+        btnSummary.innerHTML = originalText;
+        btnSummary.disabled = false;
+    }
+});
+
+
+// Fechar clicando no botão "X"
+document.getElementById('close-modal-btn').addEventListener('click', () => {
+    document.getElementById('summary-modal').style.display = 'none';
+});
+
+// Fechar clicando fora da caixa (no fundo escuro)
+document.getElementById('summary-modal').addEventListener('click', (event) => {
+    // Verifica se o clique foi exatamente no overlay escuro, e não dentro da caixa de texto
+    if (event.target === document.getElementById('summary-modal')) {
+        document.getElementById('summary-modal').style.display = 'none';
+    }
+});
+
+// Fechar apertando a tecla "ESC" no teclado
+document.addEventListener('keydown', (event) => {
+    const modal = document.getElementById('summary-modal');
+    // Só fecha se a tecla for ESC e o modal estiver aberto na tela
+    if (event.key === 'Escape' && modal.style.display === 'flex') {
+        modal.style.display = 'none';
+    }
+});
