@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="styles/chat.css">
     <link rel="stylesheet" href="styles/word_tooltip.css">
     <link rel="icon" type="image/x-icon" href="images/tati_logo.jpg">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 
 <body>
@@ -82,6 +83,12 @@
                     <span class="topbar-title" id="topbar-title">Teacher Tati</span>
                 </div>
                 <div class="topbar-right">
+                    <button class="btn-summary-mode" id="btn-switch-summary" onclick="switchToSummary()"
+                        style="display:none;">
+                        <i class="fa-solid fa-file-lines"></i>
+                        <span data-i18n="chat.summary_mode">Modo Resumo</span>
+                    </button>
+
                     <button class="btn-voice-mode" id="btn-switch-voice" onclick="switchToVoice()"
                         style="display:none;">
                         <i class="fa-solid fa-microphone"></i>
@@ -146,6 +153,16 @@
                     Shift+Enter para nova linha</p>
             </div>
         </main>
+    </div>
+    <div id="summary-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📊 Relatório de Desempenho</h2>
+                <button id="close-modal-btn" class="close-btn">&times;</button>
+            </div>
+            <div id="summary-text" class="modal-body">
+            </div>
+        </div>
     </div>
 
     <script src="js/i18n.js"></script>
