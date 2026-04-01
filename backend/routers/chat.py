@@ -253,7 +253,8 @@ async def chat_ws(websocket: WebSocket, token: str = Query(...)):
                     "2. NUNCA leia, copie ou repita o texto do livro palavra por palavra.\n"
                     "3. Use o texto do livro APENAS como inspiração silenciosa para saber qual vocabulário ou gramática ensinar.\n"
                     "4. Suas respostas devem ser curtas, naturais e parecer uma pessoa conversando, e não um áudio-livro.\n"
-                    "5. Fale diretamente com o aluno focando na prática do idioma."
+                    "5. Fale diretamente com o aluno focando na prática do idioma.\n"
+                    "6. NUNCA se justifique. NUNCA diga 'I removed the references' ou 'Based on the text'. Apenas entregue a resposta e o feedback naturalmente."
                 )
 
                 # Monta o super prompt invisível
@@ -267,13 +268,20 @@ async def chat_ws(websocket: WebSocket, token: str = Query(...)):
                 except Exception as e:
                     await websocket.send_json({"type": "error", "detail": f"Erro na LLM: {str(e)}"})
                     continue
-                # Se usou fontes, anexa no final da resposta da IA
                 texto_para_falar = full_response
-                if fontes_rag:
-                    full_response += f"\n\n**📚 Fontes consultadas:**\n{fontes_rag}"
+                texto_para_falar = texto_para_falar.replace('*', "")  # remove asteriscos para evitar problemas no TTS
+                # Lista de possíveis variações de marcadores de feedback para cortar a resposta antes de enviar ao TTS, garantindo que o áudio seja apenas a parte conversacional
+                marcadores_de_fontes = ["📚 Fontes", "Fontes consultadas:", "Sources:", "References:"]
+                for marcador in marcadores_de_fontes:
+                    if marcador in texto_para_falar:
+                        texto_para_falar = texto_para_falar.split(marcador)[0]
+                        break
+                texto_para_falar = texto_para_falar.strip()
+                '''if fontes_rag:
+                    full_response += f"\n\n**📚 Fontes consultadas:**\n{fontes_rag}"'''
 
                 await save_message(conv_id, username, "assistant", full_response)
-                audio_response_b64 = await text_to_speech(full_response)
+                audio_response_b64 = await text_to_speech(texto_para_falar)
                 if audio_response_b64:
                     await websocket.send_json({"type": "audio_response", "audio": audio_response_b64, "conversation_id": conv_id})
 
