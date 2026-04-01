@@ -24,7 +24,7 @@ router = APIRouter()
 
 JWT_SECRET_KEY   = os.getenv("JWT_SECRET_KEY", "changeme-insecure")
 ALGORITHM        = "HS256"
-ACCESS_TOKEN_EXP = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))  # 24h
+ACCESS_TOKEN_EXP = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))  # 15 minutos por padrão
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 

@@ -31,6 +31,9 @@ const TRANSLATIONS = {
     'auth.err_fields':    'Preencha todos os campos.',
     'auth.err_password':  'Senha deve ter pelo menos 6 caracteres.',
     'auth.err_connection':'Erro de conexão. Verifique se o servidor está rodando.',
+    'auth.err_email':     'E-mail já registrado. Faça login ou use outro e-mail.',
+    'auth.err_username':  'Username já registrado. Escolha outro.',
+    'auth.senha_esqueci': 'Esqueci minha senha',
 
     // ── Chat ──────────────────────────────────────────────────────
     'chat.title':           'Teacher Tati',
@@ -225,6 +228,9 @@ const TRANSLATIONS = {
     'auth.err_fields':    'Please fill in all fields.',
     'auth.err_password':  'Password must be at least 6 characters.',
     'auth.err_connection':'Connection error. Check if the server is running.',
+    'auth.err_email':     'Email already registered. Please sign in or use another email.', 
+    'auth.err_username':  'Username already taken. Please choose another.',
+    'auth.senha_esqueci': 'I forgot my password',
 
     'chat.title':           'Teacher Tati',
     'chat.welcome_title':   'Hi! I\'m Teacher Tati 👋',
