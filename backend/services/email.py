@@ -14,7 +14,7 @@ def send_reset_email(to_email: str, name: str, temp_password: str) -> bool:
     html = _build_email_html(name, temp_password)
     msg = MIMEMultipart("alternative")
     msg["Subject"] = "Teacher Tati — Sua senha temporária"
-    msg["From"] = f"Teacher Tati <{settings.smtp_from_address}>"
+    msg["From"] = f"Teacher Tati <{settings.smtp_from_adress}>"
     msg["To"] = to_email
     msg.attach(MIMEText(html, "html"))
 
@@ -23,7 +23,7 @@ def send_reset_email(to_email: str, name: str, temp_password: str) -> bool:
             server.ehlo()
             server.starttls()
             server.login(settings.smtp_user, settings.smtp_password)
-            server.sendmail(settings.smtp_from_address, to_email, msg.as_string())
+            server.sendmail(settings.smtp_from_adress, to_email, msg.as_string())
         return True
     except Exception as exc:
         print(f"[ResetPW] Erro ao enviar e-mail: {exc}")
