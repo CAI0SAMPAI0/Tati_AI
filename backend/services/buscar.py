@@ -20,7 +20,7 @@ _embeddings = HuggingFaceInferenceAPIEmbeddings(
     api_key=os.getenv("HUGGING_FACE_KEY", ""),
     model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
-vectorstore = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings_model)
+vectorstore = Chroma(persist_directory=CHROMA_PATH, embedding_function=_embeddings)
 
 def consultar_tati_com_rag(pergunta: str):
     """
