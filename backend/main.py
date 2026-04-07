@@ -30,7 +30,7 @@ app.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 app.include_router(avatar.router, prefix="/avatar", tags=["avatar"])
 app.include_router(chat.router, prefix="/voice", tags=["voice"])
 
-app.mount("/static", StaticFiles(directory=_FRONTEND_PATH), name="static")
+#app.mount("/static", StaticFiles(directory=_FRONTEND_PATH), name="static")
 
 '''@app.get("/")
 async def server_index() -> FileResponse:
