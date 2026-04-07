@@ -16,7 +16,7 @@ _CHROMA_PATH = os.path.join(_BASE_DIR, "data", "chroma_db")
 
 _embeddings = HuggingFaceEndpointEmbeddings(
     model="sentence-transformers/all-MiniLM-L6-v2",
-    huggingfacehub_api_token=os.getenv("HUGGINGFACE_API_KEY", "")
+    huggingfacehub_api_token=os.getenv("HUGGING_FACE_KEY", "")
 )
 _vectorstore = Chroma(persist_directory=_CHROMA_PATH, embedding_function=_embeddings)
 
