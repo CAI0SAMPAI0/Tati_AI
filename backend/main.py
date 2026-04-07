@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+'''from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse'''
 from dotenv import load_dotenv
 from pathlib import Path
 import os
@@ -9,8 +9,8 @@ import os
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from routers import auth, avatar, chat, dashboard, profile
-# Servir Frontend
-_FRONTEND_PATH = Path(__file__).parent.parent / "frontend"
+# Frontend
+#_FRONTEND_PATH = Path(__file__).parent.parent / "frontend"
 
 app = FastAPI(title='Teacher Tati API', description='API para o aplicativo de ensino de inglês Teacher Tati', version='1.0.0')
 

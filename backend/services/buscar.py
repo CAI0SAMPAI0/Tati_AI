@@ -15,10 +15,10 @@ DIRETORIO_BACKEND = os.path.dirname(DIRETORIO_ATUAL)
 PASTA_RAIZ = os.getcwd()
 CHROMA_PATH = os.path.join(PASTA_RAIZ,"backend", "data", "chroma_db")
 
-from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
-_embeddings = HuggingFaceInferenceAPIEmbeddings(
-    api_key=os.getenv("HUGGING_FACE_KEY", ""),
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
+_embeddings = HuggingFaceEndpointEmbeddings(
+    model="sentence-transformers/all-MiniLM-L6-v2",
+    huggingfacehub_api_token=os.getenv("HUGGINGFACE_API_KEY", "")
 )
 vectorstore = Chroma(persist_directory=CHROMA_PATH, embedding_function=_embeddings)
 
