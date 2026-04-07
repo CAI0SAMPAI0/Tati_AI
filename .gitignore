@@ -1,8 +1,10 @@
 .env
 .venv/
-*/__pycache__/
-*\__pycache__\
-*.pyc
+# Cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+
 .vscode/
 metas.txt
 setup.txt

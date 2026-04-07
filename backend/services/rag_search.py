@@ -1,41 +1,46 @@
+from __future__ import annotations
 import os
+from dataclasses import dataclass
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 
-# Configuração de caminhos blindada para rodar via Uvicorn
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # Aponta para /backend
-CHROMA_PATH = os.path.join(BASE_DIR, "data", "chroma_db")
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_CHROMA_PATH = os.path.join(_BASE_DIR, "data", "chroma_db")
 
-embeddings_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-vectorstore = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings_model)
 
-def obter_contexto_rag(pergunta: str):
-    """
-    Busca no ChromaDB e retorna um dicionário com os trechos e as fontes.
-    """
+# Busca RAG no ChromaDB usando embeddings HuggingFace.
+
+_embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+_vectorstore = Chroma(persist_directory=_CHROMA_PATH, embedding_function=_embeddings)
+
+
+@dataclass
+class RAGResult:
+    contexto: str
+    fontes: str
+
+
+def obter_contexto_rag(pergunta: str) -> RAGResult:
+    """Busca no ChromaDB e retorna contexto + fontes formatados."""
     try:
-        retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
-        docs_encontrados = retriever.invoke(pergunta)
-        
-        contexto_formatado = ""
-        fontes_usadas = set()
-        
-        if docs_encontrados:
-            for i, doc in enumerate(docs_encontrados):
-                contexto_formatado += f"\n--- Trecho {i+1} ---\n{doc.page_content}\n"
-                nome_arquivo = doc.metadata.get('title', doc.metadata.get('source', 'Arquivo Desconhecido'))
-                pagina = doc.metadata.get('page', 'N/A')
-                fontes_usadas.add(f"📄 {nome_arquivo} (Pág: {pagina})")
-        else:
-            contexto_formatado = "Nenhum trecho específico encontrado nos PDFs da biblioteca para esta pergunta."
-            
-        lista_fontes = "\n".join(fontes_usadas) if fontes_usadas else ""
-        
-        # Devolvemos um Dicionário, é impossível dar erro de unpack!
-        return {
-            "contexto": contexto_formatado,
-            "fontes": lista_fontes
+        docs = _vectorstore.as_retriever(search_kwargs={"k": 3}).invoke(pergunta)
+        if not docs:
+            return RAGResult(
+                contexto="Nenhum trecho encontrado na biblioteca para esta pergunta.",
+                fontes="",
+            )
+
+        contexto = "\n".join(
+            f"\n--- Trecho {i + 1} ---\n{doc.page_content}"
+            for i, doc in enumerate(docs)
+        )
+        fontes_set = {
+            f"📄 {doc.metadata.get('title', doc.metadata.get('source', 'Desconhecido'))} "
+            f"(Pág: {doc.metadata.get('page', 'N/A')})"
+            for doc in docs
         }
-    except Exception as e:
-        print(f"⚠️ Erro silencioso no RAG: {e}")
-        return {"contexto": "", "fontes": ""}
+        return RAGResult(contexto=contexto, fontes="\n".join(fontes_set))
+
+    except Exception as exc:
+        print(f"⚠️ Erro silencioso no RAG: {exc}")
+        return RAGResult(contexto="", fontes="")

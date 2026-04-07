@@ -1,198 +1,181 @@
-import os
-import io
+"""
+Serviço de LLM: streaming, chat simples, STT e TTS.
+
+Providers suportados: groq (padrão) | claude | gemini
+Fallback automático entre chaves Groq.
+"""
+from __future__ import annotations
+
 import base64
+import io
+from typing import AsyncIterator
+
 import anthropic
 import httpx
 from google import genai
 from google.genai import types
-from typing import AsyncIterator
 from groq import AsyncGroq, Groq
 from gtts import gTTS
 
-# ─── Configuração ────────────────────────────────────────────────────────────
+from core.config import settings
 
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq").lower()  # "claude" | "gemini" | "groq"
+Message = dict[str, str]
 
-CLAUDE_MODEL  = os.getenv("CLAUDE_MODEL",  "claude-3-5-sonnet-20241022")
-GEMINI_MODEL  = os.getenv("GEMINI_MODEL",  "gemini-2.0-flash")
+# ── Groq helpers ──────────────────────────────────────────────────────────────
 
-ANTHROPIC_API_KEY  = os.getenv("ANTHROPIC_API_KEY")
-GOOGLE_API_KEY     = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
-VOICE_ID           = os.getenv("VOICE_ID", "21m00Tcm4TlvDq8ikWAM")  # Rachel (default)
-
-# ─── Groq: coleta todas as chaves disponíveis no .env ────────────────────────
-# Lê GROQ_API_KEY, GROQ_API_KEY_1, GROQ_API_KEY_2, ... (sem limite)
-
-def _load_groq_keys() -> list[str]:
-    keys = []
-    # Chave principal
-    base = os.getenv("GROQ_API_KEY", "").strip()
-    if base:
-        keys.append(base)
-    # Chaves numeradas: _1, _2, _3, ...
-    i = 1
-    while True:
-        k = os.getenv(f"GROQ_API_KEY_{i}", "").strip()
-        if not k:
-            break
-        keys.append(k)
-        i += 1
-    return keys
-
-GROQ_KEYS: list[str] = _load_groq_keys()
-
-# ─── Tipos ───────────────────────────────────────────────────────────────────
-
-Message = dict
-
-# ─── Groq: cliente com fallback automático ───────────────────────────────────
 
 class GroqKeyError(Exception):
     """Levantada quando todas as chaves Groq falharam."""
-    pass
 
 
-def _is_key_error(e: Exception) -> bool:
-    """Retorna True se o erro indica chave inválida/expirada (não vale tentar de novo)."""
-    msg = str(e).lower()
+def _is_auth_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
     return "invalid_api_key" in msg or "401" in msg or "invalid api key" in msg
 
 
-def _is_rate_error(e: Exception) -> bool:
-    """Retorna True se o erro é de quota/rate-limit (vale tentar próxima chave)."""
-    msg = str(e).lower()
-    return "429" in msg or "rate_limit" in msg or "rate limit" in msg or "quota" in msg
+def _is_rate_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return "429" in msg or "rate_limit" in msg or "quota" in msg
 
 
-# ─── Speech-to-Text (STT) ────────────────────────────────────────────────────
+def _should_try_next_key(exc: Exception) -> bool:
+    return _is_auth_error(exc) or _is_rate_error(exc)
+
+
+# ── STT ───────────────────────────────────────────────────────────────────────
+
 
 async def transcribe_audio(audio_bytes: bytes, filename: str = "temp.wav") -> str:
-    """Converte áudio em texto usando Groq Whisper com fallback de chaves."""
-    if not GROQ_KEYS:
+    keys = settings.groq_keys
+    if not keys:
         return "[Erro: nenhuma GROQ_API_KEY configurada no .env]"
 
-    last_error = None
-    for key in GROQ_KEYS:
+    last_error: Exception | None = None
+    for key in keys:
         try:
             client = Groq(api_key=key)
-            transcription = client.audio.transcriptions.create(
+            return client.audio.transcriptions.create(
                 file=(filename, audio_bytes),
                 model="whisper-large-v3",
                 response_format="text",
                 language="en",
             )
-            return transcription
-        except Exception as e:
-            last_error = e
-            print(f"[STT] Chave falhou ({str(e)[:80]}), tentando próxima...")
-            if _is_key_error(e):
-                continue  # chave inválida → tenta a próxima
-            if _is_rate_error(e):
-                continue  # quota → tenta a próxima
-            # Erro inesperado → para aqui
+        except Exception as exc:
+            last_error = exc
+            if _should_try_next_key(exc):
+                continue
             break
 
-    return f"[Erro no STT: {str(last_error)}]"
+    return f"[Erro no STT: {last_error}]"
 
 
-# ─── Text-to-Speech (TTS) ────────────────────────────────────────────────────
+# ── TTS ───────────────────────────────────────────────────────────────────────
+
+
 async def text_to_speech(text: str) -> str:
-    """Converte texto em áudio (base64). ElevenLabs como principal, gTTS como fallback."""
-    if ELEVENLABS_API_KEY:
-        url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}"
-        headers = {
-            "xi-api-key": ELEVENLABS_API_KEY,
-            "Content-Type": "application/json"
-        }
-        data = {
-            "text": text,
-            "model_id": "eleven_monolingual_v1",
-            "voice_settings": {"stability": 0.5, "similarity_boost": 0.5}
-        }
+    """Converte texto em áudio base64. ElevenLabs → gTTS como fallback."""
+    if settings.elevenlabs_api_key:
+        result = await _tts_elevenlabs(text)
+        if result:
+            return result
+    return await _tts_gtts(text)
 
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.post(url, json=data)
-                if response.status_code == 200:
-                    return base64.b64encode(response.content).decode("utf-8")
-                else:
-                    print(f"ElevenLabs error: {response.text}")
-            except Exception as e:
-                print(f"TTS error: {e}")
 
-    # Fallback gTTS
+async def _tts_elevenlabs(text: str) -> str:
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{settings.voice_id}"
+    headers = {"xi-api-key": settings.elevenlabs_api_key, "Content-Type": "application/json"}
+    payload = {
+        "text": text,
+        "model_id": "eleven_monolingual_v1",
+        "voice_settings": {"stability": 0.5, "similarity_boost": 0.5},
+    }
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.post(url, json=payload, timeout=20)
+            if resp.status_code == 200:
+                return base64.b64encode(resp.content).decode()
+        except Exception as exc:
+            print(f"[TTS] ElevenLabs error: {exc}")
+    return ""
+
+
+async def _tts_gtts(text: str) -> str:
     try:
-        tts = gTTS(text=text, lang='en')
-        fp = io.BytesIO()
-        tts.write_to_fp(fp)
-        return base64.b64encode(fp.getvalue()).decode("utf-8")
-    except Exception as e:
-        print(f"gTTS error: {e}")
+        tts = gTTS(text=text, lang="en")
+        buf = io.BytesIO()
+        tts.write_to_fp(buf)
+        return base64.b64encode(buf.getvalue()).decode()
+    except Exception as exc:
+        print(f"[TTS] gTTS error: {exc}")
         return ""
 
 
-# ─── Streaming por provider ──────────────────────────────────────────────────
+# ── Streaming ─────────────────────────────────────────────────────────────────
 
-async def stream_claude(system: str, history: list[Message]) -> AsyncIterator[str]:
-    """Gera tokens via Anthropic streaming."""
-    client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
 
-    formatted_history = [{"role": m["role"], "content": m["content"]} for m in history]
+async def stream_llm(system: str, history: list[Message]) -> AsyncIterator[str]:
+    provider = settings.llm_provider
+    if provider == "gemini":
+        async for token in _stream_gemini(system, history):
+            yield token
+    elif provider == "groq":
+        async for token in _stream_groq(system, history):
+            yield token
+    else:
+        async for token in _stream_claude(system, history):
+            yield token
 
+
+async def _stream_claude(system: str, history: list[Message]) -> AsyncIterator[str]:
+    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+    formatted = [{"role": m["role"], "content": m["content"]} for m in history]
     async with client.messages.stream(
-        model=CLAUDE_MODEL,
+        model=settings.claude_model,
         max_tokens=4096,
         system=system,
-        messages=formatted_history,
+        messages=formatted,
     ) as stream:
         async for text in stream.text_stream:
             yield text
 
 
-async def stream_gemini(system: str, history: list[Message]) -> AsyncIterator[str]:
-    """Gera tokens via Google Gemini streaming."""
+async def _stream_gemini(system: str, history: list[Message]) -> AsyncIterator[str]:
     import asyncio
-    client = genai.Client(api_key=GOOGLE_API_KEY)
 
-    gemini_history = []
-    for msg in history[:-1]:
-        role = "user" if msg["role"] == "user" else "model"
-        gemini_history.append({"role": role, "parts": [{"text": msg["content"]}]})
+    client = genai.Client(api_key=settings.gemini_api_key)
+    gemini_history = [
+        {"role": "user" if m["role"] == "user" else "model", "parts": [{"text": m["content"]}]}
+        for m in history[:-1]
+    ]
+    last_msg = history[-1]["content"] if history else ""
 
-    last_message = history[-1]["content"] if history else ""
+    def _sync_stream() -> list[str]:
+        return [
+            chunk.text
+            for chunk in client.models.generate_content_stream(
+                model=settings.gemini_model,
+                contents=gemini_history + [{"role": "user", "parts": [{"text": last_msg}]}],
+                config=types.GenerateContentConfig(system_instruction=system),
+            )
+            if chunk.text
+        ]
 
-    def _sync_stream():
-        chunks = []
-        response = client.models.generate_content_stream(
-            model=GEMINI_MODEL,
-            contents=gemini_history + [{"role": "user", "parts": [{"text": last_message}]}],
-            config=types.GenerateContentConfig(system_instruction=system)
-        )
-        for chunk in response:
-            if chunk.text:
-                chunks.append(chunk.text)
-        return chunks
-
-    loop = asyncio.get_event_loop()
-    chunks = await loop.run_in_executor(None, _sync_stream)
-
-    for chunk in chunks:
+    for chunk in await asyncio.get_event_loop().run_in_executor(None, _sync_stream):
         yield chunk
 
 
-async def stream_groq(system: str, history: list[Message]) -> AsyncIterator[str]:
-    """Gera tokens via Groq streaming com fallback automático entre chaves."""
-    if not GROQ_KEYS:
+async def _stream_groq(system: str, history: list[Message]) -> AsyncIterator[str]:
+    keys = settings.groq_keys
+    if not keys:
         yield "[Erro: nenhuma GROQ_API_KEY configurada no .env]"
         return
 
-    messages = [{"role": "system", "content": system}]
-    for m in history:
-        messages.append({"role": m["role"], "content": m["content"]})
+    messages = [{"role": "system", "content": system}] + [
+        {"role": m["role"], "content": m["content"]} for m in history
+    ]
+    last_error: Exception | None = None
 
-    last_error = None
-    for idx, key in enumerate(GROQ_KEYS):
+    for idx, key in enumerate(keys):
         try:
             client = AsyncGroq(api_key=key)
             stream = await client.chat.completions.create(
@@ -204,105 +187,82 @@ async def stream_groq(system: str, history: list[Message]) -> AsyncIterator[str]
                 content = chunk.choices[0].delta.content
                 if content:
                     yield content
-            return  # sucesso — para aqui
-
-        except Exception as e:
-            last_error = e
-            label = f"chave {idx + 1}/{len(GROQ_KEYS)}"
-            print(f"[Groq stream] {label} falhou: {str(e)[:100]}")
-
-            if _is_key_error(e) or _is_rate_error(e):
-                continue  # tenta a próxima chave
-            # Erro inesperado → não tenta mais
+            return
+        except Exception as exc:
+            last_error = exc
+            print(f"[Groq stream] key {idx + 1}/{len(keys)} falhou: {str(exc)[:100]}")
+            if _should_try_next_key(exc):
+                continue
             break
 
-    yield f"[Erro Groq: todas as {len(GROQ_KEYS)} chave(s) falharam. Último erro: {str(last_error)[:120]}]"
+    yield f"[Erro Groq: todas as {len(keys)} chave(s) falharam. Último: {str(last_error)[:120]}]"
 
 
-async def stream_llm(system: str, history: list[Message]) -> AsyncIterator[str]:
-    """Roteador principal — usa o provider definido em LLM_PROVIDER."""
-    if LLM_PROVIDER == "gemini":
-        async for token in stream_gemini(system, history):
-            yield token
-    elif LLM_PROVIDER == "groq":
-        async for token in stream_groq(system, history):
-            yield token
-    else:  # padrão: claude
-        async for token in stream_claude(system, history):
-            yield token
+# ── Chat simples (não-streaming) ──────────────────────────────────────────────
 
 
-# ─── Groq não-streaming com fallback (usado pelo dashboard/insight) ──────────
-
-async def groq_chat(messages: list[dict], max_tokens: int = 1500, temperature: float = 0.4) -> str:
-    """
-    Chamada simples (não-streaming) ao Groq com fallback de chaves.
-    Lança GroqKeyError se todas as chaves falharem.
-    """
-    if not GROQ_KEYS:
+async def groq_chat(
+    messages: list[dict],
+    max_tokens: int = 1500,
+    temperature: float = 0.4,
+) -> str:
+    """Chamada simples ao Groq com fallback automático entre chaves."""
+    keys = settings.groq_keys
+    if not keys:
         raise GroqKeyError("Nenhuma GROQ_API_KEY configurada no .env")
 
-    last_error = None
-    for idx, key in enumerate(GROQ_KEYS):
+    last_error: Exception | None = None
+    for idx, key in enumerate(keys):
         try:
             client = AsyncGroq(api_key=key)
-            response = await client.chat.completions.create(
+            resp = await client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 max_tokens=max_tokens,
                 temperature=temperature,
                 messages=messages,
             )
-            return response.choices[0].message.content
-
-        except Exception as e:
-            last_error = e
-            label = f"chave {idx + 1}/{len(GROQ_KEYS)}"
-            print(f"[Groq chat] {label} falhou: {str(e)[:100]}")
-
-            if _is_key_error(e) or _is_rate_error(e):
+            return resp.choices[0].message.content
+        except Exception as exc:
+            last_error = exc
+            print(f"[Groq chat] key {idx + 1}/{len(keys)} falhou: {str(exc)[:100]}")
+            if _should_try_next_key(exc):
                 continue
             break
 
-    raise GroqKeyError(f"Todas as chaves Groq falharam. Último erro: {str(last_error)}")
+    raise GroqKeyError(f"Todas as chaves Groq falharam. Último: {last_error}")
 
-# criando animação labial
 
-import subprocess, json, uuid
-# ─── Animação labial (visemas)
+# ── Visemas (animação labial) ─────────────────────────────────────────────────
+
+
 async def generate_visemes(audio_b64: str) -> list:
-    """Gera visemas usando o modelo de animação labial da ElevenLabs."""
+    """Tenta gerar visemas com Rhubarb. Retorna lista vazia em caso de falha."""
+    import json
+    import os
+    import subprocess
+    import uuid
+
     file_id = str(uuid.uuid4())
     temp_audio = f"/tmp/{file_id}.mp3"
     temp_json = f"/tmp/{file_id}.json"
-    
-    # salva o áudio base64 como arquivo de áudio
+
     try:
         audio_bytes = base64.b64decode(audio_b64)
         with open(temp_audio, "wb") as f:
             f.write(audio_bytes)
-    except Exception as e:
-        print(f"Erro ao decodificar áudio para Rhubarb: {e}")
+
+        subprocess.run(
+            ["rhubarb.exe", "-f", "json", temp_audio, "-o", temp_json],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        with open(temp_json) as f:
+            return json.load(f).get("mouthCues", [])
+    except Exception as exc:
+        print(f"[Visemes] Rhubarb falhou: {exc}")
         return []
-    
-    # chama o Rhubarb para gerar os visemas
-    try:
-        subprocess.run([
-            "rhubarb.exe", 
-            "-f", "json", 
-            temp_audio, 
-            "-o", temp_json
-        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        
-        # 3. Lê o JSON que o Rhubarb gerou
-        with open(temp_json, "r") as f:
-            data = json.load(f)
-            return data.get("mouthCues", [])
-            
-    except Exception as e:
-        print(f"Erro na extração de visemas pelo Rhubarb: {e}")
-        return []
-        
     finally:
-        # 4. Limpeza: apaga os arquivos temporários para não lotar o PC
-        if os.path.exists(temp_audio): os.remove(temp_audio)
-        if os.path.exists(temp_json): os.remove(temp_json)
+        for path in (temp_audio, temp_json):
+            if os.path.exists(path):
+                os.remove(path)
