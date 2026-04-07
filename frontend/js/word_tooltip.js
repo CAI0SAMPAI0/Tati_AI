@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const API = 'http://127.0.0.1:8000';
+  const API = 'https://tatiai-production.up.railway.app';
 
   const tooltip = document.createElement('div');
   tooltip.id = 'word-tooltip';

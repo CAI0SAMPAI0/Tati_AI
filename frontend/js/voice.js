@@ -1,4 +1,4 @@
-const API    = 'http://tatiai-production.up.railway.app';
+const API    = 'https://tatiai-production.up.railway.app';
 const WS_URL = 'wss://tatiai-production.up.railway.app';
 
 // ── Auth guard ─────────────────────────────────────────────────────
