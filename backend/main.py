@@ -16,7 +16,8 @@ app = FastAPI(title='Teacher Tati API', description='API para o aplicativo de en
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://tati-ai.vercel.app/",
+                   "http://localhost:8000"], # dev
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
