@@ -1,5 +1,5 @@
-const API    = 'http://127.0.0.1:8000';
-const WS_URL = 'ws://127.0.0.1:8000';
+const API    = 'http://tatiai-production.up.railway.app';
+const WS_URL = 'wss://tatiai-production.up.railway.app';
 
 // ── Auth guard ─────────────────────────────────────────────────────
 const token   = localStorage.getItem('token');
