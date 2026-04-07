@@ -2,7 +2,6 @@ import os
 from dotenv import load_dotenv
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
 from langchain_groq import ChatGroq
 
 # Carrega as variáveis do arquivo .env
@@ -15,9 +14,12 @@ DIRETORIO_BACKEND = os.path.dirname(DIRETORIO_ATUAL)
 # Aponta para backend/data/chroma_db
 PASTA_RAIZ = os.getcwd()
 CHROMA_PATH = os.path.join(PASTA_RAIZ,"backend", "data", "chroma_db")
-HUGGING_FACE_KEY=os.getenv('HUGGING_FACE_KEY')
 
-embeddings_model = HuggingFaceInferenceAPIEmbeddings(api_key='HUGGING_FACE_KEY', model_name="sentence-transformers/all-MiniLM-L6-v2")
+from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
+_embeddings = HuggingFaceInferenceAPIEmbeddings(
+    api_key=os.getenv("HUGGING_FACE_KEY", ""),
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
+)
 vectorstore = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings_model)
 
 def consultar_tati_com_rag(pergunta: str):

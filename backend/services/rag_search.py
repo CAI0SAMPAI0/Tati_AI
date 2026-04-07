@@ -3,6 +3,10 @@ import os
 from dataclasses import dataclass
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
+from dotenv import load_dotenv
+
+load_dotenv()
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _CHROMA_PATH = os.path.join(_BASE_DIR, "data", "chroma_db")
@@ -10,7 +14,10 @@ _CHROMA_PATH = os.path.join(_BASE_DIR, "data", "chroma_db")
 
 # Busca RAG no ChromaDB usando embeddings HuggingFace.
 
-_embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+_embeddings = HuggingFaceInferenceAPIEmbeddings(
+    api_key=os.getenv("HUGGING_FACE_KEY", ""),
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
+)
 _vectorstore = Chroma(persist_directory=_CHROMA_PATH, embedding_function=_embeddings)
 
 
