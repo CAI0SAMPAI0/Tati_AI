@@ -14,7 +14,8 @@ protobuf
 pydantic==2.12.5
 pypdf
 python-dotenv==1.2.2
-python_bcrypt
+passlib[bcrypt]
+bcrypt==4.0.1
 python-docx
 python_jose==3.3.0
 supabase
