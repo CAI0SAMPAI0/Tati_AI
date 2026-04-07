@@ -5,12 +5,14 @@ from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 from pathlib import Path
 import os
-
+# carregando as variáveis de ambiente do arquivo .env
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-from routers import auth, chat, profile, dashboard, avatar
+from routers import auth, avatar, chat, dashboard, profile
+# Servir Frontend
+_FRONTEND_PATH = Path(__file__).parent.parent / "frontend"
 
-app = FastAPI()
+app = FastAPI(title='Teacher Tati API', description='API para o aplicativo de ensino de inglês Teacher Tati', version='1.0.0')
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,14 +29,13 @@ app.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 app.include_router(avatar.router, prefix="/avatar", tags=["avatar"])
 app.include_router(chat.router, prefix="/voice", tags=["voice"])
 
-# Servir Frontend
-FRONTEND_PATH = Path(__file__).parent.parent / "frontend"
-app.mount("/static", StaticFiles(directory=FRONTEND_PATH), name="static")
+app.mount("/static", StaticFiles(directory=_FRONTEND_PATH), name="static")
 
 @app.get("/")
-async def read_index():
-    return FileResponse(FRONTEND_PATH / "index.html")
+async def server_index() -> FileResponse:
+    return FileResponse(_FRONTEND_PATH / "index.html")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    from core.config import settings
+    uvicorn.run("main:app", host="0.0.0.0", port=settings.port, reload=settings.debug)
