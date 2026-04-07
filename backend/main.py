@@ -32,9 +32,9 @@ app.include_router(chat.router, prefix="/voice", tags=["voice"])
 
 app.mount("/static", StaticFiles(directory=_FRONTEND_PATH), name="static")
 
-@app.get("/")
+'''@app.get("/")
 async def server_index() -> FileResponse:
-    return FileResponse(_FRONTEND_PATH / "index.html")
+    return FileResponse(_FRONTEND_PATH / "index.html")'''
 
 if __name__ == "__main__":
     import uvicorn
