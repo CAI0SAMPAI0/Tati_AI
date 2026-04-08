@@ -17,6 +17,7 @@
 </head>
 
 <body>
+    <div class="dash-sidebar-overlay" onclick="closeDashSidebar()"></div>
     <div class="dash-layout">
 
         <aside class="dash-sidebar">
@@ -28,6 +29,9 @@
                     <span class="brand-name">Teacher Tati</span>
                     <span class="brand-sub" data-i18n="nav.dashboard">Dashboard</span>
                 </div>
+                <button class="btn-sidebar-close" onclick="closeDashSidebar()">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
 
             <nav class="dash-nav">
@@ -68,6 +72,9 @@
                     <h1 class="dash-page-title" id="page-title" data-i18n="dash.overview">Visão Geral</h1>
                     <p class="dash-page-sub" id="page-sub" data-i18n="dash.overview_sub">Resumo da plataforma</p>
                 </div>
+                <button class="btn-sidebar-toggle" onclick="toggleDashSidebar()">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
             </header>
 
             <!-- ── Visão Geral ── -->
@@ -110,15 +117,18 @@
                 </div>
 
                 <div class="overview-content" style="margin-top: 2rem;">
-                    <h3 style="color: var(--text-muted); font-size: 1.1rem; margin-bottom: 1rem;" data-i18n="dash.alertas">Alertas de Dificuldade
+                    <h3 style="color: var(--text-muted); font-size: 1.1rem; margin-bottom: 1rem;"
+                        data-i18n="dash.alertas">Alertas de Dificuldade
                         da Turma</h3>
                     <div
                         style="background: var(--surface); border-radius: 8px; border: 1px solid var(--border); overflow: hidden;">
                         <table style="width: 100%; text-align: left; border-collapse: collapse;">
                             <thead style="background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--border);">
                                 <tr>
-                                    <th style="padding: 1rem; color: var(--text-muted); font-weight: 600;" data-i18n="dash.aluno_alertas"></th>
-                                    <th style="padding: 1rem; color: var(--text-muted); font-weight: 600;" data-i18n="dash.aten_alertas"></th>
+                                    <th style="padding: 1rem; color: var(--text-muted); font-weight: 600;"
+                                        data-i18n="dash.aluno_alertas"></th>
+                                    <th style="padding: 1rem; color: var(--text-muted); font-weight: 600;"
+                                        data-i18n="dash.aten_alertas"></th>
                                 </tr>
                             </thead>
                             <tbody id="difficulties-tbody">
@@ -173,7 +183,7 @@
                                     stroke-width="2">
                                     <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
                                 </svg>
-                                
+
                             </div>
                         </div>
 
@@ -196,7 +206,7 @@
                                     <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
                                     <polyline points="17 6 23 6 23 12" />
                                 </svg>
-                                
+
                             </div>
                         </div>
 
@@ -222,7 +232,7 @@
                                     <circle cx="19" cy="12" r="1" />
                                     <circle cx="5" cy="12" r="1" />
                                 </svg>
-                                
+
                             </div>
                         </div>
                     </div>
