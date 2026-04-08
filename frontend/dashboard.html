@@ -715,297 +715,238 @@
                     border: 0.5px solid hsla(152, 68%, 42%, 0.28)
                 }
             </style>
+            <!-- Main -->
+            <main class="main">
+                <div class="topbar">
+                    <h1>Relatórios</h1>
+                    <p>Visão geral e métricas da turma</p>
+                </div>
 
-            <div class="layout">
-                <!-- Sidebar -->
-                <aside class="sidebar">
-                    <div class="brand">
-                        <div class="avatar">T</div>
-                        <div>
-                            <div class="brand-text">Teacher Tati</div>
-                            <div class="brand-sub">Dashboard</div>
+                <div class="content">
+
+                    <!-- Metric Cards -->
+                    <div class="metrics">
+                        <div class="metric-card">
+                            <div style="display:flex;align-items:flex-start;justify-content:space-between">
+                                <div class="metric-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                        <circle cx="9" cy="7" r="4" />
+                                    </svg>
+                                </div>
+                                <span class="badge badge-purple">Total</span>
+                            </div>
+                            <div>
+                                <div class="metric-label">Total de alunos</div>
+                                <div class="metric-value purple" id="val-students">1</div>
+                            </div>
+                            <div class="metric-trend">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                                </svg>
+                                Plataforma ativa
+                            </div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div style="display:flex;align-items:flex-start;justify-content:space-between">
+                                <div class="metric-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                    </svg>
+                                </div>
+                                <span class="badge badge-purple">Trocadas</span>
+                            </div>
+                            <div>
+                                <div class="metric-label">Mensagens</div>
+                                <div class="metric-value purple" id="val-msgs">174</div>
+                            </div>
+                            <div class="metric-trend">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                                    <polyline points="17 6 23 6 23 12" />
+                                </svg>
+                                +12 esta semana
+                            </div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div style="display:flex;align-items:flex-start;justify-content:space-between">
+                                <div class="metric-icon" style="background:hsla(152,68%,42%,0.12)">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2"
+                                        style="stroke:hsl(152,60%,50%)">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <polyline points="12 6 12 12 16 14" />
+                                    </svg>
+                                </div>
+                                <span class="badge badge-green">Hoje</span>
+                            </div>
+                            <div>
+                                <div class="metric-label">Alunos ativos hoje</div>
+                                <div class="metric-value green" id="val-active">0</div>
+                            </div>
+                            <div class="metric-trend">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <circle cx="12" cy="12" r="1" />
+                                    <circle cx="19" cy="12" r="1" />
+                                    <circle cx="5" cy="12" r="1" />
+                                </svg>
+                                Sem atividade hoje
+                            </div>
                         </div>
                     </div>
-                    <nav class="nav">
-                        <button class="nav-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10" />
-                                <polyline points="12 6 12 12 16 14" />
-                            </svg>
-                            Visão Geral
-                        </button>
-                        <button class="nav-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                                <circle cx="9" cy="7" r="4" />
-                                <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-                            </svg>
-                            Alunos
-                        </button>
-                        <button class="nav-item active">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                            </svg>
-                            Relatórios
-                        </button>
-                    </nav>
-                    <div class="nav-footer">
-                        <button class="nav-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                            </svg>
-                            Ir ao Chat
-                        </button>
-                        <button class="nav-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="3" />
-                                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 19.07a10 10 0 0 1 0-14.14" />
-                            </svg>
-                            Configurações
-                        </button>
-                        <button class="nav-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                                <polyline points="16 17 21 12 16 7" />
-                                <line x1="21" y1="12" x2="9" y2="12" />
-                            </svg>
-                            Sair
-                        </button>
-                    </div>
-                </aside>
 
-                <!-- Main -->
-                <main class="main">
-                    <div class="topbar">
-                        <h1>Relatórios</h1>
-                        <p>Visão geral e métricas da turma</p>
-                    </div>
+                    <!-- Charts grid -->
+                    <div class="charts-grid">
 
-                    <div class="content">
-
-                        <!-- Metric Cards -->
-                        <div class="metrics">
-                            <div class="metric-card">
-                                <div style="display:flex;align-items:flex-start;justify-content:space-between">
-                                    <div class="metric-icon">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                                            <circle cx="9" cy="7" r="4" />
-                                        </svg>
-                                    </div>
-                                    <span class="badge badge-purple">Total</span>
-                                </div>
-                                <div>
-                                    <div class="metric-label">Total de alunos</div>
-                                    <div class="metric-value purple" id="val-students">1</div>
-                                </div>
-                                <div class="metric-trend">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="2">
-                                        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-                                    </svg>
-                                    Plataforma ativa
-                                </div>
+                        <!-- Bar chart - weekly activity -->
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <div class="chart-title">Atividade semanal</div>
+                                <div class="chart-sub">Mensagens por dia — últimos 7 dias</div>
                             </div>
-
-                            <div class="metric-card">
-                                <div style="display:flex;align-items:flex-start;justify-content:space-between">
-                                    <div class="metric-icon">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
-                                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                                        </svg>
-                                    </div>
-                                    <span class="badge badge-purple">Trocadas</span>
-                                </div>
-                                <div>
-                                    <div class="metric-label">Mensagens</div>
-                                    <div class="metric-value purple" id="val-msgs">174</div>
-                                </div>
-                                <div class="metric-trend">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="2">
-                                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-                                        <polyline points="17 6 23 6 23 12" />
-                                    </svg>
-                                    +12 esta semana
-                                </div>
+                            <div style="position:relative;padding-left:30px">
+                                <div class="chart-area" id="bars"></div>
                             </div>
-
-                            <div class="metric-card">
-                                <div style="display:flex;align-items:flex-start;justify-content:space-between">
-                                    <div class="metric-icon" style="background:hsla(152,68%,42%,0.12)">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"
-                                            style="stroke:hsl(152,60%,50%)">
-                                            <circle cx="12" cy="12" r="10" />
-                                            <polyline points="12 6 12 12 16 14" />
-                                        </svg>
-                                    </div>
-                                    <span class="badge badge-green">Hoje</span>
+                            <div class="stats-row" style="margin-top:14px">
+                                <div class="stat-mini">
+                                    <div class="stat-mini-val" id="stat-avg">—</div>
+                                    <div class="stat-mini-label">Média/dia</div>
                                 </div>
-                                <div>
-                                    <div class="metric-label">Alunos ativos hoje</div>
-                                    <div class="metric-value green" id="val-active">0</div>
+                                <div class="stat-mini">
+                                    <div class="stat-mini-val" id="stat-peak">—</div>
+                                    <div class="stat-mini-label">Pico</div>
                                 </div>
-                                <div class="metric-trend">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="2">
-                                        <circle cx="12" cy="12" r="1" />
-                                        <circle cx="19" cy="12" r="1" />
-                                        <circle cx="5" cy="12" r="1" />
-                                    </svg>
-                                    Sem atividade hoje
+                                <div class="stat-mini">
+                                    <div class="stat-mini-val" id="stat-total-week">—</div>
+                                    <div class="stat-mini-label">Total semana</div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Charts grid -->
-                        <div class="charts-grid">
-
-                            <!-- Bar chart - weekly activity -->
-                            <div class="chart-card">
-                                <div class="chart-header">
-                                    <div class="chart-title">Atividade semanal</div>
-                                    <div class="chart-sub">Mensagens por dia — últimos 7 dias</div>
-                                </div>
-                                <div style="position:relative;padding-left:30px">
-                                    <div class="chart-area" id="bars"></div>
-                                </div>
-                                <div class="stats-row" style="margin-top:14px">
-                                    <div class="stat-mini">
-                                        <div class="stat-mini-val" id="stat-avg">—</div>
-                                        <div class="stat-mini-label">Média/dia</div>
-                                    </div>
-                                    <div class="stat-mini">
-                                        <div class="stat-mini-val" id="stat-peak">—</div>
-                                        <div class="stat-mini-label">Pico</div>
-                                    </div>
-                                    <div class="stat-mini">
-                                        <div class="stat-mini-val" id="stat-total-week">—</div>
-                                        <div class="stat-mini-label">Total semana</div>
-                                    </div>
-                                </div>
+                        <!-- Donut - level distribution -->
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <div class="chart-title">Distribuição de níveis</div>
+                                <div class="chart-sub">Níveis de inglês dos alunos</div>
                             </div>
-
-                            <!-- Donut - level distribution -->
-                            <div class="chart-card">
-                                <div class="chart-header">
-                                    <div class="chart-title">Distribuição de níveis</div>
-                                    <div class="chart-sub">Níveis de inglês dos alunos</div>
+                            <div class="donut-wrap">
+                                <div class="donut-container">
+                                    <svg id="donut-svg" width="140" height="140" viewBox="0 0 140 140"></svg>
+                                    <div class="donut-center">
+                                        <div class="donut-center-num" id="donut-center-num">1</div>
+                                        <div class="donut-center-label">aluno</div>
+                                    </div>
                                 </div>
-                                <div class="donut-wrap">
-                                    <div class="donut-container">
-                                        <svg id="donut-svg" width="140" height="140" viewBox="0 0 140 140"></svg>
-                                        <div class="donut-center">
-                                            <div class="donut-center-num" id="donut-center-num">1</div>
-                                            <div class="donut-center-label">aluno</div>
+                                <div class="legend" id="legend"></div>
+                            </div>
+                        </div>
+
+                        <!-- Heatmap - activity by day/hour -->
+                        <div class="chart-card full">
+                            <div class="chart-header"
+                                style="display:flex;align-items:flex-start;justify-content:space-between">
+                                <div>
+                                    <div class="chart-title">Heatmap de engajamento</div>
+                                    <div class="chart-sub">Intensidade de mensagens por dia da semana — últimas 4
+                                        semanas</div>
+                                </div>
+                                <div
+                                    style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text-subtle)">
+                                    <span>Menos</span>
+                                    <div style="display:flex;gap:3px">
+                                        <div
+                                            style="width:12px;height:12px;border-radius:3px;background:var(--primary-dim);border:0.5px solid var(--border)">
+                                        </div>
+                                        <div
+                                            style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.2)">
+                                        </div>
+                                        <div
+                                            style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.4)">
+                                        </div>
+                                        <div
+                                            style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.6)">
+                                        </div>
+                                        <div
+                                            style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.85)">
                                         </div>
                                     </div>
-                                    <div class="legend" id="legend"></div>
+                                    <span>Mais</span>
                                 </div>
                             </div>
-
-                            <!-- Heatmap - activity by day/hour -->
-                            <div class="chart-card full">
-                                <div class="chart-header"
-                                    style="display:flex;align-items:flex-start;justify-content:space-between">
-                                    <div>
-                                        <div class="chart-title">Heatmap de engajamento</div>
-                                        <div class="chart-sub">Intensidade de mensagens por dia da semana — últimas 4
-                                            semanas</div>
-                                    </div>
-                                    <div
-                                        style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text-subtle)">
-                                        <span>Menos</span>
-                                        <div style="display:flex;gap:3px">
-                                            <div
-                                                style="width:12px;height:12px;border-radius:3px;background:var(--primary-dim);border:0.5px solid var(--border)">
-                                            </div>
-                                            <div
-                                                style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.2)">
-                                            </div>
-                                            <div
-                                                style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.4)">
-                                            </div>
-                                            <div
-                                                style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.6)">
-                                            </div>
-                                            <div
-                                                style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.85)">
-                                            </div>
-                                        </div>
-                                        <span>Mais</span>
-                                    </div>
-                                </div>
-                                <div class="week-header" id="week-header"></div>
-                                <div class="heatmap-grid" id="heatmap"></div>
-                                <div class="heat-days" id="heat-days"></div>
-                            </div>
-
+                            <div class="week-header" id="week-header"></div>
+                            <div class="heatmap-grid" id="heatmap"></div>
+                            <div class="heat-days" id="heat-days"></div>
                         </div>
+
                     </div>
-                </main>
-            </div>
+                </div>
+            </main>
+    </div>
 
-            <script>
-                /* ── Bar chart ─────────────────────────── */
-                const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
-                const vals = [28, 34, 22, 41, 19, 18, 12];
-                const max = Math.max(...vals);
-                const total = vals.reduce((a, b) => a + b, 0);
-                const avg = Math.round(total / vals.length);
-                const todayIdx = new Date().getDay(); // 0=Sun, adjust
-                const todayBar = (todayIdx === 0) ? 6 : todayIdx - 1;
+    <script>
+        /* ── Bar chart ─────────────────────────── */
+        const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+        const vals = [28, 34, 22, 41, 19, 18, 12];
+        const max = Math.max(...vals);
+        const total = vals.reduce((a, b) => a + b, 0);
+        const avg = Math.round(total / vals.length);
+        const todayIdx = new Date().getDay(); // 0=Sun, adjust
+        const todayBar = (todayIdx === 0) ? 6 : todayIdx - 1;
 
-                document.getElementById('stat-avg').textContent = avg;
-                document.getElementById('stat-peak').textContent = max;
-                document.getElementById('stat-total-week').textContent = total;
+        document.getElementById('stat-avg').textContent = avg;
+        document.getElementById('stat-peak').textContent = max;
+        document.getElementById('stat-total-week').textContent = total;
 
-                const container = document.getElementById('bars');
-                container.innerHTML = vals.map((v, i) => {
-                    const h = Math.round((v / max) * 120);
-                    const isToday = i === todayBar;
-                    return `<div class="chart-bar-wrap">
+        const container = document.getElementById('bars');
+        container.innerHTML = vals.map((v, i) => {
+            const h = Math.round((v / max) * 120);
+            const isToday = i === todayBar;
+            return `<div class="chart-bar-wrap">
     <div class="bar-val" style="font-size:10px;color:var(--text-muted);text-align:center;min-height:14px">${v}</div>
     <div class="bar${isToday ? ' today' : ''}" data-val="${v} msgs" style="height:${h}px" title="${days[i]}: ${v} msgs"></div>
     <div class="bar-label" style="${isToday ? 'color:var(--primary);font-weight:600' : ''}">${days[i]}</div>
   </div>`;
-                }).join('');
+        }).join('');
 
-                /* ── Donut chart ────────────────────────── */
-                const levels = [
-                    { name: 'Beginner', pct: 100, count: 1, color: '#7c3aed' },
-                    { name: 'Pre-Intermediate', pct: 0, count: 0, color: '#0ea5e9' },
-                    { name: 'Intermediate', pct: 0, count: 0, color: '#8b5cf6' },
-                    { name: 'Business English', pct: 0, count: 0, color: '#d946ef' },
-                    { name: 'Advanced', pct: 0, count: 0, color: '#f59e0b' },
-                ];
-                const total_students = levels.reduce((a, b) => a + b.count, 0);
-                document.getElementById('donut-center-num').textContent = total_students;
+        /* ── Donut chart ────────────────────────── */
+        const levels = [
+            { name: 'Beginner', pct: 100, count: 1, color: '#7c3aed' },
+            { name: 'Pre-Intermediate', pct: 0, count: 0, color: '#0ea5e9' },
+            { name: 'Intermediate', pct: 0, count: 0, color: '#8b5cf6' },
+            { name: 'Business English', pct: 0, count: 0, color: '#d946ef' },
+            { name: 'Advanced', pct: 0, count: 0, color: '#f59e0b' },
+        ];
+        const total_students = levels.reduce((a, b) => a + b.count, 0);
+        document.getElementById('donut-center-num').textContent = total_students;
 
-                const R = 50, cx = 70, cy = 70, strokeW = 20;
-                const circumference = 2 * Math.PI * R;
-                let offset = 0;
+        const R = 50, cx = 70, cy = 70, strokeW = 20;
+        const circumference = 2 * Math.PI * R;
+        let offset = 0;
 
-                const svg = document.getElementById('donut-svg');
-                // Background ring
-                svg.innerHTML = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="hsla(258,40%,55%,0.1)" stroke-width="${strokeW}"/>`;
+        const svg = document.getElementById('donut-svg');
+        // Background ring
+        svg.innerHTML = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="hsla(258,40%,55%,0.1)" stroke-width="${strokeW}"/>`;
 
-                levels.filter(l => l.pct > 0).forEach(l => {
-                    const dash = (l.pct / 100) * circumference;
-                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                    circle.setAttribute('cx', cx); circle.setAttribute('cy', cy); circle.setAttribute('r', R);
-                    circle.setAttribute('fill', 'none'); circle.setAttribute('stroke', l.color);
-                    circle.setAttribute('stroke-width', strokeW); circle.setAttribute('stroke-linecap', 'round');
-                    circle.setAttribute('stroke-dasharray', `${dash} ${circumference}`);
-                    circle.setAttribute('stroke-dashoffset', `${-offset}`);
-                    circle.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
-                    circle.style.transition = 'stroke-dasharray 0.5s ease';
-                    svg.appendChild(circle);
-                    offset += dash;
-                });
+        levels.filter(l => l.pct > 0).forEach(l => {
+            const dash = (l.pct / 100) * circumference;
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', cx); circle.setAttribute('cy', cy); circle.setAttribute('r', R);
+            circle.setAttribute('fill', 'none'); circle.setAttribute('stroke', l.color);
+            circle.setAttribute('stroke-width', strokeW); circle.setAttribute('stroke-linecap', 'round');
+            circle.setAttribute('stroke-dasharray', `${dash} ${circumference}`);
+            circle.setAttribute('stroke-dashoffset', `${-offset}`);
+            circle.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
+            circle.style.transition = 'stroke-dasharray 0.5s ease';
+            svg.appendChild(circle);
+            offset += dash;
+        });
 
-                const legendEl = document.getElementById('legend');
-                legendEl.innerHTML = levels.map(l => `
+        const legendEl = document.getElementById('legend');
+        legendEl.innerHTML = levels.map(l => `
   <div class="legend-item">
     <div class="legend-dot" style="background:${l.color}"></div>
     <span class="legend-name" style="font-size:12px">${l.name}</span>
@@ -1013,89 +954,89 @@
     <span class="legend-count">${l.count}</span>
   </div>`).join('');
 
-                /* ── Heatmap ────────────────────────────── */
-                const dayNames = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
-                // Simulate 4 weeks of data (28 cells)
-                const heatData = [
-                    0, 2, 3, 4, 2, 1, 0,
-                    1, 3, 4, 4, 3, 2, 1,
-                    2, 4, 3, 2, 1, 0, 0,
-                    3, 4, 2, 3, 4, 2, 1
-                ];
+        /* ── Heatmap ────────────────────────────── */
+        const dayNames = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+        // Simulate 4 weeks of data (28 cells)
+        const heatData = [
+            0, 2, 3, 4, 2, 1, 0,
+            1, 3, 4, 4, 3, 2, 1,
+            2, 4, 3, 2, 1, 0, 0,
+            3, 4, 2, 3, 4, 2, 1
+        ];
 
-                const levelClass = v => {
-                    if (v === 0) return '';
-                    if (v <= 1) return 'l1';
-                    if (v <= 2) return 'l2';
-                    if (v <= 3) return 'l3';
-                    return 'l4';
-                };
+        const levelClass = v => {
+            if (v === 0) return '';
+            if (v <= 1) return 'l1';
+            if (v <= 2) return 'l2';
+            if (v <= 3) return 'l3';
+            return 'l4';
+        };
 
-                const weekHeader = document.getElementById('week-header');
-                weekHeader.innerHTML = dayNames.map(d => `<span class="week-label" style="font-size:10px;color:var(--text-subtle);flex:1;text-align:center">${d}</span>`).join('');
+        const weekHeader = document.getElementById('week-header');
+        weekHeader.innerHTML = dayNames.map(d => `<span class="week-label" style="font-size:10px;color:var(--text-subtle);flex:1;text-align:center">${d}</span>`).join('');
 
-                const heatmap = document.getElementById('heatmap');
-                const weeks = ['Sem 4', 'Sem 3', 'Sem 2', 'Esta sem'];
-                const msgCounts = [0, 12, 28, 41, 19, 18, 12, 21, 34, 22, 41, 19, 18, 12, 28, 34, 22, 41, 0, 18, 0, 28, 41, 22, 41, 19, 18, 12];
+        const heatmap = document.getElementById('heatmap');
+        const weeks = ['Sem 4', 'Sem 3', 'Sem 2', 'Esta sem'];
+        const msgCounts = [0, 12, 28, 41, 19, 18, 12, 21, 34, 22, 41, 19, 18, 12, 28, 34, 22, 41, 0, 18, 0, 28, 41, 22, 41, 19, 18, 12];
 
-                heatmap.innerHTML = heatData.map((v, i) => {
-                    const lc = levelClass(v);
-                    const week = Math.floor(i / 7);
-                    const day = i % 7;
-                    return `<div class="heat-cell${lc ? ' ' + lc : ''}" title="${weeks[week]}, ${dayNames[day]}: ${v * 10} msgs"></div>`;
-                }).join('');
+        heatmap.innerHTML = heatData.map((v, i) => {
+            const lc = levelClass(v);
+            const week = Math.floor(i / 7);
+            const day = i % 7;
+            return `<div class="heat-cell${lc ? ' ' + lc : ''}" title="${weeks[week]}, ${dayNames[day]}: ${v * 10} msgs"></div>`;
+        }).join('');
 
-                const heatDays = document.getElementById('heat-days');
-                heatDays.innerHTML = ['S4', 'S3', 'S2', 'S1'].map(w => `<span style="font-size:10px;color:var(--text-subtle);grid-column:1/-1;display:none">${w}</span>`).join('') +
-                    dayNames.map(d => `<div style="font-size:10px;color:var(--text-subtle);text-align:center">${d}</div>`).join('');
-            </script>
+        const heatDays = document.getElementById('heat-days');
+        heatDays.innerHTML = ['S4', 'S3', 'S2', 'S1'].map(w => `<span style="font-size:10px;color:var(--text-subtle);grid-column:1/-1;display:none">${w}</span>`).join('') +
+            dayNames.map(d => `<div style="font-size:10px;color:var(--text-subtle);text-align:center">${d}</div>`).join('');
+    </script>
 
-            <template id="student-modal-template">
-                <div class="modal-backdrop"></div>
-                <div class="modal-panel">
-                    <div class="modal-tabs">
-                        <button class="modal-tab active">✏️ Editar</button>
-                        <button class="modal-tab">🧩 Prompt</button>
-                        <button class="modal-tab">🧠 Insight</button>
-                        <button class="modal-tab">🎯 Interesses do Aluno</button>
-                    </div>
+    <template id="student-modal-template">
+        <div class="modal-backdrop"></div>
+        <div class="modal-panel">
+            <div class="modal-tabs">
+                <button class="modal-tab active">✏️ Editar</button>
+                <button class="modal-tab">🧩 Prompt</button>
+                <button class="modal-tab">🧠 Insight</button>
+                <button class="modal-tab">🎯 Interesses do Aluno</button>
+            </div>
 
-                    <div class="modal-tab-content" id="tab-insight-template">
-                        <div class="modal-actions">
-                            <button class="btn-modal-save" type="button">🧠 Gerar Insight</button>
-                            <button class="btn-modal-secondary" type="button" data-i18n="dash.grammar_errors">Erros
-                                Gramaticais</button>
-                        </div>
-                    </div>
+            <div class="modal-tab-content" id="tab-insight-template">
+                <div class="modal-actions">
+                    <button class="btn-modal-save" type="button">🧠 Gerar Insight</button>
+                    <button class="btn-modal-secondary" type="button" data-i18n="dash.grammar_errors">Erros
+                        Gramaticais</button>
+                </div>
+            </div>
 
-                    <div class="modal-tab-content" id="tab-interests-template" style="display: none;">
+            <div class="modal-tab-content" id="tab-interests-template" style="display: none;">
 
-                        <div class="modal-actions">
-                            <button class="btn-modal-save" id="btn-generate-interests" type="button">
-                                🎯 Analisar Interesses e Recomendações
-                            </button>
-                        </div>
+                <div class="modal-actions">
+                    <button class="btn-modal-save" id="btn-generate-interests" type="button">
+                        🎯 Analisar Interesses e Recomendações
+                    </button>
+                </div>
 
-                        <div class="interests-section">
-                            <h4>Interesses do Aluno</h4>
-                            <div id="interests-container">
-                            </div>
-                        </div>
-
-                        <div class="recommendations-section">
-                            <h4>Plano de Ação (Recomendações)</h4>
-                            <div id="recommendations-container">
-                            </div>
-                        </div>
-
+                <div class="interests-section">
+                    <h4>Interesses do Aluno</h4>
+                    <div id="interests-container">
                     </div>
                 </div>
-            </template>
 
-            <script src="js/i18n.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-            <script src="js/api.js"></script>
-            <script src="js/dashboard.js"></script>
+                <div class="recommendations-section">
+                    <h4>Plano de Ação (Recomendações)</h4>
+                    <div id="recommendations-container">
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </template>
+
+    <script src="js/i18n.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/dashboard.js"></script>
 </body>
 
 </html>
