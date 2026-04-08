@@ -405,43 +405,177 @@ async function fetchStudentInterests() {
 // ── Reports ───────────────────────────────────────────────────────────────────
 async function _loadReports() {
   try {
-    ['val-students','val-messages','val-active'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = '...';
-    });
-
+    // ── Métricas do topo ──────────────────────────────────────────
     const data = await apiGet('/dashboard/reports/overview');
-    document.getElementById('val-students').textContent = data.total_students ?? 0;
-    document.getElementById('val-messages').textContent = data.total_messages ?? 0;
-    document.getElementById('val-active').textContent   = data.active_today   ?? 0;
 
+    const setEl = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val ?? '—';
+    };
+
+    setEl('val-students', data.total_students ?? 0);
+    setEl('val-msgs',     data.total_messages ?? 0);
+    setEl('val-active',   data.active_today   ?? 0);
+
+    // ── Bar chart (atividade semanal) ─────────────────────────────
+    // Espera: data.weekly_activity = [28, 34, 22, 41, 19, 18, 12] (Dom→Sáb ou Seg→Dom)
+    const dayKeys  = ['day1','day2','day3','day4','day5','day6','day7'];
+    const dayLabels = dayKeys.map(k => t(`dash.${k}`));
+    const vals = Array.isArray(data.weekly_activity) && data.weekly_activity.length === 7
+      ? data.weekly_activity
+      : [0, 0, 0, 0, 0, 0, 0];
+
+    const maxVal = Math.max(...vals, 1);
+    const total  = vals.reduce((a, b) => a + b, 0);
+    const avg    = Math.round(total / vals.length);
+    const peak   = maxVal;
+
+    setEl('stat-avg',        avg);
+    setEl('stat-peak',       peak);
+    setEl('stat-total-week', total);
+
+    const todayIdx = new Date().getDay();           // 0=Dom
+    const todayBar = todayIdx === 0 ? 6 : todayIdx - 1; // ajusta para Seg=0
+
+    const barsEl = document.getElementById('bars');
+    if (barsEl) {
+      barsEl.innerHTML = vals.map((v, i) => {
+        const h       = Math.round((v / maxVal) * 120);
+        const isToday = i === todayBar;
+        return `<div class="chart-bar-wrap">
+          <div style="font-size:10px;color:var(--text-muted);text-align:center;min-height:14px">${v}</div>
+          <div class="bar${isToday ? ' today' : ''}" data-val="${v} msgs" style="height:${h}px" title="${dayLabels[i]}: ${v} msgs"></div>
+          <div class="bar-label" style="${isToday ? 'color:var(--primary);font-weight:600' : ''}">${dayLabels[i]}</div>
+        </div>`;
+      }).join('');
+    }
+
+    // ── Donut (distribuição de níveis) ────────────────────────────
+    // Constrói a partir de allStudents (já carregados) ou de data.level_distribution
     const LEVEL_MAP = {
-      'beginner':'Beginner','pre-intermediate':'Pre-Intermediate','pre intermediate':'Pre-Intermediate',
-      'intermediate':'Intermediate','business english':'Business English','business':'Business English','advanced':'Advanced',
+      'beginner':           'Beginner',
+      'pre-intermediate':   'Pre-Intermediate',
+      'pre intermediate':   'Pre-Intermediate',
+      'intermediate':       'Intermediate',
+      'business english':   'Business English',
+      'business':           'Business English',
+      'advanced':           'Advanced',
     };
     const COLORS = {
-      'Beginner':'#3b82f6','Pre-Intermediate':'#0ea5e9','Intermediate':'#8b5cf6',
-      'Business English':'#d946ef','Advanced':'#f59e0b','Sem Nível':'#64748b',
+      'Beginner':          '#7c3aed',
+      'Pre-Intermediate':  '#0ea5e9',
+      'Intermediate':      '#8b5cf6',
+      'Business English':  '#d946ef',
+      'Advanced':          '#f59e0b',
+      'Sem Nível':         '#64748b',
     };
-    const counts = {};
-    allStudents.forEach(s => {
-      const key = LEVEL_MAP[(s.level || '').trim().toLowerCase()] || 'Sem Nível';
-      counts[key] = (counts[key] || 0) + 1;
-    });
 
-    const labels = [], values = [], bgColors = [];
-    Object.entries(counts).forEach(([k, v]) => { if (v > 0) { labels.push(k); values.push(v); bgColors.push(COLORS[k] || '#64748b'); } });
-    if (!values.length) { labels.push('Sem Dados'); values.push(1); bgColors.push('#3f3f46'); }
+    // Prefere data.level_distribution vinda da API; fallback: conta de allStudents
+    let counts = {};
+    if (data.level_distribution && typeof data.level_distribution === 'object') {
+      counts = data.level_distribution; // { "Beginner": 3, "Intermediate": 2, ... }
+    } else {
+      allStudents.forEach(s => {
+        const key = LEVEL_MAP[(s.level || '').trim().toLowerCase()] || 'Sem Nível';
+        counts[key] = (counts[key] || 0) + 1;
+      });
+    }
 
-    const ctx = document.getElementById('levelChart')?.getContext('2d');
-    if (!ctx) return;
-    reportsChartInstance?.destroy();
-    reportsChartInstance = new Chart(ctx, {
-      type: 'doughnut',
-      data: { labels, datasets: [{ data: values, backgroundColor: bgColors, borderWidth: 0, hoverOffset: 4 }] },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: 'var(--text-muted)' } } } },
-    });
-  } catch (e) { console.error(e); }
+    const totalStudents = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+
+    const levels = Object.entries(counts)
+      .filter(([, v]) => v > 0)
+      .map(([name, count]) => ({
+        name,
+        count,
+        pct:   Math.round((count / totalStudents) * 100),
+        color: COLORS[name] || '#64748b',
+      }));
+
+    setEl('donut-center-num', totalStudents);
+
+    // Redesenha o SVG donut
+    const svg = document.getElementById('donut-svg');
+    if (svg) {
+      const R = 50, cx = 70, cy = 70, strokeW = 20;
+      const circumference = 2 * Math.PI * R;
+      svg.innerHTML = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none"
+        stroke="hsla(258,40%,55%,0.1)" stroke-width="${strokeW}"/>`;
+
+      let offset = 0;
+      levels.forEach(l => {
+        const dash   = (l.pct / 100) * circumference;
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', cx);
+        circle.setAttribute('cy', cy);
+        circle.setAttribute('r',  R);
+        circle.setAttribute('fill', 'none');
+        circle.setAttribute('stroke', l.color);
+        circle.setAttribute('stroke-width', strokeW);
+        circle.setAttribute('stroke-linecap', 'round');
+        circle.setAttribute('stroke-dasharray', `${dash} ${circumference}`);
+        circle.setAttribute('stroke-dashoffset', `${-offset}`);
+        circle.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
+        svg.appendChild(circle);
+        offset += dash;
+      });
+    }
+
+    // Redesenha a legenda
+    const legendEl = document.getElementById('legend');
+    if (legendEl) {
+      legendEl.innerHTML = levels.length
+        ? levels.map(l => `
+            <div class="legend-item" onclick="openLevelModal('${l.name}')" style="cursor:pointer">
+              <div class="legend-dot" style="background:${l.color}"></div>
+              <span class="legend-name" style="font-size:12px">${l.name}</span>
+              <span class="legend-pct">${l.pct}%</span>
+              <span class="legend-count">${l.count}</span>
+            </div>`).join('')
+        : `<p style="font-size:0.8rem;color:var(--text-muted)">Sem dados de nível.</p>`;
+    }
+
+    // ── Heatmap ───────────────────────────────────────────────────
+    // Espera: data.heatmap = array de 28 números (4 semanas × 7 dias, Seg→Dom)
+    const heatData = Array.isArray(data.heatmap) && data.heatmap.length === 28
+      ? data.heatmap
+      : new Array(28).fill(0);
+
+    const levelClass = v => {
+      if (!v)    return '';
+      if (v <= 1) return 'l1';
+      if (v <= 2) return 'l2';
+      if (v <= 3) return 'l3';
+      return 'l4';
+    };
+
+    const weeks = [t('dash.week4') || 'Sem 4', t('dash.week3') || 'Sem 3',
+                   t('dash.week2') || 'Sem 2', t('dash.week1') || 'Esta sem'];
+
+    const weekHeaderEl = document.getElementById('week-header');
+    if (weekHeaderEl) {
+      weekHeaderEl.innerHTML = dayLabels.map(d =>
+        `<span class="week-label">${d}</span>`).join('');
+    }
+
+    const heatmapEl = document.getElementById('heatmap');
+    if (heatmapEl) {
+      heatmapEl.innerHTML = heatData.map((v, i) => {
+        const lc = levelClass(v);
+        return `<div class="heat-cell${lc ? ' ' + lc : ''}"
+          title="${weeks[Math.floor(i / 7)]}, ${dayLabels[i % 7]}: ${v * 10} msgs"></div>`;
+      }).join('');
+    }
+
+    const heatDaysEl = document.getElementById('heat-days');
+    if (heatDaysEl) {
+      heatDaysEl.innerHTML = dayLabels.map(d =>
+        `<div style="font-size:10px;color:var(--text-subtle);text-align:center">${d}</div>`).join('');
+    }
+
+  } catch (e) {
+    console.error('[Reports]', e);
+  }
 }
 
 // ── Overview difficulties ─────────────────────────────────────────────────────
