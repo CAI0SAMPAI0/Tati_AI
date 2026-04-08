@@ -73,12 +73,28 @@ function switchToVoice() { if (currentConvId) window.location.href = `/voice.htm
 // ── WebSocket ─────────────────────────────────────────────────────────────────
 function _connectWS() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
-  ws = new WebSocket(`${WS_BASE}/chat/ws?token=${getToken()}`);
+
+  // Sempre pega o token atual do localStorage (não fecha em cache)
+  const currentToken = getToken();
+  if (!currentToken) { authLogout(); return; }
+
+  ws = new WebSocket(`${WS_BASE}/chat/ws?token=${currentToken}`);
   ws.onopen = () => console.log('[WS] connected');
   ws.onmessage = e => _handleWSMessage(JSON.parse(e.data));
   ws.onerror = e => console.error('[WS] error', e);
-  ws.onclose = () => { ws = null; setTimeout(_connectWS, 3000); };
-  setInterval(() => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' })); }, 20000);
+  ws.onclose = (e) => {
+    ws = null;
+    // Código 4001 = token inválido pelo backend — faz logout
+    if (e.code === 4001) { authLogout(); return; }
+    // Outros closes: reconecta após 3s
+    setTimeout(_connectWS, 3000);
+  };
+
+  // Keepalive a cada 20s para evitar idle timeout do Railway
+  const keepAlive = setInterval(() => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) { clearInterval(keepAlive); return; }
+    ws.send(JSON.stringify({ type: 'ping' }));
+  }, 20000);
 }
 
 function _waitForWS(timeout = 5000) {
