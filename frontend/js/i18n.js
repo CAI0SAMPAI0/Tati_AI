@@ -36,7 +36,7 @@ const TRANSLATIONS = {
     'auth.senha_esqueci': 'Esqueci minha senha',
     'auth.exp_img': 'Sua professora de inglês com inteligência artificial. Pratique quando quiser, no seu ritmo.',
     'auth.esq_senha': '🔑 Esqueci minha senha',
-    'auth.back_login': 'Back to login',
+    'auth.back_login': '← Back to login',
     'auth.informar_user': 'Informe seu username ou e-mail. Vamos gerar uma senha temporária e enviar para você.',
     'auth_send_temp': 'Enviar senha temporária',
 
@@ -238,7 +238,7 @@ const TRANSLATIONS = {
     'auth.senha_esqueci': 'I forgot my password',
     'auth.exp_img': 'Your AI English teacher. Practice whenever you want, at your own pace.',
     'auth.esq_senha': '🔑 I forgot my password',
-    'auth.back_login': 'Back to login',
+    'auth.back_login': '← Back to login',
     'auth.iformar_user': "Enter your username or email address. We'll generate a temporary password and send it to you.",
     'auth_send_temp': 'Send temporary password',
 
