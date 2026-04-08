@@ -405,15 +405,15 @@ async function fetchStudentInterests() {
 // ── Reports ───────────────────────────────────────────────────────────────────
 async function _loadReports() {
   try {
-    ['metric-students','metric-messages','metric-active'].forEach(id => {
+    ['val-students','val-messages','val-active'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.textContent = '...';
     });
 
     const data = await apiGet('/dashboard/reports/overview');
-    document.getElementById('metric-students').textContent = data.total_students ?? 0;
-    document.getElementById('metric-messages').textContent = data.total_messages ?? 0;
-    document.getElementById('metric-active').textContent   = data.active_today   ?? 0;
+    document.getElementById('val-students').textContent = data.total_students ?? 0;
+    document.getElementById('val-messages').textContent = data.total_messages ?? 0;
+    document.getElementById('val-active').textContent   = data.active_today   ?? 0;
 
     const LEVEL_MAP = {
       'beginner':'Beginner','pre-intermediate':'Pre-Intermediate','pre intermediate':'Pre-Intermediate',
