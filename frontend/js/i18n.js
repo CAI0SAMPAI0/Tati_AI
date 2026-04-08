@@ -82,7 +82,7 @@ const TRANSLATIONS = {
     'settings.tooltip_desc': 'Clique em palavras inglesas para ver tradução e pronúncia',
     'settings.enter_send':   'Enviar com Enter',
     'settings.enter_desc':   'Enter envia a mensagem (Shift+Enter para nova linha)',
-    'settings.save':         '💾 Salvar Alterações',
+    'settings.save':         ' Salvar Alterações',
     'settings.saved':        '✅ Salvo!',
 
     // ── Profile ───────────────────────────────────────────────────
