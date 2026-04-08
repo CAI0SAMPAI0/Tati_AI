@@ -30,7 +30,7 @@
                     onerror="this.style.display='none'; document.getElementById('avatar-fallback').style.display='flex';">
                 <div id="avatar-fallback" class="login-avatar-fallback" style="display:none;">🧑‍🏫</div>
                 <h1>Teacher Tati</h1>
-                <p>Sua professora de inglês com inteligência artificial. Pratique quando quiser, no seu ritmo.</p>
+                <p data-i18n="auth.exp_img"></p>
                 <div class="login-dots">
                     <span></span><span></span><span></span>
                 </div>
@@ -148,20 +148,17 @@
                 <!-- ── Form Esqueci minha senha ── -->
                 <form id="form-forgot" onsubmit="handleForgotPassword(event)">
                     <button type="button" class="forgot-back-btn" onclick="backToLogin()">
-                        <i class="fa-solid fa-arrow-left"></i> Voltar ao login
+                        <i class="fa-solid fa-arrow-left" data-i18n="auth.back_login"></i>
                     </button>
                     <p class="forgot-title">🔑 Esqueci minha senha</p>
-                    <p class="forgot-desc">
-                        Informe seu <strong>username</strong> ou <strong>e-mail</strong>.
-                        Vamos gerar uma senha temporária e enviar para você.
-                    </p>
+                    <p class="forgot-desc" data-i18n="auth.informar_user"></p>
                     <div class="field">
                         <label>Username ou E-mail</label>
                         <input id="forgot-identifier" type="text" placeholder="usuario ou email@exemplo.com"
                             autocomplete="username">
                     </div>
                     <button type="submit" class="btn-primary" id="btn-forgot">
-                        <span>Enviar senha temporária</span>
+                        <span data-i18n="auth_send_temp"></span>
                     </button>
                     <div id="forgot-result" class="forgot-result" style="display:none;"></div>
                 </form>
