@@ -19,9 +19,7 @@ def send_reset_email(to_email: str, name: str, temp_password: str) -> bool:
     msg.attach(MIMEText(html, "html"))
 
     try:
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
-            server.ehlo()
-            server.starttls()
+        with smtplib.SMTP(settings.smtp_host, 465) as server:
             server.login(settings.smtp_user, settings.smtp_password)
             server.sendmail(settings.smtp_from_adress, to_email, msg.as_string())
         return True
