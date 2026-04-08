@@ -548,10 +548,10 @@
                                         <circle cx="9" cy="7" r="4" />
                                     </svg>
                                 </div>
-                                <span class="badge badge-purple">Total</span>
+                                <span class="badge badge-purple" data-i18n="dash.total"></span>
                             </div>
                             <div>
-                                <div class="metric-label">Total de alunos</div>
+                                <div class="metric-label" data-i18n="dash.total_students">Total de alunos</div>
                                 <div class="metric-value purple" id="val-students">—</div>
                             </div>
                             <div class="metric-trend">
@@ -559,7 +559,7 @@
                                     stroke-width="2">
                                     <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
                                 </svg>
-                                Plataforma ativa
+                                
                             </div>
                         </div>
 
@@ -570,10 +570,10 @@
                                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                                     </svg>
                                 </div>
-                                <span class="badge badge-purple">Trocadas</span>
+                                <span class="badge badge-purple" data-i18n="dash.trocadas"></span>
                             </div>
                             <div>
-                                <div class="metric-label">Mensagens</div>
+                                <div class="metric-label" data-i18n="dash.msgs"></div>
                                 <div class="metric-value purple" id="val-msgs">—</div>
                             </div>
                             <div class="metric-trend">
@@ -582,7 +582,7 @@
                                     <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
                                     <polyline points="17 6 23 6 23 12" />
                                 </svg>
-                                +12 esta semana
+                                
                             </div>
                         </div>
 
@@ -598,7 +598,7 @@
                                 <span class="badge badge-green">Hoje</span>
                             </div>
                             <div>
-                                <div class="metric-label">Alunos ativos hoje</div>
+                                <div class="metric-label" data-i18n="dash.ac_hj"></div>
                                 <div class="metric-value green" id="val-active">—</div>
                             </div>
                             <div class="metric-trend">
@@ -608,7 +608,7 @@
                                     <circle cx="19" cy="12" r="1" />
                                     <circle cx="5" cy="12" r="1" />
                                 </svg>
-                                Sem atividade hoje
+                                
                             </div>
                         </div>
                     </div>
@@ -618,8 +618,8 @@
                         <!-- Bar chart -->
                         <div class="chart-card">
                             <div class="chart-header">
-                                <div class="chart-title">Atividade semanal</div>
-                                <div class="chart-sub">Mensagens por dia — últimos 7 dias</div>
+                                <div class="chart-title" data-i18n="dash.reports_sem"></div>
+                                <div class="chart-sub" data-i18n="dash.n_msg_day"></div>
                             </div>
                             <div style="position:relative;padding-left:30px">
                                 <div class="chart-area" id="bars"></div>
@@ -643,15 +643,15 @@
                         <!-- Donut -->
                         <div class="chart-card">
                             <div class="chart-header">
-                                <div class="chart-title">Distribuição de níveis</div>
-                                <div class="chart-sub">Níveis de inglês dos alunos</div>
+                                <div class="chart-title" data-i18n="dash.niveis"></div>
+                                <div class="chart-sub" data-i18n="dash.level_st"></div>
                             </div>
                             <div class="donut-wrap">
                                 <div class="donut-container">
                                     <svg id="donut-svg" width="140" height="140" viewBox="0 0 140 140"></svg>
                                     <div class="donut-center">
                                         <div class="donut-center-num" id="donut-center-num">—</div>
-                                        <div class="donut-center-label">aluno</div>
+                                        <div class="donut-center-label" data-i18n="dash.al_dis"></div>
                                     </div>
                                 </div>
                                 <div class="legend" id="legend"></div>
@@ -664,12 +664,11 @@
                                 style="display:flex;align-items:flex-start;justify-content:space-between">
                                 <div>
                                     <div class="chart-title">Heatmap de engajamento</div>
-                                    <div class="chart-sub">Intensidade de mensagens por dia da semana — últimas 4
-                                        semanas</div>
+                                    <div class="chart-sub" data-i18n="dash.n_msg"></div>
                                 </div>
                                 <div
                                     style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text-subtle)">
-                                    <span>Menos</span>
+                                    <span data-i18n="dash.eng_less"></span>
                                     <div style="display:flex;gap:3px">
                                         <div
                                             style="width:12px;height:12px;border-radius:3px;background:var(--primary-dim);border:0.5px solid var(--border)">
@@ -687,7 +686,7 @@
                                             style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.85)">
                                         </div>
                                     </div>
-                                    <span>Mais</span>
+                                    <span data-i18n="dash.eng_more"></span>
                                 </div>
                             </div>
                             <div class="week-header" id="week-header"></div>
