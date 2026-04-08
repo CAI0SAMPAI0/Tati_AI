@@ -80,6 +80,17 @@ async def login(form: OAuth2PasswordRequestForm = Depends()):
     user = _find_user(form.username)
     if not user or not verify_password(form.password, user["password"]):
         raise HTTPException(status_code=401, detail="Usuário ou senha incorretos")
+    
+    password_ok = verify_password(form.password, user["password"])
+    temp_ok = user.get("temp_password") and verify_password(form.password, user["temp_password"])
+
+    if not password_ok and not temp_ok:
+        raise HTTPException(status_code=401, detail="Usuário ou senha incorretos")
+
+    # Se usou a senha temporária, limpa ela
+    if temp_ok:
+        get_client().table("users").update({"temp_password": None}).eq("username", user["username"]).execute()
+
     return _build_token_response(user)
 
 
@@ -182,7 +193,7 @@ async def forgot_password(body: ForgotPasswordBody):
         return {"ok": False, "message": "Esta conta usa login pelo Google."}
 
     temp_password = generate_temp_password()
-    get_client().table("users").update({"password": hash_password(temp_password)}).eq("username", user["username"]).execute()
+    get_client().table("users").update({"temp_password": hash_password(temp_password)}).eq("username", user["username"]).execute()
 
     email_sent = send_reset_email(user["email"], user.get("name") or user["username"], temp_password)
 
