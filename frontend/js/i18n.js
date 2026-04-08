@@ -314,7 +314,7 @@ const TRANSLATIONS = {
     'settings.tooltip_desc': 'Click English words to see translation and pronunciation',
     'settings.enter_send':   'Send with Enter',
     'settings.enter_desc':   'Enter sends the message (Shift+Enter for new line)',
-    'settings.save':         '💾 Save Changes',
+    'settings.save':         ' Save Changes',
     'settings.saved':        '✅ Saved!',
 
     'profile.title':         'My Profile',
