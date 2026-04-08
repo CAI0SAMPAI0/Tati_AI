@@ -409,6 +409,7 @@ const TRANSLATIONS = {
     'dash.niveis': 'Level distributions',
     'dash.level_st': 'English proficiency levels',
     'dash.al_dis': 'student',
+    'dash.n_msg_day': 'Mensagens por dia - últimos 7 dias',
     'dash.n_msg': 'Number of messages per day of the week — last 4 weeks',
     'dash.eng_aln': 'Students engagement',
     'dash.eng_less': 'Less',
