@@ -239,7 +239,7 @@ const TRANSLATIONS = {
     'auth.exp_img': 'Your AI English teacher. Practice whenever you want, at your own pace.',
     'auth.esq_senha': '🔑 I forgot my password',
     'auth.back_login': '← Back to login',
-    'auth.iformar_user': "Enter your username or email address. We'll generate a temporary password and send it to you.",
+    'auth.informar_user': "Enter your username or email address. We'll generate a temporary password and send it to you.",
     'auth_send_temp': 'Send temporary password',
 
     'chat.title':           'Teacher Tati',
