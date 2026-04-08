@@ -14,6 +14,27 @@ let reportsChartInstance = null;
     const icon = document.getElementById('theme-icon');
     if (icon) icon.textContent = (localStorage.getItem('theme') || 'dark') === 'dark' ? '☀️' : '🌙';
 })();
+// botão do menu lateral
+function toggleDashSidebar() {
+    const sidebar  = document.querySelector('.dash-sidebar');
+    const overlay  = document.querySelector('.dash-sidebar-overlay');
+    const isOpen   = sidebar.classList.contains('open');
+ 
+    sidebar.classList.toggle('open', !isOpen);
+    overlay.classList.toggle('active', !isOpen);
+}
+ 
+function closeDashSidebar() {
+    document.querySelector('.dash-sidebar')?.classList.remove('open');
+    document.querySelector('.dash-sidebar-overlay')?.classList.remove('active');
+}
+ 
+// Fecha ao clicar em qualquer item de nav no mobile
+document.querySelectorAll('.dash-nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+        if (window.innerWidth < 768) closeDashSidebar();
+    });
+});
 
 // ── Seções ────────────────────────────────────────────────────────────────────
 const SECTIONS = {
