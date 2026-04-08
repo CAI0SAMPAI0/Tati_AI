@@ -2,18 +2,18 @@ if (!requireAuth()) throw new Error('Unauthenticated');
 const user = getUser();
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let currentConvId   = null;
-let ws              = null;
-let isStreaming     = false;
+let currentConvId = null;
+let ws = null;
+let isStreaming = false;
 let streamingBubble = null;
-let streamingMsgEl  = null;
-let mediaRecorder   = null;
-let audioChunks     = [];
-let isRecording     = false;
-let pendingFiles    = [];
-let streamBuffer    = '';
+let streamingMsgEl = null;
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+let pendingFiles = [];
+let streamBuffer = '';
 let pendingAudioB64 = null;
-let currentAudio    = null;
+let currentAudio = null;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
@@ -32,38 +32,52 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── User info ─────────────────────────────────────────────────────────────────
-function _initUserInfo() {
+async function _initUserInfo() {
   const el = id => document.getElementById(id);
-  const nameEl   = el('sidebar-user-name');
-  const levelEl  = el('sidebar-user-level');
+  const nameEl = el('sidebar-user-name');
+  const levelEl = el('sidebar-user-level');
   const avatarEl = el('sidebar-user-avatar');
 
-  if (nameEl)  nameEl.textContent  = user.name || user.username;
+  if (nameEl) nameEl.textContent = user.name || user.username;
   if (levelEl) levelEl.textContent = user.level || 'Student';
-  if (avatarEl) {
-    if (user.avatar_url) {
-      avatarEl.innerHTML = `<img src="${user.avatar_url}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:top;" alt="">`;
-    } else {
-      avatarEl.textContent = (user.name || user.username).split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-    }
+  // Tenta usar avatar do localStorage primeiro, depois busca na API
+  if (avatarEl) _renderSidebarAvatar(avatarEl, user);
+
+  if (!user.avatar_url) {
+    try {
+      const data = await apiGet('/profile/');
+      // Atualiza localStorage com avatar_url
+      saveSession(getToken(), { ...user, avatar_url: data.avatar_url || null });
+      user.avatar_url = data.avatar_url || null;
+      if (avatarEl) _renderSidebarAvatar(avatarEl, user);
+    } catch (e) { /* silencioso */ }
   }
+
   if (isStaff(user)) {
     const dashBtn = el('btn-dashboard');
     if (dashBtn) dashBtn.style.display = 'flex';
   }
 }
 
+function _renderSidebarAvatar(el, u) {
+  if (u.avatar_url) {
+    el.innerHTML = `<img src="${u.avatar_url}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:top;" alt="">`;
+  } else {
+    el.textContent = (u.name || u.username).split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+  }
+}
+
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
-function switchToVoice()  { if (currentConvId) window.location.href = `/voice.html?conv_id=${currentConvId}`; }
+function switchToVoice() { if (currentConvId) window.location.href = `/voice.html?conv_id=${currentConvId}`; }
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
 function _connectWS() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
   ws = new WebSocket(`${WS_BASE}/chat/ws?token=${getToken()}`);
-  ws.onopen    = () => console.log('[WS] connected');
+  ws.onopen = () => console.log('[WS] connected');
   ws.onmessage = e => _handleWSMessage(JSON.parse(e.data));
-  ws.onerror   = e => console.error('[WS] error', e);
-  ws.onclose   = () => { ws = null; setTimeout(_connectWS, 3000); };
+  ws.onerror = e => console.error('[WS] error', e);
+  ws.onclose = () => { ws = null; setTimeout(_connectWS, 3000); };
   setInterval(() => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' })); }, 20000);
 }
 
@@ -80,19 +94,19 @@ function _waitForWS(timeout = 5000) {
 
 function _handleWSMessage(msg) {
   const handlers = {
-    pong:           () => {},
-    transcription:  () => { _renderMessage('user', msg.text); document.getElementById('message-input').value = ''; _autoResize(document.getElementById('message-input')); },
-    status:         () => _appendStatus(msg.text),
-    stream_start:   () => {
+    pong: () => { },
+    transcription: () => { _renderMessage('user', msg.text); document.getElementById('message-input').value = ''; _autoResize(document.getElementById('message-input')); },
+    status: () => _appendStatus(msg.text),
+    stream_start: () => {
       _hideTyping();
       streamBuffer = '';
       pendingAudioB64 = null;
       const r = _appendStreamBubble();
       streamingBubble = r.bubble;
-      streamingMsgEl  = r.msgEl;
+      streamingMsgEl = r.msgEl;
     },
-    stream_token:   () => { if (streamingBubble) _appendToken(streamingBubble, msg.token); },
-    stream_end:     () => {
+    stream_token: () => { if (streamingBubble) _appendToken(streamingBubble, msg.token); },
+    stream_end: () => {
       if (streamingMsgEl) {
         const meta = _finalizeStreamBubble(streamingMsgEl, streamingBubble);
         if (pendingAudioB64 && meta) { _buildAudioControls(meta, pendingAudioB64); pendingAudioB64 = null; }
@@ -104,9 +118,9 @@ function _handleWSMessage(msg) {
       if (!active || active.textContent === 'Nova conversa') _loadConversations();
     },
     audio_response: () => { streamingMsgEl ? (pendingAudioB64 = msg.audio) : _attachAudioToLastMsg(msg.audio); },
-    error:          () => { _hideTyping(); isStreaming = false; _setInputEnabled(true); _appendErrorMsg(msg.detail || 'Erro desconhecido'); },
+    error: () => { _hideTyping(); isStreaming = false; _setInputEnabled(true); _appendErrorMsg(msg.detail || 'Erro desconhecido'); },
   };
-  (handlers[msg.type] || (() => {}))();
+  (handlers[msg.type] || (() => { }))();
 }
 
 // ── Conversations ─────────────────────────────────────────────────────────────
@@ -121,9 +135,9 @@ async function _loadConversations() {
 function _renderConversationList(convs) {
   const list = document.getElementById('conversations-list');
   if (!convs.length) { list.innerHTML = '<p class="list-empty">Nenhuma conversa ainda</p>'; return; }
-  const today     = new Date().toDateString();
+  const today = new Date().toDateString();
   const yesterday = new Date(Date.now() - 86400000).toDateString();
-  const groups    = { 'Hoje': [], 'Ontem': [], 'Anteriores': [] };
+  const groups = { 'Hoje': [], 'Ontem': [], 'Anteriores': [] };
 
   convs.forEach(c => {
     const d = new Date(c.updated_at).toDateString();
@@ -176,13 +190,13 @@ async function _openConversation(id, title) {
 }
 
 async function _loadMessages(convId) {
-  const area      = document.getElementById('chat-messages');
-  const typingEl  = document.getElementById('typing-indicator');
+  const area = document.getElementById('chat-messages');
+  const typingEl = document.getElementById('typing-indicator');
   const welcomeEl = document.getElementById('chat-welcome');
-  const voiceBtn  = document.getElementById('btn-switch-voice');
+  const voiceBtn = document.getElementById('btn-switch-voice');
 
   [...area.children].forEach(el => { if (el.id !== 'typing-indicator' && el.id !== 'chat-welcome') el.remove(); });
-  if (typingEl)  typingEl.style.display  = 'none';
+  if (typingEl) typingEl.style.display = 'none';
   if (welcomeEl) welcomeEl.style.display = 'none';
   if (!convId) { _showWelcome(); return; }
 
@@ -200,15 +214,15 @@ async function _loadMessages(convId) {
 }
 
 function _showWelcome() {
-  const area      = document.getElementById('chat-messages');
+  const area = document.getElementById('chat-messages');
   const welcomeEl = document.getElementById('chat-welcome');
-  const voiceBtn  = document.getElementById('btn-switch-voice');
-  const typing    = document.getElementById('typing-indicator');
+  const voiceBtn = document.getElementById('btn-switch-voice');
+  const typing = document.getElementById('typing-indicator');
 
   [...area.children].forEach(el => { if (el.id !== 'typing-indicator' && el.id !== 'chat-welcome') el.remove(); });
-  if (typing)    typing.style.display    = 'none';
+  if (typing) typing.style.display = 'none';
   if (welcomeEl) { welcomeEl.style.display = 'flex'; if (area.firstChild !== welcomeEl) area.insertBefore(welcomeEl, area.firstChild); }
-  if (voiceBtn)  voiceBtn.style.display  = 'none';
+  if (voiceBtn) voiceBtn.style.display = 'none';
   _checkSummaryBtn();
   document.getElementById('topbar-title').textContent = 'Teacher Tati';
   currentConvId = null;
@@ -236,11 +250,11 @@ function _showConfirmPopup(message, onConfirm) {
   const popup = document.createElement('div');
   popup.id = 'confirm-popup';
   Object.assign(popup.style, {
-    position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)',
-    background:'var(--surface)', border:'1px solid hsla(355,78%,60%,0.4)',
-    borderRadius:'12px', padding:'1rem 1.25rem', zIndex:'999',
-    display:'flex', flexDirection:'column', gap:'0.5rem', minWidth:'240px',
-    boxShadow:'var(--shadow-lg)',
+    position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
+    background: 'var(--surface)', border: '1px solid hsla(355,78%,60%,0.4)',
+    borderRadius: '12px', padding: '1rem 1.25rem', zIndex: '999',
+    display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '240px',
+    boxShadow: 'var(--shadow-lg)',
   });
   popup.innerHTML = `
     <p style="font-size:0.85rem;color:var(--text);margin:0;font-weight:600;">${message}</p>
@@ -249,7 +263,7 @@ function _showConfirmPopup(message, onConfirm) {
       <button id="pop-no"  style="flex:1;padding:0.4rem;background:var(--border);color:var(--text);border:none;border-radius:8px;cursor:pointer;font-size:0.8rem;">Cancelar</button>
     </div>`;
   document.body.appendChild(popup);
-  document.getElementById('pop-no').onclick  = () => popup.remove();
+  document.getElementById('pop-no').onclick = () => popup.remove();
   document.getElementById('pop-yes').onclick = async () => { popup.remove(); await onConfirm(); };
 }
 
@@ -260,8 +274,8 @@ function _setupFileInput() {
 
 function _triggerFileInput() {
   const input = document.createElement('input');
-  input.type     = 'file';
-  input.accept   = '.pdf,.docx,.txt,.md,.pptx,.xlsx,image/*,audio/*';
+  input.type = 'file';
+  input.accept = '.pdf,.docx,.txt,.md,.pptx,.xlsx,image/*,audio/*';
   input.multiple = true;
   input.onchange = async () => {
     for (const file of Array.from(input.files)) {
@@ -299,7 +313,7 @@ function _renderFilePreviewBar() {
 function removePendingFile(i) { pendingFiles.splice(i, 1); _renderFilePreviewBar(); }
 function _getFileIcon(name) {
   const ext = (name.split('.').pop() || '').toLowerCase();
-  return ({ pdf:'📄', docx:'📝', doc:'📝', txt:'📃', md:'📋', xlsx:'📊', pptx:'📽️' }[ext]) || '📎';
+  return ({ pdf: '📄', docx: '📝', doc: '📝', txt: '📃', md: '📋', xlsx: '📊', pptx: '📽️' }[ext]) || '📎';
 }
 function _formatFileSize(b) {
   return b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(1) + ' KB' : (b / 1048576).toFixed(1) + ' MB';
@@ -309,7 +323,7 @@ function _formatFileSize(b) {
 async function sendMessage() {
   if (isStreaming) return;
   const input = document.getElementById('message-input');
-  const text  = input.value.trim();
+  const text = input.value.trim();
   if (!text && !pendingFiles.length) return;
 
   if (!currentConvId) {
@@ -366,7 +380,7 @@ async function toggleMic() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-    audioChunks   = [];
+    audioChunks = [];
     mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
     mediaRecorder.onstop = _sendAudio;
     mediaRecorder.start();
@@ -384,8 +398,8 @@ async function _sendAudio() {
     const { data } = await apiPost('/chat/conversations', { title: 'Nova conversa' });
     currentConvId = data.id;
   }
-  if (!ws || ws.readyState !== WebSocket.OPEN) { _connectWS(); await _waitForWS(5000).catch(() => {}); }
-  const blob   = new Blob(audioChunks, { type: 'audio/webm' });
+  if (!ws || ws.readyState !== WebSocket.OPEN) { _connectWS(); await _waitForWS(5000).catch(() => { }); }
+  const blob = new Blob(audioChunks, { type: 'audio/webm' });
   const reader = new FileReader();
   reader.onload = () => {
     _showTyping();
@@ -492,14 +506,14 @@ function _buildAudioControls(meta, b64) {
     </div>`;
   meta.appendChild(controls);
 
-  const playBtn  = controls.querySelector('.btn-tts-play');
-  const rewBtn   = controls.querySelector('.btn-tts-rewind');
+  const playBtn = controls.querySelector('.btn-tts-play');
+  const rewBtn = controls.querySelector('.btn-tts-rewind');
   const volSlider = controls.querySelector('.msg-vol-slider');
   const spdSelect = controls.querySelector('.msg-spd-select');
-  const volValue  = controls.querySelector('.msg-vol-value');
+  const volValue = controls.querySelector('.msg-vol-value');
 
   const audio = new Audio(`data:audio/mp3;base64,${b64}`);
-  audio.volume       = 1;
+  audio.volume = 1;
   audio.playbackRate = defaultSpeed;
 
   const setPlayIcon = playing => {
@@ -516,7 +530,7 @@ function _buildAudioControls(meta, b64) {
       });
     }
     currentAudio = audio;
-    audio.play().catch(() => {});
+    audio.play().catch(() => { });
     setPlayIcon(true);
   };
 
@@ -528,7 +542,7 @@ function _buildAudioControls(meta, b64) {
   spdSelect.addEventListener('change', e => { e.stopPropagation(); audio.playbackRate = parseFloat(spdSelect.value); });
   audio.addEventListener('ended', () => { setPlayIcon(false); if (currentAudio === audio) currentAudio = null; });
   audio.addEventListener('pause', () => setPlayIcon(false));
-  audio.addEventListener('play',  () => setPlayIcon(true));
+  audio.addEventListener('play', () => setPlayIcon(true));
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
@@ -543,7 +557,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btn = document.getElementById('btn-switch-summary');
     const orig = btn.innerHTML;
     btn.innerHTML = 'Gerando...';
-    btn.disabled  = true;
+    btn.disabled = true;
     try {
       const data = await apiGet(`/chat/conversations/${currentConvId}/summary`);
       document.getElementById('summary-text').innerHTML = marked.parse(data.summary);
@@ -552,7 +566,7 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('Erro ao gerar resumo. Tente novamente.');
     } finally {
       btn.innerHTML = orig;
-      btn.disabled  = false;
+      btn.disabled = false;
     }
   });
 
@@ -569,10 +583,10 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── Misc ──────────────────────────────────────────────────────────────────────
-function _appendStatus(text)   { const d = document.createElement('div'); d.className = 'status-msg'; d.textContent = text; _insertBeforeTyping(d); }
+function _appendStatus(text) { const d = document.createElement('div'); d.className = 'status-msg'; d.textContent = text; _insertBeforeTyping(d); }
 function _appendErrorMsg(text) { const d = document.createElement('div'); d.className = 'error-banner'; d.textContent = '⚠️ ' + text; _insertBeforeTyping(d); _scrollBottom(); }
 function _insertBeforeTyping(el) { const a = document.getElementById('chat-messages'); a.insertBefore(el, document.getElementById('typing-indicator')); }
-function _showTyping()  { document.getElementById('typing-indicator').style.display = 'flex'; _scrollBottom(); }
-function _hideTyping()  { document.getElementById('typing-indicator').style.display = 'none'; }
+function _showTyping() { document.getElementById('typing-indicator').style.display = 'flex'; _scrollBottom(); }
+function _hideTyping() { document.getElementById('typing-indicator').style.display = 'none'; }
 function _scrollBottom() { const a = document.getElementById('chat-messages'); a.scrollTop = a.scrollHeight; }
 function logout() { authLogout(); }

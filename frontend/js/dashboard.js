@@ -485,6 +485,47 @@ function _formatInsight(text) {
     .replace(/\n/g, '<br>');
 }
 
+function openLevelModal(levelName) {
+  document.getElementById('level-modal')?.remove();
+
+  const filtered = allStudents.filter(s =>
+    (s.level || '').trim().toLowerCase() === levelName.trim().toLowerCase()
+  );
+
+  const modal = document.createElement('div');
+  modal.id = 'level-modal';
+  modal.innerHTML = `
+    <div class="modal-backdrop" onclick="this.parentElement.remove()"></div>
+    <div class="modal-panel" style="max-width:480px">
+      <div class="modal-header">
+        <div>
+          <div class="modal-student-name">Nível: ${escHtml(levelName)}</div>
+          <div class="modal-student-meta">${filtered.length} aluno(s)</div>
+        </div>
+        <button class="modal-close" onclick="document.getElementById('level-modal').remove()">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div style="padding:1rem;display:flex;flex-direction:column;gap:0.5rem;max-height:400px;overflow-y:auto">
+        ${filtered.length ? filtered.map(s => `
+          <div style="display:flex;align-items:center;gap:0.75rem;padding:0.625rem;background:var(--bg);border-radius:10px;border:1px solid var(--border);cursor:pointer"
+               onclick="document.getElementById('level-modal').remove(); openStudentModal('${escHtml(s.username)}')">
+            ${s.avatar_url
+              ? `<img src="${s.avatar_url}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0" alt="">`
+              : `<div class="student-avatar">${_initials(s.name || s.username)}</div>`}
+            <div>
+              <div style="font-size:0.875rem;font-weight:600">${escHtml(s.name || s.username)}</div>
+              <div style="font-size:0.72rem;color:var(--text-muted)">@${escHtml(s.username)} · ${s.total_messages ?? 0} msgs</div>
+            </div>
+          </div>`).join('')
+          : `<p style="color:var(--text-muted);text-align:center;padding:1rem">Nenhum aluno neste nível.</p>`}
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+  requestAnimationFrame(() => modal.querySelector('.modal-panel').classList.add('modal-panel-open'));
+}
+
 function _initials(name) { return (name || '?').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase(); }
 function _formatDate(iso) { try { return new Date(iso).toLocaleDateString('pt-BR'); } catch { return iso || '—'; } }
 function logout() { authLogout(); }

@@ -327,7 +327,7 @@
 
     <script>
         /* ── Bar chart ── */
-        const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+        const days = ['day1', 'day2', 'day3', 'day4', 'day5', 'day6', 'day7'].map(k => t(`dash.${k}`));
         const vals = [28, 34, 22, 41, 19, 18, 12];
         const max = Math.max(...vals);
         const total = vals.reduce((a, b) => a + b, 0);
@@ -358,6 +358,15 @@
             { name: 'Business English', pct: 0, count: 0, color: '#d946ef' },
             { name: 'Advanced', pct: 0, count: 0, color: '#f59e0b' },
         ];
+
+        document.getElementById('legend').innerHTML = levels.map(l => `
+        <div class="legend-item" onclick="openLevelModal('${l.name}')" style="cursor:pointer">
+            <div class="legend-dot" style="background:${l.color}"></div>
+            <span class="legend-name" style="font-size:12px">${l.name}</span>
+            <span class="legend-pct">${l.pct}%</span>
+            <span class="legend-count">${l.count}</span>
+        </div>`).join('');
+        
         const total_students = levels.reduce((a, b) => a + b.count, 0);
         document.getElementById('donut-center-num').textContent = total_students;
 
@@ -388,7 +397,7 @@
             </div>`).join('');
 
         /* ── Heatmap ── */
-        const dayNames = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+        const dayNames = days;
         const heatData = [
             0, 2, 3, 4, 2, 1, 0,
             1, 3, 4, 4, 3, 2, 1,

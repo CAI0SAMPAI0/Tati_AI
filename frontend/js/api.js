@@ -1,8 +1,9 @@
 /* o api.js é para ter o cliente centralizado para todas as chamadas à API backendd e eliminei fetch() duplicado espalhado que fiz em outros arquivos JS.
  */
 
-const API_BASE = 'https://tatiai-production.up.railway.app';
-const WS_BASE  = 'wss://tatiai-production.up.railway.app';
+const IS_LOCAL  = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+const API_BASE  = IS_LOCAL ? 'http://localhost:8000' : 'https://tatiai-production.up.railway.app';
+const WS_BASE   = IS_LOCAL ? 'ws://localhost:8000'  : 'wss://tatiai-production.up.railway.app';
 
 /** Retorna o token JWT salvo no localStorage, ou null. */
 function getToken() {
