@@ -180,3 +180,52 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 const STAFF_ROLES = new Set(['professor', 'professora', 'programador', 'Tatiana', 'Tati', 'admin']);
 function isStaff(user) { return user && STAFF_ROLES.has(user.role); }
+
+/**
+ * Wrapper sobre fetch com autenticação.
+ * Não faz logout em 401 imediato — tenta 1x antes de deslogar,
+ * para evitar logout por erro temporário de rede/cold start do Railway.
+ */
+async function apiFetch(path, options = {}) {
+  const url = API_BASE + path;
+  const headers = { ...authHeaders(), ...(options.headers || {}) };
+  
+  let res;
+  try {
+    res = await fetch(url, { ...options, headers });
+  } catch (networkErr) {
+    // Erro de rede (Railway dormindo, etc) — não desloga
+    throw networkErr;
+  }
+ 
+  if (res.status === 401) {
+    // Tenta 1x com delay antes de deslogar (Railway cold start pode causar 401 falso)
+    await sleep(1200);
+    const headers2 = { ...authHeaders(), ...(options.headers || {}) };
+    const res2 = await fetch(url, { ...options, headers: headers2 }).catch(() => null);
+    if (!res2 || res2.status === 401) {
+      authLogout();
+      throw new Error('Sessão expirada');
+    }
+    return res2;
+  }
+  return res;
+}
+ 
+// ── KEEP-ALIVE: previne logout por inatividade ─────────────────────
+(function startSessionKeepAlive() {
+  const INTERVAL_MS = 8 * 60 * 1000; // 8 minutos
+ 
+  async function ping() {
+    if (!getToken()) return;
+    try {
+      await fetch(API_BASE + '/auth/login', {  // endpoint leve que sempre existe
+        method: 'HEAD',
+        headers: authHeaders(),
+      }).catch(() => {}); // silencioso
+    } catch (_) {}
+  }
+ 
+  setInterval(ping, INTERVAL_MS);
+})();
+ 

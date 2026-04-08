@@ -361,3 +361,115 @@
     color: hsl(152, 68%, 52%);
     border: 0.5px solid hsla(152, 68%, 42%, 0.28)
 }
+
+
+/* ── Sidebar responsiva ── */
+@media (max-width: 767px) {
+  /* Sidebar nunca ocupa 100% — max 85vw */
+  .dash-sidebar {
+    width: min(280px, 85vw) !important;
+    min-width: unset !important;
+  }
+
+  /* Reports: coluna única */
+  .content {
+    padding: 16px;
+    gap: 16px;
+  }
+  .metrics {
+    grid-template-columns: 1fr !important;
+    gap: 10px;
+  }
+  .charts-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+  .chart-card.full {
+    grid-column: 1 !important;
+  }
+
+  /* Donut: empilha verticalmente */
+  .donut-wrap {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  /* Stats row: 3 colunas menores */
+  .stats-row {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .stat-mini {
+    padding: 8px;
+  }
+  .stat-mini-val {
+    font-size: 15px;
+  }
+
+  /* Heatmap: scroll horizontal se necessário */
+  .heatmap-grid,
+  .heat-days,
+  .week-header {
+    min-width: 280px;
+  }
+  .chart-card.full {
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Students table: esconde colunas menos importantes */
+  .data-table .col-focus,
+  .data-table th:nth-child(3),
+  .data-table td:nth-child(3) {
+    display: none;
+  }
+
+  /* Search wrap: largura total */
+  .dash-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.625rem;
+  }
+  .search-wrap {
+    width: 100%;
+  }
+  .search-wrap input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* Métrica: fonte menor */
+  .metric-value {
+    font-size: 24px;
+  }
+
+  /* Chart area: menor */
+  .chart-area {
+    height: 100px;
+  }
+
+  /* Stats overview: 1 coluna */
+  .stat-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Sidebar overlay: garante que não passa de 85vw ── */
+.dash-sidebar-overlay.active {
+  display: block;
+}
+
+/* ── Tablet: 2 colunas nos reports ── */
+@media (max-width: 1024px) and (min-width: 768px) {
+  .metrics {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .charts-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .content {
+    padding: 20px;
+  }
+}
