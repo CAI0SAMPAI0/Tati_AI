@@ -4,7 +4,6 @@ from email.mime.text import MIMEText
 
 from core.config import settings
 
-
 def send_reset_email(to_email: str, name: str, temp_password: str) -> bool:
     """Envia e-mail com senha temporária. Retorna True se enviado com sucesso."""
     if not settings.smtp_user or not settings.smtp_password:
