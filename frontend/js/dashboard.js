@@ -628,9 +628,21 @@ function openLevelModal(levelName) {
 
   const modal = document.createElement('div');
   modal.id = 'level-modal';
+
+  // overlay fixo que centraliza
+  Object.assign(modal.style, {
+    position: 'fixed',
+    inset: '0',
+    zIndex: '9000',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'rgba(0,0,0,0.65)',
+    backdropFilter: 'blur(6px)',
+  });
+
   modal.innerHTML = `
-    <div class="modal-backdrop" onclick="this.parentElement.remove()"></div>
-    <div class="modal-panel" style="max-width:480px">
+    <div class="modal-panel" style="max-width:480px;width:90%;margin:0;">
       <div class="modal-header">
         <div>
           <div class="modal-student-name">Nível: ${escHtml(levelName)}</div>
@@ -642,7 +654,8 @@ function openLevelModal(levelName) {
       </div>
       <div style="padding:1rem;display:flex;flex-direction:column;gap:0.5rem;max-height:400px;overflow-y:auto">
         ${filtered.length ? filtered.map(s => `
-          <div style="display:flex;align-items:center;gap:0.75rem;padding:0.625rem;background:var(--bg);border-radius:10px;border:1px solid var(--border);cursor:pointer"
+          <div style="display:flex;align-items:center;gap:0.75rem;padding:0.625rem;
+                      background:var(--bg);border-radius:10px;border:1px solid var(--border);cursor:pointer"
                onclick="document.getElementById('level-modal').remove(); openStudentModal('${escHtml(s.username)}')">
             ${s.avatar_url
               ? `<img src="${s.avatar_url}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0" alt="">`
@@ -657,6 +670,12 @@ function openLevelModal(levelName) {
     </div>`;
 
   document.body.appendChild(modal);
+
+  // fecha ao clicar no backdrop
+  modal.addEventListener('click', e => {
+    if (e.target === modal) modal.remove();
+  });
+
   requestAnimationFrame(() => modal.querySelector('.modal-panel').classList.add('modal-panel-open'));
 }
 
