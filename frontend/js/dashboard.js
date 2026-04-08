@@ -406,7 +406,7 @@ async function fetchStudentInterests() {
 async function _loadReports() {
   try {
     // Garante dados atualizados de alunos antes de montar o gráfico redondo
-    await _loadStudents(); 
+    await _loadStudents();
     // ── Métricas do topo ──────────────────────────────────────────
     const data = await apiGet('/dashboard/reports/overview');
 
@@ -469,37 +469,21 @@ async function _loadReports() {
       'Intermediate': '#8b5cf6',
       'Business English': '#d946ef',
       'Advanced': '#f59e0b',
-      'Sem Nível': '#64748b',
+      'Outros': '#64748b',
     };
 
-    // Prefere data.level_distribution vinda da API; fallback: conta de allStudents
-    let counts = {};
-    if (data.level_distribution && typeof data.level_distribution === 'object') {
-      counts = data.level_distribution; // { "Beginner": 3, "Intermediate": 2, ... }
-      try {
-        const freshStudents = await apiGet('/dashboard/students');
-        allStudents = freshStudents; // atualiza o cache também
-        _renderStudentsTable('students-table', allStudents);
-        _renderStudentsTable('recent-students-table', allStudents.slice(0, 5), true);
-      } catch (_) { }
-
-      allStudents.forEach(s => {
-        const key = LEVEL_MAP[(s.level || '').trim().toLowerCase()] || 'Sem Nível';
-        counts[key] = (counts[key] || 0) + 1;
-      });
-    }
-
-    const totalStudents = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
-
-    const levels = Object.entries(counts)
+    // USA SEMPRE a API — sem fallback em allStudents
+    const rawDist = data.level_distribution || {};
+    const levels = Object.entries(rawDist)
       .filter(([, v]) => v > 0)
       .map(([name, count]) => ({
         name,
         count,
-        pct: Math.round((count / totalStudents) * 100),
+        pct: Math.round((count / Math.max(1, Object.values(rawDist).reduce((a, b) => a + b, 0))) * 100),
         color: COLORS[name] || '#64748b',
       }));
 
+    const totalStudents = levels.reduce((a, l) => a + l.count, 0);
     setEl('donut-center-num', totalStudents);
 
     // Redesenha o SVG donut
