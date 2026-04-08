@@ -198,6 +198,11 @@ const TRANSLATIONS = {
     'dash.day5': 'Sexta',
     'dash.day6': 'Sábado',
     'dash.day7': 'Domingo',
+    'dash.media': 'Msg/dia',
+    'dash.pico': 'Pico',
+    'dash.tot_sem': 'Total semanal',
+    'dash.trocadas': 'Trocadas',
+
     
 
     // ── Voice ─────────────────────────────────────────────────────
@@ -409,7 +414,7 @@ const TRANSLATIONS = {
     'dash.niveis': 'Level distributions',
     'dash.level_st': 'English proficiency levels',
     'dash.al_dis': 'student',
-    'dash.n_msg_day': 'Mensagens por dia - últimos 7 dias',
+    'dash.n_msg_day': 'Messages per day - last 7 days',
     'dash.n_msg': 'Number of messages per day of the week — last 4 weeks',
     'dash.eng_aln': 'Students engagement',
     'dash.eng_less': 'Less',
@@ -422,6 +427,9 @@ const TRANSLATIONS = {
     'dash.day6': 'Saturday',
     'dash.day7': 'Sunday',
     'dash.trocadas': 'Exchanged',
+    'dash.media': 'Per day',
+    'dash.pico': 'Peak',
+    'dash.tot_sem': 'Weekly total',
 
 
 
