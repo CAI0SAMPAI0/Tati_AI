@@ -314,7 +314,7 @@ async function generateInsight() {
   const content = document.getElementById('insight-content');
   btn.disabled = true;
   btn.textContent = t('dash.analyzing');
-  content.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;padding:2rem;color:var(--text-muted);"><div class="insight-spinner"></div><p style="font-size:0.85rem;">Analisando...</p></div>`;
+  content.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;padding:2rem;color:var(--text-muted);"><div class="insight-spinner"></div><p style="font-size:0.85rem;" dash.analyzing>Analisando...</p></div>`;
 
   try {
     const lang = I18n.getLang();
