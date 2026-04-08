@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     smtp_password: str = ''
     smtp_from: str = ''
     
+    # email com resend
+    resend_api_key: str = ''
+
     # RAG usando o drive (em breve será o da professora, pegar link do drive dela)
     google_drive_folder_id: str = ''
     google_client_id_drive: str = ''
