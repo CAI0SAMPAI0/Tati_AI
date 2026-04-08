@@ -1,0 +1,363 @@
+.content {
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px
+}
+
+.metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px
+}
+
+.metric-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: border-color 0.2s
+}
+
+.metric-card:hover {
+    border-color: var(--border-focus)
+}
+
+.metric-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+    background: var(--primary-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center
+}
+
+.metric-icon svg {
+    width: 16px;
+    height: 16px;
+    color: var(--primary);
+    stroke: var(--primary)
+}
+
+.metric-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-weight: 600
+}
+
+.metric-value {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.03em
+}
+
+.metric-value.purple {
+    color: var(--primary)
+}
+
+.metric-value.green {
+    color: hsl(152, 60%, 50%)
+}
+
+.metric-trend {
+    font-size: 11px;
+    color: var(--text-subtle);
+    display: flex;
+    align-items: center;
+    gap: 4px
+}
+
+.metric-trend.up {
+    color: hsl(152, 60%, 50%)
+}
+
+.charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px
+}
+
+.chart-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 22px;
+    transition: border-color 0.2s
+}
+
+.chart-card:hover {
+    border-color: var(--border-focus)
+}
+
+.chart-card.full {
+    grid-column: 1/-1
+}
+
+.chart-header {
+    margin-bottom: 18px
+}
+
+.chart-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.01em
+}
+
+.chart-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 3px
+}
+
+.chart-area {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    height: 140px;
+    position: relative
+}
+
+.chart-bar-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    flex: 1
+}
+
+.bar {
+    width: 100%;
+    border-radius: 4px 4px 0 0;
+    background: var(--primary);
+    min-height: 4px;
+    transition: opacity .15s;
+    position: relative;
+    cursor: pointer
+}
+
+.bar::before {
+    content: attr(data-val);
+    position: absolute;
+    top: -22px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.2s
+}
+
+.bar:hover {
+    opacity: .8
+}
+
+.bar:hover::before {
+    opacity: 1
+}
+
+.bar.today {
+    background: hsl(152, 60%, 50%)
+}
+
+.bar-label {
+    font-size: 10px;
+    color: var(--text-subtle);
+    text-align: center;
+    white-space: nowrap
+}
+
+.donut-wrap {
+    display: flex;
+    gap: 24px;
+    align-items: center
+}
+
+.donut-container {
+    position: relative;
+    flex-shrink: 0
+}
+
+.donut-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center
+}
+
+.donut-center-num {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text)
+}
+
+.donut-center-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .06em
+}
+
+.legend {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 6px;
+    padding: 2px 0;
+    transition: color 0.15s
+}
+
+.legend-item:hover {
+    color: var(--text)
+}
+
+.legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0
+}
+
+.legend-name {
+    flex: 1
+}
+
+.legend-pct {
+    color: var(--text-subtle);
+    font-size: 11px;
+    font-weight: 600
+}
+
+.legend-count {
+    font-size: 11px;
+    color: var(--text-subtle);
+    min-width: 28px;
+    text-align: right
+}
+
+.heatmap-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-top: 4px
+}
+
+.heat-cell {
+    height: 24px;
+    border-radius: 4px;
+    background: var(--primary-dim);
+    border: 0.5px solid var(--border);
+    transition: all 0.15s;
+    cursor: pointer
+}
+
+.heat-cell:hover {
+    border-color: var(--primary)
+}
+
+.heat-cell.l1 {
+    background: hsla(var(--hue), 80%, 58%, 0.2)
+}
+
+.heat-cell.l2 {
+    background: hsla(var(--hue), 80%, 58%, 0.4)
+}
+
+.heat-cell.l3 {
+    background: hsla(var(--hue), 80%, 58%, 0.6)
+}
+
+.heat-cell.l4 {
+    background: hsla(var(--hue), 80%, 58%, 0.85)
+}
+
+.heat-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-top: 6px
+}
+
+.week-header {
+    display: flex;
+    margin-bottom: 6px
+}
+
+.week-label {
+    font-size: 10px;
+    color: var(--text-subtle);
+    flex: 1;
+    text-align: center
+}
+
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 4px
+}
+
+.stat-mini {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 12px;
+    background: var(--bg);
+    border-radius: var(--radius-md);
+    border: 0.5px solid var(--border)
+}
+
+.stat-mini-val {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--primary)
+}
+
+.stat-mini-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .06em
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .03em
+}
+
+.badge-purple {
+    background: var(--primary-dim);
+    color: var(--primary);
+    border: 0.5px solid hsla(var(--hue), 80%, 58%, 0.28)
+}
+
+.badge-green {
+    background: hsla(152, 68%, 42%, 0.12);
+    color: hsl(152, 68%, 52%);
+    border: 0.5px solid hsla(152, 68%, 42%, 0.28)
+}
