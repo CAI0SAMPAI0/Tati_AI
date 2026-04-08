@@ -406,8 +406,8 @@
   margin-top: -0.25rem;
 }
 
-/* ── Voice mode button in topbar ─────────────────────────────────── */
-.btn-voice-mode {
+/* ── Voice mode button in topbar adn summary ── */
+.btn-voice-mode, .btn-summary-mode {
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -423,7 +423,7 @@
   white-space: nowrap;
 }
 
-.btn-voice-mode:hover {
+.btn-voice-mode:hover, .btn-summary-mode:hover {
   background: rgba(124, 58, 237, 0.22);
   border-color: var(--primary);
 }
