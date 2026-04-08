@@ -89,7 +89,7 @@ class Settings(BaseSettings):
         return [k.strip() for k in candidates if k.strip()]
     
     @property
-    def stmp_from_adress(self) -> str:
+    def stmp_from_address(self) -> str:
         # retorna o endereço de email do remetente para SMTP
         return self.smtp_from or self.smtp_user
     
