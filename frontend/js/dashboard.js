@@ -333,7 +333,7 @@ async function generateGrammarErrors() {
   const content = document.getElementById('insight-content');
   const oldLabel = btn.textContent;
   btn.disabled = true;
-  btn.textContent = 'Analisando...';
+  btn.textContent = t('dash.analyzing');
   content.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;padding:2rem;color:var(--text-muted);"><div class="insight-spinner"></div><p style="font-size:0.85rem;">${t('dash.mapping_errors')}</p></div>`;
 
   try {
