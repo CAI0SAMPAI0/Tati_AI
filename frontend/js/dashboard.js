@@ -5,42 +5,42 @@ if (!isStaff(_dashUser)) {
   window.location.href = '/chat.html';
 }
 
-let allStudents          = [];
+let allStudents = [];
 let currentModalUsername = null;
 let reportsChartInstance = null;
 
 // usando modo claro ou escuro
-(function() {
-    const icon = document.getElementById('theme-icon');
-    if (icon) icon.textContent = (localStorage.getItem('theme') || 'dark') === 'dark' ? '☀️' : '🌙';
+(function () {
+  const icon = document.getElementById('theme-icon');
+  if (icon) icon.textContent = (localStorage.getItem('theme') || 'dark') === 'dark' ? '☀️' : '🌙';
 })();
 // botão do menu lateral
 function toggleDashSidebar() {
-    const sidebar  = document.querySelector('.dash-sidebar');
-    const overlay  = document.querySelector('.dash-sidebar-overlay');
-    const isOpen   = sidebar.classList.contains('open');
- 
-    sidebar.classList.toggle('open', !isOpen);
-    overlay.classList.toggle('active', !isOpen);
+  const sidebar = document.querySelector('.dash-sidebar');
+  const overlay = document.querySelector('.dash-sidebar-overlay');
+  const isOpen = sidebar.classList.contains('open');
+
+  sidebar.classList.toggle('open', !isOpen);
+  overlay.classList.toggle('active', !isOpen);
 }
- 
+
 function closeDashSidebar() {
-    document.querySelector('.dash-sidebar')?.classList.remove('open');
-    document.querySelector('.dash-sidebar-overlay')?.classList.remove('active');
+  document.querySelector('.dash-sidebar')?.classList.remove('open');
+  document.querySelector('.dash-sidebar-overlay')?.classList.remove('active');
 }
- 
+
 // Fecha ao clicar em qualquer item de nav no mobile
 document.querySelectorAll('.dash-nav-item').forEach(item => {
-    item.addEventListener('click', () => {
-        if (window.innerWidth < 768) closeDashSidebar();
-    });
+  item.addEventListener('click', () => {
+    if (window.innerWidth < 768) closeDashSidebar();
+  });
 });
 
 // ── Seções ────────────────────────────────────────────────────────────────────
 const SECTIONS = {
   overview: { title: () => t('dash.overview'), sub: () => t('dash.overview_sub') },
   students: { title: () => t('dash.students'), sub: () => t('dash.students_sub') },
-  reports:  { title: () => t('dash.reports'),  sub: () => t('dash.reports_sub')  },
+  reports: { title: () => t('dash.reports'), sub: () => t('dash.reports_sub') },
 };
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -55,7 +55,7 @@ window.addEventListener('langchange', () => {
   const name = (active.getAttribute('href') || '').replace('#', '');
   if (SECTIONS[name]) {
     document.getElementById('page-title').textContent = SECTIONS[name].title();
-    document.getElementById('page-sub').textContent   = SECTIONS[name].sub();
+    document.getElementById('page-sub').textContent = SECTIONS[name].sub();
   }
 });
 
@@ -65,8 +65,8 @@ function setSection(name, el) {
   document.querySelectorAll('.dash-section').forEach(s => s.style.display = 'none');
   document.getElementById(`section-${name}`)?.setAttribute('style', 'display:block');
   document.getElementById('page-title').textContent = SECTIONS[name]?.title() || name;
-  document.getElementById('page-sub').textContent   = SECTIONS[name]?.sub()   || '';
-  if (name === 'reports')  _loadReports();
+  document.getElementById('page-sub').textContent = SECTIONS[name]?.sub() || '';
+  if (name === 'reports') _loadReports();
   if (name === 'overview') _loadOverview();
 }
 
@@ -76,7 +76,7 @@ async function _loadStats() {
     const data = await apiGet('/dashboard/stats');
     document.getElementById('stat-total-students').textContent = data.total_students ?? '—';
     document.getElementById('stat-total-messages').textContent = data.total_messages ?? '—';
-    document.getElementById('stat-active-today').textContent   = data.active_today   ?? '—';
+    document.getElementById('stat-active-today').textContent = data.active_today ?? '—';
   } catch (e) { console.error(e); }
 }
 
@@ -106,8 +106,8 @@ function _renderStudentsTable(containerId, students, compact = false) {
       <td>
         <div class="student-name-cell">
           ${s.avatar_url
-            ? `<img src="${s.avatar_url}" class="student-avatar-img" alt="">`
-            : `<div class="student-avatar">${_initials(s.name || s.username)}</div>`}
+      ? `<img src="${s.avatar_url}" class="student-avatar-img" alt="">`
+      : `<div class="student-avatar">${_initials(s.name || s.username)}</div>`}
           <div>
             <div class="student-name">${escHtml(s.name || s.username)}</div>
             <div class="student-username">@${escHtml(s.username)}</div>
@@ -154,8 +154,8 @@ function openStudentModal(username) {
       <div class="modal-header">
         <div class="modal-student-info">
           ${s.avatar_url
-            ? `<img src="${s.avatar_url}" class="modal-avatar-img" alt="">`
-            : `<div class="modal-avatar">${_initials(s.name || s.username)}</div>`}
+      ? `<img src="${s.avatar_url}" class="modal-avatar-img" alt="">`
+      : `<div class="modal-avatar">${_initials(s.name || s.username)}</div>`}
           <div>
             <div class="modal-student-name">${escHtml(s.name || s.username)}</div>
             <div class="modal-student-meta">@${escHtml(s.username)} · ${escHtml(s.level || '—')} · ${s.total_messages ?? 0} msgs</div>
@@ -175,9 +175,9 @@ function openStudentModal(username) {
         <div class="modal-field">
           <label>${t('dash.col_level')}</label>
           <select id="modal-level">
-            ${['Beginner','Pre-Intermediate','Intermediate','Business English','Advanced'].map(l =>
-              `<option value="${l}" ${s.level === l ? 'selected' : ''}>${l}</option>`
-            ).join('')}
+            ${['Beginner', 'Pre-Intermediate', 'Intermediate', 'Business English', 'Advanced'].map(l =>
+        `<option value="${l}" ${s.level === l ? 'selected' : ''}>${l}</option>`
+      ).join('')}
           </select>
         </div>
         <div id="modal-edit-feedback" class="modal-feedback" style="display:none"></div>
@@ -243,7 +243,7 @@ function switchModalTab(tab, btn) {
 
 // ── Save / Delete ─────────────────────────────────────────────────────────────
 async function saveStudentLevel() {
-  const level    = document.getElementById('modal-level').value;
+  const level = document.getElementById('modal-level').value;
   const feedback = document.getElementById('modal-edit-feedback');
   const { ok, data } = await apiPut(`/dashboard/students/${encodeURIComponent(currentModalUsername)}`, { level });
   if (ok) {
@@ -259,8 +259,8 @@ async function saveStudentLevel() {
 
 async function saveStudentPrompt() {
   const custom_prompt = document.getElementById('modal-prompt').value.trim();
-  const feedback      = document.getElementById('modal-prompt-feedback');
-  const { ok, data }  = await apiPut(`/dashboard/students/${encodeURIComponent(currentModalUsername)}`, { custom_prompt });
+  const feedback = document.getElementById('modal-prompt-feedback');
+  const { ok, data } = await apiPut(`/dashboard/students/${encodeURIComponent(currentModalUsername)}`, { custom_prompt });
   if (ok) {
     _showModalFeedback(feedback, t('dash.prompt_saved'), 'success');
     const s = allStudents.find(s => s.username === currentModalUsername);
@@ -280,11 +280,11 @@ function confirmDeleteStudent(username) {
   const popup = document.createElement('div');
   popup.id = 'delete-confirm';
   Object.assign(popup.style, {
-    position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
-    background:'var(--surface)', border:'1px solid hsla(355,78%,60%,0.4)',
-    borderRadius:'14px', padding:'1.5rem', zIndex:'10000',
-    display:'flex', flexDirection:'column', gap:'0.75rem', minWidth:'280px',
-    boxShadow:'var(--shadow-lg)',
+    position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+    background: 'var(--surface)', border: '1px solid hsla(355,78%,60%,0.4)',
+    borderRadius: '14px', padding: '1.5rem', zIndex: '10000',
+    display: 'flex', flexDirection: 'column', gap: '0.75rem', minWidth: '280px',
+    boxShadow: 'var(--shadow-lg)',
   });
   popup.innerHTML = `
     <p style="font-size:0.9rem;font-weight:700;margin:0;"><i class="fa-solid fa-triangle-exclamation" style="color:var(--danger);margin-right:0.4rem;"></i>Excluir @${escHtml(username)}?</p>
@@ -294,7 +294,7 @@ function confirmDeleteStudent(username) {
       <button id="del-no"  style="flex:1;padding:0.5rem;background:var(--border);color:var(--text);border:none;border-radius:8px;cursor:pointer;font-size:0.85rem;">Cancelar</button>
     </div>`;
   document.body.appendChild(popup);
-  document.getElementById('del-no').onclick  = () => popup.remove();
+  document.getElementById('del-no').onclick = () => popup.remove();
   document.getElementById('del-yes').onclick = async () => { popup.remove(); await _deleteStudent(username); };
 }
 
@@ -310,9 +310,9 @@ async function _deleteStudent(username) {
 
 // ── Insight / Grammar / Interests ─────────────────────────────────────────────
 async function generateInsight() {
-  const btn     = document.getElementById('btn-generate-insight');
+  const btn = document.getElementById('btn-generate-insight');
   const content = document.getElementById('insight-content');
-  btn.disabled  = true;
+  btn.disabled = true;
   btn.textContent = t('dash.analyzing');
   content.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;padding:2rem;color:var(--text-muted);"><div class="insight-spinner"></div><p style="font-size:0.85rem;">Analisando...</p></div>`;
 
@@ -323,16 +323,16 @@ async function generateInsight() {
   } catch (e) {
     content.innerHTML = `<div class="modal-feedback error" style="display:block;">❌ ${e.message}</div>`;
   } finally {
-    btn.disabled    = false;
+    btn.disabled = false;
     btn.textContent = t('dash.regenerate');
   }
 }
 
 async function generateGrammarErrors() {
-  const btn     = document.getElementById('btn-generate-grammar');
+  const btn = document.getElementById('btn-generate-grammar');
   const content = document.getElementById('insight-content');
   const oldLabel = btn.textContent;
-  btn.disabled  = true;
+  btn.disabled = true;
   btn.textContent = 'Analisando...';
   content.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;padding:2rem;color:var(--text-muted);"><div class="insight-spinner"></div><p style="font-size:0.85rem;">${t('dash.mapping_errors')}</p></div>`;
 
@@ -359,18 +359,18 @@ async function generateGrammarErrors() {
   } catch (e) {
     content.innerHTML = `<div class="modal-feedback error" style="display:block;">❌ ${e.message}</div>`;
   } finally {
-    btn.disabled    = false;
+    btn.disabled = false;
     btn.textContent = oldLabel;
   }
 }
 
 async function fetchStudentInterests() {
-  const btn        = document.getElementById('btn-generate-interests');
-  const feedback   = document.getElementById('interests-feedback');
-  const intCont    = document.getElementById('interests-container');
-  const recCont    = document.getElementById('recommendations-container');
-  btn.disabled     = true;
-  btn.textContent  = t('dash.analyzing');
+  const btn = document.getElementById('btn-generate-interests');
+  const feedback = document.getElementById('interests-feedback');
+  const intCont = document.getElementById('interests-container');
+  const recCont = document.getElementById('recommendations-container');
+  btn.disabled = true;
+  btn.textContent = t('dash.analyzing');
   feedback.style.display = 'none';
 
   try {
@@ -397,7 +397,7 @@ async function fetchStudentInterests() {
   } catch (e) {
     _showModalFeedback(feedback, 'Erro de conexão.', 'error');
   } finally {
-    btn.disabled    = false;
+    btn.disabled = false;
     btn.textContent = '🎯 Refazer Análise';
   }
 }
@@ -405,6 +405,8 @@ async function fetchStudentInterests() {
 // ── Reports ───────────────────────────────────────────────────────────────────
 async function _loadReports() {
   try {
+    // Garante dados atualizados de alunos antes de montar o gráfico redondo
+    await _loadStudents(); 
     // ── Métricas do topo ──────────────────────────────────────────
     const data = await apiGet('/dashboard/reports/overview');
 
@@ -414,24 +416,24 @@ async function _loadReports() {
     };
 
     setEl('val-students', data.total_students ?? 0);
-    setEl('val-msgs',     data.total_messages ?? 0);
-    setEl('val-active',   data.active_today   ?? 0);
+    setEl('val-msgs', data.total_messages ?? 0);
+    setEl('val-active', data.active_today ?? 0);
 
     // ── Bar chart (atividade semanal) ─────────────────────────────
     // Espera: data.weekly_activity = [28, 34, 22, 41, 19, 18, 12] (Dom→Sáb ou Seg→Dom)
-    const dayKeys  = ['day1','day2','day3','day4','day5','day6','day7'];
+    const dayKeys = ['day1', 'day2', 'day3', 'day4', 'day5', 'day6', 'day7'];
     const dayLabels = dayKeys.map(k => t(`dash.${k}`));
     const vals = Array.isArray(data.weekly_activity) && data.weekly_activity.length === 7
       ? data.weekly_activity
       : [0, 0, 0, 0, 0, 0, 0];
 
     const maxVal = Math.max(...vals, 1);
-    const total  = vals.reduce((a, b) => a + b, 0);
-    const avg    = Math.round(total / vals.length);
-    const peak   = maxVal;
+    const total = vals.reduce((a, b) => a + b, 0);
+    const avg = Math.round(total / vals.length);
+    const peak = maxVal;
 
-    setEl('stat-avg',        avg);
-    setEl('stat-peak',       peak);
+    setEl('stat-avg', avg);
+    setEl('stat-peak', peak);
     setEl('stat-total-week', total);
 
     const todayIdx = new Date().getDay();           // 0=Dom
@@ -440,7 +442,7 @@ async function _loadReports() {
     const barsEl = document.getElementById('bars');
     if (barsEl) {
       barsEl.innerHTML = vals.map((v, i) => {
-        const h       = Math.round((v / maxVal) * 120);
+        const h = v === 0 ? 4 : Math.max(8, Math.round((v / maxVal) * 120));
         const isToday = i === todayBar;
         return `<div class="chart-bar-wrap">
           <div style="font-size:10px;color:var(--text-muted);text-align:center;min-height:14px">${v}</div>
@@ -453,28 +455,34 @@ async function _loadReports() {
     // ── Donut (distribuição de níveis) ────────────────────────────
     // Constrói a partir de allStudents (já carregados) ou de data.level_distribution
     const LEVEL_MAP = {
-      'beginner':           'Beginner',
-      'pre-intermediate':   'Pre-Intermediate',
-      'pre intermediate':   'Pre-Intermediate',
-      'intermediate':       'Intermediate',
-      'business english':   'Business English',
-      'business':           'Business English',
-      'advanced':           'Advanced',
+      'beginner': 'Beginner',
+      'pre-intermediate': 'Pre-Intermediate',
+      'pre intermediate': 'Pre-Intermediate',
+      'intermediate': 'Intermediate',
+      'business english': 'Business English',
+      'business': 'Business English',
+      'advanced': 'Advanced',
     };
     const COLORS = {
-      'Beginner':          '#7c3aed',
-      'Pre-Intermediate':  '#0ea5e9',
-      'Intermediate':      '#8b5cf6',
-      'Business English':  '#d946ef',
-      'Advanced':          '#f59e0b',
-      'Sem Nível':         '#64748b',
+      'Beginner': '#7c3aed',
+      'Pre-Intermediate': '#0ea5e9',
+      'Intermediate': '#8b5cf6',
+      'Business English': '#d946ef',
+      'Advanced': '#f59e0b',
+      'Sem Nível': '#64748b',
     };
 
     // Prefere data.level_distribution vinda da API; fallback: conta de allStudents
     let counts = {};
     if (data.level_distribution && typeof data.level_distribution === 'object') {
       counts = data.level_distribution; // { "Beginner": 3, "Intermediate": 2, ... }
-    } else {
+      try {
+        const freshStudents = await apiGet('/dashboard/students');
+        allStudents = freshStudents; // atualiza o cache também
+        _renderStudentsTable('students-table', allStudents);
+        _renderStudentsTable('recent-students-table', allStudents.slice(0, 5), true);
+      } catch (_) { }
+
       allStudents.forEach(s => {
         const key = LEVEL_MAP[(s.level || '').trim().toLowerCase()] || 'Sem Nível';
         counts[key] = (counts[key] || 0) + 1;
@@ -488,7 +496,7 @@ async function _loadReports() {
       .map(([name, count]) => ({
         name,
         count,
-        pct:   Math.round((count / totalStudents) * 100),
+        pct: Math.round((count / totalStudents) * 100),
         color: COLORS[name] || '#64748b',
       }));
 
@@ -504,11 +512,11 @@ async function _loadReports() {
 
       let offset = 0;
       levels.forEach(l => {
-        const dash   = (l.pct / 100) * circumference;
+        const dash = (l.pct / 100) * circumference;
         const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         circle.setAttribute('cx', cx);
         circle.setAttribute('cy', cy);
-        circle.setAttribute('r',  R);
+        circle.setAttribute('r', R);
         circle.setAttribute('fill', 'none');
         circle.setAttribute('stroke', l.color);
         circle.setAttribute('stroke-width', strokeW);
@@ -542,7 +550,7 @@ async function _loadReports() {
       : new Array(28).fill(0);
 
     const levelClass = v => {
-      if (!v)    return '';
+      if (!v) return '';
       if (v <= 1) return 'l1';
       if (v <= 2) return 'l2';
       if (v <= 3) return 'l3';
@@ -550,7 +558,7 @@ async function _loadReports() {
     };
 
     const weeks = [t('dash.week4') || 'Sem 4', t('dash.week3') || 'Sem 3',
-                   t('dash.week2') || 'Sem 2', t('dash.week1') || 'Esta sem'];
+    t('dash.week2') || 'Sem 2', t('dash.week1') || 'Esta sem'];
 
     const weekHeaderEl = document.getElementById('week-header');
     if (weekHeaderEl) {
@@ -583,7 +591,7 @@ async function _loadOverview() {
   const tbody = document.getElementById('difficulties-tbody');
   if (!tbody) return;
   try {
-    const data   = await apiGet('/dashboard/difficulties');
+    const data = await apiGet('/dashboard/difficulties');
     const alerts = data.alerts || [];
     tbody.innerHTML = '';
     if (!alerts.length) {
@@ -605,7 +613,7 @@ async function _loadOverview() {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function _showModalFeedback(el, msg, type) {
   el.textContent = msg;
-  el.className   = `modal-feedback ${type}`;
+  el.className = `modal-feedback ${type}`;
   el.style.display = 'block';
   setTimeout(() => { el.style.display = 'none'; }, 4000);
 }
@@ -657,15 +665,15 @@ function openLevelModal(levelName) {
           <div style="display:flex;align-items:center;gap:0.75rem;padding:0.625rem;
                       background:var(--bg);border-radius:10px;border:1px solid var(--border);cursor:pointer"
                onclick="document.getElementById('level-modal').remove(); openStudentModal('${escHtml(s.username)}')">
-            ${s.avatar_url
-              ? `<img src="${s.avatar_url}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0" alt="">`
-              : `<div class="student-avatar">${_initials(s.name || s.username)}</div>`}
+            ${s.avatar_urlf
+      ? `<img src="${s.avatar_url}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0" alt="">`
+      : `<div class="student-avatar">${_initials(s.name || s.username)}</div>`}
             <div>
               <div style="font-size:0.875rem;font-weight:600">${escHtml(s.name || s.username)}</div>
               <div style="font-size:0.72rem;color:var(--text-muted)">@${escHtml(s.username)} · ${s.total_messages ?? 0} msgs</div>
             </div>
           </div>`).join('')
-          : `<p style="color:var(--text-muted);text-align:center;padding:1rem">Nenhum aluno neste nível.</p>`}
+      : `<p style="color:var(--text-muted);text-align:center;padding:1rem">Nenhum aluno neste nível.</p>`}
       </div>
     </div>`;
 

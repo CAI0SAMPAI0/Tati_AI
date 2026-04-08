@@ -335,6 +335,9 @@ async def get_overview_report(current_user: dict = Depends(require_staff)):
         "Beginner", "Pre-Intermediate", "Intermediate",
         "Business English", "Advanced", "Outros"
     ]}
+    # removendo outros do gráfico redondo
+    if counts.get("Outros"):
+        level_distribution["Outros"] = counts["Outros"]
 
     # ── Weekly activity (últimos 7 dias, Seg→Dom) ─────────────────
     weekly_counts = defaultdict(int)
