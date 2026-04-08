@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     # autenticação
     jwt_secret_key: str = 'changeme-insecure'
     jwt_algorithm: str = 'HS256'
-    access_token_expire_minutes: int = 15
+    access_token_expire_minutes: int = 21600
     
     # Google OAuth
     google_client_id: str = ''
