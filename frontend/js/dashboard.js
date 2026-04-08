@@ -398,7 +398,7 @@ async function fetchStudentInterests() {
     _showModalFeedback(feedback, 'Erro de conexão.', 'error');
   } finally {
     btn.disabled = false;
-    btn.textContent = '🎯 Refazer Análise';
+    btn.textContent = t('dash.redo_analysis');
   }
 }
 
