@@ -148,99 +148,954 @@
                 </div>
             </section>
 
-            <section id="section-reports" class="dash-section" style="display: none;">
-                <header class="section-header">
-                    <h2 data-i18n="dash.reports_title">Relatórios de Desempenho</h2>
-                    <p data-i18n="dash.reports_desc">Acompanhe a evolução e as métricas da turma.</p>
-                </header>
+            <style>
+                * {
+                    box-sizing: border-box;
+                    margin: 0;
+                    padding: 0
+                }
 
-                <div class="reports-content">
-                    <div
-                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-                        <div
-                            style="background: var(--surface); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border); text-align: center;">
-                            <h3 style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Total de
-                                Alunos</h3>
-                            <div id="metric-students"
-                                style="font-size: 2.5rem; font-weight: bold; color: var(--primary);">--</div>
-                        </div>
-                        <div
-                            style="background: var(--surface); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border); text-align: center;">
-                            <h3 style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Mensagens
-                                Trocadas</h3>
-                            <div id="metric-messages"
-                                style="font-size: 2.5rem; font-weight: bold; color: var(--primary);">--</div>
-                        </div>
-                        <div
-                            style="background: var(--surface); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border); text-align: center;">
-                            <h3 style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem;">Alunos
-                                Ativos Hoje</h3>
-                            <div id="metric-active"
-                                style="font-size: 2.5rem; font-weight: bold; color: var(--success, #10b981);">--</div>
+                :root {
+                    --hue: 258;
+                    --primary: hsl(var(--hue), 80%, 58%);
+                    --primary-dim: hsla(var(--hue), 80%, 58%, 0.12);
+                    --primary-glow: hsla(var(--hue), 80%, 58%, 0.25);
+                    --bg: hsl(250, 28%, 7%);
+                    --bg-secondary: hsl(250, 25%, 10%);
+                    --surface: hsl(250, 22%, 13%);
+                    --border: hsla(var(--hue), 40%, 55%, 0.18);
+                    --border-focus: hsla(var(--hue), 80%, 58%, 0.55);
+                    --text: hsl(250, 20%, 94%);
+                    --text-muted: hsl(250, 12%, 58%);
+                    --text-subtle: hsl(250, 10%, 42%);
+                    --success: hsl(152, 68%, 42%);
+                    --radius-md: 10px;
+                    --radius-lg: 16px;
+                    --font-display: 'Sora', sans-serif;
+                    --font-body: 'DM Sans', sans-serif;
+                }
+
+                .layout {
+                    display: flex;
+                    height: 100vh;
+                    font-family: var(--font-body, 'DM Sans', sans-serif);
+                    background: var(--bg);
+                    min-height: 600px;
+                    color: var(--text)
+                }
+
+                /* Sidebar */
+                .sidebar {
+                    width: 220px;
+                    flex-shrink: 0;
+                    background: var(--bg-secondary);
+                    border-right: 0.5px solid var(--border);
+                    display: flex;
+                    flex-direction: column;
+                    padding: 0
+                }
+
+                .brand {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 18px 16px;
+                    border-bottom: 0.5px solid var(--border)
+                }
+
+                .avatar {
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 50%;
+                    background: var(--primary);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 13px;
+                    color: white;
+                    font-weight: 600;
+                    flex-shrink: 0;
+                    border: 2px solid var(--primary-glow)
+                }
+
+                .brand-text {
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: var(--text)
+                }
+
+                .brand-sub {
+                    font-size: 11px;
+                    color: var(--text-muted)
+                }
+
+                .nav {
+                    flex: 1;
+                    padding: 10px 8px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2px
+                }
+
+                .nav-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 8px 10px;
+                    border-radius: var(--radius-md);
+                    font-size: 13px;
+                    color: var(--text-muted);
+                    cursor: pointer;
+                    border: none;
+                    background: none;
+                    width: 100%;
+                    text-align: left;
+                    transition: all 0.15s;
+                    font-family: inherit
+                }
+
+                .nav-item svg {
+                    width: 15px;
+                    height: 15px;
+                    flex-shrink: 0;
+                    opacity: 0.6
+                }
+
+                .nav-item:hover {
+                    background: var(--primary-dim);
+                    color: var(--text)
+                }
+
+                .nav-item.active {
+                    background: var(--primary-dim);
+                    color: var(--primary);
+                    font-weight: 600
+                }
+
+                .nav-item.active svg {
+                    opacity: 1
+                }
+
+                .nav-footer {
+                    border-top: 0.5px solid var(--border);
+                    padding: 8px
+                }
+
+                /* Main */
+                .main {
+                    flex: 1;
+                    overflow-y: auto;
+                    display: flex;
+                    flex-direction: column
+                }
+
+                .topbar {
+                    padding: 20px 28px 18px;
+                    border-bottom: 0.5px solid var(--border);
+                    background: var(--bg-secondary)
+                }
+
+                .topbar h1 {
+                    font-size: 18px;
+                    font-weight: 700;
+                    color: var(--text);
+                    letter-spacing: -0.02em;
+                    font-family: var(--font-display, 'Sora', sans-serif)
+                }
+
+                .topbar p {
+                    font-size: 12px;
+                    color: var(--text-muted);
+                    margin-top: 3px
+                }
+
+                .content {
+                    padding: 28px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 24px
+                }
+
+                /* Metric Cards */
+                .metrics {
+                    display: grid;
+                    grid-template-columns: repeat(3, minmax(0, 1fr));
+                    gap: 14px
+                }
+
+                .metric-card {
+                    background: var(--surface);
+                    border: 0.5px solid var(--border);
+                    border-radius: var(--radius-lg);
+                    padding: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                    transition: border-color 0.2s
+                }
+
+                .metric-card:hover {
+                    border-color: var(--border-focus)
+                }
+
+                .metric-icon {
+                    width: 36px;
+                    height: 36px;
+                    border-radius: var(--radius-md);
+                    background: var(--primary-dim);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center
+                }
+
+                .metric-icon svg {
+                    width: 16px;
+                    height: 16px;
+                    color: var(--primary);
+                    stroke: var(--primary)
+                }
+
+                .metric-label {
+                    font-size: 11px;
+                    color: var(--text-muted);
+                    text-transform: uppercase;
+                    letter-spacing: .06em;
+                    font-weight: 600
+                }
+
+                .metric-value {
+                    font-size: 32px;
+                    font-weight: 700;
+                    line-height: 1;
+                    letter-spacing: -0.03em
+                }
+
+                .metric-value.purple {
+                    color: var(--primary)
+                }
+
+                .metric-value.green {
+                    color: hsl(152, 60%, 50%)
+                }
+
+                .metric-trend {
+                    font-size: 11px;
+                    color: var(--text-subtle);
+                    display: flex;
+                    align-items: center;
+                    gap: 4px
+                }
+
+                .metric-trend.up {
+                    color: hsl(152, 60%, 50%)
+                }
+
+                /* Chart area */
+                .charts-grid {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 16px
+                }
+
+                .chart-card {
+                    background: var(--surface);
+                    border: 0.5px solid var(--border);
+                    border-radius: var(--radius-lg);
+                    padding: 22px;
+                    transition: border-color 0.2s
+                }
+
+                .chart-card:hover {
+                    border-color: var(--border-focus)
+                }
+
+                .chart-card.full {
+                    grid-column: 1/-1
+                }
+
+                .chart-header {
+                    margin-bottom: 18px
+                }
+
+                .chart-title {
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: var(--text);
+                    letter-spacing: -0.01em
+                }
+
+                .chart-sub {
+                    font-size: 12px;
+                    color: var(--text-muted);
+                    margin-top: 3px
+                }
+
+                /* Bar Chart */
+                .chart-area {
+                    display: flex;
+                    align-items: flex-end;
+                    gap: 8px;
+                    height: 140px;
+                    padding-bottom: 0;
+                    position: relative
+                }
+
+                .chart-axis-y {
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    height: 100%;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                    padding-bottom: 24px
+                }
+
+                .axis-label {
+                    font-size: 10px;
+                    color: var(--text-subtle);
+                    text-align: right;
+                    min-width: 24px
+                }
+
+                .bars-area {
+                    flex: 1;
+                    display: flex;
+                    align-items: flex-end;
+                    gap: 6px;
+                    height: 100%
+                }
+
+                .chart-bar-wrap {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 6px;
+                    flex: 1
+                }
+
+                .bar {
+                    width: 100%;
+                    border-radius: 4px 4px 0 0;
+                    background: var(--primary);
+                    min-height: 4px;
+                    transition: opacity .15s, transform .15s;
+                    position: relative;
+                    cursor: pointer
+                }
+
+                .bar::before {
+                    content: attr(data-val);
+                    position: absolute;
+                    top: -22px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    font-size: 10px;
+                    color: var(--text-muted);
+                    white-space: nowrap;
+                    opacity: 0;
+                    transition: opacity 0.2s
+                }
+
+                .bar:hover {
+                    opacity: .8
+                }
+
+                .bar:hover::before {
+                    opacity: 1
+                }
+
+                .bar.today {
+                    background: hsl(152, 60%, 50%)
+                }
+
+                .bar-label {
+                    font-size: 10px;
+                    color: var(--text-subtle);
+                    text-align: center;
+                    white-space: nowrap
+                }
+
+                /* Donut */
+                .donut-wrap {
+                    display: flex;
+                    gap: 24px;
+                    align-items: center
+                }
+
+                .donut-container {
+                    position: relative;
+                    flex-shrink: 0
+                }
+
+                .donut-center {
+                    position: absolute;
+                    inset: 0;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center
+                }
+
+                .donut-center-num {
+                    font-size: 22px;
+                    font-weight: 700;
+                    color: var(--text)
+                }
+
+                .donut-center-label {
+                    font-size: 10px;
+                    color: var(--text-muted);
+                    text-transform: uppercase;
+                    letter-spacing: .06em
+                }
+
+                .legend {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                    flex: 1
+                }
+
+                .legend-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-size: 12px;
+                    color: var(--text-muted);
+                    cursor: pointer;
+                    border-radius: 6px;
+                    padding: 2px 0;
+                    transition: color 0.15s
+                }
+
+                .legend-item:hover {
+                    color: var(--text)
+                }
+
+                .legend-dot {
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    flex-shrink: 0
+                }
+
+                .legend-name {
+                    flex: 1
+                }
+
+                .legend-pct {
+                    color: var(--text-subtle);
+                    font-size: 11px;
+                    font-weight: 600
+                }
+
+                .legend-count {
+                    font-size: 11px;
+                    color: var(--text-subtle);
+                    min-width: 28px;
+                    text-align: right
+                }
+
+                /* Activity heatmap */
+                .heatmap-grid {
+                    display: grid;
+                    grid-template-columns: repeat(7, 1fr);
+                    gap: 4px;
+                    margin-top: 4px
+                }
+
+                .heat-cell {
+                    height: 24px;
+                    border-radius: 4px;
+                    background: var(--primary-dim);
+                    border: 0.5px solid var(--border);
+                    transition: all 0.15s;
+                    cursor: pointer;
+                    position: relative
+                }
+
+                .heat-cell:hover {
+                    border-color: var(--primary)
+                }
+
+                .heat-cell.l1 {
+                    background: hsla(var(--hue), 80%, 58%, 0.2)
+                }
+
+                .heat-cell.l2 {
+                    background: hsla(var(--hue), 80%, 58%, 0.4)
+                }
+
+                .heat-cell.l3 {
+                    background: hsla(var(--hue), 80%, 58%, 0.6)
+                }
+
+                .heat-cell.l4 {
+                    background: hsla(var(--hue), 80%, 58%, 0.85)
+                }
+
+                .heat-days {
+                    display: grid;
+                    grid-template-columns: repeat(7, 1fr);
+                    gap: 4px;
+                    margin-top: 6px
+                }
+
+                .heat-day {
+                    font-size: 10px;
+                    color: var(--text-subtle);
+                    text-align: center
+                }
+
+                /* Week labels */
+                .week-header {
+                    display: flex;
+                    margin-bottom: 6px
+                }
+
+                .week-label {
+                    font-size: 10px;
+                    color: var(--text-subtle);
+                    flex: 1;
+                    text-align: center
+                }
+
+                /* Stats row */
+                .stats-row {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 10px;
+                    margin-top: 4px
+                }
+
+                .stat-mini {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 3px;
+                    padding: 12px;
+                    background: var(--bg);
+                    border-radius: var(--radius-md);
+                    border: 0.5px solid var(--border)
+                }
+
+                .stat-mini-val {
+                    font-size: 18px;
+                    font-weight: 700;
+                    color: var(--primary)
+                }
+
+                .stat-mini-label {
+                    font-size: 10px;
+                    color: var(--text-muted);
+                    text-transform: uppercase;
+                    letter-spacing: .06em
+                }
+
+                /* Badge */
+                .badge {
+                    display: inline-flex;
+                    align-items: center;
+                    padding: 2px 8px;
+                    border-radius: 999px;
+                    font-size: 10px;
+                    font-weight: 600;
+                    letter-spacing: .03em
+                }
+
+                .badge-purple {
+                    background: var(--primary-dim);
+                    color: var(--primary);
+                    border: 0.5px solid hsla(var(--hue), 80%, 58%, 0.28)
+                }
+
+                .badge-green {
+                    background: hsla(152, 68%, 42%, 0.12);
+                    color: hsl(152, 68%, 52%);
+                    border: 0.5px solid hsla(152, 68%, 42%, 0.28)
+                }
+            </style>
+
+            <div class="layout">
+                <!-- Sidebar -->
+                <aside class="sidebar">
+                    <div class="brand">
+                        <div class="avatar">T</div>
+                        <div>
+                            <div class="brand-text">Teacher Tati</div>
+                            <div class="brand-sub">Dashboard</div>
                         </div>
                     </div>
+                    <nav class="nav">
+                        <button class="nav-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10" />
+                                <polyline points="12 6 12 12 16 14" />
+                            </svg>
+                            Visão Geral
+                        </button>
+                        <button class="nav-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                <circle cx="9" cy="7" r="4" />
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+                            </svg>
+                            Alunos
+                        </button>
+                        <button class="nav-item active">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                            </svg>
+                            Relatórios
+                        </button>
+                    </nav>
+                    <div class="nav-footer">
+                        <button class="nav-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                            </svg>
+                            Ir ao Chat
+                        </button>
+                        <button class="nav-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="3" />
+                                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 19.07a10 10 0 0 1 0-14.14" />
+                            </svg>
+                            Configurações
+                        </button>
+                        <button class="nav-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                                <polyline points="16 17 21 12 16 7" />
+                                <line x1="21" y1="12" x2="9" y2="12" />
+                            </svg>
+                            Sair
+                        </button>
+                    </div>
+                </aside>
 
-                    <div
-                        style="background: var(--surface); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border);">
-                        <h3 style="color: var(--text-muted); font-size: 1rem; margin-bottom: 1rem; text-align: center;">
-                            Distribuição de Níveis (Inglês)</h3>
-                        
-                        <div style="position: relative; height: 300px; max-width: 400px; margin: 0 auto;">
-                            <canvas id="levelChart"></canvas>
+                <!-- Main -->
+                <main class="main">
+                    <div class="topbar">
+                        <h1>Relatórios</h1>
+                        <p>Visão geral e métricas da turma</p>
+                    </div>
+
+                    <div class="content">
+
+                        <!-- Metric Cards -->
+                        <div class="metrics">
+                            <div class="metric-card">
+                                <div style="display:flex;align-items:flex-start;justify-content:space-between">
+                                    <div class="metric-icon">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                            <circle cx="9" cy="7" r="4" />
+                                        </svg>
+                                    </div>
+                                    <span class="badge badge-purple">Total</span>
+                                </div>
+                                <div>
+                                    <div class="metric-label">Total de alunos</div>
+                                    <div class="metric-value purple" id="val-students">1</div>
+                                </div>
+                                <div class="metric-trend">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                                    </svg>
+                                    Plataforma ativa
+                                </div>
+                            </div>
+
+                            <div class="metric-card">
+                                <div style="display:flex;align-items:flex-start;justify-content:space-between">
+                                    <div class="metric-icon">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                        </svg>
+                                    </div>
+                                    <span class="badge badge-purple">Trocadas</span>
+                                </div>
+                                <div>
+                                    <div class="metric-label">Mensagens</div>
+                                    <div class="metric-value purple" id="val-msgs">174</div>
+                                </div>
+                                <div class="metric-trend">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                                        <polyline points="17 6 23 6 23 12" />
+                                    </svg>
+                                    +12 esta semana
+                                </div>
+                            </div>
+
+                            <div class="metric-card">
+                                <div style="display:flex;align-items:flex-start;justify-content:space-between">
+                                    <div class="metric-icon" style="background:hsla(152,68%,42%,0.12)">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"
+                                            style="stroke:hsl(152,60%,50%)">
+                                            <circle cx="12" cy="12" r="10" />
+                                            <polyline points="12 6 12 12 16 14" />
+                                        </svg>
+                                    </div>
+                                    <span class="badge badge-green">Hoje</span>
+                                </div>
+                                <div>
+                                    <div class="metric-label">Alunos ativos hoje</div>
+                                    <div class="metric-value green" id="val-active">0</div>
+                                </div>
+                                <div class="metric-trend">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <circle cx="12" cy="12" r="1" />
+                                        <circle cx="19" cy="12" r="1" />
+                                        <circle cx="5" cy="12" r="1" />
+                                    </svg>
+                                    Sem atividade hoje
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Charts grid -->
+                        <div class="charts-grid">
+
+                            <!-- Bar chart - weekly activity -->
+                            <div class="chart-card">
+                                <div class="chart-header">
+                                    <div class="chart-title">Atividade semanal</div>
+                                    <div class="chart-sub">Mensagens por dia — últimos 7 dias</div>
+                                </div>
+                                <div style="position:relative;padding-left:30px">
+                                    <div class="chart-area" id="bars"></div>
+                                </div>
+                                <div class="stats-row" style="margin-top:14px">
+                                    <div class="stat-mini">
+                                        <div class="stat-mini-val" id="stat-avg">—</div>
+                                        <div class="stat-mini-label">Média/dia</div>
+                                    </div>
+                                    <div class="stat-mini">
+                                        <div class="stat-mini-val" id="stat-peak">—</div>
+                                        <div class="stat-mini-label">Pico</div>
+                                    </div>
+                                    <div class="stat-mini">
+                                        <div class="stat-mini-val" id="stat-total-week">—</div>
+                                        <div class="stat-mini-label">Total semana</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Donut - level distribution -->
+                            <div class="chart-card">
+                                <div class="chart-header">
+                                    <div class="chart-title">Distribuição de níveis</div>
+                                    <div class="chart-sub">Níveis de inglês dos alunos</div>
+                                </div>
+                                <div class="donut-wrap">
+                                    <div class="donut-container">
+                                        <svg id="donut-svg" width="140" height="140" viewBox="0 0 140 140"></svg>
+                                        <div class="donut-center">
+                                            <div class="donut-center-num" id="donut-center-num">1</div>
+                                            <div class="donut-center-label">aluno</div>
+                                        </div>
+                                    </div>
+                                    <div class="legend" id="legend"></div>
+                                </div>
+                            </div>
+
+                            <!-- Heatmap - activity by day/hour -->
+                            <div class="chart-card full">
+                                <div class="chart-header"
+                                    style="display:flex;align-items:flex-start;justify-content:space-between">
+                                    <div>
+                                        <div class="chart-title">Heatmap de engajamento</div>
+                                        <div class="chart-sub">Intensidade de mensagens por dia da semana — últimas 4
+                                            semanas</div>
+                                    </div>
+                                    <div
+                                        style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text-subtle)">
+                                        <span>Menos</span>
+                                        <div style="display:flex;gap:3px">
+                                            <div
+                                                style="width:12px;height:12px;border-radius:3px;background:var(--primary-dim);border:0.5px solid var(--border)">
+                                            </div>
+                                            <div
+                                                style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.2)">
+                                            </div>
+                                            <div
+                                                style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.4)">
+                                            </div>
+                                            <div
+                                                style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.6)">
+                                            </div>
+                                            <div
+                                                style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.85)">
+                                            </div>
+                                        </div>
+                                        <span>Mais</span>
+                                    </div>
+                                </div>
+                                <div class="week-header" id="week-header"></div>
+                                <div class="heatmap-grid" id="heatmap"></div>
+                                <div class="heat-days" id="heat-days"></div>
+                            </div>
+
                         </div>
                     </div>
-                </div>
-            </section>
-
-        </main>
-    </div>
-    
-    <template id="student-modal-template">
-        <div class="modal-backdrop"></div>
-        <div class="modal-panel">
-            <div class="modal-tabs">
-                <button class="modal-tab active">✏️ Editar</button>
-                <button class="modal-tab">🧩 Prompt</button>
-                <button class="modal-tab">🧠 Insight</button>
-                <button class="modal-tab">🎯 Interesses do Aluno</button>
+                </main>
             </div>
-            
-            <div class="modal-tab-content" id="tab-insight-template">
-                <div class="modal-actions">
-                    <button class="btn-modal-save" type="button">🧠 Gerar Insight</button>
-                    <button class="btn-modal-secondary" type="button" data-i18n="dash.grammar_errors">Erros
-                        Gramaticais</button>
-                </div>
-            </div>
 
-            <div class="modal-tab-content" id="tab-interests-template" style="display: none;">
+            <script>
+                /* ── Bar chart ─────────────────────────── */
+                const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+                const vals = [28, 34, 22, 41, 19, 18, 12];
+                const max = Math.max(...vals);
+                const total = vals.reduce((a, b) => a + b, 0);
+                const avg = Math.round(total / vals.length);
+                const todayIdx = new Date().getDay(); // 0=Sun, adjust
+                const todayBar = (todayIdx === 0) ? 6 : todayIdx - 1;
 
-                <div class="modal-actions">
-                    <button class="btn-modal-save" id="btn-generate-interests" type="button">
-                        🎯 Analisar Interesses e Recomendações
-                    </button>
-                </div>
+                document.getElementById('stat-avg').textContent = avg;
+                document.getElementById('stat-peak').textContent = max;
+                document.getElementById('stat-total-week').textContent = total;
 
-                <div class="interests-section">
-                    <h4>Interesses do Aluno</h4>
-                    <div id="interests-container">
+                const container = document.getElementById('bars');
+                container.innerHTML = vals.map((v, i) => {
+                    const h = Math.round((v / max) * 120);
+                    const isToday = i === todayBar;
+                    return `<div class="chart-bar-wrap">
+    <div class="bar-val" style="font-size:10px;color:var(--text-muted);text-align:center;min-height:14px">${v}</div>
+    <div class="bar${isToday ? ' today' : ''}" data-val="${v} msgs" style="height:${h}px" title="${days[i]}: ${v} msgs"></div>
+    <div class="bar-label" style="${isToday ? 'color:var(--primary);font-weight:600' : ''}">${days[i]}</div>
+  </div>`;
+                }).join('');
+
+                /* ── Donut chart ────────────────────────── */
+                const levels = [
+                    { name: 'Beginner', pct: 100, count: 1, color: '#7c3aed' },
+                    { name: 'Pre-Intermediate', pct: 0, count: 0, color: '#0ea5e9' },
+                    { name: 'Intermediate', pct: 0, count: 0, color: '#8b5cf6' },
+                    { name: 'Business English', pct: 0, count: 0, color: '#d946ef' },
+                    { name: 'Advanced', pct: 0, count: 0, color: '#f59e0b' },
+                ];
+                const total_students = levels.reduce((a, b) => a + b.count, 0);
+                document.getElementById('donut-center-num').textContent = total_students;
+
+                const R = 50, cx = 70, cy = 70, strokeW = 20;
+                const circumference = 2 * Math.PI * R;
+                let offset = 0;
+
+                const svg = document.getElementById('donut-svg');
+                // Background ring
+                svg.innerHTML = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="hsla(258,40%,55%,0.1)" stroke-width="${strokeW}"/>`;
+
+                levels.filter(l => l.pct > 0).forEach(l => {
+                    const dash = (l.pct / 100) * circumference;
+                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    circle.setAttribute('cx', cx); circle.setAttribute('cy', cy); circle.setAttribute('r', R);
+                    circle.setAttribute('fill', 'none'); circle.setAttribute('stroke', l.color);
+                    circle.setAttribute('stroke-width', strokeW); circle.setAttribute('stroke-linecap', 'round');
+                    circle.setAttribute('stroke-dasharray', `${dash} ${circumference}`);
+                    circle.setAttribute('stroke-dashoffset', `${-offset}`);
+                    circle.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
+                    circle.style.transition = 'stroke-dasharray 0.5s ease';
+                    svg.appendChild(circle);
+                    offset += dash;
+                });
+
+                const legendEl = document.getElementById('legend');
+                legendEl.innerHTML = levels.map(l => `
+  <div class="legend-item">
+    <div class="legend-dot" style="background:${l.color}"></div>
+    <span class="legend-name" style="font-size:12px">${l.name}</span>
+    <span class="legend-pct">${l.pct}%</span>
+    <span class="legend-count">${l.count}</span>
+  </div>`).join('');
+
+                /* ── Heatmap ────────────────────────────── */
+                const dayNames = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+                // Simulate 4 weeks of data (28 cells)
+                const heatData = [
+                    0, 2, 3, 4, 2, 1, 0,
+                    1, 3, 4, 4, 3, 2, 1,
+                    2, 4, 3, 2, 1, 0, 0,
+                    3, 4, 2, 3, 4, 2, 1
+                ];
+
+                const levelClass = v => {
+                    if (v === 0) return '';
+                    if (v <= 1) return 'l1';
+                    if (v <= 2) return 'l2';
+                    if (v <= 3) return 'l3';
+                    return 'l4';
+                };
+
+                const weekHeader = document.getElementById('week-header');
+                weekHeader.innerHTML = dayNames.map(d => `<span class="week-label" style="font-size:10px;color:var(--text-subtle);flex:1;text-align:center">${d}</span>`).join('');
+
+                const heatmap = document.getElementById('heatmap');
+                const weeks = ['Sem 4', 'Sem 3', 'Sem 2', 'Esta sem'];
+                const msgCounts = [0, 12, 28, 41, 19, 18, 12, 21, 34, 22, 41, 19, 18, 12, 28, 34, 22, 41, 0, 18, 0, 28, 41, 22, 41, 19, 18, 12];
+
+                heatmap.innerHTML = heatData.map((v, i) => {
+                    const lc = levelClass(v);
+                    const week = Math.floor(i / 7);
+                    const day = i % 7;
+                    return `<div class="heat-cell${lc ? ' ' + lc : ''}" title="${weeks[week]}, ${dayNames[day]}: ${v * 10} msgs"></div>`;
+                }).join('');
+
+                const heatDays = document.getElementById('heat-days');
+                heatDays.innerHTML = ['S4', 'S3', 'S2', 'S1'].map(w => `<span style="font-size:10px;color:var(--text-subtle);grid-column:1/-1;display:none">${w}</span>`).join('') +
+                    dayNames.map(d => `<div style="font-size:10px;color:var(--text-subtle);text-align:center">${d}</div>`).join('');
+            </script>
+
+            <template id="student-modal-template">
+                <div class="modal-backdrop"></div>
+                <div class="modal-panel">
+                    <div class="modal-tabs">
+                        <button class="modal-tab active">✏️ Editar</button>
+                        <button class="modal-tab">🧩 Prompt</button>
+                        <button class="modal-tab">🧠 Insight</button>
+                        <button class="modal-tab">🎯 Interesses do Aluno</button>
+                    </div>
+
+                    <div class="modal-tab-content" id="tab-insight-template">
+                        <div class="modal-actions">
+                            <button class="btn-modal-save" type="button">🧠 Gerar Insight</button>
+                            <button class="btn-modal-secondary" type="button" data-i18n="dash.grammar_errors">Erros
+                                Gramaticais</button>
+                        </div>
+                    </div>
+
+                    <div class="modal-tab-content" id="tab-interests-template" style="display: none;">
+
+                        <div class="modal-actions">
+                            <button class="btn-modal-save" id="btn-generate-interests" type="button">
+                                🎯 Analisar Interesses e Recomendações
+                            </button>
+                        </div>
+
+                        <div class="interests-section">
+                            <h4>Interesses do Aluno</h4>
+                            <div id="interests-container">
+                            </div>
+                        </div>
+
+                        <div class="recommendations-section">
+                            <h4>Plano de Ação (Recomendações)</h4>
+                            <div id="recommendations-container">
+                            </div>
+                        </div>
+
                     </div>
                 </div>
+            </template>
 
-                <div class="recommendations-section">
-                    <h4>Plano de Ação (Recomendações)</h4>
-                    <div id="recommendations-container">
-                    </div>
-                </div>
-
-            </div>
-        </div>
-    </template>
-
-    <script src="js/i18n.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="js/api.js"></script>
-    <script src="js/dashboard.js"></script>
+            <script src="js/i18n.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <script src="js/api.js"></script>
+            <script src="js/dashboard.js"></script>
 </body>
 
 </html>
