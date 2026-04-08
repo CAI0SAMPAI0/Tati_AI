@@ -37,6 +37,10 @@ app.include_router(chat.router, prefix="/voice", tags=["voice"])
 async def server_index() -> FileResponse:
     return FileResponse(_FRONTEND_PATH / "index.html")'''
 
+@app.get("/cors-test")
+async def cors_test():
+    return {"origins": ["https://tati-ai.vercel.app"]}
+
 if __name__ == "__main__":
     import uvicorn
     from core.config import settings
