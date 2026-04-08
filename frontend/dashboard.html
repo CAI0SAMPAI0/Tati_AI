@@ -58,7 +58,9 @@
             transition: border-color 0.2s
         }
 
-        .metric-card:hover { border-color: var(--border-focus) }
+        .metric-card:hover {
+            border-color: var(--border-focus)
+        }
 
         .metric-icon {
             width: 36px;
@@ -92,8 +94,13 @@
             letter-spacing: -0.03em
         }
 
-        .metric-value.purple { color: var(--primary) }
-        .metric-value.green  { color: hsl(152, 60%, 50%) }
+        .metric-value.purple {
+            color: var(--primary)
+        }
+
+        .metric-value.green {
+            color: hsl(152, 60%, 50%)
+        }
 
         .metric-trend {
             font-size: 11px;
@@ -103,7 +110,9 @@
             gap: 4px
         }
 
-        .metric-trend.up { color: hsl(152, 60%, 50%) }
+        .metric-trend.up {
+            color: hsl(152, 60%, 50%)
+        }
 
         .charts-grid {
             display: grid;
@@ -119,10 +128,17 @@
             transition: border-color 0.2s
         }
 
-        .chart-card:hover { border-color: var(--border-focus) }
-        .chart-card.full  { grid-column: 1/-1 }
+        .chart-card:hover {
+            border-color: var(--border-focus)
+        }
 
-        .chart-header { margin-bottom: 18px }
+        .chart-card.full {
+            grid-column: 1/-1
+        }
+
+        .chart-header {
+            margin-bottom: 18px
+        }
 
         .chart-title {
             font-size: 14px;
@@ -176,9 +192,17 @@
             transition: opacity 0.2s
         }
 
-        .bar:hover { opacity: .8 }
-        .bar:hover::before { opacity: 1 }
-        .bar.today { background: hsl(152, 60%, 50%) }
+        .bar:hover {
+            opacity: .8
+        }
+
+        .bar:hover::before {
+            opacity: 1
+        }
+
+        .bar.today {
+            background: hsl(152, 60%, 50%)
+        }
 
         .bar-label {
             font-size: 10px;
@@ -187,9 +211,16 @@
             white-space: nowrap
         }
 
-        .donut-wrap { display: flex; gap: 24px; align-items: center }
+        .donut-wrap {
+            display: flex;
+            gap: 24px;
+            align-items: center
+        }
 
-        .donut-container { position: relative; flex-shrink: 0 }
+        .donut-container {
+            position: relative;
+            flex-shrink: 0
+        }
 
         .donut-center {
             position: absolute;
@@ -200,7 +231,11 @@
             justify-content: center
         }
 
-        .donut-center-num { font-size: 22px; font-weight: 700; color: var(--text) }
+        .donut-center-num {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text)
+        }
 
         .donut-center-label {
             font-size: 10px;
@@ -209,7 +244,12 @@
             letter-spacing: .06em
         }
 
-        .legend { display: flex; flex-direction: column; gap: 10px; flex: 1 }
+        .legend {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex: 1
+        }
 
         .legend-item {
             display: flex;
@@ -223,11 +263,33 @@
             transition: color 0.15s
         }
 
-        .legend-item:hover { color: var(--text) }
-        .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0 }
-        .legend-name { flex: 1 }
-        .legend-pct { color: var(--text-subtle); font-size: 11px; font-weight: 600 }
-        .legend-count { font-size: 11px; color: var(--text-subtle); min-width: 28px; text-align: right }
+        .legend-item:hover {
+            color: var(--text)
+        }
+
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0
+        }
+
+        .legend-name {
+            flex: 1
+        }
+
+        .legend-pct {
+            color: var(--text-subtle);
+            font-size: 11px;
+            font-weight: 600
+        }
+
+        .legend-count {
+            font-size: 11px;
+            color: var(--text-subtle);
+            min-width: 28px;
+            text-align: right
+        }
 
         .heatmap-grid {
             display: grid;
@@ -245,11 +307,25 @@
             cursor: pointer
         }
 
-        .heat-cell:hover { border-color: var(--primary) }
-        .heat-cell.l1 { background: hsla(var(--hue), 80%, 58%, 0.2) }
-        .heat-cell.l2 { background: hsla(var(--hue), 80%, 58%, 0.4) }
-        .heat-cell.l3 { background: hsla(var(--hue), 80%, 58%, 0.6) }
-        .heat-cell.l4 { background: hsla(var(--hue), 80%, 58%, 0.85) }
+        .heat-cell:hover {
+            border-color: var(--primary)
+        }
+
+        .heat-cell.l1 {
+            background: hsla(var(--hue), 80%, 58%, 0.2)
+        }
+
+        .heat-cell.l2 {
+            background: hsla(var(--hue), 80%, 58%, 0.4)
+        }
+
+        .heat-cell.l3 {
+            background: hsla(var(--hue), 80%, 58%, 0.6)
+        }
+
+        .heat-cell.l4 {
+            background: hsla(var(--hue), 80%, 58%, 0.85)
+        }
 
         .heat-days {
             display: grid;
@@ -258,7 +334,10 @@
             margin-top: 6px
         }
 
-        .week-header { display: flex; margin-bottom: 6px }
+        .week-header {
+            display: flex;
+            margin-bottom: 6px
+        }
 
         .week-label {
             font-size: 10px;
@@ -284,7 +363,11 @@
             border: 0.5px solid var(--border)
         }
 
-        .stat-mini-val { font-size: 18px; font-weight: 700; color: var(--primary) }
+        .stat-mini-val {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary)
+        }
 
         .stat-mini-label {
             font-size: 10px;
@@ -413,17 +496,21 @@
                 <div class="overview-content" style="margin-top: 2rem;">
                     <h3 style="color: var(--text-muted); font-size: 1.1rem; margin-bottom: 1rem;">Alertas de Dificuldade
                         da Turma</h3>
-                    <div style="background: var(--surface); border-radius: 8px; border: 1px solid var(--border); overflow: hidden;">
+                    <div
+                        style="background: var(--surface); border-radius: 8px; border: 1px solid var(--border); overflow: hidden;">
                         <table style="width: 100%; text-align: left; border-collapse: collapse;">
                             <thead style="background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--border);">
                                 <tr>
-                                    <th style="padding: 1rem; color: var(--text-muted); font-weight: 600;">🧑‍🎓 Aluno</th>
-                                    <th style="padding: 1rem; color: var(--text-muted); font-weight: 600;">⚠️ Foco de Atenção</th>
+                                    <th style="padding: 1rem; color: var(--text-muted); font-weight: 600;">🧑‍🎓 Aluno
+                                    </th>
+                                    <th style="padding: 1rem; color: var(--text-muted); font-weight: 600;">⚠️ Foco de
+                                        Atenção</th>
                                 </tr>
                             </thead>
                             <tbody id="difficulties-tbody">
                                 <tr>
-                                    <td colspan="2" style="padding: 1rem; text-align: center; color: var(--text-muted);">
+                                    <td colspan="2"
+                                        style="padding: 1rem; text-align: center; color: var(--text-muted);">
                                         Carregando alertas...
                                     </td>
                                 </tr>
@@ -468,7 +555,8 @@
                                 <div class="metric-value purple" id="val-students">—</div>
                             </div>
                             <div class="metric-trend">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
                                     <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
                                 </svg>
                                 Plataforma ativa
@@ -489,7 +577,8 @@
                                 <div class="metric-value purple" id="val-msgs">—</div>
                             </div>
                             <div class="metric-trend">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
                                     <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
                                     <polyline points="17 6 23 6 23 12" />
                                 </svg>
@@ -500,7 +589,8 @@
                         <div class="metric-card">
                             <div style="display:flex;align-items:flex-start;justify-content:space-between">
                                 <div class="metric-icon" style="background:hsla(152,68%,42%,0.12)">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" style="stroke:hsl(152,60%,50%)">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2"
+                                        style="stroke:hsl(152,60%,50%)">
                                         <circle cx="12" cy="12" r="10" />
                                         <polyline points="12 6 12 12 16 14" />
                                     </svg>
@@ -512,7 +602,8 @@
                                 <div class="metric-value green" id="val-active">—</div>
                             </div>
                             <div class="metric-trend">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
                                     <circle cx="12" cy="12" r="1" />
                                     <circle cx="19" cy="12" r="1" />
                                     <circle cx="5" cy="12" r="1" />
@@ -569,19 +660,32 @@
 
                         <!-- Heatmap -->
                         <div class="chart-card full">
-                            <div class="chart-header" style="display:flex;align-items:flex-start;justify-content:space-between">
+                            <div class="chart-header"
+                                style="display:flex;align-items:flex-start;justify-content:space-between">
                                 <div>
                                     <div class="chart-title">Heatmap de engajamento</div>
-                                    <div class="chart-sub">Intensidade de mensagens por dia da semana — últimas 4 semanas</div>
+                                    <div class="chart-sub">Intensidade de mensagens por dia da semana — últimas 4
+                                        semanas</div>
                                 </div>
-                                <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text-subtle)">
+                                <div
+                                    style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text-subtle)">
                                     <span>Menos</span>
                                     <div style="display:flex;gap:3px">
-                                        <div style="width:12px;height:12px;border-radius:3px;background:var(--primary-dim);border:0.5px solid var(--border)"></div>
-                                        <div style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.2)"></div>
-                                        <div style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.4)"></div>
-                                        <div style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.6)"></div>
-                                        <div style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.85)"></div>
+                                        <div
+                                            style="width:12px;height:12px;border-radius:3px;background:var(--primary-dim);border:0.5px solid var(--border)">
+                                        </div>
+                                        <div
+                                            style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.2)">
+                                        </div>
+                                        <div
+                                            style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.4)">
+                                        </div>
+                                        <div
+                                            style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.6)">
+                                        </div>
+                                        <div
+                                            style="width:12px;height:12px;border-radius:3px;background:hsla(var(--hue),80%,58%,0.85)">
+                                        </div>
                                     </div>
                                     <span>Mais</span>
                                 </div>
@@ -625,11 +729,11 @@
 
         /* ── Donut chart ── */
         const levels = [
-            { name: 'Beginner',          pct: 100, count: 1, color: '#7c3aed' },
-            { name: 'Pre-Intermediate',  pct: 0,   count: 0, color: '#0ea5e9' },
-            { name: 'Intermediate',      pct: 0,   count: 0, color: '#8b5cf6' },
-            { name: 'Business English',  pct: 0,   count: 0, color: '#d946ef' },
-            { name: 'Advanced',          pct: 0,   count: 0, color: '#f59e0b' },
+            { name: 'Beginner', pct: 100, count: 1, color: '#7c3aed' },
+            { name: 'Pre-Intermediate', pct: 0, count: 0, color: '#0ea5e9' },
+            { name: 'Intermediate', pct: 0, count: 0, color: '#8b5cf6' },
+            { name: 'Business English', pct: 0, count: 0, color: '#d946ef' },
+            { name: 'Advanced', pct: 0, count: 0, color: '#f59e0b' },
         ];
         const total_students = levels.reduce((a, b) => a + b.count, 0);
         document.getElementById('donut-center-num').textContent = total_students;
@@ -676,7 +780,7 @@
 
         document.getElementById('heatmap').innerHTML = heatData.map((v, i) => {
             const lc = levelClass(v);
-            return `<div class="heat-cell${lc ? ' ' + lc : ''}" title="${weeks[Math.floor(i/7)]}, ${dayNames[i%7]}: ${v*10} msgs"></div>`;
+            return `<div class="heat-cell${lc ? ' ' + lc : ''}" title="${weeks[Math.floor(i / 7)]}, ${dayNames[i % 7]}: ${v * 10} msgs"></div>`;
         }).join('');
 
         document.getElementById('heat-days').innerHTML = dayNames.map(d =>
@@ -695,7 +799,8 @@
             <div class="modal-tab-content" id="tab-insight-template">
                 <div class="modal-actions">
                     <button class="btn-modal-save" type="button">🧠 Gerar Insight</button>
-                    <button class="btn-modal-secondary" type="button" data-i18n="dash.grammar_errors">Erros Gramaticais</button>
+                    <button class="btn-modal-secondary" type="button" data-i18n="dash.grammar_errors">Erros
+                        Gramaticais</button>
                 </div>
             </div>
             <div class="modal-tab-content" id="tab-interests-template" style="display:none;">
