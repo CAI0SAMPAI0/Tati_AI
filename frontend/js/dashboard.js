@@ -9,6 +9,12 @@ let allStudents          = [];
 let currentModalUsername = null;
 let reportsChartInstance = null;
 
+// usando modo claro ou escuro
+(function() {
+    const icon = document.getElementById('theme-icon');
+    if (icon) icon.textContent = (localStorage.getItem('theme') || 'dark') === 'dark' ? '☀️' : '🌙';
+})();
+
 // ── Seções ────────────────────────────────────────────────────────────────────
 const SECTIONS = {
   overview: { title: () => t('dash.overview'), sub: () => t('dash.overview_sub') },
