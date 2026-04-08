@@ -301,38 +301,105 @@ async def get_recommendations(
     return {"recommendations": recommendations, "interests": interests}
 
 
+# backend/routers/dashboard.py
+# substitua o endpoint get_overview_report completo
+
 @router.get("/reports/overview")
 async def get_overview_report(current_user: dict = Depends(require_staff)):
-    from datetime import date
+    from datetime import date, timedelta
+    from collections import defaultdict
     db = get_client()
-    today = date.today().isoformat()
+    today = date.today()
 
     students = db.table("users").select("username, level").eq("role", "student").execute()
     messages = db.table("messages").select("id").eq("role", "user").execute()
-    active_today = db.table("messages").select("username").eq("role", "user").eq("date", today).execute()
+    active_today_rows = db.table("messages").select("username").eq("role", "user").eq("date", today.isoformat()).execute()
 
+    # ── Level distribution ────────────────────────────────────────
     level_map = {
-        "beginner": "beginner", "pre-intermediate": "pre-intermediate",
-        "intermediate": "intermediate", "business english": "business_english",
-        "advanced": "advanced",
+        "beginner": "Beginner",
+        "pre-intermediate": "Pre-Intermediate",
+        "pre intermediate": "Pre-Intermediate",
+        "intermediate": "Intermediate",
+        "business english": "Business English",
+        "business": "Business English",
+        "advanced": "Advanced",
     }
     counts: Counter = Counter()
     for s in students.data:
         normalized = (s.get("level") or "").strip().lower()
-        counts[level_map.get(normalized, "outros")] += 1
+        key = level_map.get(normalized, "Outros")
+        counts[key] += 1
+
+    level_distribution = {k: counts[k] for k in [
+        "Beginner", "Pre-Intermediate", "Intermediate",
+        "Business English", "Advanced", "Outros"
+    ]}
+
+    # ── Weekly activity (últimos 7 dias, Seg→Dom) ─────────────────
+    weekly_counts = defaultdict(int)
+    for i in range(7):
+        day = today - timedelta(days=today.weekday()) + timedelta(days=i)  # Seg=0 → Dom=6
+        weekly_counts[day.isoformat()] = 0
+
+    last_7_start = (today - timedelta(days=today.weekday())).isoformat()  # segunda desta semana
+    weekly_rows = (
+        db.table("messages")
+        .select("date")
+        .eq("role", "user")
+        .gte("date", last_7_start)
+        .lte("date", today.isoformat())
+        .execute()
+    )
+    for row in weekly_rows.data:
+        d = row.get("date")
+        if d in weekly_counts:
+            weekly_counts[d] += 1
+
+    # Ordena Seg→Dom
+    monday = today - timedelta(days=today.weekday())
+    weekly_activity = [
+        weekly_counts.get((monday + timedelta(days=i)).isoformat(), 0)
+        for i in range(7)
+    ]
+
+    # ── Heatmap (últimas 4 semanas, 28 dias, Seg→Dom) ─────────────
+    heatmap_counts = {}
+    start_4w = today - timedelta(days=today.weekday() + 21)  # 4 semanas atrás (segunda)
+    heatmap_rows = (
+        db.table("messages")
+        .select("date")
+        .eq("role", "user")
+        .gte("date", start_4w.isoformat())
+        .lte("date", today.isoformat())
+        .execute()
+    )
+    for row in heatmap_rows.data:
+        d = row.get("date")
+        if d:
+            heatmap_counts[d] = heatmap_counts.get(d, 0) + 1
+
+    max_day = max(heatmap_counts.values(), default=1)
+
+    heatmap = []
+    for week in range(4):
+        monday_w = start_4w + timedelta(weeks=week)
+        for day_offset in range(7):
+            d = (monday_w + timedelta(days=day_offset)).isoformat()
+            raw = heatmap_counts.get(d, 0)
+            # Normaliza para 0-4 (nível do heatmap)
+            level = 0
+            if raw > 0:
+                level = min(4, max(1, round((raw / max_day) * 4)))
+            heatmap.append(level)
 
     return {
         "total_students": len(students.data),
         "total_messages": len(messages.data),
-        "active_today": len({m["username"] for m in active_today.data}),
-        "level_distribution": {
-            "beginner": counts["beginner"],
-            "pre-intermediate": counts["pre-intermediate"],
-            "intermediate": counts["intermediate"],
-            "business_english": counts["business_english"],
-            "advanced": counts["advanced"],
-            "outros": counts["outros"],
-        },
+        "active_today": len({m["username"] for m in active_today_rows.data}),
+        "level_distribution": level_distribution,
+        "weekly_activity": weekly_activity,
+        "heatmap": heatmap,
     }
 
 
@@ -349,3 +416,4 @@ async def get_overview_difficulties(current_user: dict = Depends(require_staff))
     except Exception as exc:
         print(f"Erro ao buscar dificuldades: {exc}")
         return {"alerts": []}
+    
