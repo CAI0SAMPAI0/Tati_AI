@@ -441,14 +441,29 @@ async function _loadReports() {
 
     const barsEl = document.getElementById('bars');
     if (barsEl) {
+      // Altura máxima relativa ao container — 100px é mais seguro que 120px
+      const MAX_H = 100;
+
       barsEl.innerHTML = vals.map((v, i) => {
-        const h = v === 0 ? 4 : Math.max(8, Math.round((v / maxVal) * 120));
         const isToday = i === todayBar;
+        // Altura proporcional: valor 0 fica com 3px (linha fina visível)
+        const h = v === 0 ? 3 : Math.max(10, Math.round((v / maxVal) * MAX_H));
+
         return `<div class="chart-bar-wrap">
-          <div style="font-size:10px;color:var(--text-muted);text-align:center;min-height:14px">${v}</div>
-          <div class="bar${isToday ? ' today' : ''}" data-val="${v} msgs" style="height:${h}px" title="${dayLabels[i]}: ${v} msgs"></div>
-          <div class="bar-label" style="${isToday ? 'color:var(--primary);font-weight:600' : ''}">${dayLabels[i]}</div>
-        </div>`;
+      <div style="
+        font-size:10px;
+        color:var(--text-muted);
+        text-align:center;
+        min-height:16px;
+        line-height:16px;
+        overflow:hidden;
+        white-space:nowrap;
+      ">${v > 0 ? v : ''}</div>
+      <div class="bar${isToday ? ' today' : ''}"
+           style="height:${h}px"
+           title="${dayLabels[i]}: ${v} msgs"></div>
+      <div class="bar-label" style="${isToday ? 'color:var(--primary);font-weight:600' : ''}">${dayLabels[i]}</div>
+    </div>`;
       }).join('');
     }
 
