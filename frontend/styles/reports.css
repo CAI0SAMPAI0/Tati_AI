@@ -121,8 +121,10 @@
     display: flex;
     align-items: flex-end;
     gap: 8px;
-    height: 140px;
-    position: relative
+    height: 100px;
+    max-height: 100px;
+    position: relative;
+    overflow: hidden;
 }
 
 .chart-bar-wrap {
@@ -447,7 +449,8 @@
 
   /* Chart area: menor */
   .chart-area {
-    height: 100px;
+    height: 72px;
+    max-height: 72px;
   }
 
   /* Stats overview: 1 coluna */
