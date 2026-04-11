@@ -4,7 +4,6 @@ from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
 
-# Carrega as variáveis do arquivo .env
 load_dotenv()
 
 # Configuração Global da "Memória" da Tati

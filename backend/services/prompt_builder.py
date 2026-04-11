@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from core.config import settings
 
 """
-Constrói o prompt efetivo (system prompt) para a LLM, combinando instruções base, perfil do aluno, contexto RAG e custom prompt.
+Constrói o prompt (system prompt) para a LLM, combinando instruções base, perfil do aluno, contexto RAG e custom prompt.
 """
 @dataclass
 class UserProfile:
