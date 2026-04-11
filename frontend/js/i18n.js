@@ -92,6 +92,7 @@ const TRANSLATIONS = {
     'settings.saved':        '✅ Salvo!',
     'settings.auto_play':    'Reprodução automática',
     'settings.auto_play_desc':'Reproduzir áudio das respostas automaticamente',
+    'settings.senha_nova': 'Preencha apenas se quiser alterar sua senha. Deixe em branco para manter a atual.',
  
     // ── Profile ───────────────────────────────────────────────────
     'profile.title':         'Meu Perfil',
@@ -360,6 +361,7 @@ const TRANSLATIONS = {
     'settings.saved':        '✅ Saved!',
     'settings.auto_play':    'Auto play audio',
     'settings.auto_play_desc':'Automatically play audio responses',
+    'settings.senha_nova': 'Fill this in only if you want to change your password. Leave it blank to keep your current password.',
  
     // ── Profile ───────────────────────────────────────────────────
     'profile.title':         'My Profile',
