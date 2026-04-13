@@ -11,6 +11,16 @@ router = APIRouter()
 PAID_START    = date(2026, 5, 1)
 FREE_MSG_LIMIT = 5
 
+# Usuários com acesso total garantido (programadores/testers)
+SPECIAL_USERS = {
+    "caio.sampaio",
+    "caio",
+    "programador",
+    "tati",
+    "tati.ai",
+    "admin"
+}
+
 # Feriados nacionais fixos (mês, dia) — adicione os móveis via banco se quiser
 FERIADOS_FIXOS = {
     (1, 1),   # Ano Novo
@@ -101,17 +111,18 @@ class ChangeDueDateRequest(BaseModel):
 @router.get("/access")
 async def get_access_info(user: dict = Depends(get_current_user)):
     today      = date.today()
-    is_admin   = user.get("role") in settings.staff_roles
-    is_exempt  = user.get("is_exempt", False)
+    username   = user.get("username")
+    is_admin   = user.get("role") in settings.staff_roles or username in SPECIAL_USERS
+    is_exempt  = user.get("is_exempt", False) or username in SPECIAL_USERS
     plan_type  = user.get("plan_type")
 
-    # Admin → sempre liberado
-    if is_admin:
-        return _access_response(is_admin=True, full=True, activities=True)
+    # Admin ou Usuário Especial → sempre liberado
+    if is_admin or is_exempt:
+        return _access_response(is_admin=is_admin, full=True, activities=True)
 
     # Antes de 01/05/2026 → período gratuito
     if today < PAID_START:
-        return _access_response(full=True, activities=True, free_mode=True)
+        return _access_response(full=True, activities=is_admin, free_mode=True)
 
     # Isento
     if is_exempt:

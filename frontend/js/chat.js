@@ -21,28 +21,61 @@ window.addEventListener('DOMContentLoaded', () => {
   _setupFileInput();
   _connectWS();
 
-  document.getElementById('btn-send').addEventListener('click', sendMessage);
-  document.getElementById('btn-mic').addEventListener('click', toggleMic);
+  document.getElementById('btn-send')?.addEventListener('click', sendMessage);
+  document.getElementById('btn-mic')?.addEventListener('click', toggleMic);
 
   const textarea = document.getElementById('message-input');
-  textarea.addEventListener('keydown', _handleKey);
-  textarea.addEventListener('input', () => _autoResize(textarea));
+  if (textarea) {
+    textarea.addEventListener('keydown', _handleKey);
+    textarea.addEventListener('input', () => _autoResize(textarea));
+  }
 
   _loadConversations();
 
   // Mobile: sidebar sempre começa fechada
   if (window.innerWidth <= 768) {
-    document.getElementById('sidebar').classList.add('collapsed');
+    const sb = document.getElementById('sidebar');
+    if (sb) sb.classList.add('collapsed');
   }
 
   // Overlay fecha sidebar ao clicar fora
   const overlay = document.getElementById('sidebar-overlay');
   if (overlay) {
     overlay.addEventListener('click', () => {
-      document.getElementById('sidebar').classList.add('collapsed');
+      const sb = document.getElementById('sidebar');
+      if (sb) sb.classList.add('collapsed');
       overlay.classList.remove('active');
     });
   }
+
+  // Summary and Modal setup
+  document.getElementById('btn-switch-summary')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-switch-summary');
+    const orig = btn.innerHTML;
+    btn.innerHTML = 'Gerando...';
+    btn.disabled = true;
+    try {
+      const data = await apiGet(`/chat/conversations/${currentConvId}/summary?lang=${I18n.getLang()}`);
+      document.getElementById('summary-text').innerHTML = marked.parse(data.summary);
+      document.getElementById('summary-modal').style.display = 'flex';
+    } catch (e) {
+      alert('Erro ao gerar resumo. Tente novamente.' + e.message);
+    } finally {
+      btn.innerHTML = orig;
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('close-modal-btn')?.addEventListener('click', () => {
+    document.getElementById('summary-modal').style.display = 'none';
+  });
+  document.getElementById('summary-modal')?.addEventListener('click', e => {
+    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+  });
+  document.addEventListener('keydown', e => {
+    const modal = document.getElementById('summary-modal');
+    if (e.key === 'Escape' && modal?.style.display === 'flex') modal.style.display = 'none';
+  });
 });
 
 // ── User info ─────────────────────────────────────────────────────────────────
@@ -54,33 +87,52 @@ async function _initUserInfo() {
 
   if (nameEl) nameEl.textContent = user.name || user.username;
   if (levelEl) levelEl.textContent = user.level || 'Student';
-  // Tenta usar avatar do localStorage primeiro, depois busca na API
   if (avatarEl) _renderSidebarAvatar(avatarEl, user);
 
   if (!user.avatar_url) {
     try {
       const data = await apiGet('/profile/');
-      // Atualiza localStorage com avatar_url
       saveSession(getToken(), { ...user, avatar_url: data.avatar_url || null });
       user.avatar_url = data.avatar_url || null;
       if (avatarEl) _renderSidebarAvatar(avatarEl, user);
     } catch (e) { /* silencioso */ }
   }
 
-  if (isStaff(user)) {
+  const specialUsers = ["caio.sampaio", "caio", "programador", "tati", "tati.ai", "admin"];
+  const isSpecial = specialUsers.includes(user.username);
+  const isTeacher = isStaff(user);
+
+  if (isTeacher || isSpecial) {
     const dashBtn = el('btn-dashboard');
     if (dashBtn) dashBtn.style.display = 'flex';
+    
+    // Botão de atividades na sidebar
+    const actBtn = document.querySelector('a[href="activities.html"]');
+    if (actBtn) actBtn.style.display = 'flex';
+  } else {
+    // Esconde para alunos normais
+    const dashBtn = el('btn-dashboard');
+    if (dashBtn) dashBtn.style.display = 'none';
+    const actBtn = document.querySelector('a[href="activities.html"]');
+    if (actBtn) actBtn.style.display = 'none';
   }
-  // user premium
-  // Badge premium
+
   const badgeEl = document.getElementById('sidebar-premium-badge');
   if (badgeEl) {
-    apiGet('/payments/status').then(sub => {
-      if (sub && sub.has_subscription && sub.status === 'active') {
+    // Se for especial ou professor, mostra badge Premium fixo ou verifica assinatura
+    if (isSpecial || isTeacher) {
         badgeEl.style.display = 'inline-block';
-        badgeEl.textContent = sub.plan_type === 'full' ? 'Premium' : 'Basic';
-      }
-    }).catch(() => { });
+        badgeEl.textContent = 'Premium';
+    } else {
+        apiGet('/payments/status').then(sub => {
+          if (sub && sub.has_subscription && sub.status === 'active') {
+            badgeEl.style.display = 'inline-block';
+            badgeEl.textContent = sub.plan_type === 'full' ? 'Premium' : 'Basic';
+          } else {
+            badgeEl.style.display = 'none';
+          }
+        }).catch(() => { badgeEl.style.display = 'none'; });
+    }
   }
 }
 
@@ -95,11 +147,12 @@ function _renderSidebarAvatar(el, u) {
 function toggleSidebar() {
   const sidebar = document.getElementById('sidebar');
   const overlay = document.getElementById('sidebar-overlay');
-  sidebar.classList.toggle('collapsed');
-  if (overlay) overlay.classList.toggle('active', !sidebar.classList.contains('collapsed'));
+  if (sidebar) sidebar.classList.toggle('collapsed');
+  if (overlay) overlay.classList.toggle('active', !sidebar?.classList.contains('collapsed'));
 }
+
 function switchToVoice() {
-  const url = currentConvId ? `/src/pages/voice.html?conv_id=${currentConvId}` : '/src/pages/voice.html';
+  const url = currentConvId ? `/voice.html?conv_id=${currentConvId}` : '/voice.html';
   window.location.href = url;
 }
 
@@ -107,7 +160,6 @@ function switchToVoice() {
 function _connectWS() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
 
-  // Sempre pega o token atual do localStorage (não fecha em cache)
   const currentToken = getToken();
   if (!currentToken) { authLogout(); return; }
 
@@ -117,13 +169,10 @@ function _connectWS() {
   ws.onerror = e => console.error('[WS] error', e);
   ws.onclose = (e) => {
     ws = null;
-    // Código 4001 = token inválido pelo backend — faz logout
     if (e.code === 4001) { authLogout(); return; }
-    // Outros closes: reconecta após 3s
     setTimeout(_connectWS, 3000);
   };
 
-  // Keepalive a cada 20s para evitar idle timeout do Railway
   const keepAlive = setInterval(() => {
     if (!ws || ws.readyState !== WebSocket.OPEN) { clearInterval(keepAlive); return; }
     ws.send(JSON.stringify({ type: 'ping' }));
@@ -174,7 +223,6 @@ function _handleWSMessage(msg) {
       _hideTyping();
       isStreaming = false;
       _setInputEnabled(true);
-
       if (msg.code === 402 || msg.detail === 'free_limit_reached') {
         _showPaywall();
         return;
@@ -196,6 +244,7 @@ async function _loadConversations() {
 
 function _renderConversationList(convs) {
   const list = document.getElementById('conversations-list');
+  if (!list) return;
   if (!convs.length) { list.innerHTML = `<p class="list-empty">${t('chat.no_convs')}</p>`; return; }
   const today = new Date().toDateString();
   const yesterday = new Date(Date.now() - 86400000).toDateString();
@@ -244,19 +293,20 @@ async function newChat() {
 async function _openConversation(id, title) {
   currentConvId = id;
   document.querySelectorAll('.conv-item').forEach(el => el.classList.toggle('active', el.dataset.id === id));
-  document.getElementById('topbar-title').textContent = title;
+  const tb = document.getElementById('topbar-title');
+  if (tb) tb.textContent = title;
   document.getElementById('chat-welcome')?.style.setProperty('display', 'none');
   await _loadMessages(id);
   _connectWS();
   if (window.innerWidth < 768) {
-    document.getElementById('sidebar').classList.add('collapsed');
-    const overlay = document.getElementById('sidebar-overlay');
-    if (overlay) overlay.classList.remove('active');
+    document.getElementById('sidebar')?.classList.add('collapsed');
+    document.getElementById('sidebar-overlay')?.classList.remove('active');
   }
 }
 
 async function _loadMessages(convId) {
   const area = document.getElementById('chat-messages');
+  if (!area) return;
   const typingEl = document.getElementById('typing-indicator');
   const welcomeEl = document.getElementById('chat-welcome');
   const voiceBtn = document.getElementById('btn-switch-voice');
@@ -281,6 +331,7 @@ async function _loadMessages(convId) {
 
 function _showWelcome() {
   const area = document.getElementById('chat-messages');
+  if (!area) return;
   const welcomeEl = document.getElementById('chat-welcome');
   const voiceBtn = document.getElementById('btn-switch-voice');
   const typing = document.getElementById('typing-indicator');
@@ -290,7 +341,8 @@ function _showWelcome() {
   if (welcomeEl) { welcomeEl.style.display = 'flex'; if (area.firstChild !== welcomeEl) area.insertBefore(welcomeEl, area.firstChild); }
   if (voiceBtn) voiceBtn.style.display = 'flex';
   _checkSummaryBtn();
-  document.getElementById('topbar-title').textContent = 'Teacher Tati';
+  const tb = document.getElementById('topbar-title');
+  if (tb) tb.textContent = 'Teacher Tati';
   currentConvId = null;
 }
 
@@ -373,7 +425,7 @@ function _renderFilePreviewBar() {
       <button class="file-preview-remove" onclick="removePendingFile(${i})">✕</button>
     </div>`).join('') +
     `<p class="file-preview-hint">📎 ${pendingFiles.length} arquivo(s) prontos</p>`;
-  document.querySelector('.chat-input-area').insertBefore(bar, document.querySelector('.chat-input-area').firstChild);
+  document.querySelector('.chat-input-area')?.insertBefore(bar, document.querySelector('.chat-input-area').firstChild);
 }
 
 function removePendingFile(i) { pendingFiles.splice(i, 1); _renderFilePreviewBar(); }
@@ -389,10 +441,10 @@ function _formatFileSize(b) {
 async function sendMessage() {
   if (isStreaming) return;
   const input = document.getElementById('message-input');
+  if (!input) return;
   const text = input.value.trim();
   if (!text && !pendingFiles.length) return;
 
-  // Esconde o welcome ao mandar mensagem
   const welcome = document.getElementById('chat-welcome');
   if (welcome) welcome.style.display = 'none';
 
@@ -401,9 +453,6 @@ async function sendMessage() {
       const { data } = await apiPost('/chat/conversations', { title: t('nav.new_chat') });
       currentConvId = data.id;
       await _loadConversations();
-      document.querySelectorAll('.conv-item').forEach(el =>
-        el.classList.toggle('active', el.dataset.id === data.id)
-      );
     } catch { _appendErrorMsg('Erro ao criar conversa.'); return; }
   }
 
@@ -442,7 +491,10 @@ function _setInputEnabled(on) {
   if (b) b.disabled = !on;
   if (i) i.disabled = !on;
 }
-function useSuggestion(btn) { document.getElementById('message-input').value = btn.textContent; sendMessage(); }
+function useSuggestion(btn) { 
+  const i = document.getElementById('message-input');
+  if (i) { i.value = btn.textContent; sendMessage(); }
+}
 
 // ── Audio recording ───────────────────────────────────────────────────────────
 async function toggleMic() {
@@ -455,13 +507,13 @@ async function toggleMic() {
     mediaRecorder.onstop = _sendAudio;
     mediaRecorder.start();
     isRecording = true;
-    document.getElementById('btn-mic').classList.add('recording');
+    document.getElementById('btn-mic')?.classList.add('recording');
   } catch (e) { alert('Microfone não disponível: ' + e.message); }
 }
 function _stopRecording() {
   mediaRecorder?.stop();
   isRecording = false;
-  document.getElementById('btn-mic').classList.remove('recording');
+  document.getElementById('btn-mic')?.classList.remove('recording');
 }
 async function _sendAudio() {
   if (!currentConvId) {
@@ -501,7 +553,7 @@ function _appendAssistantMsg(text) {
   const div = document.createElement('div');
   div.className = 'message message-assistant';
   div.innerHTML = `
-    <div class="message-avatar"><img src="../../assets/images/tati_logo.jpg" alt="Tati" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="msg-avatar-fallback" style="display:none">T</div></div>
+    <div class="message-avatar"><img src="/assets/images/tati_logo.jpg" alt="Tati" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="msg-avatar-fallback" style="display:none">T</div></div>
     <div class="message-body">
       <div class="message-bubble">${formatMarkdown(text)}</div>
       <div class="message-meta"><span class="message-time">${nowTime()}</span></div>
@@ -515,7 +567,7 @@ function _appendStreamBubble() {
   const div = document.createElement('div');
   div.className = 'message message-assistant';
   div.innerHTML = `
-    <div class="message-avatar"><img src="../../assets/images/tati_logo.jpg" alt="Tati" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="msg-avatar-fallback" style="display:none">T</div></div>
+    <div class="message-avatar"><img src="/assets/images/tati_logo.jpg" alt="Tati" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="msg-avatar-fallback" style="display:none">T</div></div>
     <div class="message-body"><div class="message-bubble stream-bubble"></div></div>`;
   _insertBeforeTyping(div); _scrollBottom();
   return { bubble: div.querySelector('.stream-bubble'), msgEl: div };
@@ -533,7 +585,7 @@ function _finalizeStreamBubble(msgEl, bubble) {
   const meta = document.createElement('div');
   meta.className = 'message-meta';
   meta.innerHTML = `<span class="message-time">${nowTime()}</span>`;
-  body.appendChild(meta);
+  body?.appendChild(meta);
   streamBuffer = '';
   return meta;
 }
@@ -587,6 +639,7 @@ function _buildAudioControls(meta, b64) {
   audio.playbackRate = defaultSpeed;
 
   const setPlayIcon = playing => {
+    if (!playBtn) return;
     playBtn.innerHTML = playing
       ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
       : `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
@@ -606,10 +659,10 @@ function _buildAudioControls(meta, b64) {
 
   if (s.autoPlay === true || s.autoPlay === 'true') playThis();
 
-  playBtn.addEventListener('click', e => { e.stopPropagation(); audio.paused ? playThis() : (audio.pause(), setPlayIcon(false)); });
-  rewBtn.addEventListener('click', e => { e.stopPropagation(); audio.currentTime = Math.max(0, audio.currentTime - 5); });
-  volSlider.addEventListener('input', e => { e.stopPropagation(); audio.volume = parseFloat(volSlider.value); volValue.textContent = Math.round(audio.volume * 100) + '%'; });
-  spdSelect.addEventListener('change', e => { e.stopPropagation(); audio.playbackRate = parseFloat(spdSelect.value); });
+  playBtn?.addEventListener('click', e => { e.stopPropagation(); audio.paused ? playThis() : (audio.pause(), setPlayIcon(false)); });
+  rewBtn?.addEventListener('click', e => { e.stopPropagation(); audio.currentTime = Math.max(0, audio.currentTime - 5); });
+  volSlider?.addEventListener('input', e => { e.stopPropagation(); audio.volume = parseFloat(volSlider.value); if (volValue) volValue.textContent = Math.round(audio.volume * 100) + '%'; });
+  spdSelect?.addEventListener('change', e => { e.stopPropagation(); audio.playbackRate = parseFloat(spdSelect.value); });
   audio.addEventListener('ended', () => { setPlayIcon(false); if (currentAudio === audio) currentAudio = null; });
   audio.addEventListener('pause', () => setPlayIcon(false));
   audio.addEventListener('play', () => setPlayIcon(true));
@@ -622,46 +675,28 @@ function _checkSummaryBtn() {
   btn.style.display = document.querySelectorAll('.message-user').length > 5 ? 'flex' : 'none';
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('btn-switch-summary')?.addEventListener('click', async () => {
-    const btn = document.getElementById('btn-switch-summary');
-    const orig = btn.innerHTML;
-    btn.innerHTML = 'Gerando...';
-    btn.disabled = true;
-    try {
-      const data = await apiGet(`/chat/conversations/${currentConvId}/summary?lang=${I18n.getLang()}`);
-      document.getElementById('summary-text').innerHTML = marked.parse(data.summary);
-      document.getElementById('summary-modal').style.display = 'flex';
-    } catch (e) {
-      alert('Erro ao gerar resumo. Tente novamente.' + e.message);
-    } finally {
-      btn.innerHTML = orig;
-      btn.disabled = false;
-    }
-  });
-
-  document.getElementById('close-modal-btn')?.addEventListener('click', () => {
-    document.getElementById('summary-modal').style.display = 'none';
-  });
-  document.getElementById('summary-modal')?.addEventListener('click', e => {
-    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
-  });
-  document.addEventListener('keydown', e => {
-    const modal = document.getElementById('summary-modal');
-    if (e.key === 'Escape' && modal?.style.display === 'flex') modal.style.display = 'none';
-  });
-});
-
 // ── Misc ──────────────────────────────────────────────────────────────────────
 function _appendStatus(text) { const d = document.createElement('div'); d.className = 'status-msg'; d.textContent = text; _insertBeforeTyping(d); }
 function _appendErrorMsg(text) { const d = document.createElement('div'); d.className = 'error-banner'; d.textContent = '⚠️ ' + text; _insertBeforeTyping(d); _scrollBottom(); }
-function _insertBeforeTyping(el) { const a = document.getElementById('chat-messages'); a.insertBefore(el, document.getElementById('typing-indicator')); }
-function _showTyping() { document.getElementById('typing-indicator').style.display = 'flex'; _scrollBottom(); }
-function _hideTyping() { document.getElementById('typing-indicator').style.display = 'none'; }
-function _scrollBottom() { const a = document.getElementById('chat-messages'); a.scrollTop = a.scrollHeight; }
+function _insertBeforeTyping(el) { 
+  const a = document.getElementById('chat-messages'); 
+  const ti = document.getElementById('typing-indicator');
+  if (a) a.insertBefore(el, ti); 
+}
+function _showTyping() { 
+  const ti = document.getElementById('typing-indicator');
+  if (ti) ti.style.display = 'flex'; 
+  _scrollBottom(); 
+}
+function _hideTyping() { 
+  const ti = document.getElementById('typing-indicator');
+  if (ti) ti.style.display = 'none'; 
+}
+function _scrollBottom() { 
+  const a = document.getElementById('chat-messages'); 
+  if (a) a.scrollTop = a.scrollHeight; 
+}
 function logout() { authLogout(); }
-
-// novidade
 
 function _showFreeMessagesBadge(remaining) {
   document.getElementById('free-msg-badge')?.remove();
@@ -689,7 +724,6 @@ function _showFreeMessagesBadge(remaining) {
 }
 
 function _showPaywall() {
-  // Desativa input
   _setInputEnabled(false);
   document.getElementById('free-msg-badge')?.remove();
 
@@ -716,4 +750,61 @@ function _showPaywall() {
     `;
   _insertBeforeTyping(wall);
   _scrollBottom();
+}
+
+async function _initUserInfo() {
+  const el = id => document.getElementById(id);
+  const nameEl = el('sidebar-user-name');
+  const levelEl = el('sidebar-user-level');
+  const avatarEl = el('sidebar-user-avatar');
+
+  if (nameEl) nameEl.textContent = user.name || user.username;
+  if (levelEl) levelEl.textContent = user.level || 'Student';
+  if (avatarEl) _renderSidebarAvatar(avatarEl, user);
+
+  if (!user.avatar_url) {
+    try {
+      const data = await apiGet('/profile/');
+      saveSession(getToken(), { ...user, avatar_url: data.avatar_url || null });
+      user.avatar_url = data.avatar_url || null;
+      if (avatarEl) _renderSidebarAvatar(avatarEl, user);
+    } catch (e) { /* silencioso */ }
+  }
+
+  const specialUsers = ["caio.sampaio", "caio", "programador", "tati", "tati.ai", "admin"];
+  const isSpecial = specialUsers.includes(user.username);
+  const isTeacher = isStaff(user);
+
+  if (isTeacher || isSpecial) {
+    const dashBtn = el('btn-dashboard');
+    if (dashBtn) dashBtn.style.display = 'flex';
+    
+    // Botão de atividades na sidebar
+    const actBtn = document.querySelector('a[href="activities.html"]');
+    if (actBtn) actBtn.style.display = 'flex';
+  } else {
+    // Esconde para alunos normais
+    const dashBtn = el('btn-dashboard');
+    if (dashBtn) dashBtn.style.display = 'none';
+    const actBtn = document.querySelector('a[href="activities.html"]');
+    if (actBtn) actBtn.style.display = 'none';
+  }
+
+  const badgeEl = document.getElementById('sidebar-premium-badge');
+  if (badgeEl) {
+    // Se for especial ou professor, mostra badge Premium fixo ou verifica assinatura
+    if (isSpecial || isTeacher) {
+        badgeEl.style.display = 'inline-block';
+        badgeEl.textContent = 'Premium';
+    } else {
+        apiGet('/payments/status').then(sub => {
+          if (sub && sub.has_subscription && sub.status === 'active') {
+            badgeEl.style.display = 'inline-block';
+            badgeEl.textContent = sub.plan_type === 'full' ? 'Premium' : 'Basic';
+          } else {
+            badgeEl.style.display = 'none';
+          }
+        }).catch(() => { badgeEl.style.display = 'none'; });
+    }
+  }
 }

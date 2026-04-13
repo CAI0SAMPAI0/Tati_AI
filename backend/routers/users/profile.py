@@ -22,6 +22,8 @@ class ProfileUpdate(BaseModel):
     focus: str | None = None
     nickname: str | None = None
     occupation: str | None = None
+    cpf: str | None = None
+    cpf_cnpj: str | None = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -38,7 +40,7 @@ def _fetch_user(username: str) -> dict:
     try:
         rows = (
             db.table("users")
-            .select("username, name, email, role, level, focus, created_at, profile, avatar_url")
+            .select("username, name, email, role, level, focus, created_at, profile, avatar_url, cpf, cpf_cnpj")
             .eq("username", username)
             .limit(1)
             .execute()
@@ -47,7 +49,7 @@ def _fetch_user(username: str) -> dict:
     except Exception:
         rows = (
             db.table("users")
-            .select("username, name, email, role, level, focus, created_at, profile")
+            .select("username, name, email, role, level, focus, created_at, profile, cpf, cpf_cnpj")
             .eq("username", username)
             .limit(1)
             .execute()
@@ -77,7 +79,7 @@ async def update_profile(body: ProfileUpdate, current_user: dict = Depends(get_c
     if not rows:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
-    top_level = {f: getattr(body, f) for f in ("name", "email", "level", "focus") if getattr(body, f) is not None}
+    top_level = {f: getattr(body, f) for f in ("name", "email", "level", "focus", "cpf", "cpf_cnpj") if getattr(body, f) is not None}
     profile = rows[0].get("profile") or {}
     for field in ("nickname", "occupation"):
         val = getattr(body, field)
