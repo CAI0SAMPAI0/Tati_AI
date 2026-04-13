@@ -1,6 +1,32 @@
 {
   "cleanUrls": true,
   "trailingSlash": false,
+  "headers": [
+    {
+      "source": "/(.*)\\.css",
+      "headers": [{ "key": "Content-Type", "value": "text/css; charset=utf-8" }]
+    },
+    {
+      "source": "/(.*)\\.js",
+      "headers": [{ "key": "Content-Type", "value": "application/javascript; charset=utf-8" }]
+    },
+    {
+      "source": "/(.*)\\.html",
+      "headers": [{ "key": "Content-Type", "value": "text/html; charset=utf-8" }]
+    },
+    {
+      "source": "/(.*)\\.jpg",
+      "headers": [{ "key": "Content-Type", "value": "image/jpeg" }]
+    },
+    {
+      "source": "/(.*)\\.png",
+      "headers": [{ "key": "Content-Type", "value": "image/png" }]
+    },
+    {
+      "source": "/(.*)\\.svg",
+      "headers": [{ "key": "Content-Type", "value": "image/svg+xml" }]
+    }
+  ],
   "rewrites": [
     { "source": "/", "destination": "/src/pages/index.html" },
     { "source": "/chat", "destination": "/src/pages/chat.html" },
