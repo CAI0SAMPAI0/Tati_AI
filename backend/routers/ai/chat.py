@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from core.config import settings
 from routers.deps import get_current_user
+from routers.users.permissions import SPECIAL_USERS
 from services.database import get_client
 from services.history import (
     auto_title,

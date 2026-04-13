@@ -22,11 +22,6 @@ def get_headers():
 # ── Clientes ─────────────────────────────────────────────────────────────────
 
 async def create_customer(name: str, email: str, cpf_cnpj: str = None, phone: str = None) -> dict:
-    """
-    Cria um novo cliente no Asaas.
-    Se já existir um cliente com o mesmo email/cpf, o Asaas pode retornar erro ou o ID existente
-    dependendo da configuração da conta, mas aqui faremos a criação direta.
-    """
     url = f"{get_base_url()}/customers"
     payload = {
         "name": name,
@@ -34,8 +29,6 @@ async def create_customer(name: str, email: str, cpf_cnpj: str = None, phone: st
         "cpfCnpj": cpf_cnpj,
         "mobilePhone": phone,
     }
-    
-    # Remove valores nulos
     payload = {k: v for k, v in payload.items() if v is not None}
 
     async with httpx.AsyncClient() as client:
@@ -50,8 +43,21 @@ async def create_customer(name: str, email: str, cpf_cnpj: str = None, phone: st
             print(f"[Asaas] Erro inesperado ao criar cliente: {exc}")
             raise
 
+async def update_customer(customer_id: str, payload: dict) -> dict:
+    url = f"{get_base_url()}/customers/{customer_id}"
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.post(url, json=payload, headers=get_headers(), timeout=20)
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as exc:
+            print(f"[Asaas] Erro ao atualizar cliente: {exc.response.text}")
+            raise Exception(f"Erro Asaas ao atualizar: {exc.response.text}")
+        except Exception as exc:
+            print(f"[Asaas] Erro inesperado ao atualizar cliente: {exc}")
+            raise
+
 async def get_customer_by_email(email: str) -> dict | None:
-    """Busca um cliente pelo email."""
     url = f"{get_base_url()}/customers"
     params = {"email": email}
 
@@ -77,10 +83,6 @@ async def create_payment(
     description: str = None,
     external_reference: str = None
 ) -> dict:
-    """
-    Cria uma cobrança no Asaas.
-    billing_type: 'PIX', 'BOLETO', 'CREDIT_CARD', 'UNDEFINED'
-    """
     url = f"{get_base_url()}/payments"
     payload = {
         "customer": customer_id,
@@ -90,8 +92,6 @@ async def create_payment(
         "description": description,
         "externalReference": external_reference,
     }
-    
-    # Remove valores nulos
     payload = {k: v for k, v in payload.items() if v is not None}
 
     async with httpx.AsyncClient() as client:
@@ -107,9 +107,7 @@ async def create_payment(
             raise
 
 async def get_pix_qr_code(payment_id: str) -> dict:
-    """Obtém o QR Code e a chave copia e cola de um pagamento Pix."""
     url = f"{get_base_url()}/payments/{payment_id}/pixQrCode"
-    
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.get(url, headers=get_headers(), timeout=20)
