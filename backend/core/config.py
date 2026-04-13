@@ -3,6 +3,9 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+
+    port: int = 8000
+    debug: bool = False
     # autenticação
     jwt_secret_key: str = 'changeme-insecure'
     jwt_algorithm: str = 'HS256'
