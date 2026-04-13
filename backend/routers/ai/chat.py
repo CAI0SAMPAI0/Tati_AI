@@ -1,0 +1,481 @@
+from __future__ import annotations
+
+import base64
+import io
+import json
+from datetime import date, datetime, timedelta
+
+import docx
+import pypdf
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
+from pydantic import BaseModel
+
+from core.config import settings
+from routers.deps import get_current_user
+from services.database import get_client
+from services.history import (
+    auto_title,
+    create_conversation,
+    delete_conversation,
+    list_conversations,
+    load_history,
+    rename_conversation,
+    save_message,
+)
+from services.llm import GroqKeyError, groq_chat, stream_llm, text_to_speech, transcribe_audio
+from services.prompt_builder import UserProfile, build_effective_prompt
+from services.rag_search import obter_contexto_rag
+
+router = APIRouter()
+
+PAID_START     = date(2026, 4, 1)
+FREE_MSG_LIMIT = 5
+
+_SOURCE_MARKERS = ["📚 Fontes", "Fontes consultadas:", "Sources:", "References:"]
+
+
+# ── Models ────────────────────────────────────────────────────────────────────
+
+
+class CreateConversationBody(BaseModel):
+    title: str = "Nova conversa"
+
+
+class RenameConversationBody(BaseModel):
+    title: str
+
+
+class TTSRequest(BaseModel):
+    text: str
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+
+def _verify_ws_token(token: str) -> dict | None:
+    from core.security import decode_token
+    return decode_token(token)
+
+
+def _clean_tts_text(text: str) -> str:
+    """Remove marcadores de fontes e asteriscos do texto antes de enviar ao TTS."""
+    text = text.replace("*", "")
+    for marker in _SOURCE_MARKERS:
+        if marker in text:
+            text = text.split(marker)[0]
+            break
+    return text.strip()
+
+
+def _get_full_user(username: str) -> dict:
+    """Retorna dados completos do usuário incluindo role e flags de acesso."""
+    rows = (
+        get_client()
+        .table("users")
+        .select("username, role, is_exempt, is_premium_active, plan_type, free_messages_used")
+        .eq("username", username)
+        .limit(1)
+        .execute()
+        .data
+    )
+    return rows[0] if rows else {}
+
+
+def _get_active_subscription(username: str) -> dict | None:
+    """Retorna a assinatura ativa do usuário, se existir."""
+    try:
+        rows = (
+            get_client()
+            .table("subscriptions")
+            .select("*")
+            .eq("username", username)
+            .eq("status", "active")
+            .order("expires_at", desc=True)
+            .limit(1)
+            .execute()
+            .data
+        )
+        return rows[0] if rows else None
+    except Exception as exc:
+        print(f"[WARN] Falha ao buscar assinatura: {exc}")
+        return None
+
+
+def _in_grace_period(today: date, expires: date) -> bool:
+    """
+    Verifica se ainda está no grace period (até 5 dias úteis após vencimento).
+    Pula finais de semana e conta apenas dias úteis.
+    """
+    if today <= expires:
+        return False
+    business_days = 0
+    check = expires + timedelta(days=1)
+    while check <= today:
+        if check.weekday() < 5:  # 0=segunda ... 4=sexta
+            business_days += 1
+        check += timedelta(days=1)
+    return business_days <= 5
+
+
+def _get_free_messages_used(username: str) -> int:
+    """Retorna quantas mensagens gratuitas o usuário já usou."""
+    try:
+        rows = (
+            get_client()
+            .table("users")
+            .select("free_messages_used")
+            .eq("username", username)
+            .limit(1)
+            .execute()
+            .data
+        )
+        return (rows[0].get("free_messages_used") or 0) if rows else 0
+    except Exception as exc:
+        print(f"[WARN] Falha ao buscar free_messages_used: {exc}")
+        return 0
+
+
+def _check_chat_access(username: str) -> dict:
+    """
+    Verifica se o usuário pode enviar mensagens.
+    Retorna dict com:
+      - allowed: bool
+      - reason: str | None
+      - free_messages_remaining: int | None
+    """
+    today = date.today()
+
+    user      = _get_full_user(username)
+    print(f"DEBUG ACCESS: username={username}, today={today}, PAID_START={PAID_START}")
+    print(f"DEBUG ACCESS: user data = {user}")
+    is_admin  = user.get("role") in settings.staff_roles
+    is_exempt = user.get("is_exempt", False)
+    print(f"DEBUG ACCESS: is_admin={is_admin}, is_exempt={is_exempt}")
+
+    # Admin e staff → sempre permitido
+    if is_admin or is_exempt:
+        return {"allowed": True, "reason": None, "free_messages_remaining": None}
+    if user.get("is_premium_active"):
+        return {"allowed": True, "reason": None, "free_messages_remaining": None}
+
+    # Período gratuito (antes de 01/05/2026)
+    if today < PAID_START:
+        return {"allowed": True, "reason": None, "free_messages_remaining": None}
+
+    # Assinatura ativa ou em grace period
+    sub = _get_active_subscription(username)
+    print(f"DEBUG ACCESS: sub={sub}")
+
+    if sub:
+        expires  = date.fromisoformat(sub["expires_at"][:10])
+        in_grace = _in_grace_period(today, expires)
+        if today <= expires or in_grace:
+            return {"allowed": True, "reason": None, "free_messages_remaining": None}
+
+    # Sem assinatura → verifica mensagens gratuitas
+    used      = _get_free_messages_used(username)
+    print(f"DEBUG ACCESS: used={used}, remaining={max(0, FREE_MSG_LIMIT - used)}")
+
+    remaining = max(0, FREE_MSG_LIMIT - used)
+
+    if remaining <= 0:
+        return {
+            "allowed": False,
+            "reason": "free_limit_reached",
+            "free_messages_remaining": 0,
+        }
+
+    return {
+        "allowed": True,
+        "reason": None,
+        "free_messages_remaining": remaining,
+    }
+
+
+def _increment_free_messages(username: str) -> None:
+    """Incrementa o contador de mensagens gratuitas usadas."""
+    try:
+        user = _get_full_user(username)
+        used = user.get("free_messages_used") or 0
+        get_client().table("users").update(
+            {"free_messages_used": used + 1}
+        ).eq("username", username).execute()
+    except Exception as exc:
+        print(f"[WARN] Falha ao incrementar free_messages: {exc}")
+
+
+async def _get_user_profile(username: str) -> UserProfile:
+    rows = (
+        get_client()
+        .table("users")
+        .select("custom_prompt, level, focus")
+        .eq("username", username)
+        .limit(1)
+        .execute()
+        .data
+    )
+    data = rows[0] if rows else {}
+    return UserProfile(
+        username=username,
+        level=data.get("level") or "Intermediate",
+        focus=data.get("focus") or "General Conversation",
+        custom_prompt=(data.get("custom_prompt") or "").strip(),
+    )
+
+
+async def extract_text_from_file(filename: str, content_b64: str) -> str:
+    """Extrai texto de PDF, DOCX ou texto puro de um arquivo base64."""
+    ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
+    try:
+        file_bytes = base64.b64decode(content_b64)
+
+        if ext == "pdf":
+            reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+            text = "\n".join(p.extract_text() for p in reader.pages if p.extract_text())
+            return text.replace("\x00", "") or "[PDF sem texto extraível]"
+
+        if ext == "docx":
+            doc = docx.Document(io.BytesIO(file_bytes))
+            text = "\n".join(p.text for p in doc.paragraphs)
+            return text.replace("\x00", "") or "[Documento sem texto]"
+
+        if ext in ("png", "jpg", "jpeg", "gif", "webp", "bmp"):
+            return f"[Imagem enviada: {filename}. Descreva que recebeu uma imagem e peça ao aluno para explicar.]"
+
+        text = file_bytes.decode("utf-8", errors="ignore").replace("\x00", "")
+        return text or "[Arquivo sem conteúdo legível]"
+
+    except Exception as exc:
+        return f"[Erro ao ler arquivo {filename}: {exc}]"
+
+
+# ── REST endpoints ────────────────────────────────────────────────────────────
+
+
+@router.post("/conversations", status_code=status.HTTP_201_CREATED)
+async def new_conversation(
+    body: CreateConversationBody = CreateConversationBody(),
+    current_user: dict = Depends(get_current_user),
+):
+    return await create_conversation(
+        username=current_user["username"],
+        title=body.title,
+        model=settings.llm_provider,
+    )
+
+
+@router.get("/conversations")
+async def get_conversations(current_user: dict = Depends(get_current_user)):
+    return await list_conversations(current_user["username"])
+
+
+@router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_conversation(conversation_id: str, current_user: dict = Depends(get_current_user)):
+    if not await delete_conversation(conversation_id, current_user["username"]):
+        raise HTTPException(status_code=404, detail="Conversa não encontrada")
+
+
+@router.patch("/conversations/{conversation_id}/title")
+async def update_title(
+    conversation_id: str,
+    body: RenameConversationBody,
+    current_user: dict = Depends(get_current_user),
+):
+    conv = await rename_conversation(conversation_id, current_user["username"], body.title)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversa não encontrada")
+    return conv
+
+
+@router.get("/conversations/{conversation_id}/messages")
+async def get_history(conversation_id: str, current_user: dict = Depends(get_current_user)):
+    messages = await load_history(conversation_id)
+    if messages is None:
+        raise HTTPException(status_code=404, detail="Conversa não encontrada")
+    return messages
+
+
+@router.post("/tts")
+async def tts_word(body: TTSRequest, current_user: dict = Depends(get_current_user)):
+    if not body.text or len(body.text) > 200:
+        raise HTTPException(status_code=400, detail="Texto inválido ou muito longo")
+    audio_b64 = await text_to_speech(body.text)
+    if not audio_b64:
+        raise HTTPException(status_code=503, detail="TTS indisponível")
+    return {"audio": audio_b64}
+
+
+@router.get("/conversations/{conversation_id}/summary")
+async def get_summary(conversation_id: str, lang: str = Query(default='pt'), current_user: dict = Depends(get_current_user)):
+    history = await load_history(conversation_id)
+    if not history or len(history) < 5:
+        raise HTTPException(status_code=400, detail="Mensagens insuficientes para gerar resumo")
+
+    conversation_text = "\n\n".join(
+        f"{'TATI' if m['role'] == 'assistant' else 'STUDENT'}: {m['content']}"
+        for m in history
+    )
+    if lang.startswith("en"):
+        prompt_system = (
+            "You are an English teaching coordinator. Analyze the transcript and write a "
+            "performance report for the student (in English) with:\n\n"
+            "🌟 **Strengths:** (praise what went well)\n"
+            "🛠️ **Areas to Improve:** (2-3 errors with corrections)\n"
+            "📚 **New Vocabulary:** (3-5 words/expressions with meaning)\n\n"
+            "Be encouraging, didactic, and use Markdown."
+        )
+    else:
+        prompt_system = (
+            "Você é um coordenador pedagógico de inglês. Analise a transcrição e escreva um "
+            "relatório para o aluno (em português) com:\n\n"
+            "🌟 **Pontos Fortes:** (elogie o que foi bem)\n"
+            "🛠️ **Para Melhorar:** (2-3 erros com correção)\n"
+            "📚 **Vocabulário Novo:** (3-5 palavras/expressões com tradução)\n\n"
+            "Seja encorajador, didático e use Markdown."
+        )
+    try:
+        resumo = await groq_chat(
+            messages=[
+                {"role": "system", "content": prompt_system},
+                {"role": "user", "content": f"Conversa:\n\n{conversation_text}"},
+            ],
+            max_tokens=1500,
+        )
+        return {"summary": resumo}
+    except GroqKeyError as exc:
+        raise HTTPException(status_code=503, detail=f"Erro ao gerar resumo: {exc}")
+
+
+# ── WebSocket ─────────────────────────────────────────────────────────────────
+
+
+@router.websocket("/ws")
+async def chat_ws(websocket: WebSocket, token: str = Query(...)):
+    payload = _verify_ws_token(token)
+    if not payload:
+        await websocket.close(code=4001, reason="Token inválido")
+        return
+
+    await websocket.accept()
+    username = payload["sub"]
+
+    try:
+        while True:
+            raw = await websocket.receive_text()
+            try:
+                msg = json.loads(raw)
+            except json.JSONDecodeError:
+                await websocket.send_json({"type": "error", "detail": "JSON inválido"})
+                continue
+
+            if msg.get("type") == "ping":
+                await websocket.send_json({"type": "pong"})
+                continue
+
+            await _handle_chat_message(websocket, msg, username)
+
+    except WebSocketDisconnect:
+        print(f"[WS] {username} deslogou")
+    except Exception as exc:
+        print(f"[WS] Erro geral: {exc}")
+
+
+async def _handle_chat_message(websocket: WebSocket, msg: dict, username: str) -> None:
+    # Inicializa access aqui para garantir que está sempre definido no escopo
+    access = {"allowed": True, "reason": None, "free_messages_remaining": None}
+
+    try:
+        msg_type = msg.get("type")
+        content  = msg.get("content", "").strip()
+        conv_id  = msg.get("conversation_id")
+
+        if msg_type not in ("text", "audio", "file") or not conv_id:
+            await websocket.send_json({"type": "error", "detail": "Tipo ou conversation_id inválido"})
+            return
+
+        # ── Processa tipo de input ────────────────────────
+        if msg_type == "file":
+            filename  = msg.get("filename", "file.txt")
+            extracted = await extract_text_from_file(filename, msg.get("content", ""))
+            caption   = msg.get("caption", "").strip()
+            content   = f"{caption}\n\n[Arquivo: {filename}]\n{extracted}" if caption else f"[Arquivo: {filename}]\n{extracted}"
+            await websocket.send_json({"type": "status", "text": f"Arquivo {filename} lido."})
+
+        elif msg_type == "audio":
+            try:
+                audio_bytes = base64.b64decode(msg.get("audio", ""))
+                content = await transcribe_audio(audio_bytes, filename="input.webm")
+                await websocket.send_json({"type": "transcription", "text": content})
+            except Exception as exc:
+                print(f"DEBUG: Erro no STT: {exc}")
+                await websocket.send_json({"type": "error", "detail": f"Erro no STT: {exc}"})
+                return
+
+        if not content:
+            return
+
+        # ── Controle de acesso ────────────────────────────
+        access = _check_chat_access(username)
+        if not access["allowed"]:
+            await websocket.send_json({
+                "type":   "error",
+                "code":   402,
+                "detail": "Limite de mensagens gratuitas atingido.",
+            })
+            return
+
+        # Avisa quantas mensagens restam (se aplicável)
+        remaining = access.get("free_messages_remaining")
+        if remaining is not None:
+            await websocket.send_json({"type": "free_warning", "remaining": remaining})
+
+        # ── Histórico e auto-título ───────────────────────
+        print(f"DEBUG: Carregando histórico para conv {conv_id}...")
+        history = await load_history(conv_id)
+        if not history:
+            await auto_title(conv_id, username, content[:50])
+
+        print(f"DEBUG: Salvando mensagem do usuário...")
+        await save_message(conv_id, username, "user", content)
+        history.append({"role": "user", "content": content})
+
+        # ── Monta prompt ──────────────────────────────────
+        profile          = await _get_user_profile(username)
+        rag_result       = obter_contexto_rag(content)
+        effective_prompt = build_effective_prompt(profile, rag_result.contexto)
+
+        # ── Streaming ─────────────────────────────────────
+        print(f"DEBUG: Iniciando stream com Groq...")
+        await websocket.send_json({"type": "stream_start", "conversation_id": conv_id})
+        full_response = ""
+
+        try:
+            async for token_chunk in stream_llm(effective_prompt, history):
+                full_response += token_chunk
+                await websocket.send_json({"type": "stream_token", "token": token_chunk})
+        except Exception as exc:
+            print(f"DEBUG: Erro na LLM: {exc}")
+            await websocket.send_json({"type": "error", "detail": f"Erro na LLM: {exc}"})
+            return
+
+        # ── TTS e finalização ─────────────────────────────
+        print(f"DEBUG: Finalizando resposta...")
+        tts_text = _clean_tts_text(full_response)
+        await save_message(conv_id, username, "assistant", full_response)
+
+        # Incrementa contador apenas para usuários no período gratuito
+        if access.get("free_messages_remaining") is not None:
+            _increment_free_messages(username)
+
+        audio_b64 = await text_to_speech(tts_text)
+        if audio_b64:
+            await websocket.send_json({"type": "audio_response", "audio": audio_b64, "conversation_id": conv_id})
+
+        await websocket.send_json({"type": "stream_end", "conversation_id": conv_id})
+        print(f"DEBUG: Resposta enviada com sucesso!")
+
+    except Exception as e:
+        print(f"FATAL ERROR in _handle_chat_message: {e}")
+        import traceback
+        traceback.print_exc()
+        await websocket.send_json({"type": "error", "detail": f"Erro interno: {str(e)}"})

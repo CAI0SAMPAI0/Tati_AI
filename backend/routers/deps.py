@@ -4,6 +4,8 @@ from fastapi.security import OAuth2PasswordBearer
 from core.config import settings
 from core.security import decode_token
 
+from services.database import get_client
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
@@ -13,7 +15,28 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido ou expirado",
         )
-    return {"username": payload["sub"], "role": payload.get("role", "student")}
+    
+    username = payload["sub"]
+    db = get_client()
+    rows = db.table("users").select("*").eq("username", username).limit(1).execute().data
+    
+    if not rows:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuário não encontrado",
+        )
+        
+    return rows[0]
+
+def check_access(user: dict = Depends(get_current_user)):
+    """Verifica se o usuário tem acesso premium ou é isento."""
+    if user.get("is_exempt") or user.get("is_premium_active"):
+        return user
+    
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Acesso premium necessário. Escolha um plano em seu perfil."
+    )
  
  
 class RoleChecker:

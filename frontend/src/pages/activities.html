@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="act.title">Tati AI — Atividades</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+        crossorigin="anonymous">
+    <link rel="stylesheet" href="../styles/global.css">
+    <link rel="stylesheet" href="../styles/activities.css">
+    <link rel="icon" type="image/x-icon" href="../../assets/images/tati_logo.jpg">
+    <style>
+        .btn-back-home {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            transition: 0.2s;
+            width: fit-content;
+        }
+        .btn-back-home:hover { color: var(--primary); }
+    </style>
+</head>
+
+<body>
+    <div class="act-layout">
+        <!-- Botão Voltar -->
+        <a href="chat.html" class="btn-back-home">
+            <i class="fa-solid fa-chevron-left"></i>
+            <span data-i18n="nav.back_chat">Voltar ao Chat</span>
+        </a>
+
+        <!-- Topbar Aluno -->
+        <header class="act-header">
+            <div class="act-title">
+                <h1 data-i18n="act.hero_title">Suas Atividades</h1>
+                <p data-i18n="act.hero_subtitle">Pratique no seu ritmo</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.75rem;">
+                <div id="trophy-count"
+                    style="display:none;align-items:center;gap:0.4rem;background:hsla(45,100%,58%,0.1);padding:0.35rem 0.65rem;border-radius:999px;border:1px solid hsla(45,100%,58%,0.2);color:#f59e0b;font-weight:700;font-size:0.85rem;">
+                    🏆 <span id="trophy-num">0</span>
+                </div>
+                <span class="user-level-badge" id="user-level-badge">...</span>
+                <a href="profile.html" style="text-decoration:none;">
+                    <div class="user-avatar" id="topbar-avatar"
+                        style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#4c1d95);color:white;font-size:0.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;">
+                        ??</div>
+                </a>
+            </div>
+        </header>
+
+        <!-- Tabs Principais -->
+        <nav class="act-tabs">
+            <button class="act-tab active" onclick="switchTab('quiz', this)">
+                <i class="fa-solid fa-circle-question"></i>
+                <span data-i18n="act.tab_quiz">Quiz</span>
+                <span class="tab-badge" id="tab-count-quiz">0</span>
+            </button>
+            <button class="act-tab" onclick="switchTab('flashcards', this)">
+                <i class="fa-solid fa-layer-group"></i>
+                <span data-i18n="act.tab_flashcards">Flash Cards</span>
+                <span class="tab-badge" id="tab-count-flashcards">0</span>
+            </button>
+            <button class="act-tab" onclick="switchTab('exercises', this)">
+                <i class="fa-solid fa-pen-to-square"></i>
+                <span data-i18n="act.tab_exercises">Exercícios</span>
+                <span class="tab-badge" id="tab-count-exercises">0</span>
+            </button>
+        </nav>
+
+        <!-- Filtros e Busca -->
+        <div class="act-filters">
+            <select class="filter-select" id="filter-course" onchange="applyFilters()">
+                <option value="" data-i18n="act.all_modules">Todos os módulos</option>
+            </select>
+            <input type="text" class="search-input" id="search-input" data-i18n-placeholder="act.search_ph"
+                placeholder="Buscar atividade..." oninput="applyFilters()">
+        </div>
+
+        <!-- Conteúdo das Abas -->
+        <div id="panel-quiz" class="act-panel">
+            <div class="quiz-list" id="quiz-list">
+                <div class="loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+            </div>
+        </div>
+
+        <div id="panel-flashcards" class="act-panel" style="display:none;">
+            <div class="flashcard-section" id="flashcard-section"></div>
+        </div>
+
+        <div id="panel-exercises" class="act-panel" style="display:none;">
+            <div class="exercise-list" id="exercise-list"></div>
+        </div>
+    </div>
+
+    <!-- Modal Módulo -->
+    <div class="module-overlay" id="module-overlay" style="display:none;">
+        <div class="module-modal">
+            <div class="module-modal-header">
+                <h2 id="module-modal-title">...</h2>
+                <button class="btn-close-mod" onclick="closeModule()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="module-modal-body" id="module-modal-body"></div>
+            <div class="module-modal-footer">
+                <button class="btn-primary" id="btn-start-quiz-from-mod" onclick="startQuizFromModule()"
+                    style="width:100%; justify-content:center;">
+                    <i class="fa-solid fa-circle-question"></i> <span data-i18n="act.btn_start">Iniciar Quiz</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Quiz -->
+    <div class="quiz-overlay" id="quiz-overlay" style="display:none;">
+        <div class="quiz-modal">
+            <header class="quiz-header">
+                <div class="quiz-title" id="quiz-modal-title">Quiz</div>
+                <div class="quiz-progress">
+                    <div class="quiz-progress-bar" id="quiz-progress-fill"></div>
+                </div>
+                <div class="quiz-q-counter" id="quiz-progress-text">1/5</div>
+                <button class="btn-close-quiz" onclick="closeQuiz()"><i class="fa-solid fa-xmark"></i></button>
+            </header>
+            <div class="quiz-modal-body" id="quiz-modal-body"></div>
+            <footer class="quiz-footer" id="quiz-nav">
+                <button class="btn-quiz-next" id="btn-next" onclick="nextQuestion()" disabled>
+                    <span data-i18n="act.quiz_next">Próxima</span> <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </footer>
+        </div>
+    </div>
+
+    <script src="../scripts/i18n.js"></script>
+    <script src="../scripts/api.js"></script>
+    <script src="../scripts/activities_ui.js"></script>
+</body>
+
+</html>
