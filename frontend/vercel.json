@@ -2,37 +2,13 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    {
-      "source": "/",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/chat",
-      "destination": "/chat.html"
-    },
-    {
-      "source": "/dashboard",
-      "destination": "/dashboard.html"
-    },
-    {
-      "source": "/profile",
-      "destination": "/profile.html"
-    },
-    {
-      "source": "/settings",
-      "destination": "/settings.html"
-    },
-    {
-      "source": "/voice",
-      "destination": "/voice.html"
-    },
-    {
-      "source": "/activities",
-      "destination": "/activities.html"
-    },
-    {
-      "source": "/payment",
-      "destination": "/payment.html"
-    }
+    { "source": "/", "destination": "/src/pages/index.html" },
+    { "source": "/chat", "destination": "/src/pages/chat.html" },
+    { "source": "/dashboard", "destination": "/src/pages/dashboard.html" },
+    { "source": "/profile", "destination": "/src/pages/profile.html" },
+    { "source": "/settings", "destination": "/src/pages/settings.html" },
+    { "source": "/voice", "destination": "/src/pages/voice.html" },
+    { "source": "/activities", "destination": "/src/pages/activities.html" },
+    { "source": "/payment", "destination": "/src/pages/payment.html" }
   ]
 }
