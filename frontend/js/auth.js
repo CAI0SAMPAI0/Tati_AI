@@ -1,5 +1,5 @@
 /* Redirect se já autenticado */
-if (getToken()) window.location.href = '/src/pages/chat.html';
+if (getToken()) window.location.href = '/chat.html';
 
 window.addEventListener('DOMContentLoaded', () => {
   _initGoogleAuth();
@@ -51,7 +51,7 @@ async function handleLogin(e) {
     const data = await res.json();
     if (!res.ok) { _showError(data.detail || (typeof t === 'function' ? await t('auth.err_login') : 'Login error.')); return; }
     saveSession(data.access_token, data.user);
-    window.location.href = '/src/pages/chat.html';
+    window.location.href = '/chat.html';
   });
 }
 
@@ -137,7 +137,7 @@ window.handleGoogleCredential = async function (response) {
     const { ok, data } = await apiPost('/auth/google', { token: response.credential });
     if (!ok) { _showError(data.detail || (typeof t === 'function' ? await t('auth.err_google_auth') : 'Error authenticating with Google.')); return; }
     saveSession(data.access_token, data.user);
-    window.location.href = '/src/pages/chat.html';
+    window.location.href = '/chat.html';
   } catch {
     _showError(typeof t === 'function' ? await t('auth.err_connection') : 'Connection error.');
   } finally {

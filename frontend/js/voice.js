@@ -4,7 +4,7 @@ const WS_URL = (location.hostname === 'localhost' || location.hostname === '127.
 // ── Auth guard ─────────────────────────────────────────────────────
 const token   = localStorage.getItem('token');
 const userRaw = localStorage.getItem('user');
-if (!token || !userRaw) { window.location.href = '/src/pages/index.html'; }
+if (!token || !userRaw) { window.location.href = '/index.html'; }
 
 const savedTheme = localStorage.getItem('theme') || 'dark';
 document.documentElement.setAttribute('data-theme', savedTheme);

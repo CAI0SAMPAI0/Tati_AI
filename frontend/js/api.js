@@ -108,7 +108,7 @@ async function apiUpload(path, formData) {
 function authLogout() {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
-  window.location.href = '/src/pages/index.html';
+  window.location.href = '/index.html';
 }
 
 function getUser() {
@@ -122,7 +122,7 @@ function saveSession(token, user) {
 
 function requireAuth() {
   if (!getToken() || !getUser()) {
-    window.location.href = '/src/pages/index.html';
+    window.location.href = '/index.html';
     return false;
   }
   return true;

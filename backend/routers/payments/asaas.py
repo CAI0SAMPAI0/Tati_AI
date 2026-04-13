@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from core.config import settings
 from routers.deps import get_current_user
-from routers.users.permissions import calc_due_date
+from routers.users.permissions import calc_due_date, SPECIAL_USERS
 from services.asaas import (
     create_customer, create_payment,
     get_customer_by_email, get_pix_qr_code,
@@ -109,7 +109,7 @@ async def create_new_payment(
     user_email = current_user.get("email")
     username   = current_user.get("username")
     user_name  = current_user.get("name") or current_user.get("username")
-    cpf_cnpj   = current_user.get("cpf") or current_user.get("cpf_cnpj") 
+    cpf_cnpj   = current_user.get("cpf") or current_user.get("cpf_cnpj")
 
     raw_phone = str(current_user.get("phone") or "")
     phone     = "".join(filter(str.isdigit, raw_phone))
@@ -123,22 +123,31 @@ async def create_new_payment(
         raise HTTPException(status_code=400, detail="planType inválido. Use 'basic' ou 'full'.")
 
     launch_date = date(2026, 5, 1)
-    allowed_testers = ['programador', 'caio.sampaio']
 
-    # Se a data atual for menor que o lançamento E o usuário não for testador, bloqueia:
-    if date.today() < launch_date and username not in allowed_testers:
+    # Se a data atual for menor que o lançamento E o usuário não for especial, bloqueia:
+    if date.today() < launch_date and username not in SPECIAL_USERS:
         raise HTTPException(
             status_code=403, 
             detail="As assinaturas estarão disponíveis apenas a partir de 01/05/2026."
         )
+
     try:
         customer    = await get_customer_by_email(user_email)
-        customer_id = customer["id"] if customer else (
-            await create_customer(
+        
+        if customer:
+            customer_id = customer["id"]
+        else:
+            if not cpf_cnpj:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="CPF/CNPJ é obrigatório para o primeiro pagamento (Asaas)."
+                )
+            
+            new_cust = await create_customer(
                 name=user_name, email=user_email,
                 cpf_cnpj=cpf_cnpj, phone=phone,
             )
-        )["id"]
+            customer_id = new_cust["id"]
 
         # Usa preferred_due_day do usuário para calcular vencimento
         user_row = get_client().table("users").select("preferred_due_day").eq(

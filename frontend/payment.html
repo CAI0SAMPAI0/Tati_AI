@@ -8,8 +8,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
-  <link rel="stylesheet" href="/src/styles/global.css">
-  <link rel="stylesheet" href="/src/styles/payment.css">
+  <link rel="stylesheet" href="/styles/global.css">
+  <link rel="stylesheet" href="/styles/payment.css">
   <link rel="icon" type="image/x-icon" href="/assets/images/tati_logo.jpg">
 </head>
 <body>
@@ -90,6 +90,18 @@
       </div>
     </div>
 
+    <!-- CPF/CNPJ -->
+    <div id="cpf-section" style="margin-bottom: 1.5rem;">
+      <div class="section-label" data-i18n="payment.cpf_label">CPF ou CNPJ</div>
+      <div style="position: relative;">
+        <input type="text" id="user-cpf" placeholder="000.000.000-00" 
+          style="width: 100%; padding: 0.85rem 1rem; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; font-size: 1rem;">
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; line-height: 1.4;">
+          Necessário para emissão da nota fiscal e processamento seguro.
+        </p>
+      </div>
+    </div>
+
     <!-- Botão gerar -->
     <div>
       <button class="btn-pay" id="btn-generate" onclick="handlePayment()">
@@ -154,9 +166,9 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-  <script src="/src/scripts/i18n.js"></script>
-  <script src="/src/scripts/api.js"></script>
-  <script src="/src/scripts/payment.js"></script>
+  <script src="/js/i18n.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/payment.js"></script>
 
 </body>
 </html>

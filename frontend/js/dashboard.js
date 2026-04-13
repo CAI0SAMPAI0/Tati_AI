@@ -2,7 +2,7 @@ if (!requireAuth()) throw new Error('Unauthenticated');
 const _dashUser = getUser();
 if (!isStaff(_dashUser)) {
   alert('Acesso negado. Área restrita a professores.');
-  window.location.href = '/src/pages/chat.html';
+  window.location.href = '/chat.html';
 }
 
 let allStudents = [];

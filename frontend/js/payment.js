@@ -5,6 +5,20 @@ let selectedMethod = 'PIX';
 let selectedPlan   = 'full';
 let _detailPlan    = null;
 
+// ── Init ──────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  // Pré-carrega CPF se já existir no perfil
+  try {
+    const userProfile = await apiGet('/profile/');
+    const cpfInput = document.getElementById('user-cpf');
+    if (cpfInput && (userProfile.cpf || userProfile.cpf_cnpj)) {
+      cpfInput.value = userProfile.cpf || userProfile.cpf_cnpj;
+    }
+  } catch (e) {
+    console.warn("Erro ao buscar perfil para pré-preencher CPF:", e);
+  }
+});
+
 // ── Toast ─────────────────────────────────────────────────────────
 function showToast(text, type = 'info') {
   Toastify({
@@ -82,6 +96,15 @@ async function handlePayment() {
   const btn       = document.getElementById('btn-generate');
   const loading   = document.getElementById('loading');
   const pixResult = document.getElementById('pix-result');
+  const cpfInput  = document.getElementById('user-cpf');
+
+  const cpfValue = cpfInput ? cpfInput.value.replace(/\D/g, '') : '';
+  
+  if (!cpfValue || (cpfValue.length !== 11 && cpfValue.length !== 14)) {
+    showToast("Por favor, informe um CPF ou CNPJ válido.", "error");
+    if (cpfInput) cpfInput.focus();
+    return;
+  }
 
   pixResult.classList.remove('visible');
   pixResult.style.display = 'none';
@@ -89,6 +112,10 @@ async function handlePayment() {
   loading.style.display = 'block';
 
   try {
+    // 1. Salva o CPF no perfil do usuário no Supabase primeiro
+    await apiPut('/profile/', { cpf: cpfValue, cpf_cnpj: cpfValue });
+
+    // 2. Cria a cobrança no Asaas
     const value   = selectedPlan === 'basic' ? 19.90 : 39.90;
     const payload = {
       billingType: selectedMethod,

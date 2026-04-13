@@ -9,8 +9,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
         crossorigin="anonymous">
-    <link rel="stylesheet" href="styles/styles/global.css">
-    <link rel="stylesheet" href="styles/styles/activities.css">
+    <link rel="stylesheet" href="styles/global.css">
+    <link rel="stylesheet" href="styles/activities.css">
     <link rel="icon" type="image/x-icon" href="/assets/images/tati_logo.jpg">
     <style>
         .btn-back-home {
@@ -26,11 +26,42 @@
             width: fit-content;
         }
         .btn-back-home:hover { color: var(--primary); }
+
+        /* Estilo para o bloqueio de acesso */
+        .access-denied-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 4rem 2rem;
+            background: var(--surface);
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            margin-top: 2rem;
+        }
+        .access-denied-icon {
+            font-size: 4rem;
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            opacity: 0.8;
+        }
+        .access-denied-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+        .access-denied-text {
+            color: var(--text-muted);
+            max-width: 400px;
+            line-height: 1.6;
+        }
     </style>
 </head>
 
 <body>
-    <div class="act-layout">
+    <div class="act-layout" id="main-content" style="display:none;">
         <!-- Botão Voltar -->
         <a href="chat.html" class="btn-back-home">
             <i class="fa-solid fa-chevron-left"></i>
@@ -138,9 +169,45 @@
         </div>
     </div>
 
-    <script src="/src/scripts/i18n.js"></script>
-    <script src="/src/scripts/api.js"></script>
-    <script src="/src/scripts/activities_ui.js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/activities_ui.js"></script>
+    <script>
+        // Bloqueio de acesso para não-admins
+        (async () => {
+            if (typeof requireAuth !== 'undefined' && !requireAuth()) return;
+            try {
+                // Busca as permissões do usuário
+                const user = JSON.parse(localStorage.getItem('user') || '{}');
+                const specialUsers = ["caio.sampaio", "caio", "programador", "tati", "tati.ai", "admin"];
+                // Se não for admin (professor) e não estiver na lista especial, bloqueia
+                if (user.role !== 'professor' && user.role !== 'admin' && user.role !== 'staff' && !specialUsers.includes(user.username)) {
+                    document.body.innerHTML = `
+                        <div class="act-layout">
+                            <a href="chat.html" class="btn-back-home">
+                                <i class="fa-solid fa-chevron-left"></i>
+                                <span>Voltar ao Chat</span>
+                            </a>
+                            <div class="access-denied-container">
+                                <div class="access-denied-icon">🛠️</div>
+                                <div class="access-denied-title">Área em Manutenção</div>
+                                <div class="access-denied-text">
+                                    Somente administradores têm acesso no momento. <br>
+                                    <b>Função em testes.</b>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('main-content').style.display = 'block';
+                }
+            } catch (e) {
+                console.error("Erro ao verificar acesso:", e);
+                // Fallback para mostrar o conteúdo caso algo dê errado na verificação local
+                document.getElementById('main-content').style.display = 'block';
+            }
+        })();
+    </script>
 </body>
 
 </html>

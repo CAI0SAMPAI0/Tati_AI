@@ -28,7 +28,7 @@ from services.rag_search import obter_contexto_rag
 
 router = APIRouter()
 
-PAID_START     = date(2026, 4, 1)
+PAID_START     = date(2026, 5, 1)
 FREE_MSG_LIMIT = 5
 
 _SOURCE_MARKERS = ["📚 Fontes", "Fontes consultadas:", "Sources:", "References:"]
@@ -148,11 +148,11 @@ def _check_chat_access(username: str) -> dict:
     user      = _get_full_user(username)
     print(f"DEBUG ACCESS: username={username}, today={today}, PAID_START={PAID_START}")
     print(f"DEBUG ACCESS: user data = {user}")
-    is_admin  = user.get("role") in settings.staff_roles
-    is_exempt = user.get("is_exempt", False)
+    is_admin  = user.get("role") in settings.staff_roles or username in SPECIAL_USERS
+    is_exempt = user.get("is_exempt", False) or username in SPECIAL_USERS
     print(f"DEBUG ACCESS: is_admin={is_admin}, is_exempt={is_exempt}")
 
-    # Admin e staff → sempre permitido
+    # Admin e staff ou Usuário Especial → sempre permitido
     if is_admin or is_exempt:
         return {"allowed": True, "reason": None, "free_messages_remaining": None}
     if user.get("is_premium_active"):
