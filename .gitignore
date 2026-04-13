@@ -11,7 +11,10 @@ setup.txt
 frontend/js/voice1.js
 frontend/styles/voice1.css
 backend/data/
+backend/runtime.txt
+backend/token.json
 backend/rhubarb.exe
 credentials.json
-.gitignore
 token.json
+ngrok.exe
+ngrok.yml

@@ -64,7 +64,12 @@ def _find_user(identifier: str, fields: str = "username, name, email, password, 
 
 
 def _build_token_response(user: dict) -> dict:
-    token = create_access_token({"sub": user["username"], "role": user.get("role", "student")})
+    token_payload = {
+        "sub": user["username"],
+        "role": user.get("role", "student"),
+        "level": user.get("level", "Beginner")
+    }
+    token = create_access_token(token_payload)
     return {
         "access_token": token,
         "token_type": "bearer",

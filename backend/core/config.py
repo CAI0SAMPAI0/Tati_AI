@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -20,6 +21,30 @@ class Settings(BaseSettings):
     gemini_model: str = 'gemini-2.0-flash'
     anthropic_api_key: str = ''
     gemini_api_key: str = ''
+
+    # prompt
+    system_prompt: str = (
+        "You are TATI, a dedicated, friendly and objective English teacher. "
+        "Your goal is to help the student practice conversation and improve their English.\n\n"
+        "CRITICAL LANGUAGE RULE:\n"
+        "1. ALWAYS write your ENTIRE response in ENGLISH ONLY.\n"
+        "2. Do NOT translate the student's message into Portuguese.\n"
+        "3. Even if the student writes in Portuguese, respond ONLY in English — "
+        "gently remind them to write in English.\n"
+        "4. The ONLY exception: if the student explicitly asks 'how do you say X in Portuguese?' "
+        "— give only that translation, then continue in English.\n\n"
+        "CORRECTION GUIDELINES:\n"
+        "5. Always identify grammar, vocabulary, or pronunciation mistakes.\n"
+        "6. After your reply, add a short '📝 Feedback' section in English.\n"
+        "7. Point out errors gently, adapted to the student's level.\n"
+        "8. If no errors, give brief positive reinforcement.\n"
+        "9. Keep feedback concise and encouraging.\n\n"
+        "Example format:\n"
+        "Your conversational reply...\n\n"
+        "📝 Feedback:\n"
+        "- 'I go to school yesterday' → 'I went to school yesterday' (past tense).\n"
+    )
+    
     
     # Groq com múltiplas chaves
     groq_api_key: str = ""
@@ -43,40 +68,26 @@ class Settings(BaseSettings):
     # email com resend
     resend_api_key: str = ''
 
-    # RAG usando o drive (em breve será o da professora, pegar link do drive dela)
-    google_drive_folder_id: str = ''
-    google_client_id_drive: str = ''
-    google_project_id: str = ''
-    google_auth_uri: str = ''
-    google_token_uri: str = ''
-    google_client_secret: str = ''
-    
-    # Config do APP 
-    port: int = 8000
-    debug: bool = True
-    system_prompt: str = (
-        "You are TATI, a dedicated, friendly and objective English teacher. "
-        "Your goal is to help the student practice conversation and improve their English.\n\n"
-        "CRITICAL LANGUAGE RULE:\n"
-        "1. ALWAYS write your ENTIRE response in ENGLISH ONLY.\n"
-        "2. Do NOT translate the student's message into Portuguese.\n"
-        "3. Even if the student writes in Portuguese, respond ONLY in English — "
-        "gently remind them to write in English.\n"
-        "4. The ONLY exception: if the student explicitly asks 'how do you say X in Portuguese?' "
-        "— give only that translation, then continue in English.\n\n"
-        "CORRECTION GUIDELINES:\n"
-        "5. Always identify grammar, vocabulary, or pronunciation mistakes.\n"
-        "6. After your reply, add a short '📝 Feedback' section in English.\n"
-        "7. Point out errors gently, adapted to the student's level.\n"
-        "8. If no errors, give brief positive reinforcement.\n"
-        "9. Keep feedback concise and encouraging.\n\n"
-        "Example format:\n"
-        "Your conversational reply...\n\n"
-        "📝 Feedback:\n"
-        "- 'I go to school yesterday' → 'I went to school yesterday' (past tense).\n"
-    )
-    
-    model_config = SettingsConfigDict(env_file='.env', extra='ignore')
+    # Asaas Pagamentos
+    api_asaas: str = Field('', validation_alias='API_ASAAS')
+    asaas_environment: str = Field('sandbox', validation_alias='ASAAS_ENVIRONMENT')
+    asaas_webhook_token: str = "" 
+
+
+    model_config = SettingsConfigDict(env_file='.env', extra='ignore', case_sensitive=False)
+
+    def __init__(self, **values):
+        super().__init__(**values)
+        import os
+        # Fallback manual reforçado
+        if not self.api_asaas:
+            self.api_asaas = os.getenv('API_ASAAS', '')
+        
+        env_val = os.getenv('ASAAS_ENVIRONMENT', '').lower()
+        if env_val:
+            self.asaas_environment = env_val
+        elif not self.asaas_environment:
+            self.asaas_environment = 'sandbox'
     
     @property
     def groq_keys(self) -> list[str]:
@@ -99,7 +110,7 @@ class Settings(BaseSettings):
     @property
     def staff_roles(self) -> tuple[str, ...]:
         # define quais papéis são considerados "staff" para acesso a certas rotas
-        return ("professor", "professora", "programador", "Tatiana", "Tati")
+        return ("professor", "professora", 'Professor', 'Professora', "programador", "Tatiana", "Tati", 'Tatiana Duarte')
 
 @lru_cache
 def get_settings() -> Settings:

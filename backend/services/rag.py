@@ -47,17 +47,17 @@ def autenticar_google():
 
 def sincronizar_drive():
     print("🔑 Iniciando autenticação...")
-    autenticar_google() 
-    
-    print(f"☁️ Conectando à pasta do Google Drive: {os.getenv('GOOGLE_DRIVE_FOLDER_ID')}...")
+    autenticar_google()
+
+    folder_id = os.getenv("GOOGLE_DRIVE_FOLDER_ID") or "11AjlpMFhuvkGJsXPQnNxRNN5wySn8W8R"
+    print(f"☁️ Conectando à pasta do Google Drive: {folder_id}...")
     try:
         # Puxa SOMENTE PDFs da pasta específica
         loader = GoogleDriveLoader(
-            folder_id=os.getenv("GOOGLE_DRIVE_FOLDER_ID"),
-            token_path="token.json",    
+            folder_id=folder_id,
+            token_path="token.json",
             recursive=True
-        )
-        
+        )        
         documentos = loader.load()
         if not documentos:
             print("⚠️ Nenhum PDF encontrado nessa pasta do Drive.")

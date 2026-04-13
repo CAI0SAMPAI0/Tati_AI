@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="nav.dashboard">Tati AI — Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+        crossorigin="anonymous">
+    <link rel="stylesheet" href="../styles/global.css">
+    <link rel="stylesheet" href="../styles/dashboard.css">
+    <link rel="stylesheet" href="../styles/modal.css">
+    <link rel="icon" type="image/x-icon" href="../../assets/images/tati_logo.jpg">
+    <link rel="stylesheet" href="../styles/reports.css">
+    <link rel="stylesheet" href="../styles/admin_modules.css">
+</head>
+
+<body>
+    <div class="dash-sidebar-overlay" onclick="closeDashSidebar()"></div>
+    <div class="dash-layout">
+
+        <aside class="dash-sidebar">
+            <div class="dash-sidebar-brand">
+                <img src="../../assets/images/tati_logo.jpg" alt="Tati" class="brand-avatar"
+                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="brand-avatar-fallback" style="display:none;">🧑‍🏫</div>
+                <div>
+                    <span class="brand-name">Teacher Tati</span>
+                    <span class="brand-sub" data-i18n="nav.dashboard">Dashboard</span>
+                </div>
+                <button class="btn-sidebar-close" onclick="closeDashSidebar()">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <nav class="dash-nav">
+                <a href="#overview" class="dash-nav-item active" onclick="setSection('overview',this)">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span data-i18n="dash.overview">Visão Geral</span>
+                </a>
+                <a href="#students" class="dash-nav-item" onclick="setSection('students',this)">
+                    <i class="fa-solid fa-users"></i>
+                    <span data-i18n="dash.students">Alunos</span>
+                </a>
+                <a href="#reports" class="dash-nav-item" id="nav-reports" onclick="setSection('reports',this)">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span data-i18n="dash.reports">Relatórios</span>
+                </a>
+                <a href="#modules" class="dash-nav-item" onclick="setSection('modules',this)">
+                    <i class="fa-solid fa-book-open"></i>
+                    <span data-i18n="mod.title">Módulos</span>
+                </a>
+                <a href="#flashcards" class="dash-nav-item" onclick="setSection('flashcards',this)">
+                    <i class="fa-solid fa-layer-group"></i>
+                    <span data-i18n="mod.section_flashcards">Flashcards</span>
+                </a>
+                <a href="#submissions" class="dash-nav-item" onclick="setSection('submissions',this)">
+                    <i class="fa-solid fa-file-signature"></i>
+                    <span data-i18n="dash.submissions">Correções</span>
+                </a>
+            </nav>
+
+            <div class="dash-sidebar-footer">
+                <a href="chat.html" class="dash-nav-item">
+                    <i class="fa-solid fa-comments"></i>
+                    <span data-i18n="dash.go_chat">Ir ao Chat</span>
+                </a>
+                <a href="settings.html" class="dash-nav-item">
+                    <i class="fa-solid fa-gear"></i>
+                    <span data-i18n="nav.settings">Configurações</span>
+                </a>
+                <button class="dash-nav-item btn-flat" onclick="logout()">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span data-i18n="nav.logout">Sair</span>
+                </button>
+            </div>
+        </aside>
+
+        <main class="dash-main">
+
+            <header class="dash-topbar">
+                <div>
+                    <h1 class="dash-page-title" id="page-title" data-i18n="dash.overview">Visão Geral</h1>
+                    <p class="dash-page-sub" id="page-sub" data-i18n="dash.overview_sub">Resumo da plataforma</p>
+                </div>
+                <button class="btn-sidebar-toggle" onclick="toggleDashSidebar()">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+            </header>
+
+            <!-- ── Visão Geral ── -->
+            <section id="section-overview" class="dash-section">
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fa-solid fa-users"></i></div>
+                        <div class="stat-body">
+                            <div class="stat-value" id="stat-total-students">—</div>
+                            <div class="stat-label" data-i18n="dash.total_students">Total de Alunos</div>
+                        </div>
+                        <div class="stat-trend up" data-i18n="dash.active">↑ Ativo</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fa-solid fa-comments"></i></div>
+                        <div class="stat-body">
+                            <div class="stat-value" id="stat-total-messages">—</div>
+                            <div class="stat-label" data-i18n="dash.total_msgs">Total de Mensagens</div>
+                        </div>
+                    </div>
+                    <div class="stat-card highlight">
+                        <div class="stat-icon"><i class="fa-solid fa-bolt"></i></div>
+                        <div class="stat-body">
+                            <div class="stat-value" id="stat-active-today">—</div>
+                            <div class="stat-label" data-i18n="dash.active_today">Ativos Hoje</div>
+                        </div>
+                        <div class="stat-trend up" data-i18n="dash.hoje">Hoje</div>
+                    </div>
+                </div>
+
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <h3 data-i18n="dash.recent">Alunos Recentes</h3>
+                        <button class="btn-link"
+                            onclick="setSection('students', document.querySelector('[onclick*=students]'))">
+                            <span data-i18n="dash.see_all">Ver todos →</span>
+                        </button>
+                    </div>
+                    <div id="recent-students-table"></div>
+                </div>
+
+                <div class="overview-content" style="margin-top: 2rem;">
+                    <h3 style="color: var(--text-muted); font-size: 1.1rem; margin-bottom: 1rem;"
+                        data-i18n="dash.alertas">Alertas de Dificuldade
+                        da Turma</h3>
+                    <div
+                        style="background: var(--surface); border-radius: 8px; border: 1px solid var(--border); overflow: hidden;">
+                        <table style="width: 100%; text-align: left; border-collapse: collapse;">
+                            <thead style="background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--border);">
+                                <tr>
+                                    <th style="padding: 1rem; color: var(--text-muted); font-weight: 600;"
+                                        data-i18n="dash.aluno_alertas"></th>
+                                    <th style="padding: 1rem; color: var(--text-muted); font-weight: 600;"
+                                        data-i18n="dash.aten_alertas"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="difficulties-tbody">
+                                <tr>
+                                    <td colspan="2" style="padding: 1rem; text-align: center; color: var(--text-muted);"
+                                        data-i18n="dash.loading">
+                                        Carregando alertas...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── Alunos ── -->
+            <section id="section-students" class="dash-section" style="display:none;">
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <h3 data-i18n="dash.all_students">Todos os Alunos</h3>
+                        <div class="search-wrap">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input id="student-search" type="text" data-i18n-placeholder="dash.search_ph"
+                                placeholder="Pesquisar aluno..." oninput="filterStudents()">
+                        </div>
+                    </div>
+                    <div id="students-table"></div>
+                </div>
+            </section>
+
+            <!-- ── Relatórios ── -->
+            <section id="section-reports" class="dash-section" style="display:none;">
+                <div class="content">
+
+                    <div class="metrics">
+                        <div class="metric-card">
+                            <div style="display:flex;align-items:flex-start;justify-content:space-between">
+                                <div class="metric-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                        <circle cx="9" cy="7" r="4" />
+                                    </svg>
+                                </div>
+                                <span class="badge badge-purple" data-i18n="dash.total"></span>
+                            </div>
+                            <div>
+                                <div class="metric-label" data-i18n="dash.total_students">Total de alunos</div>
+                                <div class="metric-value purple" id="val-students">—</div>
+                            </div>
+                            <div class="metric-trend">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                                </svg>
+
+                            </div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div style="display:flex;align-items:flex-start;justify-content:space-between">
+                                <div class="metric-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                    </svg>
+                                </div>
+                                <span class="badge badge-purple" data-i18n="dash.trocadas"></span>
+                            </div>
+                            <div>
+                                <div class="metric-label" data-i18n="dash.msgs"></div>
+                                <div class="metric-value purple" id="val-msgs">—</div>
+                            </div>
+                            <div class="metric-trend">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                                    <polyline points="17 6 23 6 23 12" />
+                                </svg>
+
+                            </div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div style="display:flex;align-items:flex-start;justify-content:space-between">
+                                <div class="metric-icon" style="background:hsla(152,68%,42%,0.12)">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2"
+                                        style="stroke:hsl(152,60%,50%)">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <polyline points="12 6 12 12 16 14" />
+                                    </svg>
+                                </div>
+                                <span class="badge badge-green" data-i18n="dash.hoje">Hoje</span>
+                            </div>
+                            <div>
+                                <div class="metric-label" data-i18n="dash.ac_hj"></div>
+                                <div class="metric-value green" id="val-active">—</div>
+                            </div>
+                            <div class="metric-trend">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <circle cx="12" cy="12" r="1" />
+                                    <circle cx="19" cy="12" r="1" />
+                                    <circle cx="5" cy="12" r="1" />
+                                </svg>
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="charts-grid">
+
+                        <!-- Bar chart -->
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <div class="chart-title" data-i18n="dash.reports_sem"></div>
+                                <div class="chart-sub" data-i18n="dash.n_msg_day"></div>
+                            </div>
+                            <div style="position:relative;padding-left:30px">
+                                <div class="chart-area" id="bars"></div>
+                            </div>
+                            <div class="stats-row" style="margin-top:14px">
+                                <div class="stat-mini">
+                                    <div class="stat-mini-val" id="stat-avg">—</div>
+                                    <div class="stat-mini-label" data-i18n="dash.media">Média/dia</div>
+                                </div>
+                                <div class="stat-mini">
+                                    <div class="stat-mini-val" id="stat-peak">—</div>
+                                    <div class="stat-mini-label" data-i18n="dash.pico">Pico</div>
+                                </div>
+                                <div class="stat-mini">
+                                    <div class="stat-mini-val" id="stat-total-week">—</div>
+                                    <div class="stat-mini-label" data-i18n="dash.tot_sem">Total semana</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Donut -->
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <div class="chart-title" data-i18n="dash.niveis"></div>
+                                <div class="chart-sub" data-i18n="dash.level_st"></div>
+                            </div>
+                            <div class="donut-wrap">
+                                <div class="donut-container">
+                                    <svg id="donut-svg" width="140" height="140" viewBox="0 0 140 140"></svg>
+                                    <div class="donut-center">
+                                        <div class="donut-center-num" id="donut-center-num">—</div>
+                                        <div class="donut-center-label" data-i18n="dash.al_dis"></div>
+                                    </div>
+                                </div>
+                                <div class="legend" id="legend"></div>
+                            </div>
+                        </div>
+
+
+                    </div>
+            </section>
+
+            <!-- ── Módulos ── -->
+            <section id="section-modules" class="dash-section" style="display:none;">
+                <div class="modules-toolbar">
+                    <div class="modules-filter">
+                        <button class="mod-filter-btn active" onclick="filterModules('all',this)"
+                            data-i18n="mod.filter_all">Todos</button>
+                        <button class="mod-filter-btn" onclick="filterModules('published',this)"
+                            data-i18n="mod.filter_pub">Publicados</button>
+                        <button class="mod-filter-btn" onclick="filterModules('draft',this)"
+                            data-i18n="mod.filter_draft">Rascunhos</button>
+                    </div>
+                    <button class="btn-new-module" onclick="openModModal()">
+                        <i class="fa-solid fa-plus"></i> <span data-i18n="mod.new">Novo Módulo</span>
+                    </button>
+                </div>
+                <div id="modules-grid" class="modules-grid"></div>
+            </section>
+
+            <!-- ── Flashcards ── -->
+            <section id="section-flashcards" class="dash-section" style="display:none;">
+                <div class="modules-toolbar">
+                    <div class="modules-filter">
+                        <button class="mod-filter-btn active" onclick="_loadFlashcards('all',this)"
+                            data-i18n="mod.filter_all">Todos</button>
+                    </div>
+                    <button class="btn-new-module" onclick="openFlashcardPackModal()">
+                        <i class="fa-solid fa-plus"></i> <span data-i18n="mod.new">Novo Pacote</span>
+                    </button>
+                </div>
+                <div id="flashcards-grid" class="modules-grid"></div>
+            </section>
+
+            <!-- ── Correções ── -->
+            <section id="section-submissions" class="dash-section" style="display:none;">
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <h3 data-i18n="dash.submissions">Correções</h3>
+                    </div>
+                    <div id="submissions-table-container">
+                        <div class="mod-empty"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Modal Novo Pacote de Flashcards (IA) -->
+    <div id="fc-pack-modal-overlay" class="mod-modal-overlay" style="display:none"
+        onclick="if(event.target===this)closeFcPackModal()">
+        <div class="mod-modal">
+            <div class="mod-modal-header">
+                <h2 data-i18n="mod.fc_gen_ai">Gerar Pacote com IA</h2>
+                <button onclick="closeFcPackModal()" class="mod-modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="mod-modal-body">
+                <div class="mod-field">
+                    <label data-i18n="mod.fc_theme">Tema do pacote</label>
+                    <input id="fc-theme" type="text" data-i18n-placeholder="mod.fc_theme_ph"
+                        placeholder="Ex: Verbos Irregulares, Aeroporto...">
+                </div>
+                <div class="mod-field">
+                    <label data-i18n="mod.fc_instructions">Instruções extras</label>
+                    <textarea id="fc-instructions" rows="3" data-i18n-placeholder="mod.fc_inst_ph"
+                        placeholder="Ex: Foque em gírias americanas..."></textarea>
+                </div>
+                <div class="mod-field">
+                    <label data-i18n="mod.field_level">Nível</label>
+                    <select id="fc-level">
+                        <option value="Beginner">Beginner</option>
+                        <option value="Pre-Intermediate">Pre-Intermediate</option>
+                        <option value="Intermediate">Intermediate</option>
+                        <option value="Business English">Business English</option>
+                        <option value="Advanced">Advanced</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mod-modal-footer">
+                <div id="fc-save-msg" class="mod-save-msg"></div>
+                <button class="btn-mod-secondary" onclick="closeFcPackModal()" data-i18n="mod.cancel">Cancelar</button>
+                <button class="btn-mod-primary" onclick="generateFlashcardsByTheme()">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> <span data-i18n="mod.gen_ai">Gerar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Criar/Editar Módulo -->
+    <div id="mod-modal-overlay" class="mod-modal-overlay" style="display:none"
+        onclick="if(event.target===this)closeModModal()">
+        <div class="mod-modal">
+            <div class="mod-modal-header">
+                <h2 id="mod-modal-title" data-i18n="mod.modal_new">Novo Módulo</h2>
+                <button onclick="closeModModal()" class="mod-modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="mod-modal-body">
+                <input type="hidden" id="mod-id">
+
+                <div class="mod-field">
+                    <label data-i18n="mod.field_title">Título do módulo</label>
+                    <input id="mod-title" type="text" data-i18n-placeholder="mod.field_title_ph"
+                        placeholder="Ex: To Be — Present Simple">
+                </div>
+                <div class="mod-field">
+                    <label data-i18n="mod.field_desc">Descrição</label>
+                    <textarea id="mod-desc" rows="2" data-i18n-placeholder="mod.field_desc_ph"
+                        placeholder="Breve descrição do que será estudado..."></textarea>
+                </div>
+                <div class="mod-field-row">
+                    <div class="mod-field" style="flex: 2;">
+                        <label data-i18n="mod.field_level">Nível</label>
+                        <div id="mod-levels-container"
+                            style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;">
+                            <label
+                                style="font-size: 0.75rem; display: flex; align-items: center; gap: 0.2rem; cursor: pointer;"><input
+                                    type="checkbox" name="mod-level" value="Beginner"> Beg</label>
+                            <label
+                                style="font-size: 0.75rem; display: flex; align-items: center; gap: 0.2rem; cursor: pointer;"><input
+                                    type="checkbox" name="mod-level" value="Pre-Intermediate"> Pre</label>
+                            <label
+                                style="font-size: 0.75rem; display: flex; align-items: center; gap: 0.2rem; cursor: pointer;"><input
+                                    type="checkbox" name="mod-level" value="Intermediate"> Int</label>
+                            <label
+                                style="font-size: 0.75rem; display: flex; align-items: center; gap: 0.2rem; cursor: pointer;"><input
+                                    type="checkbox" name="mod-level" value="Business English"> Bus</label>
+                            <label
+                                style="font-size: 0.75rem; display: flex; align-items: center; gap: 0.2rem; cursor: pointer;"><input
+                                    type="checkbox" name="mod-level" value="Advanced"> Adv</label>
+                            <label
+                                style="font-size: 0.75rem; display: flex; align-items: center; gap: 0.2rem; cursor: pointer; color: var(--primary); font-weight: bold;"><input
+                                    type="checkbox" name="mod-level" value="all"> All</label>
+                        </div>
+                    </div>
+                    <div class="mod-field">
+                        <label data-i18n="mod.field_order">Ordem</label>
+                        <input id="mod-order" type="number" value="0" min="0">
+                    </div>
+                </div>
+
+                <!-- Conteúdos do módulo -->
+                <div class="mod-contents-header">
+                    <span class="mod-section-label"><i class="fa-solid fa-film"></i> <span
+                            data-i18n="mod.section_contents">Conteúdos</span></span>
+                    <button class="btn-add-content" onclick="addContentRow()"><i class="fa-solid fa-plus"></i>
+                        <span data-i18n="mod.add_content">Adicionar</span></button>
+                </div>
+                <div id="mod-contents-list" class="mod-contents-list"></div>
+
+                <!-- Flashcards -->
+                <div class="mod-contents-header" style="margin-top: 1.5rem;">
+                    <span class="mod-section-label"><i class="fa-solid fa-layer-group"></i> <span
+                            data-i18n="mod.section_flashcards">Flashcards</span></span>
+                    <button class="btn-add-content" onclick="addFlashcardRow()"><i class="fa-solid fa-plus"></i>
+                        <span data-i18n="mod.add_content">Adicionar</span></button>
+                </div>
+                <div id="mod-flashcards-list" class="mod-contents-list"></div>
+
+                <!-- Quiz -->
+                <div class="mod-quiz-header">
+                    <span class="mod-section-label"><i class="fa-solid fa-circle-question"></i> <span
+                            data-i18n="mod.section_quiz">Quiz</span></span>
+                    <div class="quiz-header-actions">
+                        <button class="btn-gen-quiz" id="btn-gen-quiz" onclick="generateQuizAI()">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> <span data-i18n="mod.gen_ai">Gerar com
+                                IA</span>
+                        </button>
+                        <button class="btn-add-content" onclick="addQuestionRow()"><i class="fa-solid fa-plus"></i>
+                            <span data-i18n="mod.add_question">Adicionar questão</span></button>
+                    </div>
+                </div>
+                <div id="mod-quiz-title-wrap" class="mod-field" style="margin-bottom:0.75rem">
+                    <input id="quiz-title" type="text" data-i18n-placeholder="mod.quiz_title_ph"
+                        placeholder="Título do quiz (ex: Quiz — To Be)">
+                </div>
+                <div id="mod-questions-list" class="mod-questions-list"></div>
+            </div>
+
+            <div class="mod-modal-footer">
+                <div id="mod-save-msg" class="mod-save-msg"></div>
+                <button class="btn-mod-secondary" onclick="closeModModal()" data-i18n="mod.cancel">Cancelar</button>
+                <button class="btn-mod-primary" onclick="saveModule()">
+                    <i class="fa-solid fa-floppy-disk"></i> <span data-i18n="mod.save">Salvar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <template id="student-modal-template">
+        <div class="modal-backdrop"></div>
+        <div class="modal-panel">
+            <div class="modal-tabs">
+                <button class="modal-tab active" data-i18n="dash.edit">✏️ Editar</button>
+                <button class="modal-tab" data-i18n="dash.prompt">🧩 Prompt</button>
+                <button class="modal-tab" data-i18n="dash.insight">🧠 Insight</button>
+                <button class="modal-tab" data-i18n="dash.interests">🎯 Interesses do Aluno</button>
+            </div>
+            <div class="modal-tab-content" id="tab-insight-template">
+                <div class="modal-actions">
+                    <button class="btn-modal-save" type="button" data-i18n="dash.generate_insight">🧠 Gerar
+                        Insight</button>
+                    <button class="btn-modal-secondary" type="button" data-i18n="dash.grammar_errors">Erros
+                        Gramaticais</button>
+                </div>
+            </div>
+            <div class="modal-tab-content" id="tab-interests-template" style="display:none;">
+                <div class="modal-actions">
+                    <button class="btn-modal-save" id="btn-generate-interests" type="button"
+                        data-i18n="dash.analyze_interests">
+                        🎯 Analisar Interesses e Recomendações
+                    </button>
+                </div>
+                <div class="interests-section">
+                    <h4 data-i18n="dash.interests">Interesses do Aluno</h4>
+                    <div id="interests-container"></div>
+                </div>
+                <div class="recommendations-section">
+                    <h4 data-i18n="dash.practical_rec">Plano de Ação (Recomendações)</h4>
+                    <div id="recommendations-container"></div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script src="../scripts/i18n.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="../scripts/api.js"></script>
+    <script src="../scripts/dashboard.js"></script>
+    <script src="../scripts/admin_modules.js"></script>
+</body>
+
+</html>

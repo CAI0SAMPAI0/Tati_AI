@@ -1,0 +1,639 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    min-height: 100vh;
+    background: var(--bg, #0f0f13);
+    font-family: 'Inter', sans-serif;
+    color: var(--text, #e8e8f0);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* ── Topbar ── */
+.pay-topbar {
+    width: 100%;
+    max-width: 720px;
+    padding: 1.25rem 1.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.btn-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--text-muted, #888);
+    text-decoration: none;
+    font-size: 0.88rem;
+    transition: color 0.2s;
+}
+
+.btn-back:hover {
+    color: var(--text, #e8e8f0);
+}
+
+/* ── Layout ── */
+.pay-wrap {
+    width: 100%;
+    max-width: 720px;
+    padding: 2rem 1.5rem 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.pay-hero {
+    text-align: center;
+}
+
+.pay-hero h1 {
+    font-size: 1.9rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #a78bfa, #60a5fa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 0.4rem;
+}
+
+.pay-hero p {
+    color: var(--text-muted, #888);
+    font-size: 0.95rem;
+}
+
+/* ── Section label ── */
+.section-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted, #888);
+    margin-bottom: 0.75rem;
+}
+
+/* ── Plan cards ── */
+.plans-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+@media (max-width: 480px) {
+    .plans-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.plan-card {
+    position: relative;
+    background: var(--surface, #1a1a24);
+    border: 2px solid var(--border, #2a2a38);
+    border-radius: 16px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.plan-card:hover {
+    border-color: #a78bfa;
+    transform: translateY(-2px);
+}
+
+.plan-card.active {
+    border-color: #a78bfa;
+    background: rgba(167, 139, 250, 0.07);
+    box-shadow: 0 0 0 1px #a78bfa, 0 8px 32px rgba(167, 139, 250, 0.15);
+}
+
+.plan-card.active .plan-check {
+    opacity: 1;
+}
+
+.plan-badge-popular {
+    position: absolute;
+    top: -11px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #a78bfa, #60a5fa);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.2rem 0.75rem;
+    border-radius: 99px;
+    white-space: nowrap;
+}
+
+.plan-check {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 22px;
+    height: 22px;
+    background: #a78bfa;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+    font-size: 0.7rem;
+    color: #fff;
+}
+
+.plan-icon {
+    font-size: 1.6rem;
+    line-height: 1;
+}
+
+.plan-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text, #e8e8f0);
+}
+
+.plan-price {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #a78bfa;
+    line-height: 1;
+}
+
+.plan-price span {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-muted, #888);
+}
+
+.plan-features {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.plan-features li {
+    font-size: 0.82rem;
+    color: var(--text-muted, #aaa);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.plan-features li i {
+    color: #a78bfa;
+    font-size: 0.7rem;
+    width: 12px;
+}
+
+.btn-details {
+    background: none;
+    border: none;
+    color: #a78bfa;
+    font-size: 0.78rem;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+    margin-top: auto;
+    align-self: flex-start;
+}
+
+/* ── Method cards ── */
+.methods-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+}
+
+@media (max-width: 360px) {
+    .methods-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.method-card {
+    background: var(--surface, #1a1a24);
+    border: 2px solid var(--border, #2a2a38);
+    border-radius: 12px;
+    padding: 1rem 0.75rem;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.method-card:hover {
+    border-color: #a78bfa;
+}
+
+.method-card.active {
+    border-color: #a78bfa;
+    background: rgba(167, 139, 250, 0.07);
+}
+
+.method-card i {
+    font-size: 1.4rem;
+    color: var(--text-muted, #aaa);
+    transition: color 0.2s;
+}
+
+.method-card.active i {
+    color: #a78bfa;
+}
+
+.method-card span {
+    font-size: 0.82rem;
+    color: var(--text-muted, #aaa);
+    font-weight: 500;
+}
+
+.method-card.active span {
+    color: var(--text, #e8e8f0);
+}
+
+/* ── CTA ── */
+.btn-pay {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, #a78bfa, #60a5fa);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-pay:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.btn-pay:active {
+    transform: translateY(0);
+}
+
+.btn-pay:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ── Loading ── */
+#loading {
+    display: none;
+    text-align: center;
+    color: var(--text-muted, #888);
+    font-size: 0.88rem;
+    padding: 0.5rem;
+}
+
+.spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(167, 139, 250, 0.3);
+    border-top-color: #a78bfa;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 0.5rem;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ── PIX result ── */
+#pix-result {
+    display: none;
+    background: var(--surface, #1a1a24);
+    border: 1px solid var(--border, #2a2a38);
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    gap: 1rem;
+    flex-direction: column;
+    align-items: center;
+}
+
+#pix-result.visible {
+    display: flex;
+}
+
+#pix-result h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text, #e8e8f0);
+}
+
+#pix-result p {
+    font-size: 0.85rem;
+    color: var(--text-muted, #aaa);
+}
+
+.qr-wrap {
+    background: #fff;
+    border-radius: 12px;
+    padding: 12px;
+    display: inline-flex;
+}
+
+.qr-wrap img {
+    width: 180px;
+    height: 180px;
+    display: block;
+}
+
+.pix-code-box {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border, #2a2a38);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-family: monospace;
+    font-size: 0.75rem;
+    color: var(--text-muted, #aaa);
+    word-break: break-all;
+    text-align: left;
+    max-height: 80px;
+    overflow-y: auto;
+}
+
+.pix-actions {
+    display: flex;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.btn-pix-copy {
+    flex: 1;
+    padding: 0.75rem;
+    background: #a78bfa;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.btn-pix-copy:hover {
+    opacity: 0.85;
+}
+
+.btn-invoice {
+    flex: 1;
+    padding: 0.75rem;
+    background: none;
+    color: var(--text-muted, #aaa);
+    border: 1px solid var(--border, #2a2a38);
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.88rem;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    transition: all 0.2s;
+}
+
+.btn-invoice:hover {
+    border-color: #a78bfa;
+    color: var(--text, #e8e8f0);
+}
+
+/* ── Success modal ── */
+#success-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+#success-modal.visible {
+    display: flex;
+}
+
+.success-card {
+    background: var(--surface, #1a1a24);
+    border: 1px solid rgba(167, 139, 250, 0.3);
+    border-radius: 20px;
+    padding: 2.5rem 2rem;
+    max-width: 400px;
+    width: 100%;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes popIn {
+    from {
+        opacity: 0;
+        transform: scale(0.85);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.success-icon {
+    width: 72px;
+    height: 72px;
+    background: linear-gradient(135deg, #a78bfa22, #60a5fa22);
+    border: 2px solid #a78bfa;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+}
+
+.success-card h2 {
+    font-size: 1.4rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #a78bfa, #60a5fa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.success-card p {
+    font-size: 0.9rem;
+    color: var(--text-muted, #aaa);
+    line-height: 1.6;
+}
+
+.success-plan-badge {
+    background: rgba(167, 139, 250, 0.15);
+    border: 1px solid rgba(167, 139, 250, 0.4);
+    color: #a78bfa;
+    font-size: 0.85rem;
+    font-weight: 700;
+    padding: 0.4rem 1rem;
+    border-radius: 99px;
+}
+
+.btn-go-chat {
+    width: 100%;
+    padding: 0.9rem;
+    background: linear-gradient(135deg, #a78bfa, #60a5fa);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-go-chat:hover {
+    opacity: 0.88;
+}
+
+/* ── Plan detail modal ── */
+#plan-detail-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(6px);
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+#plan-detail-modal.visible {
+    display: flex;
+}
+
+.detail-card {
+    background: var(--surface, #1a1a24);
+    border: 1px solid var(--border, #2a2a38);
+    border-radius: 20px;
+    padding: 2rem;
+    max-width: 400px;
+    width: 100%;
+    animation: popIn 0.2s ease;
+}
+
+.detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.25rem;
+}
+
+.detail-price {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #a78bfa;
+}
+
+.detail-price small {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-muted, #888);
+}
+
+.btn-close-modal {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid var(--border, #2a2a38);
+    background: none;
+    color: var(--text-muted, #888);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    transition: all 0.15s;
+}
+
+.btn-close-modal:hover {
+    color: #ff6b6b;
+    border-color: #ff6b6b;
+}
+
+.detail-features {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-bottom: 1.5rem;
+}
+
+.detail-features li {
+    font-size: 0.88rem;
+    color: var(--text, #e8e8f0);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-choose {
+    width: 100%;
+    padding: 0.85rem;
+    background: linear-gradient(135deg, #a78bfa, #60a5fa);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.btn-choose:hover {
+    opacity: 0.88;
+}
+
+@keyframes modalIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}

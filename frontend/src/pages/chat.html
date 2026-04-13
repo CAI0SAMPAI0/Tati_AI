@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="chat.title">Tati AI — Chat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+        crossorigin="anonymous">
+    <link rel="stylesheet" href="../styles/global.css">
+    <link rel="stylesheet" href="../styles/chat.css">
+    <link rel="stylesheet" href="../styles/word_tooltip.css">
+    <link rel="icon" type="image/x-icon" href="../../assets/images/tati_logo.jpg">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+    <div class="app-layout">
+
+        <!-- ── Sidebar ── -->
+        <aside class="sidebar" id="sidebar">
+
+            <!-- Logo + fechar -->
+            <div class="sidebar-header">
+                <div class="sidebar-brand">
+                    <img src="../../assets/images/tati_logo.jpg" alt="Tati" class="brand-avatar"
+                        onerror="this.style.display='none'; document.getElementById('brand-fallback').style.display='flex';">
+                    <div id="brand-fallback" class="brand-avatar-fallback" style="display:none;">🧑‍🏫</div>
+                    <span class="brand-name">Teacher Tati</span>
+                </div>
+                <button class="btn-footer-icon sidebar-close" onclick="toggleSidebar()" title="Fechar">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Card de perfil do usuário -->
+            <a href="profile.html" class="sidebar-user-card">
+                <div class="user-avatar" id="sidebar-user-avatar">??</div>
+                <div class="user-info">
+                    <span class="user-name" id="sidebar-user-name">Usuário</span>
+                    <div class="user-meta">
+                        <span class="user-level" id="sidebar-user-level">Student</span>
+                        <span class="user-premium-badge" id="sidebar-premium-badge">Premium</span>
+                    </div>
+                </div>
+                <i class="fa-solid fa-chevron-right user-arrow"></i>
+            </a>
+
+            <!-- Nova conversa -->
+            <button class="btn-new-chat" onclick="newChat()">
+                <i class="fa-solid fa-plus"></i>
+                <span data-i18n="nav.new_chat">Nova conversa</span>
+            </button>
+
+            <!-- Divisor -->
+            <div class="sidebar-divider"></div>
+
+            <!-- Lista de conversas -->
+            <div class="conversations-list" id="conversations-list">
+                <p class="list-empty">
+                    <span data-i18n="chat.loading">Carregando...</span>
+                </p>
+            </div>
+
+            <!-- Rodapé: ícones de ação -->
+            <div class="sidebar-footer">
+                <a href="dashboard.html" class="btn-footer-icon" id="btn-dashboard" data-i18n-title="nav.dashboard"
+                    title="Painel" style="display:none;">
+                    <i class="fa-solid fa-chart-line"></i>
+                </a>
+                <a href="settings.html" class="btn-footer-icon" data-i18n-title="nav.settings" title="Configurações">
+                    <i class="fa-solid fa-gear"></i>
+                </a>
+                <a href="activities.html" class="btn-footer-icon" data-i18n-title="act.title" title="Atividades">
+                    <i class="fa-solid fa-book-open"></i>
+                </a>
+                <div class="footer-spacer"></div>
+                <button class="btn-footer-icon btn-danger-icon" onclick="deleteAllConversations()"
+                    data-i18n-title="chat.delete_all_title" title="Deletar todas">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+                <button class="btn-footer-icon btn-danger-icon" onclick="logout()" data-i18n-title="nav.logout"
+                    title="Sair">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
+            </div>
+
+        </aside>
+
+        <!-- ── Main ── -->
+        <main class="chat-main">
+            <header class="chat-topbar">
+                <div class="topbar-left">
+                    <button class="btn-icon" onclick="toggleSidebar()">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                    <span class="topbar-title" id="topbar-title">Teacher Tati</span>
+                </div>
+                <div class="topbar-right">
+                    <button class="btn-summary-mode" id="btn-switch-summary" onclick="switchToSummary()"
+                        style="display:none;">
+                        <i class="fa-solid fa-file-lines"></i>
+                        <span data-i18n="chat.summary_mode">Modo Resumo</span>
+                    </button>
+                    <button class="btn-voice-mode" id="btn-switch-voice" onclick="switchToVoice()">
+                        <i class="fa-solid fa-microphone"></i>
+                        <span data-i18n="chat.voice_mode">Modo Voz</span>
+                    </button>
+                </div>
+            </header>
+
+            <div class="chat-messages" id="chat-messages">
+                <div class="chat-welcome" id="chat-welcome" style="display:none;">
+                    <div class="welcome-avatar">
+                        <img src="../../assets/images/tati_logo.jpg" alt="Tati"
+                            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="welcome-avatar-fallback" style="display:none;">🧑‍🏫</div>
+                    </div>
+                    <h2 data-i18n="chat.welcome_title">Olá! Eu sou a Teacher Tati 👋</h2>
+                    <p data-i18n="chat.welcome_sub">Sua professora de inglês com IA. Vamos praticar juntos?</p>
+                    <p class="welcome-tip" data-i18n="chat.welcome_tip">💡 Clique em qualquer palavra inglesa para ver
+                        tradução e ouvir a pronúncia</p>
+                    <div class="welcome-suggestions">
+                        <button class="suggestion-chip" onclick="useSuggestion(this)" data-i18n="chat.sugg_1">How do I
+                            introduce myself?</button>
+                        <button class="suggestion-chip" onclick="useSuggestion(this)" data-i18n="chat.sugg_2">Correct my
+                            English, please</button>
+                        <button class="suggestion-chip" onclick="useSuggestion(this)" data-i18n="chat.sugg_3">Let's
+                            practice conversation</button>
+                        <button class="suggestion-chip" onclick="useSuggestion(this)" data-i18n="chat.sugg_4">Explain
+                            past tense to me</button>
+                    </div>
+                </div>
+
+                <div class="message message-assistant" id="typing-indicator" style="display:none;">
+                    <div class="message-avatar">
+                        <img src="../../assets/images/tati_logo.jpg" alt="Tati"
+                            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="msg-avatar-fallback" style="display:none;">T</div>
+                    </div>
+                    <div class="message-body">
+                        <div class="message-bubble typing">
+                            <span></span><span></span><span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-input-area">
+                <div class="chat-input-wrap">
+                    <button class="btn-attach" data-i18n-title="chat.attach" title="Anexar arquivo">
+                        <i class="fa-solid fa-paperclip"></i>
+                    </button>
+                    <textarea id="message-input" class="message-textarea" rows="1"
+                        data-i18n-placeholder="chat.placeholder"
+                        placeholder="Digite sua mensagem em inglês..."></textarea>
+                    <button class="btn-mic" id="btn-mic" data-i18n-title="chat.record" title="Gravar áudio">
+                        <i class="fa-solid fa-microphone"></i>
+                    </button>
+                    <button class="btn-send" id="btn-send" data-i18n-title="chat.send" title="Enviar">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+                <p class="input-hint" data-i18n="chat.hint">Teacher Tati pratica inglês com você · Enter para enviar ·
+                    Shift+Enter para nova linha</p>
+            </div>
+        </main>
+    </div>
+
+    <div id="summary-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-header-left">
+                    <span class="modal-icon">📊</span>
+                    <h2>Performance Report</h2>
+                </div>
+                <button id="close-modal-btn" class="close-btn">&times;</button>
+            </div>
+            <div id="summary-text" class="modal-body"></div>
+        </div>
+    </div>
+
+    <script src="../scripts/i18n.js"></script>
+    <script src="../scripts/word_tooltip.js"></script>
+    <script src="../scripts/api.js"></script>
+    <script src="../scripts/chat.js"></script>
+</body>
+
+</html>

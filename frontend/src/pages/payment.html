@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tati AI — Upgrade Premium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+  <link rel="stylesheet" href="../styles/global.css">
+  <link rel="stylesheet" href="../styles/payment.css">
+  <link rel="icon" type="image/x-icon" href="../../assets/images/tati_logo.jpg">
+</head>
+<body>
+
+  <div class="pay-topbar">
+    <a href="chat.html" class="btn-back">
+      <i class="fa-solid fa-arrow-left"></i>
+      <span data-i18n="nav.back_chat">Voltar ao Chat</span>
+    </a>
+  </div>
+
+  <div class="pay-wrap">
+
+    <!-- Hero -->
+    <div class="pay-hero">
+      <h1 data-i18n="payment.title">Upgrade to Premium</h1>
+      <p data-i18n="payment.subtitle">Escolha o seu plano:</p>
+    </div>
+
+    <!-- Planos -->
+    <div>
+      <div class="section-label">Planos</div>
+      <div class="plans-grid">
+
+        <div class="plan-card" id="plan-basic" onclick="selectPlan('basic', this)">
+          <div class="plan-check"><i class="fa-solid fa-check"></i></div>
+          <div class="plan-icon">💬</div>
+          <div>
+            <div class="plan-name" data-i18n="plan.basic">Chat & Voice</div>
+            <div class="plan-price">R$ 19,90<span>/mês</span></div>
+          </div>
+          <ul class="plan-features">
+            <li><i class="fa-solid fa-check"></i><span data-i18n="plan.basic_feature_1">Chat ilimitado</span></li>
+            <li><i class="fa-solid fa-check"></i><span data-i18n="plan.basic_feature_2">Modo Voz</span></li>
+            <li><i class="fa-solid fa-check"></i><span data-i18n="plan.basic_feature_3">Histórico</span></li>
+            <li><i class="fa-solid fa-check"></i><span data-i18n="plan.basic_feature_4">Tradução</span></li>
+          </ul>
+          <button class="btn-details" onclick="showPlanDetails(event,'basic')" data-i18n="btn.details">Ver detalhes</button>
+        </div>
+
+        <div class="plan-card active" id="plan-full" onclick="selectPlan('full', this)">
+          <div class="plan-badge-popular">⭐ Mais completo</div>
+          <div class="plan-check"><i class="fa-solid fa-check"></i></div>
+          <div class="plan-icon">👑</div>
+          <div>
+            <div class="plan-name" data-i18n="plan.full">Completo</div>
+            <div class="plan-price">R$ 39,90<span>/mês</span></div>
+          </div>
+          <ul class="plan-features">
+            <li><i class="fa-solid fa-check"></i><span data-i18n="plan.full_feature_1">Chat ilimitado</span></li>
+            <li><i class="fa-solid fa-check"></i><span data-i18n="plan.full_feature_2">Modo Voz</span></li>
+            <li><i class="fa-solid fa-check"></i><span data-i18n="plan.full_feature_5">Módulos</span></li>
+            <li><i class="fa-solid fa-check"></i><span data-i18n="plan.full_feature_6">Flashcards</span></li>
+            <li><i class="fa-solid fa-check"></i><span data-i18n="plan.full_feature_9">Relatórios</span></li>
+          </ul>
+          <button class="btn-details" onclick="showPlanDetails(event,'full')" data-i18n="btn.details">Ver detalhes</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Método -->
+    <div>
+      <div class="section-label" data-i18n="payment.method_title">Forma de pagamento</div>
+      <div class="methods-grid">
+        <div class="method-card active" id="method-PIX" onclick="selectMethod('PIX', this)">
+          <i class="fa-brands fa-pix"></i>
+          <span data-i18n="payment.method_pix">Pix</span>
+        </div>
+        <div class="method-card" id="method-BOLETO" onclick="selectMethod('BOLETO', this)">
+          <i class="fa-solid fa-barcode"></i>
+          <span data-i18n="payment.method_boleto">Boleto</span>
+        </div>
+        <div class="method-card" id="method-CREDIT_CARD" onclick="selectMethod('CREDIT_CARD', this)">
+          <i class="fa-solid fa-credit-card"></i>
+          <span data-i18n="payment.method_card">Cartão</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botão gerar -->
+    <div>
+      <button class="btn-pay" id="btn-generate" onclick="handlePayment()">
+        <i class="fa-solid fa-lock"></i>
+        <span data-i18n="payment.generate">Gerar Pagamento</span>
+      </button>
+      <div id="loading">
+        <span class="spinner"></span>
+        <span data-i18n="payment.processing">Processando...</span>
+      </div>
+    </div>
+
+    <!-- Resultado PIX -->
+    <div id="pix-result">
+      <h3 data-i18n="payment.pix_generated">Pagamento Gerado!</h3>
+      <p data-i18n="payment.pix_instruction">Escaneie o QR Code ou use Copia e Cola</p>
+      <div class="qr-wrap">
+        <img id="qr-code-img" src="" alt="QR Code PIX">
+      </div>
+      <div class="pix-code-box" id="pix-copy-paste"></div>
+      <div class="pix-actions">
+        <button class="btn-pix-copy" onclick="copyPix()">
+          <i class="fa-solid fa-copy"></i>
+          <span data-i18n="payment.copy_pix">Copiar Chave Pix</span>
+        </button>
+        <a id="invoice-link" href="#" target="_blank" class="btn-invoice">
+          <i class="fa-solid fa-arrow-up-right-from-square"></i>
+          <span data-i18n="payment.view_invoice">Ver Fatura</span>
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Modal sucesso -->
+  <div id="success-modal">
+    <div class="success-card">
+      <div class="success-icon">🎉</div>
+      <h2>Pagamento Aprovado!</h2>
+      <p>Seu acesso premium foi ativado com sucesso. Bons estudos!</p>
+      <div class="success-plan-badge" id="success-plan-name">Plano Completo</div>
+      <a href="chat.html" class="btn-go-chat">
+        <i class="fa-solid fa-comments"></i>
+        Ir para o Chat
+      </a>
+    </div>
+  </div>
+
+  <!-- Modal detalhes do plano -->
+  <div id="plan-detail-modal" onclick="if(event.target===this)closePlanDetail()">
+    <div class="detail-card">
+      <div class="detail-header">
+        <div>
+          <div id="detail-name" style="font-size:1.1rem;font-weight:700;margin-bottom:0.25rem;"></div>
+          <div class="detail-price" id="detail-price"></div>
+        </div>
+        <button class="btn-close-modal" onclick="closePlanDetail()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <ul class="detail-features" id="detail-features"></ul>
+      <button class="btn-choose" id="detail-choose-btn" onclick="choosePlanFromModal()">Escolher este plano</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+  <script src="../scripts/i18n.js"></script>
+  <script src="../scripts/api.js"></script>
+  <script src="../scripts/payment.js"></script>
+
+</body>
+</html>
