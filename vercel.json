@@ -1,0 +1,14 @@
+{
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
+    { "source": "/", "destination": "/frontend/src/pages/index.html" },
+    { "source": "/chat", "destination": "/frontend/src/pages/chat.html" },
+    { "source": "/dashboard", "destination": "/frontend/src/pages/dashboard.html" },
+    { "source": "/profile", "destination": "/frontend/src/pages/profile.html" },
+    { "source": "/settings", "destination": "/frontend/src/pages/settings.html" },
+    { "source": "/voice", "destination": "/frontend/src/pages/voice.html" },
+    { "source": "/activities", "destination": "/frontend/src/pages/activities.html" },
+    { "source": "/payment", "destination": "/frontend/src/pages/payment.html" }
+  ]
+}
