@@ -7,12 +7,38 @@ let _detailPlan    = null;
 
 // ── Init ──────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
+  const cpfInput = document.getElementById('user-cpf');
+
+  // Adiciona a máscara automática ao digitar
+  if (cpfInput) {
+    cpfInput.addEventListener('input', (e) => {
+      let v = e.target.value.replace(/\D/g, ''); // Remove tudo que não é dígito
+      if (v.length > 14) v = v.substring(0, 14); // Limita a 14 caracteres
+      
+      if (v.length <= 11) {
+        // Máscara CPF: 000.000.000-00
+        v = v.replace(/(\d{3})(\d)/, '$1.$2');
+        v = v.replace(/(\d{3})(\d)/, '$1.$2');
+        v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+      } else {
+        // Máscara CNPJ: 00.000.000/0000-00
+        v = v.replace(/^(\d{2})(\d)/, '$1.$2');
+        v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+        v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
+        v = v.replace(/(\d{4})(\d)/, '$1-$2');
+      }
+      e.target.value = v;
+    });
+  }
+
   // Pré-carrega CPF se já existir no perfil
   try {
     const userProfile = await apiGet('/profile/');
-    const cpfInput = document.getElementById('user-cpf');
     if (cpfInput && (userProfile.cpf || userProfile.cpf_cnpj)) {
-      cpfInput.value = userProfile.cpf || userProfile.cpf_cnpj;
+      const val = userProfile.cpf || userProfile.cpf_cnpj;
+      cpfInput.value = val;
+      // Dispara o evento input para aplicar a máscara no valor carregado
+      cpfInput.dispatchEvent(new Event('input'));
     }
   } catch (e) {
     console.warn("Erro ao buscar perfil para pré-preencher CPF:", e);
@@ -113,7 +139,13 @@ async function handlePayment() {
 
   try {
     // 1. Salva o CPF no perfil do usuário no Supabase primeiro
-    await apiPut('/profile/', { cpf: cpfValue, cpf_cnpj: cpfValue });
+    try {
+        const updateRes = await apiPut('/profile/', { cpf: cpfValue, cpf_cnpj: cpfValue });
+        if (!updateRes.ok) console.warn("Aviso: Falha ao salvar CPF no perfil, mas tentando prosseguir com pagamento...", updateRes.data);
+    } catch (profileErr) {
+        console.error("Erro ao atualizar perfil:", profileErr);
+        // Não bloqueia o pagamento se apenas o save no profile falhar (o Asaas pode ter sucesso se o CPF já estiver lá)
+    }
 
     // 2. Cria a cobrança no Asaas
     const value   = selectedPlan === 'basic' ? 19.90 : 39.90;

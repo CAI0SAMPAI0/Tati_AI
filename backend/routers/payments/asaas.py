@@ -9,7 +9,7 @@ from routers.deps import get_current_user
 from routers.users.permissions import calc_due_date, SPECIAL_USERS
 from services.asaas import (
     create_customer, create_payment,
-    get_customer_by_email, get_pix_qr_code,
+    get_customer_by_email, get_pix_qr_code, update_customer,
 )
 from services.database import get_client
 
@@ -106,21 +106,35 @@ async def create_new_payment(
     body:         PaymentRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    user_email = current_user.get("email")
-    username   = current_user.get("username")
-    user_name  = current_user.get("name") or current_user.get("username")
-    cpf_cnpj   = current_user.get("cpf") or current_user.get("cpf_cnpj")
+    # Busca dados frescos do banco
+    db = get_client()
+    try:
+        user_db = db.table("users").select("email, name, username, cpf, cpf_cnpj, phone").eq("username", current_user["username"]).single().execute().data
+    except Exception as e:
+        # Fallback caso a coluna phone ainda não tenha sido criada
+        print(f"[WARN] Erro ao buscar colunas completas: {e}")
+        user_db = db.table("users").select("email, name, username, cpf, cpf_cnpj").eq("username", current_user["username"]).single().execute().data
+    
+    if not user_db:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado no banco.")
 
-    raw_phone = str(current_user.get("phone") or "")
+    user_email = user_db.get("email")
+    username   = user_db.get("username")
+    user_name  = user_db.get("name") or user_db.get("username")
+    
+    # Limpa e identifica CPF ou CNPJ
+    raw_doc = str(user_db.get("cpf") or user_db.get("cpf_cnpj") or "").replace(".", "").replace("-", "").replace("/", "").strip()
+    
+    if not raw_doc:
+        raise HTTPException(status_code=400, detail="CPF/CNPJ é obrigatório para processar o pagamento.")
+
+    raw_phone = str(user_db.get("phone") or "")
     phone     = "".join(filter(str.isdigit, raw_phone))
     if len(phone) < 10:
         phone = None
 
     if not user_email:
         raise HTTPException(status_code=400, detail="Usuário não possui e-mail cadastrado.")
-
-    if body.planType not in ("basic", "full"):
-        raise HTTPException(status_code=400, detail="planType inválido. Use 'basic' ou 'full'.")
 
     launch_date = date(2026, 5, 1)
 
@@ -136,16 +150,12 @@ async def create_new_payment(
         
         if customer:
             customer_id = customer["id"]
+            if not customer.get("cpfCnpj") and raw_doc:
+                await update_customer(customer_id, {"cpfCnpj": raw_doc})
         else:
-            if not cpf_cnpj:
-                raise HTTPException(
-                    status_code=400, 
-                    detail="CPF/CNPJ é obrigatório para o primeiro pagamento (Asaas)."
-                )
-            
             new_cust = await create_customer(
                 name=user_name, email=user_email,
-                cpf_cnpj=cpf_cnpj, phone=phone,
+                cpf_cnpj=raw_doc, phone=phone,
             )
             customer_id = new_cust["id"]
 
