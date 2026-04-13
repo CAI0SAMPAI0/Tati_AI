@@ -1,0 +1,29 @@
+{
+  "outputDirectory": "frontend",
+  "routes": [
+    {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
+    },
+    {
+      "src": "/src/styles/(.*)",
+      "dest": "/src/styles/$1"
+    },
+    {
+      "src": "/src/scripts/(.*)",
+      "dest": "/src/scripts/$1"
+    },
+    {
+      "src": "/src/pages/(.*)",
+      "dest": "/src/pages/$1"
+    },
+    {
+      "src": "/",
+      "dest": "/src/pages/index.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/src/pages/$1"
+    }
+  ]
+}
