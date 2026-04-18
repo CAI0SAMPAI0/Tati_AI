@@ -210,16 +210,17 @@ google-btn-container {
     box-shadow: var(--shadow-lg), 0 0 80px hsla(var(--hue), 80%, 50%, 0.08);
     animation: card-in 0.5s var(--ease-spring) both;
     margin: 1.5rem;
-    height: 600px;
     overflow-y: auto;
+    height: 600px;
+
     /* Esconder barra de rolagem para Chrome, Safari e Edge */
     &::-webkit-scrollbar {
         display: none;
     }
-    
+
     /* Esconder barra de rolagem para Firefox */
     scrollbar-width: none;
-    
+
     /* Esconder barra de rolagem para IE e Edge antigo */
     -ms-overflow-style: none;
 }
@@ -668,8 +669,7 @@ google-btn-container {
     border-radius: var(--radius-md);
 }
 
-/* Responsive */
-@media (max-width: 620px) {
+@media (max-width: 768px) {
     .login-page {
         grid-template-columns: 1fr;
         max-width: 400px;
@@ -677,7 +677,8 @@ google-btn-container {
 
     .login-left {
         padding: 2rem 1.5rem;
-        min-height: 200px;
+        min-height: 260px;
+        /* MUDADO DE: min-height: 200px; */
     }
 
     .login-left::after {
@@ -697,5 +698,66 @@ google-btn-container {
 
     .login-right {
         padding: 2rem 1.5rem;
+    }
+}
+
+/* Responsive */
+@media (max-width: 620px) {
+    .login-page {
+        grid-template-columns: 1fr;
+        max-width: 400px;
+    }
+
+    .login-left {
+        padding: 1.5rem 1rem;
+        /* MUDADO DE: padding: 2rem 1.5rem; */
+        min-height: 270px;
+        /* MUDADO DE: min-height: 200px; */
+    }
+
+    .login-left::after {
+        display: none;
+    }
+
+    .login-avatar,
+    .login-avatar-fallback {
+        width: 80px;
+        height: 80px;
+        font-size: 2.5rem;
+    }
+
+    .login-left h1 {
+        font-size: 1.25rem;
+    }
+
+    .login-right {
+        padding: 2rem 1.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .login-left {
+        padding: 1.25rem 0.875rem;
+        min-height: 280px;
+    }
+ 
+    .login-avatar,
+    .login-avatar-fallback {
+        width: 72px;
+        height: 72px;
+        font-size: 2rem;
+        margin-bottom: 1rem;
+    }
+ 
+    .login-left h1 {
+        font-size: 1.1rem;
+    }
+ 
+    .login-left p {
+        font-size: 0.78rem;
+    }
+ 
+    .login-right {
+        padding: 1.25rem 1rem;
     }
 }

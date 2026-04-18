@@ -87,7 +87,7 @@ async function togglePublish(id, currentlyPublished) {
       mod.is_published = !currentlyPublished;
       renderModulesGrid();
     }
-  } catch (e) { alert(t('gen.error')); }
+  } catch (e) { showToast('Erro ao publicar módulo.', 'error'); }
 }
 
 // ── Linhas de Conteúdo ──────────────────────────────────────────────────────
@@ -198,11 +198,13 @@ async function openModModal(id = null) {
   document.getElementById('mod-questions-list').innerHTML = '';
   document.getElementById('mod-flashcards-list').innerHTML = '';
   document.getElementById('mod-save-msg').textContent = '';
-  
+
   document.querySelectorAll('input[name="mod-level"]').forEach(cb => cb.checked = false);
   contentRows = []; questionRows = []; flashcardRows = [];
 
   document.getElementById('mod-modal-title').textContent = id ? t('mod.modal_edit') : t('mod.modal_new');
+  document.getElementById('mod-modal-overlay').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
 
   if (id) {
     try {
@@ -210,7 +212,7 @@ async function openModModal(id = null) {
       document.getElementById('mod-title').value = data.title;
       document.getElementById('mod-desc').value = data.description || '';
       document.getElementById('mod-order').value = data.order || 0;
-      
+
       const lvls = data.levels || [data.level];
       document.querySelectorAll('input[name="mod-level"]').forEach(cb => {
         if (lvls.includes(cb.value)) cb.checked = true;
@@ -218,17 +220,30 @@ async function openModModal(id = null) {
 
       data.contents?.forEach(c => addContentRow(c));
       data.flashcards?.forEach(f => addFlashcardRow(f));
-      
+
       if (data.quizzes?.length) {
         const q = data.quizzes[0];
         document.getElementById('quiz-title').value = q.title;
         q.questions?.forEach(quest => addQuestionRow(quest));
       }
-    } catch (e) { alert(t('gen.error')); }
+    } catch (e) { showToast('Erro ao carregar módulo.', 'error'); }
   }
+}
 
-  document.getElementById('mod-modal-overlay').style.display = 'flex';
-  document.body.style.overflow = 'hidden';
+async function openQuizModal(quizId) {
+    const modal = document.getElementById('quiz-modal');
+    modal.style.display = 'flex';
+    document.getElementById('quiz-title').value = '';
+    clearQuestionRows();
+    if (quizId) {
+        try {
+            const q = await apiGet(`/dashboard/modules/quizzes/${quizId}`);
+            if (q) {
+                document.getElementById('quiz-title').value = q.title;
+                q.questions?.forEach(quest => addQuestionRow(quest));
+            }
+        } catch (e) { showToast('Erro ao carregar quiz.', 'error'); }
+    }
 }
 
 function closeModModal() {
@@ -310,7 +325,7 @@ async function generateQuizAI() {
       res.data.questions.forEach(q => addQuestionRow(q));
       res.data.flashcards.forEach(f => addFlashcardRow(f));
     }
-  } catch (e) { alert(t('gen.error')); }
+  } catch (e) { showToast('Erro ao gerar quiz com IA.', 'error'); }
   finally { btn.disabled = false; btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> ${t('mod.gen_ai')}`; }
 }
 
@@ -346,7 +361,7 @@ async function generateFlashcardsByTheme() {
   const level = document.getElementById('fc-level').value;
   const msg = document.getElementById('fc-save-msg');
 
-  if (!theme) { alert(t('mod.fc_theme_ph')); return; }
+  if (!theme) { showToast('Preencha o tema do flashcard.', 'warning'); return; }
 
   msg.textContent = t('mod.generating');
   msg.className = 'mod-save-msg';

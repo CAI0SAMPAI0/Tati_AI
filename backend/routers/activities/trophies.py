@@ -11,26 +11,52 @@ router = APIRouter()
 @router.get("/")
 async def my_trophies(current_user: dict = Depends(get_current_user)):
     """Troféus do aluno logado."""
-    return (
-        get_client()
-        .table("trophies")
-        .select("type, title, icon, earned_at")
-        .eq("username", current_user["username"])
-        .order("earned_at", desc=True)
-        .execute()
-        .data
-    )
+    db = get_client()
+    username = current_user["username"]
+    
+    # Busca troféus conquistados pelo mapeamento user_trophies -> trophies
+    try:
+        res = db.table("user_trophies").select(
+            "earned_at, trophies(name, description, icon, category)"
+        ).eq("username", username).order("earned_at", desc=True).execute()
+        
+        # Formata para facilitar o frontend
+        trophies = []
+        for row in res.data:
+            t = row.get("trophies", {})
+            trophies.append({
+                "title": t.get("name"),
+                "description": t.get("description"),
+                "icon": t.get("icon"),
+                "category": t.get("category"),
+                "earned_at": row.get("earned_at")
+            })
+        return trophies
+    except Exception as e:
+        print(f"[Trophies Router] Erro: {e}")
+        return []
 
 
 @router.get("/admin/{username}")
 async def student_trophies(username: str, current_user: dict = Depends(require_staff)):
     """Admin: troféus de um aluno específico."""
-    return (
-        get_client()
-        .table("trophies")
-        .select("type, title, icon, earned_at")
-        .eq("username", username)
-        .order("earned_at", desc=True)
-        .execute()
-        .data
-    )
+    db = get_client()
+    try:
+        res = db.table("user_trophies").select(
+            "earned_at, trophies(name, description, icon, category)"
+        ).eq("username", username).order("earned_at", desc=True).execute()
+
+        trophies = []
+        for row in res.data:
+            t = row.get("trophies", {})
+            trophies.append({
+                "title": t.get("name"),
+                "description": t.get("description"),
+                "icon": t.get("icon"),
+                "category": t.get("category"),
+                "earned_at": row.get("earned_at")
+            })
+        return trophies
+    except Exception as e:
+        print(f"[Admin Trophies] Erro: {e}")
+        return []

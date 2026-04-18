@@ -150,20 +150,43 @@ async def admin_generate_flashcards(payload: GenerateFlashcardsIn, user=Depends(
     """Admin: gera flashcards via IA."""
     _require_admin(user)
     db = get_client()
-    prompt = f"Teacher Tati: Crie 10 flashcards de inglês (JSON: title, description, flashcards[word, translation, example]). Tema: {payload.theme}. Nível: {payload.level}."
+    prompt = (
+        f"Teacher Tati: Crie 10 flashcards de inglês sobre o tema '{payload.theme}'.\n"
+        f"Nível: {payload.level}.\n"
+        "Retorne APENAS um objeto JSON no formato:\n"
+        '{"title": "Nome do Módulo", "description": "Descrição", "flashcards": [{"word": "Inglês", "translation": "Português", "example": "Exemplo em inglês"}]}'
+    )
     try:
         content = await groq_chat([{"role": "user", "content": prompt}])
-        start, end = content.find('{'), content.rfind('}') + 1
-        data = json.loads(content[start:end])
+        # Extrair JSON de forma robusta
+        try:
+            start = content.find('{')
+            end = content.rfind('}') + 1
+            if start == -1 or end == 0:
+                raise ValueError("JSON não encontrado na resposta da IA")
+            data = json.loads(content[start:end])
+        except Exception as e:
+            print(f"[IA Error] Falha ao parsear JSON: {e}\nContent: {content}")
+            raise HTTPException(500, "IA retornou formato inválido. Tente novamente.")
+
         res = db.table("modules").insert({
-            "title": data.get("title", f"Flashcards: {payload.theme}"),
+            "title": data.get("title") or f"Flashcards: {payload.theme}",
             "description": data.get("description", ""),
-            "level": payload.level, "levels": [payload.level],
-            "flashcards": data.get("flashcards", []), "is_published": True
+            "level": payload.level, 
+            "levels": [payload.level],
+            "flashcards": data.get("flashcards", []), 
+            "is_published": True
         }).execute()
+        
+        if not res.data:
+            raise HTTPException(500, "Erro ao salvar flashcards no banco.")
+            
         return {"ok": True, "module": res.data[0]}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(500, f"Erro IA: {str(e)}")
+        print(f"[Flashcard Gen] Erro: {e}")
+        raise HTTPException(500, f"Erro ao gerar flashcards: {str(e)}")
 
 @router.post("/admin/generate-quiz")
 async def admin_generate_quiz(payload: GenerateQuizIn, user=Depends(get_current_user)):
@@ -200,23 +223,47 @@ async def admin_delete_module(module_id: str, user=Depends(get_current_user)):
 
 @router.get("/")
 async def list_modules(user=Depends(get_current_user)):
-    """Lista módulos publicados para o aluno."""
+    """Lista módulos publicados para o aluno com progresso (tentativas)."""
     db = get_client()
+    username = user["username"]
     user_level = user.get("level") or "Beginner"
-    res = db.table("modules").select("*, quizzes(id)").eq("is_published", True).order("order").execute()
-    data = res.data or []
+    
+    # Busca módulos
+    res = db.table("modules").select("*, quizzes(id, title, description)").eq("is_published", True).order("order").execute()
+    modules_data = res.data or []
+    
+    # Busca progresso do usuário (tentativas de quiz)
+    progress_res = db.table("user_progress").select("quiz_id, score").eq("username", username).execute()
+    progress_data = progress_res.data or []
+    best_score_map = {p["quiz_id"]: p["score"] for p in progress_data}
+
+    # Conta tentativas reais pelo study_sessions
+    sessions_res = db.table("study_sessions").select("quiz_id").eq("username", username).eq("activity_type", "quiz").execute()
+    attempts_map = {}
+    for p in progress_data:
+        qid = p["quiz_id"]
+        attempts_map[qid] = attempts_map.get(qid, 0) + 1
+    
     filtered = []
-    for m in data:
+    for m in modules_data:
         lvls = m.get("levels") or []
         sing = m.get("level")
+        
+        # Filtro de nível
+        show = False
         if not lvls and not sing: show = True
         elif "all" in lvls or "todos" in lvls or sing in ["all", "todos"]: show = True
         elif user_level in lvls or user_level == sing: show = True
-        else: show = False
+        
         if show:
-            m["has_quiz"] = len(m.get("quizzes", [])) > 0
+            quizzes = m.get("quizzes", [])
+            for q in quizzes:
+                q["attempts"] = attempts_map.get(q["id"], 0)
+            
+            m["has_quiz"] = len(quizzes) > 0
             m["has_flashcards"] = isinstance(m.get("flashcards"), list) and len(m.get("flashcards", [])) > 0
             filtered.append(m)
+            
     return filtered
 
 @router.get("/{module_id}")
@@ -236,6 +283,16 @@ async def get_module(module_id: str, user=Depends(get_current_user)):
 @router.post("/flashcards/analyze")
 async def analyze_flashcard_answer(payload: FlashcardAnalyzeIn, user=Depends(get_current_user)):
     prompt = f"Teacher Tati: Feedback curto (Português) para flashcard. Palavra: {payload.word}. Resposta: {payload.user_answer}."
+
+    try:
+        get_client().table("study_sessions").insert({
+            "username": user["username"],
+            "activity_type": "flashcard",
+            "duration_minutes": 1  # ~1 min por flashcard revisado
+        }).execute()
+    except:
+        pass
+
     try:
         feedback = await groq_chat([{"role": "user", "content": prompt}])
         return {"feedback": feedback.strip()}

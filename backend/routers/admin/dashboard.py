@@ -159,7 +159,7 @@ async def get_students(current_user: dict = Depends(require_staff)):
     db = get_client()
     students = (
         db.table("users")
-        .select("username, name, level, focus, created_at, custom_prompt")
+        .select("username, name, level, focus, created_at, custom_prompt, profile")
         .eq("role", "student")
         .order("created_at", desc=True)
         .execute()
@@ -167,16 +167,28 @@ async def get_students(current_user: dict = Depends(require_staff)):
     )
     res = []
     for s in students:
-        # Busca última mensagem para saber data de atividade
+        # Extrai avatar do profile JSON (coluna avatar_url não existe direto)
+        avatar = None
+        profile = s.get("profile") or {}
+        if isinstance(profile, dict):
+            avatar = profile.get("avatar_url")
+        
+        # Busca última mensagem com timestamp real
         last_msg = (
             db.table("messages")
-            .select("date")
+            .select("created_at, date")
             .eq("username", s["username"])
-            .order("date", desc=True)
+            .order("created_at", desc=True)
             .limit(1)
             .execute()
             .data
         )
+        
+        # Usa created_at se disponível, senão date
+        last_active = None
+        if last_msg:
+            last_active = last_msg[0].get("created_at") or last_msg[0].get("date")
+        
         total_msgs = (
             db.table("messages")
             .select("id", count="exact")
@@ -187,8 +199,9 @@ async def get_students(current_user: dict = Depends(require_staff)):
         )
         res.append({
             **s,
+            "avatar_url": avatar,
             "total_messages": total_msgs,
-            "last_active": last_msg[0].get("date") if last_msg else None,
+            "last_active": last_active,
         })
     return res
 
@@ -437,4 +450,91 @@ async def get_overview_difficulties(current_user: dict = Depends(require_staff))
     except Exception as exc:
         print(f"Erro ao buscar dificuldades: {exc}")
         return {"alerts": []}
+
+
+# ── Simulation Management ─────────────────────────────────────────────────────
+
+class SimulationCreate(BaseModel):
+    name: str
+    description: str
+    icon: str = "🎭"
+    difficulty: str = "beginner"
+    system_prompt: str = ""
+    use_ai_generation: bool = False
+
+
+@router.get("/simulations")
+async def get_simulations(current_user: dict = Depends(require_staff)):
+    """Lista simulações criadas pelo professor."""
+    db = get_client()
+    try:
+        rows = db.table("simulations").select("*").order("created_at", desc=True).execute()
+        return {"simulations": rows.data or []}
+    except Exception:
+        return {"simulations": []}
+
+
+@router.post("/simulations")
+async def create_simulation(body: SimulationCreate, current_user: dict = Depends(require_staff)):
+    """Cria nova simulação (manual ou com IA)."""
+    db = get_client()
+    
+    # Se use_ai_generation, gera o system prompt com IA
+    system_prompt = body.system_prompt
+    if body.use_ai_generation:
+        try:
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = await groq_chat([
+                    {"role": "user", "content": f"""
+Create a roleplay scenario system prompt for an English teacher AI.
+Scenario: {body.name}
+Description: {body.description}
+Difficulty: {body.difficulty}
+
+CRITICAL: The AI must ALWAYS respond entirely in ENGLISH only. Never respond in Portuguese.
+Create a detailed system prompt that instructs the AI to play a specific role
+in this scenario. Include:
+1. The character the AI should play
+2. How to start the conversation naturally
+3. What to ask/say throughout
+4. How to give gentle corrections
+5. Keep responses natural and concise (2-3 sentences max)
+6. Use relevant vocabulary for this scenario
+7. ALWAYS respond in English only
+"""}
+                ])
+                system_prompt = result if isinstance(result, str) else result.get("content", body.system_prompt)
+            finally:
+                loop.close()
+        except Exception as e:
+            print(f"[Sim AI Gen] Erro: {e}")
+    
+    sim_data = {
+        "name": body.name,
+        "description": body.description,
+        "icon": body.icon,
+        "difficulty": body.difficulty,
+        "system_prompt": system_prompt,
+        "created_by": current_user["username"],
+    }
+    
+    try:
+        db.table("simulations").insert(sim_data).execute()
+        return {"ok": True, "simulation": sim_data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/simulations/{sim_id}")
+async def delete_simulation(sim_id: str, current_user: dict = Depends(require_staff)):
+    """Remove uma simulação."""
+    db = get_client()
+    try:
+        db.table("simulations").delete().eq("id", sim_id).execute()
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     

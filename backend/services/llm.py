@@ -1,7 +1,5 @@
-"""
-Serviço de LLM: streaming, chat simples, STT e TTS.
-
-Providers suportados: groq (padrão) | claude | gemini
+﻿"""
+LLM: streaming, chat simples, STT e TTS.
 Fallback automático entre chaves Groq.
 """
 from __future__ import annotations
@@ -10,19 +8,9 @@ import base64
 import io
 from typing import AsyncIterator
 
-import anthropic
-import httpx
-from google import genai
-from google.genai import types
-from groq import AsyncGroq, Groq
-from gtts import gTTS
-
 from core.config import settings
 
 Message = dict[str, str]
-
-# ── Groq helpers ──────────────────────────────────────────────────────────────
-
 
 class GroqKeyError(Exception):
     """Levantada quando todas as chaves Groq falharam."""
@@ -42,10 +30,12 @@ def _should_try_next_key(exc: Exception) -> bool:
     return _is_auth_error(exc) or _is_rate_error(exc)
 
 
-# ── STT ───────────────────────────────────────────────────────────────────────
-
-
 async def transcribe_audio(audio_bytes: bytes, filename: str = "temp.wav") -> str:
+    """
+    Transcreve áudio para texto usando Whisper Large V3.
+    Detecta idioma automaticamente para melhor precisão.
+    """
+    from groq import AsyncGroq
     keys = settings.groq_keys
     if not keys:
         return "[Erro: nenhuma GROQ_API_KEY configurada no .env]"
@@ -53,13 +43,13 @@ async def transcribe_audio(audio_bytes: bytes, filename: str = "temp.wav") -> st
     last_error: Exception | None = None
     for key in keys:
         try:
-            client = Groq(api_key=key)
-            return client.audio.transcriptions.create(
+            client = AsyncGroq(api_key=key)
+            resp = await client.audio.transcriptions.create(
                 file=(filename, audio_bytes),
-                model="whisper-large-v3",
+                model="whisper-large-v3-turbo",
                 response_format="text",
-                language="en",
             )
+            return resp
         except Exception as exc:
             last_error = exc
             if _should_try_next_key(exc):
@@ -69,38 +59,33 @@ async def transcribe_audio(audio_bytes: bytes, filename: str = "temp.wav") -> st
     return f"[Erro no STT: {last_error}]"
 
 
-# ── TTS ───────────────────────────────────────────────────────────────────────
-
-
 async def text_to_speech(text: str) -> str:
-    """Converte texto em áudio base64. ElevenLabs → gTTS como fallback."""
-    if settings.elevenlabs_api_key:
-        result = await _tts_elevenlabs(text)
-        if result:
-            return result
+    """Converte texto em audio base64. Edge TTS ou gTTS."""
+    print("[TTS] Tentando Edge TTS...")
+    result = await _tts_edge(text)
+    if result:
+        return result
+    print("[TTS] Usando gTTS como fallback final.")
     return await _tts_gtts(text)
 
-
-async def _tts_elevenlabs(text: str) -> str:
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{settings.voice_id}"
-    headers = {"xi-api-key": settings.elevenlabs_api_key, "Content-Type": "application/json"}
-    payload = {
-        "text": text,
-        "model_id": "eleven_monolingual_v1",
-        "voice_settings": {"stability": 0.5, "similarity_boost": 0.5},
-    }
-    async with httpx.AsyncClient() as client:
-        try:
-            resp = await client.post(url, json=payload, timeout=20)
-            if resp.status_code == 200:
-                return base64.b64encode(resp.content).decode()
-        except Exception as exc:
-            print(f"[TTS] ElevenLabs error: {exc}")
-    return ""
-
-
+async def _tts_edge(text: str) -> str:
+    """Edge TTS (Microsoft) - gratuito e boa qualidade."""
+    try:
+        import edge_tts
+        communicate = edge_tts.Communicate(text, "en-US-JennyNeural")
+        buf = io.BytesIO()
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                buf.write(chunk["data"])
+        if buf.tell() == 0:
+            return ""
+        return base64.b64encode(buf.getvalue()).decode()
+    except Exception as exc:
+        print(f"[TTS] Edge TTS error: {exc}")
+        return ""
 async def _tts_gtts(text: str) -> str:
     try:
+        from gtts import gTTS
         tts = gTTS(text=text, lang="en")
         buf = io.BytesIO()
         tts.write_to_fp(buf)
@@ -110,23 +95,21 @@ async def _tts_gtts(text: str) -> str:
         return ""
 
 
-# ── Streaming ─────────────────────────────────────────────────────────────────
-
-
 async def stream_llm(system: str, history: list[Message]) -> AsyncIterator[str]:
     provider = settings.llm_provider
-    if provider == "gemini":
-        async for token in _stream_gemini(system, history):
-            yield token
-    elif provider == "groq":
+    if provider == "groq":
         async for token in _stream_groq(system, history):
+            yield token
+    '''elif provider == "gemini":
+        async for token in _stream_gemini(system, history):
             yield token
     else:
         async for token in _stream_claude(system, history):
-            yield token
+            yield token'''
 
 
-async def _stream_claude(system: str, history: list[Message]) -> AsyncIterator[str]:
+'''async def _stream_claude(system: str, history: list[Message]) -> AsyncIterator[str]:
+    import anthropic
     client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
     formatted = [{"role": m["role"], "content": m["content"]} for m in history]
     async with client.messages.stream(
@@ -141,6 +124,8 @@ async def _stream_claude(system: str, history: list[Message]) -> AsyncIterator[s
 
 async def _stream_gemini(system: str, history: list[Message]) -> AsyncIterator[str]:
     import asyncio
+    from google import genai
+    from google.genai import types
 
     client = genai.Client(api_key=settings.gemini_api_key)
     gemini_history = [
@@ -161,10 +146,11 @@ async def _stream_gemini(system: str, history: list[Message]) -> AsyncIterator[s
         ]
 
     for chunk in await asyncio.get_event_loop().run_in_executor(None, _sync_stream):
-        yield chunk
+        yield chunk'''
 
 
 async def _stream_groq(system: str, history: list[Message]) -> AsyncIterator[str]:
+    from groq import AsyncGroq
     keys = settings.groq_keys
     if not keys:
         yield "[Erro: nenhuma GROQ_API_KEY configurada no .env]"
@@ -195,10 +181,10 @@ async def _stream_groq(system: str, history: list[Message]) -> AsyncIterator[str
                 continue
             break
 
-    yield f"[Erro Groq: todas as {len(keys)} chave(s) falharam. Último: {str(last_error)[:120]}]"
+    yield f"[Erro Groq: todas as {len(keys)} chave(s) falharam. Ãšltimo: {str(last_error)[:120]}]"
 
 
-# ── Chat simples (não-streaming) ──────────────────────────────────────────────
+# â”€â”€ Chat simples (nÃ£o-streaming) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 async def groq_chat(
@@ -206,7 +192,8 @@ async def groq_chat(
     max_tokens: int = 1500,
     temperature: float = 0.4,
 ) -> str:
-    """Chamada simples ao Groq com fallback automático entre chaves."""
+    """Chamada simples ao Groq com fallback automÃ¡tico entre chaves."""
+    from groq import AsyncGroq
     keys = settings.groq_keys
     if not keys:
         raise GroqKeyError("Nenhuma GROQ_API_KEY configurada no .env")
@@ -229,10 +216,10 @@ async def groq_chat(
                 continue
             break
 
-    raise GroqKeyError(f"Todas as chaves Groq falharam. Último: {last_error}")
+    raise GroqKeyError(f"Todas as chaves Groq falharam. Ãšltimo: {last_error}")
 
 
-# ── Visemas (animação labial) ─────────────────────────────────────────────────
+# â”€â”€ Visemas (animaÃ§Ã£o labial) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 async def generate_visemes(audio_b64: str) -> list:

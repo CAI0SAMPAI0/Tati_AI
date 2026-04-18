@@ -1,20 +1,63 @@
+# Environment
 .env
-.venv/
-# Cache Python
+.env.local
+.env.production
+
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
 
+# IDE
 .vscode/
-metas.txt
-setup.txt
-frontend/js/voice1.js
-frontend/styles/voice1.css
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backend data (local)
 backend/data/
 backend/runtime.txt
 backend/token.json
-backend/rhubarb.exe
+backend/.pytest_cache/
+
+# Credentials
 credentials.json
 token.json
+service-account.json
+
+# Executables
 ngrok.exe
 ngrok.yml
+rhubarb.exe
+
+# AI dev tools
+.qwen/
+
+# Dev docs (not for production)
+backend/TESTING_GUIDE.md
+backend/EXTERNAL_SERVICES_CONFIG.md
+backend/STUDENT_FEATURES_SUGGESTIONS.md
+backend/IMPLEMENTATION_STATUS.md
+
+
+# Test files
+tests/
+*.test.py
+test_*.py
+*_test.py
+
+# Temp
+*.tmp
+*.log
+
+# gerador de arquivos (por enquanto)
+backend/services/file_gen.py

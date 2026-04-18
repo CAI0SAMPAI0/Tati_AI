@@ -15,6 +15,7 @@
     <link rel="icon" type="image/x-icon" href="/assets/images/tati_logo.jpg">
     <link rel="stylesheet" href="/styles/reports.css">
     <link rel="stylesheet" href="/styles/admin_modules.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
 </head>
 
 <body>
@@ -59,6 +60,10 @@
                 <a href="#submissions" class="dash-nav-item" onclick="setSection('submissions',this)">
                     <i class="fa-solid fa-file-signature"></i>
                     <span data-i18n="dash.submissions">Correções</span>
+                </a>
+                <a href="#simulations" class="dash-nav-item" onclick="setSection('simulations',this)">
+                    <i class="fa-solid fa-theater-masks"></i>
+                    <span data-i18n="dash.simulations">Simulações</span>
                 </a>
             </nav>
 
@@ -343,7 +348,67 @@
                 </div>
             </section>
 
+            <!-- ── Simulações ── -->
+            <section id="section-simulations" class="dash-section" style="display:none;">
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <h3 data-i18n="dash.simulations">🎭 Simulações de Conversas</h3>
+                        <button class="btn-mod-add" onclick="openSimModal()">
+                            <i class="fa-solid fa-plus"></i>
+                            <span data-i18n="dash.new_simulation">Criar Simulação</span>
+                        </button>
+                    </div>
+                    <div id="simulations-grid" class="simulations-grid">
+                        <div class="mod-empty"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                    </div>
+                </div>
+            </section>
+
         </main>
+    </div>
+
+    <!-- Modal Criar Simulação -->
+    <div id="create-sim-modal" class="mod-modal-overlay" style="display:none" onclick="if(event.target===this)closeCreateSimulationModal()">
+        <div class="mod-modal">
+            <div class="mod-modal-header">
+                <h2 id="sim-modal-title" data-i18n="dash.new_simulation">Criar Simulação</h2>
+                <button onclick="closeCreateSimulationModal()" class="mod-modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="mod-modal-body">
+                <div class="mod-field">
+                    <label>Nome da Simulação</label>
+                    <input id="sim-name" type="text" placeholder="Ex: No Aeroporto / At the Airport">
+                </div>
+                <div class="mod-field">
+                    <label>Descrição</label>
+                    <textarea id="sim-desc" rows="2" placeholder="Pratique conversas em aeroportos..."></textarea>
+                </div>
+                <div class="mod-field">
+                    <label>Ícone (emoji)</label>
+                    <input id="sim-icon" type="text" value="🎭" placeholder="🎭">
+                </div>
+                <div class="mod-field">
+                    <label>Dificuldade</label>
+                    <select id="sim-difficulty">
+                        <option value="beginner">Iniciante</option>
+                        <option value="intermediate">Intermediário</option>
+                        <option value="advanced">Avançado</option>
+                    </select>
+                </div>
+                <div class="mod-field">
+                    <label>System Prompt (instruções para a IA)</label>
+                    <textarea id="sim-prompt" rows="6" placeholder="You are a TSA agent at JFK airport..."></textarea>
+                </div>
+                <div class="mod-field" style="display:flex;align-items:center;gap:0.5rem;">
+                    <input id="sim-use-ai" type="checkbox" style="width:auto;" checked>
+                    <label for="sim-use-ai" style="margin:0;">Gerar prompt com IA (recomendado)</label>
+                </div>
+            </div>
+            <div class="mod-modal-footer">
+                <button class="btn-mod-secondary" onclick="closeCreateSimulationModal()">Cancelar</button>
+                <button class="btn-mod-primary" onclick="createSimulation()">Criar</button>
+            </div>
+        </div>
     </div>
 
     <!-- Modal Novo Pacote de Flashcards (IA) -->
@@ -368,11 +433,11 @@
                 <div class="mod-field">
                     <label data-i18n="mod.field_level">Nível</label>
                     <select id="fc-level">
-                        <option value="Beginner">Beginner</option>
-                        <option value="Pre-Intermediate">Pre-Intermediate</option>
-                        <option value="Intermediate">Intermediate</option>
-                        <option value="Business English">Business English</option>
-                        <option value="Advanced">Advanced</option>
+                        <option value="Beginner" data-i18n="level.beginner">Beginner</option>
+                        <option value="Pre-Intermediate" data-i18n="level.pre_int">Pre-Intermediate</option>
+                        <option value="Intermediate" data-i18n="level.intermediate">Intermediate</option>
+                        <option value="Business English" data-i18n="level.business">Business English</option>
+                        <option value="Advanced" data-i18n="level.advanced">Advanced</option>
                     </select>
                 </div>
             </div>
@@ -429,7 +494,7 @@
                                     type="checkbox" name="mod-level" value="Advanced"> Adv</label>
                             <label
                                 style="font-size: 0.75rem; display: flex; align-items: center; gap: 0.2rem; cursor: pointer; color: var(--primary); font-weight: bold;"><input
-                                    type="checkbox" name="mod-level" value="all"> All</label>
+                                    type="checkbox" name="mod-level" value="all" data-i18n="mod.level_all"> All</label>
                         </div>
                     </div>
                     <div class="mod-field">
@@ -528,6 +593,7 @@
     <script src="/js/api.js"></script>
     <script src="/js/dashboard.js"></script>
     <script src="/js/admin_modules.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 </body>
 
 </html>

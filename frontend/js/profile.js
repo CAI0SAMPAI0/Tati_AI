@@ -4,7 +4,40 @@ window.addEventListener('DOMContentLoaded', () => {
     _loadProfile();
     _loadStats();
     _loadSubscription();
+    _loadPlanAction();
+    // Streak carrega em paralelo, não bloqueia
+    _loadStreaks();
 });
+
+// ── Tab Switching ─────────────────────────────────────────────────────────────
+
+function switchProfileTab(tabName, btn) {
+    // Update tab buttons
+    document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    else document.querySelector(`.profile-tab[data-tab="${tabName}"]`)?.classList.add('active');
+    
+    // Hide all content
+    document.querySelectorAll('.profile-tab-content').forEach(c => c.style.display = 'none');
+    
+    // Show selected content
+    const content = document.getElementById(`tab-content-${tabName}`);
+    if (content) {
+        content.style.display = 'block';
+    }
+    
+    // Load content if needed
+    if (tabName === 'progress' && !document.getElementById('profile-progress-container').dataset.loaded) {
+        _loadProgressTab();
+    } else if (tabName === 'vocab' && !document.getElementById('profile-vocab-container').dataset.loaded) {
+        _loadVocabTab();
+    } else if (tabName === 'goals' && !document.getElementById('profile-goals-container').dataset.loaded) {
+        _loadGoalsTab();
+    } else if (tabName === 'trophies' && !document.getElementById('profile-trophies-container').dataset.loaded) {
+        _loadTrophiesTab();
+    }
+}
+
 
 // ── Profile ───────────────────────────────────────────────────────────────────
 
@@ -79,9 +112,9 @@ async function _loadSubscription() {
   container.innerHTML = `
     <h2 class="section-title">
       <i class="fa-solid fa-crown" style="color:#a78bfa;"></i>
-      <span>Assinatura</span>
+      <span>${t('sub.assinatura')}</span>
     </h2>
-    <div id="sub-content" style="font-size:0.88rem;color:var(--text-muted);">Carregando...</div>
+    <div id="sub-content" style="font-size:0.88rem;color:var(--text-muted);">${t('gen.loading')}</div>
   `;
 
   try {
@@ -93,8 +126,8 @@ async function _loadSubscription() {
       el.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">
           <div>
-            <div style="font-weight:600;color:var(--text);">Sem assinatura ativa</div>
-            <div style="font-size:0.82rem;margin-top:0.2rem;">Assine um plano para ter acesso completo.</div>
+            <div style="font-weight:600;color:var(--text);">${t('sub.no_active')}</div>
+            <div style="font-size:0.82rem;margin-top:0.2rem;">${t('sub.no_active_desc')}</div>
           </div>
           <a href="payment.html" style="
             padding:0.55rem 1.1rem;
@@ -102,16 +135,16 @@ async function _loadSubscription() {
             color:#fff;border:none;border-radius:8px;
             font-weight:700;font-size:0.85rem;
             text-decoration:none;white-space:nowrap;
-          ">Assinar agora</a>
+          ">${t('sub.subscribe_now')}</a>
         </div>
       `;
       return;
     }
 
-    const planLabel   = sub.plan_type === 'full' ? '👑 Plano Completo' : '💬 Chat & Voice';
+    const planLabel   = sub.plan_type === 'full' ? t('sub.plan_full') : t('sub.plan_basic');
     const statusLabel = _subStatusLabel(sub.status);
     const statusColor = sub.status === 'active' ? '#4ade80' : sub.status === 'grace' ? '#fbbf24' : '#f87171';
-    const expiresDate = sub.expires_at ? new Date(sub.expires_at).toLocaleDateString('pt-BR') : '—';
+    const expiresDate = sub.expires_at ? new Date(sub.expires_at).toLocaleDateString(I18n.getLang() === 'pt-BR' ? 'pt-BR' : 'en-US') : '—';
 
     el.innerHTML = `
       <div style="
@@ -132,36 +165,94 @@ async function _loadSubscription() {
         </div>
         <div style="display:flex;gap:1.5rem;flex-wrap:wrap;">
           <div>
-            <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.2rem;">Vencimento</div>
+            <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.2rem;">${t('sub.vencimento')}</div>
             <div style="font-weight:600;color:var(--text);">${expiresDate}</div>
           </div>
           <div>
-            <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.2rem;">Dias restantes</div>
+            <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.2rem;">${t('sub.days_remaining')}</div>
             <div style="font-weight:600;color:var(--text);">${sub.days_left ?? '—'}</div>
           </div>
         </div>
         <a href="payment.html" style="
           display:inline-flex;align-items:center;gap:0.4rem;
           font-size:0.82rem;color:#a78bfa;text-decoration:none;font-weight:600;
-        "><i class="fa-solid fa-rotate"></i> Renovar / Trocar plano</a>
+        "><i class="fa-solid fa-rotate"></i> ${t('sub.renew_change')}</a>
       </div>
     `;
   } catch (e) {
     const el = document.getElementById('sub-content');
-    if (el) el.textContent = 'Erro ao carregar assinatura.';
+    if (el) el.textContent = t('sub.load_error');
     console.error(e);
   }
 }
 
 function _subStatusLabel(status) {
   const map = {
-    active:    '✓ Ativa',
-    grace:     '⚠️ Em atraso',
-    pending:   '⏳ Pendente',
-    expired:   '✗ Expirada',
-    cancelled: '✗ Cancelada',
+    active:    t('sub.status_active'),
+    grace:     t('sub.status_grace'),
+    pending:   t('sub.status_pending'),
+    expired:   t('sub.status_expired'),
+    cancelled: t('sub.status_cancelled'),
   };
   return map[status] || status;
+}
+
+// ── Plan Action (hero) ────────────────────────────────────────────────────────
+
+async function _loadPlanAction() {
+  const container = document.getElementById('profile-plan-action');
+  if (!container) return;
+
+  try {
+    const sub = await apiGet('/payments/status');
+    
+    // Sem assinatura ou expirada/cancelada → mostra "Upgrade to Premium"
+    if (!sub || !sub.has_subscription || sub.status === 'expired' || sub.status === 'cancelled') {
+      container.innerHTML = `
+        <a href="payment.html" class="btn-save" style="background: linear-gradient(135deg, #FFD700, #FFA500); color: #000; text-decoration: none;">
+          <i class="fa-solid fa-crown"></i>
+          <span>Upgrade to Premium</span>
+        </a>
+      `;
+      return;
+    }
+
+    // Assinatura ativa
+    if (sub.status === 'active' || sub.status === 'grace') {
+      // Plano básico → mostra "Upgrade to Full"
+      if (sub.plan_type === 'basic') {
+        container.innerHTML = `
+          <a href="payment.html" class="btn-save" style="background: linear-gradient(135deg, #a78bfa, #60a5fa); color: #fff; text-decoration: none;">
+            <i class="fa-solid fa-arrow-up-right-dots"></i>
+            <span>Upgrade to Full</span>
+          </a>
+        `;
+        return;
+      }
+
+      // Plano full → não mostra nada
+      if (sub.plan_type === 'full') {
+        container.innerHTML = '';
+        return;
+      }
+    }
+
+    // Default: mostra upgrade
+    container.innerHTML = `
+      <a href="payment.html" class="btn-save" style="background: linear-gradient(135deg, #FFD700, #FFA500); color: #000; text-decoration: none;">
+        <i class="fa-solid fa-crown"></i>
+        <span>Upgrade to Premium</span>
+      </a>
+    `;
+  } catch (e) {
+    console.error('Erro ao carregar ação do plano:', e);
+    container.innerHTML = `
+      <a href="payment.html" class="btn-save" style="background: linear-gradient(135deg, #FFD700, #FFA500); color: #000; text-decoration: none;">
+        <i class="fa-solid fa-crown"></i>
+        <span>Upgrade to Premium</span>
+      </a>
+    `;
+  }
 }
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
@@ -300,3 +391,91 @@ function _showFeedback(el, msg, type) {
 
 function togglePwVisibility(inputId, btn) { togglePw(inputId, btn); }
 function logout() { authLogout(); }
+
+// ── Streaks ───────────────────────────────────────────────────────────────────
+
+async function _loadStreaks() {
+  try {
+    const streak = await apiGet('/users/streak');
+    
+    if (!streak || streak.current_streak === undefined) return;
+    
+    const section = document.getElementById('streak-section');
+    if (!section) return;
+    
+    section.style.display = 'block';
+    
+    // Atualiza valores
+    document.getElementById('streak-count').textContent = streak.current_streak;
+    document.getElementById('streak-longest').textContent = streak.longest_streak;
+    
+    // Ícone baseado no streak
+    const icon = document.getElementById('streak-icon');
+    if (streak.current_streak >= 100) {
+      icon.textContent = '💎';
+    } else if (streak.current_streak >= 30) {
+      icon.textContent = '🌟';
+    } else if (streak.current_streak >= 7) {
+      icon.textContent = '🔥';
+    } else {
+      icon.textContent = '⭐';
+    }
+    
+    // Renderiza calendário
+    _renderStreakCalendar(streak);
+    
+    // Renderiza milestones
+    _renderStreakMilestones();
+    
+  } catch (e) {
+    console.error('Erro ao carregar streaks:', e);
+  }
+}
+
+function _renderStreakCalendar(streak) {
+  const container = document.getElementById('streak-calendar');
+  if (!container) return;
+  
+  // Últimos 28 dias (4 semanas)
+  const days = [];
+  const today = new Date();
+  
+  for (let i = 27; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    const dateStr = date.toISOString().split('T')[0];
+    const isActive = streak.study_dates && streak.study_dates.includes(dateStr);
+    const isToday = i === 0;
+    
+    days.push(`
+      <div class="streak-day ${isActive ? 'active' : ''} ${isToday ? 'today' : ''}">
+        <span class="streak-day-label">${date.getDate()}</span>
+      </div>
+    `);
+  }
+  
+  container.innerHTML = days.join('');
+}
+
+async function _renderStreakMilestones() {
+  const container = document.getElementById('streak-milestones');
+  if (!container) return;
+  
+  try {
+    const milestones = await apiGet('/users/streak/milestones');
+    
+    if (!milestones || !milestones.length) return;
+    
+    const html = milestones.map(m => `
+      <div class="milestone-badge ${m.achieved ? 'achieved' : ''}">
+        <span class="milestone-icon">${m.badge}</span>
+        <span>${m.label}</span>
+      </div>
+    `).join('');
+    
+    container.innerHTML = html;
+    
+  } catch (e) {
+    console.error('Erro ao carregar milestones:', e);
+  }
+}

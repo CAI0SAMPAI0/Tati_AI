@@ -12,6 +12,7 @@ from services.asaas import (
     get_customer_by_email, get_pix_qr_code, update_customer,
 )
 from services.database import get_client
+from services.document_validator import validate_document_auto
 
 from fastapi import HTTPException
 
@@ -77,6 +78,41 @@ def _upsert_subscription(username: str, plan_type: str, payment_id: str) -> None
     }).eq("username", username).execute()
 
 
+def _activate_special_user_subscription(username: str, plan_type: str = "full") -> None:
+    """Ativa assinatura para usuários especiais (programadores, caio.sampaio, etc)."""
+    from routers.users.permissions import SPECIAL_USERS
+    
+    if username not in SPECIAL_USERS:
+        return
+    
+    db = get_client()
+    today = date.today()
+    # Expira em 1 ano para usuários especiais
+    expires_at = date(today.year + 2, today.month, today.day)
+
+    # Cancela assinaturas anteriores
+    db.table("subscriptions").update({"status": "cancelled"}).eq(
+        "username", username
+    ).in_("status", ["pending", "active", "grace"]).execute()
+
+    # Cria assinatura ativa para usuário especial
+    db.table("subscriptions").insert({
+        "username":          username,
+        "plan_type":         plan_type,
+        "status":            "active",
+        "payment_id":        f"special_{username}",
+        "preferred_due_day": 5,
+        "expires_at":        expires_at.isoformat(),
+    }).execute()
+
+    # Atualiza flags no usuário
+    db.table("users").update({
+        "is_premium_active":   True,
+        "plan_type":           plan_type,
+        "free_messages_used":  0,
+    }).eq("username", username).execute()
+
+
 def _expire_subscription(payment_id: str) -> None:
     """Marca assinatura como expirada após chargeback ou cancelamento."""
     db = get_client()
@@ -121,12 +157,30 @@ async def create_new_payment(
     user_email = user_db.get("email")
     username   = user_db.get("username")
     user_name  = user_db.get("name") or user_db.get("username")
-    
+
+    # Usuários especiais não precisam de pagamento — redirecionar
+    if username in SPECIAL_USERS:
+        raise HTTPException(
+            status_code=403,
+            detail="Usuários especiais têm acesso gratuito e não precisam realizar pagamento."
+        )
+
     # Limpa e identifica CPF ou CNPJ
     raw_doc = str(user_db.get("cpf") or user_db.get("cpf_cnpj") or "").replace(".", "").replace("-", "").replace("/", "").strip()
-    
+
     if not raw_doc:
-        raise HTTPException(status_code=400, detail="CPF/CNPJ é obrigatório para processar o pagamento.")
+        raise HTTPException(
+            status_code=400,
+            detail="CPF/CNPJ é obrigatório para processar o pagamento. Por favor, preencha no seu perfil."
+        )
+
+    # Valida o documento
+    validation = validate_document_auto(raw_doc)
+    if not validation['valid']:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Documento inválido: {validation['message']}. Por favor, use um CPF/CNPJ válido ou outro método de pagamento."
+        )
 
     raw_phone = str(user_db.get("phone") or "")
     phone     = "".join(filter(str.isdigit, raw_phone))

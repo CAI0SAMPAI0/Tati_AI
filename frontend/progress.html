@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="progress.title">Teacher Tati — Meu Progresso</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+    <link rel="stylesheet" href="/styles/global.css">
+    <link rel="stylesheet" href="/styles/progress.css">
+    <link rel="icon" type="image/x-icon" href="/assets/images/tati_logo.jpg">
+</head>
+<body>
+    <div class="progress-layout">
+        <header class="progress-topbar">
+            <a href="javascript:void(0)" class="btn-back" onclick="history.back(); return false;">
+                <i class="fa-solid fa-arrow-left"></i>
+                <span data-i18n="nav.back_chat">Voltar ao Chat</span>
+            </a>
+            <div class="topbar-brand-center">
+                <img src="/assets/images/tati_logo.jpg" alt="Tati" class="topbar-logo"
+                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <span class="topbar-logo-fallback" style="display:none;">🧑‍🏫</span>
+                <span class="topbar-title">Teacher Tati</span>
+            </div>
+            <div class="topbar-user" id="topbar-user">
+                <div class="topbar-avatar" id="topbar-avatar">??</div>
+                <span class="topbar-username" id="topbar-username">...</span>
+            </div>
+        </header>
+
+        <main class="progress-content">
+            <div class="progress-header">
+                <h1 data-i18n="progress.hero_title">Seu Progresso</h1>
+                <p data-i18n="progress.hero_subtitle">Acompanhe sua evolução no aprendizado</p>
+                
+                <div class="xp-progress-container">
+                    <div class="xp-header">
+                        <span class="xp-level" id="xp-level">Nível A1</span>
+                        <span class="xp-value" id="xp-value">250 / 500 XP</span>
+                    </div>
+                    <div class="xp-bar-bg">
+                        <div class="xp-bar-fill" id="xp-bar-fill" style="width: 50%;"></div>
+                    </div>
+                </div>
+
+                <div class="progress-tabs">
+                    <button class="tab-btn active" data-tab="weekly" data-i18n="progress.weekly">Semanal</button>
+                    <button class="tab-btn" data-tab="monthly" data-i18n="progress.monthly">Mensal</button>
+                </div>
+            </div>
+
+            <div class="progress-stats-grid" id="progress-stats">
+                <!-- Stat cards unchanged -->
+                <div class="stat-highlight">
+                    <div class="stat-icon">💬</div>
+                    <div class="stat-number" id="stat-messages">0</div>
+                    <div class="stat-label" data-i18n="progress.messages">Mensagens</div>
+                </div>
+                <div class="stat-highlight">
+                    <div class="stat-icon">📚</div>
+                    <div class="stat-number" id="stat-conversations">0</div>
+                    <div class="stat-label" data-i18n="progress.conversations">Conversas</div>
+                </div>
+                <div class="stat-highlight">
+                    <div class="stat-icon">📅</div>
+                    <div class="stat-number" id="stat-days">0</div>
+                    <div class="stat-label" data-i18n="progress.study_days">Dias de Estudo</div>
+                </div>
+                <div class="stat-highlight">
+                    <div class="stat-icon">🔤</div>
+                    <div class="stat-number" id="stat-words">0</div>
+                    <div class="stat-label" data-i18n="progress.unique_words">Palavras Únicas</div>
+                </div>
+            </div>
+
+            <div class="progress-grid-2col">
+                <!-- Atividade Semanal -->
+                <div class="progress-section">
+                    <div class="section-card">
+                        <h2 class="section-title"><i class="fa-solid fa-chart-simple"></i> <span data-i18n="progress.activity_title">Atividade Semanal</span></h2>
+                        <div class="chart-container">
+                            <canvas id="activity-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 🔥 Streak Atual -->
+                <div class="progress-section">
+                    <div class="section-card">
+                        <h2 class="section-title">🔥 <span data-i18n="progress.streak_title">Streak Atual</span></h2>
+                        <div class="streak-display">
+                            <div class="streak-big-number" id="streak-current">0</div>
+                            <div class="streak-label" data-i18n="progress.days_consecutive">dias consecutivos</div>
+                            <div class="streak-divider"></div>
+                            <div class="streak-record">
+                                <div class="streak-record-label" data-i18n="progress.record">Recorde</div>
+                                <div class="streak-record-value" id="streak-longest">0</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🏆 Conquistas -->
+            <div class="progress-section">
+                <div class="section-card">
+                    <div class="section-header-flex">
+                        <h2 class="section-title">🏆 <span data-i18n="progress.achievements">Conquistas</span></h2>
+                        <span class="section-subtitle" id="trophies-count">0/24</span>
+                    </div>
+                    <div class="trophies-grid" id="trophies-grid">
+                        <div class="trophy-skeleton"></div>
+                        <div class="trophy-skeleton"></div>
+                        <div class="trophy-skeleton"></div>
+                        <div class="trophy-skeleton"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="progress-grid-2col">
+                <!-- 🎖️ Competições (Ranking) -->
+                <div class="progress-section">
+                    <div class="section-card">
+                        <h2 class="section-title">🎖️ <span data-i18n="progress.competitions">Ranking Semanal</span></h2>
+                        <div class="ranking-list" id="ranking-list">
+                            <div class="ranking-loading">Carregando ranking...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 💡 Dicas para Evoluir -->
+                <div class="progress-section">
+                    <div class="section-card">
+                        <h2 class="section-title">💡 <span data-i18n="progress.tips_title">Dicas para Evoluir</span></h2>
+                        <ul class="tips-list" id="tips-list"></ul>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/js/i18n.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/progress.js"></script>
+</body>
+</html>

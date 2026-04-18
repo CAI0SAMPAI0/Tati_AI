@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="goals.title">Teacher Tati — Metas de Estudo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+    <link rel="stylesheet" href="/styles/global.css">
+    <link rel="stylesheet" href="/styles/goals.css">
+    <link rel="icon" type="image/x-icon" href="/assets/images/tati_logo.jpg">
+</head>
+<body>
+    <div class="goals-layout">
+        <header class="goals-topbar">
+            <a href="javascript:void(0)" class="btn-back" onclick="history.back(); return false;">
+                <i class="fa-solid fa-arrow-left"></i>
+                <span data-i18n="nav.back_chat">Voltar ao Chat</span>
+            </a>
+            <div class="topbar-brand-center">
+                <img src="/assets/images/tati_logo.jpg" alt="Tati" class="topbar-logo"
+                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <span class="topbar-logo-fallback" style="display:none;">🧑‍🏫</span>
+                <span class="topbar-title">Teacher Tati</span>
+            </div>
+            <div class="topbar-user" id="topbar-user">
+                <div class="topbar-avatar" id="topbar-avatar">??</div>
+                <span class="topbar-username" id="topbar-username">...</span>
+            </div>
+        </header>
+
+        <main class="goals-content">
+            <div class="goals-header">
+                <h1 data-i18n="goals.hero_title">🎯 Minhas Metas de Estudo</h1>
+                <p data-i18n="goals.hero_subtitle">Defina e acompanhe suas metas de aprendizado</p>
+            </div>
+
+            <div class="goals-summary" id="goals-summary">
+                <div class="summary-item">
+                    <div class="summary-value" id="goals-total">0</div>
+                    <div class="summary-label" data-i18n="goals.active_goals">Metas Ativas</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value" id="goals-achieved">0</div>
+                    <div class="summary-label" data-i18n="goals.completed">Concluídas</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value" id="goals-streak">0</div>
+                    <div class="summary-label" data-i18n="goals.current_streak">Streak Atual</div>
+                </div>
+            </div>
+
+            <div class="goals-section">
+                <div class="section-header">
+                    <h2 data-i18n="goals.my_goals">Minhas Metas</h2>
+                    <button class="btn-add-goal" onclick="showAddGoalModal()">
+                        <i class="fa-solid fa-plus"></i>
+                        <span data-i18n="goals.add_goal">Nova Meta</span>
+                    </button>
+                </div>
+                
+                <div class="goals-list" id="goals-list">
+                    <div class="goals-empty">
+                        <i class="fa-solid fa-bullseye"></i>
+                        <p data-i18n="goals.empty_text">Nenhuma meta definida. Crie sua primeira meta!</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="modal-overlay" id="goal-modal" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 data-i18n="goals.new_goal_title">Nova Meta</h3>
+                <button class="btn-close" onclick="hideAddGoalModal()">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label data-i18n="goals.goal_type">Tipo de Meta</label>
+                    <select id="goal-type">
+                        <option value="daily_minutes" data-i18n="goals.type_daily_minutes">Minutos por dia</option>
+                        <option value="daily_messages" data-i18n="goals.type_daily_messages">Mensagens por dia</option>
+                        <option value="weekly_conversations" data-i18n="goals.type_weekly_conversations">Conversas por semana</option>
+                        <option value="weekly_words" data-i18n="goals.type_weekly_words">Palavras novas por semana</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-i18n="goals.goal_target">Meta (quantidade)</label>
+                    <input type="number" id="goal-target" min="1" value="30">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="goals.goal_period">Período</label>
+                    <select id="goal-period">
+                        <option value="daily" data-i18n="goals.daily">Diário</option>
+                        <option value="weekly" data-i18n="goals.weekly_period">Semanal</option>
+                    </select>
+                </div>
+                <button class="btn-submit" onclick="createGoal()" data-i18n="goals.create">Criar Meta</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/i18n.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/goals.js"></script>
+</body>
+</html>

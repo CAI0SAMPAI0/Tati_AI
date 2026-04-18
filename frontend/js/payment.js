@@ -7,14 +7,20 @@ let _detailPlan    = null;
 
 // ── Init ──────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
-  const cpfInput = document.getElementById('user-cpf');
+  // Aplica i18n a todos os elementos com data-i18n
+  if (typeof I18n !== 'undefined') {
+    I18n.applyToDOM();
+  }
 
-  // Adiciona a máscara automática ao digitar
+  const cpfInput = document.getElementById('user-cpf');
+  let validationTimeout = null;
+
+  // Adiciona a máscara automático ao digitar
   if (cpfInput) {
     cpfInput.addEventListener('input', (e) => {
       let v = e.target.value.replace(/\D/g, ''); // Remove tudo que não é dígito
       if (v.length > 14) v = v.substring(0, 14); // Limita a 14 caracteres
-      
+
       if (v.length <= 11) {
         // Máscara CPF: 000.000.000-00
         v = v.replace(/(\d{3})(\d)/, '$1.$2');
@@ -28,6 +34,10 @@ window.addEventListener('DOMContentLoaded', async () => {
         v = v.replace(/(\d{4})(\d)/, '$1-$2');
       }
       e.target.value = v;
+
+      // Validação em tempo real (debounce)
+      clearTimeout(validationTimeout);
+      validationTimeout = setTimeout(() => validateDocumentRealTime(v), 500);
     });
   }
 
@@ -44,6 +54,41 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.warn("Erro ao buscar perfil para pré-preencher CPF:", e);
   }
 });
+
+// ── Validação em tempo real ──────────────────────────────────────
+let _lastValidationResult = null;
+
+async function validateDocumentRealTime(doc) {
+  const cpfInput = document.getElementById('user-cpf');
+  if (!doc || doc.length < 11) {
+    _lastValidationResult = null;
+    if (cpfInput) {
+      cpfInput.style.borderColor = '';
+      cpfInput.style.boxShadow = '';
+    }
+    return;
+  }
+
+  try {
+    const res = await apiGet(`/validation/validate-document/${doc}`);
+    _lastValidationResult = res;
+    
+    if (cpfInput) {
+      if (res && res.valid) {
+        // Mostra feedback visual de sucesso
+        cpfInput.style.borderColor = '#4ade80';
+        cpfInput.style.boxShadow = '0 0 0 2px rgba(74, 222, 128, 0.2)';
+      } else {
+        // Mostra feedback visual de erro
+        cpfInput.style.borderColor = '#f87171';
+        cpfInput.style.boxShadow = '0 0 0 2px rgba(248, 113, 113, 0.2)';
+      }
+    }
+  } catch (e) {
+    console.warn('Erro na validação em tempo real:', e);
+    _lastValidationResult = null;
+  }
+}
 
 // ── Toast ─────────────────────────────────────────────────────────
 function showToast(text, type = 'info') {
@@ -125,10 +170,21 @@ async function handlePayment() {
   const cpfInput  = document.getElementById('user-cpf');
 
   const cpfValue = cpfInput ? cpfInput.value.replace(/\D/g, '') : '';
-  
+
   if (!cpfValue || (cpfValue.length !== 11 && cpfValue.length !== 14)) {
     showToast("Por favor, informe um CPF ou CNPJ válido.", "error");
     if (cpfInput) cpfInput.focus();
+    return;
+  }
+
+  // Verifica validação em tempo real
+  if (!_lastValidationResult || !_lastValidationResult.valid) {
+    showToast("Documento inválido. Por favor, use outro CPF/CNPJ válido para continuar.", "error");
+    if (cpfInput) {
+      cpfInput.focus();
+      cpfInput.style.borderColor = '#f87171';
+      cpfInput.style.boxShadow = '0 0 0 2px rgba(248, 113, 113, 0.2)';
+    }
     return;
   }
 
@@ -182,7 +238,16 @@ async function handlePayment() {
     }
 
   } catch (err) {
-    showToast((t('gen.error') || 'Erro') + ': ' + err.message, 'error');
+    const errorMsg = err.message || 'Erro desconhecido';
+    
+    // Mensagens de erro mais amigáveis
+    if (errorMsg.includes('Documento inválido')) {
+      showToast("❌ " + errorMsg, "error");
+    } else if (errorMsg.includes('Usuários especiais')) {
+      showToast("ℹ️ " + errorMsg, "info");
+    } else {
+      showToast('Erro: ' + errorMsg, 'error');
+    }
   } finally {
     btn.disabled = false;
     loading.style.display = 'none';
@@ -199,7 +264,14 @@ async function _pollPaymentStatus(paymentId, planType, attempts = 0) {
     const res = await apiGet('/payments/status');
     if (res?.status === 'active') {
       clearTimeout(_pollTimer);
-      showSuccessModal(planType);
+      
+      // Salva flag para mostrar animação
+      localStorage.setItem('payment_just_confirmed', 'true');
+      
+      // Redireciona para tela de comprovante
+      const today = new Date().toLocaleDateString('pt-BR');
+      const dueDate = res.expires_at ? new Date(res.expires_at).toLocaleDateString('pt-BR') : '—';
+      window.location.href = `/receipt.html?plan=${planType}&date=${today}&due=${dueDate}`;
       return;
     }
   } catch (_) { /* silencioso */ }

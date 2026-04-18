@@ -1,475 +1,563 @@
-/* activities_ui.js — Lógica da página de atividades do aluno */
+/* activities_ui.js — Tati AI English Learning */
 
-if (!requireAuth()) throw new Error('Unauthenticated');
-let _user = getUser();
-
-// ── Estado ─────────────────────────────────────────────────────
-let allModules = [];
-let allProgress = {};   // quiz_id → {score, correct_q, total_q}
-let currentTab = 'quiz';
-let filteredMods = [];
-
-// Quiz state
-let activeQuiz = null;
-let questions = [];
-let currentQIdx = 0;
-let answers = [];
-let selectedOption = null;
-let answered = false;
-let currentModDetail = null;
-
-// Flashcard state
-let fcCards = [];
-let fcIdx = 0;
-let fcKnown = 0;
-
-// ── Init ──────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
-    _initUserBadge();
-    
-    // Aplica traduções iniciais
-    if (window.I18n) I18n.applyToDOM();
+  // Notificações
+  const notifBtn = document.querySelector('.btn-notif');
+  const notifModal = document.getElementById('notif-modal');
+  if (notifBtn && notifModal) {
+    notifBtn.onclick = () => notifModal.classList.toggle('active');
+  }
 
-    await Promise.all([loadModules(), loadProgress(), loadTrophies()]);
-    initTabs();
+  setRankingMonth();
+  await loadInitialData();
+  restoreState(false); // não fecha sidebar na restauração
 });
 
-function _initUserBadge() {
-    const badge = document.getElementById('user-level-badge');
-    const avatar = document.getElementById('topbar-avatar');
-    _user = getUser();
-    if (_user) {
-        const levelKey = `level.${(_user.level || '').toLowerCase().replace('-', '_').replace(' ', '_')}`;
-        badge.textContent = t(levelKey) !== levelKey ? t(levelKey) : (_user.level || 'Student');
-        
-        if (_user.avatar_url || _user.image) {
-            const imgUrl = _user.avatar_url || _user.image;
-            avatar.innerHTML = `<img src="${imgUrl}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
-            avatar.style.background = 'none';
-        } else {
-            const nameParts = (_user.name || _user.username || '??').split(' ');
-            const initials = nameParts.length > 1 
-                ? (nameParts[0][0] + nameParts[nameParts.length-1][0]).toUpperCase()
-                : (nameParts[0][0] + (nameParts[0][1] || '')).toUpperCase();
-            avatar.textContent = initials;
-        }
-    }
+// ── NAVIGATION ──────────────────────────────────────────────────────────────
+function switchSection(sectionId, closeSidebar = true) {
+  document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+
+  const section = document.getElementById(`section-${sectionId}`);
+  if (section) section.classList.add('active');
+
+  const navItem = document.getElementById(`nav-${sectionId}`);
+  if (navItem) navItem.classList.add('active');
+  
+  localStorage.setItem('last_section', sectionId);
+
+  if (closeSidebar) {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const mainContent = document.querySelector('.main-content');
+    if (sidebar) { sidebar.classList.remove('open'); sidebar.classList.add('closed'); }
+    if (overlay) overlay.classList.remove('visible');
+    if (mainContent) mainContent.classList.add('expanded');
+  }
 }
 
-async function loadModules() {
-    try {
-        allModules = await apiGet('/activities/modules');
-        // A filtragem do dropdown acontece dentro do renderCurrentTab agora
-    } catch (e) { 
-        console.error('Erro ao carregar módulos:', e);
-        allModules = []; 
-    }
+function openSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  const mainContent = document.querySelector('.main-content');
+  if (sidebar) { sidebar.classList.add('open'); sidebar.classList.remove('closed'); }
+  if (overlay) overlay.classList.add('visible');
+  if (mainContent) mainContent.classList.remove('expanded');
 }
 
-function updateFilterDropdown() {
-    const sel = document.getElementById('filter-course');
-    if (!sel) return;
+function closeSidebarNav() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  const mainContent = document.querySelector('.main-content');
+  if (sidebar) { sidebar.classList.remove('open'); sidebar.classList.add('closed'); }
+  if (overlay) overlay.classList.remove('visible');
+  if (mainContent) mainContent.classList.add('expanded');
+}
 
-    const currentVal = sel.value;
-    sel.innerHTML = `<option value="">${t('act.all_modules')}</option>`;
+function switchSubTab(tabName) {
+  document.querySelectorAll('.sub-panel').forEach(panel => panel.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
 
-    let relevantModules = [];
-    if (currentTab === 'quiz') relevantModules = allModules.filter(m => m.has_quiz);
-    else if (currentTab === 'flashcards') relevantModules = allModules.filter(m => m.has_flashcards);
-    else relevantModules = allModules.filter(m => !m.title.toLowerCase().includes('flashcard')); // Filtra pacotes de IA da aba exercícios
+  const panel = document.getElementById(`sub-content-${tabName}`);
+  if (panel) panel.classList.add('active');
+  
+  const btns = document.querySelectorAll('.sub-tabs .tab-btn');
+  btns.forEach(btn => {
+    if (btn.getAttribute('onclick')?.includes(`'${tabName}'`)) {
+      btn.classList.add('active');
+    }
+  });
 
-    relevantModules.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m.id; opt.textContent = m.title;
-        if (m.id === currentVal) opt.selected = true;
-        sel.appendChild(opt);
+  localStorage.setItem('last_subtab', tabName);
+}
+
+async function restoreState(closeSidebar = true) {
+  const savedSection = localStorage.getItem('last_section') || 'activities';
+  const savedSubTab = localStorage.getItem('last_subtab') || 'quiz';
+  switchSection(savedSection, closeSidebar);
+  if (savedSection === 'activities') switchSubTab(savedSubTab);
+}
+
+// ── QUIZ LOGIC ──────────────────────────────────────────────────────────────
+let currentQuizState = { questions: [], currentQ: 0, answers: [], quizId: null, title: '' };
+
+function startQuiz(quizId, title) {
+  currentQuizState = { questions: [], currentQ: 0, answers: [], quizId, title };
+  const overlay = document.getElementById('quiz-overlay');
+  const titleEl = document.getElementById('qm-title');
+  // Garante footer visível e btn-next habilitado ao iniciar
+  const footer = document.querySelector('.qm-footer');
+  const btnNext = document.getElementById('btn-next');
+  if (footer) footer.style.display = '';
+  if (btnNext) btnNext.disabled = true;
+  if (overlay && titleEl) {
+    titleEl.textContent = title;
+    overlay.classList.add('active');
+    loadQuizFromAPI(quizId);
+  }
+}
+
+async function loadQuizFromAPI(quizId) {
+  try {
+    const quiz = await apiGet(`/activities/quizzes/${quizId}`);
+    currentQuizState.questions = quiz.questions || [];
+    currentQuizState.currentQ = 0;
+    currentQuizState.answers = [];
+    renderCurrentQuestion();
+  } catch (e) {
+    console.error('Erro ao carregar quiz:', e);
+  }
+}
+
+function renderCurrentQuestion() {
+  const { questions, currentQ } = currentQuizState;
+  if (currentQ >= questions.length) { finishQuiz(); return; }
+  const q = questions[currentQ];
+  const body = document.getElementById('qm-body');
+  if (!body) return;
+
+  document.getElementById('qm-sub').textContent = `${t('act.quiz_question_of')} ${currentQ + 1} ${t('act.quiz_de')} ${questions.length}`;
+  const progBar = document.getElementById('qm-prog-bar');
+  if (progBar) progBar.style.width = `${((currentQ) / questions.length) * 100}%`;
+
+  body.innerHTML = `
+    <div class="question-text">${escHtml(q.question)}</div>
+    <div class="question-options">
+      ${(q.options || []).map((opt, idx) => `
+        <button class="option-btn" onclick="selectOption(this, ${idx})">${escHtml(opt)}</button>
+      `).join('')}
+    </div>
+  `;
+  document.getElementById('btn-next').disabled = true;
+}
+
+function selectOption(el, idx) {
+  el.parentElement.querySelectorAll('.option-btn').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  currentQuizState.answers[currentQuizState.currentQ] = idx;
+  document.getElementById('btn-next').disabled = false;
+}
+
+function nextQ() {
+  const { questions, currentQ } = currentQuizState;
+  currentQuizState.currentQ++;
+  renderCurrentQuestion();
+}
+
+async function finishQuiz() {
+  try {
+    const res = await apiPost(`/activities/quizzes/${currentQuizState.quizId}/submit`, {
+      answers: currentQuizState.answers
     });
-}
+    const d = res.data;
+    const score = d.score ?? 0;
+    const correct = d.correct ?? 0;
+    const total = d.total ?? 0;
+    const trophies = d.trophies_earned ?? [];
+    const pct = Math.round((correct / total) * 100);
 
-async function loadProgress() {
-    try {
-        const prog = await apiGet('/activities/quizzes/my/progress');
-        prog.forEach(p => { allProgress[p.quiz_id] = p; });
-    } catch (e) { }
-}
-
-async function loadTrophies() {
-    try {
-        const trophies = await apiGet('/activities/trophies/');
-        if (trophies.length) {
-            document.getElementById('trophy-count').style.display = 'flex';
-            document.getElementById('trophy-num').textContent = trophies.length;
-        }
-    } catch (e) { }
-}
-
-// ── Tabs ──────────────────────────────────────────────────────
-function switchTab(tab, btn) {
-    currentTab = tab;
-    document.querySelectorAll('.act-tab').forEach(b => b.classList.remove('active'));
-    
-    const targetBtn = btn || document.querySelector(`.act-tab[onclick*="'${tab}'"]`);
-    if (targetBtn) targetBtn.classList.add('active');
-    
-    sessionStorage.setItem('tati_activities_tab', tab);
-    
-    const url = new URL(window.location);
-    url.searchParams.set('tab', tab);
-    window.history.replaceState({}, '', url);
-
-    document.getElementById('panel-quiz').style.display = tab === 'quiz' ? 'block' : 'none';
-    document.getElementById('panel-flashcards').style.display = tab === 'flashcards' ? 'block' : 'none';
-    document.getElementById('panel-exercises').style.display = tab === 'exercises' ? 'block' : 'none';
-    
-    updateFilterDropdown();
-    renderCurrentTab();
-}
-
-function initTabs() {
-    const params = new URLSearchParams(window.location.search);
-    const saved = params.get('tab') || sessionStorage.getItem('tati_activities_tab') || 'quiz';
-    switchTab(saved);
-}
-
-function renderCurrentTab() {
-    applyFilters();
-}
-
-function applyFilters() {
-    const course = document.getElementById('filter-course')?.value;
-    const searchInput = document.getElementById('search-input');
-    const search = searchInput ? searchInput.value.toLowerCase() : '';
-    
-    filteredMods = allModules.filter(m =>
-        (!course || m.id === course) &&
-        (!search || m.title.toLowerCase().includes(search) || (m.description || '').toLowerCase().includes(search))
-    );
-
-    // Contadores baseados no conteúdo real
-    document.getElementById('tab-count-quiz').textContent = allModules.filter(m => m.has_quiz).length;
-    document.getElementById('tab-count-flashcards').textContent = allModules.filter(m => m.has_flashcards).length;
-    document.getElementById('tab-count-exercises').textContent = allModules.filter(m => !m.title.toLowerCase().includes('flashcard')).length;
-
-    if (currentTab === 'quiz') renderQuizTab();
-    if (currentTab === 'flashcards') renderFlashcardsTab();
-    if (currentTab === 'exercises') renderExercisesTab();
-}
-
-// ── Quiz tab ──────────────────────────────────────────────────
-async function renderQuizTab() {
-    const container = document.getElementById('quiz-list');
-    if (!container) return;
-    
-    const quizMods = filteredMods.filter(m => m.has_quiz);
-
-    if (!quizMods.length) {
-        container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-circle-question"></i><p>${t('act.no_quizzes')}</p></div>`;
-        return;
+    let trophyHtml = '';
+    if (trophies.length) {
+      trophyHtml = `<div class="quiz-trophies">
+        <p class="trophy-label">${t('act.quiz_trophies_earned')}</p>
+        ${trophies.map(t => `<span class="trophy-earned">${t.icon || '🏆'} ${t.title}</span>`).join(' ')}
+      </div>`;
     }
 
-    container.innerHTML = quizMods.map(mod => {
-        // Tenta pegar o ID do quiz da lista (se veio) ou espera o openModule
-        const quizId = mod.quizzes && mod.quizzes[0] ? mod.quizzes[0].id : null;
-        const prog = quizId ? allProgress[quizId] : null;
-        const done = !!prog;
-        const score = prog?.score ?? null;
+    const strokeColor = pct >= 70 ? '#22c55e' : pct >= 40 ? '#f59e0b' : '#ef4444';
+    const circumference = 440;
 
-        return `
-        <div class="act-card" onclick="openModule('${mod.id}')">
-            ${done && score !== null ? `<div class="score-badge">${score}%</div>` : ''}
-            <div class="act-card-top">
-                <div class="act-category">QUIZ</div>
-                <div class="card-ai-badge" style="font-size:0.65rem;background:var(--primary-dim);color:var(--primary);padding:2px 6px;border-radius:4px;font-weight:700;">IA</div>
-            </div>
-            <h3 style="margin:0.5rem 0;">${mod.title}</h3>
-            <p style="margin-bottom:1rem;flex:1;">${mod.description || t('act.quiz_desc_fallback') + mod.title}</p>
-            <div class="act-card-footer">
-                <div class="act-meta">
-                    <i class="fa-regular fa-circle-question"></i> 5 ${t('act.questions')}
-                </div>
-                <button class="btn-check" style="width:auto;padding:0.5rem 1rem;">
-                    ${done ? t('act.btn_redo') : t('act.btn_start')}
-                </button>
-            </div>
-        </div>`;
-    }).join('');
-}
+    // Esconde o footer com botão Next e mostra só o botão de fechar no body
+    const footer = document.querySelector('.qm-footer');
+    if (footer) footer.style.display = 'none';
 
-// ── Flashcards tab ────────────────────────────────────────────
-function renderFlashcardsTab() {
-    const container = document.getElementById('flashcard-section');
-    if (!container) return;
-    
-    const fcMods = filteredMods.filter(m => m.has_flashcards);
-    
-    fcCards = [];
-    fcMods.forEach(m => {
-        if (Array.isArray(m.flashcards)) {
-            m.flashcards.forEach(f => fcCards.push({ ...f, moduleId: m.id }));
-        }
-    });
-
-    if (!fcCards.length) {
-        container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-layer-group"></i><p>${t('act.no_fc')}</p></div>`;
-        return;
-    }
-    
-    fcIdx = 0; fcKnown = 0;
-    renderFlashcard(container);
-}
-
-function renderFlashcard(container) {
-    if (!fcCards.length) return;
-    const card = fcCards[fcIdx];
-    container.innerHTML = `
-<div class="flashcard-section">
-    <div class="flashcard-wrap">
-      <div class="flashcard" id="fc-card" onclick="flipCard()">
-        <div class="flashcard-face">
-          <div class="flashcard-label">${t('act.fc_label_word')}</div>
-          <div class="flashcard-word" style="font-size:2.2rem;font-weight:800;">${card.word}</div>
-          <div class="flashcard-hint">${t('act.fc_reveal')}</div>
+    document.getElementById('qm-body').innerHTML = `
+      <div class="quiz-result">
+        <div class="circular-progress">
+          <svg viewBox="0 0 150 150" width="150" height="150" style="transform:rotate(-90deg)">
+            <circle cx="75" cy="75" r="70" fill="none" stroke="#e0e0e0" stroke-width="12"/>
+            <circle id="quiz-circle-fg" cx="75" cy="75" r="70" fill="none"
+              stroke="${strokeColor}" stroke-width="12" stroke-linecap="round"
+              stroke-dasharray="${circumference}" stroke-dashoffset="${circumference}"
+              style="transition: stroke-dashoffset 1.2s cubic-bezier(0.175,0.885,0.32,1.275)"/>
+          </svg>
+          <span class="percentage" style="color:${strokeColor}">${pct}%</span>
         </div>
-        <div class="flashcard-face flashcard-back">
-          <div class="flashcard-label">${t('act.fc_label_translation')}</div>
-          <div class="flashcard-translation" style="font-size:1.8rem;color:var(--primary);font-weight:700;">${card.translation}</div>
-          ${card.example ? `<div class="flashcard-example" style="margin-top:1.5rem;font-style:italic;color:var(--text-muted);font-size:0.9rem;">"${card.example}"</div>` : ''}
-        </div>
+        <p>${correct} ${t('act.quiz_de')} ${total} ${t('act.quiz_result_correct')}</p>
+        ${trophyHtml}
+        <button class="quiz-btn" onclick="closeQuiz()" style="margin-top:1.5rem">${t('act.quiz_close_btn')}</button>
       </div>
-    </div>
-    <div class="flashcard-controls">
-      <button class="btn-fc btn-fc-review" onclick="fcNext(false)"><i class="fa-solid fa-rotate-left"></i> ${t('act.fc_review')}</button>
-      <button class="btn-fc btn-fc-flip" onclick="flipCard()"><i class="fa-solid fa-rotate"></i> ${t('act.fc_flip')}</button>
-      <button class="btn-fc btn-fc-know" onclick="fcNext(true)"><i class="fa-solid fa-check"></i> ${t('act.fc_know')}</button>
-    </div>
-    <div class="fc-counter">${t('act.fc_counter', fcIdx + 1, fcCards.length, fcKnown)}</div>
-</div>`;
-}
-
-function flipCard() {
-    document.getElementById('fc-card')?.classList.toggle('flipped');
-}
-
-function fcNext(knew) {
-    if (knew) fcKnown++;
-    fcIdx = (fcIdx + 1) % fcCards.length;
-    renderFlashcard(document.getElementById('flashcard-section'));
-}
-
-// ── Exercises tab ─────────────────────────────────────────────
-function renderExercisesTab() {
-    const container = document.getElementById('exercise-list');
-    if (!container) return;
-    
-    // Filtra módulos de "pacote de flashcard" da IA para não aparecerem aqui como atividade de escrita
-    const exerciseMods = filteredMods.filter(m => !m.title.toLowerCase().includes('flashcard'));
-
-    if (!exerciseMods.length) {
-        container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-pen-to-square"></i><p>${t('act.ex_empty')}</p></div>`;
-        return;
-    }
-
-    container.innerHTML = exerciseMods.map(mod => `
-<div class="exercise-card">
-    <div class="exercise-type">${t('act.tab_exercises')}</div>
-    <div class="exercise-prompt"><strong>${mod.title}</strong>: ${mod.description || 'Pratique este tema.'}</div>
-    <textarea class="exercise-input" id="ex-input-${mod.id}" rows="3" placeholder="${t('act.ex_ph_textarea')}"></textarea>
-    <button class="btn-check" id="btn-submit-${mod.id}" onclick="submitExercise('${mod.id}')">
-        <i class="fa-solid fa-paper-plane"></i> ${t('chat.send')}
-    </button>
-    <div id="ex-feedback-${mod.id}" style="margin-top:0.75rem;"></div>
-</div>`).join('');
-    
-    loadMySubmissions();
-}
-
-async function submitExercise(modId) {
-    const input = document.getElementById(`ex-input-${modId}`);
-    const btn = document.getElementById(`btn-submit-${modId}`);
-    const val = input.value?.trim();
-    if (!val) return;
-
-    btn.disabled = true;
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${t('gen.loading')}`;
-
-    try {
-        const res = await apiPost('/activities/submissions/submit', { module_id: modId, student_answer: val });
-        if (res.ok) {
-            document.getElementById(`ex-feedback-${modId}`).innerHTML = `<div class="explanation-box" style="color:var(--success);border-color:var(--success);background:rgba(0,255,0,0.05);">✅ ${t('act.ex_sent')}</div>`;
-            input.disabled = true; btn.style.display = 'none';
-        }
-    } catch (e) {
-        btn.disabled = false; btn.innerHTML = t('chat.send');
-        alert(t('gen.error'));
-    }
-}
-
-async function loadMySubmissions() {
-    try {
-        const subs = await apiGet('/activities/submissions/my-submissions');
-        subs.forEach(s => {
-            const feedback = document.getElementById(`ex-feedback-${s.module_id}`);
-            const input = document.getElementById(`ex-input-${s.module_id}`);
-            const btn = document.getElementById(`btn-submit-${s.module_id}`);
-            if (feedback && input) {
-                input.value = s.student_answer; input.disabled = true;
-                if (btn) btn.style.display = 'none';
-                if (s.status === 'corrected') {
-                    feedback.innerHTML = `<div class="explanation-box" style="background:var(--primary-dim); border-color:var(--primary);"><strong>Score: ${s.score}/100</strong><br>${s.ai_feedback || ''}<br><em>${s.teacher_feedback || ''}</em></div>`;
-                } else {
-                    feedback.innerHTML = `<div class="explanation-box" style="opacity:0.7;">⏳ ${t('dash.loading')}</div>`;
-                }
-            }
-        });
-    } catch (e) { }
-}
-
-// ── Modais ────────────────────────────────────────────────────
-async function openModule(modId) {
-    try {
-        currentModDetail = await apiGet(`/activities/modules/${modId}`);
-        document.getElementById('module-modal-title').textContent = currentModDetail.title;
-        const body = document.getElementById('module-modal-body');
-        body.innerHTML = '';
-
-        if (!currentModDetail.contents || !currentModDetail.contents.length) {
-            body.innerHTML = `<div class="empty-state">Nenhum conteúdo disponível.</div>`;
-        } else {
-            currentModDetail.contents.forEach(c => {
-                const item = document.createElement('div');
-                item.style.marginBottom = '1.5rem';
-                let contentHtml = '';
-
-                if (c.type === 'video') {
-                    const videoId = extractYoutubeId(c.url);
-                    if (videoId) {
-                        contentHtml = `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px;background:#000;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/${videoId}" allowfullscreen frameborder="0"></iframe></div>`;
-                    } else {
-                        contentHtml = `<a href="${c.url}" target="_blank" class="btn-check" style="text-decoration:none;display:inline-flex;width:auto;"><i class="fa-solid fa-play"></i> Assistir Vídeo</a>`;
-                    }
-                } else if (c.type === 'text') {
-                    contentHtml = `<div class="explanation-box" style="margin:0;">${c.body || ''}</div>`;
-                } else {
-                    contentHtml = `<a href="${c.url}" target="_blank" class="btn-check" style="text-decoration:none;display:inline-flex;width:auto;background:var(--surface);color:var(--text);border:1px solid var(--border);"><i class="fa-solid fa-file-export"></i> ${t('act.view_file')}</a>`;
-                }
-
-                item.innerHTML = `<div style="font-weight:700;margin-bottom:0.75rem;display:flex;align-items:center;gap:0.5rem;"><i class="fa-solid fa-circle-play" style="color:var(--primary)"></i> ${c.title}</div>${contentHtml}`;
-                body.appendChild(item);
-            });
-        }
-
-        const hasQuiz = currentModDetail.quizzes && currentModDetail.quizzes.length;
-        document.getElementById('btn-start-quiz-from-mod').style.display = hasQuiz ? 'flex' : 'none';
-
-        document.getElementById('module-overlay').style.display = 'flex';
-        document.body.style.overflow = 'hidden';
-        if (window.I18n) I18n.applyToDOM(document.getElementById('module-overlay'));
-    } catch (e) { console.error(e); }
-}
-
-function extractYoutubeId(url) {
-    if (!url) return null;
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
-}
-
-function startQuizFromModule() {
-    if (!currentModDetail || !currentModDetail.quizzes.length) return;
-    const quiz = currentModDetail.quizzes[0];
-    closeModule();
-    startQuiz(quiz.id, quiz.title);
-}
-
-function closeModule() {
-    document.getElementById('module-overlay').style.display = 'none';
-    document.body.style.overflow = '';
-}
-
-async function startQuiz(quizId, title) {
-    try {
-        const data = await apiGet(`/activities/quizzes/${quizId}`);
-        activeQuiz = { id: quizId, title };
-        questions = data.questions || [];
-        currentQIdx = 0; answers = []; selectedOption = null; answered = false;
-        document.getElementById('quiz-modal-title').textContent = title;
-        document.getElementById('quiz-overlay').style.display = 'flex';
-        document.body.style.overflow = 'hidden';
-        renderQuestion();
-    } catch (e) { alert(t('gen.error')); }
-}
-
-function renderQuestion() {
-    const body = document.getElementById('quiz-modal-body');
-    if (!body) return;
-    if (currentQIdx >= questions.length) { showResult(); return; }
-    const q = questions[currentQIdx];
-    const total = questions.length;
-    const pct = ((currentQIdx) / total) * 100;
-    document.getElementById('quiz-progress-text').textContent = t('act.quiz_progress', currentQIdx + 1, total);
-    document.getElementById('quiz-progress-fill').style.width = pct + '%';
-    selectedOption = null; answered = false;
-    document.getElementById('btn-next').disabled = true;
-    body.innerHTML = `
-<div class="quiz-q-num">${t('mod.question_label')} ${currentQIdx + 1}</div>
-<div class="quiz-question">${q.question}</div>
-<div class="quiz-options" id="options-wrap">
-${(q.options || []).map((opt, i) => `
-  <div class="quiz-opt" onclick="selectOption(${i})" id="opt-${i}">
-    <div class="opt-letter">${String.fromCharCode(65 + i)}</div>
-    <span>${opt}</span>
-  </div>`).join('')}
-</div>
-<div id="explanation-wrap"></div>`;
-}
-
-function selectOption(idx) {
-    if (answered) return;
-    selectedOption = idx; answered = true; answers.push(selectedOption);
-    const q = questions[currentQIdx];
-    const correct = q.correct_index ?? 0;
-    document.querySelectorAll('.quiz-opt').forEach((btn, i) => {
-        btn.classList.toggle('selected', i === idx);
-        if (i === correct) btn.classList.add('correct');
-        else if (i === selectedOption && selectedOption !== correct) btn.classList.add('wrong');
+    `;
+    // Dispara animação após o DOM renderizar
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const fg = document.getElementById('quiz-circle-fg');
+        if (fg) fg.style.strokeDashoffset = circumference - (circumference * pct / 100);
+      });
     });
-    if (q.explanation) {
-        document.getElementById('explanation-wrap').innerHTML = `
-            <div class="explanation-box"><strong>${t('act.explanation_label')}</strong> ${q.explanation}</div>`;
-    }
-    document.getElementById('btn-next').disabled = false;
-    if (currentQIdx < questions.length - 1) setTimeout(nextQuestion, 2000);
-}
-
-function nextQuestion() { currentQIdx++; renderQuestion(); }
-
-async function showResult() {
-    document.getElementById('quiz-progress-fill').style.width = '100%';
-    document.getElementById('quiz-nav').style.display = 'none';
-    let result = null;
-    try {
-        const res = await apiPost(`/activities/quizzes/${activeQuiz.id}/submit`, { answers });
-        result = res.data;
-        allProgress[activeQuiz.id] = { score: result.score, correct_q: result.correct, total_q: result.total };
-    } catch (e) { }
-    const score = result?.score ?? 0;
-    const correct = result?.correct ?? 0;
-    const total = questions.length;
-    document.getElementById('quiz-modal-body').innerHTML = `
-<div class="quiz-result">
-    <div class="result-score">${score}%</div>
-    <div class="result-msg">${score >= 70 ? t('act.quiz_perfect') : t('act.quiz_keep_practicing')}</div>
-    <div class="result-stats">
-        <div class="res-stat-card"><div class="res-stat-val">${correct}</div><div class="res-stat-label">CORRETAS</div></div>
-        <div class="res-stat-card"><div class="res-stat-val">${total}</div><div class="res-stat-label">TOTAL</div></div>
-    </div>
-    <button class="btn-check" onclick="closeQuiz()">${t('act.quiz_close')}</button>
-</div>`;
+  } catch (e) { console.error(e); }
 }
 
 function closeQuiz() {
-    document.getElementById('quiz-overlay').style.display = 'none';
-    document.body.style.overflow = '';
-    activeQuiz = null;
-    renderCurrentTab();
+  document.getElementById('quiz-overlay')?.classList.remove('active');
+  const footer = document.querySelector('.qm-footer');
+  if (footer) footer.style.display = '';
+  loadQuizzes();
+}
+
+async function loadInitialData() {
+  try {
+    await Promise.all([
+      loadUserData(), loadQuizzes(), loadActivities(), 
+      loadStudyTime(), loadAchievements(), loadRanking(), 
+      loadFlashcards(), loadSimulations()
+    ]);
+    I18n.applyToDOM();
+  } catch (e) { console.error('Erro carregando dados:', e); }
+}
+
+async function loadUserData() {
+  const user = getUser();
+  if (!user) return;
+  document.getElementById('header-user-name').textContent = user.name || user.username || t('act.user_fallback');
+  
+  const avatarImg = document.getElementById('header-user-avatar-img');
+  const avatarFallback = document.getElementById('header-user-avatar');
+  if (user.avatar_url && avatarImg) { avatarImg.src = user.avatar_url; avatarImg.style.display = 'block'; if(avatarFallback) avatarFallback.style.display = 'none'; }
+  else if (avatarFallback) { avatarFallback.textContent = (user.name || user.username || '?').charAt(0).toUpperCase(); }
+
+  try {
+    const streakData = await apiGet('/users/streak');
+    document.getElementById('streak-count-text').textContent = streakData.current_streak || 0;
+    document.getElementById('trophy-count-text').textContent = `${streakData.trophies_earned || 0}/50`;
+  } catch(e) {}
+}
+
+async function loadStudyTime() {
+  try {
+    const data = await apiGet('/users/progress/study-time');
+    const fmt = m => m ? `${Math.floor(m/60)}h ${m%60}m` : null;
+    const set = (id, val) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (val) { el.textContent = val; el.style.opacity = '1'; }
+      else { el.textContent = '—'; el.style.opacity = '0.35'; el.title = 'Comece a estudar para ver seu tempo aqui'; }
+    };
+    set('study-week',       fmt(data.this_week));
+    set('study-month',      fmt(data.this_month));
+    set('study-last-month', fmt(data.last_month));
+    set('study-3months',    fmt(data.last_3_months));
+  } catch(e) {}
+}
+
+async function loadRanking() {
+  try {
+    const data = await apiGet('/users/ranking/top15');
+    const tbody = document.getElementById('ranking-body');
+    if (!tbody) return;
+    const user = getUser();
+    tbody.innerHTML = data.map((entry, i) => `
+      <tr class="${entry.username === user?.username ? 'current-user' : ''}">
+        <td class="rank-pos">${i+1}</td>
+        <td class="rank-name">${entry.name || entry.username}</td>
+        <td class="rank-score">${entry.score} pts</td>
+        <td class="rank-stat">${entry.messages || 0}</td>
+        <td class="rank-stat">${entry.quizzes || 0}</td>
+        <td class="rank-stat">${entry.flashcards || 0}</td>
+        <td class="rank-stat">${entry.exercises || 0}</td>
+      </tr>
+    `).join('');
+
+    const pos = await apiGet('/users/ranking/position');
+    document.getElementById('user-rank').textContent = `#${pos.position || '—'}`;
+    document.getElementById('user-rank-name').textContent = pos.name || '...';
+    document.getElementById('user-rank-score').textContent = `${pos.score || 0} pontos`;
+    document.getElementById('user-msgs').textContent = pos.messages || 0;
+    document.getElementById('user-quizzes').textContent = pos.quizzes || 0;
+    document.getElementById('user-flashcards').textContent = pos.flashcards || 0;
+    document.getElementById('user-exercises').textContent = pos.exercises || 0;
+
+    const winners = await apiGet('/users/ranking/winners');
+    document.getElementById('winner-1-name').textContent = winners[0]?.name || '—';
+    document.getElementById('winner-1-position').textContent = winners[0] ? `${winners[0].score} pts` : '0 pts';
+    document.getElementById('winner-2-name').textContent = winners[1]?.name || '—';
+    document.getElementById('winner-2-position').textContent = winners[1] ? `${winners[1].score} pts` : '0 pts';
+    document.getElementById('winner-3-name').textContent = winners[2]?.name || '—';
+    document.getElementById('winner-3-position').textContent = winners[2] ? `${winners[2].score} pts` : '0 pts';
+  } catch(e) { console.error(e); }
+}
+
+async function loadQuizzes() {
+  const modules = await apiGet('/activities/modules');
+  const container = document.getElementById('quiz-list-container');
+  if (!container) return;
+  
+  let allQuizzes = [];
+  modules.forEach(m => {
+      if (m.quizzes) {
+          m.quizzes.forEach(q => {
+              allQuizzes.push({...q, attempts: q.attempts || 0});
+          });
+      }
+  });
+
+  const MAX_ATTEMPTS = 3;
+
+  container.innerHTML = allQuizzes.length ? allQuizzes.map(q => {
+    const attempts  = q.attempts || 0;
+    const remaining = MAX_ATTEMPTS - attempts;
+    const blocked   = remaining <= 0;
+    const done      = attempts > 0;
+
+    const badgeHtml = blocked
+      ? `<span class="quiz-badge badge-blocked">🔒 ${t('act.quiz_limit_reached') || 'Limite atingido'}</span>`
+      : done
+        ? `<span class="quiz-badge badge-done">✓ ${t('act.quiz_done') || 'Concluído'}</span>`
+        : `<span class="quiz-badge badge-new">${t('act.quiz_new') || 'Novo'}</span>`;
+
+    const dotsHtml = Array.from({length: MAX_ATTEMPTS}, (_, i) =>
+      `<span class="attempt-dot ${i < attempts ? 'used' : ''}"></span>`
+    ).join('');
+
+    const questionsHtml = q.questions?.length
+      ? `<span class="quiz-meta-item"><i class="fa-solid fa-circle-question"></i> ${q.questions.length} ${t('act.quiz_questions') || 'perguntas'}</span>`
+      : '';
+
+    return `
+    <div class="quiz-card ${blocked ? 'blocked' : ''}" ${!blocked ? `onclick="startQuiz('${q.id}', '${q.title}')"` : ''}>
+      ${badgeHtml}
+      <h3>${q.title}</h3>
+      <p class="quiz-desc">${q.description || ''}</p>
+      <div class="quiz-meta-row">
+        ${questionsHtml}
+        <span class="quiz-meta-item"><i class="fa-solid fa-rotate-right"></i> ${attempts}/${MAX_ATTEMPTS} ${t('act.quiz_attempts').toLowerCase()}</span>
+      </div>
+      <div class="attempt-dots-row">
+        <span class="attempt-dots-label">${t('act.quiz_attempts')}:</span>
+        <div class="attempt-dots">${dotsHtml}</div>
+      </div>
+      <button class="quiz-btn ${blocked ? 'quiz-btn-blocked' : done ? 'quiz-btn-redo' : ''}" ${blocked ? 'disabled' : ''}>
+        ${blocked ? '🔒 Limite atingido' : done ? `<i class="fa-solid fa-rotate-right"></i> ${t('act.quiz_redo')}` : `<i class="fa-solid fa-play"></i> ${t('act.quiz_start')}`}
+      </button>
+    </div>`;
+  }).join('') : `<div class="empty-state"><div class="empty-state-icon">📝</div><h3>Nenhum quiz disponível</h3><p>Os quizzes aparecerão aqui quando sua professora adicionar conteúdo.</p></div>`;
+}
+
+async function loadFlashcards() {
+  const modules = await apiGet('/activities/modules');
+  const container = document.getElementById('sub-content-flashcards');
+  if (!container) return;
+  let all = modules.flatMap(m => m.flashcards || []);
+  if (all.length) {
+    container.innerHTML = `<div class="flashcard-grid">${all.map(f => `<div class="flashcard-item"><strong>${f.word}</strong><p>${f.translation}</p>${f.example ? `<span class="fc-example">${f.example}</span>` : ''}</div>`).join('')}</div>`;
+  } else {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">🃏</div>
+        <h3>${t('act.fc_none')}</h3>
+        <p>Os flashcards aparecerão aqui quando sua professora adicionar conteúdo.</p>
+      </div>`;
+  }
+}
+
+async function loadSimulations() {
+  try {
+    const data = await apiGet('/simulation/scenarios');
+    const container = document.getElementById('sub-content-simulations');
+    if (!container) return;
+    if (!data.length) { container.innerHTML = `<p class="empty-view">${t('act.sim_none')}</p>`; return; }
+    container.innerHTML = `<div class="simulation-grid">${data.map(s => `
+      <div class="sim-card" onclick="window.location.href='/simulation.html?id=${s.id}'">
+        <div class="sim-card-icon">${s.icon || '💬'}</div>
+        <div class="sim-card-body">
+          <h3>${escHtml(s.name)}</h3>
+          <p>${escHtml(s.description || '')}</p>
+        </div>
+        <span class="sim-card-difficulty ${s.difficulty}">${getDiffLabel(s.difficulty)}</span>
+      </div>
+    `).join('')}</div>`;
+  } catch(e) { console.error(e); }
+}
+
+function getDiffLabel(d) {
+  return ({ beginner: t('act.difficulty_beginner'), intermediate: t('act.difficulty_intermediate'), advanced: t('act.difficulty_advanced') })[d] || d;
+}
+
+async function loadActivities() {
+  try {
+    const subs = await apiGet('/activities/submissions/my');
+    const container = document.getElementById('sub-content-atividades');
+    if (!container) return;
+    if (!subs.length) return;
+
+    const statusLabel = { pending: t('act.status_pending'), corrected: t('act.status_corrected') };
+    container.innerHTML = subs.map(sub => {
+      const modTitle = sub.modules?.title || sub.module_id || 'Atividade';
+      const scoreVal = sub.score;
+      const scoreColor = scoreVal >= 70 ? '#22c55e' : scoreVal >= 40 ? '#f59e0b' : '#ef4444';
+      const score = scoreVal != null ? `
+        <div class="act-score-bar">
+          <div class="act-score-label" style="color:${scoreColor}">${scoreVal}/100</div>
+          <div class="act-score-track">
+            <div class="act-score-fill" style="width:${scoreVal}%;background:${scoreColor}"></div>
+          </div>
+        </div>` : '';
+      const fb = sub.ai_feedback || sub.teacher_feedback;
+      const feedbackHtml = fb ? `<p class="act-feedback">${escHtml(fb)}</p>` : '';
+      return `<div class="profile-card act-card">
+        <div class="act-header">
+          <h4>${escHtml(modTitle)}</h4>
+          <span class="act-status ${sub.status}">${statusLabel[sub.status] || sub.status}</span>
+        </div>
+        ${score}
+        <p class="act-answer">${escHtml(sub.student_answer)}</p>
+        ${feedbackHtml}
+        <span class="act-date">${new Date(sub.created_at).toLocaleDateString(I18n.getLang() === 'pt-BR' ? 'pt-BR' : 'en-US')}</span>
+      </div>`;
+    }).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function loadAchievements() {
+  try {
+    const streakData = await apiGet('/users/streaks/detail');
+    const streak = streakData.current_streak ?? 0;
+    const longest = streakData.longest_streak ?? 0;
+
+    document.getElementById('streak-val').textContent = streak;
+    document.getElementById('streak-longest').textContent = `${longest} ${t('profile.streak_days')}`;
+    document.getElementById('streak-questions').textContent = streakData.total_questions ?? 0;
+    document.getElementById('streak-hours').textContent = `${streakData.hours_saved ?? 0}h`;
+
+    const badge = document.getElementById('streak-status-label');
+    if (badge) {
+      badge.textContent = streak > 0 ? 'ATIVO' : 'INATIVO';
+      badge.style.background = streak > 0 ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.15)';
+      badge.style.color = streak > 0 ? '#10b981' : '#f59e0b';
+    }
+  } catch(e) { console.error(e); }
+
+  try {
+    const data = await apiGet('/users/trophies/all');
+    const earned = data.earned ?? 0;
+    const total = data.total ?? 50;
+    const medals = data.medals ?? [];
+    const pct = Math.round((earned / total) * 100);
+
+    document.getElementById('trophy-count').textContent = earned;
+    document.getElementById('trophy-percent').textContent = `${pct}%`;
+    const bar = document.getElementById('trophy-progress-bar');
+    if (bar) bar.style.width = `${pct}%`;
+
+    const grid = document.getElementById('medals-grid');
+    if (grid) {
+      grid.innerHTML = medals.map(m => {
+        const pct = m.progress_pct ?? (m.unlocked ? 100 : 0);
+        const cur = m.current_val ?? 0;
+        const req = m.required_val ?? 1;
+        const progressHtml = m.unlocked
+          ? `<div class="medal-progress-bar-wrap done"><div class="medal-progress-bar" style="width:100%"></div></div>
+             <div class="medal-progress-text">✓ ${t('act.quiz_done') || 'Concluído'}</div>`
+          : `<div class="medal-progress-bar-wrap">
+               <div class="medal-progress-bar" style="width:${pct}%"></div>
+             </div>
+             <div class="medal-progress-text">${cur}/${req}</div>`;
+
+        return `
+        <div class="medal-card ${m.unlocked ? 'unlocked' : 'locked'}" data-category="${m.category}">
+          ${m.unlocked ? `<div class="medal-check"><i class="fa-solid fa-check"></i></div>` : ''}
+          <div class="medal-icon">${m.icon || '🏆'}</div>
+          <div class="medal-name">${m.name}</div>
+          <div class="medal-desc">${m.description}</div>
+          ${progressHtml}
+        </div>`;
+      }).join('');
+    }
+
+    // Contadores por categoria
+    const counts = { all: medals.length, questions: 0, streak: 0, credits: 0, time: 0, milestones: 0, social: 0 };
+    medals.forEach(m => { if (counts[m.category] !== undefined) counts[m.category]++; });
+    Object.keys(counts).forEach(cat => {
+      const el = document.getElementById(`filter-${cat}-count`);
+      if (el) el.textContent = counts[cat];
+    });
+
+    // Guarda medals globalmente para o filtro
+    window._allMedals = medals;
+  } catch(e) { console.error(e); }
+}
+
+// ── UTILS ──────────────────────────────────────────────────────────────
+function filterMedals(cat, btn) {
+  // Atualiza botão ativo
+  document.querySelectorAll('.medal-filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  // Filtra os cards
+  const cards = document.querySelectorAll('.medal-card');
+  cards.forEach(card => {
+    const show = cat === 'all' || card.dataset.category === cat;
+    card.style.display = show ? '' : 'none';
+  });
+}
+function setRankingMonth() {
+    const months = [0,1,2,3,4,5,6,7,8,9,10,11].map(m => t(`act.month_${m}`));
+    const now = new Date();
+    const label = `${months[now.getMonth()]}/${now.getFullYear()}`;
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevLabel = `${months[prev.getMonth()]}/${prev.getFullYear()}`;
+    document.getElementById('ranking-month').textContent = label;
+    document.getElementById('winners-month').textContent = prevLabel;
+    document.getElementById('top15-month').textContent = label;
+}
+function openWritingModal() { document.getElementById('writing-modal')?.classList.add('active'); }
+function closeWritingModal() { document.getElementById('writing-modal')?.classList.remove('active'); }
+function openFeedbackModal() { document.getElementById('feedback-modal')?.classList.add('active'); }
+function closeFeedbackModal() { document.getElementById('feedback-modal')?.classList.remove('active'); }
+
+async function handleFeedbackSubmit(e) {
+  e.preventDefault();
+  const type = document.querySelector('input[name="fb-type"]:checked')?.value || 'bug';
+  const title = document.getElementById('fb-title')?.value?.trim();
+  const desc = document.getElementById('fb-desc')?.value?.trim();
+  if (!title || !desc) { showToast(t('act.fb_fill_all'), 'warning'); return; }
+
+  try {
+    const res = await apiPost('/feedback/send', {
+      category: type,
+      title,
+      message: desc,
+      page: location.pathname
+    });
+    if (res.data?.success) {
+      showToast(t('act.fb_success'), 'success');
+      closeFeedbackModal();
+      e.target.reset();
+    } else {
+      showToast(res.data?.message || t('act.fb_error'), 'error');
+    }
+  } catch(err) { console.error(err); showToast(t('act.fb_conn_error'), 'error'); }
+}
+
+async function handleWritingSubmit(e) {
+  e.preventDefault();
+  const theme = document.getElementById('writing-theme')?.value?.trim();
+  const content = document.getElementById('writing-content')?.value?.trim();
+  if (!theme || !content) { showToast(t('act.wr_fill_all'), 'warning'); return; }
+
+  try {
+    const res = await apiPost('/activities/submissions/submit', {
+      module_id: 'writing-' + Date.now(),
+      activity_type: 'writing',
+      student_answer: `Tema: ${theme}\n\n${content}`
+    });
+    if (res.data?.ok) {
+      showToast(t('act.wr_success'), 'success');
+      closeWritingModal();
+      e.target.reset();
+      loadActivities();
+    } else {
+      showToast(t('act.wr_error'), 'error');
+    }
+  } catch(err) { console.error(err); showToast(t('act.wr_conn_error'), 'error'); }
 }

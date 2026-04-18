@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="vocab.title">Teacher Tati — Caderno de Vocabulário</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+    <link rel="stylesheet" href="/styles/global.css">
+    <link rel="stylesheet" href="/styles/vocab.css">
+    <link rel="icon" type="image/x-icon" href="/assets/images/tati_logo.jpg">
+</head>
+<body>
+    <div class="vocab-layout">
+        <header class="vocab-topbar">
+            <a href="javascript:void(0)" class="btn-back" onclick="history.back(); return false;">
+                <i class="fa-solid fa-arrow-left"></i>
+                <span data-i18n="nav.back_chat">Voltar ao Chat</span>
+            </a>
+            <div class="topbar-brand-center">
+                <img src="/assets/images/tati_logo.jpg" alt="Tati" class="topbar-logo"
+                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <span class="topbar-logo-fallback" style="display:none;">🧑‍🏫</span>
+                <span class="topbar-title">Teacher Tati</span>
+            </div>
+            <div class="topbar-user" id="topbar-user">
+                <div class="topbar-avatar" id="topbar-avatar">??</div>
+                <span class="topbar-username" id="topbar-username">...</span>
+            </div>
+        </header>
+
+        <main class="vocab-content">
+            <div class="vocab-header">
+                <h1 data-i18n="vocab.hero_title">📝 Meu Caderno de Vocabulário</h1>
+                <p data-i18n="vocab.hero_subtitle">Palavras aprendidas e revisões</p>
+            </div>
+
+            <div class="vocab-toolbar">
+                <div class="vocab-search">
+                    <i class="fa-solid fa-search"></i>
+                    <input type="text" id="vocab-search-input" data-i18n-placeholder="vocab.search_ph" placeholder="Buscar palavra...">
+                </div>
+                <div class="vocab-filters">
+                    <button class="filter-btn active" data-filter="all" data-i18n="vocab.filter_all">Todas</button>
+                    <button class="filter-btn" data-filter="learned" data-i18n="vocab.filter_learned">Aprendidas</button>
+                    <button class="filter-btn" data-filter="learning" data-i18n="vocab.filter_learning">Aprendendo</button>
+                    <button class="filter-btn" data-filter="new" data-i18n="vocab.filter_new">Novas</button>
+                </div>
+                <button class="btn-export" onclick="exportVocab()">
+                    <i class="fa-solid fa-download"></i>
+                    <span data-i18n="vocab.export">Exportar</span>
+                </button>
+            </div>
+
+            <div class="vocab-stats" id="vocab-stats">
+                <div class="vocab-stat">
+                    <div class="vocab-stat-value" id="vocab-total">0</div>
+                    <div class="vocab-stat-label" data-i18n="vocab.total_words">Total de Palavras</div>
+                </div>
+                <div class="vocab-stat">
+                    <div class="vocab-stat-value" id="vocab-learned">0</div>
+                    <div class="vocab-stat-label" data-i18n="vocab.learned">Aprendidas</div>
+                </div>
+                <div class="vocab-stat">
+                    <div class="vocab-stat-value" id="vocab-learning">0</div>
+                    <div class="vocab-stat-label" data-i18n="vocab.learning">Aprendendo</div>
+                </div>
+            </div>
+
+            <div class="vocab-list" id="vocab-list">
+                <div class="vocab-empty">
+                    <i class="fa-solid fa-book-open"></i>
+                    <p data-i18n="vocab.empty_text">Nenhuma palavra ainda. Pratique no chat para começar!</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/i18n.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/vocab.js"></script>
+</body>
+</html>

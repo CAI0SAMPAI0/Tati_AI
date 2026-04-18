@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from routers.deps import get_current_user
 from services.database import get_client
+from services.document_validator import validate_document_auto
 
 router = APIRouter()
 
@@ -35,7 +36,8 @@ def _get_avatar_url(row: dict) -> str | None:
     return (row.get("profile") or {}).get("avatar_url")
 
 
-def _fetch_user(username: str) -> dict:
+def get_user_by_username(username: str) -> dict | None:
+    """Busca usuário por username. Retorna None se não encontrado."""
     db = get_client()
     try:
         rows = (
@@ -56,9 +58,16 @@ def _fetch_user(username: str) -> dict:
             .data
         )
     if not rows:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+        return None
     row = rows[0]
     row["avatar_url"] = _get_avatar_url(row)
+    return row
+
+
+def _fetch_user(username: str) -> dict:
+    row = get_user_by_username(username)
+    if not row:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
     return row
 
 
@@ -78,6 +87,22 @@ async def update_profile(body: ProfileUpdate, current_user: dict = Depends(get_c
     rows = db.table("users").select("profile").eq("username", username).limit(1).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    # Valida CPF/CNPJ se fornecido
+    doc_to_validate = body.cpf or body.cpf_cnpj
+    if doc_to_validate:
+        validation_result = validate_document_auto(doc_to_validate)
+        if not validation_result['valid']:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Documento inválido: {validation_result['message']}"
+            )
+        # Salva o documento formatado
+        formatted_doc = validation_result['formatted']
+        if body.cpf:
+            body.cpf = formatted_doc
+        if body.cpf_cnpj:
+            body.cpf_cnpj = formatted_doc
 
     top_level = {f: getattr(body, f) for f in ("name", "email", "level", "focus", "cpf", "cpf_cnpj") if getattr(body, f) is not None}
     profile = rows[0].get("profile") or {}
