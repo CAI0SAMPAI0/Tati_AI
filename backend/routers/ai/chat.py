@@ -250,6 +250,11 @@ async def extract_text_from_file(filename: str, content_b64: str) -> str:
         return f"[Erro ao ler arquivo {filename}: {exc}]"
 
 
+class CreateConversationBody(BaseModel):
+    title: str = "Nova conversa"
+    is_simulation: bool = False
+
+
 # ── REST endpoints ────────────────────────────────────────────────────────────
 
 
@@ -262,6 +267,7 @@ async def new_conversation(
         username=current_user["username"],
         title=body.title,
         model=settings.llm_provider,
+        is_simulation=body.is_simulation
     )
 
 
@@ -351,14 +357,29 @@ async def get_summary(conversation_id: str, lang: str = Query(default='pt'), cur
 
 
 @router.websocket("/ws")
-async def chat_ws(websocket: WebSocket, token: str = Query(...)):
-    payload = _verify_ws_token(token)
+async def chat_ws(websocket: WebSocket, token: str | None = Query(None)):
+    # 1. Tenta obter token via subprotocolo (Sec-WebSocket-Protocol) - Oculta do log do Uvicorn!
+    # O browser envia ["access_token", "JWT_AQUI"]
+    ws_token = token
+    subprotocol = None
+    
+    protocols = websocket.headers.get("sec-websocket-protocol", "").split(",")
+    for p in protocols:
+        p = p.strip()
+        if p != "access_token" and not ws_token:
+            ws_token = p
+            subprotocol = "access_token"
+    
+    payload = _verify_ws_token(ws_token)
     if not payload:
         await websocket.close(code=4001, reason="Token inválido")
         return
 
-    await websocket.accept()
+    # Aceita a conexão com o subprotocolo se usado
+    await websocket.accept(subprotocol=subprotocol)
     username = payload["sub"]
+    
+    print(f"[WS] Conexão aceita para usuário: {username}")
 
     try:
         while True:
@@ -393,6 +414,13 @@ async def _handle_chat_message(websocket: WebSocket, msg: dict, username: str) -
         if msg_type not in ("text", "audio", "file") or not conv_id:
             await websocket.send_json({"type": "error", "detail": "Tipo ou conversation_id inválido"})
             return
+
+        # Registra streak do dia
+        try:
+            from services.streaks import record_study_day
+            record_study_day(username)
+        except Exception as e:
+            print(f"[Streak] Erro ao registrar: {e}")
 
         # ── Processa tipo de input ────────────────────────
         if msg_type == "file":
@@ -462,18 +490,34 @@ async def _handle_chat_message(websocket: WebSocket, msg: dict, username: str) -
         # ── TTS e finalização ─────────────────────────────
         print(f"DEBUG: Finalizando resposta...")
         tts_text = _clean_tts_text(full_response)
-        await save_message(conv_id, username, "assistant", full_response)
+        
+        # Gera áudio antes de salvar
+        audio_b64 = await text_to_speech(tts_text)
+        
+        # Salva mensagem com áudio
+        await save_message(conv_id, username, "assistant", full_response, audio_b64=audio_b64)
 
         # Incrementa contador apenas para usuários no período gratuito
         if access.get("free_messages_remaining") is not None:
             _increment_free_messages(username)
 
-        audio_b64 = await text_to_speech(tts_text)
+        # Envia áudio para o cliente
         if audio_b64:
             await websocket.send_json({"type": "audio_response", "audio": audio_b64, "conversation_id": conv_id})
 
         await websocket.send_json({"type": "stream_end", "conversation_id": conv_id})
         print(f"DEBUG: Resposta enviada com sucesso!")
+
+        # Grava tempo de estudo ~=
+        try:
+            db = get_client()
+            db.table("study_sessions").insert({
+                "username": username,
+                "activity_type": "chat",
+                "duration_minutes": 2  # ~2 min por troca de mensagem
+            }).execute()
+        except Exception as e:
+            print(f"[StudyTime] Erro ao gravar sessão: {e}")
 
     except Exception as e:
         print(f"FATAL ERROR in _handle_chat_message: {e}")

@@ -15,7 +15,7 @@ def _make_conv_id(username: str) -> str:
 
 # ─── Conversations ────────────────────────────────────────────────────────────
 
-async def create_conversation(username: str, title: str = "Nova conversa", model: str = "claude") -> dict:
+async def create_conversation(username: str, title: str = "Nova conversa", model: str = "claude", is_simulation: bool = False) -> dict:
     db = get_client()
     new_id = _make_conv_id(username)
     data = {
@@ -23,6 +23,7 @@ async def create_conversation(username: str, title: str = "Nova conversa", model
         "username": username,
         "title": title,
         "model": model,
+        "is_simulation": is_simulation,
         "created_at": _now(),
         "updated_at": _now(),
     }
@@ -36,6 +37,7 @@ async def list_conversations(username: str) -> list[dict]:
         db.table("conversations")
         .select("id, title, model, created_at, updated_at")
         .eq("username", username)
+        .eq("is_simulation", False)
         .order("updated_at", desc=True)
         .execute()
     )
@@ -81,7 +83,7 @@ async def load_history(conversation_id: str) -> list[dict]:
         # O nome da coluna link no seu banco é session_id (tipo text)
         result = (
             db.table("messages")
-            .select("role, content")
+            .select("role, content, audio_b64")
             .eq("session_id", conversation_id)
             .order("created_at", desc=False)
             .execute()
@@ -92,7 +94,7 @@ async def load_history(conversation_id: str) -> list[dict]:
         return []
 
 
-async def save_message(conversation_id: str, username: str, role: str, content: str) -> dict:
+async def save_message(conversation_id: str, username: str, role: str, content: str, audio_b64: str = None) -> dict:
     try:
         db = get_client()
         now = datetime.now(timezone.utc)
@@ -104,13 +106,18 @@ async def save_message(conversation_id: str, username: str, role: str, content: 
             "content": content,
             "date": now.strftime("%Y-%m-%d"),
         }
-        result = db.table("messages").insert(msg).execute()
         
+        # Salva áudio se fornecido
+        if audio_b64:
+            msg["audio_b64"] = audio_b64
+        
+        result = db.table("messages").insert(msg).execute()
+
         # Atualiza updated_at da conversa
         db.table("conversations").update(
             {"updated_at": _now()}
         ).eq("id", conversation_id).execute()
-        
+
         return result.data[0] if result.data else {}
     except Exception as e:
         print(f"ERROR [save_message]: {e}")

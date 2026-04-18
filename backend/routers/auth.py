@@ -70,6 +70,17 @@ def _build_token_response(user: dict) -> dict:
         "level": user.get("level", "Beginner")
     }
     token = create_access_token(token_payload)
+    
+    # Ativa assinatura automática para usuários especiais
+    from routers.users.permissions import SPECIAL_USERS
+    username = user["username"]
+    if username in SPECIAL_USERS:
+        try:
+            from routers.payments.asaas import _activate_special_user_subscription
+            _activate_special_user_subscription(username, "full")
+        except Exception as e:
+            print(f"[Auth] Erro ao ativar subscription para {username}: {e}")
+    
     return {
         "access_token": token,
         "token_type": "bearer",

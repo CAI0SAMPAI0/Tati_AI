@@ -15,7 +15,7 @@
 <body>
 
   <div class="pay-topbar">
-    <a href="chat.html" class="btn-back">
+    <a href="javascript:void(0)" class="btn-back" onclick="history.back(); return false;">
       <i class="fa-solid fa-arrow-left"></i>
       <span data-i18n="nav.back_chat">Voltar ao Chat</span>
     </a>
@@ -94,9 +94,9 @@
     <div id="cpf-section" style="margin-bottom: 1.5rem;">
       <div class="section-label" data-i18n="payment.cpf_label">CPF ou CNPJ</div>
       <div style="position: relative;">
-        <input type="text" id="user-cpf" placeholder="000.000.000-00" 
+        <input type="text" id="user-cpf" placeholder="000.000.000-00"
           style="width: 100%; padding: 0.85rem 1rem; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; font-size: 1rem;">
-        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; line-height: 1.4;">
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; line-height: 1.4;" data-i18n="payment.cpf_hint">
           Necessário para emissão da nota fiscal e processamento seguro.
         </p>
       </div>
@@ -140,12 +140,12 @@
   <div id="success-modal">
     <div class="success-card">
       <div class="success-icon">🎉</div>
-      <h2>Pagamento Aprovado!</h2>
-      <p>Seu acesso premium foi ativado com sucesso. Bons estudos!</p>
-      <div class="success-plan-badge" id="success-plan-name">Plano Completo</div>
+      <h2 data-i18n="payment.approved_title">Pagamento Aprovado!</h2>
+      <p data-i18n="payment.approved_desc">Seu acesso premium foi ativado com sucesso. Bons estudos!</p>
+      <div class="success-plan-badge" id="success-plan-name" data-i18n="payment.full_plan">Plano Completo</div>
       <a href="chat.html" class="btn-go-chat">
         <i class="fa-solid fa-comments"></i>
-        Ir para o Chat
+        <span data-i18n="payment.go_to_chat">Ir para o Chat</span>
       </a>
     </div>
   </div>

@@ -18,7 +18,7 @@
     <div class="profile-layout">
 
         <header class="profile-topbar">
-            <a href="chat.html" class="btn-back">
+            <a href="javascript:void(0)" class="btn-back" onclick="history.back(); return false;">
                 <i class="fa-solid fa-arrow-left"></i>
                 <span data-i18n="nav.back_chat">Voltar ao Chat</span>
             </a>
@@ -50,11 +50,8 @@
                     </div>
                     <div id="avatar-upload-status" style="display:none;" class="avatar-status"></div>
                 </div>
-                <div class="profile-hero-actions" style="margin-left: auto;">
-                    <a href="payment.html" class="btn-save" style="background: linear-gradient(135deg, #FFD700, #FFA500); color: #000; text-decoration: none;">
-                        <i class="fa-solid fa-crown"></i>
-                        <span>Upgrade to Premium</span>
-                    </a>
+                <div class="profile-hero-actions" style="margin-left: auto;" id="profile-plan-action">
+                    <!-- Será preenchido dinamicamente baseado no plano do usuário -->
                 </div>
             </div>
 
@@ -71,6 +68,29 @@
                 <div class="stat-card">
                     <div class="stat-value" id="stat-days">—</div>
                     <div class="stat-label" data-i18n="profile.days">Dias ativo</div>
+                </div>
+            </div>
+
+            
+
+            <!-- Conteúdo da Aba Perfil -->
+            <div class="profile-tab-content" id="tab-content-profile">
+            <!-- Streak Section -->
+            <div class="streak-section" id="streak-section" style="display:none;">
+                <div class="streak-card">
+                    <div class="streak-header">
+                        <div class="streak-icon" id="streak-icon">🔥</div>
+                        <div class="streak-info">
+                            <div class="streak-label" data-i18n="profile.streak_label">Seu Streak</div>
+                            <div class="streak-count"><span id="streak-count">0</span> <span data-i18n="profile.streak_days">dias</span></div>
+                        </div>
+                        <div class="streak-best">
+                            <div class="streak-best-label" data-i18n="profile.streak_record">Recorde</div>
+                            <div class="streak-best-value" id="streak-longest">0</div>
+                        </div>
+                    </div>
+                    <div class="streak-calendar" id="streak-calendar"></div>
+                    <div class="streak-milestones" id="streak-milestones"></div>
                 </div>
             </div>
 
@@ -192,6 +212,33 @@
                 </section>
 
             </div>
+            </div><!-- fecha tab-content-profile -->
+
+            <!-- Conteúdo da Aba Progresso -->
+            <div class="profile-tab-content" id="tab-content-progress" style="display:none;">
+                <div id="profile-progress-container"></div>
+            </div>
+
+            <!-- Conteúdo da Aba Vocabulário -->
+            <div class="profile-tab-content" id="tab-content-vocab" style="display:none;">
+                <div id="profile-vocab-container"></div>
+            </div>
+
+            <!-- Conteúdo da Aba Metas -->
+            <div class="profile-tab-content" id="tab-content-goals" style="display:none;">
+                <div id="profile-goals-container"></div>
+            </div>
+
+            <!-- Conteúdo da Aba Conquistas -->
+            <div class="profile-tab-content" id="tab-content-trophies" style="display:none;">
+                <div class="trophies-grid" id="profile-trophies-container">
+                    <div class="loading-trophies">
+                        <i class="fa-solid fa-spinner fa-spin"></i>
+                        <p data-i18n="gen.loading">Carregando...</p>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 

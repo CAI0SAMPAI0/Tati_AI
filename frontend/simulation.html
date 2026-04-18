@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="sim.title">Teacher Tati — Simulação de Conversas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+    <link rel="stylesheet" href="/styles/global.css">
+    <link rel="stylesheet" href="/styles/simulation.css">
+    <link rel="icon" type="image/x-icon" href="/assets/images/tati_logo.jpg">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+</head>
+<body>
+    <div class="sim-layout">
+        <header class="sim-topbar">
+            <a href="javascript:void(0)" class="btn-back" onclick="history.back(); return false;">
+                <i class="fa-solid fa-arrow-left"></i>
+                <span data-i18n="nav.back_chat">Voltar ao Chat</span>
+            </a>
+            <div class="topbar-brand-center">
+                <img src="/assets/images/tati_logo.jpg" alt="Tati" class="topbar-logo"
+                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <span class="topbar-logo-fallback" style="display:none;">🧑‍🏫</span>
+                <span class="topbar-title" data-i18n="sim.topbar_title">Simulação</span>
+            </div>
+            <div class="topbar-user" id="topbar-user">
+                <div class="topbar-avatar" id="topbar-avatar">??</div>
+                <span class="topbar-username" id="topbar-username">...</span>
+            </div>
+        </header>
+
+        <main class="sim-content">
+            <div class="sim-header">
+                <div class="sim-header-actions">
+                    <button class="btn-feedback" onclick="openFeedbackModal()" title="Enviar Feedback">
+                        <i class="fa-solid fa-bug"></i>
+                        <span data-i18n="sim.feedback">Feedback</span>
+                    </button>
+                </div>
+                <h1 data-i18n="sim.hero_title">🎭 Simulação de Conversas Reais</h1>
+                <p data-i18n="sim.hero_subtitle">Escolha um cenário e pratique inglês em situações do dia a dia</p>
+            </div>
+
+            <!-- Modo de interação -->
+            <div class="sim-mode-selector">
+                <button class="mode-btn active" data-mode="text" onclick="setSimMode('text')">
+                    <i class="fa-solid fa-keyboard"></i>
+                    <span data-i18n="sim.mode_text">Chat</span>
+                </button>
+                <button class="mode-btn" data-mode="voice" onclick="setSimMode('voice')">
+                    <i class="fa-solid fa-microphone"></i>
+                    <span data-i18n="sim.mode_voice">Voz</span>
+                </button>
+                <button class="mode-btn" data-mode="both" onclick="setSimMode('both')">
+                    <i class="fa-solid fa-shuffle"></i>
+                    <span data-i18n="sim.mode_both">Ambos</span>
+                </button>
+            </div>
+
+            <!-- Cenários predefinidos -->
+            <div class="sim-section-label" data-i18n="sim.scenarios_label">Cenários Prontos</div>
+            <div class="sim-scenarios-grid" id="scenarios-grid">
+                <div class="sim-loading">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <p data-i18n="gen.loading">Carregando...</p>
+                </div>
+            </div>
+
+            <!-- Botão para cenário aleatório -->
+            <div class="sim-random-section">
+                <button class="btn-random-sim" onclick="startRandomSimulation()">
+                    <i class="fa-solid fa-dice"></i>
+                    <span data-i18n="sim.random_btn">Cenário Aleatório</span>
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal de Feedback -->
+    <div class="modal-overlay" id="feedback-modal" style="display: none;">
+        <div class="feedback-modal-panel">
+            <div class="feedback-modal-header">
+                <h3><i class="fa-solid fa-bug"></i> <span data-i18n="feedback.title">Enviar Feedback</span></h3>
+                <button class="btn-close" onclick="closeFeedbackModal()">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            <div class="feedback-modal-body">
+                <div class="feedback-field">
+                    <label data-i18n="feedback.category">Categoria</label>
+                    <select id="feedback-category">
+                        <option value="bug">🐛 Bug/Erro</option>
+                        <option value="feature">💡 Sugestão de Recurso</option>
+                        <option value="feedback">💬 Feedback Geral</option>
+                        <option value="other">📝 Outros</option>
+                    </select>
+                </div>
+                <div class="feedback-field">
+                    <label data-i18n="feedback.message">Mensagem</label>
+                    <textarea id="feedback-message" rows="5" placeholder="Descreva o problema, sugestão ou feedback..."></textarea>
+                </div>
+                <div id="feedback-status" class="feedback-status" style="display: none;"></div>
+            </div>
+            <div class="feedback-modal-footer">
+                <button class="btn-feedback-cancel" onclick="closeFeedbackModal()" data-i18n="feedback.cancel">Cancelar</button>
+                <button class="btn-feedback-send" onclick="sendFeedback()" data-i18n="feedback.send">Enviar Feedback</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Simulação -->
+    <div class="modal-overlay" id="sim-modal" style="display: none;">
+        <div class="sim-modal">
+            <div class="sim-modal-header">
+                <div class="sim-modal-icon" id="sim-icon">🛫</div>
+                <div class="sim-modal-info">
+                    <h3 id="sim-title">No Aeroporto</h3>
+                    <p id="sim-diff" class="sim-diff">Intermediário</p>
+                </div>
+                <div class="sim-modal-controls">
+                    <button class="btn-sim-mode-toggle" id="btn-sim-mode" onclick="toggleSimMode()" title="Alternar Chat/Voz">
+                        <i class="fa-solid fa-keyboard"></i>
+                    </button>
+                    <button class="btn-close" onclick="closeSimulation()">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="sim-modal-body">
+                <!-- User info -->
+                <div class="sim-user-info" id="sim-user-info">
+                    <div class="sim-user-avatar">??</div>
+                    <span class="sim-user-name">Carregando...</span>
+                </div>
+                
+                <div class="sim-chat-area" id="sim-chat-area">
+                    <div class="sim-welcome">
+                        <i class="fa-solid fa-comments"></i>
+                        <p data-i18n="sim.chat_welcome">Clique em "Iniciar" para começar a simulação</p>
+                    </div>
+                </div>
+
+                <!-- Indicador de digitação -->
+                <div id="sim-typing" class="typing-indicator" style="display: none; margin-bottom: 1rem;">
+                    <span></span><span></span><span></span>
+                </div>
+                
+                <!-- Input de texto -->
+                <div class="sim-input-area" id="sim-input-area" style="display:none;">
+                    <input type="text" id="sim-text-input" data-i18n-placeholder="sim.input_ph" placeholder="Digite sua mensagem..." onkeypress="if(event.key==='Enter')sendSimMessage()">
+                    <button class="btn-send-sim" onclick="sendSimMessage()">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+                
+                <!-- Botão de gravação de voz -->
+                <div class="sim-voice-area" id="sim-voice-area" style="display:none;">
+                    <button class="btn-sim-mic" id="btn-sim-mic" onclick="toggleSimRecording()">
+                        <i class="fa-solid fa-microphone"></i>
+                        <span data-i18n="sim.record">Gravar</span>
+                    </button>
+                    <p class="sim-voice-hint" data-i18n="sim.record_hint">Clique para gravar sua voz</p>
+                </div>
+            </div>
+            <div class="sim-modal-footer">
+                <button class="btn-start-sim" onclick="startSimulation()" id="btn-start" data-i18n="sim.start">Iniciar Simulação</button>
+                <button class="btn-end-sim" onclick="endSimulation()" id="btn-end" style="display:none;" data-i18n="sim.end">Finalizar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/i18n.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/simulation.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+</body>
+</html>

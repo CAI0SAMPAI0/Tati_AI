@@ -1,7 +1,7 @@
 if (!requireAuth()) throw new Error('Unauthenticated');
 const _dashUser = getUser();
 if (!isStaff(_dashUser)) {
-  alert('Acesso negado. Área restrita a professores.');
+  showToast('Acesso negado. Área restrita a professores.', 'error');
   window.location.href = '/chat.html';
 }
 
@@ -44,6 +44,7 @@ const SECTIONS = {
   modules: { title: () => t('mod.title'), sub: () => t('mod.subtitle') },
   flashcards: { title: () => t('mod.section_flashcards'), sub: () => t('mod.fc_manage_sub') },
   submissions: { title: () => t('dash.submissions'), sub: () => t('dash.submissions_sub') },
+  simulations: { title: () => '🎭 ' + (t('dash.simulations') || 'Simulações'), sub: () => 'Gerencie simulações de conversas reais' },
 };
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -94,6 +95,7 @@ function setSection(name, el) {
   if (name === 'overview') _loadOverview();
   if (name === 'submissions') _loadSubmissions();
   if (name === 'flashcards') _loadFlashcards();
+  if (name === 'simulations') _loadSimulations();
 }
 
 // ── Flashcards ──────────────────────────────────────────────────────────────
@@ -239,7 +241,7 @@ async function openCorrectionModal(subId) {
         </div>
       </div>`;
     document.body.appendChild(modal);
-  } catch (e) { alert(t('gen.error')); }
+  } catch (e) { showToast('Erro ao carregar submissão.', 'error'); }
 }
 
 async function aiCorrectSubmission(subId) {
@@ -257,7 +259,7 @@ async function aiCorrectSubmission(subId) {
       aiText.value = res.data.ai_feedback;
       scoreInput.value = res.data.score;
     }
-  } catch (e) { alert(t('gen.error')); }
+  } catch (e) { showToast('Erro ao corrigir com IA.', 'error'); }
   finally {
     btn.disabled = false;
     btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> ${t('dash.ai_suggest')}`;
@@ -513,7 +515,7 @@ function confirmDeleteStudent(username) {
 
 async function _deleteStudent(username) {
   const { ok } = await apiDelete(`/dashboard/students/${encodeURIComponent(username)}`);
-  if (!ok) { alert('Erro ao excluir aluno. Tente novamente.'); return; }
+  if (!ok) { showToast('Erro ao excluir aluno. Tente novamente.', 'error'); return; }
   closeStudentModal();
   allStudents = allStudents.filter(s => s.username !== username);
   _renderStudentsTable('students-table', allStudents);
@@ -885,3 +887,139 @@ function _formatDate(iso) {
   try { return new Date(iso).toLocaleDateString(I18n.getLang(), { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch { return iso || '—'; } 
 }
 function logout() { authLogout(); }
+
+// ── Simulations Management ──────────────────────────────────────────────────
+
+async function _loadSimulations() {
+  const grid = document.getElementById('simulations-grid');
+  if (!grid) return;
+  grid.innerHTML = '<div class="mod-empty"><i class="fa-solid fa-spinner fa-spin"></i></div>';
+  
+  try {
+    const data = await apiGet('/dashboard/simulations');
+    const sims = data.simulations || [];
+    
+    if (sims.length === 0) {
+      grid.innerHTML = '<div class="mod-empty"><i class="fa-solid fa-theater-masks"></i><p>Nenhuma simulação criada.</p></div>';
+      return;
+    }
+    
+    grid.innerHTML = sims.map(s => `
+      <div class="simulation-admin-card">
+        <div class="sim-admin-icon">${s.icon || '🎭'}</div>
+        <div class="sim-admin-info">
+          <h4>${s.name}</h4>
+          <p class="sim-admin-desc">${s.description || ''}</p>
+          <div class="sim-admin-meta">
+            <span class="sim-diff-badge">${(s.levels || []).join(', ') || s.difficulty}</span>
+            <span class="sim-admin-by">por ${s.created_by || '—'}</span>
+          </div>
+        </div>
+        <div class="sim-admin-actions">
+          <button class="btn-sim-edit" onclick="openSimModal('${s.id}')" title="Editar">
+            <i class="fa-solid fa-pen"></i>
+          </button>
+          <button class="btn-sim-delete" onclick="deleteSimulation('${s.id}')">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    grid.innerHTML = '<div class="mod-empty"><i class="fa-solid fa-exclamation-circle"></i><p>Erro ao carregar simulações.</p></div>';
+  }
+}
+
+let editingSimId = null;
+
+async function openSimModal(simId = null) {
+  editingSimId = simId;
+  const modal = document.getElementById('create-sim-modal');
+  const modalTitle = document.getElementById('sim-modal-title');
+  modal.style.display = 'flex';
+  
+  if (simId) {
+    modalTitle.textContent = t('dash.edit_simulation');
+  } else {
+    modalTitle.textContent = t('dash.new_simulation');
+  }
+  
+  // Reset form
+  document.getElementById('sim-name').value = '';
+  document.getElementById('sim-name-en').value = '';
+  document.getElementById('sim-desc').value = '';
+  document.getElementById('sim-desc-en').value = '';
+  document.getElementById('sim-initial-msg').value = '';
+  document.getElementById('sim-initial-msg-en').value = '';
+  document.getElementById('sim-icon').value = '🎭';
+  document.getElementById('sim-prompt').value = '';
+  document.querySelectorAll('input[name="sim-level"]').forEach(cb => cb.checked = false);
+
+  if (simId) {
+    try {
+      const data = await apiGet(`/dashboard/simulations/${simId}`);
+      if (data) {
+        document.getElementById('sim-name').value = data.name || '';
+        document.getElementById('sim-name-en').value = data.name_en || '';
+        document.getElementById('sim-desc').value = data.description || '';
+        document.getElementById('sim-desc-en').value = data.description_en || '';
+        document.getElementById('sim-initial-msg').value = data.initial_message || '';
+        document.getElementById('sim-initial-msg-en').value = data.initial_message_en || '';
+        document.getElementById('sim-icon').value = data.icon || '🎭';
+        document.getElementById('sim-prompt').value = data.system_prompt || '';
+        
+        const lvls = data.levels || [data.difficulty];
+        document.querySelectorAll('input[name="sim-level"]').forEach(cb => {
+          if (lvls.includes(cb.value)) cb.checked = true;
+        });
+      }
+    } catch (e) { console.error('Erro ao buscar simulação:', e); }
+  }
+}
+
+async function saveSimulation() {
+  const levels = Array.from(document.querySelectorAll('input[name="sim-level"]:checked')).map(cb => cb.value);
+  const payload = {
+    name: document.getElementById('sim-name').value.trim(),
+    name_en: document.getElementById('sim-name-en').value.trim(),
+    description: document.getElementById('sim-desc').value.trim(),
+    description_en: document.getElementById('sim-desc-en').value.trim(),
+    initial_message: document.getElementById('sim-initial-msg').value.trim(),
+    initial_message_en: document.getElementById('sim-initial-msg-en').value.trim(),
+    icon: document.getElementById('sim-icon').value.trim() || '🎭',
+    levels,
+    system_prompt: document.getElementById('sim-prompt').value.trim()
+  };
+
+  if (!payload.name || !payload.description) {
+    showToast('Preencha pelo menos o nome e a descrição em português.', 'warning');
+    return;
+  }
+
+  try {
+    if (editingSimId) {
+      await apiPut(`/dashboard/simulations/${editingSimId}`, payload);
+    } else {
+      await apiPost('/dashboard/simulations', payload);
+    }
+    closeCreateSimulationModal();
+    _loadSimulations();
+  } catch (e) {
+    showToast('Erro ao salvar simulação. Tente novamente.', 'error');
+  }
+}
+
+function closeCreateSimulationModal() {
+  document.getElementById('create-sim-modal').style.display = 'none';
+  editingSimId = null;
+}
+
+async function deleteSimulation(simId) {
+  if (!confirm('Tem certeza que deseja excluir esta simulação?')) return;
+  try {
+    await apiDelete(`/dashboard/simulations/${simId}`);
+    _loadSimulations();
+  } catch (e) {
+    showToast('Erro ao excluir simulação.', 'error');
+  }
+}

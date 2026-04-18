@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tati AI — Pagamento Confirmado</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+  <link rel="stylesheet" href="/styles/global.css">
+  <link rel="stylesheet" href="/styles/receipt.css">
+  <link rel="icon" type="image/x-icon" href="/assets/images/tati_logo.jpg">
+
+</head>
+<body>
+  <div class="receipt-container">
+    <div class="receipt-card">
+      <div class="receipt-icon">
+        <i class="fa-solid fa-check"></i>
+      </div>
+
+      <h1 class="receipt-title">Pagamento Confirmado! 🎉</h1>
+      <p class="receipt-subtitle">Seu acesso premium foi ativado com sucesso</p>
+
+      <div class="receipt-details" id="receipt-details">
+        <div class="receipt-row">
+          <span class="receipt-label">Plano</span>
+          <span class="receipt-value" id="receipt-plan">Carregando...</span>
+        </div>
+        <div class="receipt-row">
+          <span class="receipt-label">Status</span>
+          <span class="receipt-value highlight" id="receipt-status">✓ Ativo</span>
+        </div>
+        <div class="receipt-row">
+          <span class="receipt-label">Data de pagamento</span>
+          <span class="receipt-value" id="receipt-date">—</span>
+        </div>
+        <div class="receipt-row">
+          <span class="receipt-label">Próximo vencimento</span>
+          <span class="receipt-value" id="receipt-due">—</span>
+        </div>
+      </div>
+
+      <div class="receipt-actions">
+        <a href="chat.html" class="receipt-btn receipt-btn-primary">
+          <i class="fa-solid fa-comments"></i>
+          Ir para o Chat
+        </a>
+        <a href="profile.html" class="receipt-btn receipt-btn-secondary">
+          <i class="fa-solid fa-user"></i>
+          Ver Perfil
+        </a>
+      </div>
+
+      <div class="receipt-footer">
+        <p>💡 <strong>Dica:</strong> Agora você tem acesso completo a todas as funcionalidades!</p>
+        <p style="margin-top: 0.5rem;">Aproveite seus estudos com a Teacher Tati 🧑‍🏫</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Confetti effect
+    function createConfetti() {
+      const colors = ['#4ade80', '#a78bfa', '#60a5fa', '#FFD700', '#FFA500'];
+      for (let i = 0; i < 30; i++) {
+        setTimeout(() => {
+          const confetti = document.createElement('div');
+          confetti.className = 'confetti';
+          confetti.style.left = Math.random() * 100 + 'vw';
+          confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+          confetti.style.animationDelay = Math.random() * 2 + 's';
+          document.body.appendChild(confetti);
+          
+          setTimeout(() => confetti.remove(), 5000);
+        }, i * 100);
+      }
+    }
+
+    // Load receipt data
+    window.addEventListener('DOMContentLoaded', () => {
+      createConfetti();
+
+      // Get data from URL params or localStorage
+      const params = new URLSearchParams(window.location.search);
+      const planType = params.get('plan') || 'full';
+      const paymentDate = params.get('date') || new Date().toLocaleDateString('pt-BR');
+      const dueDate = params.get('due') || '—';
+
+      document.getElementById('receipt-plan').textContent = 
+        planType === 'full' ? '👑 Plano Completo' : '💬 Chat & Voice';
+      document.getElementById('receipt-date').textContent = paymentDate;
+      document.getElementById('receipt-due').textContent = dueDate;
+
+      // Clear poll success flag
+      localStorage.removeItem('payment_just_confirmed');
+    });
+  </script>
+</body>
+</html>

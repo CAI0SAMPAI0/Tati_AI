@@ -115,20 +115,37 @@ async def submit_quiz(
     module_id = quiz_row[0]["module_id"] if quiz_row else None
 
     # Salva/atualiza progresso (upsert)
-    db.table("user_progress").upsert(
-        {
+    try:
+        db.table("user_progress").insert(
+            {
+                "username": username,
+                "quiz_id": quiz_id,
+                "module_id": module_id,
+                "score": score,
+                "total_q": total_q,
+                "correct_q": correct_q,
+            }
+        ).execute()
+    except Exception as e:
+        print(f"[Progress] Erro ao salvar: {e}")
+
+    # Registra ação para Ranking e contagem de tentativas
+    try:
+        db.table("study_sessions").insert({
             "username": username,
-            "quiz_id": quiz_id,
-            "module_id": module_id,
-            "score": score,
-            "total_q": total_q,
-            "correct_q": correct_q,
-        },
-        on_conflict="username,quiz_id",
-    ).execute()
+            "activity_type": "quiz",
+            "duration_minutes": 1.25, # Tempo estimado por quiz
+            "quiz_id": quiz_id
+        }).execute()
+    except Exception as e:
+        print(f"[Quiz Action] Erro: {e}")
 
     # Distribui troféus
     trophies_earned = await _check_trophies(username, score, db)
+    
+    # Atualiza ofensiva (streak)
+    from services.streaks import record_study_day
+    record_study_day(username)
 
     return {
         "score": score,
@@ -276,67 +293,71 @@ Rules:
 
 TROPHY_DEFINITIONS = [
     {
-        "type": "perfect_score",
-        "title": "Perfect Score!",
-        "icon": "🏆",
-        "condition": lambda score, total_done: score == 100,
+        "name": "Primeiro Quiz",
+        "condition": lambda score, total_done: total_done >= 1,
     },
     {
-        "type": "activities_5",
-        "title": "5 Activities Done",
-        "icon": "⭐",
+        "name": "Quizzer Iniciante",
         "condition": lambda score, total_done: total_done >= 5,
     },
     {
-        "type": "activities_10",
-        "title": "10 Activities Done",
-        "icon": "🌟",
+        "name": "Quizzer",
         "condition": lambda score, total_done: total_done >= 10,
     },
     {
-        "type": "activities_25",
-        "title": "25 Activities Done",
-        "icon": "💎",
-        "condition": lambda score, total_done: total_done >= 25,
+        "name": "Mestre dos Quizzes",
+        "condition": lambda score, total_done: total_done >= 50,
     },
 ]
 
 
 async def _check_trophies(username: str, score: int, db) -> list[dict]:
     """Verifica e distribui troféus que o aluno ainda não tem."""
-    # Total de atividades concluídas
-    progress = (
-        db.table("user_progress")
-        .select("id")
-        .eq("username", username)
-        .execute()
-        .data
-    )
-    total_done = len(progress)
+    try:
+        # Total de atividades concluídas
+        progress = (
+            db.table("user_progress")
+            .select("id")
+            .eq("username", username)
+            .execute()
+            .data
+        )
+        total_done = len(progress)
 
-    # Troféus já conquistados
-    existing = (
-        db.table("trophies")
-        .select("type")
-        .eq("username", username)
-        .execute()
-        .data
-    )
-    existing_types = {t["type"] for t in existing}
+        # Troféus já conquistados pelo usuário
+        existing = (
+            db.table("user_trophies")
+            .select("trophy_id")
+            .eq("username", username)
+            .execute()
+            .data
+        )
+        existing_trophy_ids = {t["trophy_id"] for t in existing}
 
-    earned = []
-    for trophy in TROPHY_DEFINITIONS:
-        if trophy["type"] in existing_types:
-            continue
-        if trophy["condition"](score, total_done):
-            db.table("trophies").insert(
-                {
-                    "username": username,
-                    "type": trophy["type"],
-                    "title": trophy["title"],
-                    "icon": trophy["icon"],
-                }
-            ).execute()
-            earned.append({"type": trophy["type"], "title": trophy["title"], "icon": trophy["icon"]})
+        # Busca definições de troféus do banco para pegar os UUIDs
+        all_trophies = db.table("trophies").select("id, name, icon").execute().data or []
+        trophy_map = {t["name"]: t for t in all_trophies}
 
-    return earned
+        earned = []
+        for defn in TROPHY_DEFINITIONS:
+            t_info = trophy_map.get(defn["name"])
+            if not t_info:
+                continue
+
+            t_id = t_info["id"]
+            if t_id in existing_trophy_ids:
+                continue
+
+            if defn["condition"](score, total_done):
+                db.table("user_trophies").insert(
+                    {
+                        "username": username,
+                        "trophy_id": t_id,
+                    }
+                ).execute()
+                earned.append({"title": t_info["name"], "icon": t_info["icon"]})
+
+        return earned
+    except Exception as e:
+        print(f"[Trophies] Erro ao verificar: {e}")
+        return []

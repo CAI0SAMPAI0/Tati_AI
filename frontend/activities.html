@@ -4,210 +4,566 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title data-i18n="act.title">Tati AI — Atividades</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <title>Tati AI — Atividades</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
         crossorigin="anonymous">
-    <link rel="stylesheet" href="styles/global.css">
-    <link rel="stylesheet" href="styles/activities.css">
     <link rel="icon" type="image/x-icon" href="/assets/images/tati_logo.jpg">
-    <style>
-        .btn-back-home {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: var(--text-muted);
-            text-decoration: none;
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-bottom: 1.5rem;
-            transition: 0.2s;
-            width: fit-content;
-        }
-        .btn-back-home:hover { color: var(--primary); }
-
-        /* Estilo para o bloqueio de acesso */
-        .access-denied-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            padding: 4rem 2rem;
-            background: var(--surface);
-            border-radius: 20px;
-            border: 1px solid var(--border);
-            margin-top: 2rem;
-        }
-        .access-denied-icon {
-            font-size: 4rem;
-            color: var(--primary);
-            margin-bottom: 1.5rem;
-            opacity: 0.8;
-        }
-        .access-denied-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-            color: var(--text);
-        }
-        .access-denied-text {
-            color: var(--text-muted);
-            max-width: 400px;
-            line-height: 1.6;
-        }
-    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <link rel="stylesheet" href="styles/activities.css">
 </head>
 
 <body>
-    <div class="act-layout" id="main-content" style="display:none;">
-        <!-- Botão Voltar -->
-        <a href="chat.html" class="btn-back-home">
-            <i class="fa-solid fa-chevron-left"></i>
-            <span data-i18n="nav.back_chat">Voltar ao Chat</span>
-        </a>
 
-        <!-- Topbar Aluno -->
-        <header class="act-header">
-            <div class="act-title">
-                <h1 data-i18n="act.hero_title">Suas Atividades</h1>
-                <p data-i18n="act.hero_subtitle">Pratique no seu ritmo</p>
+    <!-- ── HEADER ─ -->
+    <header class="topbar">
+        <div class="topbar-left">
+            <button class="btn-menu" id="btn-menu-open" onclick="openSidebar()"><i class="fa-solid fa-bars"></i></button>
+            <div class="topbar-logo">Teacher<span>Tati</span></div>
+        </div>
+
+        <div class="topbar-right">
+            <div class="beta-group">
+                <button class="btn-beta">Beta</button>
+                <button class="btn-feedback" onclick="openFeedbackModal()">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                </button>
             </div>
-            <div style="display:flex;align-items:center;gap:0.75rem;">
-                <div id="trophy-count"
-                    style="display:none;align-items:center;gap:0.4rem;background:hsla(45,100%,58%,0.1);padding:0.35rem 0.65rem;border-radius:999px;border:1px solid hsla(45,100%,58%,0.2);color:#f59e0b;font-weight:700;font-size:0.85rem;">
-                    🏆 <span id="trophy-num">0</span>
-                </div>
-                <span class="user-level-badge" id="user-level-badge">...</span>
-                <a href="profile.html" style="text-decoration:none;">
-                    <div class="user-avatar" id="topbar-avatar"
-                        style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#4c1d95);color:white;font-size:0.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;">
-                        ??</div>
+
+            <div class="topbar-stat streak-stat">
+                <i class="fa-solid fa-fire"></i>
+                <span id="streak-count-text">0</span>
+            </div>
+
+            <div class="topbar-stat trophy">
+                <i class="fa-solid fa-trophy"></i>
+                <span id="trophy-count-text">0/50</span>
+            </div>
+
+            <button class="btn-notif">
+                <i class="fa-regular fa-bell"></i>
+                <span class="notif-dot"></span>
+            </button>
+
+            <div class="user-pill" onclick="window.location.href='chat.html'">
+                <span class="user-name" id="header-user-name">Usuário</span>
+                <img class="user-avatar-img" id="header-user-avatar-img" src="" alt="" style="display:none;"
+                    onerror="this.style.display='none'; document.getElementById('header-user-avatar').style.display='flex';">
+                <div class="user-avatar" id="header-user-avatar" style="display:none;">?</div>
+            </div>
+        </div>
+    </header>
+
+    <div class="app-body">
+        <!-- ── SIDEBAR ── -->
+        <aside class="sidebar closed" id="sidebar">
+            <div class="sidebar-header">
+                <span data-i18n="act.sidebar_menu">Menu Principal</span>
+                <button class="btn-close-sidebar" id="btn-menu-close" onclick="closeSidebarNav()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="javascript:void(0)" class="nav-item active" id="nav-activities"
+                    onclick="switchSection('activities')">
+                    <i class="fa-solid fa-book-open"></i> <span data-i18n="act.nav_activities">Atividades</span>
+                </a>
+                <a href="javascript:void(0)" class="nav-item" id="nav-profile" onclick="switchSection('profile')">
+                    <i class="fa-regular fa-user"></i> <span data-i18n="act.nav_profile">Meu Perfil</span>
+                </a>
+                <a href="javascript:void(0)" class="nav-item" id="nav-achievements"
+                    onclick="switchSection('achievements')">
+                    <i class="fa-solid fa-trophy"></i> <span data-i18n="act.nav_achievements">Conquistas</span>
+                </a>
+                <a href="javascript:void(0)" class="nav-item" id="nav-competitions"
+                    onclick="switchSection('competitions')">
+                    <i class="fa-solid fa-chart-line"></i> <span data-i18n="act.nav_competitions">Competições</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <a href="chat.html" class="nav-item logout">
+                    <i class="fa-solid fa-right-from-bracket"></i> <span data-i18n="act.nav_logout">Sair</span>
                 </a>
             </div>
-        </header>
+        </aside>
 
-        <!-- Tabs Principais -->
-        <nav class="act-tabs">
-            <button class="act-tab active" onclick="switchTab('quiz', this)">
-                <i class="fa-solid fa-circle-question"></i>
-                <span data-i18n="act.tab_quiz">Quiz</span>
-                <span class="tab-badge" id="tab-count-quiz">0</span>
-            </button>
-            <button class="act-tab" onclick="switchTab('flashcards', this)">
-                <i class="fa-solid fa-layer-group"></i>
-                <span data-i18n="act.tab_flashcards">Flash Cards</span>
-                <span class="tab-badge" id="tab-count-flashcards">0</span>
-            </button>
-            <button class="act-tab" onclick="switchTab('exercises', this)">
-                <i class="fa-solid fa-pen-to-square"></i>
-                <span data-i18n="act.tab_exercises">Exercícios</span>
-                <span class="tab-badge" id="tab-count-exercises">0</span>
-            </button>
-        </nav>
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebarNav()"></div>
 
-        <!-- Filtros e Busca -->
-        <div class="act-filters">
-            <select class="filter-select" id="filter-course" onchange="applyFilters()">
-                <option value="" data-i18n="act.all_modules">Todos os módulos</option>
-            </select>
-            <input type="text" class="search-input" id="search-input" data-i18n-placeholder="act.search_ph"
-                placeholder="Buscar atividade..." oninput="applyFilters()">
-        </div>
+        <!-- ── MAIN CONTENT ── -->
+        <main class="main-content expanded">
 
-        <!-- Conteúdo das Abas -->
-        <div id="panel-quiz" class="act-panel">
-            <div class="quiz-list" id="quiz-list">
-                <div class="loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
-            </div>
-        </div>
-
-        <div id="panel-flashcards" class="act-panel" style="display:none;">
-            <div class="flashcard-section" id="flashcard-section"></div>
-        </div>
-
-        <div id="panel-exercises" class="act-panel" style="display:none;">
-            <div class="exercise-list" id="exercise-list"></div>
-        </div>
-    </div>
-
-    <!-- Modal Módulo -->
-    <div class="module-overlay" id="module-overlay" style="display:none;">
-        <div class="module-modal">
-            <div class="module-modal-header">
-                <h2 id="module-modal-title">...</h2>
-                <button class="btn-close-mod" onclick="closeModule()"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="module-modal-body" id="module-modal-body"></div>
-            <div class="module-modal-footer">
-                <button class="btn-primary" id="btn-start-quiz-from-mod" onclick="startQuizFromModule()"
-                    style="width:100%; justify-content:center;">
-                    <i class="fa-solid fa-circle-question"></i> <span data-i18n="act.btn_start">Iniciar Quiz</span>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Quiz -->
-    <div class="quiz-overlay" id="quiz-overlay" style="display:none;">
-        <div class="quiz-modal">
-            <header class="quiz-header">
-                <div class="quiz-title" id="quiz-modal-title">Quiz</div>
-                <div class="quiz-progress">
-                    <div class="quiz-progress-bar" id="quiz-progress-fill"></div>
+            <!-- SEÇÃO: ATIVIDADES -->
+            <div id="section-activities" class="content-section active">
+                <div class="section-header">
+                    <h2 data-i18n="act.title">Minhas Atividades</h2>
+                    <p data-i18n="act.hero_subtitle">Pratique vocabulário,s gramática e pronúncia. Ganhe pontos no ranking!</p>
                 </div>
-                <div class="quiz-q-counter" id="quiz-progress-text">1/5</div>
-                <button class="btn-close-quiz" onclick="closeQuiz()"><i class="fa-solid fa-xmark"></i></button>
+
+                <!-- Abas de Atividades -->
+                <nav class="sub-tabs">
+                    <button class="tab-btn active" onclick="switchSubTab('quiz')">
+                        <i class="fa-solid fa-circle-question"></i> <span data-i18n="act.tab_quiz">Quizzes</span>
+                    </button>
+                    <button class="tab-btn" onclick="switchSubTab('flashcards')">
+                        <i class="fa-solid fa-layer-group"></i> <span data-i18n="act.tab_flashcards">Flashcards</span>
+                    </button>
+                    <button class="tab-btn" onclick="switchSubTab('atividades')">
+                        <i class="fa-solid fa-microphone"></i> <span data-i18n="act.tab_exercises">Exercícios</span>
+                    </button>
+                    <button class="tab-btn" onclick="switchSubTab('simulations')">
+                        <i class="fa-solid fa-theater-masks"></i> <span data-i18n="act.tab_simulations">Simulações</span>
+                    </button>
+                </nav>
+
+                <!-- TAB: QUIZZES -->
+                <div id="sub-content-quiz" class="sub-panel active">
+                    <div class="quiz-grid" id="quiz-list-container">
+                        <!-- Quiz cards serão carregados aqui -->
+                    </div>
+                </div>
+
+                <!-- TAB: FLASHCARDS -->
+                <div id="sub-content-flashcards" class="sub-panel">
+                    <div class="empty-view">
+                        <i class="fa-solid fa-layer-group"></i>
+                        <h3 data-i18n="act.fc_empty_title">Flashcards Personalizados</h3>
+                        <p data-i18n="act.fc_empty_sub">Seus flashcards de vocabulário serão gerados aqui em breve.</p>
+                    </div>
+                </div>
+
+                <!-- TAB: Atividades -->
+                <div id="sub-content-atividades" class="sub-panel">
+                    <div class="empty-view">
+                        <i class="fa-solid fa-notebook"></i>
+                        <h3 data-i18n="act.ex_empty_title">Exercícios</h3>
+                        <p data-i18n="act.ex_empty_sub">Pratique atividades com feedback da Tati.</p>
+                    </div>
+                </div>
+
+                <!-- TAB: SIMULAÇÕES -->
+                <div id="sub-content-simulations" class="sub-panel">
+                    <div class="empty-view">
+                        <i class="fa-solid fa-theater-masks"></i>
+                        <h3 data-i18n="act.sim_empty_title">Simulações de Conversas</h3>
+                        <p data-i18n="act.sim_empty_sub">Pratique situações reais como aeroporto, restaurante e entrevistas de emprego.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SEÇÃO: MEU PERFIL -->
+            <div id="section-profile" class="content-section">
+                <div class="section-header">
+                    <h2 data-i18n="act.profile_title">Meu Perfil</h2>
+                    <p data-i18n="act.profile_sub">Acompanhe seu progresso no aprendizado de inglês.</p>
+                </div>
+
+                <!-- Atividades Pendentes -->
+                <div class="profile-card pending-card">
+                    <h3><i class="fa-solid fa-list-check"></i> <span data-i18n="act.pending_title">Atividades Pendentes</span></h3>
+                    <p class="card-subtitle"><span data-i18n="act.pending_sub_prefix">Você tem</span> <strong id="pending-count">0</strong> <span data-i18n="act.pending_sub_suffix">atividades para completar</span></p>
+                    <div id="pending-activities-list" class="pending-list"></div>
+                </div>
+
+                <!-- Tempo de Estudo -->
+                <div class="profile-card study-time-card">
+                    <h3><i class="fa-solid fa-clock"></i> <span data-i18n="act.study_time_title">Tempo de Estudo</span></h3>
+                    <div class="study-time-grid">
+                        <div class="time-block">
+                            <div class="time-icon"><i class="fa-solid fa-calendar-week"></i></div>
+                            <div class="time-label" data-i18n="act.this_week">Esta Semana</div>
+                            <div class="time-value" id="study-week">0h 0m</div>
+                            <div class="time-badge" data-i18n="act.current_badge">Atual</div>
+                        </div>
+                        <div class="time-block">
+                            <div class="time-icon"><i class="fa-solid fa-calendar"></i></div>
+                            <div class="time-label" data-i18n="act.this_month">Este Mês</div>
+                            <div class="time-value" id="study-month">0h 0m</div>
+                            <div class="time-badge" data-i18n="act.current_badge">Atual</div>
+                        </div>
+                        <div class="time-block">
+                            <div class="time-icon"><i class="fa-solid fa-calendar-minus"></i></div>
+                            <div class="time-label" data-i18n="act.last_month">Mês Anterior</div>
+                            <div class="time-value" id="study-last-month">0h 0m</div>
+                        </div>
+                        <div class="time-block">
+                            <div class="time-icon"><i class="fa-solid fa-calendar-days"></i></div>
+                            <div class="time-label" data-i18n="act.last_3_months">Últimos 3 Meses</div>
+                            <div class="time-value" id="study-3months">0h 0m</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SEÇÃO: CONQUISTAS -->
+            <div id="section-achievements" class="content-section">
+                <div class="section-header">
+                    <h2 data-i18n="act.achievements_title">Minhas Conquistas</h2>
+                    <p data-i18n="act.achievements_sub">Marcos alcançados na sua jornada de aprendizado.</p>
+                </div>
+
+                <!-- Resumo -->
+                <div class="achievements-summary">
+                    <!-- Ofensiva -->
+                    <div class="ach-card streak-card">
+                        <div class="streak-visual">
+                            <div class="streak-flame">🔥</div>
+                            <div class="streak-status-badge" id="streak-status-label" data-i18n="act.streak_inactive">INATIVO</div>
+                        </div>
+                        <div class="ach-card-info">
+                            <div class="streak-big-number" id="streak-val">0</div>
+                            <div class="streak-big-label" data-i18n="act.streak_days_label">dias de ofensiva</div>
+                            <div class="streak-stats">
+                                <div class="streak-stat">
+                                    <span class="streak-stat-label" data-i18n="act.streak_longest_label">Maior ofensiva</span>
+                                    <span class="streak-stat-value" id="streak-longest">0 dias</span>
+                                </div>
+                                <div class="streak-stat">
+                                    <span class="streak-stat-label" data-i18n="act.total_questions_label">Total de perguntas</span>
+                                    <span class="streak-stat-value" id="streak-questions">0</span>
+                                </div>
+                                <div class="streak-stat">
+                                    <span class="streak-stat-label" data-i18n="act.hours_saved_label">Horas economizadas</span>
+                                    <span class="streak-stat-value" id="streak-hours">0,0h</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- progresso de Troféus -->
+                    <div class="ach-card progress-card">
+                        <div class="progress-header">
+                            <h3 data-i18n="act.trophy_progress_title">Progresso de Troféus</h3>
+                            <div class="progress-count">
+                                <span class="count-number" id="trophy-count">0</span>
+                                <span class="count-total">/50</span>
+                            </div>
+                        </div>
+                        <p class="progress-subtitle" data-i18n="act.trophy_progress_sub">Desbloqueie conquistas usando o Tati AI</p>
+                        <div class="trophy-bar-wrap">
+                            <div class="trophy-bar-fill" id="trophy-progress-bar"></div>
+                        </div>
+                        <div class="trophy-percent" id="trophy-percent">0%</div>
+                        <div class="trophy-tiers">
+                            <div class="tier-badge bronze"><i class="fa-solid fa-medal"></i> <span data-i18n="act.tier_bronze">Bronze</span></div>
+                            <div class="tier-badge silver"><i class="fa-solid fa-medal"></i> <span data-i18n="act.tier_silver">Prata</span></div>
+                            <div class="tier-badge gold"><i class="fa-solid fa-medal"></i> <span data-i18n="act.tier_gold">Ouro</span></div>
+                            <div class="tier-badge platinum"><i class="fa-solid fa-gem"></i> <span data-i18n="act.tier_platinum">Platina</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filtros de Medalhas -->
+                <div class="medal-filters">
+                    <button class="medal-filter-btn active" onclick="filterMedals('all', this)">
+                        <i class="fa-solid fa-trophy"></i> <span data-i18n="act.medal_all">Todos</span> <span id="filter-all-count">0</span>
+                    </button>
+                    <button class="medal-filter-btn" onclick="filterMedals('questions', this)">
+                        <i class="fa-solid fa-question"></i> <span data-i18n="act.medal_questions">Perguntas</span> <span id="filter-questions-count">0</span>
+                    </button>
+                    <button class="medal-filter-btn" onclick="filterMedals('streak', this)">
+                        <i class="fa-solid fa-fire"></i> <span data-i18n="act.medal_streak">Ofensiva</span> <span id="filter-streak-count">0</span>
+                    </button>
+                    <button class="medal-filter-btn" onclick="filterMedals('credits', this)">
+                        <i class="fa-solid fa-coins"></i> <span data-i18n="act.medal_credits">Créditos</span> <span id="filter-credits-count">0</span>
+                    </button>
+                    <button class="medal-filter-btn" onclick="filterMedals('time', this)">
+                        <i class="fa-solid fa-clock"></i> <span data-i18n="act.medal_time">Tempo</span> <span id="filter-time-count">0</span>
+                    </button>
+                    <button class="medal-filter-btn" onclick="filterMedals('milestones', this)">
+                        <i class="fa-solid fa-star"></i> <span data-i18n="act.medal_milestones">Marcos</span> <span id="filter-milestones-count">0</span>
+                    </button>
+                    <button class="medal-filter-btn" onclick="filterMedals('social', this)">
+                        <i class="fa-solid fa-heart"></i> <span data-i18n="act.medal_social">Social</span> <span id="filter-social-count">0</span>
+                    </button>
+                </div>
+
+                <!-- Lista de Medalhas -->
+                <div class="medals-grid" id="medals-grid">
+                    <!-- Medalhas serão carregadas aqui -->
+                </div>
+
+                <!-- Como Conquistar -->
+                <div class="info-section">
+                    <div class="info-section-header">
+                        <h3><i class="fa-solid fa-lightbulb"></i> <span data-i18n="act.how_to_title">Como Conquistar Troféus</span></h3>
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-card-item">
+                            <div class="info-icon streak"><i class="fa-solid fa-fire"></i></div>
+                            <div class="info-content">
+                                <h4 data-i18n="act.how_streak_title">Ofensiva (Streak)</h4>
+                                <p data-i18n="act.how_streak_desc">Estude todos os dias para manter sua ofensiva. Quanto mais dias seguidos, mais troféus!</p>
+                            </div>
+                        </div>
+                        <div class="info-card-item">
+                            <div class="info-icon questions"><i class="fa-solid fa-question"></i></div>
+                            <div class="info-content">
+                                <h4 data-i18n="act.how_questions_title">Perguntas Respondidas</h4>
+                                <p data-i18n="act.how_questions_desc">Complete quizzes, flashcards e exercícios para acumular acertos.</p>
+                            </div>
+                        </div>
+                        <div class="info-card-item">
+                            <div class="info-icon credits"><i class="fa-solid fa-coins"></i></div>
+                            <div class="info-content">
+                                <h4 data-i18n="act.how_credits_title">Créditos</h4>
+                                <p data-i18n="act.how_credits_desc">Ganhe créditos completando atividades e participando do ranking.</p>
+                            </div>
+                        </div>
+                        <div class="info-card-item">
+                            <div class="info-icon time"><i class="fa-solid fa-clock"></i></div>
+                            <div class="info-content">
+                                <h4 data-i18n="act.how_time_title">Tempo Economizado</h4>
+                                <p data-i18n="act.how_time_desc">Quanto mais você usa a IA para aprender, mais tempo economiza!</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SEÇÃO: COMPETIÇÕES / RANKING -->
+            <div id="section-competitions" class="content-section">
+                <div class="section-header">
+                    <h2 data-i18n="act.comp_title">Competições</h2>
+                    <p data-i18n="act.comp_subtitle">Veja quem são os alunos mais engajados e suba no ranking!</p>
+                </div>
+
+                <!-- Banner Ranking -->
+                <div class="ranking-banner">
+                    <div class="banner-icon"><i class="fa-solid fa-trophy"></i></div>
+                    <div class="banner-content">
+                        <h3 data-i18n="act.ranking_banner_title">Ranking de Engajamento</h3>
+                        <p><span data-i18n="act.ranking_banner_sub">Alunos mais ativos no Tati AI</span> — <span id="ranking-month"></span></p>
+                    </div>
+                </div>
+
+                <!-- Vencedores do Mês Anterior -->
+                <div class="winners-section">
+                    <h3><i class="fa-solid fa-crown"></i> <span data-i18n="act.winners_title">Vencedores</span> — <span id="winners-month"></span></h3>
+                    <div class="winners-podium">
+                        <div class="winner-card second">
+                            <div class="winner-medal">🥈</div>
+                            <div class="winner-info">
+                                <strong id="winner-2-name">—</strong>
+                                <span id="winner-2-position">0 pts</span>
+                            </div>
+                        </div>
+                        <div class="winner-card first">
+                            <div class="winner-medal">🥇</div>
+                            <div class="winner-info">
+                                <strong id="winner-1-name">—</strong>
+                                <span id="winner-1-position">0 pts</span>
+                            </div>
+                        </div>
+                        <div class="winner-card third">
+                            <div class="winner-medal">🥉</div>
+                            <div class="winner-info">
+                                <strong id="winner-3-name">—</strong>
+                                <span id="winner-3-position">0 pts</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Como Funciona e Prêmios -->
+                <div class="info-grid-2col">
+                    <div class="info-card-styled">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-circle-question"></i> <span data-i18n="act.how_ranking_title">Como funciona o ranking?</span></h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="info-description" data-i18n="act.how_ranking_desc">O score é calculado pela soma ponderada de todas as suas ações de estudo no mês:</p>
+                            <div class="points-list">
+                                <div class="point-item">
+                                    <span class="point-label"><i class="fa-solid fa-pen"></i> <span data-i18n="act.pts_exercise">Exercício submetido</span></span>
+                                    <span class="pts-badge exercise">8 pts</span>
+                                </div>
+                                <div class="point-item">
+                                    <span class="point-label"><i class="fa-solid fa-layer-group"></i> <span data-i18n="act.pts_flashcard">Flashcard revisado</span></span>
+                                    <span class="pts-badge flashcard">5 pts</span>
+                                </div>
+                                <div class="point-item">
+                                    <span class="point-label"><i class="fa-solid fa-circle-question"></i> <span data-i18n="act.pts_quiz">Quiz resolvido</span></span>
+                                    <span class="pts-badge quiz">3 pts</span>
+                                </div>
+                                <div class="point-item">
+                                    <span class="point-label"><i class="fa-solid fa-comment"></i> <span data-i18n="act.pts_message">Mensagem para a Tati IA</span></span>
+                                    <span class="pts-badge message">1 pt</span>
+                                </div>
+                            </div>
+                            <div class="tie-breaker-styled">
+                                <i class="fa-solid fa-scale-balanced"></i>
+                                <div>
+                                    <strong data-i18n="act.tiebreaker_title">Desempate:</strong>
+                                    <span data-i18n="act.tiebreaker_desc">Em caso de empate no score, o desempate é pela quantidade de tokens utilizados (quanto mais interação, melhor posição).</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="info-card-styled prizes">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-gift"></i> <span data-i18n="act.prizes_title">Prêmios</span></h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="prize-card-item gold">
+                                <div class="prize-icon">🥇</div>
+                                <div class="prize-text">
+                                    <strong data-i18n="act.prize_1_title">1º Lugar</strong>
+                                    <span data-i18n="act.prize_1_desc">Troféu Ouro + 30 créditos extras em cada agente</span>
+                                </div>
+                            </div>
+                            <div class="prize-card-item silver">
+                                <div class="prize-icon">🥈</div>
+                                <div class="prize-text">
+                                    <strong data-i18n="act.prize_2_title">2º Lugar</strong>
+                                    <span data-i18n="act.prize_2_desc">Troféu Prata + 20 créditos extras em cada agente</span>
+                                </div>
+                            </div>
+                            <div class="prize-card-item bronze">
+                                <div class="prize-icon">🥉</div>
+                                <div class="prize-text">
+                                    <strong data-i18n="act.prize_3_title">3º Lugar</strong>
+                                    <span data-i18n="act.prize_3_desc">Troféu Bronze + 10 créditos extras em cada agente</span>
+                                </div>
+                            </div>
+                            <p class="prize-note-styled" data-i18n="act.prizes_note">Os troféus ficam permanentes na sua coleção. Os créditos extras são aplicados no próximo ciclo.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Posição do Usuário -->
+                <div class="user-position-card" id="user-position-card">
+                    <div class="user-position-info">
+                        <div class="user-rank" id="user-rank">#—</div>
+                        <div class="user-details">
+                            <strong id="user-rank-name">—</strong>
+                            <span id="user-rank-score"><span data-i18n="act.points">0 pontos</span></span>
+                        </div>
+                    </div>
+                    <div class="user-stats">
+                        <div class="user-stat">
+                            <i class="fa-solid fa-comment"></i>
+                            <span id="user-msgs">0</span>
+                        </div>
+                        <div class="user-stat">
+                            <i class="fa-solid fa-circle-check"></i>
+                            <span id="user-quizzes">0</span>
+                        </div>
+                        <div class="user-stat">
+                            <i class="fa-solid fa-layer-group"></i>
+                            <span id="user-flashcards">0</span>
+                        </div>
+                        <div class="user-stat">
+                            <i class="fa-solid fa-pen"></i>
+                            <span id="user-exercises">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top 15 do Mês -->
+                <div class="ranking-section">
+                    <h3><i class="fa-solid fa-chart-line"></i> <span data-i18n="act.top15_title">Top 15</span> — <span id="top15-month"></span></h3>
+                    <div class="ranking-container">
+                        <table class="ranking-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th data-i18n="act.table_student">Aluno</th>
+                                    <th data-i18n="act.table_score">Score</th>
+                                    <th><i class="fa-solid fa-comment"></i></th>
+                                    <th><i class="fa-solid fa-circle-check"></i></th>
+                                    <th><i class="fa-solid fa-layer-group"></i></th>
+                                    <th><i class="fa-solid fa-pen"></i></th>
+                                    <th data-i18n="act.table_tokens">Tokens</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ranking-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+    </div>
+
+    <!-- ── MODAIS ── -->
+    <div class="modal-overlay" id="feedback-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 data-i18n="act.fb_modal_title">Enviar Feedback</h3>
+                <button class="btn-close-modal" onclick="closeFeedbackModal()">&times;</button>
+            </div>
+            <form id="feedback-form" onsubmit="handleFeedbackSubmit(event)">
+                <div class="form-row">
+                    <label data-i18n="act.fb_type_label">Tipo *</label>
+                    <div class="type-selector">
+                        <label><input type="radio" name="fb-type" value="bug" checked> <span data-i18n="act.fb_type_bug">Bug</span></label>
+                        <label><input type="radio" name="fb-type" value="suggestion"> <span data-i18n="act.fb_type_suggestion">Sugestão</span></label>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <label data-i18n="act.fb_title_label">Título *</label>
+                    <input type="text" id="fb-title" data-i18n-placeholder="act.fb_title_ph" placeholder="Resumo breve" required>
+                </div>
+                <div class="form-row">
+                    <label data-i18n="act.fb_desc_label">Descrição *</label>
+                    <textarea id="fb-desc" rows="4" data-i18n-placeholder="act.fb_desc_ph" placeholder="Detalhes..." required></textarea>
+                </div>
+                <button type="submit" class="btn-submit-feedback" data-i18n="act.fb_submit_btn">Enviar Feedback</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="quiz-overlay">
+        <div class="modal-content quiz-modal">
+            <header class="qm-header">
+                <div class="qm-header-copy">
+                    <div class="qm-title" id="qm-title">Quiz</div>
+                    <div class="qm-sub" id="qm-sub">Pergunta 1 de 5</div>
+                </div>
+                <button class="btn-close-modal" onclick="closeQuiz()">&times;</button>
             </header>
-            <div class="quiz-modal-body" id="quiz-modal-body"></div>
-            <footer class="quiz-footer" id="quiz-nav">
-                <button class="btn-quiz-next" id="btn-next" onclick="nextQuestion()" disabled>
-                    <span data-i18n="act.quiz_next">Próxima</span> <i class="fa-solid fa-arrow-right"></i>
-                </button>
+            <div class="qm-prog">
+                <div class="qm-prog-bar" id="qm-prog-bar"></div>
+            </div>
+            <div class="qm-body" id="qm-body"></div>
+            <footer class="qm-footer">
+                <button class="btn-next" id="btn-next" onclick="nextQ()" disabled data-i18n="act.quiz_next">Próxima</button>
             </footer>
         </div>
     </div>
 
+    <!-- Modal para Exercício de Escrita -->
+    <div class="modal-overlay" id="writing-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 data-i18n="act.writing_modal_title">Exercício de Escrita</h3>
+                <button class="btn-close-modal" onclick="closeWritingModal()">&times;</button>
+            </div>
+            <form id="writing-form" onsubmit="handleWritingSubmit(event)">
+                <div class="form-row">
+                    <label for="writing-theme" data-i18n="act.writing_theme_label">Tema do Exercício *</label>
+                    <input type="text" id="writing-theme" data-i18n-placeholder="act.writing_theme_ph" placeholder="Ex: Descreva suas últimas férias" required>
+                </div>
+                <div class="form-row">
+                    <label for="writing-content" data-i18n="act.writing_content_label">Sua Resposta *</label>
+                    <textarea id="writing-content" rows="8" data-i18n-placeholder="act.writing_content_ph" placeholder="Escreva seu texto aqui..." required></textarea>
+                </div>
+                <button type="submit" class="btn-submit-feedback" data-i18n="act.writing_submit_btn">Enviar Exercício</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notificações -->
+    <div id="notif-modal">
+        <div class="notif-header" data-i18n="act.notif_title">Notificações</div>
+        <div id="notif-list"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
     <script src="js/i18n.js"></script>
     <script src="js/api.js"></script>
     <script src="js/activities_ui.js"></script>
-    <script>
-        // Bloqueio de acesso para não-admins
-        (async () => {
-            if (typeof requireAuth !== 'undefined' && !requireAuth()) return;
-            try {
-                // Busca as permissões do usuário
-                const user = JSON.parse(localStorage.getItem('user') || '{}');
-                const specialUsers = ["caio.sampaio", "caio", "programador", "tati", "tati.ai", "admin"];
-                // Se não for admin (professor) e não estiver na lista especial, bloqueia
-                if (user.role !== 'professor' && user.role !== 'admin' && user.role !== 'staff' && !specialUsers.includes(user.username)) {
-                    document.body.innerHTML = `
-                        <div class="act-layout">
-                            <a href="chat.html" class="btn-back-home">
-                                <i class="fa-solid fa-chevron-left"></i>
-                                <span>Voltar ao Chat</span>
-                            </a>
-                            <div class="access-denied-container">
-                                <div class="access-denied-icon">🛠️</div>
-                                <div class="access-denied-title">Área em Manutenção</div>
-                                <div class="access-denied-text">
-                                    Somente administradores têm acesso no momento. <br>
-                                    <b>Função em testes.</b>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    document.getElementById('main-content').style.display = 'block';
-                }
-            } catch (e) {
-                console.error("Erro ao verificar acesso:", e);
-                // Fallback para mostrar o conteúdo caso algo dê errado na verificação local
-                document.getElementById('main-content').style.display = 'block';
-            }
-        })();
-    </script>
 </body>
 
 </html>

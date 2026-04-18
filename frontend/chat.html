@@ -13,7 +13,9 @@
     <link rel="stylesheet" href="/styles/chat.css">
     <link rel="stylesheet" href="/styles/word_tooltip.css">
     <link rel="icon" type="image/x-icon" href="/assets/images/tati_logo.jpg">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 </head>
 
 <body>
@@ -70,19 +72,18 @@
                     title="Painel" style="display:none;">
                     <i class="fa-solid fa-chart-line"></i>
                 </a>
-                <a href="settings.html" class="btn-footer-icon" data-i18n-title="nav.settings" title="Configurações">
+                <a href="settings.html" class="btn-footer-icon" data-i18n-title="nav.settings">
                     <i class="fa-solid fa-gear"></i>
                 </a>
-                <a href="activities.html" class="btn-footer-icon" data-i18n-title="act.title" title="Atividades">
+                <a href="activities.html" class="btn-footer-icon" data-i18n-title="act.title">
                     <i class="fa-solid fa-book-open"></i>
                 </a>
                 <div class="footer-spacer"></div>
                 <button class="btn-footer-icon btn-danger-icon" onclick="deleteAllConversations()"
-                    data-i18n-title="chat.delete_all_title" title="Deletar todas">
+                    data-i18n-title="chat.delete_all_title">
                     <i class="fa-solid fa-trash-can"></i>
                 </button>
-                <button class="btn-footer-icon btn-danger-icon" onclick="logout()" data-i18n-title="nav.logout"
-                    title="Sair">
+                <button class="btn-footer-icon btn-danger-icon" onclick="logout()" data-i18n-title="nav.logout">
                     <i class="fa-solid fa-right-from-bracket"></i>
                 </button>
             </div>
@@ -186,6 +187,7 @@
     <script src="/js/word_tooltip.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/chat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 </body>
 
 </html>

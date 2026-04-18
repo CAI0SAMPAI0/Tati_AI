@@ -1,0 +1,395 @@
+/* goals.css - Metas de Estudo */
+
+.goals-layout {
+    min-height: 100vh;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+}
+
+.goals-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.topbar-brand-center {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.topbar-logo {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    object-fit: cover;
+}
+
+.topbar-logo-fallback {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: var(--primary-dim);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+
+.topbar-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.topbar-user {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.topbar-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), #6d28d9);
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+.topbar-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.topbar-username {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text);
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.btn-back {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.45rem 0.75rem;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+.btn-back:hover { background: rgba(124,58,237,0.1); color: var(--primary); }
+
+.btn-profile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: all 0.2s;
+}
+.btn-profile:hover { color: var(--primary); border-color: var(--primary); }
+
+.topbar-brand {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.goals-content {
+    flex: 1;
+    padding: 2rem 1.5rem;
+    max-width: 900px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.goals-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+.goals-header h1 {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+}
+.goals-header p {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.goals-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.summary-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    text-align: center;
+}
+.summary-value {
+    font-size: 2rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #10b981, #059669);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.summary-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.25rem;
+}
+
+.goals-section {
+    margin-bottom: 2rem;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+.section-header h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.btn-add-goal {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    border-radius: 10px;
+    border: none;
+    background: var(--primary);
+    color: white;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-add-goal:hover { background: #6d28d9; transform: translateY(-2px); }
+
+.goals-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.goal-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    transition: all 0.2s;
+}
+.goal-card:hover { border-color: var(--primary); }
+.goal-card.achieved {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.goal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+.goal-icon {
+    font-size: 1.5rem;
+}
+.goal-title {
+    flex: 1;
+    margin-left: 0.75rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+}
+.goal-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.goal-progress-bar {
+    height: 8px;
+    background: var(--border);
+    border-radius: 99px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+.goal-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981, #059669);
+    border-radius: 99px;
+    transition: width 0.3s ease;
+}
+.goal-card.achieved .goal-progress-fill {
+    background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.goal-stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+.goal-stats .current {
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.btn-delete-goal {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+.btn-delete-goal:hover { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+
+.goals-empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+}
+.goals-empty i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+/* Modal */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 1rem;
+}
+
+.modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    max-width: 500px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem;
+    border-bottom: 1px solid var(--border);
+}
+.modal-header h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.btn-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+.btn-close:hover { color: var(--text); background: var(--border); }
+
+.modal-body {
+    padding: 1.25rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+.form-group label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+}
+.form-group select,
+.form-group input {
+    width: 100%;
+    padding: 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.9rem;
+}
+.form-group select:focus,
+.form-group input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.btn-submit {
+    width: 100%;
+    padding: 0.875rem;
+    border-radius: 10px;
+    border: none;
+    background: var(--primary);
+    color: white;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-submit:hover { background: #6d28d9; }
+
+@media (max-width: 768px) {
+    .goals-content { padding: 1.5rem 1rem; }
+    .goals-summary { grid-template-columns: 1fr; }
+    .section-header { flex-direction: column; gap: 1rem; align-items: flex-start; }
+    .btn-add-goal { width: 100%; justify-content: center; }
+}

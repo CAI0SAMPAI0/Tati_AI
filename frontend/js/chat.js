@@ -59,7 +59,7 @@ window.addEventListener('DOMContentLoaded', () => {
       document.getElementById('summary-text').innerHTML = marked.parse(data.summary);
       document.getElementById('summary-modal').style.display = 'flex';
     } catch (e) {
-      alert('Erro ao gerar resumo. Tente novamente.' + e.message);
+      showToast('Erro ao gerar resumo. Tente novamente.', 'error');
     } finally {
       btn.innerHTML = orig;
       btn.disabled = false;
@@ -105,7 +105,7 @@ async function _initUserInfo() {
   if (isTeacher || isSpecial) {
     const dashBtn = el('btn-dashboard');
     if (dashBtn) dashBtn.style.display = 'flex';
-    
+
     // Botão de atividades na sidebar
     const actBtn = document.querySelector('a[href="activities.html"]');
     if (actBtn) actBtn.style.display = 'flex';
@@ -152,7 +152,9 @@ function toggleSidebar() {
 }
 
 function switchToVoice() {
-  const url = currentConvId ? `/voice.html?conv_id=${currentConvId}` : '/voice.html';
+  const isNew = !currentConvId; // Se não tem conversa atual, é nova
+  const url = isNew ? '/voice.html?new=true' : 
+              currentConvId ? `/voice.html?conv_id=${currentConvId}` : '/voice.html';
   window.location.href = url;
 }
 
@@ -163,7 +165,8 @@ function _connectWS() {
   const currentToken = getToken();
   if (!currentToken) { authLogout(); return; }
 
-  ws = new WebSocket(`${WS_BASE}/chat/ws?token=${currentToken}`);
+  // Envia token via subprotocolo para evitar que apareça na URL nos logs do servidor
+  ws = new WebSocket(`${WS_BASE}/chat/ws`, ["access_token", currentToken]);
   ws.onopen = () => console.log('[WS] connected');
   ws.onmessage = e => _handleWSMessage(JSON.parse(e.data));
   ws.onerror = e => console.error('[WS] error', e);
@@ -207,17 +210,43 @@ function _handleWSMessage(msg) {
     stream_end: () => {
       if (streamingMsgEl) {
         const meta = _finalizeStreamBubble(streamingMsgEl, streamingBubble);
-        if (pendingAudioB64 && meta) { _buildAudioControls(meta, pendingAudioB64); pendingAudioB64 = null; }
+        // Áudio só é anexado aqui, após stream terminar
+        if (pendingAudioB64 && meta) {
+          _buildAudioControls(meta, pendingAudioB64);
+          pendingAudioB64 = null;
+        }
       }
       streamingBubble = null; streamingMsgEl = null;
       isStreaming = false;
       _setInputEnabled(true);
+      // Atualiza só o título na sidebar se necessário, sem resetar mensagens
       const active = document.querySelector('.conv-item.active .conv-title');
-      if (!active || active.textContent === 'Nova conversa') _loadConversations();
+      if (!active) {
+        _loadConversations().catch(() => {});
+      } else if (active.textContent === 'Nova conversa' || active.textContent === t('nav.new_chat')) {
+        // Só recarrega a lista de conversas (sem abrir conversa = sem limpar mensagens)
+        apiGet('/chat/conversations').then(convs => _renderConversationList(convs)).catch(() => {});
+      }
     },
-    audio_response: () => { streamingMsgEl ? (pendingAudioB64 = msg.audio) : _attachAudioToLastMsg(msg.audio); },
+    audio_response: () => {
+      // Durante streaming, salva para usar depois
+      if (streamingMsgEl) {
+        pendingAudioB64 = msg.audio;
+      } else {
+        // Fora de streaming, anexa imediatamente
+        _attachAudioToLastMsg(msg.audio);
+      }
+    },
     free_warning: () => {
       _showFreeMessagesBadge(msg.remaining);
+    },
+    new_title: () => {
+      if (msg.conversation_id === currentConvId) {
+        const tb = document.getElementById('topbar-title');
+        if (tb) tb.textContent = msg.title;
+        const item = document.querySelector(`.conv-item[data-id="${msg.conversation_id}"] .conv-title`);
+        if (item) item.textContent = msg.title;
+      }
     },
     error: () => {
       _hideTyping();
@@ -238,14 +267,22 @@ async function _loadConversations() {
   try {
     const convs = await apiGet('/chat/conversations');
     _renderConversationList(convs);
-    if (!currentConvId) _showWelcome();
+    
+    // Sempre começa na tela de boas-vindas
+    if (!currentConvId) {
+      _showWelcome();
+    }
   } catch (e) { console.error(e); }
 }
 
 function _renderConversationList(convs) {
   const list = document.getElementById('conversations-list');
   if (!list) return;
-  if (!convs.length) { list.innerHTML = `<p class="list-empty">${t('chat.no_convs')}</p>`; return; }
+  if (!convs.length) { 
+    list.innerHTML = `<p class="list-empty">${t('chat.no_convs')}</p>`; 
+    localStorage.removeItem('last_conv_id');
+    return; 
+  }
   const today = new Date().toDateString();
   const yesterday = new Date(Date.now() - 86400000).toDateString();
   const groups = { [t('chat.today')]: [], [t('chat.yesterday')]: [], [t('chat.older')]: [] };
@@ -292,6 +329,7 @@ async function newChat() {
 
 async function _openConversation(id, title) {
   currentConvId = id;
+  localStorage.setItem('last_conv_id', id);
   document.querySelectorAll('.conv-item').forEach(el => el.classList.toggle('active', el.dataset.id === id));
   const tb = document.getElementById('topbar-title');
   if (tb) tb.textContent = title;
@@ -311,7 +349,11 @@ async function _loadMessages(convId) {
   const welcomeEl = document.getElementById('chat-welcome');
   const voiceBtn = document.getElementById('btn-switch-voice');
 
-  [...area.children].forEach(el => { if (el.id !== 'typing-indicator' && el.id !== 'chat-welcome') el.remove(); });
+  // Limpa mensagens anteriores
+  [...area.children].forEach(el => {
+    if (el.id !== 'typing-indicator' && el.id !== 'chat-welcome') el.remove();
+  });
+  
   if (typingEl) typingEl.style.display = 'none';
   if (welcomeEl) welcomeEl.style.display = 'none';
   if (voiceBtn) voiceBtn.style.display = 'flex';
@@ -320,12 +362,21 @@ async function _loadMessages(convId) {
 
   try {
     const msgs = await apiGet(`/chat/conversations/${convId}/messages`);
+    console.log(`[Chat] Carregadas ${msgs.length} mensagens`);
+    
     if (!msgs.length) {
-      if (welcomeEl) { welcomeEl.style.display = 'flex'; if (area.firstChild !== welcomeEl) area.insertBefore(welcomeEl, area.firstChild); }
+      if (welcomeEl) welcomeEl.style.display = 'flex';
     } else {
-      msgs.forEach(m => _renderMessage(m.role, m.content));
+      for (const m of msgs) {
+        const el = _renderMessage(m.role, m.content, true, m.created_at);
+        if (m.role === 'assistant' && m.audio_b64) {
+          _attachAudioToElement(el, m.audio_b64);
+        }
+      }
     }
-  } catch (e) { console.error(e); }
+  } catch (e) {
+    console.error('[Chat] Erro ao carregar mensagens:', e);
+  }
   _scrollBottom();
 }
 
@@ -452,7 +503,9 @@ async function sendMessage() {
     try {
       const { data } = await apiPost('/chat/conversations', { title: t('nav.new_chat') });
       currentConvId = data.id;
-      await _loadConversations();
+      localStorage.setItem('last_conv_id', data.id);
+      // Adiciona na sidebar sem recarregar mensagens
+      apiGet('/chat/conversations').then(convs => _renderConversationList(convs)).catch(() => {});
     } catch { _appendErrorMsg('Erro ao criar conversa.'); return; }
   }
 
@@ -508,7 +561,7 @@ async function toggleMic() {
     mediaRecorder.start();
     isRecording = true;
     document.getElementById('btn-mic')?.classList.add('recording');
-  } catch (e) { alert('Microfone não disponível: ' + e.message); }
+  } catch (e) { showToast('Microfone não disponível: ' + e.message, 'error'); }
 }
 function _stopRecording() {
   mediaRecorder?.stop();
@@ -531,15 +584,16 @@ async function _sendAudio() {
 }
 
 // ── Render helpers ────────────────────────────────────────────────────────────
-function _renderMessage(role, content) {
-  role === 'user' ? _appendUserMsg(content) : _appendAssistantMsg(content);
+function _renderMessage(role, content, returnElement = false, isoString = null) {
+  return role === 'user' ? _appendUserMsg(content, returnElement, isoString) : _appendAssistantMsg(content, returnElement, isoString);
 }
 
-function _appendUserMsg(text) {
+function _appendUserMsg(text, returnElement = false, isoString = null) {
   const div = document.createElement('div');
   div.className = 'message message-user';
-  div.innerHTML = `<div class="message-body"><div class="message-bubble"><p>${escHtml(text)}</p></div><span class="message-time">${nowTime()}</span></div>`;
+  div.innerHTML = `<div class="message-body"><div class="message-bubble"><p>${escHtml(text)}</p></div><span class="message-time">${nowTime(isoString)}</span></div>`;
   _insertBeforeTyping(div); _scrollBottom(); _checkSummaryBtn();
+  return returnElement ? div : null;
 }
 
 function _appendFileMsg(name, size) {
@@ -549,18 +603,19 @@ function _appendFileMsg(name, size) {
   _insertBeforeTyping(div); _scrollBottom();
 }
 
-function _appendAssistantMsg(text) {
+function _appendAssistantMsg(text, returnElement = false, isoString = null) {
   const div = document.createElement('div');
   div.className = 'message message-assistant';
   div.innerHTML = `
     <div class="message-avatar"><img src="/assets/images/tati_logo.jpg" alt="Tati" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="msg-avatar-fallback" style="display:none">T</div></div>
     <div class="message-body">
-      <div class="message-bubble">${formatMarkdown(text)}</div>
-      <div class="message-meta"><span class="message-time">${nowTime()}</span></div>
+      <div class="message-bubble">${DOMPurify.sanitize(marked.parse(text))}</div>
+      <div class="message-meta"><span class="message-time">${nowTime(isoString)}</span></div>
     </div>`;
   _insertBeforeTyping(div);
   if (getSettings().wordTooltip !== false && window.WordTooltip) WordTooltip.makeClickable(div);
   _scrollBottom();
+  return returnElement ? div : null;
 }
 
 function _appendStreamBubble() {
@@ -590,11 +645,28 @@ function _finalizeStreamBubble(msgEl, bubble) {
   return meta;
 }
 
+// Anexa áudio a um elemento específico de mensagem (para histórico)
+function _attachAudioToElement(msgEl, b64) {
+  if (!msgEl) return;
+  let meta = msgEl.querySelector('.message-meta');
+  if (!meta) {
+    const body = msgEl.querySelector('.message-body');
+    if (body) {
+      meta = document.createElement('div');
+      meta.className = 'message-meta';
+      meta.innerHTML = `<span class="message-time">${nowTime()}</span>`;
+      body.appendChild(meta);
+    }
+  }
+  if (meta && !meta.querySelector('.msg-audio-controls')) {
+    _buildAudioControls(meta, b64);
+  }
+}
+
 function _attachAudioToLastMsg(b64) {
   const msgs = document.querySelectorAll('.message-assistant');
   if (!msgs.length) return;
-  const meta = msgs[msgs.length - 1].querySelector('.message-meta');
-  if (meta) _buildAudioControls(meta, b64);
+  _attachAudioToElement(msgs[msgs.length - 1], b64);
 }
 
 function _buildAudioControls(meta, b64) {
@@ -605,19 +677,19 @@ function _buildAudioControls(meta, b64) {
   const controls = document.createElement('div');
   controls.className = 'msg-audio-controls';
   controls.innerHTML = `
-    <button class="btn-tts-play" title="Play">
+    <button class="btn-tts-play" title="${t('audio.play') || 'Play'}">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
     </button>
-    <button class="btn-tts-rewind" title="↩5s">
+    <button class="btn-tts-rewind" title="${t('audio.rewind') || '↩5s'}">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.56"/></svg>
     </button>
     <div class="msg-vol-control">
-      <label>Vol</label>
+      <label>${t('audio.vol') || 'Vol'}</label>
       <input type="range" class="msg-vol-slider" min="0" max="1" step="0.05" value="1">
       <span class="msg-vol-value">100%</span>
     </div>
     <div class="msg-spd-control">
-      <label>Vel</label>
+      <label>${t('audio.speed') || 'Vel'}</label>
       <select class="msg-spd-select">
         <option value="0.75">0.75×</option>
         <option value="1" ${defaultSpeed === 1 ? 'selected' : ''}>1×</option>
@@ -778,7 +850,7 @@ async function _initUserInfo() {
   if (isTeacher || isSpecial) {
     const dashBtn = el('btn-dashboard');
     if (dashBtn) dashBtn.style.display = 'flex';
-    
+
     // Botão de atividades na sidebar
     const actBtn = document.querySelector('a[href="activities.html"]');
     if (actBtn) actBtn.style.display = 'flex';

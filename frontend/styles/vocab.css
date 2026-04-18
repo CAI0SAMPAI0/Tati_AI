@@ -1,0 +1,312 @@
+/* vocab.css - Caderno de Vocabulário */
+
+.vocab-layout {
+    min-height: 100vh;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+}
+
+.vocab-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.topbar-brand-center {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.topbar-logo {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    object-fit: cover;
+}
+.topbar-logo-fallback {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: var(--primary-dim);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+.topbar-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text);
+}
+.topbar-user {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.topbar-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), #6d28d9);
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+.topbar-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.topbar-username {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text);
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.btn-profile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: all 0.2s;
+}
+.btn-profile:hover { color: var(--primary); border-color: var(--primary); }
+
+.vocab-content {
+    flex: 1;
+    padding: 2rem 1.5rem;
+    max-width: 900px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.vocab-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+.vocab-header h1 {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+}
+.vocab-header p {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.vocab-toolbar {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+    align-items: center;
+}
+
+.vocab-search {
+    flex: 1;
+    min-width: 200px;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.vocab-search i {
+    position: absolute;
+    left: 1rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+.vocab-search input {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 2.5rem;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-size: 0.9rem;
+}
+.vocab-search input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.vocab-filters {
+    display: flex;
+    gap: 0.5rem;
+}
+.filter-btn {
+    padding: 0.5rem 1rem;
+    border-radius: 99px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.filter-btn:hover { border-color: var(--primary); color: var(--primary); }
+.filter-btn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
+.btn-export {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-weight: 600;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-export:hover { background: var(--primary); color: white; border-color: var(--primary); }
+
+.vocab-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.vocab-stat {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    text-align: center;
+}
+.vocab-stat-value {
+    font-size: 1.75rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #f97316, #ec4899);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.vocab-stat-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.25rem;
+}
+
+.vocab-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.vocab-word {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.2s;
+}
+.vocab-word:hover {
+    transform: translateX(4px);
+    border-color: var(--primary);
+}
+
+.vocab-word-info {
+    flex: 1;
+}
+.vocab-word-term {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+}
+.vocab-word-translation {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+.vocab-word-example {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 0.5rem;
+    padding-left: 0.75rem;
+    border-left: 2px solid var(--border);
+}
+
+.vocab-word-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.vocab-badge {
+    padding: 0.3rem 0.75rem;
+    border-radius: 99px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.vocab-badge.learned {
+    background: rgba(74, 222, 128, 0.15);
+    color: #4ade80;
+}
+.vocab-badge.learning {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+}
+.vocab-badge.new {
+    background: rgba(96, 165, 250, 0.15);
+    color: #60a5fa;
+}
+
+.vocab-empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+}
+.vocab-empty i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+.vocab-empty p {
+    font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+    .vocab-content { padding: 1.5rem 1rem; }
+    .vocab-toolbar { flex-direction: column; }
+    .vocab-filters { overflow-x: auto; padding-bottom: 0.5rem; }
+    .vocab-stats { grid-template-columns: 1fr; }
+}

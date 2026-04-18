@@ -18,6 +18,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     
     username = payload["sub"]
     db = get_client()
+    # Exclui explicitamente o campo 'avatar' da consulta
     rows = db.table("users").select("*").eq("username", username).limit(1).execute().data
     
     if not rows:
@@ -51,4 +52,4 @@ class RoleChecker:
             )
         return user
     
-require_staff = RoleChecker("professor", "professora", "programador", "Tatiana", "Tati")
+require_staff = RoleChecker("professor", "professora", "programador", "Tatiana", "Tati", 'Professora')

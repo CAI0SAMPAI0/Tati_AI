@@ -18,7 +18,9 @@ SPECIAL_USERS = {
     "programador",
     "tati",
     "tati.ai",
-    "admin"
+    "admin",
+    "Professora",
+    "Tatiana",
 }
 
 # Feriados nacionais fixos (mês, dia) — adicione os móveis via banco se quiser
@@ -172,7 +174,7 @@ async def change_due_date(
     db.table("subscriptions").update({
         "preferred_due_day": body.preferred_day,
         "expires_at":        new_due.isoformat(),
-    }).eq("id", sub["id"]).execute()
+    }).eq("username", user["username"]).execute()
 
     # Salva preferência no usuário também
     db.table("users").update({

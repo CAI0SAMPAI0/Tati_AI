@@ -16,10 +16,11 @@ function getSettings() {
 // ── URL params ─────────────────────────────────────────────────────
 const urlParams    = new URLSearchParams(window.location.search);
 const urlConvId    = urlParams.get('conv_id') || null;
+const isNewConv    = urlParams.get('new') === 'true';
 
 // ── Estado global ──────────────────────────────────────────────────
 let ws               = null;
-let currentConvId    = urlConvId;
+let currentConvId    = isNewConv ? null : urlConvId; // Se é nova conversa, começa sem conv_id
 let isRecording      = false;
 let isProcessing     = false;
 let mediaRecorder    = null;
@@ -315,8 +316,10 @@ function _onSpeakingEnded() {
 
 function connectWS() {
   if (ws?.readyState === WebSocket.OPEN || ws?.readyState === WebSocket.CONNECTING) return;
-  ws = new WebSocket(`${WS_URL}/chat/ws?token=${token}`);
-  ws.onopen    = () => { console.log('[Voice WS] conectado'); ensureConversation(); };
+  // Envia token via subprotocolo
+  ws = new WebSocket(`${WS_URL}/chat/ws`, ["access_token", token]);
+  ws.onopen = () => {
+ console.log('[Voice WS] conectado'); ensureConversation(); };
   ws.onmessage = e => handleWSMessage(JSON.parse(e.data));
   ws.onerror   = e => console.error('[Voice WS]', e);
   ws.onclose   = () => { ws = null; setTimeout(connectWS, 3000); };
@@ -376,9 +379,14 @@ function handleWSMessage(msg) {
 // ══════════════════════════════════════════════════════════════════
 
 async function ensureConversation() {
-  if (currentConvId) {
+  if (currentConvId && !isNewConv) {
     loadExistingMessages(currentConvId);
     return;
+  }
+
+  // Se é nova conversa, não carrega mensagens antigas
+  if (isNewConv && !currentConvId) {
+    return; // Começa zerado
   }
 
   try {
@@ -428,7 +436,29 @@ async function loadExistingMessages(convId) {
     });
     if (!res.ok) return;
     const msgs = await res.json();
-    msgs.forEach(m => addBubble(m.role === 'user' ? 'user' : 'bot', m.content));
+
+    // Coletar mensagens com áudio para anexar controles depois
+    const audioMsgs = [];
+    msgs.forEach(m => {
+      const wrap = addBubble(m.role === 'user' ? 'user' : 'bot', m.content);
+      if (m.role === 'assistant' && m.audio_b64) {
+        audioMsgs.push({ wrap, b64: m.audio_b64 });
+      }
+    });
+
+    // Após o DOM estar pronto, popula os controles de áudio de cada bolha
+    requestAnimationFrame(() => {
+      audioMsgs.forEach(({ wrap, b64 }) => {
+        if (wrap) {
+          const audioRow = wrap.querySelector('.vbubble-audio');
+          if (audioRow) {
+            audioRow.style.display = 'flex';
+            _attachBubbleAudio(audioRow, b64);
+          }
+        }
+      });
+    });
+
     scrollBottom();
   } catch (e) {
     console.error('[Voice] loadExistingMessages:', e);
@@ -475,7 +505,7 @@ async function startRecording() {
     pendingUserBubble = addBubble('user', '');
     scrollBottom();
   } catch (e) {
-    alert('Microfone não disponível: ' + e.message);
+    showToast('Microfone não disponível: ' + e.message, 'error');
   }
 }
 
@@ -546,6 +576,15 @@ function addBubble(role, text) {
   wrap.appendChild(label);
   wrap.appendChild(bub);
 
+  // Para mensagens do bot, cria a linha de áudio (será preenchida se houver audio_b64)
+  if (role === 'bot') {
+    const audioRow = document.createElement('div');
+    audioRow.className = 'vbubble-audio';
+    audioRow.id = 'bot-audio-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+    audioRow.style.display = 'none'; // oculto até o áudio chegar
+    wrap.appendChild(audioRow);
+  }
+
   // Insere antes do typing indicator
   historyEl.insertBefore(wrap, vtypingEl);
 
@@ -572,6 +611,14 @@ function startBotBubble() {
 
   wrap.appendChild(label);
   wrap.appendChild(bub);
+
+  // Linha de áudio (será preenchida quando o áudio chegar)
+  const audioRow = document.createElement('div');
+  audioRow.className = 'vbubble-audio';
+  audioRow.id = 'bot-audio-' + Date.now();
+  audioRow.style.display = 'none';
+  wrap.appendChild(audioRow);
+
   historyEl.insertBefore(wrap, vtypingEl);
 
   currentBotWrap   = wrap;
@@ -591,14 +638,6 @@ function finalizeBotBubble() {
   const s = getSettings();
   if (currentBotWrap && s.wordTooltip !== false && window.WordTooltip) {
     WordTooltip.makeClickable(currentBotWrap);
-  }
-
-  // Adiciona linha de controles de áudio (será preenchida quando o áudio chegar)
-  if (currentBotWrap) {
-    const audioRow = document.createElement('div');
-    audioRow.className = 'vbubble-audio';
-    audioRow.id = 'bot-audio-' + Date.now();
-    currentBotWrap.appendChild(audioRow);
   }
 
   currentBotBubble = null;

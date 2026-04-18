@@ -185,8 +185,9 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-function nowTime() {
-  return new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+function nowTime(isoString = null) {
+  const date = isoString ? new Date(isoString) : new Date();
+  return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
 function formatMarkdown(text) {
@@ -209,10 +210,13 @@ async function applyAccessControl() {
   try {
     const access = await apiGet('/users/permissions/access');
 
-    // ── Admin → mostra dashboard ──────────────────────────────
-    if (access.is_admin) {
-      const dashBtn = document.getElementById('btn-dashboard');
-      if (dashBtn) dashBtn.style.display = '';
+    // ── Dashboard: SOMENTE para professores/staff ──────────────
+    // is_admin não significa acesso ao dashboard - só teachers
+    const user = getUser();
+    const isStaffRole = isStaff(user);
+    const dashBtn = document.getElementById('btn-dashboard');
+    if (dashBtn) {
+      dashBtn.style.display = isStaffRole ? '' : 'none';
     }
 
     // ── Período gratuito (antes de 01/05/2026) ────────────────
@@ -285,6 +289,30 @@ function _showFreeMessagesBadge(remaining) {
   }
 
   document.body.appendChild(badge);
+}
+
+// ── Toast notifications (Toastify) ──────────────────────────────────
+function showToast(msg, type = 'info') {
+    const cfg = {
+        duration: 3500,
+        close: true,
+        gravity: 'top',
+        position: 'right',
+        stopOnFocus: true,
+    };
+    switch (type) {
+        case 'success':
+            Toastify({ text: msg, backgroundColor: '#10b981', ...cfg }).showToast();
+            break;
+        case 'error':
+            Toastify({ text: msg, backgroundColor: '#ef4444', ...cfg }).showToast();
+            break;
+        case 'warning':
+            Toastify({ text: msg, backgroundColor: '#f59e0b', ...cfg }).showToast();
+            break;
+        default:
+            Toastify({ text: msg, backgroundColor: '#6366f1', ...cfg }).showToast();
+    }
 }
 
 // ── KEEP-ALIVE: previne logout por inatividade ─────────────────────
