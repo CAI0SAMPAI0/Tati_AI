@@ -1,7 +1,7 @@
 """
 Router de Relatórios de Progresso.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends
 from routers.deps import get_current_user
 from services.progress_report import get_weekly_report, get_monthly_report
@@ -27,7 +27,7 @@ async def get_study_time(current_user: dict = Depends(get_current_user)):
     """Tempo de estudo do usuário por período."""
     db = get_client()
     username = current_user["username"]
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
 
     # Calcular períodos
     week_ago = now - timedelta(days=7)
@@ -144,7 +144,7 @@ async def get_user_ranking_position(current_user: dict = Depends(get_current_use
     username = current_user["username"]
 
     # Calcular scores de todos os usuários do mês atual
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     rankings = _calculate_rankings(db, month_start)
@@ -184,7 +184,7 @@ async def get_user_ranking_position(current_user: dict = Depends(get_current_use
 async def get_top_15_ranking(current_user: dict = Depends(get_current_user)):
     """Top 15 do ranking do mês."""
     db = get_client()
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     rankings = _calculate_rankings(db, month_start)
@@ -209,7 +209,7 @@ async def get_top_15_ranking(current_user: dict = Depends(get_current_user)):
 async def get_previous_month_winners(current_user: dict = Depends(get_current_user)):
     """Vencedores do mês anterior."""
     db = get_client()
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
 
     # Primeiro dia do mês atual
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)

@@ -568,7 +568,7 @@ const TRANSLATIONS = {
         'act.nav_profile': 'Meu Perfil',
         'act.nav_achievements': 'Conquistas',
         'act.nav_competitions': 'Competições',
-        'act.nav_logout': 'Sair',
+        'act.nav_logout': 'Voltar ao chat',
 
         // ── Atividades — Profile ─────────────────────────────────────────
         'act.profile_title': 'Meu Perfil',
@@ -1213,7 +1213,7 @@ const TRANSLATIONS = {
         'act.nav_profile': 'My Profile',
         'act.nav_achievements': 'Achievements',
         'act.nav_competitions': 'Competitions',
-        'act.nav_logout': 'Sign out',
+        'act.nav_logout': 'Back to chat',
 
         // ── Atividades — Profile ─────────────────────────────────────────
         'act.profile_title': 'My Profile',
