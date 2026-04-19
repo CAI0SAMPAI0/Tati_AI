@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 from routers.deps import get_current_user
 from services.progress_report import get_weekly_report, get_monthly_report
 from services.database import get_client
+from services.upstash import cache_get, cache_set
 
 router = APIRouter()
 
@@ -13,13 +14,27 @@ router = APIRouter()
 @router.get("/reports/weekly")
 async def get_weekly(current_user: dict = Depends(get_current_user)):
     """Relatório semanal de progresso."""
-    return get_weekly_report(current_user["username"])
+    username = current_user["username"]
+    cache_key = f"report:weekly:{username}"
+    cached = await cache_get(cache_key)
+    if cached:
+        return cached
+    result = get_weekly_report(username)
+    await cache_set(cache_key, result, ttl=1800)  # 30 minutos
+    return result
 
 
 @router.get("/reports/monthly")
 async def get_monthly(current_user: dict = Depends(get_current_user)):
     """Relatório mensal de progresso."""
-    return get_monthly_report(current_user["username"])
+    username = current_user["username"]
+    cache_key = f"report:monthly:{username}"
+    cached = await cache_get(cache_key)
+    if cached:
+        return cached
+    result = get_monthly_report(username)
+    await cache_set(cache_key, result, ttl=3600)  # 1 hora
+    return result
 
 
 @router.get("/progress/study-time")
@@ -77,8 +92,13 @@ async def get_study_time(current_user: dict = Depends(get_current_user)):
 @router.get("/trophies/all")
 async def get_all_trophies(current_user: dict = Depends(get_current_user)):
     """Todas as medalhas/troféus com progresso do usuário."""
-    db = get_client()
     username = current_user["username"]
+    cache_key = f"trophies_all:{username}"
+    cached = await cache_get(cache_key)
+    if cached:
+        return cached
+
+    db = get_client()
 
     # Troféus conquistados
     earned = db.table("user_trophies").select("*").eq("username", username).execute().data
@@ -130,26 +150,29 @@ async def get_all_trophies(current_user: dict = Depends(get_current_user)):
             "progress_pct":  round((cur_val / req_val) * 100) if req_val else 0,
         })
 
-    return {
+    result = {
         "earned": len(earned_ids),
         "total":  len(all_trophies),
         "medals": medals,
     }
+    await cache_set(cache_key, result, ttl=300) # 5 minutos
+    return result
 
 
 @router.get("/ranking/position")
 async def get_user_ranking_position(current_user: dict = Depends(get_current_user)):
     """Posição do usuário no ranking."""
-    db = get_client()
     username = current_user["username"]
+    cache_key = f"ranking:position:{username}"
+    cached = await cache_get(cache_key)
+    if cached:
+        return cached
 
-    # Calcular scores de todos os usuários do mês atual
+    db = get_client()
     now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
     rankings = _calculate_rankings(db, month_start)
 
-    # Encontrar posição do usuário
     user_pos = None
     user_entry = None
     for i, entry in enumerate(rankings):
@@ -169,7 +192,7 @@ async def get_user_ranking_position(current_user: dict = Depends(get_current_use
             "exercises": 0,
         }
 
-    return {
+    result = {
         "position": user_pos,
         "name": user_entry.get("name", username),
         "score": user_entry.get("score", 0),
@@ -178,19 +201,24 @@ async def get_user_ranking_position(current_user: dict = Depends(get_current_use
         "flashcards": user_entry.get("flashcards", 0),
         "exercises": user_entry.get("exercises", 0),
     }
+    await cache_set(cache_key, result, ttl=300)  # 5 minutos
+    return result
 
 
 @router.get("/ranking/top15")
 async def get_top_15_ranking(current_user: dict = Depends(get_current_user)):
     """Top 15 do ranking do mês."""
+    cache_key = "ranking:top15"
+    cached = await cache_get(cache_key)
+    if cached:
+        return cached
+
     db = get_client()
     now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     rankings = _calculate_rankings(db, month_start)
-    top_15 = rankings[:15]
-
-    return [
+    top_15 = [
         {
             "username": r["username"],
             "name": r.get("name", r["username"]),
@@ -201,8 +229,10 @@ async def get_top_15_ranking(current_user: dict = Depends(get_current_user)):
             "exercises": r.get("exercises", 0),
             "tokens": r.get("tokens", 0),
         }
-        for r in top_15
+        for r in rankings[:15]
     ]
+    await cache_set(cache_key, top_15, ttl=300)  # 5 minutos
+    return top_15
 
 
 @router.get("/ranking/winners")

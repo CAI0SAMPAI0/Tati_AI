@@ -11,6 +11,9 @@ import json, os, uuid
 from routers.deps import get_current_user
 from services.database import get_client
 from services.llm import groq_chat
+# sistema de cache
+from services.upstash import cache_get, cache_set, cache_delete
+
 
 router = APIRouter()
 
@@ -112,6 +115,8 @@ async def admin_create_module(payload: ModuleIn, user=Depends(get_current_user))
             q_res = db.table("quizzes").insert({"module_id": mod_id, "title": payload.quiz.title}).execute()
             quiz_id = q_res.data[0]["id"]
             db.table("quiz_questions").insert([{"quiz_id": quiz_id, **q.model_dump()} for q in payload.quiz.questions]).execute()
+        
+        await cache_delete("modules:list:all")  # invalida cache global se existir
         return {"ok": True, "module_id": mod_id}
     except Exception as e:
         raise HTTPException(500, f"Erro ao criar: {str(e)}")
@@ -141,6 +146,8 @@ async def admin_update_module(module_id: str, payload: ModuleIn, user=Depends(ge
                 q_res = db.table("quizzes").insert({"module_id": module_id, "title": payload.quiz.title}).execute()
                 quiz_id = q_res.data[0]["id"]
                 db.table("quiz_questions").insert([{"quiz_id": quiz_id, **q.model_dump()} for q in payload.quiz.questions]).execute()
+        
+        await cache_delete("modules:list:all")
         return {"ok": True}
     except Exception as e:
         raise HTTPException(500, f"Erro ao atualizar: {str(e)}")
@@ -235,54 +242,52 @@ async def admin_upload_content(file: UploadFile = File(...), user=Depends(get_cu
 async def admin_delete_module(module_id: str, user=Depends(get_current_user)):
     _require_admin(user)
     get_client().table("modules").delete().eq("id", module_id).execute()
+    await cache_delete("modules:list:all")
     return {"ok": True}
 
 
-# ── Rotas ALUNO (Devem vir DEPOIS) ─────────────────────────────────────────────
-
+# ── Rotas ALUNO 
 @router.get("/")
 async def list_modules(user=Depends(get_current_user)):
     """Lista módulos publicados para o aluno com progresso (tentativas)."""
     db = get_client()
     username = user["username"]
     user_level = user.get("level") or "Beginner"
-    
-    # Busca módulos
+
+    cache_key = f"modules:list:{username}"
+    cached = await cache_get(cache_key)
+    if cached:
+        return cached
+
     res = db.table("modules").select("*, quizzes(id, title, description)").eq("is_published", True).order("order").execute()
     modules_data = res.data or []
-    
-    # Busca progresso do usuário (tentativas de quiz)
+
     progress_res = db.table("user_progress").select("quiz_id, score").eq("username", username).execute()
     progress_data = progress_res.data or []
-    best_score_map = {p["quiz_id"]: p["score"] for p in progress_data}
-
-    # Conta tentativas reais pelo study_sessions
-    sessions_res = db.table("study_sessions").select("quiz_id").eq("username", username).eq("activity_type", "quiz").execute()
     attempts_map = {}
     for p in progress_data:
         qid = p["quiz_id"]
         attempts_map[qid] = attempts_map.get(qid, 0) + 1
-    
+
     filtered = []
     for m in modules_data:
         lvls = m.get("levels") or []
         sing = m.get("level")
-        
-        # Filtro de nível
-        show = False
-        if not lvls and not sing: show = True
-        elif "all" in lvls or "todos" in lvls or sing in ["all", "todos"]: show = True
-        elif user_level in lvls or user_level == sing: show = True
-        
+        show = (
+            (not lvls and not sing)
+            or "all" in lvls or "todos" in lvls
+            or sing in ["all", "todos"]
+            or user_level in lvls or user_level == sing
+        )
         if show:
             quizzes = m.get("quizzes", [])
             for q in quizzes:
                 q["attempts"] = attempts_map.get(q["id"], 0)
-            
             m["has_quiz"] = len(quizzes) > 0
             m["has_flashcards"] = isinstance(m.get("flashcards"), list) and len(m.get("flashcards", [])) > 0
             filtered.append(m)
-            
+
+    await cache_set(cache_key, filtered, ttl=600)  # 10 minutos
     return filtered
 
 @router.get("/{module_id}")

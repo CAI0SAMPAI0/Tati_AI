@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from routers.deps import get_current_user
 from services.database import get_client
 from services.document_validator import validate_document_auto
+from services.upstash import cache_get, cache_set, cache_delete
 
 router = APIRouter()
 
@@ -76,7 +77,14 @@ def _fetch_user(username: str) -> dict:
 
 @router.get("/")
 async def get_profile(current_user: dict = Depends(get_current_user)):
-    return _fetch_user(current_user["username"])
+    username = current_user["username"]
+    cache_key = f"profile:{username}"
+    cached = await cache_get(cache_key)
+    if cached:
+        return cached
+    result = _fetch_user(username)
+    await cache_set(cache_key, result, ttl=600)  # 10 minutos
+    return result
 
 
 @router.put("/")
@@ -113,6 +121,7 @@ async def update_profile(body: ProfileUpdate, current_user: dict = Depends(get_c
 
     update_data = {**top_level, "profile": profile}
     db.table("users").update(update_data).eq("username", username).execute()
+    await cache_delete(f"profile:{username}")  # invalida ao editar
     return {"ok": True, "updated": update_data}
 
 
@@ -138,4 +147,5 @@ async def upload_avatar(file: UploadFile = File(...), current_user: dict = Depen
         profile["avatar_url"] = data_url
         db.table("users").update({"profile": profile}).eq("username", username).execute()
 
+    await cache_delete(f"profile:{username}")  # invalida ao trocar avatar
     return {"ok": True, "avatar_url": data_url}

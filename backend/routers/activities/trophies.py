@@ -4,6 +4,7 @@ Troféus conquistados pelo aluno.
 from fastapi import APIRouter, Depends
 from routers.deps import get_current_user, require_staff
 from services.database import get_client
+from services.upstash import cache_get, cache_set
 
 router = APIRouter()
 
@@ -11,8 +12,13 @@ router = APIRouter()
 @router.get("/")
 async def my_trophies(current_user: dict = Depends(get_current_user)):
     """Troféus do aluno logado."""
-    db = get_client()
     username = current_user["username"]
+    cache_key = f"trophies:{username}"
+    cached = await cache_get(cache_key)
+    if cached:
+        return cached
+
+    db = get_client()
     
     # Busca troféus conquistados pelo mapeamento user_trophies -> trophies
     try:
@@ -31,6 +37,7 @@ async def my_trophies(current_user: dict = Depends(get_current_user)):
                 "category": t.get("category"),
                 "earned_at": row.get("earned_at")
             })
+        await cache_set(cache_key, trophies, ttl=300)  # 5 minutos
         return trophies
     except Exception as e:
         print(f"[Trophies Router] Erro: {e}")

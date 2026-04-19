@@ -24,6 +24,28 @@ def award_trophy(username: str, trophy_name: str) -> bool:
         }).execute()
         
         print(f"[Trophy Service] Troféu '{trophy_name}' concedido a {username}")
+        
+        # Invalida caches relacionados
+        try:
+            import asyncio
+            from services.upstash import cache_delete
+            
+            async def _invalidate():
+                await cache_delete(f"trophies:{username}")
+                await cache_delete(f"trophies_all:{username}")
+                await cache_delete(f"streak:{username}")
+                
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(_invalidate())
+                else:
+                    loop.run_until_complete(_invalidate())
+            except Exception:
+                pass
+        except Exception:
+            pass
+            
         return True
     except Exception as e:
         # Se cair aqui, provavelmente já tem o troféu (Unique constraint violation) ou erro de banco

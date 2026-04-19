@@ -162,6 +162,24 @@ class UpstashService:
 upstash_service = UpstashService()
 
 
+async def invalidate_user_cache(username: str):
+    """Invalida todo o cache de um usuário de uma vez."""
+    keys = [
+        f"profile:{username}",
+        f"xp:{username}",
+        f"streak:{username}",
+        f"vocabulary:{username}",
+        f"trophies:{username}",
+        f"trophies_all:{username}",
+        f"modules:list:{username}",
+        f"report:weekly:{username}",
+        f"report:monthly:{username}",
+        f"study_time:{username}",
+    ]
+    for key in keys:
+        await cache_delete(key)
+
+
 # ── Funções de conveniência ──────────────────────────────────────────────
 
 async def cache_get(key: str) -> Optional[dict]:
