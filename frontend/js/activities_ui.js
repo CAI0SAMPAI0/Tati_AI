@@ -24,7 +24,7 @@ function switchSection(sectionId, closeSidebar = true) {
   const navItem = document.getElementById(`nav-${sectionId}`);
   if (navItem) navItem.classList.add('active');
 
-  localStorage.setItem('last_section', sectionId);
+  history.replaceState(null, null, `#${sectionId}`);
 
   if (closeSidebar) {
     const sidebar = document.getElementById('sidebar');
@@ -72,8 +72,9 @@ function switchSubTab(tabName) {
 }
 
 async function restoreState(closeSidebar = true) {
-  const savedSection = localStorage.getItem('last_section') || 'activities';
-  const savedSubTab = localStorage.getItem('last_subtab') || 'quiz';
+  const hash = window.location.hash.replace('#', '');
+  const savedSection = hash || 'activities';
+  const savedSubTab = 'quiz';
   switchSection(savedSection, closeSidebar);
   if (savedSection === 'activities') switchSubTab(savedSubTab);
 }
@@ -372,11 +373,11 @@ async function loadFlashcards() {
 const SIM_KEY_MAP = {
   'Check-in no Aeroporto': 'airport_checkin',
   'Entrevista de Emprego': 'job_interview',
-  'Fazendo Compras':       'shopping',
-  'No Aeroporto':          'at_airport',
-  'No Hotel':              'at_hotel',
-  'No Médico':             'at_doctor',
-  'No Restaurante':        'at_restaurant',
+  'Fazendo Compras': 'shopping',
+  'No Aeroporto': 'at_airport',
+  'No Hotel': 'at_hotel',
+  'No Médico': 'at_doctor',
+  'No Restaurante': 'at_restaurant',
   'Pedido no Restaurante': 'restaurant_order'
 };
 
@@ -386,7 +387,7 @@ async function loadSimulations() {
     const container = document.getElementById('sub-content-simulations');
     if (!container) return;
     if (!data.length) { container.innerHTML = `<p class="empty-view">${t('act.sim_none')}</p>`; return; }
-    
+
     container.innerHTML = `<div class="simulation-grid">${data.map(s => {
       const key = SIM_KEY_MAP[s.name];
       const title = key ? t(`sim.title_${key}`) : s.name;
@@ -479,56 +480,56 @@ async function loadAchievements() {
     if (bar) bar.style.width = `${pct}%`;
 
     const TROPHY_KEY_MAP = {
-      'Primeiro Quiz':       'first_quiz',
-      'Quizzer Iniciante':   'quizzer_5',
-      'Quizzer':             'quizzer_10',
-      'Quizzer Avançado':    'quizzer_25',
-      'Mestre dos Quizzes':  'quizzer_50',
-      'Mestre Supremo':      'quizzer_100',
-      'Primeiro Dia':        'streak_1',
-      'Ofensiva de 3 Dias':  'streak_3',
-      'Ofensiva de 7 Dias':  'streak_7',
+      'Primeiro Quiz': 'first_quiz',
+      'Quizzer Iniciante': 'quizzer_5',
+      'Quizzer': 'quizzer_10',
+      'Quizzer Avançado': 'quizzer_25',
+      'Mestre dos Quizzes': 'quizzer_50',
+      'Mestre Supremo': 'quizzer_100',
+      'Primeiro Dia': 'streak_1',
+      'Ofensiva de 3 Dias': 'streak_3',
+      'Ofensiva de 7 Dias': 'streak_7',
       'Ofensiva de 14 Dias': 'streak_14',
       'Ofensiva de 30 Dias': 'streak_30',
       'Ofensiva de 60 Dias': 'streak_60',
       'Ofensiva de 100 Dias': 'streak_100',
       'Ofensiva de 365 Dias': 'streak_365',
-      'Primeira Mensagem':   'first_msg',
-      'Popular':             'msg_50',
-      '100 Mensagens':       'msg_100',
-      'Comunicador':         'msg_200',
-      '500 Mensagens':       'msg_500',
-      'Falante':             'msg_1000',
-      'Primeira Simulação':  'sim_1',
-      'Ator Iniciante':      'sim_5',
-      'Estrela de Simulação':'sim_20',
-      'Primeiro Crédito':    'credit_1',
-      'Economizador':        'credit_10',
-      'Colecionador':        'credit_50',
-      'Rico':                'credit_100',
-      'Magnata':             'credit_500',
-      'Primeira Hora':       'time_1',
-      'Mestre do Tempo':     'time_10',
-      'Tempo Supremo':       'time_50',
-      'Viajante do Tempo':   'time_100',
-      'Vocabulário 10':      'vocab_10',
-      'Vocabulário 50':      'vocab_50',
-      'Vocabulário 100':     'vocab_100',
-      'Poliglota':           'vocab_500',
-      'Dicionário Vivo':     'vocab_1000',
-      'Primeira Meta':       'goal_1',
-      'Focado':              'goal_5',
-      'Objetivo':            'goal_10',
-      'Top 10':              'rank_10',
-      'Top 3':               'rank_3',
-      'Campeão':             'rank_1',
-      'Social':              'social_1',
-      'Explorador':          'explore',
-      'Sempre Alerta':       'alert',
-      'Madrugador':          'early',
-      'Coruja':              'night',
-      'Final de Semana':     'weekend',
-      'Perfeccionista':      'perfect',
+      'Primeira Mensagem': 'first_msg',
+      'Popular': 'msg_50',
+      '100 Mensagens': 'msg_100',
+      'Comunicador': 'msg_200',
+      '500 Mensagens': 'msg_500',
+      'Falante': 'msg_1000',
+      'Primeira Simulação': 'sim_1',
+      'Ator Iniciante': 'sim_5',
+      'Estrela de Simulação': 'sim_20',
+      'Primeiro Crédito': 'credit_1',
+      'Economizador': 'credit_10',
+      'Colecionador': 'credit_50',
+      'Rico': 'credit_100',
+      'Magnata': 'credit_500',
+      'Primeira Hora': 'time_1',
+      'Mestre do Tempo': 'time_10',
+      'Tempo Supremo': 'time_50',
+      'Viajante do Tempo': 'time_100',
+      'Vocabulário 10': 'vocab_10',
+      'Vocabulário 50': 'vocab_50',
+      'Vocabulário 100': 'vocab_100',
+      'Poliglota': 'vocab_500',
+      'Dicionário Vivo': 'vocab_1000',
+      'Primeira Meta': 'goal_1',
+      'Focado': 'goal_5',
+      'Objetivo': 'goal_10',
+      'Top 10': 'rank_10',
+      'Top 3': 'rank_3',
+      'Campeão': 'rank_1',
+      'Social': 'social_1',
+      'Explorador': 'explore',
+      'Sempre Alerta': 'alert',
+      'Madrugador': 'early',
+      'Coruja': 'night',
+      'Final de Semana': 'weekend',
+      'Perfeccionista': 'perfect',
     };
     const grid = document.getElementById('medals-grid');
     if (grid) {

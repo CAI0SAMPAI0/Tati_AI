@@ -49,8 +49,7 @@ window.addEventListener('DOMContentLoaded', () => {
   
   // Recupera seção do hash ou do localStorage
   const hash = window.location.hash.replace('#', '');
-  const saved = localStorage.getItem('dash_active_section');
-  const target = (SECTIONS[hash] ? hash : null) || (SECTIONS[saved] ? saved : 'overview');
+  const target = SECTIONS[hash] ? hash : 'overview';
 
   const navItem = document.querySelector(`.dash-nav-item[href="#${target}"]`);
   setSection(target, navItem);

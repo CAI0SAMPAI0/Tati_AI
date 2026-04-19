@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 from routers.deps import get_current_user
 from services.streaks import get_streak, record_study_day, get_streak_milestones
 from services.database import get_client
+from services.upstash import cache_get, cache_set, cache_delete
 
 router = APIRouter()
 
@@ -14,16 +15,19 @@ router = APIRouter()
 async def get_user_streak(current_user: dict = Depends(get_current_user)):
     """Retorna o streak atual do usuário (usado no header)."""
     username = current_user["username"]
+    cache_key = f"streak:{username}"
+    cached = await cache_get(cache_key)
+    if cached:
+        return cached
+
     data = get_streak(username)
 
-    # Retro-award trophies (check first message, streaks, etc)
     try:
         from services.trophy_service import check_all_trophies
         check_all_trophies(username)
     except Exception as e:
         print(f"[Retro Trophy] Erro: {e}")
 
-    # Contar troféus conquistados
     db = get_client()
     try:
         earned = db.table("user_trophies").select("id").eq("username", username).execute().data
@@ -31,11 +35,13 @@ async def get_user_streak(current_user: dict = Depends(get_current_user)):
     except:
         trophies_earned = 0
 
-    return {
+    result = {
         "current_streak": data.get("current_streak", 0),
         "longest_streak": data.get("longest_streak", 0),
         "trophies_earned": trophies_earned,
     }
+    await cache_set(cache_key, result, ttl=180)  # 3 minutos
+    return result
 
 
 @router.get("/streaks/detail")
@@ -73,6 +79,7 @@ async def get_streak_detail(current_user: dict = Depends(get_current_user)):
 async def record_study(current_user: dict = Depends(get_current_user)):
     """Registra um dia de estudo e atualiza o streak."""
     username = current_user["username"]
+    await cache_delete(f"streak:{username}")  # invalida ao registrar estudo
     return record_study_day(username)
 
 

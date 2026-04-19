@@ -1,25 +1,30 @@
+"""
+Teacher Tati API - Entry Point
+
+Este arquivo inicializa a aplicação FastAPI, configura middlewares (CORS, Rate Limiting),
+integra o Sentry para monitoramento de erros e centraliza o roteamento de todos os módulos.
+"""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from pathlib import Path
 import os
 
-# Força o carregamento do .env da raiz do projeto
+# Força o carregamento do .env da raiz do projeto para garantir consistência nas chaves
 env_path = Path(__file__).parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
-print(f"DEBUG: Carregando chaves de: {env_path}")
-print(f"DEBUG: ElevenLabs Key Configurada: {'Sim' if os.getenv('ELEVENLABS_API_KEY') else 'Não'}")
-print(f"DEBUG: OpenAI Key Configurada: {'Sim' if os.getenv('OPENAI_API_KEY') else 'Não'}")
-
-# Sentry - inicializar antes de tudo para capturar erros desde o início
+# Sentry - Inicialização crítica para captura de exceções em tempo de execução
 from core.sentry_config import init_sentry
 try:
     init_sentry()
 except Exception as e:
     print(f"[Startup] Erro ao iniciar Sentry: {e}")
 
+# Importação dos roteadores de cada domínio da aplicação
 from routers.auth import router as auth_router
+# ... (restante dos imports)
 from routers.users.profile import router as profile_router
 from routers.users.permissions import router as permissions_router
 from routers.users.streaks import router as streaks_router
