@@ -77,6 +77,17 @@ async function loadScenarios() {
     }
 }
 
+const SIM_KEY_MAP = {
+  'Check-in no Aeroporto': 'airport_checkin',
+  'Entrevista de Emprego': 'job_interview',
+  'Fazendo Compras':       'shopping',
+  'No Aeroporto':          'at_airport',
+  'No Hotel':              'at_hotel',
+  'No Médico':             'at_doctor',
+  'No Restaurante':        'at_restaurant',
+  'Pedido no Restaurante': 'restaurant_order'
+};
+
 function renderScenarios() {
     const container = document.getElementById('scenarios-grid');
     if (!container) return;
@@ -85,29 +96,31 @@ function renderScenarios() {
         container.innerHTML = `
             <div class="sim-loading">
                 <i class="fa-solid fa-exclamation-circle"></i>
-                <p>Nenhum cenário disponível.</p>
+                <p>${t('act.sim_none')}</p>
             </div>
         `;
         return;
     }
     
-    container.innerHTML = scenarios.map(s => `
+    container.innerHTML = scenarios.map(s => {
+        const key = SIM_KEY_MAP[s.name];
+        const title = key ? t(`sim.title_${key}`) : s.name;
+        const desc = key ? t(`sim.desc_${key}`) : s.description;
+
+        return `
         <div class="scenario-card" onclick="openScenario('${s.id}')">
             <div class="scenario-icon">${s.icon}</div>
-            <div class="scenario-name">${s.name}</div>
-            <div class="scenario-desc">${s.description}</div>
+            <div class="scenario-name">${title}</div>
+            <div class="scenario-desc">${desc}</div>
             <span class="scenario-difficulty ${s.difficulty}">${getDifficultyLabel(s.difficulty)}</span>
         </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function getDifficultyLabel(diff) {
-    const labels = {
-        beginner: 'Iniciante',
-        intermediate: 'Intermediário',
-        advanced: 'Avançado'
-    };
-    return labels[diff] || diff;
+    const key = diff?.toLowerCase().replace('-', '_');
+    return t(`level.${key}`) || diff;
 }
 
 function startRandomSimulation() {
@@ -124,8 +137,9 @@ async function openScenario(scenarioId) {
     simConversationId = null;
     simVoiceMode = simMode === 'both' ? 'text' : simMode;
     
+    const key = SIM_KEY_MAP[currentScenario.name];
     document.getElementById('sim-icon').textContent = currentScenario.icon;
-    document.getElementById('sim-title').textContent = currentScenario.name;
+    document.getElementById('sim-title').textContent = key ? t(`sim.title_${key}`) : currentScenario.name;
     document.getElementById('sim-diff').textContent = getDifficultyLabel(currentScenario.difficulty);
     document.getElementById('sim-diff').className = `sim-diff ${currentScenario.difficulty}`;
     

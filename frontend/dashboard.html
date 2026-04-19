@@ -368,45 +368,62 @@
     </div>
 
     <!-- Modal Criar Simulação -->
-    <div id="create-sim-modal" class="mod-modal-overlay" style="display:none" onclick="if(event.target===this)closeCreateSimulationModal()">
+    <div id="create-sim-modal" class="mod-modal-overlay" style="display:none"
+        onclick="if(event.target===this)closeCreateSimulationModal()">
         <div class="mod-modal">
             <div class="mod-modal-header">
                 <h2 id="sim-modal-title" data-i18n="dash.new_simulation">Criar Simulação</h2>
-                <button onclick="closeCreateSimulationModal()" class="mod-modal-close"><i class="fa-solid fa-xmark"></i></button>
+                <button onclick="closeCreateSimulationModal()" class="mod-modal-close"><i
+                        class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="mod-modal-body">
                 <div class="mod-field">
-                    <label>Nome da Simulação</label>
-                    <input id="sim-name" type="text" placeholder="Ex: No Aeroporto / At the Airport">
+                    <label data-i18n="sim.modal_name">Nome da Simulação</label>
+                    <input id="sim-name" type="text" data-i18n-placeholder="sim.modal_name_ph"
+                        placeholder="Ex: No Aeroporto / At the Airport">
                 </div>
                 <div class="mod-field">
-                    <label>Descrição</label>
-                    <textarea id="sim-desc" rows="2" placeholder="Pratique conversas em aeroportos..."></textarea>
+                    <label data-i18n="sim.modal_desc">Descrição</label>
+                    <textarea id="sim-desc" rows="2" data-i18n-placeholder="sim.modal_desc_ph"
+                        placeholder="Pratique conversas em aeroportos..."></textarea>
                 </div>
                 <div class="mod-field">
-                    <label>Ícone (emoji)</label>
-                    <input id="sim-icon" type="text" value="🎭" placeholder="🎭">
+                    <label data-i18n="sim.modal_icon">Ícone (emoji)</label>
+                    <style>
+                        .input-emoji::placeholder {
+                            color: #b0b0b0;
+                            font-style: italic;
+                            opacity: 0.5;
+                        }
+                    </style>
+                    <input id="sim-icon" type="text" value="🎭" placeholder="🎭" class="input-emoji">
                 </div>
                 <div class="mod-field">
-                    <label>Dificuldade</label>
+                    <label data-i18n="sim.modal_diff">Dificuldade</label>
                     <select id="sim-difficulty">
-                        <option value="beginner">Iniciante</option>
-                        <option value="intermediate">Intermediário</option>
-                        <option value="advanced">Avançado</option>
+                        <option value="Beginner" data-i18n="level.beginner">Beginner</option>
+                        <option value="Pre-Intermediate" data-i18n="level.pre_int">Pre-Intermediate</option>
+                        <option value="Intermediate" data-i18n="level.intermediate">Intermediate</option>
+                        <option value="Business English" data-i18n="level.business">Business English</option>
+                        <option value="Advanced" data-i18n="level.advanced">Advanced</option>
                     </select>
                 </div>
                 <div class="mod-field">
-                    <label>System Prompt (instruções para a IA)</label>
-                    <textarea id="sim-prompt" rows="6" placeholder="You are a TSA agent at JFK airport..."></textarea>
+                    <label data-i18n="sim.modal_prompt">System Prompt (instruções para a IA)</label>
+                    <textarea id="sim-prompt" rows="6" data-i18n-placeholder="sim.modal_prompt_ph"
+                        placeholder="You are a TSA agent at JFK airport..."></textarea>
                 </div>
                 <div class="mod-field" style="display:flex;align-items:center;gap:0.5rem;">
                     <input id="sim-use-ai" type="checkbox" style="width:auto;" checked>
-                    <label for="sim-use-ai" style="margin:0;">Gerar prompt com IA (recomendado)</label>
+                    <label for="sim-use-ai" style="margin:0;" data-i18n="sim.modal_gen_ai">Gerar prompt com IA
+                        (recomendado)</label>
                 </div>
             </div>
             <div class="mod-modal-footer">
-                <button class="btn-mod-secondary" onclick="closeCreateSimulationModal()">Cancelar</button>
-                <button class="btn-mod-primary" onclick="createSimulation()">Criar</button>
+                <button class="btn-mod-secondary" onclick="closeCreateSimulationModal()"
+                    data-i18n="gen.cancel">Cancelar</button>
+                <button class="btn-mod-primary" onclick="saveSimulation()" id="btn-save-sim"
+                    data-i18n="gen.save">Salvar</button>
             </div>
         </div>
     </div>

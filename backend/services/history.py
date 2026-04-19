@@ -83,7 +83,7 @@ async def load_history(conversation_id: str) -> list[dict]:
         # O nome da coluna link no seu banco é session_id (tipo text)
         result = (
             db.table("messages")
-            .select("role, content, audio_b64")
+            .select("role, content, audio_b64, created_at")
             .eq("session_id", conversation_id)
             .order("created_at", desc=False)
             .execute()

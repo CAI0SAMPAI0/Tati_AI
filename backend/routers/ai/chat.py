@@ -36,12 +36,6 @@ _SOURCE_MARKERS = ["📚 Fontes", "Fontes consultadas:", "Sources:", "References
 
 
 # ── Models ────────────────────────────────────────────────────────────────────
-
-
-class CreateConversationBody(BaseModel):
-    title: str = "Nova conversa"
-
-
 class RenameConversationBody(BaseModel):
     title: str
 
@@ -271,6 +265,22 @@ async def new_conversation(
     )
 
 
+from fastapi.responses import FileResponse
+from services.pdf_generator import generate_report_pdf
+
+class DownloadReportRequest(BaseModel):
+    content: str
+    filename: str = "tati_study_report.pdf"
+
+@router.post("/download_report")
+async def download_report(body: DownloadReportRequest, current_user: dict = Depends(get_current_user)):
+    try:
+        path = generate_report_pdf(body.content, body.filename)
+        return FileResponse(path, filename=body.filename, media_type="application/pdf")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar PDF: {str(e)}")
+
+
 @router.get("/conversations")
 async def get_conversations(current_user: dict = Depends(get_current_user)):
     return await list_conversations(current_user["username"])
@@ -358,8 +368,6 @@ async def get_summary(conversation_id: str, lang: str = Query(default='pt'), cur
 
 @router.websocket("/ws")
 async def chat_ws(websocket: WebSocket, token: str | None = Query(None)):
-    # 1. Tenta obter token via subprotocolo (Sec-WebSocket-Protocol) - Oculta do log do Uvicorn!
-    # O browser envia ["access_token", "JWT_AQUI"]
     ws_token = token
     subprotocol = None
     
@@ -375,7 +383,6 @@ async def chat_ws(websocket: WebSocket, token: str | None = Query(None)):
         await websocket.close(code=4001, reason="Token inválido")
         return
 
-    # Aceita a conexão com o subprotocolo se usado
     await websocket.accept(subprotocol=subprotocol)
     username = payload["sub"]
     
@@ -403,7 +410,6 @@ async def chat_ws(websocket: WebSocket, token: str | None = Query(None)):
 
 
 async def _handle_chat_message(websocket: WebSocket, msg: dict, username: str) -> None:
-    # Inicializa access aqui para garantir que está sempre definido no escopo
     access = {"allowed": True, "reason": None, "free_messages_remaining": None}
 
     try:
@@ -414,13 +420,6 @@ async def _handle_chat_message(websocket: WebSocket, msg: dict, username: str) -
         if msg_type not in ("text", "audio", "file") or not conv_id:
             await websocket.send_json({"type": "error", "detail": "Tipo ou conversation_id inválido"})
             return
-
-        # Registra streak do dia
-        try:
-            from services.streaks import record_study_day
-            record_study_day(username)
-        except Exception as e:
-            print(f"[Streak] Erro ao registrar: {e}")
 
         # ── Processa tipo de input ────────────────────────
         if msg_type == "file":
@@ -453,20 +452,25 @@ async def _handle_chat_message(websocket: WebSocket, msg: dict, username: str) -
             })
             return
 
-        # Avisa quantas mensagens restam (se aplicável)
         remaining = access.get("free_messages_remaining")
         if remaining is not None:
             await websocket.send_json({"type": "free_warning", "remaining": remaining})
 
         # ── Histórico e auto-título ───────────────────────
-        print(f"DEBUG: Carregando histórico para conv {conv_id}...")
         history = await load_history(conv_id)
         if not history:
             await auto_title(conv_id, username, content[:50])
 
+        # ── Salva Mensagem e Registra Streak ──────────────
         print(f"DEBUG: Salvando mensagem do usuário...")
         await save_message(conv_id, username, "user", content)
         history.append({"role": "user", "content": content})
+
+        try:
+            from services.streaks import record_study_day
+            record_study_day(username)
+        except Exception as e:
+            print(f"[Streak] Erro ao registrar: {e}")
 
         # ── Monta prompt ──────────────────────────────────
         profile          = await _get_user_profile(username)
@@ -474,12 +478,28 @@ async def _handle_chat_message(websocket: WebSocket, msg: dict, username: str) -
         effective_prompt = build_effective_prompt(profile, rag_result.contexto)
 
         # ── Streaming ─────────────────────────────────────
-        print(f"DEBUG: Iniciando stream com Groq...")
+        level_limits = {
+            "Beginner": 300,
+            "Pre-Intermediate": 500,
+            "Intermediate": 800,
+            "Advanced": 1200,
+            "Business English": 1200
+        }
+        max_tokens = level_limits.get(profile.level, 1500)
+
+        # Se for pedido de relatório/PDF, aumenta o limite para garantir conteúdo completo
+        _report_keywords = ["report", "pdf", "study material", "study guide", "lesson", "exercise",
+                             "worksheet", "relatorio", "relatório", "material", "exercicio", "exercício"]
+        _is_report_request = any(kw in content.lower() for kw in _report_keywords)
+        if _is_report_request:
+            max_tokens = 4000
+
+        print(f"DEBUG: Iniciando stream com Groq (max_tokens={max_tokens})...")
         await websocket.send_json({"type": "stream_start", "conversation_id": conv_id})
         full_response = ""
 
         try:
-            async for token_chunk in stream_llm(effective_prompt, history):
+            async for token_chunk in stream_llm(effective_prompt, history, max_tokens=max_tokens):
                 full_response += token_chunk
                 await websocket.send_json({"type": "stream_token", "token": token_chunk})
         except Exception as exc:
@@ -488,33 +508,30 @@ async def _handle_chat_message(websocket: WebSocket, msg: dict, username: str) -
             return
 
         # ── TTS e finalização ─────────────────────────────
-        print(f"DEBUG: Finalizando resposta...")
         tts_text = _clean_tts_text(full_response)
-        
-        # Gera áudio antes de salvar
         audio_b64 = await text_to_speech(tts_text)
-        
-        # Salva mensagem com áudio
         await save_message(conv_id, username, "assistant", full_response, audio_b64=audio_b64)
 
-        # Incrementa contador apenas para usuários no período gratuito
+        try:
+            from services.trophy_service import check_chat_trophies
+            check_chat_trophies(username)
+        except Exception as e:
+            print(f"[Trophy Chat] Erro: {e}")
+
         if access.get("free_messages_remaining") is not None:
             _increment_free_messages(username)
 
-        # Envia áudio para o cliente
         if audio_b64:
             await websocket.send_json({"type": "audio_response", "audio": audio_b64, "conversation_id": conv_id})
 
         await websocket.send_json({"type": "stream_end", "conversation_id": conv_id})
-        print(f"DEBUG: Resposta enviada com sucesso!")
 
-        # Grava tempo de estudo ~=
         try:
             db = get_client()
             db.table("study_sessions").insert({
                 "username": username,
                 "activity_type": "chat",
-                "duration_minutes": 2  # ~2 min por troca de mensagem
+                "duration_minutes": 2
             }).execute()
         except Exception as e:
             print(f"[StudyTime] Erro ao gravar sessão: {e}")

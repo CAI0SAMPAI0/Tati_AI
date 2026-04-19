@@ -11,6 +11,8 @@
     <link rel="icon" type="image/x-icon" href="/assets/images/tati_logo.jpg">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <link rel="stylesheet" href="styles/activities.css">
+    <link rel="stylesheet" href="htt ps://site-assets.fontawesome.com/releases/v6.4.2/css/all.css">
+
 </head>
 
 <body>
@@ -18,7 +20,8 @@
     <!-- ── HEADER ─ -->
     <header class="topbar">
         <div class="topbar-left">
-            <button class="btn-menu" id="btn-menu-open" onclick="openSidebar()"><i class="fa-solid fa-bars"></i></button>
+            <button class="btn-menu" id="btn-menu-open" onclick="openSidebar()"><i
+                    class="fa-solid fa-bars"></i></button>
             <div class="topbar-logo">Teacher<span>Tati</span></div>
         </div>
 
@@ -45,7 +48,7 @@
                 <span class="notif-dot"></span>
             </button>
 
-            <div class="user-pill" onclick="window.location.href='chat.html'">
+            <div class="user-pill" onclick="window.location.href='profile.html'">
                 <span class="user-name" id="header-user-name">Usuário</span>
                 <img class="user-avatar-img" id="header-user-avatar-img" src="" alt="" style="display:none;"
                     onerror="this.style.display='none'; document.getElementById('header-user-avatar').style.display='flex';">
@@ -59,12 +62,15 @@
         <aside class="sidebar closed" id="sidebar">
             <div class="sidebar-header">
                 <span data-i18n="act.sidebar_menu">Menu Principal</span>
-                <button class="btn-close-sidebar" id="btn-menu-close" onclick="closeSidebarNav()"><i class="fa-solid fa-xmark"></i></button>
+                <button class="btn-close-sidebar" id="btn-menu-close" onclick="closeSidebarNav()"><i
+                        class="fa-solid fa-xmark"></i></button>
             </div>
+
             <nav class="sidebar-nav">
                 <a href="javascript:void(0)" class="nav-item active" id="nav-activities"
                     onclick="switchSection('activities')">
-                    <i class="fa-solid fa-book-open"></i> <span data-i18n="act.nav_activities">Atividades</span>
+                    <i class="fa-sharp-duotone fa-solid fa-book-open"></i> <span
+                        data-i18n="act.nav_activities">Atividades</span>
                 </a>
                 <a href="javascript:void(0)" class="nav-item" id="nav-profile" onclick="switchSection('profile')">
                     <i class="fa-regular fa-user"></i> <span data-i18n="act.nav_profile">Meu Perfil</span>
@@ -95,7 +101,8 @@
             <div id="section-activities" class="content-section active">
                 <div class="section-header">
                     <h2 data-i18n="act.title">Minhas Atividades</h2>
-                    <p data-i18n="act.hero_subtitle">Pratique vocabulário,s gramática e pronúncia. Ganhe pontos no ranking!</p>
+                    <p data-i18n="act.hero_subtitle">Pratique vocabulário,s gramática e pronúncia. Ganhe pontos no
+                        ranking!</p>
                 </div>
 
                 <!-- Abas de Atividades -->
@@ -110,7 +117,8 @@
                         <i class="fa-solid fa-microphone"></i> <span data-i18n="act.tab_exercises">Exercícios</span>
                     </button>
                     <button class="tab-btn" onclick="switchSubTab('simulations')">
-                        <i class="fa-solid fa-theater-masks"></i> <span data-i18n="act.tab_simulations">Simulações</span>
+                        <i class="fa-solid fa-theater-masks"></i> <span
+                            data-i18n="act.tab_simulations">Simulações</span>
                     </button>
                 </nav>
 
@@ -144,7 +152,8 @@
                     <div class="empty-view">
                         <i class="fa-solid fa-theater-masks"></i>
                         <h3 data-i18n="act.sim_empty_title">Simulações de Conversas</h3>
-                        <p data-i18n="act.sim_empty_sub">Pratique situações reais como aeroporto, restaurante e entrevistas de emprego.</p>
+                        <p data-i18n="act.sim_empty_sub">Pratique situações reais como aeroporto, restaurante e
+                            entrevistas de emprego.</p>
                     </div>
                 </div>
             </div>
@@ -158,14 +167,18 @@
 
                 <!-- Atividades Pendentes -->
                 <div class="profile-card pending-card">
-                    <h3><i class="fa-solid fa-list-check"></i> <span data-i18n="act.pending_title">Atividades Pendentes</span></h3>
-                    <p class="card-subtitle"><span data-i18n="act.pending_sub_prefix">Você tem</span> <strong id="pending-count">0</strong> <span data-i18n="act.pending_sub_suffix">atividades para completar</span></p>
+                    <h3><i class="fa-solid fa-list-check"></i> <span data-i18n="act.pending_title">Atividades
+                            Pendentes</span></h3>
+                    <p class="card-subtitle"><span data-i18n="act.pending_sub_prefix">Você tem</span> <strong
+                            id="pending-count">0</strong> <span data-i18n="act.pending_sub_suffix">atividades para
+                            completar</span></p>
                     <div id="pending-activities-list" class="pending-list"></div>
                 </div>
 
                 <!-- Tempo de Estudo -->
                 <div class="profile-card study-time-card">
-                    <h3><i class="fa-solid fa-clock"></i> <span data-i18n="act.study_time_title">Tempo de Estudo</span></h3>
+                    <h3><i class="fa-solid fa-clock"></i> <span data-i18n="act.study_time_title">Tempo de Estudo</span>
+                    </h3>
                     <div class="study-time-grid">
                         <div class="time-block">
                             <div class="time-icon"><i class="fa-solid fa-calendar-week"></i></div>
@@ -206,22 +219,26 @@
                     <div class="ach-card streak-card">
                         <div class="streak-visual">
                             <div class="streak-flame">🔥</div>
-                            <div class="streak-status-badge" id="streak-status-label" data-i18n="act.streak_inactive">INATIVO</div>
+                            <div class="streak-status-badge" id="streak-status-label" data-i18n="act.streak_inactive">
+                                INATIVO</div>
                         </div>
                         <div class="ach-card-info">
                             <div class="streak-big-number" id="streak-val">0</div>
                             <div class="streak-big-label" data-i18n="act.streak_days_label">dias de ofensiva</div>
                             <div class="streak-stats">
                                 <div class="streak-stat">
-                                    <span class="streak-stat-label" data-i18n="act.streak_longest_label">Maior ofensiva</span>
+                                    <span class="streak-stat-label" data-i18n="act.streak_longest_label">Maior
+                                        ofensiva</span>
                                     <span class="streak-stat-value" id="streak-longest">0 dias</span>
                                 </div>
                                 <div class="streak-stat">
-                                    <span class="streak-stat-label" data-i18n="act.total_questions_label">Total de perguntas</span>
+                                    <span class="streak-stat-label" data-i18n="act.total_questions_label">Total de
+                                        perguntas</span>
                                     <span class="streak-stat-value" id="streak-questions">0</span>
                                 </div>
                                 <div class="streak-stat">
-                                    <span class="streak-stat-label" data-i18n="act.hours_saved_label">Horas economizadas</span>
+                                    <span class="streak-stat-label" data-i18n="act.hours_saved_label">Horas
+                                        economizadas</span>
                                     <span class="streak-stat-value" id="streak-hours">0,0h</span>
                                 </div>
                             </div>
@@ -237,16 +254,21 @@
                                 <span class="count-total">/50</span>
                             </div>
                         </div>
-                        <p class="progress-subtitle" data-i18n="act.trophy_progress_sub">Desbloqueie conquistas usando o Tati AI</p>
+                        <p class="progress-subtitle" data-i18n="act.trophy_progress_sub">Desbloqueie conquistas usando o
+                            Tati AI</p>
                         <div class="trophy-bar-wrap">
                             <div class="trophy-bar-fill" id="trophy-progress-bar"></div>
                         </div>
                         <div class="trophy-percent" id="trophy-percent">0%</div>
                         <div class="trophy-tiers">
-                            <div class="tier-badge bronze"><i class="fa-solid fa-medal"></i> <span data-i18n="act.tier_bronze">Bronze</span></div>
-                            <div class="tier-badge silver"><i class="fa-solid fa-medal"></i> <span data-i18n="act.tier_silver">Prata</span></div>
-                            <div class="tier-badge gold"><i class="fa-solid fa-medal"></i> <span data-i18n="act.tier_gold">Ouro</span></div>
-                            <div class="tier-badge platinum"><i class="fa-solid fa-gem"></i> <span data-i18n="act.tier_platinum">Platina</span></div>
+                            <div class="tier-badge bronze"><i class="fa-solid fa-medal"></i> <span
+                                    data-i18n="act.tier_bronze">Bronze</span></div>
+                            <div class="tier-badge silver"><i class="fa-solid fa-medal"></i> <span
+                                    data-i18n="act.tier_silver">Prata</span></div>
+                            <div class="tier-badge gold"><i class="fa-solid fa-medal"></i> <span
+                                    data-i18n="act.tier_gold">Ouro</span></div>
+                            <div class="tier-badge platinum"><i class="fa-solid fa-gem"></i> <span
+                                    data-i18n="act.tier_platinum">Platina</span></div>
                         </div>
                     </div>
                 </div>
@@ -254,25 +276,20 @@
                 <!-- Filtros de Medalhas -->
                 <div class="medal-filters">
                     <button class="medal-filter-btn active" onclick="filterMedals('all', this)">
-                        <i class="fa-solid fa-trophy"></i> <span data-i18n="act.medal_all">Todos</span> <span id="filter-all-count">0</span>
+                        <i class="fa-solid fa-trophy"></i> <span data-i18n="act.medal_all">Todos</span> <span
+                            id="filter-all-count">0</span>
                     </button>
                     <button class="medal-filter-btn" onclick="filterMedals('questions', this)">
-                        <i class="fa-solid fa-question"></i> <span data-i18n="act.medal_questions">Perguntas</span> <span id="filter-questions-count">0</span>
+                        <i class="fa-solid fa-question"></i> <span data-i18n="act.medal_questions">Perguntas</span>
+                        <span id="filter-questions-count">0</span>
                     </button>
                     <button class="medal-filter-btn" onclick="filterMedals('streak', this)">
-                        <i class="fa-solid fa-fire"></i> <span data-i18n="act.medal_streak">Ofensiva</span> <span id="filter-streak-count">0</span>
-                    </button>
-                    <button class="medal-filter-btn" onclick="filterMedals('credits', this)">
-                        <i class="fa-solid fa-coins"></i> <span data-i18n="act.medal_credits">Créditos</span> <span id="filter-credits-count">0</span>
-                    </button>
-                    <button class="medal-filter-btn" onclick="filterMedals('time', this)">
-                        <i class="fa-solid fa-clock"></i> <span data-i18n="act.medal_time">Tempo</span> <span id="filter-time-count">0</span>
+                        <i class="fa-solid fa-fire"></i> <span data-i18n="act.medal_streak">Ofensiva</span> <span
+                            id="filter-streak-count">0</span>
                     </button>
                     <button class="medal-filter-btn" onclick="filterMedals('milestones', this)">
-                        <i class="fa-solid fa-star"></i> <span data-i18n="act.medal_milestones">Marcos</span> <span id="filter-milestones-count">0</span>
-                    </button>
-                    <button class="medal-filter-btn" onclick="filterMedals('social', this)">
-                        <i class="fa-solid fa-heart"></i> <span data-i18n="act.medal_social">Social</span> <span id="filter-social-count">0</span>
+                        <i class="fa-solid fa-star"></i> <span data-i18n="act.medal_milestones">Marcos</span> <span
+                            id="filter-milestones-count">0</span>
                     </button>
                 </div>
 
@@ -284,37 +301,27 @@
                 <!-- Como Conquistar -->
                 <div class="info-section">
                     <div class="info-section-header">
-                        <h3><i class="fa-solid fa-lightbulb"></i> <span data-i18n="act.how_to_title">Como Conquistar Troféus</span></h3>
+                        <h3><i class="fa-solid fa-lightbulb"></i> <span data-i18n="act.how_to_title">Como Conquistar
+                                Troféus</span></h3>
                     </div>
                     <div class="info-grid">
                         <div class="info-card-item">
                             <div class="info-icon streak"><i class="fa-solid fa-fire"></i></div>
                             <div class="info-content">
                                 <h4 data-i18n="act.how_streak_title">Ofensiva (Streak)</h4>
-                                <p data-i18n="act.how_streak_desc">Estude todos os dias para manter sua ofensiva. Quanto mais dias seguidos, mais troféus!</p>
+                                <p data-i18n="act.how_streak_desc">Estude todos os dias para manter sua ofensiva. Quanto
+                                    mais dias seguidos, mais troféus!</p>
                             </div>
                         </div>
                         <div class="info-card-item">
                             <div class="info-icon questions"><i class="fa-solid fa-question"></i></div>
                             <div class="info-content">
                                 <h4 data-i18n="act.how_questions_title">Perguntas Respondidas</h4>
-                                <p data-i18n="act.how_questions_desc">Complete quizzes, flashcards e exercícios para acumular acertos.</p>
+                                <p data-i18n="act.how_questions_desc">Complete quizzes, flashcards e exercícios para
+                                    acumular acertos.</p>
                             </div>
                         </div>
-                        <div class="info-card-item">
-                            <div class="info-icon credits"><i class="fa-solid fa-coins"></i></div>
-                            <div class="info-content">
-                                <h4 data-i18n="act.how_credits_title">Créditos</h4>
-                                <p data-i18n="act.how_credits_desc">Ganhe créditos completando atividades e participando do ranking.</p>
-                            </div>
-                        </div>
-                        <div class="info-card-item">
-                            <div class="info-icon time"><i class="fa-solid fa-clock"></i></div>
-                            <div class="info-content">
-                                <h4 data-i18n="act.how_time_title">Tempo Economizado</h4>
-                                <p data-i18n="act.how_time_desc">Quanto mais você usa a IA para aprender, mais tempo economiza!</p>
-                            </div>
-                        </div>
+
                     </div>
                 </div>
             </div>
@@ -331,13 +338,34 @@
                     <div class="banner-icon"><i class="fa-solid fa-trophy"></i></div>
                     <div class="banner-content">
                         <h3 data-i18n="act.ranking_banner_title">Ranking de Engajamento</h3>
-                        <p><span data-i18n="act.ranking_banner_sub">Alunos mais ativos no Tati AI</span> — <span id="ranking-month"></span></p>
+                        <p><span data-i18n="act.ranking_banner_sub">Alunos mais ativos no Tati AI</span> — <span
+                                id="ranking-month"></span></p>
+                    </div>
+                </div>
+
+                <!-- Countdown fim do mês -->
+                <div class="countdown-card" id="countdown-card">
+                    <div class="countdown-label"><i class="fa-solid fa-clock"></i> <span
+                            data-i18n="act.countdown_label">Tempo restante no mês</span></div>
+                    <div class="countdown-timer">
+                        <div class="countdown-unit"><span id="cd-days">00</span><small
+                                data-i18n="act.cd_days">dias</small></div>
+                        <div class="countdown-sep">:</div>
+                        <div class="countdown-unit"><span id="cd-hours">00</span><small
+                                data-i18n="act.cd_hours">horas</small></div>
+                        <div class="countdown-sep">:</div>
+                        <div class="countdown-unit"><span id="cd-minutes">00</span><small
+                                data-i18n="act.cd_minutes">min</small></div>
+                        <div class="countdown-sep">:</div>
+                        <div class="countdown-unit"><span id="cd-seconds">00</span><small
+                                data-i18n="act.cd_seconds">seg</small></div>
                     </div>
                 </div>
 
                 <!-- Vencedores do Mês Anterior -->
                 <div class="winners-section">
-                    <h3><i class="fa-solid fa-crown"></i> <span data-i18n="act.winners_title">Vencedores</span> — <span id="winners-month"></span></h3>
+                    <h3><i class="fa-solid fa-crown"></i> <span data-i18n="act.winners_title">Vencedores</span> — <span
+                            id="winners-month"></span></h3>
                     <div class="winners-podium">
                         <div class="winner-card second">
                             <div class="winner-medal">🥈</div>
@@ -367,33 +395,45 @@
                 <div class="info-grid-2col">
                     <div class="info-card-styled">
                         <div class="card-header">
-                            <h3><i class="fa-solid fa-circle-question"></i> <span data-i18n="act.how_ranking_title">Como funciona o ranking?</span></h3>
+                            <h3><i class="fa-solid fa-circle-question"></i> <span data-i18n="act.how_ranking_title">Como
+                                    funciona o ranking?</span></h3>
                         </div>
                         <div class="card-body">
-                            <p class="info-description" data-i18n="act.how_ranking_desc">O score é calculado pela soma ponderada de todas as suas ações de estudo no mês:</p>
-                            <div class="points-list">
+                            <p class="info-description" data-i18n="act.how_ranking_desc">O score é calculado pela soma
+                                ponderada de todas as suas ações de estudo no mês:</p>
+                                <div class="points-list">
+                                    <div class="point-item">
+                                        <span class="point-label"><i class="fa-solid fa-theater-masks"></i> <span
+                                            data-i18n="act.pts_simulation">Simulação concluída</span></span>
+                                            <span class="pts-badge simulation">10 pts</span>
+                                    </div>
                                 <div class="point-item">
-                                    <span class="point-label"><i class="fa-solid fa-pen"></i> <span data-i18n="act.pts_exercise">Exercício submetido</span></span>
-                                    <span class="pts-badge exercise">8 pts</span>
+                                    <span class="point-label"><i class="fa-solid fa-comment"></i> <span
+                                            data-i18n="act.pts_message">Mensagem para a Tati IA</span></span>
+                                    <span class="pts-badge message">8 pts</span>
                                 </div>
                                 <div class="point-item">
-                                    <span class="point-label"><i class="fa-solid fa-layer-group"></i> <span data-i18n="act.pts_flashcard">Flashcard revisado</span></span>
-                                    <span class="pts-badge flashcard">5 pts</span>
+                                    <span class="point-label"><i class="fa-solid fa-circle-question"></i> <span
+                                            data-i18n="act.pts_quiz">Quiz resolvido</span></span>
+                                    <span class="pts-badge quiz">7 pts</span>
                                 </div>
                                 <div class="point-item">
-                                    <span class="point-label"><i class="fa-solid fa-circle-question"></i> <span data-i18n="act.pts_quiz">Quiz resolvido</span></span>
-                                    <span class="pts-badge quiz">3 pts</span>
+                                    <span class="point-label"><i class="fa-solid fa-pen"></i> <span
+                                            data-i18n="act.pts_exercise">Exercício submetido</span></span>
+                                    <span class="pts-badge exercise">5 pts</span>
                                 </div>
                                 <div class="point-item">
-                                    <span class="point-label"><i class="fa-solid fa-comment"></i> <span data-i18n="act.pts_message">Mensagem para a Tati IA</span></span>
-                                    <span class="pts-badge message">1 pt</span>
+                                    <span class="point-label"><i class="fa-solid fa-layer-group"></i> <span
+                                            data-i18n="act.pts_flashcard">Flashcard revisado</span></span>
+                                    <span class="pts-badge flashcard">3 pts</span>
                                 </div>
                             </div>
                             <div class="tie-breaker-styled">
                                 <i class="fa-solid fa-scale-balanced"></i>
                                 <div>
                                     <strong data-i18n="act.tiebreaker_title">Desempate:</strong>
-                                    <span data-i18n="act.tiebreaker_desc">Em caso de empate no score, o desempate é pela quantidade de tokens utilizados (quanto mais interação, melhor posição).</span>
+                                    <span data-i18n="act.tiebreaker_desc">Em caso de empate no score, o desempate é pela
+                                        quantidade de tokens utilizados (quanto mais interação, melhor posição).</span>
                                 </div>
                             </div>
                         </div>
@@ -408,24 +448,24 @@
                                 <div class="prize-icon">🥇</div>
                                 <div class="prize-text">
                                     <strong data-i18n="act.prize_1_title">1º Lugar</strong>
-                                    <span data-i18n="act.prize_1_desc">Troféu Ouro + 30 créditos extras em cada agente</span>
+                                    <span data-i18n="act.prize_1_desc">Troféu Ouro</span>
                                 </div>
                             </div>
                             <div class="prize-card-item silver">
                                 <div class="prize-icon">🥈</div>
                                 <div class="prize-text">
                                     <strong data-i18n="act.prize_2_title">2º Lugar</strong>
-                                    <span data-i18n="act.prize_2_desc">Troféu Prata + 20 créditos extras em cada agente</span>
+                                    <span data-i18n="act.prize_2_desc">Troféu Prata</span>
                                 </div>
                             </div>
                             <div class="prize-card-item bronze">
                                 <div class="prize-icon">🥉</div>
                                 <div class="prize-text">
                                     <strong data-i18n="act.prize_3_title">3º Lugar</strong>
-                                    <span data-i18n="act.prize_3_desc">Troféu Bronze + 10 créditos extras em cada agente</span>
+                                    <span data-i18n="act.prize_3_desc">Troféu Bronze</span>
                                 </div>
                             </div>
-                            <p class="prize-note-styled" data-i18n="act.prizes_note">Os troféus ficam permanentes na sua coleção. Os créditos extras são aplicados no próximo ciclo.</p>
+                            <p class="prize-note-styled" data-i18n="act.prizes_note">Os troféus ficam permanentes na sua coleção.</p>
                         </div>
                     </div>
                 </div>
@@ -461,7 +501,8 @@
 
                 <!-- Top 15 do Mês -->
                 <div class="ranking-section">
-                    <h3><i class="fa-solid fa-chart-line"></i> <span data-i18n="act.top15_title">Top 15</span> — <span id="top15-month"></span></h3>
+                    <h3><i class="fa-solid fa-chart-line"></i> <span data-i18n="act.top15_title">Top 15</span> — <span
+                            id="top15-month"></span></h3>
                     <div class="ranking-container">
                         <table class="ranking-table">
                             <thead>
@@ -473,7 +514,6 @@
                                     <th><i class="fa-solid fa-circle-check"></i></th>
                                     <th><i class="fa-solid fa-layer-group"></i></th>
                                     <th><i class="fa-solid fa-pen"></i></th>
-                                    <th data-i18n="act.table_tokens">Tokens</th>
                                 </tr>
                             </thead>
                             <tbody id="ranking-body"></tbody>
@@ -497,17 +537,21 @@
                 <div class="form-row">
                     <label data-i18n="act.fb_type_label">Tipo *</label>
                     <div class="type-selector">
-                        <label><input type="radio" name="fb-type" value="bug" checked> <span data-i18n="act.fb_type_bug">Bug</span></label>
-                        <label><input type="radio" name="fb-type" value="suggestion"> <span data-i18n="act.fb_type_suggestion">Sugestão</span></label>
+                        <label><input type="radio" name="fb-type" value="bug" checked> <span
+                                data-i18n="act.fb_type_bug">Bug</span></label>
+                        <label><input type="radio" name="fb-type" value="suggestion"> <span
+                                data-i18n="act.fb_type_suggestion">Sugestão</span></label>
                     </div>
                 </div>
                 <div class="form-row">
                     <label data-i18n="act.fb_title_label">Título *</label>
-                    <input type="text" id="fb-title" data-i18n-placeholder="act.fb_title_ph" placeholder="Resumo breve" required>
+                    <input type="text" id="fb-title" data-i18n-placeholder="act.fb_title_ph" placeholder="Resumo breve"
+                        required>
                 </div>
                 <div class="form-row">
                     <label data-i18n="act.fb_desc_label">Descrição *</label>
-                    <textarea id="fb-desc" rows="4" data-i18n-placeholder="act.fb_desc_ph" placeholder="Detalhes..." required></textarea>
+                    <textarea id="fb-desc" rows="4" data-i18n-placeholder="act.fb_desc_ph" placeholder="Detalhes..."
+                        required></textarea>
                 </div>
                 <button type="submit" class="btn-submit-feedback" data-i18n="act.fb_submit_btn">Enviar Feedback</button>
             </form>
@@ -528,7 +572,8 @@
             </div>
             <div class="qm-body" id="qm-body"></div>
             <footer class="qm-footer">
-                <button class="btn-next" id="btn-next" onclick="nextQ()" disabled data-i18n="act.quiz_next">Próxima</button>
+                <button class="btn-next" id="btn-next" onclick="nextQ()" disabled
+                    data-i18n="act.quiz_next">Próxima</button>
             </footer>
         </div>
     </div>
@@ -543,13 +588,16 @@
             <form id="writing-form" onsubmit="handleWritingSubmit(event)">
                 <div class="form-row">
                     <label for="writing-theme" data-i18n="act.writing_theme_label">Tema do Exercício *</label>
-                    <input type="text" id="writing-theme" data-i18n-placeholder="act.writing_theme_ph" placeholder="Ex: Descreva suas últimas férias" required>
+                    <input type="text" id="writing-theme" data-i18n-placeholder="act.writing_theme_ph"
+                        placeholder="Ex: Descreva suas últimas férias" required>
                 </div>
                 <div class="form-row">
                     <label for="writing-content" data-i18n="act.writing_content_label">Sua Resposta *</label>
-                    <textarea id="writing-content" rows="8" data-i18n-placeholder="act.writing_content_ph" placeholder="Escreva seu texto aqui..." required></textarea>
+                    <textarea id="writing-content" rows="8" data-i18n-placeholder="act.writing_content_ph"
+                        placeholder="Escreva seu texto aqui..." required></textarea>
                 </div>
-                <button type="submit" class="btn-submit-feedback" data-i18n="act.writing_submit_btn">Enviar Exercício</button>
+                <button type="submit" class="btn-submit-feedback" data-i18n="act.writing_submit_btn">Enviar
+                    Exercício</button>
             </form>
         </div>
     </div>

@@ -14,6 +14,36 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _calculate_current_streak(streak_data: dict, today: date) -> int:
+    """Helper puramente lógico para testes de streak."""
+    study_dates = streak_data.get("study_dates", [])
+    if not study_dates:
+        return 0
+    
+    # Ordena datas decrescente (garante que a mais recente é a primeira)
+    sorted_dates = sorted([date.fromisoformat(d) for d in study_dates], reverse=True)
+    
+    last_study_date = sorted_dates[0]
+    days_since_last = (today - last_study_date).days
+    
+    if days_since_last > 1:
+        return 0 if days_since_last > 1 else 1 # Se passou mais de 1 dia, streak é 0
+        # Na verdade, se today for hoje e a última atividade foi anteontem, o streak é 0.
+        # Se a última atividade foi ontem, o streak é mantido.
+    
+    # Se a última atividade foi há mais de 1 dia do "today", o streak acabou.
+    if (today - last_study_date).days > 1:
+        return 0
+        
+    streak = 1
+    for i in range(1, len(sorted_dates)):
+        if (sorted_dates[i-1] - sorted_dates[i]).days == 1:
+            streak += 1
+        else:
+            break
+    return streak
+
+
 def get_streak(username: str) -> dict:
     """
     Retorna o streak atual do usuário baseado em ATIVIDADE REAL.
@@ -126,24 +156,41 @@ def _empty_streak() -> dict:
 def record_study_day(username: str) -> dict:
     """
     Registra atividade hoje e atualiza o streak.
+    Regra: O dia só conta se houver pelo menos 3 mensagens do usuário.
     """
     db = get_client()
     today = date.today()
     today_str = today.isoformat()
     
     try:
+        # 1. Conta mensagens do usuário HOJE (Chat e Voice)
+        res = db.table("messages").select("id", count="exact").eq("username", username).eq("date", today_str).eq("role", "user").execute()
+        msg_count = res.count or 0
+        
+        # 2. Busca dados atuais do streak
         row = db.table("users").select("streak_data").eq("username", username).single().execute().data
         streak_data = row.get("streak_data") if row else None
         
         if not streak_data:
             streak_data = _empty_streak()
         
+        # Armazena contagem de hoje para feedback no front se necessário
+        streak_data["today_messages"] = msg_count
+        
         last_date_str = streak_data.get("last_study_date")
         study_dates = streak_data.get("study_dates", [])
         
+        # Se já atingiu a meta hoje, não faz nada
         if last_date_str == today_str:
-            return streak_data # Já registrado hoje
+            return streak_data
             
+        # 3. Verifica se atingiu a meta de 3 mensagens HOJE
+        if msg_count < 3:
+            # Ainda não atingiu a meta do dia, mas salvamos o count
+            db.table("users").update({"streak_data": streak_data}).eq("username", username).execute()
+            return streak_data
+
+        # 4. Atingiu a meta! Atualiza o streak
         if last_date_str:
             last_date = date.fromisoformat(last_date_str)
             days_since_last = (today - last_date).days
@@ -176,6 +223,13 @@ def record_study_day(username: str) -> dict:
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }).eq("username", username).execute()
         
+        # Verifica troféus de streak
+        try:
+            from services.trophy_service import check_streak_trophies
+            check_streak_trophies(username, streak_data.get("longest_streak", 0))
+        except Exception as e:
+            print(f"[Streak Trophy] Erro: {e}")
+            
         return streak_data
     except Exception as e:
         print(f"[Streak] Erro ao gravar: {e}")

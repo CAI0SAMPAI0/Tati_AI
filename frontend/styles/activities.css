@@ -446,7 +446,9 @@ body {
 .quiz-card::before {
     content: '';
     position: absolute;
-    top: 0; left: 0; right: 0;
+    top: 0;
+    left: 0;
+    right: 0;
     height: 4px;
     background: linear-gradient(90deg, var(--primary), var(--secondary));
 }
@@ -472,9 +474,21 @@ body {
     align-self: flex-start;
     margin-bottom: 0.25rem;
 }
-.badge-new     { background: #ede9fe; color: var(--primary); }
-.badge-done    { background: #dcfce7; color: #16a34a; }
-.badge-blocked { background: #f3f4f6; color: #6b7280; }
+
+.badge-new {
+    background: #ede9fe;
+    color: var(--primary);
+}
+
+.badge-done {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.badge-blocked {
+    background: #f3f4f6;
+    color: #6b7280;
+}
 
 /* Meta row */
 .quiz-meta-row {
@@ -483,6 +497,7 @@ body {
     margin: 0.4rem 0 0.25rem;
     flex-wrap: wrap;
 }
+
 .quiz-meta-item {
     display: flex;
     align-items: center;
@@ -490,7 +505,10 @@ body {
     font-size: 0.82rem;
     color: var(--text-muted);
 }
-.quiz-meta-item i { color: var(--primary); }
+
+.quiz-meta-item i {
+    color: var(--primary);
+}
 
 /* Attempt dots */
 .attempt-dots-row {
@@ -499,18 +517,26 @@ body {
     gap: 0.6rem;
     margin: 0.25rem 0 0.5rem;
 }
+
 .attempt-dots-label {
     font-size: 0.78rem;
     color: var(--text-muted);
 }
-.attempt-dots { display: flex; gap: 6px; }
+
+.attempt-dots {
+    display: flex;
+    gap: 6px;
+}
+
 .attempt-dot {
-    width: 11px; height: 11px;
+    width: 11px;
+    height: 11px;
     border-radius: 50%;
     background: #e5e7eb;
     border: 2px solid #d1d5db;
     transition: background 0.2s;
 }
+
 .attempt-dot.used {
     background: var(--primary);
     border-color: var(--primary);
@@ -522,15 +548,20 @@ body {
     border: 2px solid var(--primary) !important;
     color: var(--primary) !important;
 }
+
 .quiz-btn-redo:hover {
     background: var(--primary) !important;
     color: white !important;
 }
+
 .quiz-btn-blocked {
     background: #9ca3af !important;
     cursor: not-allowed !important;
 }
-.quiz-btn-blocked:hover { transform: none !important; }
+
+.quiz-btn-blocked:hover {
+    transform: none !important;
+}
 
 .quiz-level {
     display: inline-block;
@@ -1138,21 +1169,25 @@ body {
     overflow: hidden;
     margin-top: 0.6rem;
 }
+
 .medal-progress-bar-wrap.done .medal-progress-bar {
     background: #22c55e;
 }
+
 .medal-progress-bar {
     height: 100%;
     background: var(--primary);
     border-radius: 99px;
     transition: width 1s ease;
 }
+
 .medal-progress-text {
     font-size: 0.72rem;
     color: var(--text-muted);
     margin-top: 0.3rem;
     text-align: center;
 }
+
 .medal-card.unlocked .medal-progress-text {
     color: #16a34a;
     font-weight: 700;
@@ -1417,7 +1452,9 @@ body {
 .sim-card::before {
     content: '';
     position: absolute;
-    top: 0; left: 0; right: 0;
+    top: 0;
+    left: 0;
+    right: 0;
     height: 4px;
     background: linear-gradient(90deg, var(--primary), var(--secondary));
 }
@@ -1450,9 +1487,21 @@ body {
     font-weight: 600;
     text-transform: uppercase;
 }
-.sim-card-difficulty.beginner { background: rgba(16,185,129,0.12); color: var(--success); }
-.sim-card-difficulty.intermediate { background: rgba(245,158,11,0.12); color: var(--warning); }
-.sim-card-difficulty.advanced { background: rgba(239,68,68,0.12); color: var(--danger); }
+
+.sim-card-difficulty.beginner {
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--success);
+}
+
+.sim-card-difficulty.intermediate {
+    background: rgba(245, 158, 11, 0.12);
+    color: var(--warning);
+}
+
+.sim-card-difficulty.advanced {
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--danger);
+}
 
 /* ─── ACTIVITY CARDS ─── */
 .act-card {
@@ -1479,8 +1528,16 @@ body {
     border-radius: 99px;
     text-transform: uppercase;
 }
-.act-status.pending { background: rgba(245,158,11,0.15); color: var(--warning); }
-.act-status.corrected { background: rgba(16,185,129,0.15); color: var(--success); }
+
+.act-status.pending {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--warning);
+}
+
+.act-status.corrected {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--success);
+}
 
 .act-score {
     font-size: 1.5rem;
@@ -1527,7 +1584,7 @@ body {
 
 .trophy-earned {
     display: inline-block;
-    background: rgba(124,58,237,0.1);
+    background: rgba(124, 58, 237, 0.1);
     color: var(--primary);
     border-radius: 99px;
     padding: 0.4rem 0.8rem;
@@ -2191,19 +2248,21 @@ body {
 
 /* ── Desktop (> 1024px) ── */
 @media (min-width: 1025px) {
+
     /* Layout Base */
     .sidebar {
         width: 260px;
         transform: translateX(0);
         transition: var(--transition);
     }
-    
+
     .sidebar.closed {
         transform: translateX(-100%);
     }
 
     .btn-menu {
-        display: block; /* Permite abrir se fechar */
+        display: block;
+        /* Permite abrir se fechar */
     }
 
     .main-content {
@@ -2218,47 +2277,81 @@ body {
     .sidebar-overlay {
         display: none !important;
     }
-    
+
     /* Layout Base */
-    .sidebar { transform: translateX(0); width: 260px; }
-    .main-content { margin-left: 260px; }
-    
+    .sidebar {
+        transform: translateX(0);
+        width: 260px;
+    }
+
+    .main-content {
+        margin-left: 260px;
+    }
+
     /* ── Minhas Atividades (Desktop) ── */
-    .quiz-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
-    .profile-grid { grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); }
-    .achievements-summary { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
-    .study-time-grid { grid-template-columns: 1fr 1fr; }
-    .medals-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+    .quiz-grid {
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    }
+
+    .profile-grid {
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    }
+
+    .achievements-summary {
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }
+
+    .study-time-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .medals-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
 
     /* ── Competições (Desktop) ── */
-    .info-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
-    .info-grid-2col { grid-template-columns: 1fr 1fr; }
-    .winners-podium { flex-direction: row; }
+    .info-grid {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
+    .info-grid-2col {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .winners-podium {
+        flex-direction: row;
+    }
 }
 
 /* ── Tablet (768px – 1024px) ── */
 @media (min-width: 769px) and (max-width: 1024px) {
+
     /* Layout Base */
     .sidebar {
         transform: translateX(-100%);
         width: 280px;
     }
+
     .sidebar.open {
         transform: translateX(0);
     }
+
     .btn-menu {
         display: block;
     }
+
     .main-content {
         margin-left: 0;
     }
 
     /* Minhas Atividades */
-    .quiz-grid, 
+    .quiz-grid,
     .profile-grid,
     .info-grid-2col {
-        grid-template-columns: repeat(2, 1fr); /* 2 colunas cravadas */
+        grid-template-columns: repeat(2, 1fr);
+        /* 2 colunas cravadas */
     }
+
     .achievements-summary {
         grid-template-columns: 1fr 1fr;
     }
@@ -2268,8 +2361,10 @@ body {
         flex-wrap: wrap;
         width: 100%;
     }
+
     .medal-filter-btn {
-        width: calc(33.33% - 8px); /* 3 botões por linha */
+        width: calc(33.33% - 8px);
+        /* 3 botões por linha */
         justify-content: center;
     }
 
@@ -2277,9 +2372,11 @@ body {
     .ranking-banner {
         padding: 1.5rem;
     }
+
     .winners-podium {
         gap: 0.5rem;
     }
+
     .winner-card {
         padding: 1rem;
         max-width: 180px;
@@ -2288,22 +2385,27 @@ body {
 
 /* ── Mobile (≤ 768px) ── */
 @media (max-width: 768px) {
+
     /* Layout Base (Topbar e Sidebar) */
     .sidebar {
         transform: translateX(-100%);
         width: 280px;
         max-width: 85vw;
     }
+
     .sidebar.open {
         transform: translateX(0);
     }
+
     .btn-menu {
         display: block;
         margin-left: -10px;
     }
+
     .main-content {
         margin-left: 0;
     }
+
     .content-section {
         padding: 1.5rem 1rem;
     }
@@ -2313,14 +2415,18 @@ body {
         padding: 0 1rem;
         /* Removido o max-width: 35px que quebrava tudo */
     }
-    .topbar-logo, 
-    .btn-beta, 
+
+    .topbar-logo,
+    .btn-beta,
     .user-name {
-        display: none; /* Poupa espaço na tela pequena */
+        display: none;
+        /* Poupa espaço na tela pequena */
     }
+
     .topbar-right {
         gap: 1rem;
     }
+
     .user-pill {
         margin-left: 0;
         padding: 0.5rem;
@@ -2330,10 +2436,10 @@ body {
     .section-header h2 {
         font-size: 1.5rem;
     }
-    
+
     /* Força 1 coluna para todos os cards */
-    .quiz-grid, 
-    .profile-grid, 
+    .quiz-grid,
+    .profile-grid,
     .achievements-summary,
     .study-time-grid,
     .info-grid,
@@ -2349,6 +2455,7 @@ body {
         padding: 0;
         width: 100%;
     }
+
     .medal-filter-btn {
         width: calc(50% - 5px);
         box-sizing: border-box;
@@ -2366,12 +2473,13 @@ body {
         padding: 1.5rem;
         gap: 1rem;
     }
-    
+
     .user-position-card {
         flex-direction: column;
         text-align: center;
         gap: 1.5rem;
     }
+
     .user-position-info {
         flex-direction: column;
         gap: 0.5rem;
@@ -2380,15 +2488,19 @@ body {
     /* Tabela de Ranking com Scroll Horizontal */
     .ranking-container {
         border-radius: 12px;
-        margin: 0 -1rem; /* Faz a tabela encostar nas bordas no celular */
+        margin: 0 -1rem;
+        /* Faz a tabela encostar nas bordas no celular */
         border-left: none;
         border-right: none;
         border-radius: 0;
     }
+
     .ranking-table {
         font-size: 0.85rem;
-        min-width: 500px; /* Garante que não amasse as colunas, cria scroll */
+        min-width: 500px;
+        /* Garante que não amasse as colunas, cria scroll */
     }
+
     .ranking-table th,
     .ranking-table td {
         padding: 0.75rem;
@@ -2401,35 +2513,50 @@ body {
         gap: 1rem;
         padding-top: 1rem;
     }
+
     .winner-card {
         width: 100%;
         max-width: 280px;
         height: auto !important;
     }
+
     /* Muda a ordem para o 1º lugar ficar no topo no celular */
-    .winner-card.first { order: 1; }
-    .winner-card.second { order: 2; }
-    .winner-card.third { order: 3; }
+    .winner-card.first {
+        order: 1;
+    }
+
+    .winner-card.second {
+        order: 2;
+    }
+
+    .winner-card.third {
+        order: 3;
+    }
 
     /* Modais e Componentes Gerais */
     .sub-tabs {
         gap: 0.5rem;
     }
+
     .tab-btn {
         padding: 0.6rem 1rem;
         font-size: 0.9rem;
     }
+
     #notif-modal {
         width: 90vw;
         right: 5vw;
     }
+
     .modal-content {
         max-width: 95vw;
         margin: 0 10px;
     }
+
     .qm-header {
         padding: 1rem 1.5rem;
     }
+
     .qm-body {
         padding: 1.5rem;
     }
@@ -2450,12 +2577,12 @@ body {
     text-align: center;
     cursor: pointer;
     transition: var(--transition);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .flashcard-item:hover {
     border-color: var(--primary);
-    box-shadow: 0 6px 20px rgba(124,58,237,0.12);
+    box-shadow: 0 6px 20px rgba(124, 58, 237, 0.12);
     transform: translateY(-3px);
 }
 
@@ -2472,40 +2599,188 @@ body {
     color: var(--text-muted);
     margin: 0;
 }
+
 /* ── Empty State ── */
 .empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 4rem 2rem;
-  text-align: center;
-  color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+    color: var(--text-muted);
 }
-.empty-state-icon { font-size: 3rem; margin-bottom: 1rem; }
-.empty-state h3 { font-size: 1.2rem; font-weight: 700; color: var(--text); margin-bottom: 0.5rem; }
-.empty-state p { font-size: 0.95rem; max-width: 320px; }
+
+.empty-state-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    font-size: 0.95rem;
+    max-width: 320px;
+}
 
 /* ── Flashcard example ── */
 .fc-example {
-  display: block;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  font-style: italic;
-  margin-top: 0.4rem;
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 0.4rem;
 }
 
 /* ── Exercise score bar ── */
-.act-score-bar { margin: 0.5rem 0 0.75rem; }
-.act-score-label { font-size: 1.4rem; font-weight: 800; margin-bottom: 0.3rem; }
-.act-score-track {
-  height: 8px;
-  background: #e5e7eb;
-  border-radius: 99px;
-  overflow: hidden;
+.act-score-bar {
+    margin: 0.5rem 0 0.75rem;
 }
+
+.act-score-label {
+    font-size: 1.4rem;
+    font-weight: 800;
+    margin-bottom: 0.3rem;
+}
+
+.act-score-track {
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 99px;
+    overflow: hidden;
+}
+
 .act-score-fill {
-  height: 100%;
-  border-radius: 99px;
-  transition: width 1s ease;
+    height: 100%;
+    border-radius: 99px;
+    transition: width 1s ease;
+}
+
+/* ── Sidebar User Card ── */
+.sidebar-user-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--primary-dim);
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.sidebar-user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    font-weight: 800;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.sidebar-user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.sidebar-user-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar-user-level {
+    font-size: 0.75rem;
+    color: var(--primary);
+    font-weight: 600;
+    background: white;
+    padding: 0.1rem 0.5rem;
+    border-radius: 99px;
+    align-self: flex-start;
+}
+
+/* ── Countdown ── */
+.countdown-card {
+    background: linear-gradient(135deg, var(--primary), #4c1d95);
+    border-radius: 16px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+    color: white;
+    text-align: center;
+}
+
+.countdown-card.urgent {
+    background: linear-gradient(135deg, #dc2626, #991b1b);
+    animation: pulse-urgent 2s ease-in-out infinite;
+}
+
+@keyframes pulse-urgent {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4);
+    }
+
+    50% {
+        box-shadow: 0 0 0 10px rgba(220, 38, 38, 0);
+    }
+}
+
+.countdown-label {
+    font-size: 0.85rem;
+    opacity: 0.85;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+.countdown-timer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.countdown-unit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    min-width: 48px;
+}
+
+.countdown-unit span {
+    font-size: 2rem;
+    font-weight: 900;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.countdown-unit small {
+    font-size: 0.65rem;
+    opacity: 0.75;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.countdown-sep {
+    font-size: 1.5rem;
+    font-weight: 900;
+    opacity: 0.6;
+    margin-bottom: 0.9rem;
 }

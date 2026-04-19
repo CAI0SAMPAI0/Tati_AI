@@ -145,10 +145,16 @@ window.handleGoogleCredential = async function (response) {
   }
 };
 
-function _initGoogleAuth() {
+function _initGoogleAuth(retries = 0) {
   const clientId = document.querySelector('meta[name="google-client-id"]')?.content || '';
-  if (!clientId || typeof google === 'undefined' || !google?.accounts?.id) {
-      console.warn("Google Identity Services client not available. Skipping initialization.");
+  if (!clientId) return;
+
+  if (typeof google === 'undefined' || !google?.accounts?.id) {
+      if (retries < 15) { // Tenta por até 7.5 segundos
+          setTimeout(() => _initGoogleAuth(retries + 1), 500);
+      } else {
+          console.warn("Google Identity Services client not available. Skipping initialization.");
+      }
       return;
   }
 

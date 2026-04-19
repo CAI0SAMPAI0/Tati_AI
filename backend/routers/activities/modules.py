@@ -147,12 +147,20 @@ async def admin_update_module(module_id: str, payload: ModuleIn, user=Depends(ge
 
 @router.post("/admin/generate-flashcards")
 async def admin_generate_flashcards(payload: GenerateFlashcardsIn, user=Depends(get_current_user)):
-    """Admin: gera flashcards via IA."""
+    """Admin: gera flashcards via IA usando material do RAG."""
     _require_admin(user)
     db = get_client()
+    
+    # Busca contexto no RAG baseado no tema
+    from services.rag_search import obter_contexto_rag
+    rag_context = obter_contexto_rag(payload.theme).contexto
+    
+    context_str = f"\nUse este material de apoio como base:\n---\n{rag_context}\n---\n" if rag_context else ""
+
     prompt = (
         f"Teacher Tati: Crie 10 flashcards de inglês sobre o tema '{payload.theme}'.\n"
         f"Nível: {payload.level}.\n"
+        f"{context_str}"
         "Retorne APENAS um objeto JSON no formato:\n"
         '{"title": "Nome do Módulo", "description": "Descrição", "flashcards": [{"word": "Inglês", "translation": "Português", "example": "Exemplo em inglês"}]}'
     )
@@ -190,9 +198,20 @@ async def admin_generate_flashcards(payload: GenerateFlashcardsIn, user=Depends(
 
 @router.post("/admin/generate-quiz")
 async def admin_generate_quiz(payload: GenerateQuizIn, user=Depends(get_current_user)):
-    """Admin: gera quiz via IA."""
+    """Admin: gera quiz via IA usando material do RAG."""
     _require_admin(user)
-    prompt = f"Teacher Tati: Crie quiz de 5 questões (JSON: quiz_title, questions[question, options, correct_index, explanation]). Módulo: {payload.title}. Nível: {payload.level}."
+    
+    # Busca contexto no RAG baseado no título/descrição
+    from services.rag_search import obter_contexto_rag
+    rag_context = obter_contexto_rag(f"{payload.title} {payload.description or ''}").contexto
+    
+    context_str = f"\nMaterial de apoio:\n{rag_context}\n" if rag_context else ""
+
+    prompt = (
+        f"Teacher Tati: Crie quiz de 5 questões (JSON: quiz_title, questions[question, options, correct_index, explanation]). "
+        f"Módulo: {payload.title}. Nível: {payload.level}.\n"
+        f"{context_str}"
+    )
     try:
         text = await groq_chat([{"role": "user", "content": prompt}])
         start, end = text.find('{'), text.rfind('}') + 1

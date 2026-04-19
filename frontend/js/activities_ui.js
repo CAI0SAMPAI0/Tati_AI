@@ -23,7 +23,7 @@ function switchSection(sectionId, closeSidebar = true) {
 
   const navItem = document.getElementById(`nav-${sectionId}`);
   if (navItem) navItem.classList.add('active');
-  
+
   localStorage.setItem('last_section', sectionId);
 
   if (closeSidebar) {
@@ -60,7 +60,7 @@ function switchSubTab(tabName) {
 
   const panel = document.getElementById(`sub-content-${tabName}`);
   if (panel) panel.classList.add('active');
-  
+
   const btns = document.querySelectorAll('.sub-tabs .tab-btn');
   btns.forEach(btn => {
     if (btn.getAttribute('onclick')?.includes(`'${tabName}'`)) {
@@ -208,8 +208,8 @@ function closeQuiz() {
 async function loadInitialData() {
   try {
     await Promise.all([
-      loadUserData(), loadQuizzes(), loadActivities(), 
-      loadStudyTime(), loadAchievements(), loadRanking(), 
+      loadUserData(), loadQuizzes(), loadActivities(),
+      loadStudyTime(), loadAchievements(), loadRanking(),
       loadFlashcards(), loadSimulations()
     ]);
     I18n.applyToDOM();
@@ -219,35 +219,44 @@ async function loadInitialData() {
 async function loadUserData() {
   const user = getUser();
   if (!user) return;
-  document.getElementById('header-user-name').textContent = user.name || user.username || t('act.user_fallback');
-  
+  const displayName = user.name || user.username || t('act.user_fallback');
+  document.getElementById('header-user-name').textContent = displayName;
+
   const avatarImg = document.getElementById('header-user-avatar-img');
   const avatarFallback = document.getElementById('header-user-avatar');
-  if (user.avatar_url && avatarImg) { avatarImg.src = user.avatar_url; avatarImg.style.display = 'block'; if(avatarFallback) avatarFallback.style.display = 'none'; }
-  else if (avatarFallback) { avatarFallback.textContent = (user.name || user.username || '?').charAt(0).toUpperCase(); }
+  if (user.avatar_url && avatarImg) { avatarImg.src = user.avatar_url; avatarImg.style.display = 'block'; if (avatarFallback) avatarFallback.style.display = 'none'; }
+  else if (avatarFallback) { avatarFallback.textContent = displayName.charAt(0).toUpperCase(); }
+
+  // Preenche mini card da sidebar
+  const sidebarName = document.getElementById('sidebar-user-name');
+  const sidebarLevel = document.getElementById('sidebar-user-level');
+  const sidebarAvatar = document.getElementById('sidebar-user-avatar');
+  if (sidebarName) sidebarName.textContent = displayName;
+  if (sidebarLevel) sidebarLevel.textContent = user.level || 'Beginner';
+  if (sidebarAvatar) sidebarAvatar.textContent = displayName.charAt(0).toUpperCase();
 
   try {
     const streakData = await apiGet('/users/streak');
     document.getElementById('streak-count-text').textContent = streakData.current_streak || 0;
     document.getElementById('trophy-count-text').textContent = `${streakData.trophies_earned || 0}/50`;
-  } catch(e) {}
+  } catch (e) { }
 }
 
 async function loadStudyTime() {
   try {
     const data = await apiGet('/users/progress/study-time');
-    const fmt = m => m ? `${Math.floor(m/60)}h ${m%60}m` : null;
+    const fmt = m => m ? `${Math.floor(m / 60)}h ${m % 60}m` : null;
     const set = (id, val) => {
       const el = document.getElementById(id);
       if (!el) return;
       if (val) { el.textContent = val; el.style.opacity = '1'; }
       else { el.textContent = '—'; el.style.opacity = '0.35'; el.title = 'Comece a estudar para ver seu tempo aqui'; }
     };
-    set('study-week',       fmt(data.this_week));
-    set('study-month',      fmt(data.this_month));
+    set('study-week', fmt(data.this_week));
+    set('study-month', fmt(data.this_month));
     set('study-last-month', fmt(data.last_month));
-    set('study-3months',    fmt(data.last_3_months));
-  } catch(e) {}
+    set('study-3months', fmt(data.last_3_months));
+  } catch (e) { }
 }
 
 async function loadRanking() {
@@ -258,7 +267,7 @@ async function loadRanking() {
     const user = getUser();
     tbody.innerHTML = data.map((entry, i) => `
       <tr class="${entry.username === user?.username ? 'current-user' : ''}">
-        <td class="rank-pos">${i+1}</td>
+        <td class="rank-pos">${i + 1}</td>
         <td class="rank-name">${entry.name || entry.username}</td>
         <td class="rank-score">${entry.score} pts</td>
         <td class="rank-stat">${entry.messages || 0}</td>
@@ -284,30 +293,30 @@ async function loadRanking() {
     document.getElementById('winner-2-position').textContent = winners[1] ? `${winners[1].score} pts` : '0 pts';
     document.getElementById('winner-3-name').textContent = winners[2]?.name || '—';
     document.getElementById('winner-3-position').textContent = winners[2] ? `${winners[2].score} pts` : '0 pts';
-  } catch(e) { console.error(e); }
+  } catch (e) { console.error(e); }
 }
 
 async function loadQuizzes() {
   const modules = await apiGet('/activities/modules');
   const container = document.getElementById('quiz-list-container');
   if (!container) return;
-  
+
   let allQuizzes = [];
   modules.forEach(m => {
-      if (m.quizzes) {
-          m.quizzes.forEach(q => {
-              allQuizzes.push({...q, attempts: q.attempts || 0});
-          });
-      }
+    if (m.quizzes) {
+      m.quizzes.forEach(q => {
+        allQuizzes.push({ ...q, attempts: q.attempts || 0 });
+      });
+    }
   });
 
   const MAX_ATTEMPTS = 3;
 
   container.innerHTML = allQuizzes.length ? allQuizzes.map(q => {
-    const attempts  = q.attempts || 0;
+    const attempts = q.attempts || 0;
     const remaining = MAX_ATTEMPTS - attempts;
-    const blocked   = remaining <= 0;
-    const done      = attempts > 0;
+    const blocked = remaining <= 0;
+    const done = attempts > 0;
 
     const badgeHtml = blocked
       ? `<span class="quiz-badge badge-blocked">🔒 ${t('act.quiz_limit_reached') || 'Limite atingido'}</span>`
@@ -315,7 +324,7 @@ async function loadQuizzes() {
         ? `<span class="quiz-badge badge-done">✓ ${t('act.quiz_done') || 'Concluído'}</span>`
         : `<span class="quiz-badge badge-new">${t('act.quiz_new') || 'Novo'}</span>`;
 
-    const dotsHtml = Array.from({length: MAX_ATTEMPTS}, (_, i) =>
+    const dotsHtml = Array.from({ length: MAX_ATTEMPTS }, (_, i) =>
       `<span class="attempt-dot ${i < attempts ? 'used' : ''}"></span>`
     ).join('');
 
@@ -360,27 +369,47 @@ async function loadFlashcards() {
   }
 }
 
+const SIM_KEY_MAP = {
+  'Check-in no Aeroporto': 'airport_checkin',
+  'Entrevista de Emprego': 'job_interview',
+  'Fazendo Compras':       'shopping',
+  'No Aeroporto':          'at_airport',
+  'No Hotel':              'at_hotel',
+  'No Médico':             'at_doctor',
+  'No Restaurante':        'at_restaurant',
+  'Pedido no Restaurante': 'restaurant_order'
+};
+
 async function loadSimulations() {
   try {
     const data = await apiGet('/simulation/scenarios');
     const container = document.getElementById('sub-content-simulations');
     if (!container) return;
     if (!data.length) { container.innerHTML = `<p class="empty-view">${t('act.sim_none')}</p>`; return; }
-    container.innerHTML = `<div class="simulation-grid">${data.map(s => `
+    
+    container.innerHTML = `<div class="simulation-grid">${data.map(s => {
+      const key = SIM_KEY_MAP[s.name];
+      const title = key ? t(`sim.title_${key}`) : s.name;
+      const desc = key ? t(`sim.desc_${key}`) : s.description;
+      const diffLabel = getDiffLabel(s.difficulty);
+
+      return `
       <div class="sim-card" onclick="window.location.href='/simulation.html?id=${s.id}'">
         <div class="sim-card-icon">${s.icon || '💬'}</div>
         <div class="sim-card-body">
-          <h3>${escHtml(s.name)}</h3>
-          <p>${escHtml(s.description || '')}</p>
+          <h3>${escHtml(title)}</h3>
+          <p>${escHtml(desc || '')}</p>
         </div>
-        <span class="sim-card-difficulty ${s.difficulty}">${getDiffLabel(s.difficulty)}</span>
+        <span class="sim-card-difficulty ${s.difficulty}">${diffLabel}</span>
       </div>
-    `).join('')}</div>`;
-  } catch(e) { console.error(e); }
+      `;
+    }).join('')}</div>`;
+  } catch (e) { console.error(e); }
 }
 
 function getDiffLabel(d) {
-  return ({ beginner: t('act.difficulty_beginner'), intermediate: t('act.difficulty_intermediate'), advanced: t('act.difficulty_advanced') })[d] || d;
+  const key = d?.toLowerCase().replace('-', '_');
+  return t(`level.${key}`) || d;
 }
 
 async function loadActivities() {
@@ -415,7 +444,7 @@ async function loadActivities() {
         <span class="act-date">${new Date(sub.created_at).toLocaleDateString(I18n.getLang() === 'pt-BR' ? 'pt-BR' : 'en-US')}</span>
       </div>`;
     }).join('');
-  } catch(e) { console.error(e); }
+  } catch (e) { console.error(e); }
 }
 
 async function loadAchievements() {
@@ -435,7 +464,7 @@ async function loadAchievements() {
       badge.style.background = streak > 0 ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.15)';
       badge.style.color = streak > 0 ? '#10b981' : '#f59e0b';
     }
-  } catch(e) { console.error(e); }
+  } catch (e) { console.error(e); }
 
   try {
     const data = await apiGet('/users/trophies/all');
@@ -449,12 +478,67 @@ async function loadAchievements() {
     const bar = document.getElementById('trophy-progress-bar');
     if (bar) bar.style.width = `${pct}%`;
 
+    const TROPHY_KEY_MAP = {
+      'Primeiro Quiz':       'first_quiz',
+      'Quizzer Iniciante':   'quizzer_5',
+      'Quizzer':             'quizzer_10',
+      'Quizzer Avançado':    'quizzer_25',
+      'Mestre dos Quizzes':  'quizzer_50',
+      'Mestre Supremo':      'quizzer_100',
+      'Primeiro Dia':        'streak_1',
+      'Ofensiva de 3 Dias':  'streak_3',
+      'Ofensiva de 7 Dias':  'streak_7',
+      'Ofensiva de 14 Dias': 'streak_14',
+      'Ofensiva de 30 Dias': 'streak_30',
+      'Ofensiva de 60 Dias': 'streak_60',
+      'Ofensiva de 100 Dias': 'streak_100',
+      'Ofensiva de 365 Dias': 'streak_365',
+      'Primeira Mensagem':   'first_msg',
+      'Popular':             'msg_50',
+      '100 Mensagens':       'msg_100',
+      'Comunicador':         'msg_200',
+      '500 Mensagens':       'msg_500',
+      'Falante':             'msg_1000',
+      'Primeira Simulação':  'sim_1',
+      'Ator Iniciante':      'sim_5',
+      'Estrela de Simulação':'sim_20',
+      'Primeiro Crédito':    'credit_1',
+      'Economizador':        'credit_10',
+      'Colecionador':        'credit_50',
+      'Rico':                'credit_100',
+      'Magnata':             'credit_500',
+      'Primeira Hora':       'time_1',
+      'Mestre do Tempo':     'time_10',
+      'Tempo Supremo':       'time_50',
+      'Viajante do Tempo':   'time_100',
+      'Vocabulário 10':      'vocab_10',
+      'Vocabulário 50':      'vocab_50',
+      'Vocabulário 100':     'vocab_100',
+      'Poliglota':           'vocab_500',
+      'Dicionário Vivo':     'vocab_1000',
+      'Primeira Meta':       'goal_1',
+      'Focado':              'goal_5',
+      'Objetivo':            'goal_10',
+      'Top 10':              'rank_10',
+      'Top 3':               'rank_3',
+      'Campeão':             'rank_1',
+      'Social':              'social_1',
+      'Explorador':          'explore',
+      'Sempre Alerta':       'alert',
+      'Madrugador':          'early',
+      'Coruja':              'night',
+      'Final de Semana':     'weekend',
+      'Perfeccionista':      'perfect',
+    };
     const grid = document.getElementById('medals-grid');
     if (grid) {
       grid.innerHTML = medals.map(m => {
         const pct = m.progress_pct ?? (m.unlocked ? 100 : 0);
         const cur = m.current_val ?? 0;
         const req = m.required_val ?? 1;
+        const key = TROPHY_KEY_MAP[m.name];
+        const medalName = key ? t(`act.title_${key}`) : m.name;
+        const medalDesc = key ? t(`act.desc_${key}`) : m.description;
         const progressHtml = m.unlocked
           ? `<div class="medal-progress-bar-wrap done"><div class="medal-progress-bar" style="width:100%"></div></div>
              <div class="medal-progress-text">✓ ${t('act.quiz_done') || 'Concluído'}</div>`
@@ -467,15 +551,23 @@ async function loadAchievements() {
         <div class="medal-card ${m.unlocked ? 'unlocked' : 'locked'}" data-category="${m.category}">
           ${m.unlocked ? `<div class="medal-check"><i class="fa-solid fa-check"></i></div>` : ''}
           <div class="medal-icon">${m.icon || '🏆'}</div>
-          <div class="medal-name">${m.name}</div>
-          <div class="medal-desc">${m.description}</div>
-          ${progressHtml}
+          <div class="medal-name">${medalName}</div>
+          <div class="medal-desc">${medalDesc}</div>
+          <div class="medal-progress">
+            ${progressHtml}
+          </div>
         </div>`;
       }).join('');
     }
 
+    // Atualiza traduções dos filtros
+    document.querySelectorAll('.medal-filter').forEach(btn => {
+      const cat = btn.getAttribute('data-category');
+      btn.textContent = t(`act.cat_${cat}`) || cat;
+    });
+
     // Contadores por categoria
-    const counts = { all: medals.length, questions: 0, streak: 0, credits: 0, time: 0, milestones: 0, social: 0 };
+    const counts = { all: medals.length, questions: 0, streak: 0, milestones: 0 };
     medals.forEach(m => { if (counts[m.category] !== undefined) counts[m.category]++; });
     Object.keys(counts).forEach(cat => {
       const el = document.getElementById(`filter-${cat}-count`);
@@ -484,7 +576,7 @@ async function loadAchievements() {
 
     // Guarda medals globalmente para o filtro
     window._allMedals = medals;
-  } catch(e) { console.error(e); }
+  } catch (e) { console.error(e); }
 }
 
 // ── UTILS ──────────────────────────────────────────────────────────────
@@ -501,14 +593,44 @@ function filterMedals(cat, btn) {
   });
 }
 function setRankingMonth() {
-    const months = [0,1,2,3,4,5,6,7,8,9,10,11].map(m => t(`act.month_${m}`));
+  const months = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(m => t(`act.month_${m}`));
+  const now = new Date();
+  const label = `${months[now.getMonth()]}/${now.getFullYear()}`;
+  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevLabel = `${months[prev.getMonth()]}/${prev.getFullYear()}`;
+  document.getElementById('ranking-month').textContent = label;
+  document.getElementById('winners-month').textContent = prevLabel;
+  document.getElementById('top15-month').textContent = label;
+  startCountdown();
+}
+
+function startCountdown() {
+  function update() {
     const now = new Date();
-    const label = `${months[now.getMonth()]}/${now.getFullYear()}`;
-    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const prevLabel = `${months[prev.getMonth()]}/${prev.getFullYear()}`;
-    document.getElementById('ranking-month').textContent = label;
-    document.getElementById('winners-month').textContent = prevLabel;
-    document.getElementById('top15-month').textContent = label;
+    // Último momento do mês atual
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0) - 1;
+    const diff = endOfMonth - now;
+
+    if (diff <= 0) { update(); return; }
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+    const pad = n => String(n).padStart(2, '0');
+    const el = id => document.getElementById(id);
+    if (el('cd-days')) el('cd-days').textContent = pad(days);
+    if (el('cd-hours')) el('cd-hours').textContent = pad(hours);
+    if (el('cd-minutes')) el('cd-minutes').textContent = pad(minutes);
+    if (el('cd-seconds')) el('cd-seconds').textContent = pad(seconds);
+
+    // Muda cor para vermelho nos últimos 3 dias
+    const card = document.getElementById('countdown-card');
+    if (card) card.classList.toggle('urgent', days < 3);
+  }
+  update();
+  setInterval(update, 1000);
 }
 function openWritingModal() { document.getElementById('writing-modal')?.classList.add('active'); }
 function closeWritingModal() { document.getElementById('writing-modal')?.classList.remove('active'); }
@@ -536,7 +658,7 @@ async function handleFeedbackSubmit(e) {
     } else {
       showToast(res.data?.message || t('act.fb_error'), 'error');
     }
-  } catch(err) { console.error(err); showToast(t('act.fb_conn_error'), 'error'); }
+  } catch (err) { console.error(err); showToast(t('act.fb_conn_error'), 'error'); }
 }
 
 async function handleWritingSubmit(e) {
@@ -559,5 +681,5 @@ async function handleWritingSubmit(e) {
     } else {
       showToast(t('act.wr_error'), 'error');
     }
-  } catch(err) { console.error(err); showToast(t('act.wr_conn_error'), 'error'); }
+  } catch (err) { console.error(err); showToast(t('act.wr_conn_error'), 'error'); }
 }

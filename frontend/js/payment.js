@@ -2,8 +2,8 @@ if (!requireAuth()) throw new Error('Unauthenticated');
 
 // ── State ─────────────────────────────────────────────────────────
 let selectedMethod = 'PIX';
-let selectedPlan   = 'full';
-let _detailPlan    = null;
+let selectedPlan = 'full';
+let _detailPlan = null;
 
 // ── Init ──────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
@@ -72,7 +72,7 @@ async function validateDocumentRealTime(doc) {
   try {
     const res = await apiGet(`/validation/validate-document/${doc}`);
     _lastValidationResult = res;
-    
+
     if (cpfInput) {
       if (res && res.valid) {
         // Mostra feedback visual de sucesso
@@ -122,16 +122,16 @@ function showPlanDetails(e, plan) {
   if (e) e.stopPropagation();
   _detailPlan = plan;
 
-  const isBasic  = plan === 'basic';
-  const nameKey  = isBasic ? 'plan.basic'       : 'plan.full';
-  const priceKey = isBasic ? 'plan.basic_price'  : 'plan.full_price';
-  const count    = isBasic ? 4 : 9;
+  const isBasic = plan === 'basic';
+  const nameKey = isBasic ? 'plan.basic' : 'plan.full';
+  const priceKey = isBasic ? 'plan.basic_price' : 'plan.full_price';
+  const count = isBasic ? 4 : 9;
   const features = Array.from({ length: count }, (_, i) =>
     t(`plan.${isBasic ? 'basic' : 'full'}_feature_${i + 1}`)
   );
 
-  document.getElementById('detail-name').textContent  = t(nameKey);
-  document.getElementById('detail-price').innerHTML   =
+  document.getElementById('detail-name').textContent = t(nameKey);
+  document.getElementById('detail-price').innerHTML =
     `${t(priceKey)}<small>${t('plan.per_month')}</small>`;
 
   const ul = document.getElementById('detail-features');
@@ -156,7 +156,7 @@ function choosePlanFromModal() {
 // ── Modal sucesso ─────────────────────────────────────────────────
 function showSuccessModal(planType) {
   const planName = planType === 'full' ? t('plan.full') : t('plan.basic');
-  const badge    = document.getElementById('success-plan-name');
+  const badge = document.getElementById('success-plan-name');
   if (badge) badge.textContent = `Plano ${planName}`;
   const modal = document.getElementById('success-modal');
   if (modal) modal.classList.add('visible');
@@ -164,10 +164,10 @@ function showSuccessModal(planType) {
 
 // ── Pagamento ─────────────────────────────────────────────────────
 async function handlePayment() {
-  const btn       = document.getElementById('btn-generate');
-  const loading   = document.getElementById('loading');
+  const btn = document.getElementById('btn-generate');
+  const loading = document.getElementById('loading');
   const pixResult = document.getElementById('pix-result');
-  const cpfInput  = document.getElementById('user-cpf');
+  const cpfInput = document.getElementById('user-cpf');
 
   const cpfValue = cpfInput ? cpfInput.value.replace(/\D/g, '') : '';
 
@@ -190,38 +190,37 @@ async function handlePayment() {
 
   pixResult.classList.remove('visible');
   pixResult.style.display = 'none';
-  btn.disabled    = true;
+  btn.disabled = true;
   loading.style.display = 'block';
 
   try {
     // 1. Salva o CPF no perfil do usuário no Supabase primeiro
     try {
-        const updateRes = await apiPut('/profile/', { cpf: cpfValue, cpf_cnpj: cpfValue });
-        if (!updateRes.ok) console.warn("Aviso: Falha ao salvar CPF no perfil, mas tentando prosseguir com pagamento...", updateRes.data);
+      const updateRes = await apiPut('/profile/', { cpf: cpfValue, cpf_cnpj: cpfValue });
+      if (!updateRes.ok) console.warn("Aviso: Falha ao salvar CPF no perfil, mas tentando prosseguir com pagamento...", updateRes.data);
     } catch (profileErr) {
-        console.error("Erro ao atualizar perfil:", profileErr);
-        // Não bloqueia o pagamento se apenas o save no profile falhar (o Asaas pode ter sucesso se o CPF já estiver lá)
+      console.error("Erro ao atualizar perfil:", profileErr);
+      // Não bloqueia o pagamento se apenas o save no profile falhar (o Asaas pode ter sucesso se o CPF já estiver lá)
     }
 
     // 2. Cria a cobrança no Asaas
-    const value   = selectedPlan === 'basic' ? 19.90 : 39.90;
+    const value = selectedPlan === 'basic' ? 19.90 : 39.90;
     const payload = {
       billingType: selectedMethod,
-      planType:    selectedPlan,
-      value,
-      description: `Assinatura Teacher Tati — Plano ${selectedPlan}`
+      planType: selectedPlan,
+      // value e description removidos — vêm do banco agora
     };
 
-    const res = await apiPost('/payments/create', payload);
+    const res = await apiPost('/payments/subscribe', payload);
     if (!res.ok) throw new Error(res.data?.detail || t('gen.error'));
 
     const data = res.data;
 
     if (selectedMethod === 'PIX') {
       // Exibe QR Code
-      document.getElementById('qr-code-img').src     = `data:image/png;base64,${data.pixQrCode}`;
+      document.getElementById('qr-code-img').src = `data:image/png;base64,${data.pixQrCode}`;
       document.getElementById('pix-copy-paste').textContent = data.pixCopyPaste;
-      document.getElementById('invoice-link').href   = data.invoiceUrl;
+      document.getElementById('invoice-link').href = data.invoiceUrl;
       pixResult.classList.add('visible');
       pixResult.style.display = 'flex';
 
@@ -239,7 +238,7 @@ async function handlePayment() {
 
   } catch (err) {
     const errorMsg = err.message || 'Erro desconhecido';
-    
+
     // Mensagens de erro mais amigáveis
     if (errorMsg.includes('Documento inválido')) {
       showToast("❌ " + errorMsg, "error");
@@ -264,10 +263,10 @@ async function _pollPaymentStatus(paymentId, planType, attempts = 0) {
     const res = await apiGet('/payments/status');
     if (res?.status === 'active') {
       clearTimeout(_pollTimer);
-      
+
       // Salva flag para mostrar animação
       localStorage.setItem('payment_just_confirmed', 'true');
-      
+
       // Redireciona para tela de comprovante
       const today = new Date().toLocaleDateString('pt-BR');
       const dueDate = res.expires_at ? new Date(res.expires_at).toLocaleDateString('pt-BR') : '—';

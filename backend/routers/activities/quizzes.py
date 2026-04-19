@@ -218,11 +218,20 @@ async def generate_questions(
     """
     import json
 
+    # Se não houver contexto manual, busca no RAG baseado no quiz_id (título do quiz)
+    context = body.context
+    if not context or len(context.strip()) < 10:
+        db = get_client()
+        quiz = db.table("quizzes").select("title").eq("id", quiz_id).single().execute().data
+        if quiz:
+            from services.rag_search import obter_contexto_rag
+            context = obter_contexto_rag(quiz["title"]).contexto
+
     prompt = f"""You are an English teacher creating a multiple-choice quiz.
 
 Context (lesson content):
 ---
-{body.context}
+{context}
 ---
 
 Create exactly {body.num_questions} multiple-choice questions based on this content.
