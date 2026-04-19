@@ -27,6 +27,5 @@ resend
 sentry-sdk[fastapi]
 upstash-redis
 python-dateutil
-edge-
 reportlab
 edge-tts
