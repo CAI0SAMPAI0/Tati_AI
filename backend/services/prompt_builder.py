@@ -13,31 +13,53 @@ class UserProfile:
     custom_prompt: str = ""
 
 
-_LEVEL_RULES = (
-    "ADAPTATION RULES:\n"
-    "- Beginner: use extremely simple words, short sentences, explain slowly.\n"
-    "- Intermediate: speak naturally, introduce useful phrasal verbs.\n"
-    "- Advanced: talk like a native speaker, use idioms and complex vocabulary.\n"
-    "- Always align examples with the student's Main Focus."
-)
+_LEVEL_RULES = {
+    "Beginner": (
+        "ADAPTATION RULES for BEGINNER:\n"
+        "- Use EXTREMELY simple words and VERY short sentences.\n"
+        "- Be VERY direct. Answer in 2-3 short sentences max.\n"
+        "- No complex explanations unless explicitly asked.\n"
+        "- Explain slowly and clearly if needed."
+    ),
+    "Pre-Intermediate": (
+        "ADAPTATION RULES for PRE-INTERMEDIATE:\n"
+        "- Use simple language but slightly more elaborated than beginner.\n"
+        "- Keep answers concise and clear (max 4-5 sentences).\n"
+        "- Introduce basic phrasal verbs."
+    ),
+    "Intermediate": (
+        "ADAPTATION RULES for INTERMEDIATE:\n"
+        "- Speak naturally, use standard vocabulary.\n"
+        "- Balanced responses, natural conversation flow.\n"
+        "- Introduce useful phrasal verbs and common idioms."
+    ),
+    "Advanced": (
+        "ADAPTATION RULES for ADVANCED / BUSINESS:\n"
+        "- Talk like a native speaker.\n"
+        "- Use sophisticated idioms and complex vocabulary.\n"
+        "- Full native-level responses with nuance and detail."
+    )
+}
 
 _RAG_RULES = (
     "STRICT BEHAVIOR RULES:\n"
     "1. NEVER mention you have access to books or documents.\n"
     "2. NEVER copy source text word for word.\n"
     "3. Use library context only as silent inspiration.\n"
-    "4. Keep responses short, natural, conversational.\n"
+    "4. Keep responses natural and conversational.\n"
     "5. NEVER say 'Based on the text' or 'I removed references'.\n"
     "6. Just deliver the response and feedback naturally."
 )
 
 
 def build_profile_instruction(profile: UserProfile) -> str:
+    level_rule = _LEVEL_RULES.get(profile.level, _LEVEL_RULES["Intermediate"])
     return (
         f"\n\n--- STUDENT PROFILE ---\n"
         f"English Level: {profile.level}\n"
         f"Main Focus: {profile.focus}\n\n"
-        f"{_LEVEL_RULES}"
+        f"{level_rule}\n"
+        f"- Always align examples with the student's Main Focus."
     )
 
 

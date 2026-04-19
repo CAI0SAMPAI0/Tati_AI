@@ -248,6 +248,7 @@ def _calculate_rankings(db, start_date, end_date=None):
         "quiz": 7,
         "flashcard": 3,
         "exercise": 5,
+        "simulation": 10,
     }
 
     user_scores = {}

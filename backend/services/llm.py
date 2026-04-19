@@ -95,61 +95,13 @@ async def _tts_gtts(text: str) -> str:
         return ""
 
 
-async def stream_llm(system: str, history: list[Message]) -> AsyncIterator[str]:
+async def stream_llm(system: str, history: list[Message], max_tokens: int = 1500) -> AsyncIterator[str]:
     provider = settings.llm_provider
     if provider == "groq":
-        async for token in _stream_groq(system, history):
+        async for token in _stream_groq(system, history, max_tokens=max_tokens):
             yield token
-    '''elif provider == "gemini":
-        async for token in _stream_gemini(system, history):
-            yield token
-    else:
-        async for token in _stream_claude(system, history):
-            yield token'''
 
-
-'''async def _stream_claude(system: str, history: list[Message]) -> AsyncIterator[str]:
-    import anthropic
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-    formatted = [{"role": m["role"], "content": m["content"]} for m in history]
-    async with client.messages.stream(
-        model=settings.claude_model,
-        max_tokens=4096,
-        system=system,
-        messages=formatted,
-    ) as stream:
-        async for text in stream.text_stream:
-            yield text
-
-
-async def _stream_gemini(system: str, history: list[Message]) -> AsyncIterator[str]:
-    import asyncio
-    from google import genai
-    from google.genai import types
-
-    client = genai.Client(api_key=settings.gemini_api_key)
-    gemini_history = [
-        {"role": "user" if m["role"] == "user" else "model", "parts": [{"text": m["content"]}]}
-        for m in history[:-1]
-    ]
-    last_msg = history[-1]["content"] if history else ""
-
-    def _sync_stream() -> list[str]:
-        return [
-            chunk.text
-            for chunk in client.models.generate_content_stream(
-                model=settings.gemini_model,
-                contents=gemini_history + [{"role": "user", "parts": [{"text": last_msg}]}],
-                config=types.GenerateContentConfig(system_instruction=system),
-            )
-            if chunk.text
-        ]
-
-    for chunk in await asyncio.get_event_loop().run_in_executor(None, _sync_stream):
-        yield chunk'''
-
-
-async def _stream_groq(system: str, history: list[Message]) -> AsyncIterator[str]:
+async def _stream_groq(system: str, history: list[Message], max_tokens: int = 1500) -> AsyncIterator[str]:
     from groq import AsyncGroq
     keys = settings.groq_keys
     if not keys:
@@ -168,6 +120,7 @@ async def _stream_groq(system: str, history: list[Message]) -> AsyncIterator[str
                 model="llama-3.3-70b-versatile",
                 messages=messages,
                 stream=True,
+                max_tokens=max_tokens,
             )
             async for chunk in stream:
                 content = chunk.choices[0].delta.content
@@ -182,9 +135,6 @@ async def _stream_groq(system: str, history: list[Message]) -> AsyncIterator[str
             break
 
     yield f"[Erro Groq: todas as {len(keys)} chave(s) falharam. Ãšltimo: {str(last_error)[:120]}]"
-
-
-# â”€â”€ Chat simples (nÃ£o-streaming) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 async def groq_chat(
@@ -217,9 +167,6 @@ async def groq_chat(
             break
 
     raise GroqKeyError(f"Todas as chaves Groq falharam. Ãšltimo: {last_error}")
-
-
-# â”€â”€ Visemas (animaÃ§Ã£o labial) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 async def generate_visemes(audio_b64: str) -> list:

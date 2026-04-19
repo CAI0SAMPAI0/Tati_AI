@@ -56,6 +56,7 @@ window.addEventListener('DOMContentLoaded', () => {
     btn.disabled = true;
     try {
       const data = await apiGet(`/chat/conversations/${currentConvId}/summary?lang=${I18n.getLang()}`);
+      window._lastSummaryMarkdown = data.summary; // Store for PDF generation
       document.getElementById('summary-text').innerHTML = marked.parse(data.summary);
       document.getElementById('summary-modal').style.display = 'flex';
     } catch (e) {
@@ -64,6 +65,11 @@ window.addEventListener('DOMContentLoaded', () => {
       btn.innerHTML = orig;
       btn.disabled = false;
     }
+  });
+
+  document.getElementById('download-pdf-btn')?.addEventListener('click', async () => {
+    if (!window._lastSummaryMarkdown) return;
+    await _downloadReportPDF(window._lastSummaryMarkdown, `Tati_Report_${new Date().toISOString().slice(0, 10)}.pdf`, 'download-pdf-btn');
   });
 
   document.getElementById('close-modal-btn')?.addEventListener('click', () => {
@@ -211,10 +217,10 @@ function _handleWSMessage(msg) {
       if (streamingMsgEl) {
         const meta = _finalizeStreamBubble(streamingMsgEl, streamingBubble);
         // Áudio só é anexado aqui, após stream terminar
-        if (pendingAudioB64 && meta) {
+        if (pendingAudioB64 && meta && !window._lastStreamIsReport) {
           _buildAudioControls(meta, pendingAudioB64);
-          pendingAudioB64 = null;
         }
+        pendingAudioB64 = null;
       }
       streamingBubble = null; streamingMsgEl = null;
       isStreaming = false;
@@ -613,6 +619,7 @@ function _appendAssistantMsg(text, returnElement = false, isoString = null) {
       <div class="message-meta"><span class="message-time">${nowTime(isoString)}</span></div>
     </div>`;
   _insertBeforeTyping(div);
+  _checkAndAddReportButton(div, text);
   if (getSettings().wordTooltip !== false && window.WordTooltip) WordTooltip.makeClickable(div);
   _scrollBottom();
   return returnElement ? div : null;
@@ -630,17 +637,34 @@ function _appendStreamBubble() {
 
 function _appendToken(bubble, token) {
   streamBuffer += token;
-  bubble.innerHTML = formatMarkdown(streamBuffer);
+  // Se for um relatório, não exibe o markdown durante o streaming
+  if (streamBuffer.includes('# 📊 STUDY REPORT')) {
+    bubble.innerHTML = `<div style="display:flex;align-items:center;gap:10px;color:var(--primary);font-weight:600;">
+      <i class="fa-solid fa-file-lines fa-lg"></i>
+      <span>${t('act.generating_report') || 'Gerando relatório pedagógico...'}</span>
+    </div>`;
+  } else {
+    bubble.innerHTML = formatMarkdown(streamBuffer);
+  }
   _scrollBottom();
 }
 
 function _finalizeStreamBubble(msgEl, bubble) {
   if (getSettings().wordTooltip !== false && window.WordTooltip) WordTooltip.makeClickable(msgEl);
+  const text = streamBuffer; // Capture content before clearing
+  window._lastStreamIsReport = text.includes('# 📊 STUDY REPORT');
+
+  // Re-render final content with marked for better quality
+  bubble.innerHTML = DOMPurify.sanitize(marked.parse(text));
+  bubble.classList.remove('stream-bubble');
+
   const body = msgEl.querySelector('.message-body');
   const meta = document.createElement('div');
   meta.className = 'message-meta';
   meta.innerHTML = `<span class="message-time">${nowTime()}</span>`;
   body?.appendChild(meta);
+
+  _checkAndAddReportButton(msgEl, text);
   streamBuffer = '';
   return meta;
 }
@@ -822,61 +846,95 @@ function _showPaywall() {
     `;
   _insertBeforeTyping(wall);
   _scrollBottom();
-}
+  }
 
-async function _initUserInfo() {
-  const el = id => document.getElementById(id);
-  const nameEl = el('sidebar-user-name');
-  const levelEl = el('sidebar-user-level');
-  const avatarEl = el('sidebar-user-avatar');
+  async function _downloadReportPDF(content, filename, clickedBtn = null) {
+    const btn = clickedBtn;
+    const orig = btn ? btn.innerHTML : null;
+    if (btn) {
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${t('act.generating_pdf') || 'Gerando PDF...'}` ;
+      btn.disabled = true;
+      btn.style.opacity = '0.8';
+    }
 
-  if (nameEl) nameEl.textContent = user.name || user.username;
-  if (levelEl) levelEl.textContent = user.level || 'Student';
-  if (avatarEl) _renderSidebarAvatar(avatarEl, user);
-
-  if (!user.avatar_url) {
     try {
-      const data = await apiGet('/profile/');
-      saveSession(getToken(), { ...user, avatar_url: data.avatar_url || null });
-      user.avatar_url = data.avatar_url || null;
-      if (avatarEl) _renderSidebarAvatar(avatarEl, user);
-    } catch (e) { /* silencioso */ }
-  }
-
-  const specialUsers = ["caio.sampaio", "caio", "programador", "tati", "tati.ai", "admin"];
-  const isSpecial = specialUsers.includes(user.username);
-  const isTeacher = isStaff(user);
-
-  if (isTeacher || isSpecial) {
-    const dashBtn = el('btn-dashboard');
-    if (dashBtn) dashBtn.style.display = 'flex';
-
-    // Botão de atividades na sidebar
-    const actBtn = document.querySelector('a[href="activities.html"]');
-    if (actBtn) actBtn.style.display = 'flex';
-  } else {
-    // Esconde para alunos normais
-    const dashBtn = el('btn-dashboard');
-    if (dashBtn) dashBtn.style.display = 'none';
-    const actBtn = document.querySelector('a[href="activities.html"]');
-    if (actBtn) actBtn.style.display = 'none';
-  }
-
-  const badgeEl = document.getElementById('sidebar-premium-badge');
-  if (badgeEl) {
-    // Se for especial ou professor, mostra badge Premium fixo ou verifica assinatura
-    if (isSpecial || isTeacher) {
-        badgeEl.style.display = 'inline-block';
-        badgeEl.textContent = 'Premium';
-    } else {
-        apiGet('/payments/status').then(sub => {
-          if (sub && sub.has_subscription && sub.status === 'active') {
-            badgeEl.style.display = 'inline-block';
-            badgeEl.textContent = sub.plan_type === 'full' ? 'Premium' : 'Basic';
-          } else {
-            badgeEl.style.display = 'none';
-          }
-        }).catch(() => { badgeEl.style.display = 'none'; });
+      const response = await fetch(`${API_BASE}/chat/download_report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getToken()}`
+        },
+        body: JSON.stringify({ content, filename })
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        throw new Error(detail.detail || 'Falha ao gerar PDF');
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      if (btn) btn.innerHTML = `<i class="fa-solid fa-check"></i> PDF Baixado!`;
+      setTimeout(() => { if (btn) { btn.innerHTML = orig; btn.disabled = false; btn.style.opacity = ''; } }, 2500);
+    } catch (e) {
+      console.error(e);
+      showToast('Erro ao gerar PDF. Tente novamente.', 'error');
+      if (btn) { btn.innerHTML = orig; btn.disabled = false; btn.style.opacity = ''; }
     }
   }
-}
+
+  function _checkAndAddReportButton(msgEl, text) {
+    if (!text.includes('# 📊 STUDY REPORT')) return;
+
+    const body = msgEl.querySelector('.message-body');
+    const bubble = body?.querySelector('.message-bubble');
+    if (!body || !bubble || body.querySelector('.btn-report-download')) return;
+
+    // Extract title if possible
+    const lines = text.split('\n');
+    const reportLine = lines.find(l => l.includes('# 📊 STUDY REPORT'));
+    const titleLine = lines.find(l => l.startsWith('## ')) || reportLine;
+    const cleanTitle = titleLine.replace(/#|📊/g, '').trim();
+
+    // Hide the original long markdown and show a compact card
+    bubble.innerHTML = `
+      <div class="report-card" style="padding: 10px; background: hsla(var(--p), 0.1); border-left: 4px solid var(--primary); border-radius: 4px;">
+        <p style="margin: 0 0 8px 0; font-weight: 700; color: var(--primary);">📄 ${cleanTitle}</p>
+        <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted);">The full pedagogical report has been generated. Click below to download the PDF version with Teacher Tati's formatting.</p>
+      </div>
+    `;
+
+    const btn = document.createElement('button');
+    btn.className = 'btn-report-download';
+    btn.style.cssText = `
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 12px; padding: 10px 20px;
+      background: var(--primary); color: white;
+      border: none; border-radius: 10px;
+      font-size: 0.9rem; font-weight: 700;
+      cursor: pointer; transition: transform 0.2s;
+      width: 100%; justify-content: center;
+      box-shadow: var(--shadow-sm);
+    `;
+    btn.innerHTML = `<i class="fa-solid fa-file-pdf"></i> ${t('act.download_pdf_report') || 'Download PDF Report'}`;
+    btn.onclick = (e) => {
+      e.preventDefault();
+      // Gera filename a partir do título do relatório
+      const slug = cleanTitle
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .trim()
+        .replace(/\s+/g, '_')
+        .slice(0, 50);
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const filename = `Tati_Report_${slug}_${dateStr}.pdf`;
+      _downloadReportPDF(text, filename, btn);
+    };
+
+    body.appendChild(btn);
+  }

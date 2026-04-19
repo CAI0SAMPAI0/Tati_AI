@@ -7,6 +7,7 @@ from services.ranking import get_ranking_data
 
 router = APIRouter()
 
+
 @router.get("")
 async def get_ranking(current_user: dict = Depends(get_current_user)):
     """Retorna os dados do ranking para a tela de competições."""

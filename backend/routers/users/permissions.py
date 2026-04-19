@@ -14,13 +14,13 @@ FREE_MSG_LIMIT = 5
 # Usuários com acesso total garantido (programadores/testers)
 SPECIAL_USERS = {
     "caio.sampaio",
-    "caio",
-    "programador",
     "tati",
     "tati.ai",
     "admin",
     "Professora",
     "Tatiana",
+    "programador",
+    "Programador",
 }
 
 # Feriados nacionais fixos (mês, dia) — adicione os móveis via banco se quiser

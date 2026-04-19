@@ -9,7 +9,8 @@ ACTION_POINTS = {
     "quiz": 7,
     "flashcard": 3,
     "message": 8,
-    "exercise": 5
+    "exercise": 5,
+    "simulation": 10,
 }
 
 def _empty_stats(username: str, user_map: dict) -> dict:

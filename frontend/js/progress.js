@@ -34,20 +34,51 @@ async function loadTrophies() {
     const grid = document.getElementById('trophies-grid');
     const countEl = document.getElementById('trophies-count');
     if (!grid) return;
-    
+
+    grid.innerHTML = '<div class="ranking-loading">Carregando conquistas...</div>';
+
     try {
         const data = await apiGet('/users/trophies/all');
-        if (data && data.medals) {
-            if (countEl) countEl.textContent = `${data.earned}/${data.total}`;
-            
-            grid.innerHTML = data.medals.map(m => `
-                <div class="trophy-item ${m.unlocked ? 'earned' : ''}" title="${m.description}">
-                    <span class="trophy-icon">${m.icon || '🏆'}</span>
-                    <span class="trophy-name">${m.name}</span>
-                    <span class="trophy-date">${m.unlocked ? (m.progress || 'Conquistado') : (m.progress || 'Bloqueado')}</span>
-                </div>
-            `).join('');
+
+        // Suporta dois formatos: { medals, earned, total } ou array direto
+        let medals = [];
+        let earned = 0;
+        let total = 0;
+
+        if (data && Array.isArray(data.medals)) {
+            medals = data.medals;
+            earned = data.earned || 0;
+            total  = data.total  || medals.length;
+        } else if (Array.isArray(data)) {
+            // Formato antigo: array de troféus conquistados
+            medals = data.map(t => ({
+                name: t.title || t.name,
+                description: t.description,
+                icon: t.icon || '🏆',
+                unlocked: true,
+                progress: t.earned_at ? new Date(t.earned_at).toLocaleDateString('pt-BR') : 'Conquistado'
+            }));
+            earned = medals.length;
+            total  = medals.length;
         }
+
+        if (countEl) countEl.textContent = `${earned}/${total}`;
+
+        if (!medals.length) {
+            grid.innerHTML = '<div class="ranking-loading">Nenhuma conquista ainda. Continue estudando! 🎯</div>';
+            return;
+        }
+
+        grid.innerHTML = medals.map(m => `
+            <div class="trophy-item ${m.unlocked ? 'earned' : ''}" title="${m.description || ''}">
+                <span class="trophy-icon">${m.icon || '🏆'}</span>
+                <span class="trophy-name">${m.name || ''}</span>
+                <span class="trophy-date">${m.unlocked
+                    ? (m.progress || 'Conquistado')
+                    : (m.progress || 'Bloqueado')}</span>
+            </div>
+        `).join('');
+
     } catch (e) {
         console.error('Erro ao carregar troféus:', e);
         grid.innerHTML = '<div class="ranking-loading">Erro ao carregar conquistas.</div>';
@@ -60,7 +91,7 @@ async function loadRanking() {
     
     try {
         const top15 = await apiGet('/users/ranking/top15');
-        const myPos = await apiGet('/users/ranking/position');
+        const myPos = await apiGet('/users/ranking/position').catch(() => null);
         const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
         
         if (Array.isArray(top15)) {

@@ -70,8 +70,13 @@ async def send_simulation_message(
 ):
     """Envia mensagem para simulação e recebe resposta da IA (com TTS)."""
     username = current_user["username"]
-    
-    # Registra atividade
+    conv_id = body.conversation_id or f"sim_{username}_{body.scenario}"
+
+    # Salva mensagem do usuário no histórico real
+    from services.history import save_message
+    await save_message(conv_id, username, "user", body.content)
+
+    # Registra atividade (agora com regra de 3 mensagens)
     from services.streaks import record_study_day
     record_study_day(username)
 
@@ -113,7 +118,10 @@ async def send_simulation_message(
         except Exception as e:
             print(f"[Sim TTS] Erro: {e}")
         
-        return {"reply": reply_text, "scenario": body.scenario, "audio_b64": tts_b64}
+        # Salva resposta da IA no histórico real
+        await save_message(conv_id, username, "assistant", reply_text, audio_b64=tts_b64)
+        
+        return {"reply": reply_text, "scenario": body.scenario, "audio_b64": tts_b64, "conversation_id": conv_id}
     except Exception as e:
         error_msg = str(e)
         print(f"[Simulation] Erro LLM: {error_msg}")

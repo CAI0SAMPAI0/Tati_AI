@@ -16,6 +16,13 @@ async def get_user_streak(current_user: dict = Depends(get_current_user)):
     username = current_user["username"]
     data = get_streak(username)
 
+    # Retro-award trophies (check first message, streaks, etc)
+    try:
+        from services.trophy_service import check_all_trophies
+        check_all_trophies(username)
+    except Exception as e:
+        print(f"[Retro Trophy] Erro: {e}")
+
     # Contar troféus conquistados
     db = get_client()
     try:

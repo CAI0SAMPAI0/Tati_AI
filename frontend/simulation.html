@@ -91,15 +91,14 @@
                 <div class="feedback-field">
                     <label data-i18n="feedback.category">Categoria</label>
                     <select id="feedback-category">
-                        <option value="bug">🐛 Bug/Erro</option>
-                        <option value="feature">💡 Sugestão de Recurso</option>
-                        <option value="feedback">💬 Feedback Geral</option>
-                        <option value="other">📝 Outros</option>
+                        <option value="bug" data-i18n="feedback.cat_bug">🪲 Relatar Bug</option>
+                        <option value="suggestion" data-i18n="feedback.cat_suggestion">💡 Sugestão</option>
+                        <option value="general" data-i18n="feedback.cat_general">💬 Feedback Geral</option>
                     </select>
                 </div>
                 <div class="feedback-field">
                     <label data-i18n="feedback.message">Mensagem</label>
-                    <textarea id="feedback-message" rows="5" placeholder="Descreva o problema, sugestão ou feedback..."></textarea>
+                    <textarea id="feedback-message" rows="5" data-i18n-placeholder="feedback.message_ph" placeholder="Descreva o problema, sugestão ou feedback..."></textarea>
                 </div>
                 <div id="feedback-status" class="feedback-status" style="display: none;"></div>
             </div>

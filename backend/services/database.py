@@ -4,7 +4,7 @@ from core.config import settings
 
 # acessa o supabase e evita bug de reconexão
 
-_client: Client = None
+_client = create_client(settings.supabase_url, settings.supabase_service_key or settings.supabase_key)
 
 def get_client() -> Client:
     global _client

@@ -483,6 +483,11 @@ async def create_simulation(body: SimulationCreate, current_user: dict = Depends
     system_prompt = body.system_prompt
     if body.use_ai_generation:
         try:
+            # Busca contexto no RAG baseado no nome da simulação
+            from services.rag_search import obter_contexto_rag
+            rag_context = obter_contexto_rag(f"{body.name} {body.description}").contexto
+            context_str = f"\nUse este material como base para o cenário:\n---\n{rag_context}\n---\n" if rag_context else ""
+
             import asyncio
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -493,6 +498,7 @@ Create a roleplay scenario system prompt for an English teacher AI.
 Scenario: {body.name}
 Description: {body.description}
 Difficulty: {body.difficulty}
+{context_str}
 
 CRITICAL: The AI must ALWAYS respond entirely in ENGLISH only. Never respond in Portuguese.
 Create a detailed system prompt that instructs the AI to play a specific role
@@ -524,6 +530,47 @@ in this scenario. Include:
     try:
         db.table("simulations").insert(sim_data).execute()
         return {"ok": True, "simulation": sim_data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/simulations/{sim_id}")
+async def get_simulation(sim_id: str, current_user: dict = Depends(require_staff)):
+    """Retorna detalhes de uma simulação específica."""
+    db = get_client()
+    try:
+        res = db.table("simulations").select("*").eq("id", sim_id).single().execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Simulação não encontrada")
+        return res.data
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/simulations/{sim_id}")
+async def update_simulation(sim_id: str, body: SimulationCreate, current_user: dict = Depends(require_staff)):
+    """Atualiza uma simulação existente."""
+    db = get_client()
+    
+    system_prompt = body.system_prompt
+    # Se use_ai_generation estiver ligado, gera o prompt novamente (opcional)
+    if body.use_ai_generation:
+        # (Lógica de geração com IA aqui se desejado, mas geralmente ao editar o professor quer manter o prompt manual)
+        # Se quiser permitir regerar ao editar, pode manter a lógica similar ao POST
+        pass
+
+    sim_data = {
+        "name": body.name,
+        "description": body.description,
+        "icon": body.icon,
+        "difficulty": body.difficulty,
+        "system_prompt": system_prompt,
+    }
+    
+    try:
+        db.table("simulations").update(sim_data).eq("id", sim_id).execute()
+        return {"ok": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -186,8 +186,16 @@ function escHtml(str) {
 }
 
 function nowTime(isoString = null) {
-  const date = isoString ? new Date(isoString) : new Date();
-  return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  let date;
+  if (isoString) {
+    // Se vier sem timezone (ex: "2026-04-19T14:32:00"), assume UTC
+    const iso = isoString.includes('Z') || isoString.includes('+') ? isoString : isoString + 'Z';
+    date = new Date(iso);
+  } else {
+    date = new Date();
+  }
+  const lang = (typeof I18n !== 'undefined' ? I18n.getLang() : null) || 'pt-BR';
+  return date.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' });
 }
 
 function formatMarkdown(text) {
@@ -293,26 +301,26 @@ function _showFreeMessagesBadge(remaining) {
 
 // ── Toast notifications (Toastify) ──────────────────────────────────
 function showToast(msg, type = 'info') {
-    const cfg = {
-        duration: 3500,
-        close: true,
-        gravity: 'top',
-        position: 'right',
-        stopOnFocus: true,
-    };
-    switch (type) {
-        case 'success':
-            Toastify({ text: msg, backgroundColor: '#10b981', ...cfg }).showToast();
-            break;
-        case 'error':
-            Toastify({ text: msg, backgroundColor: '#ef4444', ...cfg }).showToast();
-            break;
-        case 'warning':
-            Toastify({ text: msg, backgroundColor: '#f59e0b', ...cfg }).showToast();
-            break;
-        default:
-            Toastify({ text: msg, backgroundColor: '#6366f1', ...cfg }).showToast();
-    }
+  const cfg = {
+    duration: 3500,
+    close: true,
+    gravity: 'top',
+    position: 'right',
+    stopOnFocus: true,
+  };
+  switch (type) {
+    case 'success':
+      Toastify({ text: msg, style: { background: '#10b981' }, ...cfg }).showToast();
+      break;
+    case 'error':
+      Toastify({ text: msg, style: { background: '#ef4444' }, ...cfg }).showToast();
+      break;
+    case 'warning':
+      Toastify({ text: msg, style: { background: '#f59e0b' }, ...cfg }).showToast();
+      break;
+    default:
+      Toastify({ text: msg, style: { background: '#6366f1' }, ...cfg }).showToast();
+  }
 }
 
 // ── KEEP-ALIVE: previne logout por inatividade ─────────────────────

@@ -9,11 +9,7 @@ let allStudents = [];
 let currentModalUsername = null;
 let reportsChartInstance = null;
 
-// usando modo claro ou escuro
-(function () {
-  const icon = document.getElementById('theme-icon');
-  if (icon) icon.textContent = (localStorage.getItem('theme') || 'dark') === 'dark' ? '☀️' : '🌙';
-})();
+
 // botão do menu lateral
 function toggleDashSidebar() {
   const sidebar = document.querySelector('.dash-sidebar');
@@ -44,7 +40,7 @@ const SECTIONS = {
   modules: { title: () => t('mod.title'), sub: () => t('mod.subtitle') },
   flashcards: { title: () => t('mod.section_flashcards'), sub: () => t('mod.fc_manage_sub') },
   submissions: { title: () => t('dash.submissions'), sub: () => t('dash.submissions_sub') },
-  simulations: { title: () => '🎭 ' + (t('dash.simulations') || 'Simulações'), sub: () => 'Gerencie simulações de conversas reais' },
+  simulations: { title: () => '🎭 ' + (t('dash.simulations') || 'Simulações'), sub: () => t('dash.simulations_sub') },
 };
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -68,6 +64,7 @@ window.addEventListener('langchange', () => {
     document.getElementById('page-title').textContent = SECTIONS[name].title();
     document.getElementById('page-sub').textContent = SECTIONS[name].sub();
   }
+  if (typeof I18n !== 'undefined') I18n.applyToDOM();
 });
 
 function setSection(name, el) {
@@ -390,9 +387,15 @@ function openStudentModal(username) {
         <div class="modal-field">
           <label>${t('dash.col_level')}</label>
           <select id="modal-level">
-            ${['Beginner', 'Pre-Intermediate', 'Intermediate', 'Business English', 'Advanced'].map(l =>
-        `<option value="${l}" ${s.level === l ? 'selected' : ''}>${l}</option>`
-      ).join('')}
+            ${[
+              {v:'Beginner', k:'level.beginner'},
+              {v:'Pre-Intermediate', k:'level.pre_int'},
+              {v:'Intermediate', k:'level.intermediate'},
+              {v:'Business English', k:'level.business'},
+              {v:'Advanced', k:'level.advanced'}
+            ].map(item =>
+              `<option value="${item.v}" ${s.level === item.v ? 'selected' : ''} data-i18n="${item.k}">${t(item.k)}</option>`
+            ).join('')}
           </select>
         </div>
         <div id="modal-edit-feedback" class="modal-feedback" style="display:none"></div>
@@ -890,6 +893,17 @@ function logout() { authLogout(); }
 
 // ── Simulations Management ──────────────────────────────────────────────────
 
+const SIM_KEY_MAP = {
+  'Check-in no Aeroporto': 'airport_checkin',
+  'Entrevista de Emprego': 'job_interview',
+  'Fazendo Compras':       'shopping',
+  'No Aeroporto':          'at_airport',
+  'No Hotel':              'at_hotel',
+  'No Médico':             'at_doctor',
+  'No Restaurante':        'at_restaurant',
+  'Pedido no Restaurante': 'restaurant_order'
+};
+
 async function _loadSimulations() {
   const grid = document.getElementById('simulations-grid');
   if (!grid) return;
@@ -900,33 +914,39 @@ async function _loadSimulations() {
     const sims = data.simulations || [];
     
     if (sims.length === 0) {
-      grid.innerHTML = '<div class="mod-empty"><i class="fa-solid fa-theater-masks"></i><p>Nenhuma simulação criada.</p></div>';
+      grid.innerHTML = `<div class="mod-empty"><i class="fa-solid fa-theater-masks"></i><p>${t('mod.fc_none')}</p></div>`;
       return;
     }
     
-    grid.innerHTML = sims.map(s => `
+    grid.innerHTML = sims.map(s => {
+      const key = SIM_KEY_MAP[s.name];
+      const title = key ? t(`sim.title_${key}`) : s.name;
+      const desc = key ? t(`sim.desc_${key}`) : s.description;
+      const diffLabel = t(`level.${s.difficulty?.toLowerCase().replace('-', '_')}`) || s.difficulty;
+
+      return `
       <div class="simulation-admin-card">
         <div class="sim-admin-icon">${s.icon || '🎭'}</div>
         <div class="sim-admin-info">
-          <h4>${s.name}</h4>
-          <p class="sim-admin-desc">${s.description || ''}</p>
+          <h4>${title}</h4>
+          <p class="sim-admin-desc">${desc || ''}</p>
           <div class="sim-admin-meta">
-            <span class="sim-diff-badge">${(s.levels || []).join(', ') || s.difficulty}</span>
-            <span class="sim-admin-by">por ${s.created_by || '—'}</span>
+            <span class="sim-diff-badge">${diffLabel}</span>
+            <span class="sim-admin-by">${t('dash.col_since')} ${s.created_by || '—'}</span>
           </div>
         </div>
         <div class="sim-admin-actions">
-          <button class="btn-sim-edit" onclick="openSimModal('${s.id}')" title="Editar">
+          <button class="btn-sim-edit" onclick="openSimModal('${s.id}')" title="${t('dash.edit')}">
             <i class="fa-solid fa-pen"></i>
           </button>
-          <button class="btn-sim-delete" onclick="deleteSimulation('${s.id}')">
+          <button class="btn-sim-delete" onclick="deleteSimulation('${s.id}')" title="${t('mod.delete')}">
             <i class="fa-solid fa-trash"></i>
           </button>
         </div>
       </div>
-    `).join('');
+    `;}).join('');
   } catch (e) {
-    grid.innerHTML = '<div class="mod-empty"><i class="fa-solid fa-exclamation-circle"></i><p>Erro ao carregar simulações.</p></div>';
+    grid.innerHTML = `<div class="mod-empty"><i class="fa-solid fa-exclamation-circle"></i><p>${t('gen.error')}</p></div>`;
   }
 }
 
@@ -936,76 +956,69 @@ async function openSimModal(simId = null) {
   editingSimId = simId;
   const modal = document.getElementById('create-sim-modal');
   const modalTitle = document.getElementById('sim-modal-title');
+  const saveBtn = document.getElementById('btn-save-sim');
   modal.style.display = 'flex';
   
   if (simId) {
     modalTitle.textContent = t('dash.edit_simulation');
+    saveBtn.textContent = t('gen.save');
   } else {
     modalTitle.textContent = t('dash.new_simulation');
+    saveBtn.textContent = t('mod.publish');
   }
   
+  if (typeof I18n !== 'undefined') I18n.applyToDOM(modal);
+
   // Reset form
   document.getElementById('sim-name').value = '';
-  document.getElementById('sim-name-en').value = '';
   document.getElementById('sim-desc').value = '';
-  document.getElementById('sim-desc-en').value = '';
-  document.getElementById('sim-initial-msg').value = '';
-  document.getElementById('sim-initial-msg-en').value = '';
-  document.getElementById('sim-icon').value = '🎭';
+  document.getElementById('sim-icon').value = '';
+  document.getElementById('sim-difficulty').value = 'beginner';
   document.getElementById('sim-prompt').value = '';
-  document.querySelectorAll('input[name="sim-level"]').forEach(cb => cb.checked = false);
+  document.getElementById('sim-use-ai').checked = true;
 
   if (simId) {
     try {
       const data = await apiGet(`/dashboard/simulations/${simId}`);
       if (data) {
         document.getElementById('sim-name').value = data.name || '';
-        document.getElementById('sim-name-en').value = data.name_en || '';
         document.getElementById('sim-desc').value = data.description || '';
-        document.getElementById('sim-desc-en').value = data.description_en || '';
-        document.getElementById('sim-initial-msg').value = data.initial_message || '';
-        document.getElementById('sim-initial-msg-en').value = data.initial_message_en || '';
-        document.getElementById('sim-icon').value = data.icon || '🎭';
+        document.getElementById('sim-icon').value = data.icon || '';
+        document.getElementById('sim-difficulty').value = data.difficulty || 'beginner';
         document.getElementById('sim-prompt').value = data.system_prompt || '';
-        
-        const lvls = data.levels || [data.difficulty];
-        document.querySelectorAll('input[name="sim-level"]').forEach(cb => {
-          if (lvls.includes(cb.value)) cb.checked = true;
-        });
+        document.getElementById('sim-use-ai').checked = false; // Desativa por padrão ao editar para não sobrescrever
       }
     } catch (e) { console.error('Erro ao buscar simulação:', e); }
   }
 }
 
 async function saveSimulation() {
-  const levels = Array.from(document.querySelectorAll('input[name="sim-level"]:checked')).map(cb => cb.value);
   const payload = {
     name: document.getElementById('sim-name').value.trim(),
-    name_en: document.getElementById('sim-name-en').value.trim(),
     description: document.getElementById('sim-desc').value.trim(),
-    description_en: document.getElementById('sim-desc-en').value.trim(),
-    initial_message: document.getElementById('sim-initial-msg').value.trim(),
-    initial_message_en: document.getElementById('sim-initial-msg-en').value.trim(),
-    icon: document.getElementById('sim-icon').value.trim() || '🎭',
-    levels,
-    system_prompt: document.getElementById('sim-prompt').value.trim()
+    icon: document.getElementById('sim-icon').value.trim() || '',
+    difficulty: document.getElementById('sim-difficulty').value,
+    system_prompt: document.getElementById('sim-prompt').value.trim(),
+    use_ai_generation: document.getElementById('sim-use-ai').checked
   };
 
   if (!payload.name || !payload.description) {
-    showToast('Preencha pelo menos o nome e a descrição em português.', 'warning');
+    showToast(t('act.fb_fill_all'), 'warning');
     return;
   }
 
   try {
     if (editingSimId) {
       await apiPut(`/dashboard/simulations/${editingSimId}`, payload);
+      showToast(t('gen.success'), 'success');
     } else {
       await apiPost('/dashboard/simulations', payload);
+      showToast(t('gen.success'), 'success');
     }
     closeCreateSimulationModal();
     _loadSimulations();
   } catch (e) {
-    showToast('Erro ao salvar simulação. Tente novamente.', 'error');
+    showToast(t('gen.error'), 'error');
   }
 }
 

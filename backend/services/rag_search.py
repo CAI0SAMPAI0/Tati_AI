@@ -1,9 +1,6 @@
 from __future__ import annotations
 import os
 from dataclasses import dataclass
-from langchain_chroma import Chroma
-#from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,14 +8,23 @@ load_dotenv()
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _CHROMA_PATH = os.path.join(_BASE_DIR, "data", "chroma_db")
 
+# Lazy initialization — carrega apenas na primeira chamada real
+_embeddings = None
+_vectorstore = None
 
-# Busca RAG no ChromaDB usando embeddings HuggingFace.
 
-_embeddings = HuggingFaceEndpointEmbeddings(
-    model="sentence-transformers/all-MiniLM-L6-v2",
-    huggingfacehub_api_token=os.getenv("HUGGING_FACE_KEY", "")
-)
-_vectorstore = Chroma(persist_directory=_CHROMA_PATH, embedding_function=_embeddings)
+def _get_vectorstore():
+    """Inicializa ChromaDB e embeddings apenas quando necessário (lazy)."""
+    global _embeddings, _vectorstore
+    if _vectorstore is None:
+        from langchain_chroma import Chroma
+        from langchain_huggingface import HuggingFaceEndpointEmbeddings
+        _embeddings = HuggingFaceEndpointEmbeddings(
+            model="sentence-transformers/all-MiniLM-L6-v2",
+            huggingfacehub_api_token=os.getenv("HUGGING_FACE_KEY", "")
+        )
+        _vectorstore = Chroma(persist_directory=_CHROMA_PATH, embedding_function=_embeddings)
+    return _vectorstore
 
 
 @dataclass
@@ -30,7 +36,8 @@ class RAGResult:
 def obter_contexto_rag(pergunta: str) -> RAGResult:
     """Busca no ChromaDB e retorna contexto + fontes formatados."""
     try:
-        docs = _vectorstore.as_retriever(search_kwargs={"k": 3}).invoke(pergunta)
+        vs = _get_vectorstore()
+        docs = vs.as_retriever(search_kwargs={"k": 3}).invoke(pergunta)
         if not docs:
             return RAGResult(
                 contexto="Nenhum trecho encontrado na biblioteca para esta pergunta.",
