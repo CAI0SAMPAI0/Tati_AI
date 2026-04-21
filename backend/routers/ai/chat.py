@@ -417,8 +417,12 @@ async def _handle_chat_message(websocket: WebSocket, msg: dict, username: str) -
         content  = msg.get("content", "").strip()
         conv_id  = msg.get("conversation_id")
 
-        if msg_type not in ("text", "audio", "file") or not conv_id:
-            await websocket.send_json({"type": "error", "detail": "Tipo ou conversation_id inválido"})
+        if msg_type not in ("text", "audio", "file"):
+            await websocket.send_json({"type": "error", "detail": "Tipo de mensagem inválido"})
+            return
+            
+        if not conv_id:
+            await websocket.send_json({"type": "error", "detail": "conversation_id ausente"})
             return
 
         # ── Processa tipo de input ────────────────────────

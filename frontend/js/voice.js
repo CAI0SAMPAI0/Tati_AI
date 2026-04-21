@@ -1,26 +1,12 @@
-const API    = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? 'http://localhost:8000' : 'https://tatiai-production.up.railway.app';
-const WS_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? 'ws://localhost:8000'  : 'wss://tatiai-production.up.railway.app';
-
 // ── Auth guard ─────────────────────────────────────────────────────
-const token   = localStorage.getItem('token');
-const userRaw = localStorage.getItem('user');
-if (!token || !userRaw) { window.location.href = '/index.html'; }
+if (!requireAuth()) { window.location.href = '/index.html'; }
 
-const savedTheme = localStorage.getItem('theme') || 'dark';
-document.documentElement.setAttribute('data-theme', savedTheme);
-
-function getSettings() {
-  try { return JSON.parse(localStorage.getItem('tati_settings') || '{}'); } catch { return {}; }
-}
-
-// ── URL params ─────────────────────────────────────────────────────
-const urlParams    = new URLSearchParams(window.location.search);
-const urlConvId    = urlParams.get('conv_id') || null;
-const isNewConv    = urlParams.get('new') === 'true';
+const user = getUser();
+const token = getToken();
 
 // ── Estado global ──────────────────────────────────────────────────
 let ws               = null;
-let currentConvId    = isNewConv ? null : urlConvId; // Se é nova conversa, começa sem conv_id
+let currentConvId    = null; // Será definido em ensureConversation
 let isRecording      = false;
 let isProcessing     = false;
 let mediaRecorder    = null;
@@ -28,6 +14,11 @@ let audioChunks      = [];
 let currentAudio     = null;
 let lastAudioB64     = null;
 let pendingUserBubble = null;
+
+// URL params
+const urlParams    = new URLSearchParams(window.location.search);
+const urlConvId    = urlParams.get('conv_id');
+const isNewConv    = urlParams.get('new') === 'true';
 
 // ── Avatar: frames e estado ────────────────────────────────────────
 const FRAMES = {
@@ -79,12 +70,7 @@ const vacSpdVal  = document.getElementById('vac-spd-val');
 
 async function loadAvatarFrames() {
   try {
-    const res  = await fetch(`${API}/avatar/frames`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (!res.ok) throw new Error('Avatar endpoint não disponível');
-
-    const data = await res.json();
+    const data = await apiGet('/avatar/frames');
     Object.assign(FRAMES, data);
 
     if (FRAMES.has_frames && FRAMES.normal) {
@@ -117,91 +103,58 @@ function _showEmojiAvatar() {
   avatarEmoji.style.display = 'flex';
 }
 
-// ── Limpa timers da animação ───────────────────────────────────────
 function _stopAnimations() {
   if (_blinkTimer) { clearTimeout(_blinkTimer); clearInterval(_blinkTimer); _blinkTimer = null; }
   if (_mouthTimer) { clearInterval(_mouthTimer); _mouthTimer = null; }
 }
 
-// ── ESTADO: idle ───────────────────────────────────────────────────
 function _enterIdle() {
   _stopAnimations();
   _avatarState = 'idle';
 
-  if (avatarWrap) {
-    avatarWrap.className = 'avatar-wrap';
-  }
-  if (statusText) {
-    statusText.textContent = typeof t === 'function' ? t('voice.online') : 'Online';
-  }
-  if (micHint) {
-    micHint.textContent = typeof t === 'function' ? t('voice.tap_speak') : 'Toque para falar';
-  }
+  if (avatarWrap) avatarWrap.className = 'avatar-wrap';
+  if (statusText) statusText.textContent = t('voice.online');
+  if (micHint)    micHint.textContent = t('voice.tap_speak');
 
-  // Mostra frame normal
-  if (FRAMES.has_frames && FRAMES.normal) {
-    _setFrame(FRAMES.normal);
-  }
+  if (FRAMES.has_frames && FRAMES.normal) _setFrame(FRAMES.normal);
 
-  // Piscar aleatório (como no Streamlit)
   if (!FRAMES.has_frames) return;
 
   ;(function scheduleBlink() {
-    const delay = 3200 + Math.random() * 2000; // entre 3.2s e 5.2s
+    const delay = 3200 + Math.random() * 2000;
     _blinkTimer = setTimeout(() => {
       if (_avatarState !== 'idle') return;
-
-      // Mostra frame piscando por 150ms depois volta ao normal
       _setFrame(FRAMES.piscando || FRAMES.normal);
       setTimeout(() => {
         if (_avatarState !== 'idle') return;
         _setFrame(FRAMES.normal);
-        scheduleBlink(); // agenda o próximo
+        scheduleBlink();
       }, 150);
     }, delay);
   })();
 }
 
-// ── ESTADO: listening ─────────────────────────────────────────────
 function _enterListening() {
   _stopAnimations();
   _avatarState = 'listening';
 
-  if (avatarWrap) {
-    avatarWrap.className = 'avatar-wrap listening';
-  }
-  if (statusText) {
-    statusText.textContent = typeof t === 'function' ? t('voice.listening') : '🎙 Ouvindo…';
-  }
-  if (micHint) {
-    micHint.textContent = typeof t === 'function' ? t('voice.tap_stop') : 'Toque para parar';
-  }
+  if (avatarWrap) avatarWrap.className = 'avatar-wrap listening';
+  if (statusText) statusText.textContent = t('voice.listening');
+  if (micHint)    micHint.textContent = t('voice.tap_stop');
 
-  // Frame especial de ouvindo
-  if (FRAMES.has_frames) {
-    _setFrame(FRAMES.ouvindo || FRAMES.normal);
-  }
+  if (FRAMES.has_frames) _setFrame(FRAMES.ouvindo || FRAMES.normal);
 }
 
-// ── ESTADO: processing ────────────────────────────────────────────
 function _enterProcessing() {
   _stopAnimations();
   _avatarState = 'processing';
 
-  if (avatarWrap) {
-    avatarWrap.className = 'avatar-wrap processing';
-  }
-  if (statusText) {
-    statusText.textContent = typeof t === 'function' ? t('voice.processing') : '⏳ Processando…';
-  }
-  if (micHint) {
-    micHint.textContent = typeof t === 'function' ? t('voice.wait') : 'Aguarde…';
-  }
+  if (avatarWrap) avatarWrap.className = 'avatar-wrap processing';
+  if (statusText) statusText.textContent = t('voice.processing');
+  if (micHint)    micHint.textContent = t('voice.wait');
 
   if (FRAMES.has_frames) {
     _setFrame(FRAMES.normal);
-
-    // Piscar lento enquanto processa (indica "pensando")
     let _blink = false;
     _blinkTimer = setInterval(() => {
       if (_avatarState !== 'processing') return;
@@ -211,44 +164,25 @@ function _enterProcessing() {
   }
 }
 
-// ── ESTADO: speaking — com sincronia labial
 function _enterSpeaking(audioElement) {
   _stopAnimations();
   _avatarState = 'speaking';
 
   if (avatarWrap) avatarWrap.className = 'avatar-wrap speaking';
-  if (statusText) statusText.textContent = typeof t === 'function' ? t('voice.speaking') : '🗣 Falando…';
-  if (micHint) micHint.textContent = typeof t === 'function' ? t('voice.tap_speak') : 'Toque para falar';
+  if (statusText) statusText.textContent = t('voice.speaking');
+  if (micHint)    micHint.textContent = t('voice.tap_speak');
 
   if (!FRAMES.has_frames) return;
 
-  // Se um dia o backend passar a enviar 'visemes', usa eles
-  if (typeof visemes !== 'undefined' && visemes && visemes.length > 0) {
-    function animationLoop() {
-      if (_avatarState !== 'speaking' || audioElement.paused) return;
-      const currentTime = audioElement.currentTime;
-      const currentCue = visemes.find(c => c.start <= currentTime && c.end >= currentTime);
-      if (currentCue) {
-        const frameKey = VISEME_MAP[currentCue.value] || 'frame_A';
-        _setFrame(FRAMES[frameKey] || FRAMES.normal);
-      }
-      _animFrameId = requestAnimationFrame(animationLoop);
-    }
-    _animFrameId = requestAnimationFrame(animationLoop);
-    return;
-  }
-
-  // === SOLUÇÃO: Análise de volume em tempo real (Web Audio API) ===
   try {
     if (!_audioCtx) {
       _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
 
     _analyser = _audioCtx.createAnalyser();
-    _analyser.fftSize = 256; // Resolução menor para focar nas frequências gerais
-    _analyser.smoothingTimeConstant = 0.2; // Deixa o movimento da boca menos "tremido"
+    _analyser.fftSize = 256;
+    _analyser.smoothingTimeConstant = 0.2;
 
-    // Conecta o áudio atual no analisador
     const source = _audioCtx.createMediaElementSource(audioElement);
     source.connect(_analyser);
     _analyser.connect(_audioCtx.destination);
@@ -256,37 +190,27 @@ function _enterSpeaking(audioElement) {
     const freqData = new Uint8Array(_analyser.frequencyBinCount);
 
     _mouthTimer = setInterval(() => {
-      // Se parou de falar ou pausou, fecha a boca
       if (_avatarState !== 'speaking' || audioElement.paused) {
         _setFrame(FRAMES.normal);
         return;
       }
 
       _analyser.getByteFrequencyData(freqData);
-
-      // Calcula a energia média (volume real do áudio nesse exato milissegundo)
       let sum = 0;
-      for (let i = 0; i < freqData.length; i++) {
-        sum += freqData[i];
-      }
+      for (let i = 0; i < freqData.length; i++) sum += freqData[i];
       const avgVolume = sum / freqData.length;
 
-      // Decide o frame baseado na força do som
       if (avgVolume < 15) { 
-        // Silêncio ou pausas na respiração
         _setFrame(FRAMES.normal);
       } else if (avgVolume < 70) { 
-        // Som médio
         _setFrame(FRAMES.meio || FRAMES.frame_C);
       } else { 
-        // Som alto (vogais abertas)
         _setFrame(FRAMES.bem_aberta || FRAMES.frame_E);
       }
-    }, 50); // Roda a cada 50ms para ficar bem fluido
+    }, 50);
 
   } catch (err) {
     console.warn('[Avatar] Web Audio API falhou, usando fallback cego:', err.message);
-    // Fallback caso o navegador bloqueie a leitura de áudio
     let _f = false;
     _mouthTimer = setInterval(() => {
       if (_avatarState !== 'speaking') return;
@@ -296,17 +220,10 @@ function _enterSpeaking(audioElement) {
   }
 }
 
-
-// ── Callback: fim da fala ──────────────────────────────────────────
 function _onSpeakingEnded() {
   _stopAnimations();
-  _analyser = null; // libera o analyser para o próximo áudio
-
-  // Volta ao idle (com frame normal primeiro)
-  if (FRAMES.has_frames) {
-    _setFrame(FRAMES.normal);
-  }
-
+  _analyser = null;
+  if (FRAMES.has_frames) _setFrame(FRAMES.normal);
   setTimeout(_enterIdle, 200);
 }
 
@@ -316,15 +233,15 @@ function _onSpeakingEnded() {
 
 function connectWS() {
   if (ws?.readyState === WebSocket.OPEN || ws?.readyState === WebSocket.CONNECTING) return;
-  // Envia token via subprotocolo
-  ws = new WebSocket(`${WS_URL}/chat/ws`, ["access_token", token]);
+  ws = new WebSocket(`${WS_BASE}/chat/ws`, ["access_token", token]);
   ws.onopen = () => {
- console.log('[Voice WS] conectado'); ensureConversation(); };
+    console.log('[Voice WS] conectado');
+    ensureConversation();
+  };
   ws.onmessage = e => handleWSMessage(JSON.parse(e.data));
   ws.onerror   = e => console.error('[Voice WS]', e);
   ws.onclose   = () => { ws = null; setTimeout(connectWS, 3000); };
 
-  // Keepalive
   setInterval(() => {
     if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
   }, 20000);
@@ -379,65 +296,68 @@ function handleWSMessage(msg) {
 // ══════════════════════════════════════════════════════════════════
 
 async function ensureConversation() {
+  // 1. Se já temos currentConvId (e não é forçada nova), apenas carrega
   if (currentConvId && !isNewConv) {
-    loadExistingMessages(currentConvId);
+    await loadExistingMessages(currentConvId);
     return;
   }
 
-  // Se é nova conversa, não carrega mensagens antigas
-  if (isNewConv && !currentConvId) {
-    return; // Começa zerado
+  // 2. Se temos um conv_id na URL e não é "new", usa ele
+  if (urlConvId && !isNewConv) {
+    currentConvId = urlConvId;
+    await loadExistingMessages(currentConvId);
+    return;
   }
 
-  try {
-    const res = await fetch(`${API}/chat/conversations`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (res.ok) {
-      const convs = await res.json();
-      if (convs.length) {
-        currentConvId = convs[0].id;
-        loadExistingMessages(currentConvId);
-        return;
+  // 3. Se é "new", cria uma nova obrigatoriamente
+  if (isNewConv) {
+    try {
+      const { ok, data } = await apiPost('/chat/conversations', { title: 'Voice Mode' });
+      if (ok) {
+        currentConvId = data.id;
+        console.log('[Voice] Nova conversa criada:', currentConvId);
+        // Limpa mensagens anteriores do DOM se houver
+        const bubbles = historyEl.querySelectorAll('.vbubble-wrap');
+        bubbles.forEach(b => b.remove());
       }
+    } catch (e) {
+      console.error('[Voice] Erro ao criar nova conversa:', e);
     }
-    // Cria nova conversa
-    const res2 = await fetch(`${API}/chat/conversations`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: 'Modo Voz' })
-    });
-    const conv = await res2.json();
-    currentConvId = conv.id;
+    return;
+  }
+
+  // 4. Se não tem ID nenhum, tenta buscar a última ou cria
+  try {
+    const convs = await apiGet('/chat/conversations');
+    if (convs.length > 0) {
+      currentConvId = convs[0].id;
+      await loadExistingMessages(currentConvId);
+    } else {
+      const { ok, data } = await apiPost('/chat/conversations', { title: 'Voice Mode' });
+      if (ok) currentConvId = data.id;
+    }
   } catch (e) {
-    console.error('[Voice] ensureConversation:', e);
+    console.error('[Voice] Erro em ensureConversation:', e);
   }
 }
 
 async function loadExistingMessages(convId) {
   try {
-    // Título da conversa
-    const res = await fetch(`${API}/chat/conversations`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (res.ok) {
-      const convs = await res.json();
-      const conv  = convs.find(c => c.id === convId);
-      if (conv) {
-        const titleEl = document.getElementById('voice-conv-title');
-        if (titleEl) titleEl.textContent = conv.title || 'Voice Mode';
-      }
+    const convs = await apiGet('/chat/conversations');
+    const conv  = convs.find(c => c.id === convId);
+    if (conv) {
+      const titleEl = document.getElementById('voice-conv-title');
+      if (titleEl) titleEl.textContent = conv.title || 'Voice Mode';
     }
   } catch (_) {}
 
   try {
-    const res = await fetch(`${API}/chat/conversations/${convId}/messages`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (!res.ok) return;
-    const msgs = await res.json();
+    const msgs = await apiGet(`/chat/conversations/${convId}/messages`);
+    
+    // Limpa DOM antes de carregar histórico
+    const bubbles = historyEl.querySelectorAll('.vbubble-wrap');
+    bubbles.forEach(b => b.remove());
 
-    // Coletar mensagens com áudio para anexar controles depois
     const audioMsgs = [];
     msgs.forEach(m => {
       const wrap = addBubble(m.role === 'user' ? 'user' : 'bot', m.content);
@@ -446,7 +366,6 @@ async function loadExistingMessages(convId) {
       }
     });
 
-    // Após o DOM estar pronto, popula os controles de áudio de cada bolha
     requestAnimationFrame(() => {
       audioMsgs.forEach(({ wrap, b64 }) => {
         if (wrap) {
@@ -472,11 +391,9 @@ async function loadExistingMessages(convId) {
 if (micBtn) {
   micBtn.addEventListener('click', async () => {
     if (isProcessing) return;
-
     if (isRecording) {
       stopRecording();
     } else {
-      // Para áudio em reprodução se estiver falando
       if (currentAudio) {
         currentAudio.pause();
         currentAudio = null;
@@ -501,7 +418,6 @@ async function startRecording() {
     micBtn.textContent = '⏹';
     _enterListening();
 
-    // Bolha "transcrevendo" pendente
     pendingUserBubble = addBubble('user', '');
     scrollBottom();
   } catch (e) {
@@ -523,7 +439,17 @@ function stopRecording() {
 }
 
 async function sendAudio() {
-  if (!currentConvId) await ensureConversation();
+  if (!currentConvId) {
+    await ensureConversation();
+  }
+  
+  // Se mesmo após ensureConversation não temos ID, aborta
+  if (!currentConvId) {
+    showToast('Erro ao inicializar conversa', 'error');
+    _resetMicBtn();
+    _enterIdle();
+    return;
+  }
 
   const blob   = new Blob(audioChunks, { type: 'audio/webm' });
   const reader = new FileReader();
@@ -576,16 +502,14 @@ function addBubble(role, text) {
   wrap.appendChild(label);
   wrap.appendChild(bub);
 
-  // Para mensagens do bot, cria a linha de áudio (será preenchida se houver audio_b64)
   if (role === 'bot') {
     const audioRow = document.createElement('div');
     audioRow.className = 'vbubble-audio';
     audioRow.id = 'bot-audio-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
-    audioRow.style.display = 'none'; // oculto até o áudio chegar
+    audioRow.style.display = 'none';
     wrap.appendChild(audioRow);
   }
 
-  // Insere antes do typing indicator
   historyEl.insertBefore(wrap, vtypingEl);
 
   const s = getSettings();
@@ -612,7 +536,6 @@ function startBotBubble() {
   wrap.appendChild(label);
   wrap.appendChild(bub);
 
-  // Linha de áudio (será preenchida quando o áudio chegar)
   const audioRow = document.createElement('div');
   audioRow.className = 'vbubble-audio';
   audioRow.id = 'bot-audio-' + Date.now();
@@ -652,9 +575,7 @@ function finalizeBotBubble() {
 // ══════════════════════════════════════════════════════════════════
 
 function playAudio(b64) {
-  // Para áudio anterior
   if (currentAudio) { currentAudio.pause(); currentAudio = null; }
-  // Reseta o analyser para o novo áudio
   _analyser = null;
 
   const s     = getSettings();
@@ -667,25 +588,20 @@ function playAudio(b64) {
   currentAudio       = audio;
 
   if (vacPlayBtn) {
-    vacPlayBtn.textContent = typeof t === 'function' ? t('voice.stop') : '⏹ Parar';
+    vacPlayBtn.textContent = t('voice.stop');
   }
 
-  // Entra em modo "speaking" passando o elemento de áudio para a análise de volume
   audio.onplay = () => _enterSpeaking(audio);
 
   audio.onended = () => {
     currentAudio = null;
-    if (vacPlayBtn) {
-      vacPlayBtn.textContent = typeof t === 'function' ? t('voice.play') : '▶ Ouvir';
-    }
+    if (vacPlayBtn) vacPlayBtn.textContent = t('voice.play');
     _onSpeakingEnded();
   };
 
   audio.onerror = () => {
     currentAudio = null;
-    if (vacPlayBtn) {
-      vacPlayBtn.textContent = typeof t === 'function' ? t('voice.play') : '▶ Ouvir';
-    }
+    if (vacPlayBtn) vacPlayBtn.textContent = t('voice.play');
     _enterIdle();
   };
 
@@ -694,7 +610,6 @@ function playAudio(b64) {
     _enterIdle();
   });
 
-  // Anexa controles à última bolha
   const rows = document.querySelectorAll('.vbubble-audio');
   if (rows.length) {
     const lastRow = rows[rows.length - 1];
@@ -733,7 +648,7 @@ function _attachBubbleAudio(row, b64) {
   const rewB  = row.querySelector('.btn-tts-rewind');
   const volS  = row.querySelector('.msg-vol-slider');
   const spdS  = row.querySelector('.msg-spd-select');
-  let bubAudio = currentAudio; // referência ao áudio atual
+  let bubAudio = currentAudio;
 
   function updateIcon(playing) {
     if (!playB) return;
@@ -754,7 +669,6 @@ function _attachBubbleAudio(row, b64) {
 
   playB.onclick = () => {
     if (!bubAudio || bubAudio.ended) {
-      // Recria o áudio para replay
       bubAudio = new Audio('data:audio/mp3;base64,' + b64);
       bubAudio.volume = parseFloat(volS.value);
       bubAudio.playbackRate = parseFloat(spdS.value);
@@ -766,12 +680,12 @@ function _attachBubbleAudio(row, b64) {
       bubAudio.play();
       updateIcon(true);
       _enterSpeaking(bubAudio);
-      if (vacPlayBtn) vacPlayBtn.textContent = typeof t === 'function' ? t('voice.stop') : '⏹ Parar';
+      if (vacPlayBtn) vacPlayBtn.textContent = t('voice.stop');
     } else {
       bubAudio.pause();
       updateIcon(false);
       _onSpeakingEnded();
-      if (vacPlayBtn) vacPlayBtn.textContent = typeof t === 'function' ? t('voice.play') : '▶ Ouvir';
+      if (vacPlayBtn) vacPlayBtn.textContent = t('voice.play');
     }
   };
 
@@ -785,7 +699,7 @@ if (vacPlayBtn) {
   vacPlayBtn.addEventListener('click', () => {
     if (currentAudio && !currentAudio.paused) {
       currentAudio.pause();
-      vacPlayBtn.textContent = typeof t === 'function' ? t('voice.play') : '▶ Ouvir';
+      vacPlayBtn.textContent = t('voice.play');
       _onSpeakingEnded();
     } else if (lastAudioB64) {
       playAudio(lastAudioB64);
@@ -821,15 +735,6 @@ function showTyping()  { if (vtypingEl) { vtypingEl.style.display = 'flex'; scro
 function hideTyping()  { if (vtypingEl) vtypingEl.style.display = 'none'; }
 function scrollBottom() { if (historyEl) historyEl.scrollTop = historyEl.scrollHeight; }
 
-function formatMarkdown(text) {
-  return text
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/`(.*?)`/g, '<code>$1</code>')
-    .replace(/\n/g, '<br>');
-}
-
 // ── i18n ───────────────────────────────────────────────────────────
 function applyVoiceI18n() {
   if (typeof I18n === 'undefined') return;
@@ -847,13 +752,7 @@ function applyVoiceI18n() {
 document.addEventListener('DOMContentLoaded', async () => {
   applyVoiceI18n();
   window.addEventListener('langchange', applyVoiceI18n);
-
-  // 1. Carrega os frames do avatar
   await loadAvatarFrames();
-
-  // 2. Inicia no estado idle
   _enterIdle();
-
-  // 3. Conecta WebSocket
   connectWS();
 });
