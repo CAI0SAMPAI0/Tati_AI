@@ -259,7 +259,10 @@ async def list_modules(user=Depends(get_current_user)):
     if cached:
         return cached
 
-    res = db.table("modules").select("*, quizzes(id, title, description)").eq("is_published", True).order("order").execute()
+    # Módulo especial de exercícios da IA
+    PERSONALIZED_MODULE_ID = "00000000-0000-0000-0000-000000000001"
+    
+    res = db.table("modules").select("*, quizzes(id, title, description)").or_(f"is_published.eq.true,id.eq.{PERSONALIZED_MODULE_ID}").order("order").execute()
     modules_data = res.data or []
 
     progress_res = db.table("user_progress").select("quiz_id, score").eq("username", username).execute()
@@ -274,7 +277,8 @@ async def list_modules(user=Depends(get_current_user)):
         lvls = m.get("levels") or []
         sing = m.get("level")
         show = (
-            (not lvls and not sing)
+            m.get("id") == PERSONALIZED_MODULE_ID
+            or (not lvls and not sing)
             or "all" in lvls or "todos" in lvls
             or sing in ["all", "todos"]
             or user_level in lvls or user_level == sing
@@ -322,3 +326,42 @@ async def analyze_flashcard_answer(payload: FlashcardAnalyzeIn, user=Depends(get
         return {"feedback": feedback.strip()}
     except:
         return {"feedback": "Good try!"}
+
+@router.post("/personalized/generate")
+async def generate_personalized(user=Depends(get_current_user)):
+    # rate limit 3 gerações 
+    try:
+        from services.upstash import cache_get, cache_set
+        rate_key = f"exercise_gen_limit:{username}"
+        if await cache_get(rate_key):
+            raise HTTPException(429, "Você já gerou exercícios nas últimas horas. Volte mais tarde!")
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # Se o cache falhar, deixa passar
+    """Aluno solicita geração de exercícios baseados nos seus erros."""
+    from services.exercise_generator import generate_exercises_from_history
+    username = user["username"]
+    db = get_client()
+
+    # Pega as últimas conversas para contexto
+    convs = db.table("conversations").select("id").eq("username", username).order("updated_at", desc=True).limit(5).execute()
+    context = ""
+    for c in (convs.data or []):
+        msgs = db.table("messages").select("content, role").eq("session_id", c["id"]).order("created_at").limit(30).execute()
+        context += "\n\n" + "\n".join(f"{m['role'].upper()}: {m['content']}" for m in msgs.data)
+
+    if not context.strip():
+        raise HTTPException(400, "Você ainda não tem conversas suficientes para gerar exercícios.")
+
+    quiz_id = await generate_exercises_from_history(username, context)
+    if not quiz_id:
+        raise HTTPException(500, "Não foi possível gerar exercícios agora. Tente novamente.")
+    
+    # usando o limite após o sucesso
+    try:
+        await cache_set(rate_key, '3', ttl=10800) # 3h
+    except Exception:
+        pass
+
+    return {"ok": True, "quiz_id": quiz_id}

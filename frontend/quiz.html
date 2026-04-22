@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tati AI — Quiz</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <link rel="stylesheet" href="styles/global.css">
+    <link rel="stylesheet" href="styles/quiz.css">
+</head>
+
+<body class="quiz-page">
+    <header class="quiz-header">
+        <button class="btn-back" onclick="window.location.href='activities.html'"><i class="fa-solid fa-arrow-left"></i>
+            Voltar</button>
+        <div class="quiz-title-area">
+            <h1 id="quiz-title">Carregando...</h1>
+            <span id="quiz-progress-text">Pergunta 0 de 0</span>
+        </div>
+        <div class="header-spacer"></div>
+    </header>
+
+    <main class="quiz-container">
+        <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="quiz-progress-bar"></div>
+        </div>
+
+        <div id="quiz-content" class="quiz-card">
+            <div class="loading-spinner">
+                <i class="fa-solid fa-spinner fa-spin"></i>
+            </div>
+        </div>
+
+        <div id="quiz-result" class="result-card" style="display:none;">
+            <div class="result-icon" id="result-icon">🏆</div>
+            <h2 id="result-title">Parabéns!</h2>
+            <p id="result-score">Você acertou 0 de 0 questões.</p>
+            <div id="result-feedback"></div>
+            <button class="btn-primary" onclick="window.location.href='activities.html'">Voltar para Atividades</button>
+        </div>
+    </main>
+
+    <footer class="quiz-footer">
+        <button id="btn-next" class="btn-next" disabled onclick="handleNext()">Próxima</button>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script src="/js/i18n.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/quiz.js"></script>
+    </body>
+    </html>

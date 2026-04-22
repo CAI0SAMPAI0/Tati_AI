@@ -1,0 +1,122 @@
+/* competitions.css — Tati AI Competitions */
+
+.ranking-banner {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    background: linear-gradient(135deg, var(--primary), #4c1d95);
+    color: white;
+    padding: 2rem;
+    border-radius: 20px;
+    margin-bottom: 2rem;
+    box-shadow: 0 12px 32px rgba(124, 58, 237, 0.2);
+}
+
+.banner-icon { font-size: 3rem; color: #fbbf24; }
+.banner-content h3 { margin: 0; font-size: 1.5rem; }
+.banner-content p { margin: 0.5rem 0 0 0; opacity: 0.9; }
+
+.countdown-card {
+    background: linear-gradient(135deg, var(--primary), #4c1d95);
+    border-radius: 16px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+    color: white;
+    text-align: center;
+}
+
+.countdown-timer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.countdown-unit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    min-width: 48px;
+}
+
+.countdown-unit span {
+    font-size: 2rem;
+    font-weight: 900;
+}
+
+.winners-podium {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 1rem;
+    padding-top: 2rem;
+    margin-bottom: 3rem;
+}
+
+.winner-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px 16px 8px 8px;
+    padding: 1.5rem;
+    text-align: center;
+    width: 100%;
+    max-width: 200px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.winner-card.first {
+    height: 240px;
+    border-color: #fbbf24;
+    background: linear-gradient(to bottom, var(--surface), rgba(251, 191, 36, 0.05));
+    order: 2;
+}
+
+.winner-card.second { height: 200px; border-color: #9ca3af; order: 1; }
+.winner-card.third { height: 180px; border-color: #cd7f32; order: 3; }
+
+.user-position-card {
+    background: var(--surface);
+    border: 2px solid var(--primary);
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.user-position-info { display: flex; align-items: center; gap: 1.5rem; }
+.user-rank { font-size: 2rem; font-weight: 900; color: var(--primary); }
+.user-stats { display: flex; gap: 1.5rem; }
+.user-stat { display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted); }
+.user-stat i { color: var(--primary); }
+
+.ranking-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow-x: auto;
+}
+
+.ranking-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.ranking-table th {
+    text-align: left;
+    padding: 1.25rem;
+    background: var(--bg);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.ranking-table td {
+    padding: 1.25rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.ranking-table tr.current-user {
+    background: rgba(124, 58, 237, 0.05);
+}

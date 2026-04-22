@@ -23,7 +23,7 @@
                 <span data-i18n="nav.back_chat">Voltar ao Chat</span>
             </a>
             <span class="topbar-brand">Teacher Tati</span>
-            
+
         </header>
 
         <div class="profile-content">
@@ -71,147 +71,154 @@
                 </div>
             </div>
 
-            
+
 
             <!-- Conteúdo da Aba Perfil -->
             <div class="profile-tab-content" id="tab-content-profile">
-            <!-- Streak Section -->
-            <div class="streak-section" id="streak-section" style="display:none;">
-                <div class="streak-card">
-                    <div class="streak-header">
-                        <div class="streak-icon" id="streak-icon">🔥</div>
-                        <div class="streak-info">
-                            <div class="streak-label" data-i18n="profile.streak_label">Seu Streak</div>
-                            <div class="streak-count"><span id="streak-count">0</span> <span data-i18n="profile.streak_days">dias</span></div>
+                <!-- Streak Section -->
+                <div class="streak-section" id="streak-section" style="display:none;">
+                    <div class="streak-card">
+                        <div class="streak-header">
+                            <div class="streak-icon" id="streak-icon">🔥</div>
+                            <div class="streak-info">
+                                <div class="streak-label" data-i18n="profile.streak_label">Seu Streak</div>
+                                <div class="streak-count"><span id="streak-count">0</span> <span
+                                        data-i18n="profile.streak_days">dias</span></div>
+                            </div>
+                            <div class="streak-best">
+                                <div class="streak-best-label" data-i18n="profile.streak_record">Recorde</div>
+                                <div class="streak-best-value" id="streak-longest">0</div>
+                            </div>
                         </div>
-                        <div class="streak-best">
-                            <div class="streak-best-label" data-i18n="profile.streak_record">Recorde</div>
-                            <div class="streak-best-value" id="streak-longest">0</div>
-                        </div>
+                        <div class="streak-calendar" id="streak-calendar"></div>
+                        <div class="streak-milestones" id="streak-milestones"></div>
                     </div>
-                    <div class="streak-calendar" id="streak-calendar"></div>
-                    <div class="streak-milestones" id="streak-milestones"></div>
                 </div>
-            </div>
 
-            <!-- Form -->
-            <div class="profile-sections">
+                <!-- Form -->
+                <div class="profile-sections">
 
-                <!-- Dados pessoais -->
-                <section class="profile-section">
-                    <h2 class="section-title">
-                        <i class="fa-solid fa-user"></i>
-                        <span data-i18n="profile.personal">Informações Pessoais</span>
-                    </h2>
-                    <div class="form-grid">
-                        <div class="field">
-                            <label data-i18n="profile.full_name">Nome completo</label>
-                            <input id="field-name" type="text" placeholder="Seu nome">
-                        </div>
-                        <div class="field">
-                            <label data-i18n="profile.nickname">Apelido</label>
-                            <input id="field-nickname" type="text" data-i18n-placeholder="profile.nickname_ph"
-                                placeholder="Como prefere ser chamado">
-                        </div>
-                        <div class="field">
-                            <label data-i18n="profile.email">E-mail</label>
-                            <input id="field-email" type="email" placeholder="seu@email.com">
-                        </div>
-                        <div class="field">
-                            <label data-i18n="profile.occupation">Profissão</label>
-                            <input id="field-occupation" type="text" data-i18n-placeholder="profile.occupation_ph"
-                                placeholder="Ex: Desenvolvedor, Estudante...">
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Preferências de estudo -->
-                <section class="profile-section">
-                    <h2 class="section-title">
-                        <i class="fa-solid fa-star"></i>
-                        <span data-i18n="profile.study">Preferências de Estudo</span>
-                    </h2>
-                    <div class="form-grid">
-                        <div class="field">
-                            <label data-i18n="profile.level">Nível de inglês</label>
-                            <select id="field-level">
-                                <option value="Beginner" data-i18n="level.beginner">Beginner</option>
-                                <option value="Pre-Intermediate" data-i18n="level.pre_int">Pre-Intermediate</option>
-                                <option value="Intermediate" data-i18n="level.intermediate">Intermediate</option>
-                                <option value="Business English" data-i18n="level.business">Business English</option>
-                                <option value="Advanced" data-i18n="level.advanced">Advanced</option>
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label data-i18n="profile.focus">Foco de aprendizado</label>
-                            <select id="field-focus">
-                                <option value="General Conversation" data-i18n="focus.general">General Conversation
-                                </option>
-                                <option value="Business English" data-i18n="focus.business">Business English</option>
-                                <option value="Travel English" data-i18n="focus.travel">Travel English</option>
-                                <option value="Academic English" data-i18n="focus.academic">Academic English</option>
-                                <option value="Job Interviews" data-i18n="focus.interviews">Job Interviews</option>
-                            </select>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Segurança -->
-                <section class="profile-section">
-                    <h2 class="section-title">
-                        <i class="fa-solid fa-lock"></i>
-                        <span data-i18n="profile.security">Segurança</span>
-                    </h2>
-                    <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem;" data-i18n="settings.senha_nova">
-                        
-                    </p>
-                    <div class="form-grid">
-                        <div class="field">
-                            <label data-i18n="profile.current_pw">Senha atual</label>
-                            <div class="pw-input-wrap">
-                                <input id="field-current-pw" type="password" placeholder="••••••••">
-                                <button type="button" class="btn-pw-eye"
-                                    onclick="togglePwVisibility('field-current-pw', this)" tabindex="-1">
-                                    <i class="fa-solid fa-eye"></i>
-                                </button>
+                    <!-- Dados pessoais -->
+                    <section class="profile-section">
+                        <h2 class="section-title">
+                            <i class="fa-solid fa-user"></i>
+                            <span data-i18n="profile.personal">Informações Pessoais</span>
+                        </h2>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label data-i18n="profile.full_name">Nome completo</label>
+                                <input id="field-name" type="text" placeholder="Seu nome">
+                            </div>
+                            <div class="field">
+                                <label data-i18n="profile.nickname">Apelido</label>
+                                <input id="field-nickname" type="text" data-i18n-placeholder="profile.nickname_ph"
+                                    placeholder="Como prefere ser chamado">
+                            </div>
+                            <div class="field">
+                                <label data-i18n="profile.email">E-mail</label>
+                                <input id="field-email" type="email" placeholder="seu@email.com">
+                            </div>
+                            <div class="field">
+                                <label data-i18n="profile.occupation">Profissão</label>
+                                <input id="field-occupation" type="text" data-i18n-placeholder="profile.occupation_ph"
+                                    placeholder="Ex: Desenvolvedor, Estudante...">
                             </div>
                         </div>
-                        <div class="field">
-                            <label data-i18n="profile.new_pw">Nova senha</label>
-                            <div class="pw-input-wrap">
-                                <input id="field-new-pw" type="password" data-i18n-placeholder="profile.new_pw_ph"
-                                    placeholder="mínimo 6 caracteres">
-                                <button type="button" class="btn-pw-eye"
-                                    onclick="togglePwVisibility('field-new-pw', this)" tabindex="-1">
-                                    <i class="fa-solid fa-eye"></i>
-                                </button>
+                    </section>
+
+                    <!-- Preferências de estudo -->
+                    <section class="profile-section">
+                        <h2 class="section-title">
+                            <i class="fa-solid fa-star"></i>
+                            <span data-i18n="profile.study">Preferências de Estudo</span>
+                        </h2>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label data-i18n="profile.level">Nível de inglês</label>
+                                <select id="field-level">
+                                    <option value="Beginner" data-i18n="level.beginner">Beginner</option>
+                                    <option value="Pre-Intermediate" data-i18n="level.pre_int">Pre-Intermediate</option>
+                                    <option value="Intermediate" data-i18n="level.intermediate">Intermediate</option>
+                                    <option value="Business English" data-i18n="level.business">Business English
+                                    </option>
+                                    <option value="Advanced" data-i18n="level.advanced">Advanced</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label data-i18n="profile.focus">Foco de aprendizado</label>
+                                <select id="field-focus">
+                                    <option value="General Conversation" data-i18n="focus.general">General Conversation
+                                    </option>
+                                    <option value="Business English" data-i18n="focus.business">Business English
+                                    </option>
+                                    <option value="Travel English" data-i18n="focus.travel">Travel English</option>
+                                    <option value="Academic English" data-i18n="focus.academic">Academic English
+                                    </option>
+                                    <option value="Job Interviews" data-i18n="focus.interviews">Job Interviews</option>
+                                </select>
                             </div>
                         </div>
-                    </div>
-                </section>
+                    </section>
 
-                <!-- Botão único de salvar -->
-                <div id="save-feedback" class="save-feedback" style="display:none;"></div>
-                <button class="btn-save" id="btn-save" onclick="saveAll()" style="width:100%;justify-content:center;">
-                    <i class="fa-solid fa-floppy-disk"></i>
-                    <span data-i18n="profile.save">Salvar alterações</span>
-                </button>
+                    <!-- Segurança -->
+                    <section class="profile-section">
+                        <h2 class="section-title">
+                            <i class="fa-solid fa-lock"></i>
+                            <span data-i18n="profile.security">Segurança</span>
+                        </h2>
+                        <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem;"
+                            data-i18n="settings.senha_nova">
 
-                <!-- Zona de perigo -->
-                <section class="profile-section danger-zone">
-                    <h2 class="section-title danger">
-                        <i class="fa-solid fa-triangle-exclamation"></i>
-                        <span data-i18n="profile.danger">Zona de Perigo</span>
-                    </h2>
-                    <p class="danger-desc" data-i18n="profile.danger_desc">Estas ações são irreversíveis. Prossiga com
-                        cuidado.</p>
-                    <button class="btn-danger" onclick="logout()">
-                        <i class="fa-solid fa-right-from-bracket"></i>
-                        <span data-i18n="nav.logout">Sair da conta</span>
+                        </p>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label data-i18n="profile.current_pw">Senha atual</label>
+                                <div class="pw-input-wrap">
+                                    <input id="field-current-pw" type="password" placeholder="••••••••">
+                                    <button type="button" class="btn-pw-eye"
+                                        onclick="togglePwVisibility('field-current-pw', this)" tabindex="-1">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label data-i18n="profile.new_pw">Nova senha</label>
+                                <div class="pw-input-wrap">
+                                    <input id="field-new-pw" type="password" data-i18n-placeholder="profile.new_pw_ph"
+                                        placeholder="mínimo 6 caracteres">
+                                    <button type="button" class="btn-pw-eye"
+                                        onclick="togglePwVisibility('field-new-pw', this)" tabindex="-1">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Botão único de salvar -->
+                    <div id="save-feedback" class="save-feedback" style="display:none;"></div>
+                    <button class="btn-save" id="btn-save" onclick="saveAll()"
+                        style="width:100%;justify-content:center;">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span data-i18n="profile.save">Salvar alterações</span>
                     </button>
-                </section>
 
-            </div>
+                    <!-- Zona de perigo -->
+                    <section class="profile-section danger-zone">
+                        <h2 class="section-title danger">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            <span data-i18n="profile.danger">Zona de Perigo</span>
+                        </h2>
+                        <p class="danger-desc" data-i18n="profile.danger_desc">Estas ações são irreversíveis. Prossiga
+                            com
+                            cuidado.</p>
+                        <button class="btn-danger" onclick="logout()">
+                            <i class="fa-solid fa-right-from-bracket"></i>
+                            <span data-i18n="nav.logout">Sair da conta</span>
+                        </button>
+                    </section>
+
+                </div>
             </div><!-- fecha tab-content-profile -->
 
             <!-- Conteúdo da Aba Progresso -->

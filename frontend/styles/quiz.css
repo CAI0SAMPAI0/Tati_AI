@@ -1,0 +1,161 @@
+/* quiz.css - Tati AI */
+.quiz-page {
+    background: var(--bg);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.quiz-header {
+    padding: 1rem 2rem;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+}
+
+.quiz-title-area {
+    text-align: center;
+}
+
+.quiz-title-area h1 {
+    font-size: 1.2rem;
+    margin: 0;
+    color: var(--text);
+}
+
+.quiz-title-area span {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.btn-back {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.quiz-container {
+    flex: 1;
+    max-width: 800px;
+    margin: 2rem auto;
+    width: 90%;
+}
+
+.progress-bar-wrap {
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    margin-bottom: 2rem;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: var(--primary);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.quiz-card {
+    background: var(--surface);
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border);
+}
+
+.question-text {
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-bottom: 2rem;
+    line-height: 1.4;
+}
+
+.options-list {
+    display: grid;
+    gap: 1rem;
+}
+
+.option-btn {
+    padding: 1.2rem;
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    text-align: left;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text);
+}
+
+.option-btn:hover {
+    border-color: var(--primary);
+    background: rgba(120, 40, 200, 0.05);
+}
+
+.option-btn.selected {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: white;
+}
+
+.quiz-footer {
+    padding: 1.5rem 2rem;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.btn-next {
+    padding: 0.8rem 2.5rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.btn-next:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.result-card {
+    text-align: center;
+    background: var(--surface);
+    padding: 3rem;
+    border-radius: 20px;
+}
+
+.result-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.result-title {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.result-score {
+    font-size: 1.2rem;
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+}
+
+.loading-spinner {
+    display: flex;
+    justify-content: center;
+    padding: 3rem;
+    font-size: 2rem;
+    color: var(--primary);
+}

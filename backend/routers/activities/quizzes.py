@@ -173,6 +173,17 @@ async def my_progress(current_user: dict = Depends(get_current_user)):
 # ── Admin: criação manual ─────────────────────────────────────
 
 
+@router.get("/admin/list")
+async def list_quizzes(username: str | None = None, current_user: dict = Depends(require_staff)):
+    """Lista quizzes (opcionalmente filtrado por aluno)."""
+    db = get_client()
+    query = db.table("quizzes").select("*")
+    if username:
+        query = query.eq("username", username)
+    res = query.order("created_at", desc=True).execute()
+    return res.data or []
+
+
 @router.post("/admin", status_code=status.HTTP_201_CREATED)
 async def create_quiz(body: QuizCreate, current_user: dict = Depends(require_staff)):
     result = get_client().table("quizzes").insert(body.model_dump()).execute()
@@ -196,7 +207,12 @@ async def add_question(
 
 @router.delete("/admin/{quiz_id}", status_code=204)
 async def delete_quiz(quiz_id: str, current_user: dict = Depends(require_staff)):
-    get_client().table("quizzes").delete().eq("id", quiz_id).execute()
+    db = get_client()
+    # Primeiro deleta as perguntas vinculadas
+    db.table("quiz_questions").delete().eq("quiz_id", quiz_id).execute()
+    # Depois o quiz
+    db.table("quizzes").delete().eq("id", quiz_id).execute()
+    return {"ok": True}
 
 
 @router.delete("/admin/questions/{question_id}", status_code=204)

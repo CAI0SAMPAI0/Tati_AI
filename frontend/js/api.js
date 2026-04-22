@@ -53,6 +53,20 @@ async function apiGet(path) {
   return res.json();
 }
 
+const apiCache = {};
+const CACHE_TTL = 30000; // 30 segundos de cache
+
+/** Faz GET com cache e retorna JSON. */
+async function apiGetCached(path) {
+    const now = Date.now();
+    if (apiCache[path] && (now - apiCache[path].timestamp < CACHE_TTL)) {
+        return apiCache[path].data;
+    }
+    const data = await apiGet(path);
+    apiCache[path] = { data, timestamp: now };
+    return data;
+}
+
 /** Faz POST com JSON body e retorna JSON. */
 async function apiPost(path, body) {
   const res = await apiFetch(path, {
@@ -209,7 +223,7 @@ function formatMarkdown(text) {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-const STAFF_ROLES = new Set(['professor', 'professora', 'programador', 'Tatiana', 'Tati', 'admin']);
+const STAFF_ROLES = new Set(['professor', 'professora', 'programador', 'Tatiana', 'Tati', 'admin', 'caio.sampaio']);
 function isStaff(user) { return user && STAFF_ROLES.has(user.role); }
 
 // ── Access Control ────────────────────────────────────────────────────────────

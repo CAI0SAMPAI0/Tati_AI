@@ -104,40 +104,42 @@ async function _initUserInfo() {
     } catch (e) { /* silencioso */ }
   }
 
-  const specialUsers = ["caio.sampaio", "caio", "programador", "tati", "tati.ai", "admin"];
-  const isSpecial = specialUsers.includes(user.username);
   const isTeacher = isStaff(user);
+  const isPremium = user.plan_type === 'full' || user.is_premium_active;
 
-  if (isTeacher || isSpecial) {
+  if (isTeacher) {
     const dashBtn = el('btn-dashboard');
     if (dashBtn) dashBtn.style.display = 'flex';
-
-    // Botão de atividades na sidebar
-    const actBtn = document.querySelector('a[href="activities.html"]');
-    if (actBtn) actBtn.style.display = 'flex';
   } else {
-    // Esconde para alunos normais
     const dashBtn = el('btn-dashboard');
     if (dashBtn) dashBtn.style.display = 'none';
-    const actBtn = document.querySelector('a[href="activities.html"]');
-    if (actBtn) actBtn.style.display = 'none';
+  }
+
+  // Botão de atividades: visível para professores E usuários premium
+  const actBtn = document.querySelector('a[href="activities.html"]');
+  if (actBtn) {
+    apiGet('/users/permissions/access').then(access => {
+      actBtn.style.display = (isTeacher || access.can_access_activities) ? 'flex' : 'none';
+    }).catch(() => {
+      actBtn.style.display = isPremium ? 'flex' : 'none';
+    });
   }
 
   const badgeEl = document.getElementById('sidebar-premium-badge');
   if (badgeEl) {
     // Se for especial ou professor, mostra badge Premium fixo ou verifica assinatura
     if (isSpecial || isTeacher) {
-        badgeEl.style.display = 'inline-block';
-        badgeEl.textContent = 'Premium';
+      badgeEl.style.display = 'inline-block';
+      badgeEl.textContent = 'Premium';
     } else {
-        apiGet('/payments/status').then(sub => {
-          if (sub && sub.has_subscription && sub.status === 'active') {
-            badgeEl.style.display = 'inline-block';
-            badgeEl.textContent = sub.plan_type === 'full' ? 'Premium' : 'Basic';
-          } else {
-            badgeEl.style.display = 'none';
-          }
-        }).catch(() => { badgeEl.style.display = 'none'; });
+      apiGet('/payments/status').then(sub => {
+        if (sub && sub.has_subscription && sub.status === 'active') {
+          badgeEl.style.display = 'inline-block';
+          badgeEl.textContent = sub.plan_type === 'full' ? 'Premium' : 'Basic';
+        } else {
+          badgeEl.style.display = 'none';
+        }
+      }).catch(() => { badgeEl.style.display = 'none'; });
     }
   }
 }
@@ -159,8 +161,8 @@ function toggleSidebar() {
 
 function switchToVoice() {
   const isNew = !currentConvId; // Se não tem conversa atual, é nova
-  const url = isNew ? '/voice.html?new=true' : 
-              currentConvId ? `/voice.html?conv_id=${currentConvId}` : '/voice.html';
+  const url = isNew ? '/voice.html?new=true' :
+    currentConvId ? `/voice.html?conv_id=${currentConvId}` : '/voice.html';
   window.location.href = url;
 }
 
@@ -228,10 +230,10 @@ function _handleWSMessage(msg) {
       // Atualiza só o título na sidebar se necessário, sem resetar mensagens
       const active = document.querySelector('.conv-item.active .conv-title');
       if (!active) {
-        _loadConversations().catch(() => {});
+        _loadConversations().catch(() => { });
       } else if (active.textContent === 'Nova conversa' || active.textContent === t('nav.new_chat')) {
         // Só recarrega a lista de conversas (sem abrir conversa = sem limpar mensagens)
-        apiGet('/chat/conversations').then(convs => _renderConversationList(convs)).catch(() => {});
+        apiGet('/chat/conversations').then(convs => _renderConversationList(convs)).catch(() => { });
       }
     },
     audio_response: () => {
@@ -273,7 +275,7 @@ async function _loadConversations() {
   try {
     const convs = await apiGet('/chat/conversations');
     _renderConversationList(convs);
-    
+
     // Sempre começa na tela de boas-vindas
     if (!currentConvId) {
       _showWelcome();
@@ -284,10 +286,10 @@ async function _loadConversations() {
 function _renderConversationList(convs) {
   const list = document.getElementById('conversations-list');
   if (!list) return;
-  if (!convs.length) { 
-    list.innerHTML = `<p class="list-empty">${t('chat.no_convs')}</p>`; 
+  if (!convs.length) {
+    list.innerHTML = `<p class="list-empty">${t('chat.no_convs')}</p>`;
     localStorage.removeItem('last_conv_id');
-    return; 
+    return;
   }
   const today = new Date().toDateString();
   const yesterday = new Date(Date.now() - 86400000).toDateString();
@@ -359,7 +361,7 @@ async function _loadMessages(convId) {
   [...area.children].forEach(el => {
     if (el.id !== 'typing-indicator' && el.id !== 'chat-welcome') el.remove();
   });
-  
+
   if (typingEl) typingEl.style.display = 'none';
   if (welcomeEl) welcomeEl.style.display = 'none';
   if (voiceBtn) voiceBtn.style.display = 'flex';
@@ -369,7 +371,7 @@ async function _loadMessages(convId) {
   try {
     const msgs = await apiGet(`/chat/conversations/${convId}/messages`);
     console.log(`[Chat] Carregadas ${msgs.length} mensagens`);
-    
+
     if (!msgs.length) {
       if (welcomeEl) welcomeEl.style.display = 'flex';
     } else {
@@ -511,7 +513,7 @@ async function sendMessage() {
       currentConvId = data.id;
       localStorage.setItem('last_conv_id', data.id);
       // Adiciona na sidebar sem recarregar mensagens
-      apiGet('/chat/conversations').then(convs => _renderConversationList(convs)).catch(() => {});
+      apiGet('/chat/conversations').then(convs => _renderConversationList(convs)).catch(() => { });
     } catch { _appendErrorMsg('Erro ao criar conversa.'); return; }
   }
 
@@ -550,7 +552,7 @@ function _setInputEnabled(on) {
   if (b) b.disabled = !on;
   if (i) i.disabled = !on;
 }
-function useSuggestion(btn) { 
+function useSuggestion(btn) {
   const i = document.getElementById('message-input');
   if (i) { i.value = btn.textContent; sendMessage(); }
 }
@@ -619,7 +621,6 @@ function _appendAssistantMsg(text, returnElement = false, isoString = null) {
       <div class="message-meta"><span class="message-time">${nowTime(isoString)}</span></div>
     </div>`;
   _insertBeforeTyping(div);
-  _checkAndAddReportButton(div, text);
   if (getSettings().wordTooltip !== false && window.WordTooltip) WordTooltip.makeClickable(div);
   _scrollBottom();
   return returnElement ? div : null;
@@ -664,7 +665,6 @@ function _finalizeStreamBubble(msgEl, bubble) {
   meta.innerHTML = `<span class="message-time">${nowTime()}</span>`;
   body?.appendChild(meta);
 
-  _checkAndAddReportButton(msgEl, text);
   streamBuffer = '';
   return meta;
 }
@@ -774,23 +774,23 @@ function _checkSummaryBtn() {
 // ── Misc ──────────────────────────────────────────────────────────────────────
 function _appendStatus(text) { const d = document.createElement('div'); d.className = 'status-msg'; d.textContent = text; _insertBeforeTyping(d); }
 function _appendErrorMsg(text) { const d = document.createElement('div'); d.className = 'error-banner'; d.textContent = '⚠️ ' + text; _insertBeforeTyping(d); _scrollBottom(); }
-function _insertBeforeTyping(el) { 
-  const a = document.getElementById('chat-messages'); 
+function _insertBeforeTyping(el) {
+  const a = document.getElementById('chat-messages');
   const ti = document.getElementById('typing-indicator');
-  if (a) a.insertBefore(el, ti); 
+  if (a) a.insertBefore(el, ti);
 }
-function _showTyping() { 
+function _showTyping() {
   const ti = document.getElementById('typing-indicator');
-  if (ti) ti.style.display = 'flex'; 
-  _scrollBottom(); 
+  if (ti) ti.style.display = 'flex';
+  _scrollBottom();
 }
-function _hideTyping() { 
+function _hideTyping() {
   const ti = document.getElementById('typing-indicator');
-  if (ti) ti.style.display = 'none'; 
+  if (ti) ti.style.display = 'none';
 }
-function _scrollBottom() { 
-  const a = document.getElementById('chat-messages'); 
-  if (a) a.scrollTop = a.scrollHeight; 
+function _scrollBottom() {
+  const a = document.getElementById('chat-messages');
+  if (a) a.scrollTop = a.scrollHeight;
 }
 function logout() { authLogout(); }
 
@@ -846,95 +846,124 @@ function _showPaywall() {
     `;
   _insertBeforeTyping(wall);
   _scrollBottom();
+}
+
+async function _downloadReportPDF(content, filename, clickedBtn = null) {
+  const btn = clickedBtn;
+  const orig = btn ? btn.innerHTML : null;
+  if (btn) {
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${t('act.generating_pdf') || 'Gerando PDF...'}`;
+    btn.disabled = true;
+    btn.style.opacity = '0.8';
   }
 
-  async function _downloadReportPDF(content, filename, clickedBtn = null) {
-    const btn = clickedBtn;
-    const orig = btn ? btn.innerHTML : null;
-    if (btn) {
-      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${t('act.generating_pdf') || 'Gerando PDF...'}` ;
-      btn.disabled = true;
-      btn.style.opacity = '0.8';
+  try {
+    const response = await fetch(`${API_BASE}/chat/download_report`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getToken()}`
+      },
+      body: JSON.stringify({ content, filename })
+    });
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}));
+      throw new Error(detail.detail || 'Falha ao gerar PDF');
     }
-
-    try {
-      const response = await fetch(`${API_BASE}/chat/download_report`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getToken()}`
-        },
-        body: JSON.stringify({ content, filename })
-      });
-      if (!response.ok) {
-        const detail = await response.json().catch(() => ({}));
-        throw new Error(detail.detail || 'Falha ao gerar PDF');
-      }
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      if (btn) btn.innerHTML = `<i class="fa-solid fa-check"></i> PDF Baixado!`;
-      setTimeout(() => { if (btn) { btn.innerHTML = orig; btn.disabled = false; btn.style.opacity = ''; } }, 2500);
-    } catch (e) {
-      console.error(e);
-      showToast('Erro ao gerar PDF. Tente novamente.', 'error');
-      if (btn) { btn.innerHTML = orig; btn.disabled = false; btn.style.opacity = ''; }
-    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    if (btn) btn.innerHTML = `<i class="fa-solid fa-check"></i> PDF Baixado!`;
+    setTimeout(() => { if (btn) { btn.innerHTML = orig; btn.disabled = false; btn.style.opacity = ''; } }, 2500);
+  } catch (e) {
+    console.error(e);
+    showToast('Erro ao gerar PDF. Tente novamente.', 'error');
+    if (btn) { btn.innerHTML = orig; btn.disabled = false; btn.style.opacity = ''; }
   }
+}
 
-  function _checkAndAddReportButton(msgEl, text) {
-    if (!text.includes('# 📊 STUDY REPORT')) return;
+function _checkAndAddReportButton(msgEl, text) {
+  if (!text.includes('# 📊 STUDY REPORT')) return;
 
-    const body = msgEl.querySelector('.message-body');
-    const bubble = body?.querySelector('.message-bubble');
-    if (!body || !bubble || body.querySelector('.btn-report-download')) return;
+  const body = msgEl.querySelector('.message-body');
+  const bubble = body?.querySelector('.message-bubble');
+  if (!body || !bubble || body.querySelector('.btn-report-download')) return;
 
-    // Extract title if possible
-    const lines = text.split('\n');
-    const reportLine = lines.find(l => l.includes('# 📊 STUDY REPORT'));
-    const titleLine = lines.find(l => l.startsWith('## ')) || reportLine;
-    const cleanTitle = titleLine.replace(/#|📊/g, '').trim();
+  // Extract title if possible
+  const lines = text.split('\n');
+  const reportLine = lines.find(l => l.includes('# 📊 STUDY REPORT'));
+  const titleLine = lines.find(l => l.startsWith('## ')) || reportLine;
+  const cleanTitle = titleLine.replace(/#|📊/g, '').trim();
 
-    // Hide the original long markdown and show a compact card
-    bubble.innerHTML = `
-      <div class="report-card" style="padding: 10px; background: hsla(var(--p), 0.1); border-left: 4px solid var(--primary); border-radius: 4px;">
-        <p style="margin: 0 0 8px 0; font-weight: 700; color: var(--primary);">📄 ${cleanTitle}</p>
-        <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted);">The full pedagogical report has been generated. Click below to download the PDF version with Teacher Tati's formatting.</p>
+  // Hide the original long markdown and show a compact card
+  bubble.innerHTML = `
+      <div class="report-card" style="
+        padding: 20px; 
+        background: rgba(120, 40, 200, 0.12); 
+        border-left: 6px solid var(--primary); 
+        border-radius: 16px;
+        margin: 10px 0;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      ">
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px;">
+          <span style="font-size: 2rem;">📊</span>
+          <p style="margin: 0; font-weight: 800; color: var(--primary); font-size: 1.2rem;">${cleanTitle || 'Study Report'}</p>
+        </div>
+        <p style="margin: 0; font-size: 1rem; color: var(--text-muted); line-height: 1.5; font-weight: 500;">
+          ${t('chat.report_generated_desc') || "Teacher Tati generated a full pedagogical report based on your performance. Download the PDF version below."}
+        </p>
       </div>
     `;
 
-    const btn = document.createElement('button');
-    btn.className = 'btn-report-download';
-    btn.style.cssText = `
-      display: flex; align-items: center; gap: 8px;
-      margin-top: 12px; padding: 10px 20px;
+  const btn = document.createElement('button');
+  btn.className = 'btn-report-download';
+  btn.style.cssText = `
+      display: flex; align-items: center; gap: 12px;
+      margin-top: 20px; padding: 16px 32px;
       background: var(--primary); color: white;
-      border: none; border-radius: 10px;
-      font-size: 0.9rem; font-weight: 700;
-      cursor: pointer; transition: transform 0.2s;
+      border: none; border-radius: 16px;
+      font-size: 1.1rem; font-weight: 800;
+      cursor: pointer; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       width: 100%; justify-content: center;
-      box-shadow: var(--shadow-sm);
+      box-shadow: 0 8px 20px rgba(120, 40, 200, 0.4);
+      border: 1px solid rgba(255,255,255,0.2);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     `;
-    btn.innerHTML = `<i class="fa-solid fa-file-pdf"></i> ${t('act.download_pdf_report') || 'Download PDF Report'}`;
-    btn.onclick = (e) => {
-      e.preventDefault();
-      // Gera filename a partir do título do relatório
-      const slug = cleanTitle
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, '')
-        .trim()
-        .replace(/\s+/g, '_')
-        .slice(0, 50);
-      const dateStr = new Date().toISOString().slice(0, 10);
-      const filename = `Tati_Report_${slug}_${dateStr}.pdf`;
-      _downloadReportPDF(text, filename, btn);
-    };
 
-    body.appendChild(btn);
-  }
+  // Add hover effect via JS
+  btn.onmouseover = () => {
+    btn.style.transform = 'scale(1.02) translateY(-3px)';
+    btn.style.boxShadow = '0 12px 25px rgba(120, 40, 200, 0.5)';
+    btn.style.background = 'var(--primary-hover, #8a3ad6)';
+  };
+  btn.onmouseout = () => {
+    btn.style.transform = 'scale(1) translateY(0)';
+    btn.style.boxShadow = '0 8px 20px rgba(120, 40, 200, 0.4)';
+    btn.style.background = 'var(--primary)';
+  };
+
+  btn.innerHTML = `<i class="fa-solid fa-file-pdf"></i> ${t('act.download_pdf_report') || 'Download PDF Report'}`;
+  btn.onclick = (e) => {
+    e.preventDefault();
+    // Gera filename a partir do título do relatório
+    const slug = (cleanTitle || 'report')
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, "") // remove acentos
+      .replace(/[^a-z0-9\s]/g, '')
+      .trim()
+      .replace(/\s+/g, '_')
+      .slice(0, 50);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const filename = `Tati_Report_${slug}_${dateStr}.pdf`;
+    _downloadReportPDF(text, filename, btn);
+  };
+
+  body.appendChild(btn);
+}

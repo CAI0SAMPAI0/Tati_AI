@@ -1,5 +1,7 @@
 /* Redirect se já autenticado */
-if (getToken()) window.location.href = '/chat.html';
+if (getToken() && !window.location.pathname.includes('quiz.html') && !window.location.pathname.includes('activities.html')) {
+  window.location.href = '/chat.html';
+}
 
 window.addEventListener('DOMContentLoaded', () => {
   _initGoogleAuth();

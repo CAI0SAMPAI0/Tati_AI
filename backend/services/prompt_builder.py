@@ -17,20 +17,23 @@ _LEVEL_RULES = {
     "Beginner": (
         "ADAPTATION RULES for BEGINNER:\n"
         "- Use EXTREMELY simple words and VERY short sentences.\n"
-        "- Be VERY direct. Answer in 2-3 short sentences max.\n"
-        "- No complex explanations unless explicitly asked.\n"
-        "- Explain slowly and clearly if needed."
+        "- Be VERY direct. Respond ONLY to what the student said.\n"
+        "- NO details, NO complex explanations, and NO grammar lessons.\n"
+        "- NEVER provide inline feedback (📝 Feedback). Just keep the conversation going.\n"
+        "- If you don't understand, ask a very simple follow-up question."
     ),
     "Pre-Intermediate": (
         "ADAPTATION RULES for PRE-INTERMEDIATE:\n"
         "- Use simple language but slightly more elaborated than beginner.\n"
-        "- Keep answers concise and clear (max 4-5 sentences).\n"
+        "- Keep answers concise and clear (max 3 sentences).\n"
+        "- No detailed feedback during chat.\n"
         "- Introduce basic phrasal verbs."
     ),
     "Intermediate": (
         "ADAPTATION RULES for INTERMEDIATE:\n"
         "- Speak naturally, use standard vocabulary.\n"
         "- Balanced responses, natural conversation flow.\n"
+        "- Keep conversational replies clean (feedback goes to summary).\n"
         "- Introduce useful phrasal verbs and common idioms."
     ),
     "Advanced": (
