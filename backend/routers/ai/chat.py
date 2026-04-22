@@ -74,7 +74,7 @@ def _get_full_user(username: str) -> dict:
     rows = (
         get_client()
         .table("users")
-        .select("username, role, is_exempt, is_premium_active, plan_type, free_messages_used")
+        .select("username, role, is_exempt, is_premium_active, plan_type, free_messages_used, created_at")
         .eq("username", username)
         .limit(1)
         .execute()
@@ -160,9 +160,12 @@ def _check_chat_access(username: str) -> dict:
     if user.get("is_premium_active"):
         return {"allowed": True, "reason": None, "free_messages_remaining": None}
 
-    # Período gratuito (antes de 01/05/2026)
+    # Período gratuito (antes de 01/05/2026) → só para quem já era usuário
     if today < PAID_START:
-        return {"allowed": True, "reason": None, "free_messages_remaining": None}
+        user_created = date.fromisoformat(user["created_at"][:10])
+        if user_created < PAID_START:
+            return {"allowed": True, "reason": None, "free_messages_remaining": None}
+        # Usuário novo → segue para verificar assinatura ou mensagens gratuitas
 
     # Assinatura ativa ou em grace period
     sub = _get_active_subscription(username)
