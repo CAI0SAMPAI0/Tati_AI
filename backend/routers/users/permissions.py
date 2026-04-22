@@ -122,9 +122,13 @@ async def get_access_info(user: dict = Depends(get_current_user)):
     if is_admin or is_exempt:
         return _access_response(is_admin=is_admin, full=True, activities=True)
 
-    # Antes de 01/05/2026 → período gratuito
+    # Antes de 01/05/2026 → período gratuito, mas só para quem já era usuário
     if today < PAID_START:
-        return _access_response(full=True, activities=is_admin, free_mode=True)
+        user_created = date.fromisoformat(user["created_at"][:10])
+        if user_created < PAID_START:
+            return _access_response(full=True, activities=is_admin, free_mode=True)
+        # Usuário novo → ainda não passou da data de início, mas não é do período gratuito
+        # segue para verificar assinatura ativa
 
     # Isento
     if is_exempt:

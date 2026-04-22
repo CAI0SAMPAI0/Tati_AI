@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from core.config import settings
 from routers.deps import get_current_user
-from routers.users.permissions import calc_due_date, SPECIAL_USERS
+from routers.users.permissions import PAID_START, SPECIAL_USERS, calc_due_date
 from services.asaas import (
     cancel_subscription, create_customer, create_subscription,
     get_customer_by_email, get_pix_qr_code, get_subscription_payments,
@@ -29,6 +29,26 @@ class ChangeDueDateRequest(BaseModel):
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+async def _find_customer_by_document(doc: str) -> dict | None:
+    """Busca customer Asaas pelo documento (CPF/CNPJ)."""
+    from services.asaas import get_base_url, get_headers
+    import httpx
+    url = f"{get_base_url()}/customers"
+    params = {}
+    if len(doc) == 11:
+        params["cpf"] = doc
+    else:
+        params["cnpj"] = doc
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, params=params, headers=get_headers(), timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+            return data["data"][0] if data.get("data") else None
+    except Exception:
+        return None
+
 
 def _get_validated_user(username: str) -> dict:
     """Busca e valida dados do usuário necessários para pagamento."""
@@ -164,6 +184,14 @@ async def subscribe(
     """
     db = get_client()
 
+    username = current_user["username"]
+    if username not in SPECIAL_USERS:
+        if date.today() < PAID_START:
+            raise HTTPException(
+                status_code=403,
+                detail="Planos e pagamentos só estarão disponíveis a partir de 01/05/2026.",
+            )
+
     # 1. Busca o plano no banco — o valor vem daqui, nunca do frontend
     plan = db.table("plans").select("*").eq("id", body.planType).eq("is_active", True).execute().data
     if not plan:
@@ -185,13 +213,24 @@ async def subscribe(
         if not customer.get("cpfCnpj") and raw_doc:
             await update_customer(customer_id, {"cpfCnpj": raw_doc})
     else:
-        new_cust    = await create_customer(
-            name=user_db.get("name") or username,
-            email=user_db["email"],
-            cpf_cnpj=raw_doc,
-            phone=phone,
-        )
-        customer_id = new_cust["id"]
+        try:
+            new_cust    = await create_customer(
+                name=user_db.get("name") or username,
+                email=user_db["email"],
+                cpf_cnpj=raw_doc,
+                phone=phone,
+            )
+            customer_id = new_cust["id"]
+        except Exception as exc:
+            err_str = str(exc)
+            if "já cadastrado" in err_str or "already been taken" in err_str or "duplicate" in err_str.lower():
+                customer_by_doc = await _find_customer_by_document(raw_doc)
+                if customer_by_doc:
+                    customer_id = customer_by_doc["id"]
+                else:
+                    raise HTTPException(status_code=409, detail="Documento já cadastrado no sistema de pagamento. Use outro CPF/CNPJ ou entre em contato.")
+            else:
+                raise HTTPException(status_code=500, detail=err_str)
 
     # 4. Calcula data do primeiro vencimento
     preferred_day = user_db.get("preferred_due_day") or 5
@@ -208,7 +247,10 @@ async def subscribe(
             external_reference = f"{username}|{body.planType}",
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        err_str = str(exc)
+        if body.billingType == "PIX" and ("duplicate" in err_str.lower() or "já" in err_str.lower()):
+            raise HTTPException(status_code=409, detail="Este pagamento PIX já foi gerado. Tente outra forma de pagamento (boleto ou cartão).")
+        raise HTTPException(status_code=500, detail=err_str)
 
     subscription_id = subscription.get("id")
 
