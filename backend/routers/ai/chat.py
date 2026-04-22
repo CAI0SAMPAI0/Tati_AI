@@ -53,8 +53,15 @@ def _verify_ws_token(token: str) -> dict | None:
 
 
 def _clean_tts_text(text: str) -> str:
-    """Remove marcadores de fontes e asteriscos do texto antes de enviar ao TTS."""
+    """Remove marcadores de fontes, feedback e asteriscos do texto antes de enviar ao TTS."""
     text = text.replace("*", "")
+    
+    # Remove qualquer seção de feedback/correção para não ser lida no áudio
+    markers_to_cut = ["📝 Feedback", "Feedback:", "Correction:", "📝 Correção", "Note:"]
+    for marker in markers_to_cut:
+        if marker in text:
+            text = text.split(marker)[0]
+
     for marker in _SOURCE_MARKERS:
         if marker in text:
             text = text.split(marker)[0]
@@ -324,14 +331,32 @@ async def tts_word(body: TTSRequest, current_user: dict = Depends(get_current_us
 
 @router.get("/conversations/{conversation_id}/summary")
 async def get_summary(conversation_id: str, lang: str = Query(default='pt'), current_user: dict = Depends(get_current_user)):
+    username = current_user["username"]
     history = await load_history(conversation_id)
-    if not history or len(history) < 5:
+    if not history or len(history) < 3:
         raise HTTPException(status_code=400, detail="Mensagens insuficientes para gerar resumo")
+
+    # 1. Verifica Cache no histórico (mensagem do sistema começando com SUMMARY_CACHE_)
+    cache_prefix = f"SUMMARY_CACHE_{lang.upper()}:"
+    for m in history:
+        if m.get("role") == "system" and m.get("content", "").startswith("SUMMARY_CACHE_"):
+            # Verifica se o idioma bate, senão ignora o cache
+            if m.get("content", "").startswith(cache_prefix):
+                print(f"[Summary] Usando cache para {conversation_id}")
+                return {"summary": m["content"].replace(cache_prefix, "").strip()}
 
     conversation_text = "\n\n".join(
         f"{'TATI' if m['role'] == 'assistant' else 'STUDENT'}: {m['content']}"
-        for m in history
+        for m in history if m['role'] in ('assistant', 'user')
     )
+    
+    # Gera exercícios silenciosamente para a página de Atividades
+    try:
+        from services.exercise_generator import generate_exercises_from_history
+        await generate_exercises_from_history(username, conversation_text)
+    except Exception as e:
+        print(f"[Summary] Erro ao gerar exercícios: {e}")
+
     if lang.startswith("en"):
         prompt_system = (
             "You are an English teaching coordinator. Analyze the transcript and write a "
@@ -339,7 +364,7 @@ async def get_summary(conversation_id: str, lang: str = Query(default='pt'), cur
             "🌟 **Strengths:** (praise what went well)\n"
             "🛠️ **Areas to Improve:** (2-3 errors with corrections)\n"
             "📚 **New Vocabulary:** (3-5 words/expressions with meaning)\n\n"
-            "Be encouraging, didactic, and use Markdown."
+            "Be encouraging and didactic. DO NOT mention exercises here."
         )
     else:
         prompt_system = (
@@ -348,8 +373,9 @@ async def get_summary(conversation_id: str, lang: str = Query(default='pt'), cur
             "🌟 **Pontos Fortes:** (elogie o que foi bem)\n"
             "🛠️ **Para Melhorar:** (2-3 erros com correção)\n"
             "📚 **Vocabulário Novo:** (3-5 palavras/expressões com tradução)\n\n"
-            "Seja encorajador, didático e use Markdown."
+            "Seja encorajador e didático. NÃO mencione exercícios aqui."
         )
+        
     try:
         resumo = await groq_chat(
             messages=[
@@ -358,7 +384,15 @@ async def get_summary(conversation_id: str, lang: str = Query(default='pt'), cur
             ],
             max_tokens=1500,
         )
-        return {"summary": resumo}
+        final_summary = resumo.strip()
+        
+        # 2. Salva no Cache (como mensagem de sistema)
+        try:
+            await save_message(conversation_id, username, "system", cache_prefix + final_summary)
+        except Exception as e:
+            print(f"[Summary] Falha ao salvar cache: {e}")
+
+        return {"summary": final_summary}
     except GroqKeyError as exc:
         raise HTTPException(status_code=503, detail=f"Erro ao gerar resumo: {exc}")
 
@@ -416,6 +450,7 @@ async def _handle_chat_message(websocket: WebSocket, msg: dict, username: str) -
         msg_type = msg.get("type")
         content  = msg.get("content", "").strip()
         conv_id  = msg.get("conversation_id")
+        is_voice_mode = (msg_type == "audio")
 
         if msg_type not in ("text", "audio", "file"):
             await websocket.send_json({"type": "error", "detail": "Tipo de mensagem inválido"})
@@ -465,11 +500,70 @@ async def _handle_chat_message(websocket: WebSocket, msg: dict, username: str) -
         if not history:
             await auto_title(conv_id, username, content[:50])
 
+        # Dica de Sumário após 3 mensagens (1 histórico + 2 usuário = 3)
+        user_msg_count = len([m for m in (history or []) if m.get("role") == "user"])
+        if user_msg_count == 2:
+            await websocket.send_json({
+                "type": "status",
+                "text": "💡 Tip: You've sent 3 messages! Click the 'Summary' button anytime for a report and exercises."
+            })
+
         # ── Salva Mensagem e Registra Streak ──────────────
         print(f"DEBUG: Salvando mensagem do usuário...")
         await save_message(conv_id, username, "user", content)
         history.append({"role": "user", "content": content})
+        # contando erros e geração de atividades automaticamente
+        try:
+            # formas que vai entender que a IA corrigiu
+            correction_markers = [
+                "should be", "correct form", "you should say",
+                "instead of", "the correct", "mistake", "incorrect",
+                "correction:", "❌", "✅ correct"
+            ]
+            response_lower = full_response.lower()
+            has_correction = any(m in response_lower for m in correction_markers)
+            if has_correction:
+                # erros com redis e cache que expira em 7 dias
+                from services.upstash import cache_get, cache_set
+                error_key = f'error_count:{username}'
+                cached = await cache_get(error_key)
+                count = int(cached) + 1 if cached else 1
+                await cache_set(error_key, str(count), ttl=604800) # 7 dias de cache
+                print(f'[AutoExercise] {username} acumulou {count} errors')
 
+                # a cada 5 erros, gera atividade e zera o contador
+                if count >= 5:
+                    await cache_set(error_key, '0', ttl=604800)
+
+                    # escolhendo tipo de exercício aleatório
+                    type_key = f'exercise_type:{username}'
+                    type_cached = await cache_get(type_key)
+                    current_type = int(type_cached) if type_cached else 0
+                    next_type = (current_type + 1) % 4
+                    await cache_set(type_key, str(next_type), ttl=604800)
+
+                    exercise_types = ["quiz", "story", "fill_in", "dialogue"]
+                    chosen_type = exercise_types[current_type]
+
+                    print(f"[AutoExercise] Gerando '{chosen_type}' para {username}")
+
+                    # Busca contexto das últimas conversas
+                    from services.exercise_generator import generate_exercises_from_history
+                    convs = db.table("conversations").select("id").eq("username", username).order("updated_at", desc=True).limit(5).execute()
+                    context = ""
+                    for c in (convs.data or []):
+                        msgs_ctx = db.table("messages").select("content, role").eq("session_id", c["id"]).order("created_at").limit(30).execute()
+                        context += "\n\n" + "\n".join(f"{m['role'].upper()}: {m['content']}" for m in msgs_ctx.data)
+
+                    await generate_exercises_from_history(username, context, exercise_type=chosen_type)
+
+                    # Notifica o aluno via WebSocket
+                    await websocket.send_json({
+                        "type": "status",
+                        "text": "🎯 Nova atividade personalizada gerada com base nos seus erros! Veja em Atividades."
+                    })
+        except Exception as e:
+            print(f"[AutoExercise] Erro: {e}")
         try:
             from services.streaks import record_study_day
             record_study_day(username)
@@ -480,6 +574,9 @@ async def _handle_chat_message(websocket: WebSocket, msg: dict, username: str) -
         profile          = await _get_user_profile(username)
         rag_result       = obter_contexto_rag(content)
         effective_prompt = build_effective_prompt(profile, rag_result.contexto)
+        
+        if is_voice_mode:
+            effective_prompt += "\n\nCRITICAL: User is in VOICE MODE. DO NOT generate PDFs or long reports. Keep responses very short for listening."
 
         # ── Streaming ─────────────────────────────────────
         level_limits = {

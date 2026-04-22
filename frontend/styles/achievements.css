@@ -1,0 +1,265 @@
+/* achievements.css — Tati AI Achievements */
+
+.achievements-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.ach-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Streak Card */
+.streak-card {
+    display: flex;
+    gap: 1.5rem;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.05), rgba(249, 115, 22, 0.05));
+    border-color: rgba(239, 68, 68, 0.1);
+}
+
+.streak-visual {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 100px;
+}
+
+.streak-flame {
+    font-size: 3.5rem;
+    filter: drop-shadow(0 4px 8px rgba(239, 68, 68, 0.3));
+    animation: flameFloat 3s ease-in-out infinite;
+}
+
+@keyframes flameFloat {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-5px) scale(1.05); }
+}
+
+.streak-status-badge {
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 0.25rem 0.6rem;
+    border-radius: 99px;
+    letter-spacing: 0.5px;
+    background: #9ca3af;
+    color: white;
+}
+
+.streak-status-badge.active {
+    background: var(--success);
+}
+
+.streak-big-number {
+    font-size: 3rem;
+    font-weight: 900;
+    line-height: 1;
+    color: var(--text);
+    margin-bottom: 0.25rem;
+}
+
+.streak-big-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 1.25rem;
+}
+
+.streak-stats {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+}
+
+.streak-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.streak-stat:last-child {
+    border-bottom: none;
+}
+
+.streak-stat-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.streak-stat-value {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+/* Progress Card */
+.progress-card {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.progress-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.progress-count {
+    text-align: right;
+}
+
+.count-number {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.count-total {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.progress-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+
+.trophy-bar-wrap {
+    height: 12px;
+    background: var(--bg);
+    border-radius: 99px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+    border: 1px solid var(--border);
+}
+
+.trophy-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--secondary));
+    border-radius: 99px;
+    transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.trophy-percent {
+    text-align: right;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 1rem;
+}
+
+.trophy-tiers {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.tier-badge {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.5rem;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.tier-badge.bronze { background: rgba(205, 127, 50, 0.1); color: #cd7f32; }
+.tier-badge.silver { background: rgba(192, 192, 192, 0.1); color: #9ca3af; }
+.tier-badge.gold { background: rgba(255, 215, 0, 0.1); color: #fbbf24; }
+.tier-badge.platinum { background: rgba(229, 231, 235, 0.1); color: #94a3b8; }
+
+/* Medal Grid */
+.medal-filters {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+}
+
+.medal-filter-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: var(--transition);
+}
+
+.medal-filter-btn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
+.medals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 3rem;
+}
+
+.medal-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.25rem;
+    text-align: center;
+    position: relative;
+    transition: var(--transition);
+}
+
+.medal-card.locked {
+    opacity: 0.5;
+    filter: grayscale(0.8);
+}
+
+.medal-card.unlocked {
+    border-color: rgba(124, 58, 237, 0.3);
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.1);
+}
+
+.medal-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.medal-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.medal-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.3;
+}

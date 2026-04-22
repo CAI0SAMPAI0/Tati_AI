@@ -5,39 +5,33 @@ window.addEventListener('DOMContentLoaded', () => {
     _loadStats();
     _loadSubscription();
     _loadPlanAction();
-    // Streak carrega em paralelo, não bloqueia
-    _loadStreaks();
+    loadUserData();
 });
 
-// ── Tab Switching ─────────────────────────────────────────────────────────────
+async function loadUserData() {
+    const user = getUser();
+    if (!user) return;
+    
+    try {
+        const streakData = await apiGet('/users/streak');
+        document.getElementById('streak-count-text').textContent = streakData.current_streak || 0;
+        document.getElementById('trophy-count-text').textContent = `${streakData.trophies_earned || 0}/50`;
+        
+        const displayName = user.name || user.username || t('act.user_fallback');
+        document.getElementById('header-user-name').textContent = displayName;
 
-function switchProfileTab(tabName, btn) {
-    // Update tab buttons
-    document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
-    if (btn) btn.classList.add('active');
-    else document.querySelector(`.profile-tab[data-tab="${tabName}"]`)?.classList.add('active');
-    
-    // Hide all content
-    document.querySelectorAll('.profile-tab-content').forEach(c => c.style.display = 'none');
-    
-    // Show selected content
-    const content = document.getElementById(`tab-content-${tabName}`);
-    if (content) {
-        content.style.display = 'block';
-    }
-    
-    // Load content if needed
-    if (tabName === 'progress' && !document.getElementById('profile-progress-container').dataset.loaded) {
-        _loadProgressTab();
-    } else if (tabName === 'vocab' && !document.getElementById('profile-vocab-container').dataset.loaded) {
-        _loadVocabTab();
-    } else if (tabName === 'goals' && !document.getElementById('profile-goals-container').dataset.loaded) {
-        _loadGoalsTab();
-    } else if (tabName === 'trophies' && !document.getElementById('profile-trophies-container').dataset.loaded) {
-        _loadTrophiesTab();
-    }
+        const avatarImg = document.getElementById('header-user-avatar-img');
+        const avatarFallback = document.getElementById('header-user-avatar');
+        if (user.avatar_url && avatarImg) {
+            avatarImg.src = user.avatar_url;
+            avatarImg.style.display = 'block';
+            if (avatarFallback) avatarFallback.style.display = 'none';
+        } else if (avatarFallback) {
+            avatarFallback.textContent = displayName.charAt(0).toUpperCase();
+            avatarFallback.style.display = 'flex';
+        }
+    } catch (e) { }
 }
-
 
 // ── Profile ───────────────────────────────────────────────────────────────────
 
@@ -93,14 +87,12 @@ function _setField(id, val) {
 // ── Subscription card ─────────────────────────────────────────────────────────
 
 async function _loadSubscription() {
-  // Injeta o card antes da danger zone se ainda não existir
   let container = document.getElementById('subscription-section');
   if (!container) {
     container = document.createElement('section');
     container.id        = 'subscription-section';
     container.className = 'profile-section';
 
-    // Insere antes do botão salvar
     const btnSave = document.getElementById('btn-save');
     if (btnSave) {
       btnSave.parentElement.insertBefore(container, btnSave);
@@ -197,16 +189,12 @@ function _subStatusLabel(status) {
   return map[status] || status;
 }
 
-// ── Plan Action (hero) ────────────────────────────────────────────────────────
-
 async function _loadPlanAction() {
   const container = document.getElementById('profile-plan-action');
   if (!container) return;
 
   try {
     const sub = await apiGet('/payments/status');
-    
-    // Sem assinatura ou expirada/cancelada → mostra "Upgrade to Premium"
     if (!sub || !sub.has_subscription || sub.status === 'expired' || sub.status === 'cancelled') {
       container.innerHTML = `
         <a href="payment.html" class="btn-save" style="background: linear-gradient(135deg, #FFD700, #FFA500); color: #000; text-decoration: none;">
@@ -217,9 +205,7 @@ async function _loadPlanAction() {
       return;
     }
 
-    // Assinatura ativa
     if (sub.status === 'active' || sub.status === 'grace') {
-      // Plano básico → mostra "Upgrade to Full"
       if (sub.plan_type === 'basic') {
         container.innerHTML = `
           <a href="payment.html" class="btn-save" style="background: linear-gradient(135deg, #a78bfa, #60a5fa); color: #fff; text-decoration: none;">
@@ -229,33 +215,15 @@ async function _loadPlanAction() {
         `;
         return;
       }
-
-      // Plano full → não mostra nada
       if (sub.plan_type === 'full') {
         container.innerHTML = '';
         return;
       }
     }
-
-    // Default: mostra upgrade
-    container.innerHTML = `
-      <a href="payment.html" class="btn-save" style="background: linear-gradient(135deg, #FFD700, #FFA500); color: #000; text-decoration: none;">
-        <i class="fa-solid fa-crown"></i>
-        <span>Upgrade to Premium</span>
-      </a>
-    `;
   } catch (e) {
     console.error('Erro ao carregar ação do plano:', e);
-    container.innerHTML = `
-      <a href="payment.html" class="btn-save" style="background: linear-gradient(135deg, #FFD700, #FFA500); color: #000; text-decoration: none;">
-        <i class="fa-solid fa-crown"></i>
-        <span>Upgrade to Premium</span>
-      </a>
-    `;
   }
 }
-
-// ── Stats ─────────────────────────────────────────────────────────────────────
 
 async function _loadStats() {
   try {
@@ -270,8 +238,6 @@ async function _loadStats() {
     _setVal('stat-messages', '—', 'textContent');
   } catch (e) { console.error(e); }
 }
-
-// ── Save all ──────────────────────────────────────────────────────────────────
 
 async function saveAll() {
   const btn       = document.getElementById('btn-save');
@@ -335,8 +301,6 @@ async function saveAll() {
   if (labelSpan) labelSpan.textContent = t('profile.save');
 }
 
-// ── Avatar upload ─────────────────────────────────────────────────────────────
-
 async function handleAvatarUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -380,8 +344,6 @@ async function handleAvatarUpload(event) {
   }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function _showFeedback(el, msg, type) {
   el.textContent   = msg;
   el.className     = `save-feedback show ${type}`;
@@ -392,90 +354,16 @@ function _showFeedback(el, msg, type) {
 function togglePwVisibility(inputId, btn) { togglePw(inputId, btn); }
 function logout() { authLogout(); }
 
-// ── Streaks ───────────────────────────────────────────────────────────────────
-
-async function _loadStreaks() {
-  try {
-    const streak = await apiGet('/users/streak');
-    
-    if (!streak || streak.current_streak === undefined) return;
-    
-    const section = document.getElementById('streak-section');
-    if (!section) return;
-    
-    section.style.display = 'block';
-    
-    // Atualiza valores
-    document.getElementById('streak-count').textContent = streak.current_streak;
-    document.getElementById('streak-longest').textContent = streak.longest_streak;
-    
-    // Ícone baseado no streak
-    const icon = document.getElementById('streak-icon');
-    if (streak.current_streak >= 100) {
-      icon.textContent = '💎';
-    } else if (streak.current_streak >= 30) {
-      icon.textContent = '🌟';
-    } else if (streak.current_streak >= 7) {
-      icon.textContent = '🔥';
-    } else {
-      icon.textContent = '⭐';
-    }
-    
-    // Renderiza calendário
-    _renderStreakCalendar(streak);
-    
-    // Renderiza milestones
-    _renderStreakMilestones();
-    
-  } catch (e) {
-    console.error('Erro ao carregar streaks:', e);
-  }
+function openSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (sidebar) sidebar.classList.add('open');
+    if (overlay) overlay.classList.add('visible');
 }
 
-function _renderStreakCalendar(streak) {
-  const container = document.getElementById('streak-calendar');
-  if (!container) return;
-  
-  // Últimos 28 dias (4 semanas)
-  const days = [];
-  const today = new Date();
-  
-  for (let i = 27; i >= 0; i--) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split('T')[0];
-    const isActive = streak.study_dates && streak.study_dates.includes(dateStr);
-    const isToday = i === 0;
-    
-    days.push(`
-      <div class="streak-day ${isActive ? 'active' : ''} ${isToday ? 'today' : ''}">
-        <span class="streak-day-label">${date.getDate()}</span>
-      </div>
-    `);
-  }
-  
-  container.innerHTML = days.join('');
-}
-
-async function _renderStreakMilestones() {
-  const container = document.getElementById('streak-milestones');
-  if (!container) return;
-  
-  try {
-    const milestones = await apiGet('/users/streak/milestones');
-    
-    if (!milestones || !milestones.length) return;
-    
-    const html = milestones.map(m => `
-      <div class="milestone-badge ${m.achieved ? 'achieved' : ''}">
-        <span class="milestone-icon">${m.badge}</span>
-        <span>${m.label}</span>
-      </div>
-    `).join('');
-    
-    container.innerHTML = html;
-    
-  } catch (e) {
-    console.error('Erro ao carregar milestones:', e);
-  }
+function closeSidebarNav() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (sidebar) sidebar.classList.remove('open');
+    if (overlay) overlay.classList.remove('visible');
 }

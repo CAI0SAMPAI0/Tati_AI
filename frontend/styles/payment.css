@@ -65,6 +65,7 @@ body {
 .pay-hero p {
     color: var(--text-muted, #888);
     font-size: 0.95rem;
+    display: none;
 }
 
 /* ── Section label ── */
@@ -75,13 +76,15 @@ body {
     letter-spacing: 0.08em;
     color: var(--text-muted, #888);
     margin-bottom: 0.75rem;
+    display: none;
 }
 
 /* ── Plan cards ── */
 .plans-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
     gap: 1rem;
+    text-align: center;
 }
 
 @media (max-width: 480px) {

@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tati AI — Competições</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+        crossorigin="anonymous">
+    <link rel="icon" type="image/x-icon" href="/assets/images/tati_logo.jpg">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <link rel="stylesheet" href="styles/activities.css">
+    <link rel="stylesheet" href="styles/competitions.css">
+</head>
+
+<body>
+
+    <!-- ── HEADER ─ -->
+    <header class="topbar">
+        <div class="topbar-left">
+            <button class="btn-menu" id="btn-menu-open" onclick="openSidebar()"><i
+                    class="fa-solid fa-bars"></i></button>
+            <div class="topbar-logo">Teacher<span>Tati</span></div>
+        </div>
+
+        <div class="topbar-right">
+            <div class="beta-group">
+                <button class="btn-beta">Beta</button>
+                <button class="btn-feedback" onclick="openFeedbackModal()">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                </button>
+            </div>
+
+            <div class="topbar-stat streak-stat">
+                <i class="fa-solid fa-fire"></i>
+                <span id="streak-count-text">0</span>
+            </div>
+
+            <div class="topbar-stat trophy">
+                <i class="fa-solid fa-trophy"></i>
+                <span id="trophy-count-text">0/50</span>
+            </div>
+
+            <button class="btn-notif">
+                <i class="fa-regular fa-bell"></i>
+                <span class="notif-dot"></span>
+            </button>
+
+            <div class="user-pill" onclick="window.location.href='profile_activities.html?tab=settings'">
+                <span class="user-name" id="header-user-name">Usuário</span>
+                <img class="user-avatar-img" id="header-user-avatar-img" src="" alt="" style="display:none;"
+                    onerror="this.style.display='none'; document.getElementById('header-user-avatar').style.display='flex';">
+                <div class="user-avatar" id="header-user-avatar" style="display:none;">?</div>
+            </div>
+        </div>
+    </header>
+
+    <div class="app-body">
+        <!-- ── SIDEBAR ── -->
+        <aside class="sidebar closed" id="sidebar">
+            <div class="sidebar-header">
+                <span data-i18n="act.sidebar_menu">Menu Principal</span>
+                <button class="btn-close-sidebar" id="btn-menu-close" onclick="closeSidebarNav()"><i
+                        class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="activities.html" class="nav-item" id="nav-activities">
+                    <i class="fa-sharp-duotone fa-solid fa-book-open"></i> <span
+                        data-i18n="act.nav_activities">Atividades</span>
+                </a>
+                <a href="profile_activities.html" class="nav-item">
+                    <i class="fa-regular fa-user"></i> <span data-i18n="act.nav_profile">Meu Perfil</span>
+                </a>
+                <a href="achievements.html" class="nav-item" id="nav-achievements">
+                    <i class="fa-solid fa-trophy"></i> <span data-i18n="act.nav_achievements">Conquistas</span>
+                </a>
+                <a href="competitions.html" class="nav-item active" id="nav-competitions">
+                    <i class="fa-solid fa-chart-line"></i> <span data-i18n="act.nav_competitions">Competições</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <a href="dashboard.html" class="nav-item logout">
+                    <i class="fa-solid fa-right-from-bracket"></i> <span data-i18n="act.nav_logout">Sair</span>
+                </a>
+            </div>
+        </aside>
+
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebarNav()"></div>
+
+        <!-- ── MAIN CONTENT ── -->
+        <main class="main-content expanded">
+            <!-- SEÇÃO: COMPETIÇÕES / RANKING -->
+            <div id="section-competitions" class="content-section active">
+                <div class="section-header">
+                    <h2 data-i18n="act.comp_title">Competições</h2>
+                    <p data-i18n="act.comp_subtitle">Veja quem são os alunos mais engajados e suba no ranking!</p>
+                </div>
+
+                <!-- Banner Ranking -->
+                <div class="ranking-banner">
+                    <div class="banner-icon"><i class="fa-solid fa-trophy"></i></div>
+                    <div class="banner-content">
+                        <h3 data-i18n="act.ranking_banner_title">Ranking de Engajamento</h3>
+                        <p><span data-i18n="act.ranking_banner_sub">Alunos mais ativos no Tati AI</span> — <span
+                                id="ranking-month"></span></p>
+                    </div>
+                </div>
+
+                <!-- Countdown fim do mês -->
+                <div class="countdown-card" id="countdown-card">
+                    <div class="countdown-label"><i class="fa-solid fa-clock"></i> <span
+                            data-i18n="act.countdown_label">Tempo restante no mês</span></div>
+                    <div class="countdown-timer">
+                        <div class="countdown-unit"><span id="cd-days">00</span><small
+                                data-i18n="act.cd_days">dias</small></div>
+                        <div class="countdown-sep">:</div>
+                        <div class="countdown-unit"><span id="cd-hours">00</span><small
+                                data-i18n="act.cd_hours">horas</small></div>
+                        <div class="countdown-sep">:</div>
+                        <div class="countdown-unit"><span id="cd-minutes">00</span><small
+                                data-i18n="act.cd_minutes">min</small></div>
+                        <div class="countdown-sep">:</div>
+                        <div class="countdown-unit"><span id="cd-seconds">00</span><small
+                                data-i18n="act.cd_seconds">seg</small></div>
+                    </div>
+                </div>
+
+                <!-- Vencedores do Mês Anterior -->
+                <div class="winners-section">
+                    <h3><i class="fa-solid fa-crown"></i> <span data-i18n="act.winners_title">Vencedores</span> — <span
+                            id="winners-month"></span></h3>
+                    <div class="winners-podium">
+                        <div class="winner-card second">
+                            <div class="winner-medal">🥈</div>
+                            <div class="winner-info">
+                                <strong id="winner-2-name">—</strong>
+                                <span id="winner-2-position">0 pts</span>
+                            </div>
+                        </div>
+                        <div class="winner-card first">
+                            <div class="winner-medal">🥇</div>
+                            <div class="winner-info">
+                                <strong id="winner-1-name">—</strong>
+                                <span id="winner-1-position">0 pts</span>
+                            </div>
+                        </div>
+                        <div class="winner-card third">
+                            <div class="winner-medal">🥉</div>
+                            <div class="winner-info">
+                                <strong id="winner-3-name">—</strong>
+                                <span id="winner-3-position">0 pts</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Como Funciona e Prêmios -->
+                <div class="info-grid-2col">
+                    <div class="info-card-styled">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-circle-question"></i> <span data-i18n="act.how_ranking_title">Como
+                                    funciona o ranking?</span></h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="info-description" data-i18n="act.how_ranking_desc">O score é calculado pela soma
+                                ponderada de todas as suas ações de estudo no mês:</p>
+                                <div class="points-list">
+                                    <div class="point-item">
+                                        <span class="point-label"><i class="fa-solid fa-theater-masks"></i> <span
+                                            data-i18n="act.pts_simulation">Simulação concluída</span></span>
+                                            <span class="pts-badge simulation">10 pts</span>
+                                    </div>
+                                <div class="point-item">
+                                    <span class="point-label"><i class="fa-solid fa-comment"></i> <span
+                                            data-i18n="act.pts_message">Mensagem para a Tati IA</span></span>
+                                    <span class="pts-badge message">8 pts</span>
+                                </div>
+                                <div class="point-item">
+                                    <span class="point-label"><i class="fa-solid fa-circle-question"></i> <span
+                                            data-i18n="act.pts_quiz">Quiz resolvido</span></span>
+                                    <span class="pts-badge quiz">7 pts</span>
+                                </div>
+                                <div class="point-item">
+                                    <span class="point-label"><i class="fa-solid fa-pen"></i> <span
+                                            data-i18n="act.pts_exercise">Exercício submetido</span></span>
+                                    <span class="pts-badge exercise">5 pts</span>
+                                </div>
+                                <div class="point-item">
+                                    <span class="point-label"><i class="fa-solid fa-layer-group"></i> <span
+                                            data-i18n="act.pts_flashcard">Flashcard revisado</span></span>
+                                    <span class="pts-badge flashcard">3 pts</span>
+                                </div>
+                            </div>
+                            <div class="tie-breaker-styled">
+                                <i class="fa-solid fa-scale-balanced"></i>
+                                <div>
+                                    <strong data-i18n="act.tiebreaker_title">Desempate:</strong>
+                                    <span data-i18n="act.tiebreaker_desc">Em caso de empate no score, o desempate é pela
+                                        quantidade de tokens utilizados (quanto mais interação, melhor posição).</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="info-card-styled prizes">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-gift"></i> <span data-i18n="act.prizes_title">Prêmios</span></h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="prize-card-item gold">
+                                <div class="prize-icon">🥇</div>
+                                <div class="prize-text">
+                                    <strong data-i18n="act.prize_1_title">1º Lugar</strong>
+                                    <span data-i18n="act.prize_1_desc">Troféu Ouro</span>
+                                </div>
+                            </div>
+                            <div class="prize-card-item silver">
+                                <div class="prize-icon">🥈</div>
+                                <div class="prize-text">
+                                    <strong data-i18n="act.prize_2_title">2º Lugar</strong>
+                                    <span data-i18n="act.prize_2_desc">Troféu Prata</span>
+                                </div>
+                            </div>
+                            <div class="prize-card-item bronze">
+                                <div class="prize-icon">🥉</div>
+                                <div class="prize-text">
+                                    <strong data-i18n="act.prize_3_title">3º Lugar</strong>
+                                    <span data-i18n="act.prize_3_desc">Troféu Bronze</span>
+                                </div>
+                            </div>
+                            <p class="prize-note-styled" data-i18n="act.prizes_note">Os troféus ficam permanentes na sua coleção.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Posição do Usuário -->
+                <div class="user-position-card" id="user-position-card">
+                    <div class="user-position-info">
+                        <div class="user-rank" id="user-rank">#—</div>
+                        <div class="user-details">
+                            <strong id="user-rank-name">—</strong>
+                            <span id="user-rank-score"><span data-i18n="act.points">0 pontos</span></span>
+                        </div>
+                    </div>
+                    <div class="user-stats">
+                        <div class="user-stat">
+                            <i class="fa-solid fa-comment"></i>
+                            <span id="user-msgs">0</span>
+                        </div>
+                        <div class="user-stat">
+                            <i class="fa-solid fa-circle-check"></i>
+                            <span id="user-quizzes">0</span>
+                        </div>
+                        <div class="user-stat">
+                            <i class="fa-solid fa-layer-group"></i>
+                            <span id="user-flashcards">0</span>
+                        </div>
+                        <div class="user-stat">
+                            <i class="fa-solid fa-pen"></i>
+                            <span id="user-exercises">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top 15 do Mês -->
+                <div class="ranking-section">
+                    <h3><i class="fa-solid fa-chart-line"></i> <span data-i18n="act.top15_title">Top 15</span> — <span
+                            id="top15-month"></span></h3>
+                    <div class="ranking-container">
+                        <table class="ranking-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th data-i18n="act.table_student">Aluno</th>
+                                    <th data-i18n="act.table_score">Score</th>
+                                    <th><i class="fa-solid fa-comment"></i></th>
+                                    <th><i class="fa-solid fa-circle-check"></i></th>
+                                    <th><i class="fa-solid fa-layer-group"></i></th>
+                                    <th><i class="fa-solid fa-pen"></i></th>
+                                </tr>
+                            </thead>
+                            <tbody id="ranking-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/competitions.js"></script>
+</body>
+
+</html>

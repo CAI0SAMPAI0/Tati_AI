@@ -59,17 +59,16 @@ def _clean(text: str) -> str:
         '\u201c': '"', '\u201d': '"',
         '\u2013': '-', '\u2014': '--',
         '\u2022': '-', '\u2026': '...',
-        '\u00e9': 'e', '\u00e8': 'e', '\u00ea': 'e',
-        '\u00e0': 'a', '\u00e2': 'a', '\u00e7': 'c',
-        '\u00ee': 'i', '\u00f4': 'o', '\u00fb': 'u',
     }
     for k, v in subs.items():
         text = text.replace(k, v)
-    # Remove emojis e outros Unicode fora do Basic Multilingual Plane
-    text = re.sub(r'[^\x00-\xFF]', '', text)
-    # Remove markdown bold/italic
+    # Remove markdown bold/italic e converte para tags HTML do ReportLab
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
     text = re.sub(r'\*(.+?)\*', r'<i>\1</i>', text)
+    
+    # Remove apenas caracteres que REALMENTE quebram o ReportLab (fora do Latin-1 básico)
+    # Mas preserva acentuação (á, é, í, ó, ú, ç, etc)
+    # Emojis e caracteres asiáticos/árabes ainda serão removidos para evitar erros de fonte.
     return text.strip()
 
 

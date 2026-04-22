@@ -116,15 +116,19 @@ def get_weekly_report(username: str) -> dict:
     streak_data = get_streak(username)
 
     # Distribuição por dia da semana
-    days_of_week = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
     messages_by_day = [0] * 7
+    user_msgs = [m for m in messages if m.get("role") == "user"]
+    
+    for m in user_msgs:
+        d = m.get("date")
+        if d:
+            try:
+                day_idx = datetime.fromisoformat(d[:10]).weekday()
+                messages_by_day[day_idx] += 1
+            except Exception:
+                pass
 
-    for d in study_day_set:
-        try:
-            day_idx = datetime.fromisoformat(d).weekday()
-            messages_by_day[day_idx] += 1
-        except Exception:
-            pass
+    days_of_week = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
 
     return {
         "period": "weekly",

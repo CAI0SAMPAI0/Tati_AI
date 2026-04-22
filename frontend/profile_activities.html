@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tati AI — Meu Perfil</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+        crossorigin="anonymous">
+    <link rel="icon" type="image/x-icon" href="/assets/images/tati_logo.jpg">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <link rel="stylesheet" href="styles/activities.css">
+    <link rel="stylesheet" href="styles/profile.css">
+    <link rel="stylesheet" href="styles/profile_activities.css">
+</head>
+
+<body>
+
+    <!-- ── HEADER ─ -->
+    <header class="topbar">
+        <div class="topbar-left">
+            <button class="btn-menu" id="btn-menu-open" onclick="openSidebar()"><i
+                    class="fa-solid fa-bars"></i></button>
+            <div class="topbar-logo">Teacher<span>Tati</span></div>
+        </div>
+
+        <div class="topbar-right">
+            <div class="beta-group">
+                <button class="btn-beta">Beta</button>
+                <button class="btn-feedback" onclick="openFeedbackModal()">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                </button>
+            </div>
+
+            <div class="topbar-stat streak-stat">
+                <i class="fa-solid fa-fire"></i>
+                <span id="streak-count-text">0</span>
+            </div>
+
+            <div class="topbar-stat trophy">
+                <i class="fa-solid fa-trophy"></i>
+                <span id="trophy-count-text">0/50</span>
+            </div>
+
+            <button class="btn-notif">
+                <i class="fa-regular fa-bell"></i>
+                <span class="notif-dot"></span>
+            </button>
+
+            <div class="user-pill" onclick="switchActivityTab('settings')">
+                <span class="user-name" id="header-user-name">Usuário</span>
+                <img class="user-avatar-img" id="header-user-avatar-img" src="" alt="" style="display:none;"
+                    onerror="this.style.display='none'; document.getElementById('header-user-avatar').style.display='flex';">
+                <div class="user-avatar" id="header-user-avatar" style="display:none;">?</div>
+            </div>
+        </div>
+    </header>
+
+    <div class="app-body">
+        <!-- ── SIDEBAR ── -->
+        <aside class="sidebar closed" id="sidebar">
+            <div class="sidebar-header">
+                <span data-i18n="act.sidebar_menu">Menu Principal</span>
+                <button class="btn-close-sidebar" id="btn-menu-close" onclick="closeSidebarNav()"><i
+                        class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="activities.html" class="nav-item">
+                    <i class="fa-sharp-duotone fa-solid fa-book-open"></i> <span
+                        data-i18n="act.nav_activities">Atividades</span>
+                </a>
+                <a href="profile_activities.html" class="nav-item active">
+                    <i class="fa-regular fa-user"></i> <span data-i18n="act.nav_profile">Meu Perfil</span>
+                </a>
+                <a href="achievements.html" class="nav-item">
+                    <i class="fa-solid fa-trophy"></i> <span data-i18n="act.nav_achievements">Conquistas</span>
+                </a>
+                <a href="competitions.html" class="nav-item">
+                    <i class="fa-solid fa-chart-line"></i> <span data-i18n="act.nav_competitions">Competições</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <a href="chat.html" class="nav-item logout">
+                    <i class="fa-solid fa-right-from-bracket"></i> <span data-i18n="act.nav_logout">Sair</span>
+                </a>
+            </div>
+        </aside>
+
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebarNav()"></div>
+
+        <!-- ── MAIN CONTENT ── -->
+        <main class="main-content expanded">
+            <!-- Hero (Sempre visível no topo do perfil) -->
+            <div class="profile-hero" style="margin-bottom: 2rem;">
+                <div class="profile-avatar-wrap">
+                    <img id="profile-avatar-img" class="profile-avatar-photo" src="" alt="" style="display:none;"
+                        onerror="this.style.display='none'; document.getElementById('profile-avatar').style.display='flex';">
+                    <div class="profile-avatar" id="profile-avatar">??</div>
+                    <label class="avatar-upload-overlay" title="Trocar foto" for="avatar-file-input">
+                        <i class="fa-solid fa-camera"></i>
+                    </label>
+                    <input type="file" id="avatar-file-input" accept="image/jpeg,image/png,image/webp"
+                        style="display:none;" onchange="handleAvatarUpload(event)">
+                </div>
+                <div class="profile-hero-info">
+                    <h1 id="profile-display-name">Carregando...</h1>
+                    <p id="profile-display-username" class="profile-username">@username</p>
+                    <div class="profile-badges">
+                        <span class="badge badge-level" id="badge-level">Beginner</span>
+                        <span class="badge badge-role" id="badge-role">Student</span>
+                    </div>
+                </div>
+                <div id="profile-plan-action" style="margin-left: auto;"></div>
+            </div>
+
+            <!-- Abas Internas -->
+            <nav class="sub-tabs">
+                <button class="tab-btn active" onclick="switchActivityTab('progress')">
+                    <i class="fa-solid fa-chart-line"></i> <span data-i18n="profile.tab_progress">Progresso</span>
+                </button>
+            </nav>
+
+            <!-- Conteúdo da Aba Progresso -->
+            <div class="sub-panel active" id="tab-content-progress">
+                <div id="profile-progress-container"></div>
+            </div>
+
+            <!-- Conteúdo da Aba Vocabulário -->
+            <div class="sub-panel" id="tab-content-vocab">
+                <div id="profile-vocab-container"></div>
+            </div>
+
+            <!-- Conteúdo da Aba Metas -->
+            <div class="sub-panel" id="tab-content-goals">
+                <div id="profile-goals-container"></div>
+            </div>
+
+            <!-- Conteúdo da Aba Ajustes (Antigo profile.html) -->
+            <div class="sub-panel" id="tab-content-settings">
+                <div class="profile-sections">
+                    <section class="profile-section">
+                        <h2 class="section-title"><i class="fa-solid fa-user"></i> <span
+                                data-i18n="profile.personal">Informações Pessoais</span></h2>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label data-i18n="profile.full_name">Nome completo</label>
+                                <input id="field-name" type="text" placeholder="Seu nome">
+                            </div>
+                            <div class="field">
+                                <label data-i18n="profile.nickname">Apelido</label>
+                                <input id="field-nickname" type="text" placeholder="Como prefere ser chamado">
+                            </div>
+                            <div class="field">
+                                <label data-i18n="profile.email">E-mail</label>
+                                <input id="field-email" type="email" placeholder="seu@email.com">
+                            </div>
+                            <div class="field">
+                                <label data-i18n="profile.occupation">Profissão</label>
+                                <input id="field-occupation" type="text" placeholder="Ex: Desenvolvedor...">
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="profile-section">
+                        <h2 class="section-title"><i class="fa-solid fa-star"></i> <span
+                                data-i18n="profile.study">Preferências de Estudo</span></h2>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label data-i18n="profile.level">Nível de inglês</label>
+                                <select id="field-level">
+                                    <option value="Beginner">Beginner</option>
+                                    <option value="Pre-Intermediate">Pre-Intermediate</option>
+                                    <option value="Intermediate">Intermediate</option>
+                                    <option value="Business English">Business English</option>
+                                    <option value="Advanced">Advanced</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label data-i18n="profile.focus">Foco</label>
+                                <select id="field-focus">
+                                    <option value="General Conversation">General Conversation</option>
+                                    <option value="Business English">Business English</option>
+                                    <option value="Travel English">Travel English</option>
+                                </select>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="profile-section">
+                        <h2 class="section-title"><i class="fa-solid fa-lock"></i> <span
+                                data-i18n="profile.security">Segurança</span></h2>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label data-i18n="profile.current_pw">Senha atual</label>
+                                <input id="field-current-pw" type="password" placeholder="••••••••">
+                            </div>
+                            <div class="field">
+                                <label data-i18n="profile.new_pw">Nova senha</label>
+                                <input id="field-new-pw" type="password" placeholder="mínimo 6 caracteres">
+                            </div>
+                        </div>
+                    </section>
+
+                    <div id="save-feedback" class="save-feedback" style="display:none;"></div>
+                    <button class="btn-save" id="btn-save" onclick="saveAllSettings()"
+                        style="width:100%; justify-content:center;">
+                        <i class="fa-solid fa-floppy-disk"></i> <span data-i18n="profile.save">Salvar Alterações</span>
+                    </button>
+
+                    <section class="profile-section danger-zone"
+                        style="margin-top: 2rem; border-color: rgba(239,68,68,0.2);">
+                        <h2 class="section-title danger" style="color: #f87171;"><i
+                                class="fa-solid fa-triangle-exclamation"></i> Zona de Perigo</h2>
+                        <button class="btn-danger" onclick="authLogout()"
+                            style="background: rgba(239,68,68,0.1); color: #f87171; border: 1px solid rgba(239,68,68,0.3); padding: 0.6rem 1rem; border-radius: 8px; cursor: pointer;">
+                            <i class="fa-solid fa-right-from-bracket"></i> Sair da conta
+                        </button>
+                    </section>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal Feedback -->
+    <div class="modal-overlay" id="feedback-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 data-i18n="act.fb_modal_title">Enviar Feedback</h3>
+                <button class="btn-close-modal" onclick="closeFeedbackModal()">&times;</button>
+            </div>
+            <form id="feedback-form" onsubmit="handleFeedbackSubmit(event)">
+                <div class="form-row">
+                    <label data-i18n="act.fb_title_label">Título</label>
+                    <input type="text" id="fb-title" required>
+                </div>
+                <div class="form-row">
+                    <label data-i18n="act.fb_desc_label">Descrição</label>
+                    <textarea id="fb-desc" rows="4" required></textarea>
+                </div>
+                <button type="submit" class="btn-submit-feedback">Enviar</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/profile_activities.js"></script>
+</body>
+
+</html>

@@ -80,9 +80,23 @@ function setSection(name, el) {
     initModulesSection();
   }
 
-  document.querySelectorAll('.dash-section').forEach(s => s.style.display = 'none');
+  document.querySelectorAll('.dash-section').forEach(s => {
+      s.style.display = 'none';
+      s.style.opacity = '0';
+  });
+
   const sectionEl = document.getElementById(`section-${name}`);
-  if (sectionEl) sectionEl.style.display = 'block';
+  if (sectionEl) {
+      sectionEl.style.display = 'block';
+      sectionEl.style.opacity = '0';
+      sectionEl.style.transform = 'translateY(10px)';
+      sectionEl.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+      
+      requestAnimationFrame(() => {
+          sectionEl.style.opacity = '1';
+          sectionEl.style.transform = 'translateY(0)';
+      });
+  }
 
   document.getElementById('page-title').textContent = SECTIONS[name]?.title() || name;
   document.getElementById('page-sub').textContent = SECTIONS[name]?.sub() || '';
