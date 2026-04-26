@@ -3,8 +3,9 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
+    overflow-y: auto;
     position: relative;
+    padding: 1rem 0;
 }
 
 /* Noise texture overlay */
@@ -14,7 +15,7 @@ body::before {
     inset: 0;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
     pointer-events: none;
-    z-index: 0;
+    z-index: -1;
 }
 
 /* Ambient glow */
@@ -27,10 +28,10 @@ body::after {
     height: 65%;
     background: radial-gradient(ellipse, hsla(var(--hue), 80%, 50%, 0.14) 0%, transparent 70%);
     pointer-events: none;
-    z-index: 0;
+    z-index: -1;
 }
 
-google-btn-container {
+.google-btn-container {
     position: relative;
     width: 100%;
     margin-bottom: 1rem;
@@ -96,6 +97,7 @@ google-btn-container {
     align-items: center;
     font-size: 0.9rem;
     transition: color 0.15s;
+    z-index: 5;
 }
 
 .btn-pw-eye:hover {
@@ -116,6 +118,8 @@ google-btn-container {
     opacity: 0.8;
     transition: opacity 0.15s;
     font-family: inherit;
+    position: relative;
+    z-index: 5;
 }
 
 .btn-forgot-link:hover {
@@ -141,6 +145,8 @@ google-btn-container {
     margin-bottom: 1.25rem;
     font-family: inherit;
     transition: color 0.15s;
+    position: relative;
+    z-index: 5;
 }
 
 .forgot-back-btn:hover {
@@ -199,30 +205,20 @@ google-btn-container {
 
 .login-page {
     position: relative;
-    z-index: 1;
+    z-index: 10;
     display: grid;
     grid-template-columns: 300px 1fr;
     width: 100%;
     max-width: 800px;
-    min-height: 560px;
     border-radius: var(--radius-xl);
     border: 1px solid var(--border);
     box-shadow: var(--shadow-lg), 0 0 80px hsla(var(--hue), 80%, 50%, 0.08);
     animation: card-in 0.5s var(--ease-spring) both;
-    margin: 1.5rem;
-    overflow-y: auto;
-    height: 600px;
-
-    /* Esconder barra de rolagem para Chrome, Safari e Edge */
-    &::-webkit-scrollbar {
-        display: none;
-    }
-
-    /* Esconder barra de rolagem para Firefox */
-    scrollbar-width: none;
-
-    /* Esconder barra de rolagem para IE e Edge antigo */
-    -ms-overflow-style: none;
+    margin: 1rem;
+    height: auto;
+    min-height: min-content;
+    max-height: none;
+    overflow: visible;
 }
 
 @keyframes card-in {
@@ -271,6 +267,7 @@ google-btn-container {
         radial-gradient(ellipse at 20% 20%, hsla(320, 60%, 50%, 0.2) 0%, transparent 50%),
         radial-gradient(ellipse at 80% 80%, hsla(220, 70%, 50%, 0.2) 0%, transparent 50%);
     animation: mesh-move 8s ease-in-out infinite alternate;
+    z-index: -1;
 }
 
 @keyframes mesh-move {
@@ -356,12 +353,17 @@ google-btn-container {
     justify-content: center;
     padding: 2.25rem 2.5rem;
     background: var(--surface);
+    overflow-y: visible;
+    position: relative;
+    z-index: 1;
 }
 
 .login-form-wrap {
     width: 100%;
     max-width: 320px;
     animation: slide-in 0.45s 0.1s var(--ease) both;
+    position: relative;
+    z-index: 2;
 }
 
 @keyframes slide-in {
@@ -399,6 +401,8 @@ google-btn-container {
     padding: 3px;
     margin-bottom: 1.5rem;
     border: 1px solid var(--border);
+    position: relative;
+    z-index: 5;
 }
 
 .tab-btn {
@@ -424,6 +428,8 @@ google-btn-container {
 /* Fields */
 .field {
     margin-bottom: 1rem;
+    position: relative;
+    z-index: 1;
 }
 
 .field label {
@@ -456,35 +462,6 @@ google-btn-container {
     box-shadow: 0 0 0 3px var(--primary-dim);
 }
 
-/* Password eye */
-.pw-field-wrap {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.pw-field-wrap input {
-    padding-right: 2.75rem !important;
-}
-
-.btn-pw-eye {
-    position: absolute;
-    right: 0.75rem;
-    background: none;
-    border: none;
-    color: var(--text-subtle);
-    cursor: pointer;
-    padding: 4px;
-    display: flex;
-    align-items: center;
-    font-size: 0.875rem;
-    transition: color var(--dur-fast);
-}
-
-.btn-pw-eye:hover {
-    color: var(--primary);
-}
-
 /* Primary button */
 .btn-primary {
     width: 100%;
@@ -499,6 +476,8 @@ google-btn-container {
     cursor: pointer;
     transition: all var(--dur-base) var(--ease);
     margin-top: 0.4rem;
+    position: relative;
+    z-index: 5;
 }
 
 .btn-primary:hover {
@@ -511,50 +490,6 @@ google-btn-container {
     opacity: 0.5;
     cursor: not-allowed;
     transform: none;
-}
-
-/* Google button */
-.google-btn-container {
-    position: relative;
-    width: 100%;
-    margin-bottom: 1rem;
-}
-
-.btn-google {
-    width: 100%;
-    padding: 0.68rem;
-    background: var(--input-bg);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    font-size: 0.855rem;
-    font-weight: 500;
-    font-family: var(--font-body);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.6rem;
-    transition: all var(--dur-base);
-    pointer-events: none;
-}
-
-#google-btn-wrap {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    border-radius: var(--radius-md);
-    opacity: 0.001;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-#google-btn-wrap>div,
-#google-btn-wrap iframe {
-    width: 100% !important;
-    height: 100% !important;
 }
 
 /* Divider */
@@ -576,109 +511,16 @@ google-btn-container {
     background: var(--border);
 }
 
-/* Forgot link */
-.btn-forgot-link {
-    background: none;
-    border: none;
-    color: var(--primary);
-    font-size: 0.77rem;
-    font-weight: 500;
-    cursor: pointer;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-    opacity: 0.8;
-    transition: opacity var(--dur-fast);
-    font-family: var(--font-body);
-}
-
-.btn-forgot-link:hover {
-    opacity: 1;
-}
-
-/* Forgot form */
-#form-forgot {
-    display: none;
-}
-
-.forgot-back-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    font-size: 0.82rem;
-    font-weight: 500;
-    cursor: pointer;
-    padding: 0;
-    margin-bottom: 1.25rem;
-    font-family: var(--font-body);
-    transition: color var(--dur-fast);
-}
-
-.forgot-back-btn:hover {
-    color: var(--primary);
-}
-
-.forgot-title {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--text);
-    margin-bottom: 0.35rem;
-}
-
-.forgot-desc {
-    font-size: 0.82rem;
-    color: var(--text-muted);
-    margin-bottom: 1.25rem;
-    line-height: 1.55;
-}
-
-.forgot-result {
-    margin-top: 1rem;
-    padding: 0.875rem 1rem;
-    border-radius: var(--radius-md);
-    font-size: 0.83rem;
-    line-height: 1.6;
-}
-
-.forgot-result.success {
-    background: hsla(152, 68%, 42%, 0.1);
-    border: 1px solid hsla(152, 68%, 42%, 0.3);
-    color: hsl(152, 68%, 70%);
-}
-
-.forgot-result.error {
-    background: hsla(215, 70%, 55%, 0.1);
-    border: 1px solid hsla(215, 70%, 55%, 0.3);
-    color: hsl(215, 80%, 75%);
-}
-
-.forgot-result.dev {
-    background: var(--primary-dim);
-    border: 1px solid hsla(var(--hue), 80%, 58%, 0.3);
-    color: var(--text);
-    text-align: center;
-}
-
-.forgot-result code {
-    display: inline-block;
-    margin-top: 0.5rem;
-    background: var(--primary-dim);
-    padding: 0.35rem 0.75rem;
-    border-radius: var(--radius-md);
-}
-
+/* Media Queries */
 @media (max-width: 768px) {
     .login-page {
         grid-template-columns: 1fr;
-        max-width: 400px;
+        max-width: 420px;
+        margin: 2rem auto;
     }
 
     .login-left {
-        padding: 2rem 1.5rem;
-        min-height: 260px;
-        /* MUDADO DE: min-height: 200px; */
+        padding: 2rem 1.5rem 1.5rem;
     }
 
     .login-left::after {
@@ -690,55 +532,31 @@ google-btn-container {
         width: 80px;
         height: 80px;
         font-size: 2.5rem;
+        margin-bottom: 0.75rem;
     }
 
     .login-left h1 {
         font-size: 1.25rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .login-left p {
+        font-size: 0.8rem;
     }
 
     .login-right {
-        padding: 2rem 1.5rem;
-    }
-}
-
-/* Responsive */
-@media (max-width: 620px) {
-    .login-page {
-        grid-template-columns: 1fr;
-        max-width: 400px;
-    }
-
-    .login-left {
-        padding: 1.5rem 1rem;
-        /* MUDADO DE: padding: 2rem 1.5rem; */
-        min-height: 270px;
-        /* MUDADO DE: min-height: 200px; */
-    }
-
-    .login-left::after {
-        display: none;
-    }
-
-    .login-avatar,
-    .login-avatar-fallback {
-        width: 80px;
-        height: 80px;
-        font-size: 2.5rem;
-    }
-
-    .login-left h1 {
-        font-size: 1.25rem;
-    }
-
-    .login-right {
-        padding: 2rem 1.5rem;
+        padding: 1.5rem 1.5rem 2rem;
+        overflow: visible;
     }
 }
 
 @media (max-width: 480px) {
+    .login-page {
+        margin: 1rem 0.5rem;
+    }
+
     .login-left {
-        padding: 1.25rem 0.875rem;
-        min-height: 280px;
+        padding: 1.5rem 1rem 1rem;
     }
  
     .login-avatar,
@@ -746,7 +564,7 @@ google-btn-container {
         width: 72px;
         height: 72px;
         font-size: 2rem;
-        margin-bottom: 1rem;
+        margin-bottom: 0.5rem;
     }
  
     .login-left h1 {
@@ -755,9 +573,26 @@ google-btn-container {
  
     .login-left p {
         font-size: 0.78rem;
+        max-width: 180px;
     }
  
     .login-right {
-        padding: 1.25rem 1rem;
+        padding: 1rem;
+    }
+
+    .login-form-wrap h2 {
+        font-size: 1.2rem;
+    }
+
+    .tabs {
+        margin-bottom: 1rem;
+    }
+    
+    .field {
+        margin-bottom: 0.75rem;
+    }
+    
+    .field input, .field select {
+        padding: 0.55rem 0.75rem;
     }
 }

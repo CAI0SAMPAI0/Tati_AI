@@ -12,7 +12,10 @@ function getToken() {
 
 /** Retorna os headers de autenticação padrão. */
 function authHeaders(extra = {}) {
-  return { 'Authorization': `Bearer ${getToken()}`, ...extra };
+  const lang = (typeof I18n !== 'undefined' && typeof I18n.getLang === 'function')
+    ? I18n.getLang()
+    : (localStorage.getItem('tati_lang') || 'pt-BR');
+  return { 'Authorization': `Bearer ${getToken()}`, 'Accept-Language': lang, ...extra };
 }
 
 /**
@@ -223,8 +226,19 @@ function formatMarkdown(text) {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-const STAFF_ROLES = new Set(['professor', 'professora', 'programador', 'Tatiana', 'Tati', 'admin', 'caio.sampaio']);
-function isStaff(user) { return user && STAFF_ROLES.has(user.role); }
+const STAFF_ROLES = new Set(['professor', 'professora', 'programador', 'Tatiana', 'Tati', 'admin', 'Admin', 'Programador', 'Professora']);
+function isStaff(user) { 
+  if (!user) return false;
+  const role = user.role || '';
+  const username = user.username || '';
+  return STAFF_ROLES.has(role) || STAFF_ROLES.has(username) || STAFF_ROLES.has(role.toLowerCase());
+}
+function canAccessDashboard(user, access = null) {
+  if (access && Object.prototype.hasOwnProperty.call(access, 'can_access_dashboard')) {
+    return Boolean(access.can_access_dashboard);
+  }
+  return isStaff(user);
+}
 
 // ── Access Control ────────────────────────────────────────────────────────────
 
@@ -235,13 +249,13 @@ async function applyAccessControl() {
     // ── Dashboard: SOMENTE para professores/staff ──────────────
     // is_admin não significa acesso ao dashboard - só teachers
     const user = getUser();
-    const isStaffRole = isStaff(user);
+    const canSeeDashboard = canAccessDashboard(user, access);
     const dashBtn = document.getElementById('btn-dashboard');
     if (dashBtn) {
-      dashBtn.style.display = isStaffRole ? '' : 'none';
+      dashBtn.style.display = canSeeDashboard ? '' : 'none';
     }
 
-    // ── Período gratuito (antes de 01/05/2026) ────────────────
+    // ── Período gratuito (até 30/06/2026) ─────────────────────
     if (access.free_mode) {
       document.querySelectorAll('.premium-only').forEach(el => el.style.display = '');
       document.querySelectorAll('.paywall-only').forEach(el => el.style.display = 'none');
@@ -259,7 +273,8 @@ async function applyAccessControl() {
 
     // ── Atividades (plano full) ───────────────────────────────
     document.querySelectorAll('.activities-only').forEach(el => {
-      el.style.display = access.can_access_activities ? '' : 'none';
+      const canSeeActivities = access.free_mode || access.can_access_activities;
+      el.style.display = canSeeActivities ? '' : 'none';
     });
 
     // ── Contador de mensagens gratuitas ───────────────────────
@@ -315,6 +330,15 @@ function _showFreeMessagesBadge(remaining) {
 
 // ── Toast notifications (Toastify) ──────────────────────────────────
 function showToast(msg, type = 'info') {
+  if (typeof Toastify !== 'function') {
+    if (type === 'error') console.error(msg);
+    else console.log(msg);
+    if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+      window.alert(msg);
+    }
+    return;
+  }
+
   const cfg = {
     duration: 3500,
     close: true,

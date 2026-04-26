@@ -1,2190 +1,4369 @@
-const TRANSLATIONS = {
+﻿const TRANSLATIONS = {
+
     'pt-BR': {
-        // ── Global / Nav ──────────────────────────────────────────────
+
+        // ── Global / Nav ──────────────────────────────────────────────────────
+
         'nav.chat': 'Chat',
+
         'nav.dashboard': 'Painel',
+
         'nav.settings': 'Configurações',
+
         'nav.profile': 'Perfil',
+
         'nav.logout': 'Sair',
+
         'nav.back_chat': 'Voltar ao Chat',
+
         'nav.new_chat': 'Nova conversa',
+
         'nav.delete_all': 'Deletar todas as conversas',
+
         'nav.back': 'Voltar',
+
         'nav.simulations': 'Simulações',
 
-        // ── Auth ──────────────────────────────────────────────────────
+
+
+        // ── Auth ──────────────────────────────────────────────────────────────
+
         'auth.welcome': 'Bem-vindo',
+
         'auth.subtitle': 'Entre na sua conta ou crie uma nova',
+
         'auth.tab_login': 'Entrar',
+
         'auth.tab_register': 'Criar Conta',
+
         'auth.username_email': 'Username ou E-mail',
+
         'auth.password': 'Senha',
+
         'auth.name': 'Nome completo',
+
         'auth.email': 'E-mail',
+
         'auth.username': 'Username',
+
         'auth.level': 'Nível de inglês',
+
         'auth.btn_login': 'Entrar',
+
         'auth.btn_register': 'Criar Conta',
+
         'auth.btn_google': 'Continuar com Google',
+
         'auth.or': 'ou',
+
         'auth.logging_in': 'Entrando...',
+
         'auth.registering': 'Criando conta...',
+
         'auth.success_register': 'Conta criada! Faça login agora.',
+
         'auth.err_fields': 'Preencha todos os campos.',
+
         'auth.err_password': 'Senha deve ter pelo menos 6 caracteres.',
+
         'auth.err_connection': 'Erro de conexão. Verifique se o servidor está rodando.',
+
         'auth.err_email': 'E-mail já registrado. Faça login ou use outro e-mail.',
+
         'auth.err_username': 'Username já registrado. Escolha outro.',
+
         'auth.err_login': 'Credenciais inválidas.',
+
         'auth.err_register': 'Erro ao criar conta.',
+
         'auth.err_forgot_identifier': 'Por favor, informe seu usuário ou e-mail.',
+
         'auth.err_forgot_request': 'Erro ao solicitar redefinição de senha.',
+
         'auth.err_message_unknown': 'Erro desconhecido',
+
         'auth.err_google_auth': 'Erro ao autenticar com o Google.',
+
         'auth.senha_esqueci': 'Esqueci minha senha',
+
         'auth.exp_img': 'Sua professora de inglês com inteligência artificial. Pratique quando quiser, no seu ritmo.',
-        'auth.esq_senha': '🔑 Esqueci minha senha',
+
+        'auth.esq_senha': '🔒 Esqueci minha senha',
+
         'auth.back_login': '← Voltar ao login',
+
         'auth.informar_user': 'Informe seu username ou e-mail. Vamos gerar uma senha temporária e enviar para você.',
+
         'auth_send_temp': 'Enviar senha temporária',
+
         'auth.sending_temp_pass': 'Enviando senha temporária...',
+
         'auth.btn_forgot_password': 'Redefinir Senha',
+
         'auth.dev_mode_title': 'Modo de Desenvolvimento',
+
         'auth.temp_password': 'Senha Temporária',
+
         'auth.warning_new_password': 'Por favor, altere sua senha após entrar.',
+
         'auth.email_sent': 'E-mail enviado!',
+
         'auth.check_email': 'Verifique seu e-mail para instruções.',
 
-        // ── Chat ──────────────────────────────────────────────────────
+
+
+        // ── Chat ──────────────────────────────────────────────────────────────
+
         'chat.title': 'Teacher Tati',
+
         'chat.welcome_title': 'Olá! Eu sou a Teacher Tati 👋',
+
         'chat.welcome_sub': 'Sua professora de inglês com IA. Vamos praticar juntos?',
+
         'chat.welcome_tip': '💡 Clique em qualquer palavra inglesa para ver tradução e ouvir a pronúncia',
+
         'chat.sugg_1': 'How do I introduce myself?',
+
         'chat.sugg_2': 'Correct my English, please',
+
         'chat.sugg_3': "Let's practice conversation",
+
         'chat.sugg_4': 'Explain past tense to me',
-        'chat.placeholder': 'Digite sua mensagem em inglês...',
+
+        'chat.placeholder': 'Digite sua mensagem...',
+
         'chat.hint': 'Teacher Tati pratica inglês com você · Enter para enviar · Shift+Enter para nova linha',
+
         'chat.voice_mode': 'Modo Voz',
+
         'chat.switch_summary': 'Sumário',
+
         'chat.report_generated_desc': 'A Teacher Tati gerou um relatório pedagógico completo baseado no seu desempenho. Baixe a versão em PDF abaixo.',
+
         'chat.summary_title': '📊 Sumário da Conversa',
+
         'chat.summary_mode': 'Modo Resumo',
+
         'chat.loading': 'Carregando...',
+
         'chat.no_convs': 'Nenhuma conversa ainda',
+
         'chat.level_student': 'Aluno',
+
         'chat.plan_premium': 'Premium',
+
         'chat.plan_basic': 'Basic',
+
         'chat.new_conversation': 'Nova conversa',
+
         'chat.today': 'Hoje',
+
         'chat.yesterday': 'Ontem',
+
         'chat.older': 'Anteriores',
+
         'chat.delete_conv': 'Deletar esta conversa?',
+
         'chat.delete_all_conv': '⚠️ Deletar TODAS as conversas?',
+
         'chat.confirm': 'Confirmar',
+
         'chat.cancel': 'Cancelar',
+
         'chat.err_connect': 'Não foi possível conectar ao servidor.',
+
         'chat.err_unknown': 'Erro desconhecido',
+
         'chat.attach': 'Anexar arquivo',
+
         'chat.record': 'Gravar áudio',
+
         'chat.send': 'Enviar',
+
         'chat.new_conv': 'Nova conversa',
+
         'chat.delete_all_title': 'Deletar todas',
+
         'chat.sidebar_toggle': 'Menu',
 
-        // ── Settings ──────────────────────────────────────────────────
+        'chat.generating_audio': 'Gerando áudio...',
+
+        'chat.generating_summary': 'Gerando resumo...',
+
+
+
+        // ── Settings ──────────────────────────────────────────────────────────
+
         'settings.title': 'Configurações',
+
         'settings.appearance': 'Aparência',
+
         'settings.theme': 'Tema',
+
         'settings.theme_desc': 'Escolha entre modo claro e escuro',
+
         'settings.dark': 'Escuro',
+
         'settings.light': 'Claro',
+
         'settings.language': 'Idioma da interface',
+
         'settings.language_desc': 'Idioma dos botões e textos do app',
+
         'settings.audio': 'Áudio',
+
         'settings.speed': 'Velocidade padrão',
+
         'settings.speed_desc': 'Velocidade de reprodução das respostas em áudio',
+
         'settings.chat': 'Chat',
+
         'settings.tooltip': 'Tooltip de palavras',
+
         'settings.tooltip_desc': 'Clique em palavras inglesas para ver tradução e pronúncia',
+
         'settings.enter_send': 'Enviar com Enter',
+
         'settings.enter_desc': 'Enter envia a mensagem (Shift+Enter para nova linha)',
+
         'settings.save': 'Salvar Alterações',
+
         'settings.saved': '✅ Salvo!',
+
         'settings.auto_play': 'Reprodução automática',
+
         'settings.auto_play_desc': 'Reproduzir áudio das respostas automaticamente',
+
         'settings.senha_nova': 'Preencha apenas se quiser alterar sua senha. Deixe em branco para manter a atual.',
 
-        // ── Profile ───────────────────────────────────────────────────
+
+
+        // ── Profile ───────────────────────────────────────────────────────────
+
         'profile.title': 'Meu Perfil',
+
         'profile.personal': 'Informações Pessoais',
+
         'profile.full_name': 'Nome completo',
+
         'profile.nickname': 'Apelido',
+
         'profile.nickname_ph': 'Como prefere ser chamado',
+
         'profile.email': 'E-mail',
+
         'profile.occupation': 'Profissão',
+
         'profile.occupation_ph': 'Ex: Desenvolvedor, Estudante...',
+
         'profile.study': 'Preferências de Estudo',
+
         'profile.level': 'Nível de inglês',
+
         'profile.focus': 'Foco de aprendizado',
+
         'profile.save': 'Salvar alterações',
+
         'profile.saving': 'Salvando...',
-        'profile.saved': 'Perfil atualizado com sucesso! ✓',
+
+        'profile.saved': 'Perfil atualizado com sucesso! ✔',
+
         'profile.security': 'Segurança',
+
         'profile.current_pw': 'Senha atual',
+
         'profile.new_pw': 'Nova senha',
+
         'profile.new_pw_ph': 'mínimo 6 caracteres',
+
         'profile.update_pw': 'Atualizar senha',
+
         'profile.change_photo': 'Trocar foto',
+
         'profile.danger': 'Zona de Perigo',
+
         'profile.danger_desc': 'Estas ações são irreversíveis. Prossiga com cuidado.',
+
         'profile.msgs': 'Mensagens',
+
         'profile.convs': 'Conversas',
+
         'profile.days': 'Dias ativo',
+
+        'profile.words': 'Palavras aprendidas',
+
         'profile.pw_hint': 'Preencha apenas se quiser alterar sua senha.',
+
         'profile.logout': 'Sair da conta',
+
         'profile.upgrade_premium': 'Upgrade to Premium',
+
         'profile.upgrade_full': 'Upgrade to Full',
+
         'profile.audio_reload_hint': 'Áudio disponível mesmo após sair da conversa',
+
         'profile.streak_label': 'Seu Streak',
+
         'profile.streak_days': 'dias',
+
         'profile.streak_record': 'Recorde',
+
         'profile.streak_milestone_7': '🔥 7 dias - Week Warrior',
+
         'profile.streak_milestone_30': '🌟 30 dias - Monthly Master',
+
         'profile.streak_milestone_100': '💎 100 dias - Diamond Learner',
 
 
-        // ── Progress ─────────────────────────────────────────────────
+
+        // ── Progress ──────────────────────────────────────────────────────────
+
         'progress.title': 'Meu Progresso',
+
         'progress.hero_title': 'Seu Progresso',
+
         'progress.hero_subtitle': 'Acompanhe sua evolução no aprendizado',
+
         'progress.weekly': 'Semanal',
+
         'progress.monthly': 'Mensal',
+
         'progress.messages': 'Mensagens',
+
         'progress.conversations': 'Conversas',
+
         'progress.study_days': 'Dias de Estudo',
+
         'progress.unique_words': 'Palavras Únicas',
+
         'progress.activity_title': 'Atividade',
+
         'progress.streak_title': '🔥 Streak Atual',
+
         'progress.days_consecutive': 'dias consecutivos',
+
         'progress.record': 'Recorde',
+
         'progress.tips_title': '💡 Dicas para Evoluir',
+
         'progress.semanal': '📊 Relatório Semanal',
 
-        // ── Vocabulary ─────────────────────────────────────────────────
+
+
+        // ── Vocabulary ────────────────────────────────────────────────────────
+
         'vocab.title': 'Caderno de Vocabulário',
+
         'vocab.hero_title': '📝 Meu Caderno de Vocabulário',
+
         'vocab.hero_subtitle': 'Palavras aprendidas e revisões',
+
         'vocab.search_ph': 'Buscar palavra...',
+
         'vocab.filter_all': 'Todas',
+
         'vocab.filter_learned': 'Aprendidas',
+
         'vocab.filter_learning': 'Aprendendo',
+
         'vocab.filter_new': 'Novas',
+
         'vocab.export': 'Exportar',
+
         'vocab.total_words': 'Total de Palavras',
+
         'vocab.learned': 'Aprendidas',
+
         'vocab.learning': 'Aprendendo',
+
         'vocab.empty_text': 'Nenhuma palavra encontrada.',
+
         'vocab.nenhuma': 'Nenhuma palavra ainda. Pratique no chat!',
 
-        // ── Goals ─────────────────────────────────────────────────
+
+
+        // ── Goals ─────────────────────────────────────────────────────────────
+
         'goals.title': 'Metas de Estudo',
+
         'goals.hero_title': '🎯 Minhas Metas de Estudo',
+
         'goals.hero_subtitle': 'Defina e acompanhe suas metas de aprendizado',
+
         'goals.active_goals': 'Metas Ativas',
+
         'goals.completed': 'Concluídas',
+
         'goals.current_streak': 'Streak Atual',
+
         'goals.my_goals': 'Minhas Metas',
+
         'goals.add_goal': 'Nova Meta',
+
         'goals.empty_text': 'Nenhuma meta definida. Crie sua primeira meta!',
+
         'goals.new_goal_title': 'Nova Meta',
+
         'goals.goal_type': 'Tipo de Meta',
+
         'goals.type_daily_minutes': 'Minutos por dia',
+
         'goals.type_daily_messages': 'Mensagens por dia',
+
         'goals.type_weekly_conversations': 'Conversas por semana',
+
         'goals.type_weekly_words': 'Palavras novas por semana',
+
         'goals.goal_target': 'Meta (quantidade)',
+
         'goals.goal_period': 'Período',
+
         'goals.daily': 'Diário',
+
         'goals.weekly_period': 'Semanal',
+
         'goals.create': 'Criar Meta →',
 
-        // ── Simulation ─────────────────────────────────────────────────
+
+
+        // ── Simulation ────────────────────────────────────────────────────────
+
         'sim.title': 'Simulação de Conversas',
+
         'sim.topbar_title': 'Simulação',
+
         'sim.hero_title': '🎭 Simulação de Conversas Reais',
+
         'sim.hero_subtitle': 'Escolha um cenário e pratique inglês em situações do dia a dia',
+
         'sim.chat_welcome': 'Clique em "Iniciar" para começar a simulação',
+
         'sim.start': 'Iniciar Simulação',
+
         'sim.mode_text': 'Chat',
+
         'sim.mode_voice': 'Voz',
+
         'sim.mode_both': 'Ambos',
+
         'sim.scenarios_label': 'Cenários Prontos',
+
         'sim.random_btn': 'Cenário Aleatório',
+
         'sim.input_ph': 'Digite sua mensagem...',
+
         'sim.record': 'Gravar',
+
         'sim.record_hint': 'Clique para gravar sua voz',
+
         'sim.end': 'Finalizar',
 
-        // ── XP System ─────────────────────────────────────────────────
+
+
+        // ── XP System ─────────────────────────────────────────────────────────
+
         'xp.level': 'Nível',
+
         'xp.xp': 'XP',
+
         'xp.to_next': 'para o próximo nível',
+
         'xp.leaderboard': 'Ranking',
+
         'xp.rank': 'Posição',
+
         'xp.beginner': 'Iniciante',
+
         'xp.elementary': 'Elementar',
+
         'xp.intermediate': 'Intermediário',
+
         'xp.upper_intermediate': 'Intermediário Superior',
+
         'xp.advanced': 'Avançado',
+
         'xp.mastery': 'Domínio Total',
 
+
+
         'profile.tab_profile': 'Perfil',
+
         'profile.tab_progress': 'Progresso',
+
         'profile.tab_vocab': 'Vocabulário',
+
         'profile.tab_goals': 'Metas',
+
         'profile.tab_trophies': 'Conquistas',
 
-        // ── Audio Controls ─────────────────────────────────────────────────
+
+
+        // ── Audio Controls ────────────────────────────────────────────────────
+
         'audio.play': 'Reproduzir',
+
         'audio.rewind': '↩5s',
+
         'audio.vol': 'Vol',
+
         'audio.speed': 'Vel',
 
-        // ── Features Menu ─────────────────────────────────────────────────
+
+
+        // ── Features Menu ─────────────────────────────────────────────────────
+
         'features.progress': 'Meu Progresso',
+
         'features.vocab': 'Vocabulário',
+
         'features.goals': 'Minhas Metas',
+
         'features.simulation': 'Simulação',
 
-        // ── Payment Missing ─────────────────────────────────────────────────
+
+
+        // ── Payment ───────────────────────────────────────────────────────────
+
         'payment.approved_title': 'Pagamento Aprovado!',
+
         'payment.approved_desc': 'Seu acesso premium foi ativado com sucesso. Bons estudos!',
+
         'payment.full_plan': 'Plano Completo',
+
         'payment.go_to_chat': 'Ir para o Chat',
+
         'payment.choose_plan': 'Escolha seu plano',
+
         'payment.basic_title': 'Chat & Voice',
+
         'payment.full_title': 'Full',
+
         'payment.per_month': '/mês',
+
         'payment.select_plan': 'Selecionar',
+
         'payment.recommended': 'Recomendado',
+
         'payment.feat_unlimited_chat': '💬 Unlimited chat with Teacher Tati',
+
         'payment.feat_voice': '🎙️ Voice Mode',
+
         'payment.feat_history': '📊 Conversation history',
+
         'payment.feat_translation': '🌐 Word translation in chat',
+
         'payment.feat_modules': '📚 Modules and activities',
+
         'payment.feat_flashcards': '🃏 Flashcards',
+
         'payment.feat_reports': '📈 Performance reports',
 
-        // ── Pagamento ─────────────────────────────────────────────────
         'payment.title': 'Upgrade para Premium',
+
         'payment.subtitle': 'Escolha o seu plano:',
+
         'payment.method_title': 'Forma de pagamento',
+
         'payment.method_pix': 'Pix',
+
         'payment.method_boleto': 'Boleto',
+
         'payment.method_card': 'Cartão',
+
         'payment.cpf_label': 'CPF ou CNPJ',
+
         'payment.cpf_hint': 'Necessário para emissão da nota fiscal e processamento seguro.',
+
         'payment.generate': 'Gerar Pagamento',
+
         'payment.pix_copied': 'Chave Pix copiada!',
+
         'payment.invoice_opening': 'Abrindo fatura para pagamento...',
+
         'payment.processing': 'Processando...',
+
         'payment.pix_generated': 'Pagamento Gerado!',
+
         'payment.pix_instruction': 'Escaneie o QR Code abaixo ou use "Copia e Cola".',
+
         'payment.copy_pix': 'Copiar Chave Pix',
+
         'payment.view_invoice': 'Ver Fatura Completa',
+
         'payment.receipt_title': 'Pagamento Confirmado!',
+
         'payment.receipt_subtitle': 'Seu acesso premium foi ativado com sucesso',
+
         'payment.receipt_plan': 'Plano',
+
         'payment.receipt_status': 'Status',
+
         'payment.receipt_date': 'Data de pagamento',
+
         'payment.receipt_due': 'Próximo vencimento',
-        'payment.receipt_active': '✓ Ativo',
+
+        'payment.receipt_active': 'Ativo',
+
         'payment.receipt_go_chat': 'Ir para o Chat',
+
         'payment.receipt_go_profile': 'Ver Perfil',
+
         'payment.receipt_tip': '💡 Dica: Agora você tem acesso completo a todas as funcionalidades!',
+
         'payment.receipt_enjoy': 'Aproveite seus estudos com a Teacher Tati 🧑‍🏫',
+
         'payment.invalid_use_another': 'Documento inválido. Por favor, use outro CPF/CNPJ válido para continuar.',
 
-        // ── Subscription Section ──────────────────────────────────────────
-        'sub.assinatura': 'Assinatura',
-        'sub.no_active': 'Sem assinatura ativa',
-        'sub.no_active_desc': 'Assine um plano para ter acesso completo.',
-        'sub.subscribe_now': 'Assinar agora',
-        'sub.vencimento': 'Vencimento',
-        'sub.days_remaining': 'Dias restantes',
-        'sub.renew_change': 'Renovar plano',
-        'sub.load_error': 'Erro ao carregar assinatura.',
-        'sub.status_active': '✓ Ativa',
-        'sub.status_grace': '⚠️ Em atraso',
-        'sub.status_pending': '⏳ Pendente',
-        'sub.status_expired': '✗ Expirada',
-        'sub.status_cancelled': '✗ Cancelada',
-        'sub.plan_full': '👑 Plano Completo',
-        'sub.plan_basic': '💬 Chat & Voice',
         'payment.special_users_no_payment': 'Usuários especiais têm acesso gratuito e não precisam realizar pagamento.',
+
+
+
+        // ── Subscription ──────────────────────────────────────────────────────
+
+        'sub.assinatura': 'Assinatura',
+
+        'sub.no_active': 'Sem assinatura ativa',
+
+        'sub.no_active_desc': 'Assine um plano para ter acesso completo.',
+
+        'sub.subscribe_now': 'Assinar agora',
+
+        'sub.vencimento': 'Vencimento',
+
+        'sub.days_remaining': 'Dias restantes',
+
+        'sub.renew_change': 'Renovar plano',
+
+        'sub.load_error': 'Erro ao carregar assinatura.',
+
+        'sub.status_active': 'Ativa',
+
+        'sub.status_grace': 'Em atraso',
+
+        'sub.status_pending': 'Pendente',
+
+        'sub.status_expired': 'Expirada',
+
+        'sub.status_cancelled': 'Cancelada',
+
+        'sub.plan_full': 'Plano Completo',
+
+        'sub.plan_basic': 'Chat & Voice',
+
+        'sub.cancel_button': 'Cancelar assinatura',
+
+        'sub.cancel_confirm_toast': 'Toque novamente em cancelar assinatura em até 5 segundos para confirmar.',
+
+        'sub.cancel_success': 'Assinatura cancelada com sucesso.',
+
+        'sub.cancel_error': 'Não foi possível cancelar a assinatura.',
+
+        'sub.cancel_connection_error': 'Erro de conexão ao cancelar assinatura.',
+
         'paywall.limit_reached': 'Limite gratuito atingido!',
+
         'paywall.upgrade_desc': 'Assine um plano para continuar praticando.',
+
         'paywall.upgrade': 'Ver planos',
+
         'paywall.messages_left': (n) => `Você tem ${n} mensagem${n === 1 ? '' : 's'} gratuita${n === 1 ? '' : 's'} restante${n === 1 ? '' : 's'}.`,
 
-        // ── Planos ────────────────────────────────────────────────────
+
+
+        // ── Planos ────────────────────────────────────────────────────────────
+
         'plan.basic': 'Chat & Voice',
+
         'plan.basic_price': 'R$ 19,90',
+
         'plan.basic_desc': 'Acesso ao chat e modo de voz com a Teacher Tati.',
+
         'plan.full': 'Completo',
+
         'plan.full_price': 'R$ 39,90',
+
         'plan.full_desc': 'Acesso completo a todas as funcionalidades, incluindo atividades e relatórios.',
+
         'btn.details': 'Ver detalhes',
+
         'modal.title': 'Detalhes do Plano',
+
         'loading_text': 'Processando...',
+
         'plan.per_month': '/mês',
+
         'plan.choose': 'Escolher este plano',
+
         'plan.basic_feature_1': '💬 Chat ilimitado com a Teacher Tati',
+
         'plan.basic_feature_2': '🎙️ Modo Voz',
+
         'plan.basic_feature_3': '📊 Histórico de conversas',
+
         'plan.basic_feature_4': '🌐 Tradução de palavras no chat',
+
         'plan.full_feature_1': '💬 Chat ilimitado com a Teacher Tati',
+
         'plan.full_feature_2': '🎙️ Modo Voz',
+
         'plan.full_feature_3': '📊 Histórico de conversas',
+
         'plan.full_feature_4': '🌐 Tradução de palavras no chat',
+
         'plan.full_feature_5': '📚 Módulos e atividades',
+
         'plan.full_feature_6': '🃏 Flashcards',
+
         'plan.full_feature_7': '✏️ Exercícios com correção',
+
         'plan.full_feature_8': '🏆 Troféus e progresso',
+
         'plan.full_feature_9': '📈 Relatórios de desempenho',
 
-        // ── Dashboard — geral ─────────────────────────────────────────
+
+
+        // ── Dashboard – geral ─────────────────────────────────────────────────
+
         'dash.overview': 'Visão Geral',
+
         'dash.overview_sub': 'Resumo da plataforma',
+
         'dash.students': 'Alunos',
+
         'dash.students_sub': 'Gerenciamento de alunos',
+
         'dash.reports': 'Relatórios',
+
         'dash.reports_sub': 'Visão geral e métricas da turma',
+
         'dash.go_chat': 'Ir ao Chat',
+
         'dash.total_students': 'Total de Alunos',
+
         'dash.total_msgs': 'Total de Mensagens',
+
         'dash.active_today': 'Ativos Hoje',
+
         'dash.recent': 'Alunos Recentes',
+
         'dash.see_all': 'Ver todos →',
+
         'dash.all_students': 'Todos os Alunos',
+
         'dash.search_ph': 'Pesquisar aluno...',
+
         'dash.no_students': 'Nenhum aluno encontrado.',
-        'dash.active': '↑ Ativo',
+
+        'dash.active': '→ Ativo',
+
         'dash.hoje': 'Hoje',
+
         'dash.alertas': 'Alertas de Dificuldade da Turma',
+
         'dash.aluno_alertas': '🧑‍🎓 Aluno',
+
         'dash.aten_alertas': '⚠️ Foco de atenção',
+
         'dash.loading': 'Carregando...',
+
         'dash.no_alerts': 'Nenhum aluno com dificuldade registrada.',
+
         'dash.submissions': 'Correções',
+
         'dash.submissions_sub': 'Respostas dos alunos para correção',
+
         'dash.simulations': 'Simulações',
+
         'dash.simulations_sub': 'Gerencie simulações de conversas reais',
+
         'dash.new_simulation': 'Criar Simulação',
+
         'dash.edit_simulation': 'Editar Simulação',
+
         'dash.no_submissions': 'Nenhuma resposta enviada ainda.',
+
         'dash.btn_feedback': 'Corrigir',
+
         'dash.col_date': 'Data',
+
         'dash.col_activity': 'Atividade',
+
         'dash.col_response': 'Resposta',
+
         'dash.col_score': 'Nota',
+
         'dash.col_actions': 'Ações',
+
         'dash.correction_title': 'Corrigir resposta de',
+
         'dash.student_answer': 'Resposta do aluno',
+
         'dash.ai_suggest': '✨ Sugerir com IA',
+
         'dash.ai_feedback': 'Feedback da IA',
+
         'dash.teacher_feedback': 'Feedback do Professor',
+
         'dash.teacher_feedback_ph': 'Adicione um comentário personalizado...',
+
         'dash.score_label': 'Nota (0–100)',
+
         'dash.save_correction': 'Salvar Correção',
 
-        // ── Dashboard — tabela alunos ─────────────────────────────────
+
+
+        // ── Dashboard – tabela alunos ─────────────────────────────────────────
+
         'dash.col_student': 'Aluno',
+
         'dash.col_level': 'Nível',
+
         'dash.col_focus': 'Foco',
+
         'dash.col_last': 'Último acesso',
+
         'dash.col_msgs': 'Msgs',
+
         'dash.col_since': 'Cadastro',
 
-        // ── Dashboard — modal aluno ───────────────────────────────────
+
+
+        // ── Dashboard – modal aluno ───────────────────────────────────────────
+
         'dash.edit': '✏️ Editar',
+
         'dash.prompt': '🧩 Prompt',
+
         'dash.insight': '🧠 Insight',
+
         'dash.interests': '🎯 Interesses',
+
         'dash.save_level': 'Salvar nível',
+
         'dash.save_prompt': 'Salvar prompt',
+
         'dash.clear_prompt': 'Limpar prompt',
+
         'dash.generate_insight': '🧠 Gerar Insight',
+
         'dash.regenerate': '🔄 Gerar Novamente',
+
         'dash.analyzing': '⏳ Analisando...',
+
         'dash.delete_student': 'Excluir aluno',
+
         'dash.confirm_delete': 'Excluir',
-        'dash.level_updated': '✓ Nível atualizado com sucesso!',
-        'dash.prompt_saved': '✓ Prompt salvo! Entrará em vigor na próxima mensagem.',
+
+        'dash.level_updated': '✔ Nível atualizado com sucesso!',
+
+        'dash.prompt_saved': '✔ Prompt salvo! Entrará em vigor na próxima mensagem.',
+
         'dash.err_save': '✗ Erro ao salvar. Tente novamente.',
+
         'dash.prompt_hint': 'Adicione instruções extras para a Tati seguir <strong>somente com este aluno</strong>.',
+
         'dash.grammar_errors': 'Erros Gramaticais',
+
         'dash.mapping_errors': 'Mapeando erros gramaticais recorrentes...',
+
         'dash.no_grammar_errors': 'Sem erros detectados nas últimas mensagens analisadas.',
+
         'dash.exemples': 'Exemplo',
+
         'dash.click': 'Clique em 🧠 Gerar Insight para analisar o histórico ou em Erros Gramaticais para ver erros recorrentes.',
+
         'dash.confirm_delete_msg': 'Esta ação é irreversível.',
+
         'dash.interests_hint': 'A IA analisará o histórico para mapear hobbies e sugerir planos de estudo.',
+
         'dash.analyze_interests': '🎯 Analisar Interesses',
+
         'dash.redo_analysis': '🎯 Refazer Análise',
+
         'dash.interests_focus': 'Interesses e Foco',
+
         'dash.click_to_load': 'Clique em analisar para carregar.',
+
         'dash.practical_rec': 'Recomendações Práticas',
+
         'dash.no_interests': 'Nenhum interesse mapeado ainda.',
+
         'dash.no_recs': 'Nenhuma recomendação disponível.',
+
         'dash.action': '💡 Ação:',
 
-        // ── Dashboard — reports ───────────────────────────────────────
+
+
+        // ── Dashboard – reports ───────────────────────────────────────────────
+
         'dash.reports_title': 'Relatórios de Desempenho',
+
         'dash.reports_desc': 'Acompanhe a evolução e as métricas da turma.',
+
         'dash.reports_sem': 'Atividade semanal',
+
         'dash.total': 'Total',
+
         'dash.msgs': 'Mensagens trocadas',
+
         'dash.trocadas': 'Trocadas',
+
         'dash.ac_hj': 'Ativos hoje',
+
         'dash.niveis': 'Distribuição de níveis',
+
         'dash.level_st': 'Níveis de inglês dos alunos',
+
         'dash.al_dis': 'aluno',
-        'dash.n_msg_day': 'Mensagens por dia — últimos 7 dias',
-        'dash.n_msg': 'Intensidade por dia da semana — últimas 4 semanas',
+
+        'dash.n_msg_day': 'Mensagens por dia – últimos 7 dias',
+
+        'dash.n_msg': 'Intensidade por dia da semana – últimas 4 semanas',
+
         'dash.eng_less': 'Menos',
+
         'dash.eng_more': 'Mais',
+
         'dash.media': 'Média/dia',
+
         'dash.pico': 'Pico',
+
         'dash.tot_sem': 'Total semanal',
+
         'dash.val_students': 'Total de alunos',
+
         'dash.val_msgs': 'Mensagens',
+
         'dash.val_active': 'Ativos hoje',
 
-        // ── Dashboard — dias da semana ────────────────────────────────
+        'vct.tour': 'Ver tour do sistema',
+
+
+
+        // ── Dashboard – dias da semana ────────────────────────────────────────
+
         'dash.day1': 'Seg',
+
         'dash.day2': 'Ter',
+
         'dash.day3': 'Qua',
+
         'dash.day4': 'Qui',
+
         'dash.day5': 'Sex',
+
         'dash.day6': 'Sáb',
+
         'dash.day7': 'Dom',
 
-        // ── Dashboard — heatmap ───────────────────────────────────────
+
+
+        // ── Dashboard – heatmap ───────────────────────────────────────────────
+
         'dash.week_label': (n) => `Sem ${n}`,
 
-        // ── Módulos (admin) ───────────────────────────────────────────
+
+
+        // ── Módulos (admin) ───────────────────────────────────────────────────
+
         'mod.title': 'Módulos',
+
         'mod.subtitle': 'Gerencie os módulos de ensino',
+
         'mod.new': 'Novo Módulo',
+
         'mod.edit': 'Editar',
+
         'mod.save': 'Salvar',
+
         'mod.cancel': 'Cancelar',
+
         'mod.publish': 'Publicar',
+
         'mod.unpublish': 'Despublicar',
+
         'mod.delete': 'Excluir',
+
         'mod.modal_new': 'Novo Módulo',
+
         'mod.modal_edit': 'Editar Módulo',
+
         'mod.filter_all': 'Todos',
+
         'mod.filter_pub': 'Publicados',
+
         'mod.filter_draft': 'Rascunhos',
+
         'mod.empty': 'Nenhum módulo encontrado.',
+
         'mod.loading': 'Carregando módulos...',
+
         'mod.order': 'Ordem:',
+
         'mod.field_title': 'Título do módulo',
-        'mod.field_title_ph': 'Ex: To Be — Present Simple',
+
+        'mod.field_title_ph': 'Ex: To Be – Present Simple',
+
         'mod.field_desc': 'Descrição',
+
         'mod.field_desc_ph': 'Breve descrição do que será estudado...',
+
         'mod.field_level': 'Nível',
+
         'mod.field_order': 'Ordem',
+
         'mod.section_contents': 'Conteúdos',
+
         'mod.section_flashcards': 'Flashcards',
+
         'mod.section_quiz': 'Quiz',
+
         'mod.add_content': 'Adicionar',
+
         'mod.add_question': 'Adicionar questão',
+
         'mod.upload': '📁 Arquivo',
+
         'mod.upload_ok': 'Arquivo enviado',
+
         'mod.gen_ai': 'Gerar com IA',
+
         'mod.generating': '⏳ Gerando...',
+
         'mod.save_ok_create': 'Módulo criado com sucesso!',
+
         'mod.save_ok_update': 'Módulo atualizado com sucesso!',
+
         'mod.confirm_del': 'Excluir este módulo permanentemente?',
+
         'mod.question_label': 'Questão',
+
         'mod.option_label': 'Opção',
+
         'mod.explanation_label': 'Explicação',
+
         'mod.explanation_ph': 'Por que esta é a resposta correta?',
-        'mod.quiz_title_ph': 'Título do quiz (ex: Quiz — To Be)',
+
+        'mod.quiz_title_ph': 'Título do quiz (ex: Quiz – To Be)',
+
         'mod.fc_word_ph': 'Palavra em inglês',
+
         'mod.fc_trans_ph': 'Tradução',
+
         'mod.fc_ex_ph': 'Exemplo de uso',
+
         'mod.fc_manage_sub': 'Gerencie pacotes de flashcards',
+
         'mod.fc_none': 'Nenhum pacote de flashcards encontrado.',
+
         'mod.fc_count': (n) => `${n} card${n !== 1 ? 's' : ''}`,
+
         'mod.fc_gen_ai': 'Gerar Pacote com IA',
+
         'mod.fc_theme': 'Tema do pacote',
+
         'mod.fc_theme_ph': 'Ex: Verbos Irregulares, Aeroporto...',
+
         'mod.fc_instructions': 'Instruções extras',
+
         'mod.fc_inst_ph': 'Ex: Foque em gírias americanas...',
+
         'mod.level_all': 'Todos',
 
-        // ── Atividades (aluno) ────────────────────────────────────────
+
+
+        // ── Atividades (aluno) ────────────────────────────────────────────────
+
         'act.no_exercises_yet': 'A Tati está analisando seu progresso. Exercícios personalizados aparecerão aqui em breve!',
+
         'act.generate_new': 'Gerar Novos Exercícios',
+
         'act.personalized_writing': 'Exercício de Escrita',
+
         'act.personalized_writing_desc': 'Pratique sua escrita e receba feedback personalizado da Tati.',
+
         'act.start_exercise': 'Criar novo exercício',
+
         'act.personalized_desc': 'Baseado nos seus erros recentes de conversas.',
+
         'act.personalized_fc': 'Revisão de Vocabulário',
+
         'act.personalized_fc_desc': 'Palavras que você errou ou está aprendendo.',
+
         'act.view_flashcards': 'Ver Flashcards',
+
         'act.items': 'itens',
+
         'act.no_activities': 'Nenhuma atividade ainda. Converse com a Tati para gerar exercícios!',
+
         'act.title': 'Minhas Atividades',
+
         'act.title_advanced_quizzer': 'Quizzer Avançado',
+
         'act.title_supreme_master': 'Mestre Supremo',
+
         'act.title_3_day_streak': 'Ofensiva de 3 Dias',
+
         'act.title_14_day_streak': 'Ofensiva de 14 Dias',
+
         'act.title_60_day_streak': 'Ofensiva de 60 Dias',
+
         'act.title_100_day_streak': 'Ofensiva de 100 Dias',
+
         'act.title_365_day_streak': 'Ofensiva de 365 Dias',
+
         'act.title_popular': 'Popular',
+
         'act.title_communicator': 'Comunicador',
+
         'act.title_500_messages': '500 Mensagens',
+
         'act.title_speaker': 'Falante',
+
         'act.title_first_simulation': 'Primeira Simulação',
+
         'act.title_beginner_actor': 'Ator Iniciante',
+
         'act.title_simulation_star': 'Estrela de Simulação',
+
         'act.title_first_credit': 'Primeiro Crédito',
+
         'act.title_saver': 'Economizador',
+
         'act.title_collector': 'Colecionador',
+
         'act.title_rich': 'Rico',
+
         'act.title_magnate': 'Magnata',
+
         'act.title_first_hour': 'Primeira Hora',
+
         'act.title_time_master': 'Mestre do Tempo',
+
         'act.title_supreme_time': 'Tempo Supremo',
+
         'act.title_time_traveler': 'Viajante do Tempo',
+
         'act.title_vocabulary_10': 'Vocabulário 10',
+
         'act.title_vocabulary_50': 'Vocabulário 50',
+
         'act.title_vocabulary_100': 'Vocabulário 100',
+
         'act.title_polyglot': 'Poliglota',
+
         'act.title_living_dictionary': 'Dicionário Vivo',
+
         'act.title_first_goal': 'Primeira Meta',
+
         'act.title_focused': 'Focado',
+
         'act.title_objective': 'Objetivo',
+
         'act.title_top_10': 'Top 10',
+
         'act.title_top_3': 'Top 3',
+
         'act.title_champion': 'Campeão',
+
         'act.title_social': 'Social',
+
         'act.title_explorer': 'Explorador',
+
         'act.title_always_alert': 'Sempre Alerta',
+
         'act.title_early_bird': 'Madrugador',
+
         'act.title_owl': 'Coruja',
+
         'act.title_weekend': 'Final de Semana',
+
         'act.title_perfectionist': 'Perfeccionista',
+
         'act.hero_title': 'Suas Atividades',
+
         'act.hero_subtitle': 'Pratique vocabulário, gramática e pronúncia. Ganhe pontos no ranking!',
+
+        'act.restricted_activities': 'Atividades disponíveis apenas para plano Full a partir de 01/07/2026.',
+
         'act.tab_quiz': 'Quizzes',
+
         'act.tab_flashcards': 'Flashcards',
+
         'act.tab_exercises': 'Exercícios',
+
         'act.tab_simulations': 'Simulações',
+
         'act.sim_title': '🎭 Simulação de Conversas Reais',
+
         'act.sim_desc': 'Pratique inglês em situações do dia a dia com a Teacher Tati',
+
         'act.sim_launch': 'Abrir Simulação',
+
         'act.all_modules': 'Todos os módulos',
+
         'act.search_ph': 'Buscar atividade...',
+
         'act.no_quizzes': 'Nenhum quiz disponível.',
+
         'act.no_fc': 'Nenhum flashcard disponível.',
+
         'act.ex_empty': 'Nenhum exercício disponível.',
+
         'act.questions': 'questões',
+
         'act.btn_start': 'Iniciar',
+
         'act.btn_redo': 'Refazer',
+
         'act.quiz_desc_fallback': 'Pratique seus conhecimentos sobre ',
+
+        'act.quiz_finish': 'Finalizar quiz',
+
         'act.fc_label_word': 'Palavra',
+
         'act.fc_label_translation': 'Tradução',
+
         'act.fc_reveal': 'Clique para revelar',
+
         'act.fc_flip': 'Virar',
+
         'act.fc_know': 'Sei!',
+
         'act.fc_review': 'Rever',
+
         'act.fc_counter': (idx, total, known) => `${idx} de ${total} • ${known} aprendidas`,
+
         'act.quiz_progress': (cur, total) => `${cur} de ${total}`,
+
         'act.quiz_next': 'Próxima',
+
+        'act.quiz_check': 'Verificar Resposta',
+
         'act.quiz_perfect': '🎉 Parabéns! Ótimo desempenho!',
-        'act.quiz_keep_practicing': '💪 Continue praticando!',
+
+        'act.quiz_excellent': '🥇 Excelente!',
+
+        'act.quiz_very_good': '🥈 Muito bom!',
+
+        'act.quiz_good': '🥉 Bom trabalho!',
+
+        'act.quiz_satisfactory': '💪 Satisfatório, mas pode melhorar!',
+
+        'act.quiz_needs_improvement': '📖 Precisa de mais prática!',
+
+        'act.quiz_poor': '📚 Resultado insuficiente, estude mais!',
+
+        'act.quiz_very_poor': '⚠️ Precisa revisar o conteúdo com urgência!',
+
         'act.quiz_close': 'Fechar',
+
+        'act.quiz_result': (correct, total, pct) => `${correct} de ${total} acertos (${pct}%)`,
+
         'act.explanation_label': 'Explicação:',
+
         'act.view_file': 'Ver arquivo',
+
         'act.ex_ph_textarea': 'Escreva sua resposta aqui...',
+
         'act.ex_sent': 'Enviado! Aguarde a correção.',
 
-        // ── Atividades — Sidebar ────────────────────────────────────────
+
+
+        // ── Atividades – Sidebar ──────────────────────────────────────────────
+
         'act.sidebar_menu': 'Menu Principal',
+
         'act.nav_activities': 'Atividades',
+
         'act.nav_profile': 'Meu Perfil',
+
         'act.nav_achievements': 'Conquistas',
+
         'act.nav_competitions': 'Competições',
+
         'act.nav_logout': 'Voltar ao chat',
 
-        // ── Atividades — Profile ─────────────────────────────────────────
+
+
+        // ── Atividades – Profile ──────────────────────────────────────────────
+
         'act.profile_title': 'Meu Perfil',
+
         'act.profile_sub': 'Acompanhe seu progresso no aprendizado de inglês.',
+
         'act.pending_title': 'Atividades Pendentes',
+
         'act.pending_sub_prefix': 'Você tem',
+
         'act.pending_sub_suffix': 'atividades para completar',
+
         'act.study_time_title': 'Tempo de Estudo',
+
         'act.this_week': 'Esta Semana',
+
         'act.this_month': 'Este Mês',
+
         'act.last_month': 'Mês Anterior',
+
         'act.last_3_months': 'Últimos 3 Meses',
+
         'act.current_badge': 'Atual',
 
-        // ── Atividades — Achievements ────────────────────────────────────
+
+
+        // ── Atividades – Achievements ─────────────────────────────────────────
+
         'act.achievements_title': 'Minhas Conquistas',
+
         'act.achievements_sub': 'Marcos alcançados na sua jornada de aprendizado.',
+
         'act.streak_inactive': 'INATIVO',
+
         'act.streak_active': 'ATIVO',
+
         'act.streak_days_label': 'dias de ofensiva',
+
         'act.streak_longest_label': 'Maior ofensiva',
+
         'act.total_questions_label': 'Total de perguntas',
+
         'act.hours_saved_label': 'Horas economizadas',
+
         'act.trophy_progress_title': 'Progresso de Troféus',
+
         'act.trophy_progress_sub': 'Desbloqueie conquistas usando o Tati AI',
+
         'act.tier_bronze': 'Bronze',
+
         'act.tier_silver': 'Prata',
+
         'act.tier_gold': 'Ouro',
+
         'act.tier_platinum': 'Platina',
+
         'act.medal_all': 'Todos',
+
         'act.medal_questions': 'Perguntas',
+
         'act.medal_streak': 'Ofensiva',
+
         'act.medal_credits': 'Créditos',
+
         'act.medal_time': 'Tempo',
+
         'act.medal_milestones': 'Marcos',
+
         'act.medal_social': 'Social',
+
         'act.how_to_title': 'Como Conquistar Troféus',
+
         'act.how_streak_title': 'Ofensiva (Streak)',
+
         'act.how_streak_desc': 'Estude todos os dias para manter sua ofensiva. Quanto mais dias seguidos, mais troféus!',
+
         'act.how_questions_title': 'Perguntas Respondidas',
+
         'act.how_questions_desc': 'Complete quizzes, flashcards e exercícios para acumular acertos.',
+
         'act.how_credits_title': 'Créditos',
+
         'act.how_credits_desc': 'Ganhe créditos completando atividades e participando do ranking.',
+
         'act.how_time_title': 'Tempo Economizado',
+
         'act.how_time_desc': 'Quanto mais você usa a IA para aprender, mais tempo economiza!',
+
         'act.troph_prof': 'Você ainda não conquistou troféus. Complete quizzes e desafios para ganhar!',
 
-        // ── Atividades — Flashcards empty ────────────────────────────────
+
+
+        // ── Atividades – Flashcards empty ─────────────────────────────────────
+
         'act.fc_empty_title': 'Flashcards Personalizados',
+
         'act.fc_empty_sub': 'Seus flashcards de vocabulário serão gerados aqui em breve.',
 
-        // ── Atividades — Exercises empty ─────────────────────────────────
+
+
+        // ── Atividades – Exercises empty ──────────────────────────────────────
+
         'act.ex_empty_title': 'Exercícios',
+
         'act.ex_empty_sub': 'Pratique atividades com feedback da Tati.',
 
-        // ── Atividades — Simulations empty ───────────────────────────────
+
+
+        // ── Atividades – Simulations empty ────────────────────────────────────
+
         'act.sim_empty_title': 'Simulações de Conversas',
+
         'act.sim_empty_sub': 'Pratique situações reais como aeroporto, restaurante e entrevistas de emprego.',
 
-        // ── Atividades — Competitions/Ranking ───────────────────────────
+
+
+        // ── Atividades – Competitions/Ranking ────────────────────────────────
+
         'act.comp_title': 'Competições',
+
         'act.comp_subtitle': 'Veja quem são os alunos mais engajados e suba no ranking!',
+
         'act.ranking_banner_title': 'Ranking de Engajamento',
+
         'act.ranking_banner_sub': 'Alunos mais ativos no Tati AI',
+
         'act.winners_title': 'Vencedores',
+
+        'act.current_podium': 'Pódio Atual',
+
         'act.how_ranking_title': 'Como funciona o ranking?',
+
         'act.how_ranking_desc': 'O score é calculado pela soma ponderada de todas as suas ações de estudo no mês:',
+
         'act.pts_exercise': 'Exercício submetido',
+
         'act.pts_flashcard': 'Flashcard revisado',
+
         'act.pts_quiz': 'Quiz resolvido',
+
         'act.pts_message': 'Mensagem para a Tati IA',
+
         'act.tiebreaker_title': 'Desempate:',
+
         'act.tiebreaker_desc': 'Em caso de empate no score, o desempate é pela quantidade de tokens utilizados (quanto mais interação, melhor posição).',
+
         'act.prizes_title': 'Prêmios',
+
         'act.prize_1_title': '1º Lugar',
-        'act.prize_1_desc': 'Troféu Ouro',
+
+        'act.prize_1_desc': 'Badge Diamante + 1 semana Premium',
+
         'act.prize_2_title': '2º Lugar',
-        'act.prize_2_desc': 'Troféu Prata',
+
+        'act.prize_2_desc': 'Badge Ouro + Destaque na Comunidade',
+
         'act.prize_3_title': '3º Lugar',
-        'act.prize_3_desc': 'Troféu Bronze',
-        'act.prizes_note': 'Os troféus ficam permanentes na sua coleção. Os créditos extras são aplicados no próximo ciclo.',
+
+        'act.prize_3_desc': 'Badge Prata',
+
+        'act.prizes_note': 'As Badges ficam permanentes na sua coleção.',
+
         'act.points': 'pontos',
+
         'act.top15_title': 'Top 15',
+
         'act.table_student': 'Aluno',
+
         'act.table_score': 'Score',
+
         'act.table_tokens': 'Tokens',
+
         'act.cd_days': 'Dias restantes',
+
         'act.cd_hours': 'Horas restantes',
-        'act.cd_minutes': "Minutos restantes",
+
+        'act.cd_minutes': 'Minutos restantes',
+
         'act.cd_seconds': 'Segundos restantes',
+
         'act.countdown_label': 'Tempo restante',
+
         'act.pts_simulation': 'Simulações feitas',
 
-        // ── Atividades — Modals ───────────────────────────────────────────
+
+
+        // ── Atividades – Modals ───────────────────────────────────────────────
+
         'act.fb_modal_title': 'Enviar Feedback',
+
         'act.fb_type_label': 'Tipo *',
+
         'act.fb_type_bug': 'Bug',
+
         'act.fb_type_suggestion': 'Sugestão',
+
         'act.fb_title_label': 'Título *',
+
         'act.fb_title_ph': 'Resumo breve',
+
         'act.fb_desc_label': 'Descrição *',
+
         'act.fb_desc_ph': 'Detalhes...',
+
         'act.fb_submit_btn': 'Enviar Feedback',
+
         'act.writing_modal_title': 'Exercício de Escrita',
+
         'act.writing_theme_label': 'Tema do Exercício *',
+
         'act.writing_theme_ph': 'Ex: Descreva suas últimas férias',
+
         'act.writing_content_label': 'Sua Resposta *',
+
         'act.writing_content_ph': 'Escreva seu texto aqui...',
+
         'act.writing_submit_btn': 'Enviar Exercício',
+
         'act.notif_title': 'Notificações',
 
-        // ── Simulações (Cenários) ────────────────────────────────────────
+        'act.notif_mark_all': 'Marcar todas como lidas',
+
+        'act.notif_empty': 'Nenhuma notificação ainda.',
+
+        'act.notif_error': 'Erro ao carregar notificações.',
+
+        'act.notif_loading': 'Carregando...',
+
+        'act.notif_time_now': 'Agora mesmo',
+
+        'act.notif_time_min': (n) => `${n}min atrás`,
+
+        'act.notif_time_hour': (n) => `${n}h atrás`,
+
+        'notif.streak_reminder.title': 'Não quebre sua ofensiva!',
+
+        'notif.streak_reminder.message': (p = {}) => `Você está com ${p.streak || 0} dias de ofensiva. Pratique agora para manter.`,
+
+        'notif.streak_milestone.title': 'Marco de ofensiva conquistado!',
+
+        'notif.streak_milestone.message': (p = {}) => `Você alcançou ${p.streak || 0} dias seguidos. Continue nessa sequência.`,
+
+        'notif.streak_broken.title': 'Sua ofensiva foi quebrada',
+
+        'notif.streak_broken.message': (p = {}) => `Sua ofensiva anterior foi de ${p.streak || 0} dias. Recomece hoje.`,
+
+        'notif.trophy_earned.title': 'Novo troféu desbloqueado!',
+
+        'notif.trophy_earned.message': (p = {}) => `Você ganhou o troféu: ${p.trophy_name || ''}`,
+
+
+
+        // ── Simulações (Cenários) ─────────────────────────────────────────────
+
         'sim.cat_all': 'Tudo',
+
         'sim.cat_travel': 'Viagem',
+
         'sim.cat_work': 'Trabalho',
+
         'sim.cat_daily': 'Dia a dia',
 
+
+
         'sim.title_airport_checkin': 'Check-in no Aeroporto',
+
         'sim.desc_airport_checkin': 'Pratique seu inglês no balcão de check-in do aeroporto.',
+
         'sim.title_job_interview': 'Entrevista de Emprego',
+
         'sim.desc_job_interview': 'Pratique entrevistas de emprego em inglês.',
+
         'sim.title_shopping': 'Fazendo Compras',
+
         'sim.desc_shopping': 'Compre em lojas, pergunte preços e tamanhos.',
+
         'sim.title_at_airport': 'No Aeroporto',
-        'sim.desc_at_airport': 'Pratique conversas em aeroportos — check-in, segurança, embarque.',
+
+        'sim.desc_at_airport': 'Pratique conversas em aeroportos – check-in, segurança, embarque.',
+
         'sim.title_at_hotel': 'No Hotel',
+
         'sim.desc_at_hotel': 'Faça check-in e peça serviços no hotel.',
+
         'sim.title_at_doctor': 'No Médico',
+
         'sim.desc_at_doctor': 'Descreva sintomas e consulte médicos em inglês.',
+
         'sim.title_at_restaurant': 'No Restaurante',
+
         'sim.desc_at_restaurant': 'Faça pedidos em restaurantes e pergunte sobre o cardápio.',
+
         'sim.title_restaurant_order': 'Pedido no Restaurante',
+
         'sim.desc_restaurant_order': 'Peça sua comida e tire dúvidas sobre o menu.',
 
-        // ── Feedback / Suporte ───────────────────────────────────────────
+
+
+        // ── Feedback / Suporte ────────────────────────────────────────────────
+
         'feedback.title': 'Enviar Feedback',
+
         'feedback.category': 'Categoria',
+
         'feedback.cat_general': '💬 Feedback Geral',
+
         'feedback.cat_bug': '🪲 Relatar Bug',
+
         'feedback.cat_suggestion': '💡 Sugestão',
+
         'feedback.message': 'Mensagem',
+
         'feedback.message_ph': 'Descreva o problema, sugestão ou feedback...',
+
         'feedback.cancel': 'Cancelar',
+
         'feedback.send': 'Enviar Feedback',
+
         'sim.feedback': 'Feedback da Simulação',
 
+
+
         'sim.modal_name': 'Nome da Simulação',
+
         'sim.modal_name_ph': 'Ex: No Aeroporto / At the Airport',
+
         'sim.modal_desc': 'Descrição',
+
         'sim.modal_desc_ph': 'Pratique conversas em aeroportos...',
+
         'sim.modal_icon': 'Ícone (emoji)',
+
         'sim.modal_diff': 'Dificuldade',
+
         'sim.modal_prompt': 'System Prompt (instruções para a IA)',
+
         'sim.modal_prompt_ph': 'You are a TSA agent at JFK airport...',
+
         'sim.modal_gen_ai': 'Gerar prompt com IA (recomendado)',
 
 
 
-        // ── Atividades — Quiz Results ────────────────────────────────────
+        // ── Atividades – Quiz Results ─────────────────────────────────────────
+
         'act.quiz_result_correct': 'respostas corretas',
+
         'act.quiz_trophies_earned': 'Troféus conquistados:',
+
         'act.quiz_question_of': 'Pergunta',
+
         'act.quiz_de': 'de',
+
         'act.quiz_close_btn': 'Fechar',
 
-        // ── Atividades — JS Hardcoded ───────────────────────────────────
+
+
+        // ── Atividades – JS Hardcoded ─────────────────────────────────────────
+
         'act.quiz_attempts': 'tentativas',
+
         'act.quiz_start': 'Iniciar',
+
         'act.quiz_redo': 'Revisar',
+
         'act.quiz_done': 'Concluído',
+
         'act.generating_report': 'Gerando relatório pedagógico...',
+
         'act.generating_pdf': 'Gerando PDF...',
-        'act.download_pdf_report': 'Baixar Relatório PDF',
+
+        'act.download_pdf': 'Baixar Relatório PDF',
+
         'act.quiz_new': 'Novo',
+
         'act.quiz_limit_reached': 'Limite atingido',
+
         'act.quiz_questions': 'perguntas',
+
         'act.fc_none': 'Nenhum flashcard.',
+
         'act.sim_none': 'Nenhum cenário disponível.',
+
         'act.status_pending': 'Pendente',
+
         'act.status_corrected': 'Corrigido',
+
         'act.personalized_pending': 'Prática Personalizada (Novos Exercícios)',
+
         'act.history': 'Histórico de Atividades',
+
         'act.difficulty_beginner': 'Iniciante',
+
         'act.difficulty_intermediate': 'Intermediário',
+
         'act.difficulty_pre_intermediate': 'Pré-Intermediário',
+
         'act.difficulty_business': 'Inglês para Negócios',
+
         'act.difficulty_advanced': 'Avançado',
+
         'act.user_fallback': 'Aluno',
 
-        // ── Atividades — Feedback/Writing Messages ────────────────────────
+
+
+        // ── Atividades – Feedback/Writing Messages ────────────────────────────
+
         'act.fb_fill_all': 'Preencha todos os campos.',
+
         'act.fb_success': 'Feedback enviado com sucesso!',
+
         'act.fb_error': 'Erro ao enviar.',
+
         'act.fb_conn_error': 'Erro de conexão.',
+
         'act.wr_fill_all': 'Preencha todos os campos.',
+
         'act.wr_success': 'Exercício enviado com sucesso!',
+
         'act.wr_error': 'Erro ao enviar.',
+
         'act.wr_conn_error': 'Erro de conexão.',
 
-        // ── Atividades — Months ───────────────────────────────────────────
+
+
+        // ── Atividades – Months ───────────────────────────────────────────────
+
         'act.month_0': 'Janeiro',
+
         'act.month_1': 'Fevereiro',
+
         'act.month_2': 'Março',
+
         'act.month_3': 'Abril',
+
         'act.month_4': 'Maio',
+
         'act.month_5': 'Junho',
+
         'act.month_6': 'Julho',
+
         'act.month_7': 'Agosto',
+
         'act.month_8': 'Setembro',
+
         'act.month_9': 'Outubro',
+
         'act.month_10': 'Novembro',
+
         'act.month_11': 'Dezembro',
 
-        // ── Voice ─────────────────────────────────────────────────────
+
+
+        // ── Voice ─────────────────────────────────────────────────────────────
+
         'voice.online': 'Online',
+
         'voice.listening': '🎙 Ouvindo…',
+
         'voice.processing': '⏳ Processando…',
+
         'voice.speaking': '🗣 Falando…',
+
         'voice.tap_speak': 'Toque para falar',
+
         'voice.tap_stop': 'Toque para parar',
+
         'voice.wait': 'Aguarde…',
+
         'voice.play': '▶ Ouvir',
+
         'voice.stop': '⏹ Parar',
+
         'voice.rewind': '↩ 5s',
+
         'voice.vol': 'Vol',
+
         'voice.speed': 'Vel',
+
         'voice.transcribing': '🎙 Transcrevendo…',
+
         'voice.back_chat': 'Chat',
+
         'voice.settings': 'Configurações',
 
-        // ── Níveis ────────────────────────────────────────────────────
+
+
+        // ── Níveis ────────────────────────────────────────────────────────────
+
         'level.beginner': 'Beginner',
+
         'level.pre_int': 'Pre-Intermediate',
+
         'level.intermediate': 'Intermediate',
+
         'level.business': 'Business English',
+
         'level.advanced': 'Advanced',
 
-        // ── Foco ──────────────────────────────────────────────────────
+
+
+        // ── Foco ──────────────────────────────────────────────────────────────
+
         'focus.general': 'Conversação Geral',
+
         'focus.business': 'Inglês para Negócios',
+
         'focus.travel': 'Inglês para Viagens',
+
         'focus.academic': 'Inglês Acadêmico',
+
         'focus.interviews': 'Entrevistas de Emprego',
 
-        // troféus
-        // Títulos
+
+
+        // ── Troféus – Títulos ─────────────────────────────────────────────────
+
         'act.title_first_quiz': 'Primeiro Quiz',
+
         'act.title_first_day': 'Primeiro Dia',
+
         'act.title_first_message': 'Primeira Mensagem',
+
         'act.title_quizzer': 'Quizzer',
+
         'act.title_beginner_quizzer': 'Quizzer Iniciante',
+
         'act.title_30_day_streak': 'Ofensiva de 30 Dias',
+
         'act.title_100_messages': '100 Mensagens',
+
         'act.title_7_day_streak': 'Ofensiva de 7 Dias',
+
         'act.title_quiz_master': 'Mestre dos Quizzes',
 
-        // Descrições
+
+
+        // ── Troféus – Descrições ──────────────────────────────────────────────
+
         'act.desc_first_quiz': 'Complete seu primeiro quiz',
+
         'act.desc_first_day': 'Complete seu primeiro dia de estudo',
+
         'act.desc_first_message': 'Envie sua primeira mensagem para a Tati',
+
         'act.desc_quizzer': 'Complete 10 quizzes',
+
         'act.desc_beginner_quizzer': 'Complete 5 quizzes',
+
         'act.desc_30_day_streak': 'Estude 30 dias seguidos',
+
         'act.desc_100_messages': 'Envie 100 mensagens',
+
         'act.desc_7_day_streak': 'Estude 7 dias seguidos',
+
         'act.desc_quiz_master': 'Complete 50 quizzes',
 
-        // ── Genérico ──────────────────────────────────────────────────
+        'act.desc_advanced_quizzer': 'Complete 25 quizzes',
+
+        'act.desc_supreme_master': 'Complete 100 quizzes',
+
+        'act.desc_3_day_streak': 'Estude 3 dias seguidos',
+
+        'act.desc_14_day_streak': 'Estude 14 dias seguidos',
+
+        'act.desc_60_day_streak': 'Estude 60 dias seguidos',
+
+        'act.desc_100_day_streak': 'Estude 100 dias seguidos',
+
+        'act.desc_365_day_streak': 'Estude 365 dias seguidos',
+
+        'act.desc_popular': 'Envie 50 mensagens no chat',
+
+        'act.desc_communicator': 'Envie 200 mensagens no chat',
+
+        'act.desc_500_messages': 'Envie 500 mensagens',
+
+        'act.desc_speaker': 'Envie 1000 mensagens no chat',
+
+        'act.desc_first_simulation': 'Complete sua primeira simulação',
+
+        'act.desc_beginner_actor': 'Complete 5 simulações',
+
+        'act.desc_simulation_star': 'Complete 20 simulações',
+
+        'act.desc_first_credit': 'Ganhe seu primeiro crédito',
+
+        'act.desc_saver': 'Acumule 10 créditos',
+
+        'act.desc_collector': 'Acumule 50 créditos',
+
+        'act.desc_rich': 'Acumule 100 créditos',
+
+        'act.desc_magnate': 'Acumule 500 créditos',
+
+        'act.desc_first_hour': 'Economize 1 hora de estudo',
+
+        'act.desc_time_master': 'Economize 10 horas de estudo',
+
+        'act.desc_supreme_time': 'Economize 50 horas de estudo',
+
+        'act.desc_time_traveler': 'Economize 100 horas de estudo',
+
+        'act.desc_vocabulary_10': 'Aprenda 10 novas palavras',
+
+        'act.desc_vocabulary_50': 'Aprenda 50 novas palavras',
+
+        'act.desc_vocabulary_100': 'Aprenda 100 novas palavras',
+
+        'act.desc_polyglot': 'Aprenda 500 novas palavras',
+
+        'act.desc_living_dictionary': 'Aprenda 1000 novas palavras',
+
+        'act.desc_first_goal': 'Defina sua primeira meta de estudo',
+
+        'act.desc_focused': 'Complete 5 metas de estudo',
+
+        'act.desc_objective': 'Complete 10 metas de estudo',
+
+        'act.desc_top_10': 'Alcance o Top 10 do ranking mensal',
+
+        'act.desc_top_3': 'Alcance o Top 3 do ranking mensal',
+
+        'act.desc_champion': 'Termine em 1º lugar no ranking mensal',
+
+        'act.desc_social': 'Interaja com a comunidade',
+
+        'act.desc_explorer': 'Visite todas as páginas do app',
+
+        'act.desc_always_alert': 'Abra o app 7 dias seguidos',
+
+        'act.desc_early_bird': 'Estude antes das 8h da manhã',
+
+        'act.desc_owl': 'Estude depois das 22h',
+
+        'act.desc_weekend': 'Estude no sábado e no domingo',
+
+        'act.desc_perfectionist': 'Tire 100% em 5 quizzes',
+
+
+
+        // ── Genérico ──────────────────────────────────────────────────────────
+
         'gen.confirm': 'Confirmar',
+
         'gen.cancel': 'Cancelar',
+
         'gen.save': 'Salvar',
+
         'gen.delete': 'Excluir',
+
         'gen.edit': 'Editar',
+
         'gen.close': 'Fechar',
+
         'gen.loading': 'Carregando...',
+
         'gen.error': 'Erro. Tente novamente.',
+
         'gen.success': 'Salvo com sucesso!',
+
         'gen.back': 'Voltar',
+
         'gen.search': 'Pesquisar',
+
         'gen.no_data': 'Sem dados disponíveis.',
+
         'gen.see_all': 'Ver todos',
+
+
+
+        // ── Progress Badge ────────────────────────────────────────────────────
+
+        'pb.title': 'Progresso',
+
+        'pb.close': 'Fechar',
+
+        'pb.words_today': 'Palavras novas hoje',
+
+        'pb.msgs_week': 'Mensagens esta semana',
+
+        'pb.see_progress': 'Ver progresso',
+
+        'pb.words_today_short': 'palavras hoje',
+
+        'pb.word_today_short': 'palavra hoje',
+
     },
 
+
+
     'en-US': {
-        // ── Global / Nav ──────────────────────────────────────────────
+
+        // ── Global / Nav ──────────────────────────────────────────────────────
+
         'nav.chat': 'Chat',
+
         'nav.dashboard': 'Dashboard',
+
         'nav.settings': 'Settings',
+
         'nav.profile': 'Profile',
+
         'nav.logout': 'Sign out',
+
         'nav.back_chat': 'Back to Chat',
+
         'nav.new_chat': 'New conversation',
+
         'nav.simulations': 'Simulations',
+
         'nav.delete_all': 'Delete all conversations',
+
         'nav.back': 'Back',
 
-        // ── Auth ──────────────────────────────────────────────────────
+
+
+        // ── Auth ──────────────────────────────────────────────────────────────
+
         'auth.welcome': 'Welcome',
+
         'auth.subtitle': 'Sign in or create a new account',
+
         'auth.tab_login': 'Sign in',
+
         'auth.tab_register': 'Create Account',
+
         'auth.username_email': 'Username or Email',
+
         'auth.password': 'Password',
+
         'auth.name': 'Full name',
+
         'auth.email': 'Email',
+
         'auth.username': 'Username',
+
         'auth.level': 'English level',
+
         'auth.btn_login': 'Sign in',
+
         'auth.btn_register': 'Create Account',
+
         'auth.btn_google': 'Continue with Google',
+
         'auth.or': 'or',
+
         'auth.logging_in': 'Signing in...',
+
         'auth.registering': 'Creating account...',
+
         'auth.success_register': 'Account created! Sign in now.',
+
         'auth.err_fields': 'Please fill in all fields.',
+
         'auth.err_password': 'Password must be at least 6 characters.',
+
         'auth.err_connection': 'Connection error. Check if the server is running.',
+
         'auth.err_email': 'Email already registered. Please sign in or use another email.',
+
         'auth.err_username': 'Username already taken. Please choose another.',
+
         'auth.err_login': 'Invalid credentials.',
+
         'auth.err_register': 'Error creating account.',
+
         'auth.err_forgot_identifier': 'Please enter your username or email.',
+
         'auth.err_forgot_request': 'Error requesting password reset.',
+
         'auth.err_message_unknown': 'Unknown error',
+
         'auth.err_google_auth': 'Error authenticating with Google.',
+
         'auth.senha_esqueci': 'I forgot my password',
+
         'auth.exp_img': 'Your AI English teacher. Practice whenever you want, at your own pace.',
-        'auth.esq_senha': '🔑 Forgot my password',
+
+        'auth.esq_senha': '🔒 Forgot my password',
+
         'auth.back_login': '← Back to login',
+
         'auth.informar_user': "Enter your username or email. We'll generate a temporary password and send it to you.",
+
         'auth_send_temp': 'Send temporary password',
+
         'auth.sending_temp_pass': 'Sending temporary password...',
+
         'auth.btn_forgot_password': 'Reset Password',
+
         'auth.dev_mode_title': 'Development Mode',
+
         'auth.temp_password': 'Temporary Password',
+
         'auth.warning_new_password': 'Please change your password after logging in.',
+
         'auth.email_sent': 'Email sent!',
+
         'auth.check_email': 'Check your email for instructions.',
 
-        // ── Chat ──────────────────────────────────────────────────────
+
+
+        // ── Chat ──────────────────────────────────────────────────────────────
+
         'chat.title': 'Teacher Tati',
+
         'chat.welcome_title': "Hi! I'm Teacher Tati 👋",
+
         'chat.welcome_sub': "Your AI English teacher. Let's practice together?",
+
         'chat.welcome_tip': '💡 Click any English word to see the translation and hear the pronunciation',
+
         'chat.sugg_1': 'How do I introduce myself?',
+
         'chat.sugg_2': 'Correct my English, please',
+
         'chat.sugg_3': "Let's practice conversation",
+
         'chat.sugg_4': 'Explain past tense to me',
-        'chat.placeholder': 'Type your message in English...',
+
+        'chat.placeholder': 'Type your message...',
+
         'chat.hint': 'Teacher Tati practices English with you · Enter to send · Shift+Enter for new line',
+
         'chat.voice_mode': 'Voice Mode',
+
         'chat.summary_mode': 'Summary Mode',
+
         'chat.loading': 'Loading...',
+
         'chat.no_convs': 'No conversations yet',
+
         'chat.level_student': 'Student',
+
         'chat.plan_premium': 'Premium',
+
         'chat.plan_basic': 'Basic',
+
         'chat.new_conversation': 'New conversation',
+
         'chat.today': 'Today',
+
         'chat.yesterday': 'Yesterday',
+
         'chat.older': 'Earlier',
+
         'chat.delete_conv': 'Delete this conversation?',
+
         'chat.delete_all_conv': '⚠️ Delete ALL conversations?',
+
         'chat.confirm': 'Confirm',
+
         'chat.cancel': 'Cancel',
+
         'chat.err_connect': 'Could not connect to the server.',
+
         'chat.err_unknown': 'Unknown error',
+
         'chat.attach': 'Attach file',
+
         'chat.record': 'Record audio',
+
         'chat.send': 'Send',
+
         'chat.new_conv': 'New conversation',
+
         'chat.delete_all_title': 'Delete all',
+
         'chat.sidebar_toggle': 'Menu',
 
-        // ── Settings ──────────────────────────────────────────────────
+        'chat.generating_audio': 'Generating audio...',
+
+        'chat.generating_summary': 'Generating summary...',
+
+
+
+        // ── Settings ──────────────────────────────────────────────────────────
+
         'settings.title': 'Settings',
+
         'settings.appearance': 'Appearance',
+
         'settings.theme': 'Theme',
+
         'settings.theme_desc': 'Choose between light and dark mode',
+
         'settings.dark': 'Dark',
+
         'settings.light': 'Light',
+
         'settings.language': 'Interface language',
+
         'settings.language_desc': 'Language for buttons and app text',
+
         'settings.audio': 'Audio',
+
         'settings.speed': 'Default speed',
+
         'settings.speed_desc': 'Playback speed for audio responses',
+
         'settings.chat': 'Chat',
+
         'settings.tooltip': 'Word tooltip',
+
         'settings.tooltip_desc': 'Click English words to see translation and pronunciation',
+
         'settings.enter_send': 'Send with Enter',
+
         'settings.enter_desc': 'Enter sends the message (Shift+Enter for new line)',
+
         'settings.save': 'Save Changes',
+
         'settings.saved': '✅ Saved!',
+
         'settings.auto_play': 'Auto play audio',
+
         'settings.auto_play_desc': 'Automatically play audio responses',
+
         'settings.senha_nova': 'Fill this in only if you want to change your password. Leave it blank to keep your current password.',
 
-        // ── Profile ───────────────────────────────────────────────────
+
+
+        // ── Profile ───────────────────────────────────────────────────────────
+
         'profile.title': 'My Profile',
+
         'profile.personal': 'Personal Information',
+
         'profile.full_name': 'Full name',
+
         'profile.nickname': 'Nickname',
+
         'profile.nickname_ph': 'What you prefer to be called',
+
         'profile.email': 'Email',
+
         'profile.occupation': 'Occupation',
+
         'profile.occupation_ph': 'E.g.: Developer, Student...',
+
         'profile.study': 'Study Preferences',
+
         'profile.level': 'English level',
+
         'profile.focus': 'Learning focus',
+
         'profile.save': 'Save changes',
+
         'profile.saving': 'Saving...',
-        'profile.saved': 'Profile updated successfully! ✓',
+
+        'profile.saved': 'Profile updated successfully! ✔',
+
         'profile.security': 'Security',
+
         'profile.current_pw': 'Current password',
+
         'profile.new_pw': 'New password',
+
         'profile.new_pw_ph': 'at least 6 characters',
+
         'profile.update_pw': 'Update password',
+
         'profile.change_photo': 'Change photo',
+
         'profile.danger': 'Danger Zone',
+
         'profile.danger_desc': 'These actions are irreversible. Proceed with care.',
+
         'profile.msgs': 'Messages',
+
         'profile.convs': 'Conversations',
+
         'profile.days': 'Days active',
+
+        'profile.words': 'Words learned',
+
         'profile.pw_hint': 'Fill in only if you want to change your password.',
+
         'profile.logout': 'Sign out',
+
         'profile.upgrade_premium': 'Upgrade to Premium',
+
         'profile.upgrade_full': 'Upgrade to Full',
+
         'profile.audio_reload_hint': 'Audio available even after leaving the conversation',
+
         'profile.streak_label': 'Your Streak',
+
         'profile.streak_days': 'days',
+
         'profile.streak_record': 'Record',
+
         'profile.streak_milestone_7': '🔥 7 days - Week Warrior',
+
         'profile.streak_milestone_30': '🌟 30 days - Monthly Master',
+
         'profile.streak_milestone_100': '💎 100 days - Diamond Learner',
 
-        // ── Pagamento ─────────────────────────────────────────────────
+
+
+        // ── Payment ───────────────────────────────────────────────────────────
+
         'payment.title': 'Upgrade to Premium',
+
         'payment.subtitle': 'Choose your plan:',
+
         'payment.method_title': 'Payment Method',
+
         'payment.method_pix': 'Pix',
+
         'payment.method_boleto': 'Boleto',
+
         'payment.method_card': 'Card',
+
         'payment.cpf_label': 'CPF or CNPJ',
+
         'payment.cpf_hint': 'Required for invoice issuance and secure processing.',
+
         'payment.generate': 'Generate Payment',
+
         'payment.pix_copied': 'Pix key copied!',
+
         'payment.invoice_opening': 'Opening payment invoice...',
+
         'payment.processing': 'Processing...',
+
         'payment.pix_generated': 'Payment Generated!',
+
         'payment.pix_instruction': 'Scan the QR Code below or use "Copy & Paste".',
+
         'payment.copy_pix': 'Copy Pix Key',
+
         'payment.view_invoice': 'View Full Invoice',
+
         'payment.receipt_title': 'Payment Confirmed!',
+
         'payment.receipt_subtitle': 'Your premium access has been activated successfully',
+
         'payment.receipt_plan': 'Plan',
+
         'payment.receipt_status': 'Status',
+
         'payment.receipt_date': 'Payment date',
+
         'payment.receipt_due': 'Next due date',
-        'payment.receipt_active': '✓ Active',
+
+        'payment.receipt_active': 'Active',
+
         'payment.receipt_go_chat': 'Go to Chat',
+
         'payment.receipt_go_profile': 'View Profile',
+
         'payment.receipt_tip': '💡 Tip: Now you have full access to all features!',
+
         'payment.receipt_enjoy': 'Enjoy your studies with Teacher Tati 🧑‍🏫',
+
         'payment.invalid_use_another': 'Invalid document. Please use another valid CPF/CNPJ to continue.',
+
         'payment.special_users_no_payment': 'Special users have free access and do not need to make payment.',
 
-        // ── Subscription Section ──────────────────────────────────────────
+
+
+        // ── Subscription ──────────────────────────────────────────────────────
+
         'sub.assinatura': 'Subscription',
+
         'sub.no_active': 'No active subscription',
+
         'sub.no_active_desc': 'Subscribe to a plan for full access.',
+
         'sub.subscribe_now': 'Subscribe now',
+
         'sub.vencimento': 'Due date',
+
         'sub.days_remaining': 'Days remaining',
+
         'sub.renew_change': 'Renew plan',
+
         'sub.load_error': 'Error loading subscription.',
-        'sub.status_active': '✓ Active',
-        'sub.status_grace': '⚠️ Overdue',
-        'sub.status_pending': '⏳ Pending',
-        'sub.status_expired': '✗ Expired',
-        'sub.status_cancelled': '✗ Cancelled',
-        'sub.plan_full': '👑 Full Plan',
-        'sub.plan_basic': '💬 Chat & Voice',
+
+        'sub.status_active': 'Active',
+
+        'sub.status_grace': 'Overdue',
+
+        'sub.status_pending': 'Pending',
+
+        'sub.status_expired': 'Expired',
+
+        'sub.status_cancelled': 'Cancelled',
+
+        'sub.plan_full': 'Full Plan',
+
+        'sub.plan_basic': 'Chat & Voice',
+
+        'sub.cancel_button': 'Cancel subscription',
+
+        'sub.cancel_confirm_toast': 'Tap cancel subscription again within 5 seconds to confirm.',
+
+        'sub.cancel_success': 'Subscription cancelled successfully.',
+
+        'sub.cancel_error': 'Could not cancel the subscription.',
+
+        'sub.cancel_connection_error': 'Connection error while cancelling subscription.',
+
         'paywall.limit_reached': 'Free limit reached!',
+
         'paywall.upgrade_desc': 'Subscribe to a plan to keep practicing.',
+
         'paywall.upgrade': 'See plans',
+
         'paywall.messages_left': (n) => `You have ${n} free message${n === 1 ? '' : 's'} remaining.`,
 
-        // ── Planos ────────────────────────────────────────────────────
+
+
+        // ── Plans ─────────────────────────────────────────────────────────────
+
         'plan.basic': 'Chat & Voice',
+
         'plan.basic_price': '$19.90',
+
         'plan.basic_desc': 'Access to chat and voice mode with Teacher Tati.',
+
         'plan.full': 'Full',
+
         'plan.full_price': '$39.90',
+
         'plan.full_desc': 'Full access to all features, including activities and reports.',
+
         'btn.details': 'View details',
+
         'modal.title': 'Plan Details',
+
         'loading_text': 'Processing...',
+
         'plan.per_month': '/month',
+
         'plan.choose': 'Choose this plan',
+
         'plan.basic_feature_1': '💬 Unlimited chat with Teacher Tati',
+
         'plan.basic_feature_2': '🎙️ Voice Mode',
+
         'plan.basic_feature_3': '📊 Conversation history',
+
         'plan.basic_feature_4': '🌐 Word translation in chat',
+
         'plan.full_feature_1': '💬 Unlimited chat with Teacher Tati',
+
         'plan.full_feature_2': '🎙️ Voice Mode',
+
         'plan.full_feature_3': '📊 Conversation history',
+
         'plan.full_feature_4': '🌐 Word translation in chat',
+
         'plan.full_feature_5': '📚 Modules and activities',
+
         'plan.full_feature_6': '🃏 Flashcards',
+
         'plan.full_feature_7': '✏️ Exercises with correction',
+
         'plan.full_feature_8': '🏆 Trophies and progress',
+
         'plan.full_feature_9': '📈 Performance reports',
 
 
-        // ── Dashboard — geral ─────────────────────────────────────────
+
+        // ── Dashboard – general ───────────────────────────────────────────────
+
         'dash.overview': 'Overview',
+
         'dash.overview_sub': 'Platform summary',
+
         'dash.students': 'Students',
+
         'dash.students_sub': 'Student management',
+
         'dash.reports': 'Reports',
+
         'dash.reports_sub': 'Overview and class metrics',
+
         'dash.go_chat': 'Go to Chat',
+
         'dash.total_students': 'Total Students',
+
         'dash.total_msgs': 'Total Messages',
+
         'dash.active_today': 'Active Today',
+
         'dash.recent': 'Recent Students',
+
         'dash.see_all': 'See all →',
+
         'dash.all_students': 'All Students',
+
         'dash.search_ph': 'Search student...',
+
         'dash.no_students': 'No students found.',
-        'dash.active': '↑ Active',
+
+        'dash.active': '→ Active',
+
         'dash.hoje': 'Today',
+
         'dash.alertas': 'Class Difficulty Alerts',
+
         'dash.aluno_alertas': '🧑‍🎓 Student',
+
         'dash.aten_alertas': '⚠️ Spotlight',
+
         'dash.loading': 'Loading...',
+
         'dash.no_alerts': 'No students with registered difficulties.',
+
         'dash.submissions': 'Corrections',
+
         'dash.submissions_sub': 'Student answers to review',
+
         'dash.no_submissions': 'No answers submitted yet.',
+
         'dash.btn_feedback': 'Review',
+
         'dash.col_date': 'Date',
+
         'dash.col_activity': 'Activity',
+
         'dash.col_response': 'Answer',
+
         'dash.col_score': 'Score',
+
         'dash.col_actions': 'Actions',
+
         'dash.correction_title': 'Review answer from',
+
         'dash.student_answer': 'Student answer',
+
         'dash.ai_suggest': '✨ AI Suggestion',
+
         'dash.ai_feedback': 'AI Feedback',
+
         'dash.teacher_feedback': 'Teacher Feedback',
+
         'dash.teacher_feedback_ph': 'Add a personalized comment...',
+
         'dash.score_label': 'Score (0–100)',
+
         'dash.save_correction': 'Save Review',
 
-        // ── Dashboard — tabela alunos ─────────────────────────────────
+
+
+        // ── Dashboard – student table ─────────────────────────────────────────
+
         'dash.col_student': 'Student',
+
         'dash.col_level': 'Level',
+
         'dash.col_focus': 'Focus',
+
         'dash.col_last': 'Last active',
+
         'dash.col_msgs': 'Msgs',
+
         'dash.col_since': 'Joined',
 
-        // ── Dashboard — modal aluno ───────────────────────────────────
+
+
+        // ── Dashboard – student modal ─────────────────────────────────────────
+
         'dash.edit': '✏️ Edit',
+
         'dash.prompt': '🧩 Prompt',
+
         'dash.insight': '🧠 Insight',
+
         'dash.interests': '🎯 Interests',
+
         'dash.save_level': 'Save level',
+
         'dash.save_prompt': 'Save prompt',
+
         'dash.clear_prompt': 'Clear prompt',
+
         'dash.generate_insight': '🧠 Generate Insight',
+
         'dash.regenerate': '🔄 Regenerate',
+
         'dash.analyzing': '⏳ Analyzing...',
+
         'dash.delete_student': 'Delete student',
+
         'dash.confirm_delete': 'Delete',
-        'dash.level_updated': '✓ Level updated successfully!',
-        'dash.prompt_saved': '✓ Prompt saved! Takes effect on next message.',
+
+        'dash.level_updated': '✔ Level updated successfully!',
+
+        'dash.prompt_saved': '✔ Prompt saved! Takes effect on next message.',
+
         'dash.err_save': '✗ Error saving. Please try again.',
+
         'dash.prompt_hint': 'Add extra instructions for Tati to follow <strong>only with this student</strong>.',
+
         'dash.grammar_errors': 'Grammar Errors',
+
         'dash.mapping_errors': 'Mapping recurring grammar mistakes...',
+
         'dash.no_grammar_errors': 'No grammar errors detected in the latest messages.',
+
         'dash.exemples': 'Example',
+
         'dash.click': "Click 🧠 Generate Insight to analyze this student's history or Grammar Errors to see recurring mistakes.",
+
         'dash.interests_hint': 'The AI will analyze the history to map hobbies and suggest study plans.',
+
         'dash.analyze_interests': '🎯 Analyze Interests',
+
         'dash.redo_analysis': '🎯 Redo Analysis',
+
         'dash.interests_focus': 'Interests and Focus',
+
         'dash.click_to_load': 'Click analyze to load.',
+
         'dash.practical_rec': 'Practical Recommendations',
+
         'dash.no_interests': 'No interests mapped yet.',
+
         'dash.no_recs': 'No recommendations available.',
+
         'dash.action': '💡 Action:',
+
         'dash.confirm_delete_msg': 'This action is irreversible.',
 
-        // ── Dashboard — reports ───────────────────────────────────────
+
+
+        // ── Dashboard – reports ───────────────────────────────────────────────
+
         'dash.reports_title': 'Performance Reports',
+
         'dash.reports_desc': 'Track the evolution and metrics of the class.',
+
         'dash.reports_sem': 'Weekly activity',
+
         'dash.total': 'Total',
+
         'dash.msgs': 'Messages exchanged',
+
         'dash.trocadas': 'Exchanged',
+
         'dash.ac_hj': 'Active today',
+
         'dash.niveis': 'Level distribution',
+
         'dash.level_st': 'English proficiency levels',
+
         'dash.al_dis': 'student',
-        'dash.n_msg_day': 'Messages per day — last 7 days',
-        'dash.n_msg': 'Message intensity by day of week — last 4 weeks',
+
+        'dash.n_msg_day': 'Messages per day – last 7 days',
+
+        'dash.n_msg': 'Message intensity by day of week – last 4 weeks',
+
         'dash.eng_less': 'Less',
+
         'dash.eng_more': 'More',
+
         'dash.media': 'Avg/day',
+
         'dash.pico': 'Peak',
+
         'dash.tot_sem': 'Weekly total',
+
         'dash.val_students': 'Total students',
+
         'dash.val_msgs': 'Messages',
+
         'dash.val_active': 'Active today',
 
-        // dash simulações
+
+
+        // ── Dashboard – simulations ───────────────────────────────────────────
 
         'dash.simulations': 'Simulations',
+
         'dash.simulations_sub': 'Manage real-life conversation simulations',
+
         'dash.new_simulation': 'Create Simulation',
+
         'dash.edit_simulation': 'Edit Simulation',
 
-        // ── Dashboard — dias da semana ────────────────────────────────
+
+
+        // ── Dashboard – weekdays ──────────────────────────────────────────────
+
         'dash.day1': 'Mon',
+
         'dash.day2': 'Tue',
+
         'dash.day3': 'Wed',
+
         'dash.day4': 'Thu',
+
         'dash.day5': 'Fri',
+
         'dash.day6': 'Sat',
+
         'dash.day7': 'Sun',
 
-        // ── Dashboard — heatmap ───────────────────────────────────────
+
+
+        // ── Dashboard – heatmap ───────────────────────────────────────────────
+
         'dash.week_label': (n) => `Week ${n}`,
 
-        // ── Módulos (admin) ───────────────────────────────────────────
+
+
+        // ── Modules (admin) ───────────────────────────────────────────────────
+
         'mod.title': 'Modules',
+
         'mod.subtitle': 'Manage teaching modules',
+
         'mod.new': 'New Module',
+
         'mod.edit': 'Edit',
+
         'mod.save': 'Save',
+
         'mod.cancel': 'Cancel',
+
         'mod.publish': 'Publish',
+
         'mod.unpublish': 'Unpublish',
+
         'mod.delete': 'Delete',
+
         'mod.modal_new': 'New Module',
+
         'mod.modal_edit': 'Edit Module',
+
         'mod.filter_all': 'All',
+
         'mod.filter_pub': 'Published',
+
         'mod.filter_draft': 'Drafts',
+
         'mod.empty': 'No modules found.',
+
         'mod.loading': 'Loading modules...',
+
         'mod.order': 'Order:',
+
         'mod.field_title': 'Module title',
-        'mod.field_title_ph': 'E.g.: To Be — Present Simple',
+
+        'mod.field_title_ph': 'E.g.: To Be – Present Simple',
+
         'mod.field_desc': 'Description',
+
         'mod.field_desc_ph': 'Brief description of what will be studied...',
+
         'mod.field_level': 'Level',
+
         'mod.field_order': 'Order',
+
         'mod.section_contents': 'Contents',
+
         'mod.section_flashcards': 'Flashcards',
+
         'mod.section_quiz': 'Quiz',
+
         'mod.add_content': 'Add',
+
         'mod.add_question': 'Add question',
+
         'mod.upload': '📁 File',
+
         'mod.upload_ok': 'File uploaded',
+
         'mod.gen_ai': 'Generate with AI',
+
         'mod.generating': '⏳ Generating...',
+
         'mod.save_ok_create': 'Module created successfully!',
+
         'mod.save_ok_update': 'Module updated successfully!',
+
         'mod.confirm_del': 'Permanently delete this module?',
+
         'mod.question_label': 'Question',
+
         'mod.option_label': 'Option',
+
         'mod.explanation_label': 'Explanation',
+
         'mod.explanation_ph': 'Why is this the correct answer?',
-        'mod.quiz_title_ph': 'Quiz title (e.g.: Quiz — To Be)',
+
+        'mod.quiz_title_ph': 'Quiz title (e.g.: Quiz – To Be)',
+
         'mod.fc_word_ph': 'English word',
+
         'mod.fc_trans_ph': 'Translation',
+
         'mod.fc_ex_ph': 'Usage example',
+
         'mod.fc_manage_sub': 'Manage flashcard packs',
+
         'mod.fc_none': 'No flashcard packs found.',
+
         'mod.fc_count': (n) => `${n} card${n !== 1 ? 's' : ''}`,
+
         'mod.fc_gen_ai': 'Generate Pack with AI',
+
         'mod.fc_theme': 'Pack theme',
+
         'mod.fc_theme_ph': 'E.g.: Irregular Verbs, Airport...',
+
         'mod.fc_instructions': 'Extra instructions',
+
         'mod.fc_inst_ph': 'E.g.: Focus on American slang...',
+
         'mod.level_all': 'All',
 
-        // ── Atividades (aluno) ────────────────────────────────────────
+
+
+        // ── Activities (student) ──────────────────────────────────────────────
+
+        'act.no_exercises_yet': 'Tati is analyzing your progress. Personalized exercises will appear here soon!',
+
+        'act.generate_new': 'Generate New Exercises',
+
+        'act.personalized_writing': 'Writing Exercise',
+
+        'act.personalized_writing_desc': 'Practice your writing and receive personalized feedback from Tati.',
+
+        'act.start_exercise': 'Create new exercise',
+
+        'act.personalized_desc': 'Based on your recent conversation mistakes.',
+
+        'act.personalized_fc': 'Vocabulary Review',
+
+        'act.personalized_fc_desc': 'Words you got wrong or are learning.',
+
+        'act.view_flashcards': 'View Flashcards',
+
+        'act.items': 'items',
+
+        'act.no_activities': 'No activities yet. Chat with Tati to generate exercises!',
+
         'act.title': 'My Activities',
+
         'act.hero_title': 'Your Activities',
+
         'act.hero_subtitle': 'Practice vocabulary, grammar and pronunciation. Earn points in the ranking!',
+
+        'act.restricted_activities': 'Activities are available only for Full plan users starting on July 1, 2026.',
+
         'act.tab_quiz': 'Quizzes',
+
         'act.tab_flashcards': 'Flashcards',
+
         'act.tab_exercises': 'Exercises',
+
         'act.tab_simulations': 'Simulations',
+
         'act.sim_title': '🎭 Real Conversation Simulation',
+
         'act.sim_desc': 'Practice English in everyday situations with Teacher Tati',
+
         'act.sim_launch': 'Open Simulation',
+
         'act.all_modules': 'All modules',
+
         'act.search_ph': 'Search activity...',
+
         'act.no_quizzes': 'No quizzes available.',
+
         'act.no_fc': 'No flashcards available.',
+
         'act.ex_empty': 'No exercises available.',
+
         'act.questions': 'questions',
+
         'act.btn_start': 'Start',
+
         'act.btn_redo': 'Redo',
+
         'act.quiz_desc_fallback': 'Practice your knowledge about ',
+
+        'act.quiz_finish': 'Submit',
+
         'act.fc_label_word': 'Word',
+
         'act.fc_label_translation': 'Translation',
+
         'act.fc_reveal': 'Click to reveal',
+
         'act.fc_flip': 'Flip',
+
         'act.fc_know': 'Got it!',
+
         'act.fc_review': 'Review',
+
         'act.fc_counter': (idx, total, known) => `${idx} of ${total} • ${known} learned`,
+
         'act.quiz_progress': (cur, total) => `${cur} of ${total}`,
+
         'act.quiz_next': 'Next',
-        'act.quiz_perfect': '🎉 Congratulations! Great performance!',
-        'act.quiz_keep_practicing': '💪 Keep practicing!',
+
+        'act.quiz_check': 'Check Answer',
+
+        'act.quiz_perfect': '🎉 Congratulations! Great job!',
+
+        'act.quiz_excellent': '🥇 Excellent!',
+
+        'act.quiz_very_good': '🥈 Very good!',
+
+        'act.quiz_good': '🥉 Good job!',
+
+        'act.quiz_satisfactory': '💪 Satisfactory, but you can do better!',
+
+        'act.quiz_needs_improvement': '📖 Needs more practice!',
+
+        'act.quiz_poor': '📚 Insufficient result, study more!',
+
+        'act.quiz_very_poor': '⚠️ You need to review this content urgently!',
+
         'act.quiz_close': 'Close',
+
+        'act.quiz_result': (correct, total, pct) => `${correct} out of ${total} correct (${pct}%)`,
+
         'act.explanation_label': 'Explanation:',
+
         'act.view_file': 'View file',
+
         'act.ex_ph_textarea': 'Write your answer here...',
+
         'act.ex_sent': 'Submitted! Awaiting review.',
 
-        // ── Atividades — Sidebar ────────────────────────────────────────
+
+
+        // ── Activities – Sidebar ──────────────────────────────────────────────
+
         'act.sidebar_menu': 'Main Menu',
+
         'act.nav_activities': 'Activities',
+
         'act.nav_profile': 'My Profile',
+
         'act.nav_achievements': 'Achievements',
+
         'act.nav_competitions': 'Competitions',
+
         'act.nav_logout': 'Back to chat',
 
-        // ── Atividades — Profile ─────────────────────────────────────────
+
+
+        // ── Activities – Profile ──────────────────────────────────────────────
+
         'act.profile_title': 'My Profile',
+
         'act.profile_sub': 'Track your English learning progress.',
+
         'act.pending_title': 'Pending Activities',
+
         'act.pending_sub_prefix': 'You have',
+
         'act.pending_sub_suffix': 'activities to complete',
+
         'act.study_time_title': 'Study Time',
+
         'act.this_week': 'This Week',
+
         'act.this_month': 'This Month',
+
         'act.last_month': 'Last Month',
+
         'act.last_3_months': 'Last 3 Months',
+
         'act.current_badge': 'Current',
 
-        // ── Atividades — Achievements ────────────────────────────────────
+
+
+        // ── Activities – Achievements ─────────────────────────────────────────
+
         'act.achievements_title': 'My Achievements',
+
         'act.achievements_sub': 'Milestones achieved in your learning journey.',
+
         'act.streak_inactive': 'INACTIVE',
+
         'act.streak_active': 'ACTIVE',
+
         'act.streak_days_label': 'days streak',
+
         'act.streak_longest_label': 'Longest streak',
+
         'act.total_questions_label': 'Total questions',
+
         'act.hours_saved_label': 'Hours saved',
+
         'act.trophy_progress_title': 'Trophy Progress',
+
         'act.trophy_progress_sub': 'Unlock achievements using Tati AI',
+
         'act.tier_bronze': 'Bronze',
+
         'act.tier_silver': 'Silver',
+
         'act.tier_gold': 'Gold',
+
         'act.tier_platinum': 'Platinum',
+
         'act.medal_all': 'All',
+
         'act.medal_questions': 'Questions',
+
         'act.medal_streak': 'Streak',
+
         'act.medal_credits': 'Credits',
+
         'act.medal_time': 'Time',
+
         'act.medal_milestones': 'Milestones',
+
         'act.medal_social': 'Social',
+
         'act.how_to_title': 'How to Earn Trophies',
+
         'act.how_streak_title': 'Streak',
+
         'act.how_streak_desc': 'Study every day to maintain your streak. The more consecutive days, the more trophies!',
+
         'act.how_questions_title': 'Questions Answered',
+
         'act.how_questions_desc': 'Complete quizzes, flashcards and exercises to accumulate correct answers.',
+
         'act.how_credits_title': 'Credits',
+
         'act.how_credits_desc': 'Earn credits by completing activities and participating in the ranking.',
+
         'act.how_time_title': 'Time Saved',
+
         'act.how_time_desc': 'The more you use AI to learn, the more time you save!',
 
-        // ── Atividades — Flashcards empty ────────────────────────────────
+        'act.troph_prof': "You haven't won any trophies yet. Complete quizzes and challenges to earn them!",
+
+
+
+        // ── Activities – Flashcards empty ─────────────────────────────────────
+
         'act.fc_empty_title': 'Custom Flashcards',
+
         'act.fc_empty_sub': 'Your vocabulary flashcards will be generated here soon.',
 
-        // ── Atividades — Exercises empty ─────────────────────────────────
+
+
+        // ── Activities – Exercises empty ──────────────────────────────────────
+
         'act.ex_empty_title': 'Exercises',
+
         'act.ex_empty_sub': 'Practice activities with Tati feedback.',
 
-        // ── Atividades — Simulations empty ───────────────────────────────
+
+
+        // ── Activities – Simulations empty ────────────────────────────────────
+
         'act.sim_empty_title': 'Conversation Simulations',
+
         'act.sim_empty_sub': 'Practice real situations like airport, restaurant and job interviews.',
 
-        // ── Atividades — Competitions/Ranking ───────────────────────────
+
+
+        // ── Activities – Competitions/Ranking ────────────────────────────────
+
         'act.comp_title': 'Competitions',
+
         'act.comp_subtitle': 'See who the most engaged students are and climb the ranking!',
+
         'act.ranking_banner_title': 'Engagement Ranking',
+
         'act.ranking_banner_sub': 'Most active students on Tati AI',
+
         'act.winners_title': 'Winners',
+
+        'act.current_podium': 'Current Podium',
+
         'act.how_ranking_title': 'How does the ranking work?',
+
         'act.how_ranking_desc': 'The score is calculated by the weighted sum of all your study actions in the month:',
+
         'act.pts_exercise': 'Exercise submitted',
+
         'act.pts_flashcard': 'Flashcard reviewed',
+
         'act.pts_simulation': 'Simulations made',
+
         'act.pts_quiz': 'Quiz completed',
+
         'act.pts_message': 'Message to Tati AI',
+
         'act.tiebreaker_title': 'Tiebreaker:',
+
         'act.tiebreaker_desc': 'In case of a tie in score, the tiebreaker is by the number of tokens used (more interaction means better position).',
+
         'act.prizes_title': 'Prizes',
+
         'act.prize_1_title': '1st Place',
-        'act.prize_1_desc': 'Gold Trophy',
+
+        'act.prize_1_desc': 'Diamond Badge + 1 Premium week',
+
         'act.prize_2_title': '2nd Place',
-        'act.prize_2_desc': 'Silver Trophy',
+
+        'act.prize_2_desc': 'Gold Badge + Community Spotlight',
+
         'act.prize_3_title': '3rd Place',
-        'act.prize_3_desc': 'Bronze Trophy',
-        'act.prizes_note': 'Trophies stay permanently in your collection. Extra credits are applied in the next cycle.',
+
+        'act.prize_3_desc': 'Silver Badge',
+
+        'act.prizes_note': 'Badges stay permanently in your collection.',
+
         'act.points': 'points',
+
         'act.top15_title': 'Top 15',
+
         'act.table_student': 'Student',
+
         'act.table_score': 'Score',
+
         'act.table_tokens': 'Tokens',
+
         'act.cd_days': 'Days remaining',
+
         'act.cd_hours': 'Hours remaining',
+
         'act.cd_minutes': 'Minutes remaining',
+
         'act.cd_seconds': 'Seconds remaining',
+
         'act.countdown_label': 'Time remaining',
 
-        // ── Atividades — Modals ───────────────────────────────────────────
-        'act.fb_modal_title': 'Send Feedback',
-        'act.fb_type_label': 'Type *',
-        'act.fb_type_bug': 'Bug',
-        'act.fb_type_suggestion': 'Suggestion',
-        'act.fb_title_label': 'Title *',
-        'act.fb_title_ph': 'Brief summary',
-        'act.fb_desc_label': 'Description *',
-        'act.fb_desc_ph': 'Details...',
-        'act.fb_submit_btn': 'Send Feedback',
-        'act.writing_modal_title': 'Writing Exercise',
-        'act.writing_theme_label': 'Exercise Theme *',
-        // ── Trophies (Names and Descriptions) ──────────────────────────────────
-        'act.title_first_quiz': 'First Quiz',
-        'act.desc_first_quiz': 'Complete your first quiz',
-        'act.title_quizzer_5': 'Beginner Quizzer',
-        'act.desc_quizzer_5': 'Complete 5 quizzes',
-        'act.title_quizzer_10': 'Quizzer',
-        'act.desc_quizzer_10': 'Complete 10 quizzes',
-        'act.title_quizzer_25': 'Advanced Quizzer',
-        'act.desc_quizzer_25': 'Complete 25 quizzes',
-        'act.title_quizzer_50': 'Quiz Master',
-        'act.desc_quizzer_50': 'Complete 50 quizzes',
-        'act.title_quizzer_100': 'Supreme Master',
-        'act.desc_quizzer_100': 'Complete 100 quizzes',
-        'act.title_streak_1': 'First Day',
-        'act.desc_streak_1': 'Complete your first study day',
-        'act.title_streak_3': '3-Day Streak',
-        'act.desc_streak_3': 'Study for 3 consecutive days',
-        'act.title_streak_7': '7-Day Streak',
-        'act.desc_streak_7': 'Study for 7 consecutive days',
-        'act.title_streak_14': '14-Day Streak',
-        'act.desc_streak_14': 'Study for 14 consecutive days',
-        'act.title_streak_30': '30-Day Streak',
-        'act.desc_streak_30': 'Study for 30 consecutive days',
-        'act.title_streak_60': '60-Day Streak',
-        'act.desc_streak_60': 'Study for 60 consecutive days',
-        'act.title_streak_100': '100-Day Streak',
-        'act.desc_streak_100': 'Study for 100 consecutive days',
-        'act.title_streak_365': '365-Day Streak',
-        'act.desc_streak_365': 'Study for 365 consecutive days',
-        'act.title_first_msg': 'First Message',
-        'act.desc_first_msg': 'Send your first message to Tati',
-        'act.title_msg_50': 'Popular',
-        'act.desc_msg_50': 'Send 50 messages in chat',
-        'act.generate_new': 'Generate New Exercises',
-        'act.title_msg_100': '100 Messages',
-        'act.desc_msg_100': 'Send 100 messages',
-        'act.title_msg_200': 'Communicator',
-        'act.desc_msg_200': 'Send 200 messages in chat',
-        'act.title_msg_500': '500 Messages',
-        'act.desc_msg_500': 'Send 500 messages',
-        'act.title_msg_1000': 'Talkative',
-        'act.desc_msg_1000': 'Send 1000 messages in chat',
-        'act.title_sim_1': 'First Simulation',
-        'act.desc_sim_1': 'Complete your first simulation',
-        'act.title_sim_5': 'Beginner Actor',
-        'act.desc_sim_5': 'Complete 5 simulations',
-        'act.title_sim_20': 'Simulation Star',
-        'act.desc_sim_20': 'Complete 20 simulations',
-        'act.title_credit_1': 'First Credit',
-        'act.desc_credit_1': 'Earn your first credit',
-        'act.title_credit_10': 'Saver',
-        'act.desc_credit_10': 'Accumulate 10 credits',
-        'act.title_credit_50': 'Collector',
-        'act.desc_credit_50': 'Accumulate 50 credits',
-        'act.title_credit_100': 'Rich',
-        'act.desc_credit_100': 'Accumulate 100 credits',
-        'act.title_credit_500': 'Tycoon',
-        'act.desc_credit_500': 'Accumulate 500 credits',
-        'act.title_time_1': 'First Hour',
-        'act.desc_time_1': 'Save 1 hour of study',
-        'act.title_time_10': 'Time Master',
-        'act.desc_time_10': 'Save 10 hours of study',
-        'act.title_time_50': 'Supreme Time',
-        'act.desc_time_50': 'Save 50 hours of study',
-        'act.title_time_100': 'Time Traveler',
-        'act.desc_time_100': 'Save 100 hours of study',
-        'act.title_vocab_10': 'Vocabulary 10',
-        'act.desc_vocab_10': 'Learn 10 new words',
-        'act.title_vocab_50': 'Vocabulary 50',
-        'act.desc_vocab_50': 'Learn 50 new words',
-        'act.title_vocab_100': 'Vocabulary 100',
-        'act.desc_vocab_100': 'Learn 100 new words',
-        'act.title_vocab_500': 'Polyglot',
-        'act.desc_vocab_500': 'Learn 500 new words',
-        'act.title_vocab_1000': 'Living Dictionary',
-        'act.desc_vocab_1000': 'Learn 1000 new words',
-        'act.title_goal_1': 'First Goal',
-        'act.desc_goal_1': 'Set your first study goal',
-        'act.title_goal_5': 'Focused',
-        'act.desc_goal_5': 'Complete 5 study goals',
-        'act.title_goal_10': 'Objective',
-        'act.desc_goal_10': 'Complete 10 study goals',
-        'act.title_rank_10': 'Top 10',
-        'act.desc_rank_10': 'Reach Top 10 in monthly ranking',
-        'act.title_rank_3': 'Top 3',
-        'act.desc_rank_3': 'Reach Top 3 in monthly ranking',
-        'act.title_rank_1': 'Champion',
-        'act.desc_rank_1': 'Rank 1st in monthly ranking',
-        'act.title_social_1': 'Social',
-        'act.desc_social_1': 'Interact with the community',
-        'act.title_explore': 'Explorer',
-        'act.desc_explore': 'Visit all app pages',
-        'act.title_alert': 'Always Alert',
-        'act.desc_alert': 'Open the app 7 days in a row',
-        'act.title_early': 'Early Bird',
-        'act.desc_early': 'Study before 8 AM',
-        'act.title_night': 'Night Owl',
-        'act.desc_night': 'Study after 10 PM',
-        'act.title_weekend': 'Weekend',
-        'act.desc_weekend': 'Study on Saturday and Sunday',
-        'act.title_perfect': 'Perfectionist',
-        'act.desc_perfect': 'Get 100% on 5 quizzes',
 
-        // ── Activities — Categories ──────────────────────────────────────
-        'act.cat_all': 'All',
-        'act.cat_questions': 'Quizzes',
-        'act.cat_streak': 'Streak',
-        'act.cat_milestones': 'Milestones',
-        'act.cat_social': 'Social',
-        'act.cat_credits': 'Credits',
-        'act.cat_time': 'Time',
-        'act.cat_vocabulary': 'Vocabulary',
-        'act.cat_goals': 'Goals',
-        'act.cat_ranking': 'Ranking',
+
+        // ── Activities – Modals ───────────────────────────────────────────────
+
+        'act.fb_modal_title': 'Send Feedback',
+
+        'act.fb_type_label': 'Type *',
+
+        'act.fb_type_bug': 'Bug',
+
+        'act.fb_type_suggestion': 'Suggestion',
+
+        'act.fb_title_label': 'Title *',
+
+        'act.fb_title_ph': 'Brief summary',
+
+        'act.fb_desc_label': 'Description *',
+
+        'act.fb_desc_ph': 'Details...',
+
+        'act.fb_submit_btn': 'Send Feedback',
+
+        'act.writing_modal_title': 'Writing Exercise',
+
+        'act.writing_theme_label': 'Exercise Theme *',
+
+        'act.writing_theme_ph': 'E.g.: Describe your last vacation',
 
         'act.writing_content_label': 'Your Answer *',
+
         'act.writing_content_ph': 'Write your text here...',
+
         'act.writing_submit_btn': 'Submit Exercise',
+
         'act.notif_title': 'Notifications',
 
-        // ── Simulations (Scenarios) ──────────────────────────────────────
+        'act.notif_mark_all': 'Mark all as read',
+
+        'act.notif_empty': 'No notifications yet.',
+
+        'act.notif_error': 'Error loading notifications.',
+
+        'act.notif_loading': 'Loading...',
+
+        'act.notif_time_now': 'Just now',
+
+        'act.notif_time_min': (n) => `${n}min ago`,
+
+        'act.notif_time_hour': (n) => `${n}h ago`,
+
+        'notif.streak_reminder.title': 'Do not break your streak!',
+
+        'notif.streak_reminder.message': (p = {}) => `You are on a ${p.streak || 0}-day streak. Practice now to keep it.`,
+
+        'notif.streak_milestone.title': 'Streak milestone unlocked!',
+
+        'notif.streak_milestone.message': (p = {}) => `You reached ${p.streak || 0} consecutive days. Keep the momentum.`,
+
+        'notif.streak_broken.title': 'Your streak was broken',
+
+        'notif.streak_broken.message': (p = {}) => `Your previous streak was ${p.streak || 0} days. Restart today.`,
+
+        'notif.trophy_earned.title': 'New trophy unlocked!',
+
+        'notif.trophy_earned.message': (p = {}) => `You earned the trophy: ${p.trophy_name || ''}`,
+
+
+
+        // ── Simulations (Scenarios) ───────────────────────────────────────────
+
         'sim.cat_all': 'All',
+
         'sim.cat_travel': 'Travel',
+
         'sim.cat_work': 'Work',
+
         'sim.cat_daily': 'Daily Life',
 
+
+
         'sim.title_airport_checkin': 'Airport Check-in',
+
         'sim.desc_airport_checkin': 'Practice your English at the airport check-in counter.',
+
         'sim.title_job_interview': 'Job Interview',
+
         'sim.desc_job_interview': 'Practice job interviews in English.',
+
         'sim.title_shopping': 'Shopping',
+
         'sim.desc_shopping': 'Shop in stores, ask for prices and sizes.',
+
         'sim.title_at_airport': 'At the Airport',
-        'sim.desc_at_airport': 'Practice airport conversations — check-in, security, boarding.',
+
+        'sim.desc_at_airport': 'Practice airport conversations – check-in, security, boarding.',
+
         'sim.title_at_hotel': 'At the Hotel',
+
         'sim.desc_at_hotel': 'Check-in and request hotel services.',
+
         'sim.title_at_doctor': 'At the Doctor',
+
         'sim.desc_at_doctor': 'Describe symptoms and consult doctors in English.',
+
         'sim.title_at_restaurant': 'At the Restaurant',
+
         'sim.desc_at_restaurant': 'Order in restaurants and ask about the menu.',
+
         'sim.title_restaurant_order': 'Restaurant Order',
+
         'sim.desc_restaurant_order': 'Order your food and ask questions about the menu.',
 
-        // ── Feedback / Support ───────────────────────────────────────────
+
+
+        // ── Feedback / Support ────────────────────────────────────────────────
+
         'feedback.title': 'Send Feedback',
+
         'feedback.category': 'Category',
+
         'feedback.cat_general': '💬 General Feedback',
+
         'feedback.cat_bug': '🪲 Report a Bug',
+
         'feedback.cat_suggestion': '💡 Suggestion',
+
         'feedback.message': 'Message',
+
         'feedback.message_ph': 'Describe the problem, suggestion or feedback...',
+
         'feedback.cancel': 'Cancel',
+
         'feedback.send': 'Send Feedback',
+
         'sim.feedback': 'Simulation Feedback',
 
+        'vct.tour': 'Start system tour',
+
+
+
         'sim.modal_name': 'Simulation Name',
+
         'sim.modal_name_ph': 'E.g.: At the Airport',
+
         'sim.modal_desc': 'Description',
+
         'sim.modal_desc_ph': 'Practice conversations at the airport...',
+
         'sim.modal_icon': 'Icon (emoji)',
+
         'sim.modal_diff': 'Difficulty',
+
         'sim.modal_prompt': 'System Prompt (AI instructions)',
+
         'sim.modal_prompt_ph': 'You are a TSA agent at JFK airport...',
+
         'sim.modal_gen_ai': 'Generate prompt with AI (recommended)',
 
 
 
-        // ── Atividades — Quiz Results ────────────────────────────────────
+        // ── Activities – Quiz Results ─────────────────────────────────────────
+
         'act.quiz_result_correct': 'correct answers',
+
         'act.quiz_trophies_earned': 'Trophies earned:',
+
         'act.quiz_question_of': 'Question',
+
         'act.quiz_de': 'of',
+
         'act.quiz_close_btn': 'Close',
 
-        // ── Atividades — JS Hardcoded ───────────────────────────────────
+
+
+        // ── Activities – JS Hardcoded ─────────────────────────────────────────
+
         'act.quiz_attempts': 'Attempts',
+
         'act.quiz_start': 'Start',
+
         'act.quiz_redo': 'Redo',
+
         'act.quiz_done': 'Completed',
+
         'act.generating_report': 'Generating pedagogical report...',
+
         'act.generating_pdf': 'Generating PDF...',
-        'act.download_pdf_report': 'Download PDF Report',
+
+        'act.download_pdf': 'Download PDF Report',
+
         'act.quiz_new': 'New',
+
         'act.quiz_limit_reached': 'Limit reached',
+
         'act.quiz_questions': 'questions',
+
         'act.fc_none': 'No flashcards.',
+
         'act.sim_none': 'No scenarios available.',
+
         'act.status_pending': 'Pending',
+
         'act.status_corrected': 'Corrected',
-        'act.difficulty_beginner': 'Beginner',
-        'act.difficulty_intermediate': 'Intermediate',
-        'act.difficulty_pre_intermediate': 'Pre-Intermediate',
-        'act.difficulty_business': 'Business English',
-        'act.difficulty_advanced': 'Advanced',
-        'act.user_fallback': 'Student',
 
-        // ── Atividades — Feedback/Writing Messages ────────────────────────
-        'act.fb_fill_all': 'Please fill in all fields.',
-        'act.fb_success': 'Feedback sent successfully!',
-        'act.fb_error': 'Error sending.',
-        'act.fb_conn_error': 'Connection error.',
-        'act.wr_fill_all': 'Please fill in all fields.',
-        'act.wr_success': 'Exercise sent successfully!',
-        'act.wr_error': 'Error sending.',
-        'act.wr_conn_error': 'Connection error.',
-
-        // ── Atividades — Months ───────────────────────────────────────────
-        'act.month_0': 'January',
-        'act.month_1': 'February',
-        'act.month_2': 'March',
-        'act.month_3': 'April',
-        'act.month_4': 'May',
-        'act.month_5': 'June',
-        'act.month_6': 'July',
-        'act.month_7': 'August',
-        'act.month_8': 'September',
-        'act.month_9': 'October',
-        'act.month_10': 'November',
-        'act.month_11': 'December',
-
-        // ── Voice ─────────────────────────────────────────────────────
-        'voice.online': 'Online',
-        'voice.listening': '🎙 Listening…',
-        'voice.processing': '⏳ Processing…',
-        'voice.speaking': '🗣 Speaking…',
-        'voice.tap_speak': 'Tap to speak',
-        'voice.tap_stop': 'Tap to stop',
-        'voice.wait': 'Please wait…',
-        'voice.play': '▶ Play',
-        'voice.stop': '⏹ Stop',
-        'voice.rewind': '↩ 5s',
-        'voice.vol': 'Vol',
-        'voice.speed': 'Spd',
-        'voice.transcribing': '🎙 Transcribing…',
-        'voice.back_chat': 'Chat',
-        'voice.settings': 'Settings',
-
-        // ── Níveis ────────────────────────────────────────────────────
-        'level.beginner': 'Beginner',
-        'level.pre_int': 'Pre-Intermediate',
-        'level.intermediate': 'Intermediate',
-        'level.business': 'Business English',
-        'level.advanced': 'Advanced',
-
-        // ── Foco ──────────────────────────────────────────────────────
-        'focus.general': 'General Conversation',
-        'focus.business': 'Business English',
-        'focus.travel': 'Travel English',
-        'focus.academic': 'Academic English',
-        'focus.interviews': 'Job Interviews',
-
-        // ── Genérico ──────────────────────────────────────────────────
-        'gen.confirm': 'Confirm',
-        // ── Trophies (Names and Descriptions) ──────────────────────────────────
-        'act.title_first_quiz': 'First Quiz',
-        'act.desc_first_quiz': 'Complete your first quiz',
-        'act.title_quizzer_5': 'Beginner Quizzer',
-        'act.desc_quizzer_5': 'Complete 5 quizzes',
-        'act.title_quizzer_10': 'Quizzer',
-        'act.desc_quizzer_10': 'Complete 10 quizzes',
-        'act.title_quizzer_25': 'Advanced Quizzer',
-        'act.desc_quizzer_25': 'Complete 25 quizzes',
-        'act.title_quizzer_50': 'Quiz Master',
-        'act.desc_quizzer_50': 'Complete 50 quizzes',
-        'act.title_quizzer_100': 'Supreme Master',
-        'act.desc_quizzer_100': 'Complete 100 quizzes',
-        'act.title_streak_1': 'First Day',
-        'act.desc_streak_1': 'Complete your first study day',
-        'act.title_streak_3': '3-Day Streak',
-        'act.desc_streak_3': 'Study for 3 consecutive days',
-        'act.title_streak_7': '7-Day Streak',
-        'act.desc_streak_7': 'Study for 7 consecutive days',
-        'act.title_streak_14': '14-Day Streak',
-        'act.desc_streak_14': 'Study for 14 consecutive days',
-        'act.title_streak_30': '30-Day Streak',
-        'act.desc_streak_30': 'Study for 30 consecutive days',
-        'act.title_streak_60': '60-Day Streak',
-        'act.desc_streak_60': 'Study for 60 consecutive days',
-        'act.title_streak_100': '100-Day Streak',
-        'act.desc_streak_100': 'Study for 100 consecutive days',
-        'act.title_streak_365': '365-Day Streak',
-        'act.desc_streak_365': 'Study for 365 consecutive days',
-        'act.title_first_msg': 'First Message',
-        'act.desc_first_msg': 'Send your first message to Tati',
-        'act.title_msg_50': 'Popular',
-        'act.desc_msg_50': 'Send 50 messages in chat',
-        'act.title_msg_100': '100 Messages',
-        'act.desc_msg_100': 'Send 100 messages',
-        'act.title_msg_200': 'Communicator',
-        'act.desc_msg_200': 'Send 200 messages in chat',
-        'act.title_msg_500': '500 Messages',
-        'act.desc_msg_500': 'Send 500 messages',
-        'act.title_msg_1000': 'Talkative',
-        'act.desc_msg_1000': 'Send 1000 messages in chat',
-        'act.title_sim_1': 'First Simulation',
-        'act.desc_sim_1': 'Complete your first simulation',
-        'act.title_sim_5': 'Beginner Actor',
-        'act.desc_sim_5': 'Complete 5 simulations',
-        'act.title_sim_20': 'Simulation Star',
-        'act.desc_sim_20': 'Complete 20 simulations',
-        'act.title_credit_1': 'First Credit',
-        'act.desc_credit_1': 'Earn your first credit',
-        'act.title_credit_10': 'Saver',
-        'act.desc_credit_10': 'Accumulate 10 credits',
-        'act.title_credit_50': 'Collector',
-        'act.desc_credit_50': 'Accumulate 50 credits',
-        'act.title_credit_100': 'Rich',
-        'act.desc_credit_100': 'Accumulate 100 credits',
-        'act.title_credit_500': 'Tycoon',
-        'act.desc_credit_500': 'Accumulate 500 credits',
-        'act.title_time_1': 'First Hour',
-        'act.desc_time_1': 'Save 1 hour of study',
-        'act.title_time_10': 'Time Master',
-        'act.desc_time_10': 'Save 10 hours of study',
-        'act.title_time_50': 'Supreme Time',
-        'act.desc_time_50': 'Save 50 hours of study',
-        'act.title_time_100': 'Time Traveler',
-        'act.desc_time_100': 'Save 100 hours of study',
-        'act.title_vocab_10': 'Vocabulary 10',
-        'act.desc_vocab_10': 'Learn 10 new words',
-        'act.title_vocab_50': 'Vocabulary 50',
-        'act.desc_vocab_50': 'Learn 50 new words',
-        'act.title_vocab_100': 'Vocabulary 100',
-        'act.desc_vocab_100': 'Learn 100 new words',
-        'act.title_vocab_500': 'Polyglot',
-        'act.desc_vocab_500': 'Learn 500 new words',
-        'act.title_vocab_1000': 'Living Dictionary',
-        'act.desc_vocab_1000': 'Learn 1000 new words',
-        'act.title_goal_1': 'First Goal',
-        'act.desc_goal_1': 'Set your first study goal',
-        'act.title_goal_5': 'Focused',
-        'act.desc_goal_5': 'Complete 5 study goals',
-        'act.title_goal_10': 'Objective',
-        'act.desc_goal_10': 'Complete 10 study goals',
-        'act.title_rank_10': 'Top 10',
-        'act.desc_rank_10': 'Reach Top 10 in monthly ranking',
-        'act.title_rank_3': 'Top 3',
-        'act.desc_rank_3': 'Reach Top 3 in monthly ranking',
-        'act.title_rank_1': 'Champion',
-        'act.desc_rank_1': 'Rank 1st in monthly ranking',
-        'act.title_social_1': 'Social',
-        'act.desc_social_1': 'Interact with the community',
-        'act.title_explore': 'Explorer',
-        'act.desc_explore': 'Visit all app pages',
-        'act.title_alert': 'Always Alert',
-        'act.desc_alert': 'Open the app 7 days in a row',
-        'act.title_early': 'Early Bird',
-        'act.desc_early': 'Study before 8 AM',
-        'act.title_night': 'Night Owl',
-        'act.desc_night': 'Study after 10 PM',
-        'act.title_weekend': 'Weekend',
-        'act.desc_weekend': 'Study on Saturday and Sunday',
-        'act.title_perfect': 'Perfectionist',
-        'act.desc_perfect': 'Get 100% on 5 quizzes',
-
-        // ── Activities — Categories ──────────────────────────────────────
-        'act.cat_all': 'All',
-        'act.cat_questions': 'Quizzes',
-        'act.cat_streak': 'Streak',
-        'act.cat_milestones': 'Milestones',
-        'act.cat_social': 'Social',
-        'act.cat_credits': 'Credits',
-        'act.cat_time': 'Time',
-        'act.cat_vocabulary': 'Vocabulary',
-        'act.cat_goals': 'Goals',
-        'act.cat_ranking': 'Ranking',
-
-        'gen.cancel': 'Cancel',
-        'gen.save': 'Save',
-        'gen.delete': 'Delete',
-        'gen.edit': 'Edit',
-        'gen.close': 'Close',
-        'gen.loading': 'Loading...',
-        'gen.error': 'Error. Please try again.',
-        'gen.success': 'Saved successfully!',
-        'gen.back': 'Back',
-        'gen.search': 'Search',
-        'gen.no_data': 'No data available.',
-        'gen.see_all': 'See all',
-
-        // ── Progress ─────────────────────────────────────────────────
-        'progress.title': 'My Progress',
-        'progress.hero_title': 'Your Progress',
-        'progress.hero_subtitle': 'Track your learning evolution',
-        'progress.weekly': 'Weekly',
-        'progress.monthly': 'Monthly',
-        'progress.messages': 'Messages',
-        'progress.conversations': 'Conversations',
-        'progress.study_days': 'Study Days',
-        'progress.unique_words': 'Unique Words',
-        'progress.activity_title': 'Activity',
-        'progress.streak_title': '🔥 Current Streak',
-        'progress.days_consecutive': 'consecutive days',
-        'progress.record': 'Record',
-        'progress.tips_title': '💡 Tips to Improve',
-
-        // ── Vocabulary ─────────────────────────────────────────────────
-        'vocab.title': 'Vocabulary Notebook',
-        'vocab.hero_title': '📝 My Vocabulary Notebook',
-        'vocab.hero_subtitle': 'Learned words and reviews',
-        'vocab.search_ph': 'Search word...',
-        'vocab.filter_all': 'All',
-        'vocab.filter_learned': 'Learned',
-        'vocab.filter_learning': 'Learning',
-        'vocab.filter_new': 'New',
-        'vocab.export': 'Export',
-        'vocab.total_words': 'Total Words',
-        'vocab.learned': 'Learned',
-        'vocab.learning': 'Learning',
-        'vocab.empty_text': 'No words found.',
-
-        // ── Goals ─────────────────────────────────────────────────
-        'goals.title': 'Study Goals',
-        'goals.hero_title': '🎯 My Study Goals',
-        'goals.hero_subtitle': 'Set and track your learning goals',
-        'goals.active_goals': 'Active Goals',
-        'goals.completed': 'Completed',
-        'goals.current_streak': 'Current Streak',
-        'goals.my_goals': 'My Goals',
-        'goals.add_goal': 'New Goal',
-        'goals.empty_text': 'No goals defined. Create your first goal!',
-        'goals.new_goal_title': 'New Goal',
-        'goals.goal_type': 'Goal Type',
-        'goals.type_daily_minutes': 'Minutes per day',
-        'goals.type_daily_messages': 'Messages per day',
-        'goals.type_weekly_conversations': 'Conversations per week',
-        'goals.type_weekly_words': 'New words per week',
-        'goals.goal_target': 'Target (quantity)',
-        'goals.goal_period': 'Period',
-        'goals.daily': 'Daily',
-        'goals.weekly_period': 'Weekly',
-        'goals.create': 'Create Goal →',
-
-        // ── Simulation ─────────────────────────────────────────────────
-        'sim.title': 'Conversation Simulation',
-        'sim.topbar_title': 'Simulation',
-        'sim.hero_title': '🎭 Real Conversation Simulation',
-        'sim.hero_subtitle': 'Choose a scenario and practice English in everyday situations',
-        'sim.chat_welcome': 'Click "Start" to begin the simulation',
-        'sim.start': 'Start Simulation',
-        'sim.mode_text': 'Chat',
-        'sim.mode_voice': 'Voice',
-        'sim.mode_both': 'Both',
-        'sim.scenarios_label': 'Ready Scenarios',
-        'sim.random_btn': 'Random Scenario',
-        'sim.input_ph': 'Type your message...',
-        'sim.record': 'Record',
-        'sim.record_hint': 'Click to record your voice',
-        'sim.end': 'End',
-
-        // ── XP System ─────────────────────────────────────────────────
-        'xp.level': 'Level',
-        'xp.xp': 'XP',
-        'xp.to_next': 'to next level',
-        'xp.leaderboard': 'Leaderboard',
-        'xp.rank': 'Rank',
-        'xp.beginner': 'Beginner',
-        'xp.elementary': 'Elementary',
-        'xp.intermediate': 'Intermediate',
-        'xp.upper_intermediate': 'Upper Intermediate',
-        'xp.advanced': 'Advanced',
-        'xp.mastery': 'Mastery',
-
-        'profile.tab_profile': 'Profile',
-        'profile.tab_progress': 'Progress',
-        'profile.tab_vocab': 'Vocabulary',
-        'profile.tab_goals': 'Goals',
-        'profile.tab_trophies': 'Achievements',
-
-        // ── Audio Controls ─────────────────────────────────────────────────
-        'audio.play': 'Play',
-        'audio.rewind': '↩5s',
-        'audio.vol': 'Vol',
-        'audio.speed': 'Speed',
-
-        // ── Features Menu ─────────────────────────────────────────────────
-        'features.progress': 'My Progress',
-        'features.vocab': 'Vocabulary',
-        'features.goals': 'My Goals',
-        'features.simulation': 'Simulation',
-
-        // trophies
-        // Titles
-        'act.title_first_quiz': 'First Quiz',
-        'act.title_first_day': 'First Day',
-        'act.title_first_message': 'First Message',
-        'act.title_quizzer': 'Quizzer',
-        'act.title_beginner_quizzer': 'Beginner Quizzer',
-        'act.title_30_day_streak': '30-Day Streak',
-        'act.title_100_messages': '100 Messages',
-        'act.title_7_day_streak': '7-Day Streak',
-        'act.title_quiz_master': 'Quiz Master',
-        'act.title_advanced_quizzer': 'Advanced Quizzer',
-        'act.title_supreme_master': 'Supreme Master',
-        'act.title_3_day_streak': '3-Day Streak',
-        'act.title_14_day_streak': '14-Day Streak',
-        'act.title_60_day_streak': '60-Day Streak',
-        'act.title_100_day_streak': '100-Day Streak',
-        'act.title_365_day_streak': '365-Day Streak',
-        'act.title_popular': 'Popular',
-        'act.title_communicator': 'Communicator',
-        'act.title_500_messages': '500 Messages',
-        'act.title_speaker': 'Speaker',
-        'act.title_first_simulation': 'First Simulation',
-        'act.title_beginner_actor': 'Beginner Actor',
-        'act.title_simulation_star': 'Simulation Star',
-        'act.title_first_credit': 'First Credit',
-        'act.title_saver': 'Saver',
-        'act.title_collector': 'Collector',
-        'act.title_rich': 'Rich',
-        'act.title_magnate': 'Magnate',
-        'act.title_first_hour': 'First Hour',
-        'act.title_time_master': 'Time Master',
-        'act.title_supreme_time': 'Supreme Time',
-        'act.title_time_traveler': 'Time Traveler',
-        'act.title_vocabulary_10': 'Vocabulary 10',
-        'act.title_vocabulary_50': 'Vocabulary 50',
-        'act.title_vocabulary_100': 'Vocabulary 100',
-        'act.title_polyglot': 'Polyglot',
-        'act.title_living_dictionary': 'Living Dictionary',
-        'act.title_first_goal': 'First Goal',
-        'act.title_focused': 'Focused',
-        'act.title_objective': 'Objective',
-        'act.title_top_10': 'Top 10',
-        'act.title_top_3': 'Top 3',
-        'act.title_champion': 'Champion',
-        'act.title_social': 'Social',
-        'act.title_explorer': 'Explorer',
-        'act.title_always_alert': 'Always Alert',
-        'act.title_early_bird': 'Early Bird',
-        'act.title_owl': 'Night Owl',
-        'act.title_weekend': 'Weekend Warrior',
-        'act.title_perfectionist': 'Perfectionist',
-
-        // en-US — descriptions
-        'act.desc_first_quiz': 'Complete your first quiz',
-        'act.desc_first_day': 'Complete your first day of study',
-        'act.desc_first_message': 'Send your first message to Tati',
-        'act.desc_quizzer': 'Complete 10 quizzes',
-        'act.desc_beginner_quizzer': 'Complete 5 quizzes',
-        'act.desc_30_day_streak': 'Study 30 days in a row',
-        'act.desc_100_messages': 'Send 100 messages',
-        'act.desc_7_day_streak': 'Study 7 days in a row',
-        'act.desc_quiz_master': 'Complete 50 quizzes',
-        'act.desc_advanced_quizzer': 'Complete 25 quizzes',
-        'act.desc_supreme_master': 'Complete 100 quizzes',
-        'act.desc_3_day_streak': 'Study 3 days in a row',
-        'act.desc_14_day_streak': 'Study 14 days in a row',
-        'act.desc_60_day_streak': 'Study 60 days in a row',
-        'act.desc_100_day_streak': 'Study 100 days in a row',
-        'act.desc_365_day_streak': 'Study 365 days in a row',
-        'act.desc_popular': 'Send 50 messages in chat',
-        'act.desc_communicator': 'Send 200 messages in chat',
-        'act.desc_500_messages': 'Send 500 messages',
-        'act.desc_speaker': 'Send 1000 messages in chat',
-        'act.desc_first_simulation': 'Complete your first simulation',
-        'act.desc_beginner_actor': 'Complete 5 simulations',
-        'act.desc_simulation_star': 'Complete 20 simulations',
-        'act.desc_first_credit': 'Earn your first credit',
-        'act.desc_saver': 'Accumulate 10 credits',
         'act.personalized_pending': 'Personalised Practice (New Exercises)',
-        'act.desc_collector': 'Accumulate 50 credits',
-        'act.desc_rich': 'Accumulate 100 credits',
-        'act.desc_magnate': 'Accumulate 500 credits',
-        'act.desc_first_hour': 'Save 1 hour of study',
-        'act.desc_time_master': 'Save 10 hours of study',
-        'act.desc_supreme_time': 'Save 50 hours of study',
-        'act.desc_time_traveler': 'Save 100 hours of study',
-        'act.desc_vocabulary_10': 'Learn 10 new words',
-        'act.desc_vocabulary_50': 'Learn 50 new words',
-        'act.desc_vocabulary_100': 'Learn 100 new words',
-        'act.desc_polyglot': 'Learn 500 new words',
-        'act.desc_living_dictionary': 'Learn 1000 new words',
-        'act.desc_first_goal': 'Set your first study goal',
-        'act.desc_focused': 'Complete 5 study goals',
-        'act.desc_objective': 'Complete 10 study goals',
-        'act.desc_top_10': 'Reach the Top 10 of the monthly ranking',
-        'act.desc_top_3': 'Reach the Top 3 of the monthly ranking',
-        'act.desc_champion': 'Finish 1st in the monthly ranking',
-        'act.desc_social': 'Interact with the community',
-        'act.desc_explorer': 'Visit all pages of the app',
-        'act.desc_always_alert': 'Open the app 7 days in a row',
-        'act.desc_early_bird': 'Study before 8am',
-        'act.desc_owl': 'Study after 10pm',
-        'act.desc_weekend': 'Study on Saturday and Sunday',
-        'act.desc_perfectionist': 'Score 100% on 5 quizzes',
-        'act.title_first_day': 'First Day',
-        'act.title_first_message': 'First Message',
-        'act.title_quizzer': 'Quizzer',
-        'act.title_beginner_quizzer': 'Beginner Quizzer',
-        'act.title_30_day_streak': '30-Day Streak',
-        'act.title_100_messages': '100 Messages',
-        'act.title_7_day_streak': '7-Day Streak',
-        'act.title_quiz_master': 'Quiz Master',
-        'act.no_exercises_yet': 'Tati is analyzing your progress. Personalized exercises will appear here soon!',
 
-        // Descriptions
-        'act.desc_first_quiz': 'Complete your first quiz',
-        'act.desc_first_day': 'Complete your first day of study',
-        'act.desc_first_message': 'Send your first message to Tati',
-        'act.desc_quizzer': 'Complete 10 quizzes',
-        'act.desc_beginner_quizzer': 'Complete 5 quizzes',
-        'act.desc_30_day_streak': 'Study for 30 days in a row',
-        'act.desc_100_messages': 'Send 100 messages',
-        'act.desc_7_day_streak': 'Study for 7 days in a row',
-        'act.desc_quiz_master': 'Complete 50 quizzes',
         'act.history': 'Activities history',
 
-        // ── Payment Missing ─────────────────────────────────────────────────
+        'act.difficulty_beginner': 'Beginner',
+
+        'act.difficulty_intermediate': 'Intermediate',
+
+        'act.difficulty_pre_intermediate': 'Pre-Intermediate',
+
+        'act.difficulty_business': 'Business English',
+
+        'act.difficulty_advanced': 'Advanced',
+
+        'act.user_fallback': 'Student',
+
+
+
+        // ── Activities – Feedback/Writing Messages ────────────────────────────
+
+        'act.fb_fill_all': 'Please fill in all fields.',
+
+        'act.fb_success': 'Feedback sent successfully!',
+
+        'act.fb_error': 'Error sending.',
+
+        'act.fb_conn_error': 'Connection error.',
+
+        'act.wr_fill_all': 'Please fill in all fields.',
+
+        'act.wr_success': 'Exercise sent successfully!',
+
+        'act.wr_error': 'Error sending.',
+
+        'act.wr_conn_error': 'Connection error.',
+
+
+
+        // ── Activities – Months ───────────────────────────────────────────────
+
+        'act.month_0': 'January',
+
+        'act.month_1': 'February',
+
+        'act.month_2': 'March',
+
+        'act.month_3': 'April',
+
+        'act.month_4': 'May',
+
+        'act.month_5': 'June',
+
+        'act.month_6': 'July',
+
+        'act.month_7': 'August',
+
+        'act.month_8': 'September',
+
+        'act.month_9': 'October',
+
+        'act.month_10': 'November',
+
+        'act.month_11': 'December',
+
+
+
+        // ── Voice ─────────────────────────────────────────────────────────────
+
+        'voice.online': 'Online',
+
+        'voice.listening': '🎙 Listening…',
+
+        'voice.processing': '⏳ Processing…',
+
+        'voice.speaking': '🗣 Speaking…',
+
+        'voice.tap_speak': 'Tap to speak',
+
+        'voice.tap_stop': 'Tap to stop',
+
+        'voice.wait': 'Please wait…',
+
+        'voice.play': '▶ Play',
+
+        'voice.stop': '⏹ Stop',
+
+        'voice.rewind': '↩ 5s',
+
+        'voice.vol': 'Vol',
+
+        'voice.speed': 'Spd',
+
+        'voice.transcribing': '🎙 Transcribing…',
+
+        'voice.back_chat': 'Chat',
+
+        'voice.settings': 'Settings',
+
+
+
+        // ── Levels ────────────────────────────────────────────────────────────
+
+        'level.beginner': 'Beginner',
+
+        'level.pre_int': 'Pre-Intermediate',
+
+        'level.intermediate': 'Intermediate',
+
+        'level.business': 'Business English',
+
+        'level.advanced': 'Advanced',
+
+
+
+        // ── Focus ─────────────────────────────────────────────────────────────
+
+        'focus.general': 'General Conversation',
+
+        'focus.business': 'Business English',
+
+        'focus.travel': 'Travel English',
+
+        'focus.academic': 'Academic English',
+
+        'focus.interviews': 'Job Interviews',
+
+
+
+        // ── Trophies – Titles ─────────────────────────────────────────────────
+
+        'act.title_first_quiz': 'First Quiz',
+
+        'act.title_first_day': 'First Day',
+
+        'act.title_first_message': 'First Message',
+
+        'act.title_quizzer': 'Quizzer',
+
+        'act.title_beginner_quizzer': 'Beginner Quizzer',
+
+        'act.title_30_day_streak': '30-Day Streak',
+
+        'act.title_100_messages': '100 Messages',
+
+        'act.title_7_day_streak': '7-Day Streak',
+
+        'act.title_quiz_master': 'Quiz Master',
+
+        'act.title_advanced_quizzer': 'Advanced Quizzer',
+
+        'act.title_supreme_master': 'Supreme Master',
+
+        'act.title_3_day_streak': '3-Day Streak',
+
+        'act.title_14_day_streak': '14-Day Streak',
+
+        'act.title_60_day_streak': '60-Day Streak',
+
+        'act.title_100_day_streak': '100-Day Streak',
+
+        'act.title_365_day_streak': '365-Day Streak',
+
+        'act.title_popular': 'Popular',
+
+        'act.title_communicator': 'Communicator',
+
+        'act.title_500_messages': '500 Messages',
+
+        'act.title_speaker': 'Speaker',
+
+        'act.title_first_simulation': 'First Simulation',
+
+        'act.title_beginner_actor': 'Beginner Actor',
+
+        'act.title_simulation_star': 'Simulation Star',
+
+        'act.title_first_credit': 'First Credit',
+
+        'act.title_saver': 'Saver',
+
+        'act.title_collector': 'Collector',
+
+        'act.title_rich': 'Rich',
+
+        'act.title_magnate': 'Magnate',
+
+        'act.title_first_hour': 'First Hour',
+
+        'act.title_time_master': 'Time Master',
+
+        'act.title_supreme_time': 'Supreme Time',
+
+        'act.title_time_traveler': 'Time Traveler',
+
+        'act.title_vocabulary_10': 'Vocabulary 10',
+
+        'act.title_vocabulary_50': 'Vocabulary 50',
+
+        'act.title_vocabulary_100': 'Vocabulary 100',
+
+        'act.title_polyglot': 'Polyglot',
+
+        'act.title_living_dictionary': 'Living Dictionary',
+
+        'act.title_first_goal': 'First Goal',
+
+        'act.title_focused': 'Focused',
+
+        'act.title_objective': 'Objective',
+
+        'act.title_top_10': 'Top 10',
+
+        'act.title_top_3': 'Top 3',
+
+        'act.title_champion': 'Champion',
+
+        'act.title_social': 'Social',
+
+        'act.title_explorer': 'Explorer',
+
+        'act.title_always_alert': 'Always Alert',
+
+        'act.title_early_bird': 'Early Bird',
+
+        'act.title_owl': 'Night Owl',
+
+        'act.title_weekend': 'Weekend Warrior',
+
+        'act.title_perfectionist': 'Perfectionist',
+
+
+
+        // ── Trophies – Descriptions ───────────────────────────────────────────
+
+        'act.desc_first_quiz': 'Complete your first quiz',
+
+        'act.desc_first_day': 'Complete your first day of study',
+
+        'act.desc_first_message': 'Send your first message to Tati',
+
+        'act.desc_quizzer': 'Complete 10 quizzes',
+
+        'act.desc_beginner_quizzer': 'Complete 5 quizzes',
+
+        'act.desc_30_day_streak': 'Study 30 days in a row',
+
+        'act.desc_100_messages': 'Send 100 messages',
+
+        'act.desc_7_day_streak': 'Study 7 days in a row',
+
+        'act.desc_quiz_master': 'Complete 50 quizzes',
+
+        'act.desc_advanced_quizzer': 'Complete 25 quizzes',
+
+        'act.desc_supreme_master': 'Complete 100 quizzes',
+
+        'act.desc_3_day_streak': 'Study 3 days in a row',
+
+        'act.desc_14_day_streak': 'Study 14 days in a row',
+
+        'act.desc_60_day_streak': 'Study 60 days in a row',
+
+        'act.desc_100_day_streak': 'Study 100 days in a row',
+
+        'act.desc_365_day_streak': 'Study 365 days in a row',
+
+        'act.desc_popular': 'Send 50 messages in chat',
+
+        'act.desc_communicator': 'Send 200 messages in chat',
+
+        'act.desc_500_messages': 'Send 500 messages',
+
+        'act.desc_speaker': 'Send 1000 messages in chat',
+
+        'act.desc_first_simulation': 'Complete your first simulation',
+
+        'act.desc_beginner_actor': 'Complete 5 simulations',
+
+        'act.desc_simulation_star': 'Complete 20 simulations',
+
+        'act.desc_first_credit': 'Earn your first credit',
+
+        'act.desc_saver': 'Accumulate 10 credits',
+
+        'act.desc_collector': 'Accumulate 50 credits',
+
+        'act.desc_rich': 'Accumulate 100 credits',
+
+        'act.desc_magnate': 'Accumulate 500 credits',
+
+        'act.desc_first_hour': 'Save 1 hour of study',
+
+        'act.desc_time_master': 'Save 10 hours of study',
+
+        'act.desc_supreme_time': 'Save 50 hours of study',
+
+        'act.desc_time_traveler': 'Save 100 hours of study',
+
+        'act.desc_vocabulary_10': 'Learn 10 new words',
+
+        'act.desc_vocabulary_50': 'Learn 50 new words',
+
+        'act.desc_vocabulary_100': 'Learn 100 new words',
+
+        'act.desc_polyglot': 'Learn 500 new words',
+
+        'act.desc_living_dictionary': 'Learn 1000 new words',
+
+        'act.desc_first_goal': 'Set your first study goal',
+
+        'act.desc_focused': 'Complete 5 study goals',
+
+        'act.desc_objective': 'Complete 10 study goals',
+
+        'act.desc_top_10': 'Reach the Top 10 of the monthly ranking',
+
+        'act.desc_top_3': 'Reach the Top 3 of the monthly ranking',
+
+        'act.desc_champion': 'Finish 1st in the monthly ranking',
+
+        'act.desc_social': 'Interact with the community',
+
+        'act.desc_explorer': 'Visit all pages of the app',
+
+        'act.desc_always_alert': 'Open the app 7 days in a row',
+
+        'act.desc_early_bird': 'Study before 8 AM',
+
+        'act.desc_owl': 'Study after 10 PM',
+
+        'act.desc_weekend': 'Study on Saturday and Sunday',
+
+        'act.desc_perfectionist': 'Score 100% on 5 quizzes',
+
+
+
+        // ── Activities – Categories ───────────────────────────────────────────
+
+        'act.cat_all': 'All',
+
+        'act.cat_questions': 'Quizzes',
+
+        'act.cat_streak': 'Streak',
+
+        'act.cat_milestones': 'Milestones',
+
+        'act.cat_social': 'Social',
+
+        'act.cat_credits': 'Credits',
+
+        'act.cat_time': 'Time',
+
+        'act.cat_vocabulary': 'Vocabulary',
+
+        'act.cat_goals': 'Goals',
+
+        'act.cat_ranking': 'Ranking',
+
+
+
+        // ── Generic ───────────────────────────────────────────────────────────
+
+        'gen.confirm': 'Confirm',
+
+        'gen.cancel': 'Cancel',
+
+        'gen.save': 'Save',
+
+        'gen.delete': 'Delete',
+
+        'gen.edit': 'Edit',
+
+        'gen.close': 'Close',
+
+        'gen.loading': 'Loading...',
+
+        'gen.error': 'Error. Please try again.',
+
+        'gen.success': 'Saved successfully!',
+
+        'gen.back': 'Back',
+
+        'gen.search': 'Search',
+
+        'gen.no_data': 'No data available.',
+
+        'gen.see_all': 'See all',
+
+
+
+        // ── Progress ──────────────────────────────────────────────────────────
+
+        'progress.title': 'My Progress',
+
+        'progress.hero_title': 'Your Progress',
+
+        'progress.hero_subtitle': 'Track your learning evolution',
+
+        'progress.weekly': 'Weekly',
+
+        'progress.monthly': 'Monthly',
+
+        'progress.messages': 'Messages',
+
+        'progress.conversations': 'Conversations',
+
+        'progress.study_days': 'Study Days',
+
+        'progress.unique_words': 'Unique Words',
+
+        'progress.activity_title': 'Activity',
+
+        'progress.streak_title': '🔥 Current Streak',
+
+        'progress.days_consecutive': 'consecutive days',
+
+        'progress.record': 'Record',
+
+        'progress.tips_title': '💡 Tips to Improve',
+
+
+
+        // ── Vocabulary ────────────────────────────────────────────────────────
+
+        'vocab.title': 'Vocabulary Notebook',
+
+        'vocab.hero_title': '📝 My Vocabulary Notebook',
+
+        'vocab.hero_subtitle': 'Learned words and reviews',
+
+        'vocab.search_ph': 'Search word...',
+
+        'vocab.filter_all': 'All',
+
+        'vocab.filter_learned': 'Learned',
+
+        'vocab.filter_learning': 'Learning',
+
+        'vocab.filter_new': 'New',
+
+        'vocab.export': 'Export',
+
+        'vocab.total_words': 'Total Words',
+
+        'vocab.learned': 'Learned',
+
+        'vocab.learning': 'Learning',
+
+        'vocab.empty_text': 'No words found.',
+
+        'vocab.nenhuma': 'No words yet. Practice in the chat!',
+
+
+
+        // ── Goals ─────────────────────────────────────────────────────────────
+
+        'goals.title': 'Study Goals',
+
+        'goals.hero_title': '🎯 My Study Goals',
+
+        'goals.hero_subtitle': 'Set and track your learning goals',
+
+        'goals.active_goals': 'Active Goals',
+
+        'goals.completed': 'Completed',
+
+        'goals.current_streak': 'Current Streak',
+
+        'goals.my_goals': 'My Goals',
+
+        'goals.add_goal': 'New Goal',
+
+        'goals.empty_text': 'No goals defined. Create your first goal!',
+
+        'goals.new_goal_title': 'New Goal',
+
+        'goals.goal_type': 'Goal Type',
+
+        'goals.type_daily_minutes': 'Minutes per day',
+
+        'goals.type_daily_messages': 'Messages per day',
+
+        'goals.type_weekly_conversations': 'Conversations per week',
+
+        'goals.type_weekly_words': 'New words per week',
+
+        'goals.goal_target': 'Target (quantity)',
+
+        'goals.goal_period': 'Period',
+
+        'goals.daily': 'Daily',
+
+        'goals.weekly_period': 'Weekly',
+
+        'goals.create': 'Create Goal →',
+
+
+
+        // ── Simulation ────────────────────────────────────────────────────────
+
+        'sim.title': 'Conversation Simulation',
+
+        'sim.topbar_title': 'Simulation',
+
+        'sim.hero_title': '🎭 Real Conversation Simulation',
+
+        'sim.hero_subtitle': 'Choose a scenario and practice English in everyday situations',
+
+        'sim.chat_welcome': 'Click "Start" to begin the simulation',
+
+        'sim.start': 'Start Simulation',
+
+        'sim.mode_text': 'Chat',
+
+        'sim.mode_voice': 'Voice',
+
+        'sim.mode_both': 'Both',
+
+        'sim.scenarios_label': 'Ready Scenarios',
+
+        'sim.random_btn': 'Random Scenario',
+
+        'sim.input_ph': 'Type your message...',
+
+        'sim.record': 'Record',
+
+        'sim.record_hint': 'Click to record your voice',
+
+        'sim.end': 'End',
+
+
+
+        // ── XP System ─────────────────────────────────────────────────────────
+
+        'xp.level': 'Level',
+
+        'xp.xp': 'XP',
+
+        'xp.to_next': 'to next level',
+
+        'xp.leaderboard': 'Leaderboard',
+
+        'xp.rank': 'Rank',
+
+        'xp.beginner': 'Beginner',
+
+        'xp.elementary': 'Elementary',
+
+        'xp.intermediate': 'Intermediate',
+
+        'xp.upper_intermediate': 'Upper Intermediate',
+
+        'xp.advanced': 'Advanced',
+
+        'xp.mastery': 'Mastery',
+
+
+
+        'profile.tab_profile': 'Profile',
+
+        'profile.tab_progress': 'Progress',
+
+        'profile.tab_vocab': 'Vocabulary',
+
+        'profile.tab_goals': 'Goals',
+
+        'profile.tab_trophies': 'Achievements',
+
+
+
+        // ── Audio Controls ────────────────────────────────────────────────────
+
+        'audio.play': 'Play',
+
+        'audio.rewind': '↩5s',
+
+        'audio.vol': 'Vol',
+
+        'audio.speed': 'Speed',
+
+
+
+        // ── Features Menu ─────────────────────────────────────────────────────
+
+        'features.progress': 'My Progress',
+
+        'features.vocab': 'Vocabulary',
+
+        'features.goals': 'My Goals',
+
+        'features.simulation': 'Simulation',
+
+
+
+        // ── Payment Missing ───────────────────────────────────────────────────
+
         'payment.approved_title': 'Payment Approved!',
+
         'payment.approved_desc': 'Your premium access has been activated successfully. Enjoy your studies!',
+
         'payment.full_plan': 'Full Plan',
+
         'payment.go_to_chat': 'Go to Chat',
+
         'payment.choose_plan': 'Choose your plan',
+
         'payment.basic_title': 'Chat & Voice',
+
         'payment.full_title': 'Full',
+
         'payment.per_month': '/month',
+
         'payment.select_plan': 'Select',
+
         'payment.recommended': 'Recommended',
+
         'payment.feat_unlimited_chat': '💬 Unlimited chat with Teacher Tati',
+
         'payment.feat_voice': '🎙️ Voice Mode',
+
         'payment.feat_history': '📊 Conversation history',
+
         'payment.feat_translation': '🌐 Word translation in chat',
+
         'payment.feat_modules': '📚 Modules and activities',
+
         'payment.feat_flashcards': '🃏 Flashcards',
+
         'payment.feat_reports': '📈 Performance reports',
+
+
+
+        // ── Progress Badge ────────────────────────────────────────────────────
+
+        'pb.title': 'Progress',
+
+        'pb.close': 'Close',
+
+        'pb.words_today': 'New words today',
+
+        'pb.msgs_week': 'Messages this week',
+
+        'pb.see_progress': 'See progress',
+
+        'pb.words_today_short': 'words today',
+
+        'pb.word_today_short': 'word today',
+
     },
+
 };
 
-// en-UK herda do en-US com overrides britânicos
+
+
+// ── Quiz status keys ──────────────────────────────────────────────────────────
+
+Object.assign(TRANSLATIONS['pt-BR'], {
+
+    'act.quiz_correct': 'Correto!',
+
+    'act.quiz_wrong': 'Incorreto.',
+
+    'act.status_done': 'Feito',
+
+});
+
+
+
+Object.assign(TRANSLATIONS['en-US'], {
+
+    'act.quiz_correct': 'Correct!',
+
+    'act.quiz_wrong': 'Incorrect.',
+
+    'act.status_done': 'Done',
+
+});
+
+
+
+Object.assign(TRANSLATIONS['pt-BR'], {
+
+    'act.loading': 'Carregando...',
+
+    
+    'act.tab_podcasts': 'Pratique com podcast',
+
+    'act.podcast_focus_label': 'Foco do Podcast',
+
+    'act.podcast_loading': 'Carregando podcast...',
+
+    'act.podcast_loading_sub': 'Prepare-se para ouvir e praticar.',
+
+    'act.podcast_details_error': 'Erro ao carregar detalhes do podcast.',
+
+    'act.podcast_open_source': 'Abrir fonte original',
+
+    'act.podcast_invalid_embed': 'Não foi possível carregar o player deste conteúdo.',
+
+    'act.podcast_audio_mode': 'Modo áudio',
+
+    'act.podcast_video_mode': 'Modo vídeo',
+
+    'act.podcast_transcript_title': 'Tradução guiada',
+
+    'act.podcast_transcript_original': 'Original',
+
+    'act.podcast_transcript_translation': 'Tradução',
+
+    'act.podcast_no_transcript': 'Sem transcrição disponível para este conteúdo.',
+
+    'act.podcast_writing_title': 'Prática de Escrita',
+
+    'act.podcast_choice_title': 'Múltipla Escolha',
+
+    'act.podcast_voice_title': 'Pronúncia',
+
+    'act.practice_title': 'Prática do Podcast',
+
+    'act.practice_sub': 'Assista ao conteúdo acima e responda às questões da Teacher Tati.',
+
+    'act.write_placeholder': 'Escreva sua resposta em inglês aqui...',
+
+    'act.repeat_phrase': 'Repita a frase abaixo:',
+
+    'act.click_mic': 'Clique no microfone para falar.',
+
+    'act.listening': 'Ouvindo...',
+
+    'act.rec_finished': 'Gravação finalizada.',
+
+    'act.evaluate': 'Avaliar',
+
+    'act.exercise_error': 'Erro ao gerar exercícios. Tente recarregar a página.',
+
+    'act.exercise_eval_error': 'Erro ao avaliar exercício.',
+
+    'act.correct_ans': 'Resposta correta',
+
+    'act.tati_preparing': 'Tati está preparando seus exercícios...',
+
+    'act.translation_ready': 'Tradução completa',
+
+    'act.podcast_reason_prefix': 'Sugestão IA',
+
+    'act.voice_not_supported': 'Seu navegador não suporta reconhecimento de voz.',
+
+    'act.feedback_default': 'Continue praticando para evoluir!',
+
+});
+
+
+
+Object.assign(TRANSLATIONS['en-US'], {
+
+    'act.loading': 'Loading...',
+
+    'act.tab_podcasts': 'Practice with podcast',
+
+    'act.podcast_focus_label': 'Podcast Focus',
+
+    'act.podcast_loading': 'Loading podcast...',
+
+    'act.podcast_loading_sub': 'Get ready to listen and practice.',
+
+    'act.podcast_details_error': 'Failed to load podcast details.',
+
+    'act.podcast_open_source': 'Open original source',
+
+    'act.podcast_invalid_embed': 'Unable to load the embedded player for this content.',
+
+    'act.podcast_audio_mode': 'Audio mode',
+
+    'act.podcast_video_mode': 'Video mode',
+
+    'act.podcast_transcript_title': 'Guided transcript',
+
+    'act.podcast_transcript_original': 'Original',
+
+    'act.podcast_transcript_translation': 'Translation',
+
+    'act.podcast_no_transcript': 'No transcript available for this content.',
+
+    'act.podcast_writing_title': 'Writing Practice',
+
+    'act.podcast_choice_title': 'Multiple Choice',
+
+    'act.podcast_voice_title': 'Pronunciation',
+
+    'act.practice_title': 'Podcast Practice',
+
+    'act.practice_sub': 'Watch or listen to the content above and answer Teacher Tati questions.',
+
+    'act.write_placeholder': 'Write your answer in English here...',
+
+    'act.repeat_phrase': 'Repeat the phrase below:',
+
+    'act.click_mic': 'Click the microphone to speak.',
+
+    'act.listening': 'Listening...',
+
+    'act.rec_finished': 'Recording finished.',
+
+    'act.evaluate': 'Evaluate',
+
+    'act.exercise_error': 'Error generating exercises. Try reloading the page.',
+
+    'act.exercise_eval_error': 'Error evaluating exercise.',
+
+    'act.correct_ans': 'Correct answer',
+
+    'act.tati_preparing': 'Tati is preparing your exercises...',
+
+    'act.translation_ready': 'Full translation',
+
+    'act.podcast_reason_prefix': 'AI recommendation',
+
+    'act.voice_not_supported': 'Your browser does not support speech recognition.',
+
+    'act.feedback_default': 'Keep practicing to improve!',
+
+});
+
+Object.assign(TRANSLATIONS['pt-BR'], {
+    'gen.send': 'Enviar',
+    'gen.evaluating': 'Avaliando...',
+});
+
+Object.assign(TRANSLATIONS['en-US'], {
+    'gen.send': 'Send',
+    'gen.evaluating': 'Evaluating...',
+});
+
+
+
+// ── en-UK inherits from en-US with British overrides ─────────────────────────
+
 TRANSLATIONS['en-UK'] = {
+
     ...TRANSLATIONS['en-US'],
+
     'settings.dark': 'Dark',
+
     'settings.light': 'Light',
+
     'dash.day1': 'Mon',
+
     'dash.day2': 'Tue',
+
     'dash.day3': 'Wed',
+
     'dash.day4': 'Thu',
+
     'dash.day5': 'Fri',
+
     'dash.day6': 'Sat',
+
     'dash.day7': 'Sun',
+
     'dash.week_label': (n) => `Week ${n}`,
+
     'mod.fc_count': (n) => `${n} card${n !== 1 ? 's' : ''}`,
+
     'act.fc_counter': (idx, total, known) => `${idx} of ${total} • ${known} learned`,
+
     'act.quiz_progress': (cur, total) => `${cur} of ${total}`,
+
     'focus.general': 'General Conversation',
+
     'focus.business': 'Business English',
+
     'act.streak_days_label': 'days streak',
+
     'act.streak_longest_label': 'Longest streak',
+
     'act.total_questions_label': 'Total questions',
+
     'act.hours_saved_label': 'Hours saved',
+
     'act.how_ranking_desc': 'The score is calculated by the weighted sum of all your study actions in the month:',
+
     'act.how_streak_desc': 'Study every day to maintain your streak. The more consecutive days, the more trophies!',
+
     'act.how_questions_desc': 'Complete quizzes, flashcards and exercises to accumulate correct answers.',
+
     'act.how_credits_desc': 'Earn credits by completing activities and participating in the ranking.',
+
     'act.how_time_desc': 'The more you use AI to learn, the more time you save!',
+
     'act.prizes_note': 'Trophies stay permanently in your collection. Extra credits are applied in the next cycle.',
+
     'act.tiebreaker_desc': 'In case of a tie in score, the tiebreaker is by the number of tokens used (more interaction means better position).',
+
     'act.troph_prof': "You haven't won any trophies yet. Complete quizzes and challenges to earn them!",
-    'act.personalized_writing': 'Exercício de Escrita',
-    'act.personalized_writing_desc': 'Pratique sua escrita e receba feedback personalizado da Tati.',
-    'act.start_exercise': 'Criar novo exercício',
-    'act.personalized_desc': 'Baseado nos seus erros recentes de conversas.',
-    'act.personalized_fc': 'Revisão de Vocabulário',
-    'act.personalized_fc_desc': 'Palavras que você errou ou está aprendendo.',
-    'act.view_flashcards': 'Ver Flashcards',
-    'act.items': 'itens',
-    'act.no_activities': 'Nenhuma atividade ainda. Converse com a Tati para gerar exercícios!',
+
+    'act.personalized_writing': 'Writing Exercise',
+
+    'act.personalized_writing_desc': 'Practice your writing and receive personalised feedback from Tati.',
+
+    'act.start_exercise': 'Create new exercise',
+
+    'act.personalized_desc': 'Based on your recent conversation mistakes.',
+
+    'act.personalized_fc': 'Vocabulary Review',
+
+    'act.personalized_fc_desc': 'Words you got wrong or are still learning.',
+
+    'act.view_flashcards': 'View Flashcards',
+
+    'act.items': 'items',
+
+    'act.no_activities': 'No activities yet. Chat with Tati to generate exercises!',
+
 };
+
+
 
 // ── i18n Engine ───────────────────────────────────────────────────────────────
 
 const I18n = (() => {
+
     const STORAGE_KEY = 'tati_lang';
+
     const DEFAULT = 'pt-BR';
+
     const SUPPORTED = ['pt-BR', 'en-US', 'en-UK'];
 
+
+
     let _lang = localStorage.getItem(STORAGE_KEY) || DEFAULT;
+
     if (!SUPPORTED.includes(_lang)) _lang = DEFAULT;
 
+
+
     function t(key, ...args) {
+
         const dict = TRANSLATIONS[_lang] || TRANSLATIONS[DEFAULT];
+
         const value = dict[key] ?? TRANSLATIONS[DEFAULT][key] ?? key;
-        // Suporte a funções (ex: dash.week_label, act.fc_counter)
+
         return typeof value === 'function' ? value(...args) : value;
+
     }
 
+
+
     function setLang(lang) {
+
         if (!SUPPORTED.includes(lang)) return;
+
         _lang = lang;
+
         localStorage.setItem(STORAGE_KEY, lang);
+
         applyToDOM();
+
         window.dispatchEvent(new CustomEvent('langchange', { detail: { lang } }));
+
     }
+
+
 
     function getLang() { return _lang; }
 
+
+
     function applyToDOM(root) {
+
         const scope = root || document;
+
         scope.querySelectorAll('[data-i18n]').forEach(el => {
+
             el.textContent = t(el.getAttribute('data-i18n'));
+
         });
+
         scope.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+
             el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
+
         });
+
         scope.querySelectorAll('[data-i18n-title]').forEach(el => {
+
             el.title = t(el.getAttribute('data-i18n-title'));
+
         });
+
         scope.querySelectorAll('[data-i18n-html]').forEach(el => {
+
             el.innerHTML = t(el.getAttribute('data-i18n-html'));
+
         });
+
     }
+
+
 
     if (document.readyState === 'loading') {
+
         document.addEventListener('DOMContentLoaded', () => applyToDOM());
+
     } else {
+
         applyToDOM();
+
     }
 
+
+
     return { t, setLang, getLang, applyToDOM, SUPPORTED };
+
 })();
 
-// Shorthand global — suporta argumentos para chaves funcionais
+
+
+// Shorthand global – supports arguments for functional keys
+
 window.t = (key, ...args) => I18n.t(key, ...args);
+
+Object.assign(TRANSLATIONS['pt-BR'], {
+    'act.podcast_title': 'Podcasts Recomendados',
+    'act.podcast_subtitle': 'Melhore sua escuta e pronuncia com conteudos do seu nivel.',
+});
+
+Object.assign(TRANSLATIONS['en-US'], {
+    'act.podcast_title': 'Recommended Podcasts',
+    'act.podcast_subtitle': 'Improve listening and pronunciation with content for your level.',
+});
+
+Object.assign(TRANSLATIONS['en-UK'], {
+    'act.podcast_title': 'Recommended Podcasts',
+    'act.podcast_subtitle': 'Improve listening and pronunciation with content for your level.',
+    'notif.streak_reminder.title': 'Do not break your streak!',
+    'notif.streak_reminder.message': (p = {}) => `You are on a ${p.streak || 0}-day streak. Practice now to keep it.`,
+    'notif.streak_milestone.title': 'Streak milestone unlocked!',
+    'notif.streak_milestone.message': (p = {}) => `You reached ${p.streak || 0} consecutive days. Keep the momentum.`,
+    'notif.streak_broken.title': 'Your streak was broken',
+    'notif.streak_broken.message': (p = {}) => `Your previous streak was ${p.streak || 0} days. Restart today.`,
+    'notif.trophy_earned.title': 'New trophy unlocked!',
+    'notif.trophy_earned.message': (p = {}) => `You earned the trophy: ${p.trophy_name || ''}`,
+});

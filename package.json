@@ -1,0 +1,56 @@
+{
+  "name": "teacher-tati-ai",
+  "version": "1.0.0",
+  "description": "Teacher Tati - Plataforma de Aprendizado de Inglês com IA",
+  "main": "backend/main.py",
+  "scripts": {
+    "start": "python backend/main.py",
+    "dev": "python backend/main.py",
+    "install-pwa": "node pwa/create-pwa-icons.js && echo 'PWA files created successfully!'",
+    "build-pwa": "./pwa/build-pwa.sh",
+    "test": "python -m pytest backend/tests/",
+    "lint": "flake8 backend/",
+    "format": "black backend/"
+  },
+  "keywords": [
+    "english-learning",
+    "ai",
+    "education",
+    "pwa",
+    "chatbot"
+  ],
+  "author": "Teacher Tati Team",
+  "license": "MIT",
+  "devDependencies": {
+    "node-sass": "^7.0.0",
+    "css-minifier": "^1.0.1",
+    "uglify-js": "^3.17.0"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.0",
+    "bcrypt": "^5.0.0",
+    "jsonwebtoken": "^9.0.0",
+    "requests": "^2.28.0",
+    "python-dotenv": "^1.0.0"
+  },
+  "browserslist": [
+    "last 2 Chrome versions",
+    "last 2 Firefox versions",
+    "last 2 Edge versions",
+    "last 2 Safari versions"
+  ],
+  "pwa": {
+    "name": "Teacher Tati",
+    "short_name": "Tati AI",
+    "description": "Pratique inglês com uma professora de IA 24/7",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#6C63FF",
+    "theme_color": "#6C63FF",
+    "orientation": "portrait-primary",
+    "categories": ["education", "language-learning"],
+    "lang": "pt-BR"
+  }
+}

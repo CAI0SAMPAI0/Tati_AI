@@ -29,7 +29,7 @@ from services.rag_search import obter_contexto_rag
 
 router = APIRouter()
 
-PAID_START     = date(2026, 5, 1)
+PAID_START     = date(2026, 6, 30)
 FREE_MSG_LIMIT = 5
 
 _SOURCE_MARKERS = ["📚 Fontes", "Fontes consultadas:", "Sources:", "References:"]
@@ -56,8 +56,12 @@ def _clean_tts_text(text: str) -> str:
     """Remove marcadores de fontes, feedback e asteriscos do texto antes de enviar ao TTS."""
     text = text.replace("*", "")
     
-    # Remove qualquer seção de feedback/correção para não ser lida no áudio
-    markers_to_cut = ["📝 Feedback", "Feedback:", "Correction:", "📝 Correção", "Note:"]
+    # Remove seções de feedback/correção para não ser lida no áudio
+    markers_to_cut = [
+        "📝 Feedback", "Feedback:", "Correction:", "📝 Correção", "Note:",
+        "You could say it like this", "A small correction", "By the way, it's better to say",
+        "Just a quick tip"
+    ]
     for marker in markers_to_cut:
         if marker in text:
             text = text.split(marker)[0]
@@ -74,7 +78,7 @@ def _get_full_user(username: str) -> dict:
     rows = (
         get_client()
         .table("users")
-        .select("username, role, is_exempt, is_premium_active, plan_type, free_messages_used, created_at")
+        .select("username, name, role, focus, is_exempt, is_premium_active, plan_type, free_messages_used, created_at")
         .eq("username", username)
         .limit(1)
         .execute()
@@ -160,7 +164,7 @@ def _check_chat_access(username: str) -> dict:
     if user.get("is_premium_active"):
         return {"allowed": True, "reason": None, "free_messages_remaining": None}
 
-    # Período gratuito (antes de 01/05/2026) → só para quem já era usuário
+    # Período gratuito (antes de 30/06/2026) → só para quem já era usuário
     if today < PAID_START:
         user_created = date.fromisoformat(user["created_at"][:10])
         if user_created < PAID_START:
@@ -213,7 +217,7 @@ async def _get_user_profile(username: str) -> UserProfile:
     rows = (
         get_client()
         .table("users")
-        .select("custom_prompt, level, focus")
+        .select("name, custom_prompt, level, focus")
         .eq("username", username)
         .limit(1)
         .execute()
@@ -222,6 +226,7 @@ async def _get_user_profile(username: str) -> UserProfile:
     data = rows[0] if rows else {}
     return UserProfile(
         username=username,
+        name=data.get("name") or username,
         level=data.get("level") or "Intermediate",
         focus=data.get("focus") or "General Conversation",
         custom_prompt=(data.get("custom_prompt") or "").strip(),
@@ -319,7 +324,9 @@ async def get_history(conversation_id: str, current_user: dict = Depends(get_cur
     messages = await load_history(conversation_id)
     if messages is None:
         raise HTTPException(status_code=404, detail="Conversa não encontrada")
-    return messages
+    # Filtra mensagens de sistema que são cache de resumo
+    filtered = [m for m in messages if not (m.get("role") == "system" and m.get("content", "").startswith("SUMMARY_CACHE_"))]
+    return filtered
 
 
 @router.post("/tts")
@@ -453,7 +460,8 @@ async def _handle_chat_message(websocket: WebSocket, msg: dict, username: str) -
         msg_type = msg.get("type")
         content  = msg.get("content", "").strip()
         conv_id  = msg.get("conversation_id")
-        is_voice_mode = (msg_type == "audio")
+        # is_voice_mode agora se refere à INTERFACE de Voz, não apenas se a entrada foi áudio
+        is_voice_mode = (msg.get("origin") == "voice")
 
         if msg_type not in ("text", "audio", "file"):
             await websocket.send_json({"type": "error", "detail": "Tipo de mensagem inválido"})
@@ -473,8 +481,13 @@ async def _handle_chat_message(websocket: WebSocket, msg: dict, username: str) -
 
         elif msg_type == "audio":
             try:
+                user_db = _get_full_user(username)
+                user_real_name = user_db.get("name") or user_db.get("username") or username
+                user_focus = user_db.get("focus", "")
+                stt_prompt = f"User name: {user_real_name}. Learning focus: {user_focus}. The user is practicing English."
+                
                 audio_bytes = base64.b64decode(msg.get("audio", ""))
-                content = await transcribe_audio(audio_bytes, filename="input.webm")
+                content = await transcribe_audio(audio_bytes, filename="input.webm", prompt=stt_prompt)
                 await websocket.send_json({"type": "transcription", "text": content})
             except Exception as exc:
                 print(f"DEBUG: Erro no STT: {exc}")
@@ -515,58 +528,16 @@ async def _handle_chat_message(websocket: WebSocket, msg: dict, username: str) -
         print(f"DEBUG: Salvando mensagem do usuário...")
         await save_message(conv_id, username, "user", content)
         history.append({"role": "user", "content": content})
-        # contando erros e geração de atividades automaticamente
         try:
-            # formas que vai entender que a IA corrigiu
-            correction_markers = [
-                "should be", "correct form", "you should say",
-                "instead of", "the correct", "mistake", "incorrect",
-                "correction:", "❌", "✅ correct"
-            ]
-            response_lower = full_response.lower()
-            has_correction = any(m in response_lower for m in correction_markers)
-            if has_correction:
-                # erros com redis e cache que expira em 7 dias
-                from services.upstash import cache_get, cache_set
-                error_key = f'error_count:{username}'
-                cached = await cache_get(error_key)
-                count = int(cached) + 1 if cached else 1
-                await cache_set(error_key, str(count), ttl=604800) # 7 dias de cache
-                print(f'[AutoExercise] {username} acumulou {count} errors')
+            new_user_msg_count = user_msg_count + 1
+            if new_user_msg_count % 3 == 0:
+                from routers.activities.podcasts import invalidate_podcast_recommendations_cache
 
-                # a cada 5 erros, gera atividade e zera o contador
-                if count >= 5:
-                    await cache_set(error_key, '0', ttl=604800)
-
-                    # escolhendo tipo de exercício aleatório
-                    type_key = f'exercise_type:{username}'
-                    type_cached = await cache_get(type_key)
-                    current_type = int(type_cached) if type_cached else 0
-                    next_type = (current_type + 1) % 4
-                    await cache_set(type_key, str(next_type), ttl=604800)
-
-                    exercise_types = ["quiz", "story", "fill_in", "dialogue"]
-                    chosen_type = exercise_types[current_type]
-
-                    print(f"[AutoExercise] Gerando '{chosen_type}' para {username}")
-
-                    # Busca contexto das últimas conversas
-                    from services.exercise_generator import generate_exercises_from_history
-                    convs = db.table("conversations").select("id").eq("username", username).order("updated_at", desc=True).limit(5).execute()
-                    context = ""
-                    for c in (convs.data or []):
-                        msgs_ctx = db.table("messages").select("content, role").eq("session_id", c["id"]).order("created_at").limit(30).execute()
-                        context += "\n\n" + "\n".join(f"{m['role'].upper()}: {m['content']}" for m in msgs_ctx.data)
-
-                    await generate_exercises_from_history(username, context, exercise_type=chosen_type)
-
-                    # Notifica o aluno via WebSocket
-                    await websocket.send_json({
-                        "type": "status",
-                        "text": "🎯 Nova atividade personalizada gerada com base nos seus erros! Veja em Atividades."
-                    })
+                invalidate_podcast_recommendations_cache(username)
         except Exception as e:
-            print(f"[AutoExercise] Erro: {e}")
+            print(f"[Podcast Reco] Erro ao invalidar cache: {e}")
+
+        # contando erros e geração de atividades automaticamente
         try:
             from services.streaks import record_study_day
             record_study_day(username)
@@ -611,6 +582,51 @@ async def _handle_chat_message(websocket: WebSocket, msg: dict, username: str) -
             await websocket.send_json({"type": "error", "detail": f"Erro na LLM: {exc}"})
             return
 
+        # ── AutoExercise: contando erros e geração de atividades ──────────
+        try:
+            correction_markers = [
+                "should be", "correct form", "you should say",
+                "instead of", "the correct", "mistake", "incorrect",
+                "correction:", "❌", "✅ correct", "you could say",
+                "small correction", "better to say", "quick tip"
+            ]
+            response_lower = full_response.lower()
+            has_correction = any(m in response_lower for m in correction_markers)
+            if has_correction:
+                from services.upstash import cache_get, cache_set
+                db = get_client() # Supabase client
+                error_key = f'error_count:{username}'
+                cached = await cache_get(error_key)
+                count = int(cached) + 1 if cached else 1
+                await cache_set(error_key, str(count), ttl=604800) # 7 dias
+
+                if count >= 5:
+                    await cache_set(error_key, '0', ttl=604800)
+                    type_key = f'exercise_type:{username}'
+                    type_cached = await cache_get(type_key)
+                    current_type = int(type_cached) if type_cached else 0
+                    next_type = (current_type + 1) % 4
+                    await cache_set(type_key, str(next_type), ttl=604800)
+
+                    exercise_types = ["quiz", "story", "fill_in", "dialogue"]
+                    chosen_type = exercise_types[current_type]
+
+                    # Busca contexto das últimas conversas
+                    from services.exercise_generator import generate_exercises_from_history
+                    convs = db.table("conversations").select("id").eq("username", username).order("updated_at", desc=True).limit(5).execute()
+                    context = ""
+                    for c in (convs.data or []):
+                        msgs_ctx = db.table("messages").select("content, role").eq("session_id", c["id"]).order("created_at").limit(30).execute()
+                        context += "\n\n" + "\n".join(f"{m['role'].upper()}: {m['content']}" for m in msgs_ctx.data)
+
+                    await generate_exercises_from_history(username, context, exercise_type=chosen_type)
+                    await websocket.send_json({
+                        "type": "status",
+                        "text": "🎯 Nova atividade personalizada gerada com base nos seus erros! Veja em Atividades."
+                    })
+        except Exception as e:
+            print(f"[AutoExercise] Erro: {e}")
+
         # ── TTS e finalização ─────────────────────────────
         tts_text = _clean_tts_text(full_response)
         audio_b64 = await text_to_speech(tts_text)
@@ -645,3 +661,5 @@ async def _handle_chat_message(websocket: WebSocket, msg: dict, username: str) -
         import traceback
         traceback.print_exc()
         await websocket.send_json({"type": "error", "detail": f"Erro interno: {str(e)}"})
+
+

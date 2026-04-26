@@ -30,10 +30,11 @@ def _should_try_next_key(exc: Exception) -> bool:
     return _is_auth_error(exc) or _is_rate_error(exc)
 
 
-async def transcribe_audio(audio_bytes: bytes, filename: str = "temp.wav") -> str:
+async def transcribe_audio(audio_bytes: bytes, filename: str = "temp.wav", prompt: str = "") -> str:
     """
     Transcreve áudio para texto usando Whisper Large V3.
     Detecta idioma automaticamente para melhor precisão.
+    O 'prompt' ajuda o Whisper com termos específicos (nomes, contexto).
     """
     from groq import AsyncGroq
     keys = settings.groq_keys
@@ -44,10 +45,22 @@ async def transcribe_audio(audio_bytes: bytes, filename: str = "temp.wav") -> st
     for key in keys:
         try:
             client = AsyncGroq(api_key=key)
+            # Whisper prompt: verbatim transcription, support mixed PT/EN
+            # Expanded common English verbs to improve contextual accuracy
+            default_prompt = (
+                "Transcreva exatamente o que foi dito, palavra por palavra. Não traduza. "
+                "Suporta Português e Inglês misturados. "
+                "Context: English learning practice. Phonetic accuracy is critical. "
+                "Pay close attention to common verbs: 'buy' (not by/bye), 'eat', 'order', 'want', 'need', 'go', 'work', 'study', 'think', 'believe', 'understand', 'explain', 'practice', 'improve', 'learn'. "
+                "Distinguish between 'can' and 'can't', 'do' and 'does', 'did' and 'done'."
+            )
+            effective_prompt = f"{default_prompt} {prompt}" if prompt else default_prompt
+
             resp = await client.audio.transcriptions.create(
                 file=(filename, audio_bytes),
                 model="whisper-large-v3-turbo",
                 response_format="text",
+                prompt=effective_prompt
             )
             return resp
         except Exception as exc:
@@ -117,7 +130,7 @@ async def _stream_groq(system: str, history: list[Message], max_tokens: int = 15
         try:
             client = AsyncGroq(api_key=key)
             stream = await client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model="llama-3.1-8b-instant",
                 messages=messages,
                 stream=True,
                 max_tokens=max_tokens,

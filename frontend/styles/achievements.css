@@ -191,12 +191,32 @@
 
 /* Medal Grid */
 .medal-filters {
+    display: grid;
+    /* Cria duas colunas com o mesmo tamanho */
+    grid-template-columns: repeat(2, 1fr); 
+    /* Aumenta a distância entre eles (horizontal e vertical) */
+    gap: 1rem; 
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+}
+
+.medal-filters button, .medal-filter-item { 
+    padding: 0.75rem 1rem; /* Aumenta o espaço interno (cima/baixo e lados) */
+    width: 100%;           /* Faz o botão ocupar todo o espaço da coluna do grid */
+    font-size: 0.9rem;     /* Ajuste o tamanho da fonte se necessário */
+    display: flex;         /* Ajuda a alinhar o ícone e texto dentro do botão */
+    justify-content: center;
+    align-items: center;
+    min-height: 44px;      /* Altura mínima recomendada para toque no celular */
+}
+
+/*.medal-filters {
     display: flex;
     gap: 0.75rem;
     margin-bottom: 1.5rem;
     overflow-x: auto;
     padding-bottom: 0.5rem;
-}
+}/*
 
 .medal-filter-btn {
     display: flex;

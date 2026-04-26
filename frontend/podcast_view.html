@@ -1,0 +1,70 @@
+﻿<!DOCTYPE html>
+<html lang="pt-br" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tati AI - Podcast Practice</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+    <link rel="stylesheet" href="styles/global.css">
+    <link rel="stylesheet" href="styles/activities.css">
+    <link rel="stylesheet" href="styles/podcast_view.css">
+    <link rel="icon" type="image/x-icon" href="/assets/images/tati_logo.jpg">
+</head>
+
+<body class="podcast-body">
+    <header class="topbar">
+        <div class="topbar-left">
+            <a href="activities.html" class="nav-item back"><i class="fa-solid fa-arrow-left"></i> <span data-i18n="gen.back">Voltar</span></a>
+            <span class="topbar-logo">Teacher<span>Tati</span></span>
+        </div>
+    </header>
+
+    <main class="podcast-view-shell">
+        <section class="podcast-hero reveal-block is-visible">
+            <div class="podcast-hero-copy">
+                <p class="hero-kicker" data-i18n="act.podcast_focus_label">Podcast Focus</p>
+                <h1 id="p-title" data-i18n="act.podcast_loading">Carregando podcast...</h1>
+                <p id="p-desc" class="hero-desc" data-i18n="act.podcast_loading_sub">Prepare-se para ouvir e praticar.</p>
+            </div>
+            <div class="hero-meta" id="p-meta">
+                <span class="hero-chip"><i class="fa-solid fa-spinner fa-spin"></i> <span data-i18n="act.loading">Carregando...</span></span>
+            </div>
+        </section>
+
+        <section class="podcast-content-grid" id="podcast-content-grid">
+            <article class="media-card reveal-block">
+                <div class="media-embed media-video" id="p-video-container"></div>
+                <div class="media-footer" id="p-media-footer"></div>
+            </article>
+
+            <aside class="transcript-card reveal-block" id="p-transcript-card">
+                <header class="transcript-head">
+                    <h2><i class="fa-solid fa-language"></i> <span data-i18n="act.podcast_transcript_title">Transcrição guiada</span></h2>
+                    <div class="transcript-tabs">
+                        <button type="button" class="transcript-tab is-active" data-mode="source" onclick="switchTranscriptMode('source')" data-i18n="act.podcast_transcript_original">Original</button>
+                        <button type="button" class="transcript-tab" data-mode="translated" onclick="switchTranscriptMode('translated')" data-i18n="act.podcast_transcript_translation">Tradução</button>
+                    </div>
+                </header>
+                <div class="transcript-list" id="transcript-list">
+                    <div class="transcript-empty" data-i18n="act.podcast_loading_sub">Prepare-se para ouvir e praticar.</div>
+                </div>
+            </aside>
+        </section>
+
+        <section class="exercises-section reveal-block" id="exercises-container">
+            <div class="exercise-loading">
+                <i class="fa-solid fa-spinner fa-spin fa-2xl"></i>
+                <p data-i18n="act.tati_preparing">Tati está preparando seus exercícios...</p>
+            </div>
+        </section>
+    </main>
+
+    <script src="js/i18n.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/podcast_view.js"></script>
+</body>
+
+</html>
+

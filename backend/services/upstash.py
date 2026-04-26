@@ -34,13 +34,13 @@ class UpstashService:
                 from upstash_redis import Redis
                 self._redis = Redis(url=upstash_url, token=upstash_token)
                 self._enabled = True
-                print("[Upstash] ✅ Conectado ao Redis")
+                print("[Upstash] OK Conectado ao Redis")
             else:
                 print("[Upstash] ⚠️ UPSTASH_REDIS_URL ou UPSTASH_REDIS_TOKEN não configurado")
         except ImportError:
-            print("[Upstash] ⚠️ Pacote upstash-redis não instalado")
+            print("[Upstash] WARNING Pacote upstash-redis não instalado")
         except Exception as e:
-            print(f"[Upstash] ⚠️ Erro ao conectar: {e}")
+            print(f"[Upstash] WARNING Erro ao conectar: {e}")
         
         self._initialized = True
     

@@ -41,6 +41,8 @@ rhubarb.exe
 
 # AI dev tools
 .qwen/
+.claude/
+.gemini/
 
 # Dev docs (not for production)
 backend/TESTING_GUIDE.md
@@ -54,10 +56,28 @@ tests/
 *.test.py
 test_*.py
 *_test.py
+.pytest_cache/
+pytest-cache-files-*/
+debug_ui/
+frontend/debug_ui/
+frontend/js/debug_bypass.js
+debug_ui.py
 
 # Temp
 *.tmp
 *.log
 
-# gerador de arquivos (por enquanto)
+# Screenshots and images (root)
+Captura de tela *.png
+mentoria.expert_dashboard_conquistas_.png
+
+# Web
+node_modules/
+.npm/
+.yarn/
+
+# Project specific
 backend/services/file_gen.py
+agents/
+design_system/
+Tati_AI.zip

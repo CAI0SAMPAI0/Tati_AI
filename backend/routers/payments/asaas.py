@@ -189,7 +189,7 @@ async def subscribe(
         if date.today() < PAID_START:
             raise HTTPException(
                 status_code=403,
-                detail="Planos e pagamentos só estarão disponíveis a partir de 01/05/2026.",
+                detail="Planos e pagamentos só estarão disponíveis a partir de 30/06/2026.",
             )
 
     # 1. Busca o plano no banco — o valor vem daqui, nunca do frontend

@@ -14,6 +14,44 @@ let simMediaRecorder = null;
 let simAudioChunks = [];
 let simIsRecording = false;
 let simCurrentAudio = null; // Rastrear áudio atual para parar ao sair
+let simRecognition = null;
+let simPendingUserBubble = null;
+
+// ── Speech Recognition ─────────────────────────────────────────────
+function initSimSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return null;
+
+  const rec = new SpeechRecognition();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = 'en-US';
+
+  rec.onresult = (event) => {
+    let interimTranscript = '';
+    let finalTranscript = '';
+
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      if (event.results[i].isFinal) {
+        finalTranscript += event.results[i][0].transcript;
+      } else {
+        interimTranscript += event.results[i][0].transcript;
+      }
+    }
+
+    if (simPendingUserBubble) {
+      const bub = simPendingUserBubble.querySelector('.msg-bubble');
+      if (bub) {
+        bub.textContent = finalTranscript + interimTranscript;
+        const chatArea = document.getElementById('sim-chat-area');
+        if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
+      }
+    }
+  };
+
+  rec.onerror = (e) => console.warn('[SimSpeechRec] Error:', e.error);
+  return rec;
+}
 
 // Para áudio ao sair da página
 window.addEventListener('beforeunload', stopAllSimAudio);
@@ -21,6 +59,7 @@ window.addEventListener('beforeunload', stopAllSimAudio);
 window.addEventListener('DOMContentLoaded', () => {
     loadTopbarUser();
     loadScenarios();
+    simRecognition = initSimSpeechRecognition();
     const params = new URLSearchParams(window.location.search);
     const scenarioId = params.get('id');
     if (scenarioId) {
@@ -462,9 +501,8 @@ function _buildAudioControls(meta, b64) {
       audio.play().catch(() => { });
     };
 
-    if (s.autoPlay === true || s.autoPlay === 'true') {
-        setTimeout(playThis, 300);
-    }
+    // Auto-reproduz áudio em simulações por padrão
+    setTimeout(playThis, 300);
 
     playBtn?.addEventListener('click', e => { 
         e.stopPropagation(); 
@@ -516,6 +554,13 @@ async function startSimRecording(btn) {
         simMediaRecorder.onstop = sendSimAudio;
         
         simMediaRecorder.start();
+
+        // Inicia reconhecimento em tempo real
+        if (simRecognition) {
+          try { simRecognition.start(); } catch(e) {}
+        }
+        simPendingUserBubble = addSimMessage('user', '');
+
         simIsRecording = true;
         
         if (btn) btn.classList.add('recording');
@@ -527,9 +572,13 @@ async function startSimRecording(btn) {
 function stopSimRecording() {
     if (simMediaRecorder && simIsRecording) {
         simMediaRecorder.stop();
+        if (simRecognition) {
+          try { simRecognition.stop(); } catch(e) {}
+        }
         simIsRecording = false;
         
         document.querySelectorAll('.btn-sim-mic').forEach(b => b.classList.remove('recording'));
+        document.querySelectorAll('.btn-sim-mic-inline').forEach(b => b.classList.remove('recording'));
     }
 }
 
@@ -559,9 +608,16 @@ async function sendSimAudio() {
                 const data = await res.json();
                 const text = data.text || '[Não foi possível transcrever]';
                 if (text) {
-                    // addSimMessage('user', ...) já foi removido daqui para não duplicar se chamarmos sendSimMessageText
-                    // Envia texto transcrito para a simulação
-                    await sendSimMessageText(text);
+                    // Atualiza a bolha pendente com o texto final do Whisper (mais preciso)
+                    if (simPendingUserBubble) {
+                      const bub = simPendingUserBubble.querySelector('.msg-bubble');
+                      if (bub) bub.textContent = text;
+                      
+                      // Envia para processamento (IA responde)
+                      await processSimResponse(text);
+                    } else {
+                      await sendSimMessageText(text);
+                    }
                 } else {
                     showSimTyping(false);
                     addSimMessage('bot', '(Não consegui entender o áudio)');
@@ -570,14 +626,50 @@ async function sendSimAudio() {
                 showSimTyping(false);
                 addSimMessage('bot', '(Erro ao processar áudio)');
             }
+            simPendingUserBubble = null;
         } catch (e) {
             console.error('Erro ao enviar áudio:', e);
             showSimTyping(false);
             addSimMessage('bot', '(Erro de conexão no áudio)');
+            simPendingUserBubble = null;
         }
     };
     
     reader.readAsDataURL(blob);
+}
+
+/**
+ * Apenas processa a resposta da IA para um texto já exibido no DOM (usado no áudio)
+ */
+async function processSimResponse(text) {
+  showSimTyping(true);
+  try {
+      const res = await fetch(`${API}/simulation/message`, {
+          method: 'POST',
+          headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+              content: text,
+              conversation_id: simConversationId,
+              scenario: currentScenario.id
+          })
+      });
+      
+      showSimTyping(false);
+      
+      if (res.ok) {
+          const data = await res.json();
+          if (data.reply) {
+              const msgEl = addSimMessage('bot', data.reply);
+              if (data.audio_b64) _attachAudioToSimMsg(msgEl, data.audio_b64);
+          }
+      }
+  } catch (e) {
+      console.error('Erro no processSimResponse:', e);
+      showSimTyping(false);
+  }
 }
 
 // ── Feedback Modal ─────────────────────────────────────────────────────────────

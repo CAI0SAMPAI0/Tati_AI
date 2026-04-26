@@ -14,6 +14,42 @@ let audioChunks      = [];
 let currentAudio     = null;
 let lastAudioB64     = null;
 let pendingUserBubble = null;
+let recognition      = null;
+
+// ── Speech Recognition ─────────────────────────────────────────────
+function initSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return null;
+
+  const rec = new SpeechRecognition();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = 'en-US'; // Default para inglês, mas Whisper no backend resolve se for PT
+
+  rec.onresult = (event) => {
+    let interimTranscript = '';
+    let finalTranscript = '';
+
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      if (event.results[i].isFinal) {
+        finalTranscript += event.results[i][0].transcript;
+      } else {
+        interimTranscript += event.results[i][0].transcript;
+      }
+    }
+
+    if (pendingUserBubble) {
+      const bub = pendingUserBubble.querySelector('.vbubble.user');
+      if (bub) {
+        bub.textContent = finalTranscript + interimTranscript;
+        scrollBottom();
+      }
+    }
+  };
+
+  rec.onerror = (e) => console.warn('[SpeechRec] Error:', e.error);
+  return rec;
+}
 
 // URL params
 const urlParams    = new URLSearchParams(window.location.search);
@@ -413,6 +449,11 @@ async function startRecording() {
     mediaRecorder.onstop = sendAudio;
     mediaRecorder.start();
 
+    // Inicia reconhecimento em tempo real
+    if (recognition) {
+      try { recognition.start(); } catch(e) {}
+    }
+
     isRecording = true;
     micBtn.classList.add('recording');
     micBtn.textContent = '⏹';
@@ -427,6 +468,10 @@ async function startRecording() {
 
 function stopRecording() {
   if (mediaRecorder) mediaRecorder.stop();
+  if (recognition) {
+    try { recognition.stop(); } catch(e) {}
+  }
+
   isRecording  = false;
   isProcessing = true;
 
@@ -458,7 +503,12 @@ async function sendAudio() {
     const b64 = reader.result.split(',')[1];
     showTyping();
 
-    const payload = JSON.stringify({ type: 'audio', audio: b64, conversation_id: currentConvId });
+    const payload = JSON.stringify({ 
+      type: 'audio', 
+      audio: b64, 
+      conversation_id: currentConvId,
+      origin: 'voice'
+    });
 
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(payload);
@@ -755,4 +805,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadAvatarFrames();
   _enterIdle();
   connectWS();
+  recognition = initSpeechRecognition();
 });

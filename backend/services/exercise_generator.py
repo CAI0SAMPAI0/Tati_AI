@@ -118,6 +118,18 @@ async def generate_exercises_from_history(username: str, current_conversations_t
 
         quiz_id = quiz_res.data[0]["id"]
 
+        # Registra status inicial da prática personalizada para o aluno.
+        try:
+            db.table("user_exercise_attempts").insert({
+                "username": username,
+                "exercise_id": quiz_id,
+                "module_id": PERSONALIZED_MODULE_ID,
+                "activity_type": "quiz",
+                "status": "pending",
+            }).execute()
+        except Exception as e:
+            print(f"[ExerciseGen] Aviso ao registrar status pending: {e}")
+
         # Insere as questões
         for i, q in enumerate(data.get("exercises", [])):
             db.table("quiz_questions").insert({

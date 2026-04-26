@@ -39,14 +39,19 @@ from routers.simulation import router as simulation_router
 from routers.ai.avatar import router as avatar_router
 from routers.activities.modules import router as modules_router
 from routers.activities.quizzes import router as quizzes_router
+from routers.activities.podcasts import router as podcasts_router
 from routers.activities.trophies import router as trophies_router
 from routers.activities.submissions import router as submissions_router
 from routers.activities.ranking import router as ranking_router
 from routers.payments import asaas_router as payments_router
+from routers.users.onboarding import router as onboarding_router
+from routers.users.daily_summary import router as daily_summary_router
+from routers.notifications import router as notifications_router
 from routers.validation import router as validation_router
+from services.notification_scheduler import start_notification_scheduler
 
 app = FastAPI(
-    title="Teacher Tati API",
+    title="Teacher Tati AI",
     description="API para o aplicativo de ensino de inglês Teacher Tati",
     version="2.0.0",
 )
@@ -90,12 +95,16 @@ app.include_router(simulation_router, tags=["simulation"])
 # ── Activities ────────────────────────────────────────────────
 app.include_router(modules_router,   prefix="/activities/modules",  tags=["activities"])
 app.include_router(quizzes_router,   prefix="/activities/quizzes",  tags=["activities"])
+app.include_router(podcasts_router,  prefix="/activities/podcasts", tags=["activities"])
 app.include_router(trophies_router,  prefix="/activities/trophies", tags=["activities"])
 app.include_router(submissions_router, prefix="/activities/submissions", tags=["activities"])
 app.include_router(ranking_router, prefix="/activities/ranking", tags=["activities"])
 
 # ── Payments ──────────────────────────────────────────────────
 app.include_router(payments_router,  prefix="/payments",   tags=["payments"])
+app.include_router(onboarding_router, tags=["users"])
+app.include_router(daily_summary_router, tags=["users"])
+app.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
 
 # ── Validation ────────────────────────────────────────────────
 app.include_router(validation_router, prefix="/validation", tags=["validation"])
@@ -104,6 +113,11 @@ app.include_router(validation_router, prefix="/validation", tags=["validation"])
 @app.get("/cors-test")
 async def cors_test():
     return {"origins": ["https://tati-ai.vercel.app"]}
+
+
+@app.on_event("startup")
+async def startup_notifications():
+    start_notification_scheduler()
 
 
 if __name__ == "__main__":

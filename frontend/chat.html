@@ -5,6 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title data-i18n="chat.title">Tati AI — Chat</title>
+    <meta name="theme-color" content="#6C63FF">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="/manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
@@ -55,6 +59,28 @@
                 <i class="fa-solid fa-plus"></i>
                 <span data-i18n="nav.new_chat">Nova conversa</span>
             </button>
+
+            <!-- Divisor -->
+            <div class="sidebar-divider"></div>
+
+
+            <!-- Weekly Study Plan -->
+            <div class="weekly-plan-card" id="weekly-plan-card" style="display:none;">
+                <div class="wp-header">
+                    <span class="wp-icon">📅</span>
+                    <div>
+                        <p class="wp-title">This Week's Plan</p>
+                        <p class="wp-week" id="wp-week"></p>
+                    </div>
+                    <span class="wp-overall-badge" id="wp-overall-badge" style="display:none;"></span>
+                </div>
+                <p class="wp-greeting" id="wp-greeting"></p>
+                <div class="wp-focuses" id="wp-focuses"></div>
+                <button class="wp-new-plan-btn" id="wp-new-plan-btn" style="display:none;"
+                    onclick="openPlanTransitionModal()">
+                    ✨ Get New Plan
+                </button>
+            </div>
 
             <!-- Divisor -->
             <div class="sidebar-divider"></div>
@@ -170,6 +196,19 @@
         </main>
     </div>
 
+    <!-- Teleprompter Overlay -->
+    <div id="teleprompter-overlay">
+        <div class="tele-header">
+            <div class="tele-title">
+                <div class="tele-dot"></div>
+                Teleprompter
+            </div>
+            <div id="tele-timer" style="font-family: monospace; font-size: 0.8rem; color: rgba(255,255,255,0.6);">00:00</div>
+        </div>
+        <div class="tele-content" id="tele-content">...</div>
+        <div class="tele-hint">Fale em inglês... o texto aparecerá aqui em tempo real.</div>
+    </div>
+
     <div id="summary-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">
@@ -185,10 +224,57 @@
         </div>
     </div>
 
+    <!-- Modal: Transição de Plano Semanal -->
+    <div id="plan-transition-overlay" class="pt-overlay" style="display:none;">
+        <div class="pt-modal">
+            <div class="pt-modal-header">
+                <div>
+                    <h2 class="pt-title" id="pt-title">Weekly Review</h2>
+                    <p class="pt-subtitle" id="pt-subtitle">Complete the review to unlock your new plan</p>
+                </div>
+                <button class="pt-skip-btn" id="pt-skip-btn" onclick="skipPlanTransition()">Skip for
+                    now</button>
+            </div>
+
+            <!-- Estado: loading -->
+            <div id="pt-loading" class="pt-loading">
+                <div class="pt-spinner"></div>
+                <p>Tati is preparing your review exercises…</p>
+            </div>
+
+            <!-- Estado: quiz -->
+            <div id="pt-quiz" style="display:none;">
+                <div class="pt-progress-bar-wrap">
+                    <div class="pt-progress-bar" id="pt-progress-bar"></div>
+                </div>
+                <p class="pt-counter" id="pt-counter"></p>
+                <div id="pt-question-block" class="pt-question-block"></div>
+                <div id="pt-options" class="pt-options"></div>
+                <div id="pt-feedback" class="pt-feedback" style="display:none;"></div>
+                <button class="pt-next-btn" id="pt-next-btn" style="display:none;"
+                    onclick="ptNextQuestion()">Next →</button>
+            </div>
+
+            <!-- Estado: resultado final -->
+            <div id="pt-result" style="display:none;">
+                <div class="pt-result">
+                    <span class="pt-result-icon" id="pt-result-icon">🏆</span>
+                    <h2 class="pt-result-title" id="pt-result-title">Excellent!</h2>
+                    <p class="pt-result-sub" id="pt-result-sub">You're ready for your new plan.</p>
+                    <button class="pt-finish-btn" onclick="finishPlanTransition()">Get my new plan →</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="/js/i18n.js"></script>
     <script src="/js/word_tooltip.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/chat.js"></script>
+    <script src="/js/onboarding.js?v=3"></script>
+    <script src="/js/progress_bradge.js?v=3"></script>
+    <script src="/js/notifications.js?v=3"></script>
+    <script src="/js/pwa.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 </body>
 

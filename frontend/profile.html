@@ -58,10 +58,6 @@
             <!-- Stats -->
             <div class="profile-stats" id="profile-stats">
                 <div class="stat-card">
-                    <div class="stat-value" id="stat-messages">—</div>
-                    <div class="stat-label" data-i18n="profile.msgs">Mensagens</div>
-                </div>
-                <div class="stat-card">
                     <div class="stat-value" id="stat-conversations">—</div>
                     <div class="stat-label" data-i18n="profile.convs">Conversas</div>
                 </div>
@@ -203,6 +199,14 @@
                         <span data-i18n="profile.save">Salvar alterações</span>
                     </button>
 
+                    <!-- Tour do sistema -->
+                    <section class="profile-section">
+                        <button class="btn-secondary" onclick="startTour()" style="width:100%;justify-content:center;">
+                            <i class="fa-solid fa-map-location-dot"></i>
+                            <span data-i18n="vct.tour">Ver tour do sistema</span>
+                        </button>
+                    </section>
+
                     <!-- Zona de perigo -->
                     <section class="profile-section danger-zone">
                         <h2 class="section-title danger">
@@ -220,31 +224,6 @@
 
                 </div>
             </div><!-- fecha tab-content-profile -->
-
-            <!-- Conteúdo da Aba Progresso -->
-            <div class="profile-tab-content" id="tab-content-progress" style="display:none;">
-                <div id="profile-progress-container"></div>
-            </div>
-
-            <!-- Conteúdo da Aba Vocabulário -->
-            <div class="profile-tab-content" id="tab-content-vocab" style="display:none;">
-                <div id="profile-vocab-container"></div>
-            </div>
-
-            <!-- Conteúdo da Aba Metas -->
-            <div class="profile-tab-content" id="tab-content-goals" style="display:none;">
-                <div id="profile-goals-container"></div>
-            </div>
-
-            <!-- Conteúdo da Aba Conquistas -->
-            <div class="profile-tab-content" id="tab-content-trophies" style="display:none;">
-                <div class="trophies-grid" id="profile-trophies-container">
-                    <div class="loading-trophies">
-                        <i class="fa-solid fa-spinner fa-spin"></i>
-                        <p data-i18n="gen.loading">Carregando...</p>
-                    </div>
-                </div>
-            </div>
 
         </div>
     </div>

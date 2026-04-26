@@ -1,8 +1,14 @@
 if (!requireAuth()) throw new Error('Unauthenticated');
 const _dashUser = getUser();
-if (!isStaff(_dashUser)) {
-  showToast('Acesso negado. Área restrita a professores.', 'error');
-  window.location.href = '/chat.html';
+
+async function _ensureDashboardAccess() {
+  const fallback = isStaff(_dashUser);
+  try {
+    const access = await apiGet('/users/permissions/access');
+    return canAccessDashboard(_dashUser, access);
+  } catch (_) {
+    return fallback;
+  }
 }
 
 let allStudents = [];
@@ -43,7 +49,14 @@ const SECTIONS = {
   simulations: { title: () => '🎭 ' + (t('dash.simulations') || 'Simulações'), sub: () => t('dash.simulations_sub') },
 };
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
+  const allowed = await _ensureDashboardAccess();
+  if (!allowed) {
+    showToast('Acesso negado. Área restrita a professores.', 'error');
+    setTimeout(() => { window.location.href = '/chat.html'; }, 120);
+    return;
+  }
+
   _loadStats();
   _loadStudents();
   

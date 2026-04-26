@@ -8,12 +8,11 @@ from core.config import settings
 
 router = APIRouter()
 
-PAID_START    = date(2026, 5, 1)
+PAID_START    = date(2026, 6, 30)
 FREE_MSG_LIMIT = 5
 
 # Usuários com acesso total garantido (programadores/testers)
 SPECIAL_USERS = {
-    "caio.sampaio",
     "tati",
     "tati.ai",
     "admin",
@@ -114,25 +113,36 @@ class ChangeDueDateRequest(BaseModel):
 async def get_access_info(user: dict = Depends(get_current_user)):
     today      = date.today()
     username   = user.get("username")
-    is_admin   = user.get("role") in settings.staff_roles or username in SPECIAL_USERS
+    can_access_dashboard = _can_access_dashboard(user)
+    is_admin   = can_access_dashboard
     is_exempt  = user.get("is_exempt", False) or username in SPECIAL_USERS
     plan_type  = user.get("plan_type")
 
     # Admin ou Usuário Especial → sempre liberado
     if is_admin or is_exempt:
-        return _access_response(is_admin=is_admin, full=True, activities=True)
+        return _access_response(
+            is_admin=is_admin,
+            full=True,
+            activities=True,
+            can_access_dashboard=can_access_dashboard,
+        )
 
-    # Antes de 01/05/2026 → período gratuito, mas só para quem já era usuário
-    if today < PAID_START:
-        user_created = date.fromisoformat(user["created_at"][:10])
-        if user_created < PAID_START:
-            return _access_response(full=True, activities=is_admin, free_mode=True)
-        # Usuário novo → ainda não passou da data de início, mas não é do período gratuito
-        # segue para verificar assinatura ativa
+    # Até 30/06/2026 (inclusive) → período gratuito para todos os alunos
+    if _is_free_mode_period(today):
+        return _access_response(
+            full=True,
+            activities=True,
+            free_mode=True,
+            can_access_dashboard=can_access_dashboard,
+        )
 
     # Isento
     if is_exempt:
-        return _access_response(full=True, activities=True)
+        return _access_response(
+            full=True,
+            activities=True,
+            can_access_dashboard=can_access_dashboard,
+        )
 
     # Verifica assinatura ativa no banco
     sub = _get_active_subscription(user["username"])
@@ -148,6 +158,7 @@ async def get_access_info(user: dict = Depends(get_current_user)):
             return _access_response(
                 full=True,
                 activities=(plan == "full"),
+                can_access_dashboard=can_access_dashboard,
                 plan_type=plan,
                 expires_at=sub["expires_at"][:10],
                 in_grace=in_grace,
@@ -156,7 +167,12 @@ async def get_access_info(user: dict = Depends(get_current_user)):
     # Sem assinatura ativa → mensagens gratuitas
     used      = _get_free_messages_used(user["username"])
     remaining = max(0, FREE_MSG_LIMIT - used)
-    return _access_response(full=False, activities=False, free_messages_remaining=remaining)
+    return _access_response(
+        full=False,
+        activities=False,
+        can_access_dashboard=can_access_dashboard,
+        free_messages_remaining=remaining,
+    )
 
 
 @router.post("/change-due-date")
@@ -220,6 +236,7 @@ async def get_subscription(user: dict = Depends(get_current_user)):
 
 def _access_response(
     is_admin=False, full=False, activities=False,
+    can_access_dashboard=False,
     free_mode=False, plan_type=None, expires_at=None,
     in_grace=False, free_messages_remaining=None,
 ):
@@ -227,12 +244,23 @@ def _access_response(
         "is_admin":                is_admin,
         "full_access":             full,
         "can_access_activities":   activities,
+        "can_access_dashboard":    can_access_dashboard,
         "free_mode":               free_mode,
         "plan_type":               plan_type,
         "expires_at":              expires_at,
         "in_grace_period":         in_grace,
         "free_messages_remaining": free_messages_remaining,
     }
+
+
+def _can_access_dashboard(user: dict) -> bool:
+    username = user.get("username")
+    role = user.get("role")
+    return role in settings.staff_roles or username in SPECIAL_USERS
+
+
+def _is_free_mode_period(today: date) -> bool:
+    return today <= PAID_START
 
 
 def _get_active_subscription(username: str) -> dict | None:

@@ -21,7 +21,8 @@ async function loadInitialData() {
             loadUserData(),
             _loadProgressTab(),
             _loadProfileData(),
-            _loadPlanAction()
+            _loadPlanAction(),
+            applyAccessControl()
         ]);
         I18n.applyToDOM();
     } catch (e) { console.error('Erro carregando dados:', e); }

@@ -1,0 +1,31 @@
+{
+  "name": "Teacher Tati - AI English Learning",
+  "short_name": "Tati AI",
+  "description": "Pratique inglês com uma professora de IA 24/7.",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#6C63FF",
+  "orientation": "portrait-primary",
+  "lang": "pt-BR",
+  "categories": ["education", "language-learning"],
+  "icons": [
+    {
+      "src": "/assets/images/tati_logo.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "/assets/images/tati_logo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "/assets/images/tati_logo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "maskable"
+    }
+  ]
+}

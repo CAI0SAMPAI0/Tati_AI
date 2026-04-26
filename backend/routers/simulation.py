@@ -52,11 +52,19 @@ async def get_scenario_details(scenario_id: str):
 
 
 @router.post("/simulation/transcribe")
-async def transcribe_simulation_audio(body: SimAudioRequest):
+async def transcribe_simulation_audio(
+    body: SimAudioRequest,
+    current_user: dict = Depends(get_current_user)
+):
     """Transcreve áudio enviado na simulação."""
     try:
+        username = current_user["username"]
+        user_name = current_user.get("name", username)
+        user_focus = current_user.get("focus", "")
+        stt_prompt = f"User name: {user_name}. Learning focus: {user_focus}. The user is practicing English in a simulation."
+        
         audio_bytes = base64.b64decode(body.audio)
-        text = await transcribe_audio(audio_bytes, filename="sim_input.webm")
+        text = await transcribe_audio(audio_bytes, filename="sim_input.webm", prompt=stt_prompt)
         return {"text": text}
     except Exception as e:
         print(f"[Sim Transcribe] Erro: {e}")
