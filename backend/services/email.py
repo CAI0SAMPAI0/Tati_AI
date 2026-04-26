@@ -12,7 +12,7 @@ def send_reset_email(to_email: str, name: str, temp_password: str) -> bool:
 
     try:
         resend.Emails.send({
-            "from": "Teacher Tati <onboarding@resend.dev>",
+            "from": "Teacher Tati <tatiai@resend.dev>",
             "to": to_email,
             "subject": "Teacher Tati — Sua senha temporária",
             "html": _build_email_html(name, temp_password),
@@ -29,7 +29,7 @@ def send_submission_notification(student_name: str, activity_title: str) -> bool
     resend.api_key = settings.resend_api_key
     try:
         resend.Emails.send({
-            "from": "Tati IA Notificações <onboarding@resend.dev>",
+            "from": "Tati IA Notificações <tatiai@resend.dev>",
             "to": "cmsampaio71@gmail.com",
             "subject": f"Nova Atividade: {activity_title}",
             "html": f"<p>O aluno <strong>{student_name}</strong> enviou uma nova atividade: <strong>{activity_title}</strong>.</p><p>Acesse o dashboard para corrigir.</p>"
@@ -58,7 +58,7 @@ def send_feedback_notification(student_name: str, student_email: str, category: 
 
     try:
         resend.Emails.send({
-            "from": "Tati IA Feedback <onboarding@resend.dev>",
+            "from": "Tati IA Feedback <tatiai@resend.dev>",
             "to": "cmsampaio71@gmail.com",
             "subject": f"[{category_label}] Feedback de {student_name}",
             "html": f"""
@@ -113,7 +113,7 @@ def send_correction_notification(student_name: str, student_email: str, activity
 
     try:
         resend.Emails.send({
-            "from": "Teacher Tati <onboarding@resend.dev>",
+            "from": "Teacher Tati <tatiai@resend.dev>",
             "to": student_email,
             "subject": f"Atividade Corrigida: {activity_title}",
             "html": f"""
@@ -141,3 +141,22 @@ def send_correction_notification(student_name: str, student_email: str, activity
     except Exception as exc:
         print(f"[CorrectionEmail] Erro: {exc}")
         return False
+
+
+def _build_email_html(name: str, temp_password: str) -> str:
+    """Helper para construir o HTML do e-mail de senha temporária."""
+    return f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; color: #333;">
+        <h2 style="color: #6366f1;">Sua Senha Temporária</h2>
+        <p>Olá, <strong>{name}</strong>,</p>
+        <p>Você solicitou uma nova senha para sua conta na Teacher Tati.</p>
+        <div style="background: #f3f4f6; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 14px; color: #666;">Use a senha abaixo para entrar:</p>
+            <p style="margin: 10px 0 0; font-size: 24px; font-weight: bold; letter-spacing: 2px; color: #1f2937;">{temp_password}</p>
+        </div>
+        <p>Após fazer o login, recomendamos que você altere sua senha nas configurações do perfil.</p>
+        <p style="color: #ef4444; font-size: 14px;">Se você não solicitou esta alteração, ignore este e-mail.</p>
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+        <p style="font-size: 12px; color: #999;">Equipe Teacher Tati</p>
+    </div>
+    """
