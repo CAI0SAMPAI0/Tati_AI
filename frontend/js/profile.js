@@ -419,7 +419,17 @@ function logout() {
 async function cancelSubscription() {
   if (!window._cancelSubscriptionConfirmUntil || Date.now() > window._cancelSubscriptionConfirmUntil) {
     window._cancelSubscriptionConfirmUntil = Date.now() + 5000;
-    showToast(t('sub.cancel_confirm_toast'), 'warning');
+    
+    // Toastify instead of alert
+    if (typeof Toastify === 'function') {
+      Toastify({
+        text: t('sub.cancel_confirm_toast') || 'Click again to confirm cancellation',
+        duration: 5000,
+        gravity: "top",
+        position: "center",
+        style: { background: "#fbbf24", color: "#000", borderRadius: "10px", fontWeight: "bold" }
+      }).showToast();
+    }
     return;
   }
   window._cancelSubscriptionConfirmUntil = 0;

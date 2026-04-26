@@ -651,10 +651,9 @@
         'sub.plan_basic': 'Chat & Voice',
 
         'sub.cancel_button': 'Cancelar assinatura',
+        'sub.cancel_confirm_toast': '⚠️ Clique novamente em 5 segundos para confirmar o cancelamento.',
 
-        'sub.cancel_confirm_toast': 'Toque novamente em cancelar assinatura em até 5 segundos para confirmar.',
-
-        'sub.cancel_success': 'Assinatura cancelada com sucesso.',
+        'paywall.limit_reached': 'Limite gratuito atingido!',
 
         'sub.cancel_error': 'Não foi possível cancelar a assinatura.',
 
