@@ -10,7 +10,8 @@ async function loadInitialData() {
         await Promise.all([
             loadUserData(),
             loadRanking(),
-            loadWinners()
+            loadWinners(),
+            applyAccessControl()
         ]);
         startCountdown();
         I18n.applyToDOM();
@@ -59,6 +60,9 @@ async function loadRanking() {
             </tr>
         `).join('');
 
+        // Use top 3 of current ranking for podium if winners (last month) is empty or by default
+        updatePodium(data.slice(0, 3));
+
         const pos = await apiGet('/users/ranking/position');
         document.getElementById('user-rank').textContent = `#${pos.position || '—'}`;
         document.getElementById('user-rank-name').textContent = pos.name || '...';
@@ -74,28 +78,28 @@ async function loadRanking() {
     } catch (e) { console.error(e); }
 }
 
+function updatePodium(top3) {
+    const setWinner = (pos, name, score) => {
+        const nameEl = document.getElementById(`winner-${pos}-name`);
+        const posEl = document.getElementById(`winner-${pos}-position`);
+        if (nameEl) nameEl.textContent = name || '—';
+        if (posEl) posEl.textContent = score ? `${score} pts` : '0 pts';
+    };
+
+    setWinner(1, top3[0]?.name || top3[0]?.username, top3[0]?.score);
+    setWinner(2, top3[1]?.name || top3[1]?.username, top3[1]?.score);
+    setWinner(3, top3[2]?.name || top3[2]?.username, top3[2]?.score);
+}
+
 async function loadWinners() {
     try {
         const data = await apiGet('/users/ranking/winners');
         const winners = data.winners || [];
-        const lastMonth = data.month || '...';
-        document.getElementById('winners-month').textContent = lastMonth;
-
-        const setWinner = (pos, name, score) => {
-            const nameEl = document.getElementById(`winner-${pos}-name`);
-            const posEl = document.getElementById(`winner-${pos}-position`);
-            if (nameEl) nameEl.textContent = name || '—';
-            if (posEl) posEl.textContent = score ? `${score} pts` : '0 pts';
-        };
-
-        const w1 = winners.find(w => w.position === 1);
-        const w2 = winners.find(w => w.position === 2);
-        const w3 = winners.find(w => w.position === 3);
-
-        setWinner(1, w1?.name || w1?.username, w1?.score);
-        setWinner(2, w2?.name || w2?.username, w2?.score);
-        setWinner(3, w3?.name || w3?.username, w3?.score);
-
+        if (winners.length > 0) {
+            const lastMonth = data.month || '...';
+            document.getElementById('winners-month').textContent = lastMonth;
+            // updatePodium(winners); // Se quiser priorizar vencedores reais do mês passado
+        }
     } catch (e) { }
 }
 

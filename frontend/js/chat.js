@@ -14,12 +14,59 @@ let pendingFiles = [];
 let streamBuffer = '';
 let pendingAudioB64 = null;
 let currentAudio = null;
+let chatRecognition = null;
+
+// ── Speech Recognition ─────────────────────────────────────────────
+function initChatSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return null;
+
+  const rec = new SpeechRecognition();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = 'en-US';
+
+  rec.onresult = (event) => {
+    let interimTranscript = '';
+    let finalTranscript = '';
+
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      if (event.results[i].isFinal) {
+        finalTranscript += event.results[i][0].transcript;
+      } else {
+        interimTranscript += event.results[i][0].transcript;
+      }
+    }
+
+    const input = document.getElementById('message-input');
+    const teleContent = document.getElementById('tele-content');
+    const text = finalTranscript + interimTranscript;
+
+    if (input) {
+      input.value = text;
+      input.dispatchEvent(new Event('input')); 
+      _autoResize(input);
+    }
+    if (teleContent) {
+      teleContent.textContent = text || '...';
+    }
+  };
+
+  rec.onerror = (e) => console.warn('[ChatSpeechRec] Error:', e.error);
+  return rec;
+}
+
+// Weekly Plan Status Constants
+const _STATUS_ICON = { done: '✅', partial: '🌓', not_started: '○' };
+const _STATUS_LABEL = { done: 'Concluído', partial: 'Em andamento', not_started: 'Não iniciado' };
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   _initUserInfo();
   _setupFileInput();
   _connectWS();
+  loadWeeklyPlan();
+  if (typeof initOnboardingIfNeeded === 'function') initOnboardingIfNeeded();
 
   document.getElementById('btn-send')?.addEventListener('click', sendMessage);
   document.getElementById('btn-mic')?.addEventListener('click', toggleMic);
@@ -106,27 +153,35 @@ async function _initUserInfo() {
 
   const isTeacher = isStaff(user);
   const isPremium = user.plan_type === 'full' || user.is_premium_active;
+  const isFreeWindowFallback = _isActivitiesFreeWindowFallback();
+  let access = null;
 
-  if (isTeacher) {
-    const dashBtn = el('btn-dashboard');
-    if (dashBtn) dashBtn.style.display = 'flex';
-  } else {
-    const dashBtn = el('btn-dashboard');
-    if (dashBtn) dashBtn.style.display = 'none';
+  try {
+    access = await apiGet('/users/permissions/access');
+  } catch (_) {
+    access = null;
   }
 
+  const canSeeDashboard = canAccessDashboard(user, access);
+
+  const dashBtn = el('btn-dashboard');
+  if (dashBtn) dashBtn.style.display = canSeeDashboard ? 'flex' : 'none';
+
   // Botão de atividades: visível para professores E usuários premium
-  const actBtn = document.querySelector('a[href="activities.html"]');
+  const actBtn = document.querySelector('a[href="activities.html"], a[href="/activities.html"]');
   if (actBtn) {
-    apiGet('/users/permissions/access').then(access => {
-      actBtn.style.display = (isTeacher || access.can_access_activities) ? 'flex' : 'none';
-    }).catch(() => {
-      actBtn.style.display = isPremium ? 'flex' : 'none';
-    });
+    if (access) {
+      const canSeeActivities = isTeacher || access.free_mode || access.can_access_activities;
+      actBtn.style.display = canSeeActivities ? 'flex' : 'none';
+    } else {
+      const canSeeActivitiesFallback = isTeacher || isPremium || isFreeWindowFallback;
+      actBtn.style.display = canSeeActivitiesFallback ? 'flex' : 'none';
+    }
   }
 
   const badgeEl = document.getElementById('sidebar-premium-badge');
   if (badgeEl) {
+    const isSpecial = Boolean(user?.is_exempt) || Boolean(access?.is_admin && !isTeacher);
     // Se for especial ou professor, mostra badge Premium fixo ou verifica assinatura
     if (isSpecial || isTeacher) {
       badgeEl.style.display = 'inline-block';
@@ -142,6 +197,19 @@ async function _initUserInfo() {
       }).catch(() => { badgeEl.style.display = 'none'; });
     }
   }
+}
+
+function _isActivitiesFreeWindowFallback() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const day = now.getDate();
+
+  if (year < 2026) return true;
+  if (year > 2026) return false;
+  if (month < 6) return true;
+  if (month > 6) return false;
+  return day <= 30;
 }
 
 function _renderSidebarAvatar(el, u) {
@@ -204,8 +272,20 @@ function _waitForWS(timeout = 5000) {
 function _handleWSMessage(msg) {
   const handlers = {
     pong: () => { },
-    transcription: () => { _renderMessage('user', msg.text); document.getElementById('message-input').value = ''; _autoResize(document.getElementById('message-input')); },
-    status: () => _appendStatus(msg.text),
+    transcription: () => { 
+      const input = document.getElementById('message-input');
+      if (input) {
+        input.value = ''; // Limpa após envio bem sucedido
+        _autoResize(input);
+      }
+      // Remove placeholder if exists
+      document.getElementById('stt-placeholder')?.remove();
+      _renderMessage('user', msg.text); 
+    },
+    status: () => {
+      if (msg.text.startsWith('SUMMARY_CACHE_')) return; // Bloqueia exibição de cache no chat
+      _appendStatus(msg.text);
+    },
     stream_start: () => {
       _hideTyping();
       streamBuffer = '';
@@ -378,13 +458,15 @@ async function _loadMessages(convId) {
       for (const m of msgs) {
         const el = _renderMessage(m.role, m.content, true, m.created_at);
         if (m.role === 'assistant' && m.audio_b64) {
-          _attachAudioToElement(el, m.audio_b64);
+          // Passamos isHistory=true para NÃO auto-reproduzir
+          _attachAudioToElement(el, m.audio_b64, true);
         }
       }
     }
   } catch (e) {
     console.error('[Chat] Erro ao carregar mensagens:', e);
   }
+  _checkSummaryBtn();
   _scrollBottom();
 }
 
@@ -539,7 +621,7 @@ async function sendMessage() {
 
   _renderMessage('user', text);
   _showTyping(); isStreaming = true; _setInputEnabled(false); _scrollBottom();
-  ws.send(JSON.stringify({ type: 'text', content: text, conversation_id: currentConvId }));
+  ws.send(JSON.stringify({ type: 'text', content: text, conversation_id: currentConvId, origin: 'chat' }));
 }
 
 function _handleKey(e) {
@@ -558,6 +640,8 @@ function useSuggestion(btn) {
 }
 
 // ── Audio recording ───────────────────────────────────────────────────────────
+let teleTimerInterval = null;
+
 async function toggleMic() {
   if (isRecording) return _stopRecording();
   try {
@@ -567,14 +651,48 @@ async function toggleMic() {
     mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
     mediaRecorder.onstop = _sendAudio;
     mediaRecorder.start();
+
+    // Teleprompter
+    const tele = document.getElementById('teleprompter-overlay');
+    const teleContent = document.getElementById('tele-content');
+    const teleTimer = document.getElementById('tele-timer');
+    if (tele) tele.classList.add('active');
+    if (teleContent) teleContent.textContent = '...';
+    
+    let seconds = 0;
+    if (teleTimer) {
+      teleTimer.textContent = '00:00';
+      teleTimerInterval = setInterval(() => {
+        seconds++;
+        const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+        const s = (seconds % 60).toString().padStart(2, '0');
+        teleTimer.textContent = `${m}:${s}`;
+      }, 1000);
+    }
+
+    if (!chatRecognition) chatRecognition = initChatSpeechRecognition();
+    if (chatRecognition) {
+      try { chatRecognition.start(); } catch(e) {}
+    }
+
     isRecording = true;
     document.getElementById('btn-mic')?.classList.add('recording');
   } catch (e) { showToast('Microfone não disponível: ' + e.message, 'error'); }
 }
 function _stopRecording() {
   mediaRecorder?.stop();
+  if (chatRecognition) {
+    try { chatRecognition.stop(); } catch(e) {}
+  }
   isRecording = false;
   document.getElementById('btn-mic')?.classList.remove('recording');
+  
+  const tele = document.getElementById('teleprompter-overlay');
+  if (tele) tele.classList.remove('active');
+  if (teleTimerInterval) {
+    clearInterval(teleTimerInterval);
+    teleTimerInterval = null;
+  }
 }
 async function _sendAudio() {
   if (!currentConvId) {
@@ -582,18 +700,24 @@ async function _sendAudio() {
     currentConvId = data.id;
   }
   if (!ws || ws.readyState !== WebSocket.OPEN) { _connectWS(); await _waitForWS(5000).catch(() => { }); }
+  
+  // Render placeholder message immediately
+  const placeholder = _renderMessage('user', '🎤 Transcribing...', true);
+  placeholder.id = 'stt-placeholder';
+
   const blob = new Blob(audioChunks, { type: 'audio/webm' });
   const reader = new FileReader();
   reader.onload = () => {
-    _showTyping();
-    ws.send(JSON.stringify({ type: 'audio', audio: reader.result.split(',')[1], conversation_id: currentConvId }));
+    // Note: Typing indicator only shown AFTER we send to WS
+    ws.send(JSON.stringify({ type: 'audio', audio: reader.result.split(',')[1], conversation_id: currentConvId, origin: 'chat' }));
   };
   reader.readAsDataURL(blob);
 }
 
 // ── Render helpers ────────────────────────────────────────────────────────────
 function _renderMessage(role, content, returnElement = false, isoString = null) {
-  return role === 'user' ? _appendUserMsg(content, returnElement, isoString) : _appendAssistantMsg(content, returnElement, isoString);
+  const el = role === 'user' ? _appendUserMsg(content, returnElement, isoString) : _appendAssistantMsg(content, returnElement, isoString);
+  return el;
 }
 
 function _appendUserMsg(text, returnElement = false, isoString = null) {
@@ -621,9 +745,41 @@ function _appendAssistantMsg(text, returnElement = false, isoString = null) {
       <div class="message-meta"><span class="message-time">${nowTime(isoString)}</span></div>
     </div>`;
   _insertBeforeTyping(div);
+  
+  // Check for PDF report button
+  const isReport = _checkAndAddReportButton(div, text);
+
   if (getSettings().wordTooltip !== false && window.WordTooltip) WordTooltip.makeClickable(div);
   _scrollBottom();
+  
+  // Return info if it's a report to block audio later if needed
+  div.dataset.isReport = isReport ? 'true' : 'false';
+  
   return returnElement ? div : null;
+}
+
+function _checkAndAddReportButton(container, text) {
+  if (text.includes('STUDY REPORT') || text.includes('📊 STUDY REPORT')) {
+    const bubble = container.querySelector('.message-bubble');
+    if (bubble) {
+      bubble.style.display = 'none';
+      const reportCard = document.createElement('div');
+      reportCard.className = 'report-card';
+      reportCard.innerHTML = `
+        <div class="report-card-icon"><i class="fa-solid fa-file-pdf"></i></div>
+        <div class="report-card-info">
+          <h4>${t('chat.report_ready') || 'Relatório de Estudo Pronto!'}</h4>
+          <p>${t('chat.report_desc') || 'Clique abaixo para baixar seu resumo personalizado em PDF.'}</p>
+          <button class="btn-download-pdf" onclick="downloadReport('${currentConvId}')">
+            <i class="fa-solid fa-download"></i> ${t('chat.download_pdf') || 'Baixar PDF'}
+          </button>
+        </div>
+      `;
+      bubble.parentNode.insertBefore(reportCard, bubble);
+      return true;
+    }
+  }
+  return false;
 }
 
 function _appendStreamBubble() {
@@ -665,13 +821,23 @@ function _finalizeStreamBubble(msgEl, bubble) {
   meta.innerHTML = `<span class="message-time">${nowTime()}</span>`;
   body?.appendChild(meta);
 
+  if (window._lastStreamIsReport) {
+    _checkAndAddReportButton(msgEl, text);
+  }
+
   streamBuffer = '';
   return meta;
 }
 
 // Anexa áudio a um elemento específico de mensagem (para histórico)
-function _attachAudioToElement(msgEl, b64) {
+function _attachAudioToElement(msgEl, b64, isHistory = false) {
   if (!msgEl) return;
+  
+  // BLOQUEIO CRÍTICO: Se a mensagem for um relatório, nunca anexa áudio
+  if (msgEl.dataset.isReport === 'true' || msgEl.querySelector('.report-card-container')) {
+    return;
+  }
+
   let meta = msgEl.querySelector('.message-meta');
   if (!meta) {
     const body = msgEl.querySelector('.message-body');
@@ -683,18 +849,25 @@ function _attachAudioToElement(msgEl, b64) {
     }
   }
   if (meta && !meta.querySelector('.msg-audio-controls')) {
-    _buildAudioControls(meta, b64);
+    _buildAudioControls(meta, b64, isHistory);
   }
 }
 
 function _attachAudioToLastMsg(b64) {
   const msgs = document.querySelectorAll('.message-assistant');
   if (!msgs.length) return;
-  _attachAudioToElement(msgs[msgs.length - 1], b64);
+  _attachAudioToElement(msgs[msgs.length - 1], b64, false); // Nova mensagem = autoPlay OK
 }
 
-function _buildAudioControls(meta, b64) {
+function _buildAudioControls(meta, b64, isHistory = false) {
   if (meta.querySelector('.msg-audio-controls')) return;
+  
+  // Verifica novamente se o pai é um relatório por segurança
+  const msgEl = meta.closest('.message-assistant');
+  if (msgEl && (msgEl.dataset.isReport === 'true' || msgEl.querySelector('.report-card-container'))) {
+    return;
+  }
+
   const s = getSettings();
   const defaultSpeed = parseFloat(s.defaultSpeed || '1');
 
@@ -753,7 +926,10 @@ function _buildAudioControls(meta, b64) {
     setPlayIcon(true);
   };
 
-  if (s.autoPlay === true || s.autoPlay === 'true') playThis();
+  // SÓ REPRODUZ SE NÃO FOR HISTÓRICO
+  if (!isHistory && (s.autoPlay === true || s.autoPlay === 'true' || s.autoPlay === undefined)) {
+    playThis();
+  }
 
   playBtn?.addEventListener('click', e => { e.stopPropagation(); audio.paused ? playThis() : (audio.pause(), setPlayIcon(false)); });
   rewBtn?.addEventListener('click', e => { e.stopPropagation(); audio.currentTime = Math.max(0, audio.currentTime - 5); });
@@ -768,7 +944,7 @@ function _buildAudioControls(meta, b64) {
 function _checkSummaryBtn() {
   const btn = document.getElementById('btn-switch-summary');
   if (!btn) return;
-  btn.style.display = document.querySelectorAll('.message-user').length > 5 ? 'flex' : 'none';
+  btn.style.display = document.querySelectorAll('.message-user').length >= 3 ? 'flex' : 'none';
 }
 
 // ── Misc ──────────────────────────────────────────────────────────────────────
@@ -889,81 +1065,285 @@ async function _downloadReportPDF(content, filename, clickedBtn = null) {
 }
 
 function _checkAndAddReportButton(msgEl, text) {
-  if (!text.includes('# 📊 STUDY REPORT')) return;
+  // Regex mais robusto para detectar o marcador de relatório
+  if (!/📊 STUDY REPORT/i.test(text)) return;
 
   const body = msgEl.querySelector('.message-body');
   const bubble = body?.querySelector('.message-bubble');
   if (!body || !bubble || body.querySelector('.btn-report-download')) return;
 
-  // Extract title if possible
+  // Extrai título se possível
   const lines = text.split('\n');
-  const reportLine = lines.find(l => l.includes('# 📊 STUDY REPORT'));
-  const titleLine = lines.find(l => l.startsWith('## ')) || reportLine;
-  const cleanTitle = titleLine.replace(/#|📊/g, '').trim();
+  const reportLine = lines.find(l => /📊 STUDY REPORT/i.test(l));
+  const titleLine = lines.find(l => l.trim().startsWith('## ')) || reportLine;
+  const cleanTitle = titleLine.replace(/#|📊/g, '').replace(/STUDY REPORT -/i, '').trim();
 
-  // Hide the original long markdown and show a compact card
-  bubble.innerHTML = `
+  // Esconde o conteúdo original COMPLETAMENTE (estilo e conteúdo)
+  bubble.style.display = 'none';
+  bubble.setAttribute('aria-hidden', 'true');
+
+  // Cria o card de download
+  const card = document.createElement('div');
+  card.className = 'report-card-container';
+  card.innerHTML = `
       <div class="report-card" style="
-        padding: 20px; 
-        background: rgba(120, 40, 200, 0.12); 
-        border-left: 6px solid var(--primary); 
-        border-radius: 16px;
-        margin: 10px 0;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        padding: 10px 14px; 
+        background: var(--surface-secondary, rgba(120, 40, 200, 0.05)); 
+        border: 1px solid rgba(120, 40, 200, 0.2);
+        border-left: 4px solid var(--primary); 
+        border-radius: 10px;
+        margin: 4px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-width: 260px;
       ">
-        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px;">
-          <span style="font-size: 2rem;">📊</span>
-          <p style="margin: 0; font-weight: 800; color: var(--primary); font-size: 1.2rem;">${cleanTitle || 'Study Report'}</p>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.1rem;">📄</span>
+          <p style="margin: 0; font-weight: 700; color: var(--primary); font-size: 0.9rem; line-height: 1.2;">
+            ${cleanTitle || 'Material de Estudo'}
+          </p>
         </div>
-        <p style="margin: 0; font-size: 1rem; color: var(--text-muted); line-height: 1.5; font-weight: 500;">
-          ${t('chat.report_generated_desc') || "Teacher Tati generated a full pedagogical report based on your performance. Download the PDF version below."}
+        <p style="margin: 0; font-size: 0.75rem; color: var(--text-muted); opacity: 0.8;">
+          Relatório pedagógico pronto para baixar.
         </p>
+        <button class="btn-report-download" style="
+            display: flex; align-items: center; gap: 6px;
+            margin-top: 8px; padding: 8px 16px;
+            background: var(--primary); color: white;
+            border: none; border-radius: 8px;
+            font-size: 0.8rem; font-weight: 700;
+            cursor: pointer; transition: all 0.2s ease;
+            width: fit-content;
+            box-shadow: 0 3px 10px rgba(120, 40, 200, 0.2);
+        ">
+          <i class="fa-solid fa-file-pdf"></i> ${t('act.download_pdf') || 'Baixar PDF'}
+        </button>
       </div>
     `;
 
-  const btn = document.createElement('button');
-  btn.className = 'btn-report-download';
-  btn.style.cssText = `
-      display: flex; align-items: center; gap: 12px;
-      margin-top: 20px; padding: 16px 32px;
-      background: var(--primary); color: white;
-      border: none; border-radius: 16px;
-      font-size: 1.1rem; font-weight: 800;
-      cursor: pointer; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      width: 100%; justify-content: center;
-      box-shadow: 0 8px 20px rgba(120, 40, 200, 0.4);
-      border: 1px solid rgba(255,255,255,0.2);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    `;
-
-  // Add hover effect via JS
-  btn.onmouseover = () => {
-    btn.style.transform = 'scale(1.02) translateY(-3px)';
-    btn.style.boxShadow = '0 12px 25px rgba(120, 40, 200, 0.5)';
-    btn.style.background = 'var(--primary-hover, #8a3ad6)';
-  };
-  btn.onmouseout = () => {
-    btn.style.transform = 'scale(1) translateY(0)';
-    btn.style.boxShadow = '0 8px 20px rgba(120, 40, 200, 0.4)';
-    btn.style.background = 'var(--primary)';
-  };
-
-  btn.innerHTML = `<i class="fa-solid fa-file-pdf"></i> ${t('act.download_pdf_report') || 'Download PDF Report'}`;
-  btn.onclick = (e) => {
+  const downloadBtn = card.querySelector('.btn-report-download');
+  downloadBtn.onclick = (e) => {
     e.preventDefault();
-    // Gera filename a partir do título do relatório
-    const slug = (cleanTitle || 'report')
-      .toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, "") // remove acentos
-      .replace(/[^a-z0-9\s]/g, '')
-      .trim()
-      .replace(/\s+/g, '_')
-      .slice(0, 50);
-    const dateStr = new Date().toISOString().slice(0, 10);
-    const filename = `Tati_Report_${slug}_${dateStr}.pdf`;
-    _downloadReportPDF(text, filename, btn);
+    const slug = (cleanTitle || 'report').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_').slice(0, 50);
+    const filename = `Tati_Report_${slug}_${new Date().toISOString().slice(0, 10)}.pdf`;
+    _downloadReportPDF(text, filename, downloadBtn);
   };
 
-  body.appendChild(btn);
+  // Insere o card antes da bolha escondida
+  body.insertBefore(card, bubble);
+}
+
+// ─── Plano de Estudos Semanal ────────────────────────────────────────────────
+
+
+async function loadWeeklyPlan() {
+  try {
+    const plan = await apiGet('/users/weekly-plan');
+    const card = document.getElementById('weekly-plan-card');
+    if (!card || !plan?.focuses) return;
+
+    document.getElementById('wp-week').textContent = plan.week || '';
+    document.getElementById('wp-greeting').textContent = plan.greeting || '';
+
+    const progress = plan.progress || {};
+    const overall = progress.overall || 'not_started';
+
+    // Badge geral no header
+    const badge = document.getElementById('wp-overall-badge');
+    if (badge) {
+      badge.textContent = _STATUS_ICON[overall] || '';
+      badge.title = _STATUS_LABEL[overall] || '';
+      badge.style.display = 'inline-block';
+    }
+
+    // Renderiza tópicos com indicador de progresso
+    document.getElementById('wp-focuses').innerHTML = plan.focuses.map((f, i) => {
+      // Busca status ignorando case e espaços para ser mais robusto com o retorno da IA
+      const topicKey = Object.keys(progress).find(k => k.toLowerCase().trim() === f.topic.toLowerCase().trim());
+      const topicStatus = topicKey ? progress[topicKey] : 'not_started';
+      
+      const icon = _STATUS_ICON[topicStatus] || '';
+      return `
+        <div class="wp-focus-item">
+          <span class="wp-num">${i + 1}</span>
+          <div class="wp-focus-content">
+            <p class="wp-topic">${f.topic} <span class="wp-status-icon" title="${_STATUS_LABEL[topicStatus]}">${icon}</span></p>
+            <p class="wp-detail" style="display:none;">${f.why}<br><em>💡 ${f.tip}</em></p>
+          </div>
+          <span class="wp-arrow">›</span>
+        </div>`;
+    }).join('');
+
+    // Expandir ao clicar
+    card.querySelectorAll('.wp-focus-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const detail = item.querySelector('.wp-detail');
+        const arrow = item.querySelector('.wp-arrow');
+        const open = detail.style.display === 'block';
+        detail.style.display = open ? 'none' : 'block';
+        arrow.style.transform = open ? '' : 'rotate(90deg)';
+      });
+    });
+
+    // Botão "Get New Plan" — aparece se a semana acabou ou transição ainda não foi feita
+    const newPlanBtn = document.getElementById('wp-new-plan-btn');
+    if (newPlanBtn && !plan.transition_done) {
+      // Verifica se já passou segunda-feira (semana nova) baseando-se no campo week
+      const today = new Date();
+      const dayOfWeek = today.getDay(); // 0=dom, 1=seg, ..., 6=sab
+      // Mostra o botão a partir de quinta (dia 4) para o aluno saber que pode trocar
+      if (dayOfWeek >= 4 || overall === 'done') {
+        newPlanBtn.style.display = 'block';
+      }
+    }
+
+    card.style.display = 'block';
+  } catch (e) { console.error('[WeeklyPlan]', e); }
+}
+
+// ─── Modal de Transição de Plano ─────────────────────────────────────────────
+
+let _ptExercises = [];
+let _ptCurrentIndex = 0;
+let _ptCorrect = 0;
+let _ptAnswered = false;
+
+async function openPlanTransitionModal() {
+  // Reseta estado
+  _ptExercises = [];
+  _ptCurrentIndex = 0;
+  _ptCorrect = 0;
+  _ptAnswered = false;
+
+  // Mostra overlay com loading
+  const overlay = document.getElementById('plan-transition-overlay');
+  overlay.style.display = 'flex';
+  document.getElementById('pt-loading').style.display = 'flex';
+  document.getElementById('pt-quiz').style.display = 'none';
+  document.getElementById('pt-result').style.display = 'none';
+  document.getElementById('pt-skip-btn').style.display = 'block';
+
+  try {
+    const res = await apiPost('/users/weekly-plan/transition', {});
+    if (!res.ok || res.data.error) throw new Error(res.data?.error || 'Erro ao carregar exercícios');
+
+    _ptExercises = res.data.exercises || [];
+    document.getElementById('pt-title').textContent = res.data.title || 'Weekly Review';
+    document.getElementById('pt-subtitle').textContent = res.data.description || '';
+
+    document.getElementById('pt-loading').style.display = 'none';
+    document.getElementById('pt-quiz').style.display = 'block';
+
+    _ptRenderQuestion();
+  } catch (e) {
+    console.error('[PlanTransition]', e);
+    document.getElementById('pt-loading').innerHTML =
+      '<p style="color:var(--text-muted)">Could not load exercises. Try again later.</p>';
+  }
+}
+
+function _ptRenderQuestion() {
+  if (_ptCurrentIndex >= _ptExercises.length) {
+    _ptShowResult();
+    return;
+  }
+
+  const q = _ptExercises[_ptCurrentIndex];
+  const total = _ptExercises.length;
+  _ptAnswered = false;
+
+  // Progress bar
+  const pct = (_ptCurrentIndex / total) * 100;
+  document.getElementById('pt-progress-bar').style.width = `${pct}%`;
+  document.getElementById('pt-counter').textContent = `Question ${_ptCurrentIndex + 1} of ${total}`;
+
+  // Pergunta
+  const qBlock = document.getElementById('pt-question-block');
+  qBlock.innerHTML = `<p class="pt-question-text">${q.question}</p>`;
+
+  // Opções
+  const optContainer = document.getElementById('pt-options');
+  optContainer.innerHTML = (q.options || []).map((opt, i) =>
+    `<button class="pt-option" data-index="${i}" onclick="ptSelectOption(this, ${i})">${opt}</button>`
+  ).join('');
+
+  // Reset feedback e botão next
+  const fb = document.getElementById('pt-feedback');
+  fb.style.display = 'none';
+  fb.innerHTML = '';
+  document.getElementById('pt-next-btn').style.display = 'none';
+}
+
+function ptSelectOption(btn, selectedIndex) {
+  if (_ptAnswered) return;
+  _ptAnswered = true;
+
+  const q = _ptExercises[_ptCurrentIndex];
+  const correct = q.correct_index;
+  const isCorrect = selectedIndex === correct;
+
+  if (isCorrect) _ptCorrect++;
+
+  // Marca opções
+  document.querySelectorAll('.pt-option').forEach((b, i) => {
+    b.disabled = true;
+    if (i === correct) b.classList.add('pt-correct');
+    if (i === selectedIndex && !isCorrect) b.classList.add('pt-wrong');
+  });
+
+  // Feedback
+  const fb = document.getElementById('pt-feedback');
+  fb.style.display = 'block';
+  fb.className = `pt-feedback ${isCorrect ? 'pt-feedback-correct' : 'pt-feedback-wrong'}`;
+  fb.innerHTML = `<strong>${isCorrect ? '✅ Correct!' : '❌ Not quite.'}</strong> ${q.explanation || ''}`;
+
+  // Botão next ou finish
+  const nextBtn = document.getElementById('pt-next-btn');
+  nextBtn.style.display = 'block';
+  const isLast = _ptCurrentIndex === _ptExercises.length - 1;
+  nextBtn.textContent = isLast ? 'See results →' : 'Next →';
+}
+
+function ptNextQuestion() {
+  _ptCurrentIndex++;
+  _ptRenderQuestion();
+}
+
+function _ptShowResult() {
+  document.getElementById('pt-quiz').style.display = 'none';
+  document.getElementById('pt-result').style.display = 'flex';
+  document.getElementById('pt-skip-btn').style.display = 'none';
+
+  const total = _ptExercises.length;
+  const pct = Math.round((_ptCorrect / total) * 100);
+
+  let icon, title, sub;
+  if (pct >= 80) {
+    icon = '🏆'; title = `Excellent! ${_ptCorrect}/${total} correct`;
+    sub = "You're ready for a new challenge. Let's keep growing!";
+  } else if (pct >= 50) {
+    icon = '💪'; title = `Good effort! ${_ptCorrect}/${total} correct`;
+    sub = "Your new plan will reinforce what needs more practice.";
+  } else {
+    icon = '📚'; title = `${_ptCorrect}/${total} correct`;
+    sub = "No worries — your new plan will focus on exactly these topics.";
+  }
+
+  document.getElementById('pt-result-icon').textContent = icon;
+  document.getElementById('pt-result-title').textContent = title;
+  document.getElementById('pt-result-sub').textContent = sub;
+  document.getElementById('pt-progress-bar').style.width = '100%';
+}
+
+async function finishPlanTransition() {
+  document.getElementById('plan-transition-overlay').style.display = 'none';
+  // Recarrega o plano (já foi invalidado no backend, vai gerar novo)
+  document.getElementById('weekly-plan-card').style.display = 'none';
+  document.getElementById('wp-new-plan-btn').style.display = 'none';
+  await loadWeeklyPlan();
+}
+
+function skipPlanTransition() {
+  document.getElementById('plan-transition-overlay').style.display = 'none';
 }

@@ -1,7 +1,7 @@
 """
 Serviço de Ranking de Alunos.
 """
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from services.database import get_client
 
 # REGRAS DE PONTUAÇÃO EXATAS
@@ -32,41 +32,64 @@ def get_ranking_data(username: str) -> dict:
     start_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     try:
-        # 1. Filtra usuários NÃO staff
-        access = db.table("student_access").select("username, name, role").execute().data or []
-        staff_usernames = {u["username"] for u in access if u["role"] in ["programador", "professor", "professora"]}
-        user_map = {u["username"]: u for u in access}
+        from core.config import settings
+        staff_usernames = set(settings.staff_roles)
+        access = db.table("student_access").select("username, role").execute().data or []
+        for a in access:
+            if a.get("role") in ("professor", "professora", "programador", "admin"):
+                staff_usernames.add(a["username"])
         
-        # 2. Busca dados de sessões e mensagens
+        # Busca dados de sessões e mensagens
         actions = db.table("study_sessions").select("username, activity_type").gte("created_at", start_month.isoformat()).execute().data or []
         messages = db.table("messages").select("username").eq("role", "user").gte("created_at", start_month.isoformat()).execute().data or []
 
         stats = {}
-        # Inicializa stats apenas para usuários válidos
-        for u_data in access:
-            if u_data["username"] not in staff_usernames:
-                stats[u_data["username"]] = _empty_stats(u_data["username"], user_map)
-
-        # Pontuação
+        
         for a in actions:
-            u = a["username"]
-            if u in stats and a["activity_type"] in ACTION_POINTS:
-                stats[u]["score"] += ACTION_POINTS[a["activity_type"]]
-                atype = a["activity_type"]
+            u = a.get("username")
+            if not u or u in staff_usernames:
+                continue
+            if u not in stats:
+                stats[u] = _empty_stats(u, {})
+            
+            atype = a.get("activity_type")
+            if atype in ACTION_POINTS:
+                stats[u]["score"] += ACTION_POINTS[atype]
                 if atype in ["quiz", "flashcard", "exercise", "message", "simulation"]:
                     stats[u][f"{atype}s"] += 1
         
         for m in messages:
-            u = m["username"]
-            if u in stats:
-                stats[u]["score"] += ACTION_POINTS["message"]
-                stats[u]["messages"] += 1
+            u = m.get("username")
+            if not u or u in staff_usernames:
+                continue
+            if u not in stats:
+                stats[u] = _empty_stats(u, {})
+            stats[u]["score"] += ACTION_POINTS["message"]
+            stats[u]["messages"] += 1
+
+        # Tenta buscar nomes reais para todos no stats
+        if stats:
+            usernames = list(stats.keys())
+            users = db.table("users").select("username, name").in_("username", usernames).execute().data or []
+            for u_info in users:
+                uname = u_info.get("username")
+                if uname in stats:
+                    stats[uname]["name"] = u_info.get("name") or uname
 
         ranking = sorted(stats.values(), key=lambda x: x["score"], reverse=True)
+        
+        # Mês anterior para winners
+        last_month_end = start_month - timedelta(days=1)
+        last_month_start = last_month_end.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        # Nota: Como get_ranking_data é usado principalmente para o ranking atual, 
+        # os winners podem ser calculados separadamente se necessário, 
+        # mas aqui vamos apenas garantir que top15 esteja correto.
+        
         return {
             "top15": ranking[:15], 
             "my_position": next((i+1 for i, x in enumerate(ranking) if x["username"] == username), 0),
-            "winners": []
+            "winners": [] # Winners são carregados via endpoint específico no frontend
         }
     except Exception as e:
         print(f"[Ranking] Erro: {e}")

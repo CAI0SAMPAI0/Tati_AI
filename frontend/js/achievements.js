@@ -8,7 +8,8 @@ async function loadInitialData() {
     try {
         await Promise.all([
             loadUserData(),
-            loadAchievements()
+            loadAchievements(),
+            applyAccessControl()
         ]);
         I18n.applyToDOM();
     } catch (e) { console.error('Erro carregando dados:', e); }

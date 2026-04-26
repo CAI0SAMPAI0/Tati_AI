@@ -1,23 +1,25 @@
 <!DOCTYPE html>
 <html lang="pt-br" data-theme="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title data-i18n="sim.title">Teacher Tati — Simulação de Conversas</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+        crossorigin="anonymous">
     <link rel="stylesheet" href="/styles/global.css">
     <link rel="stylesheet" href="/styles/simulation.css">
     <link rel="icon" type="image/x-icon" href="/assets/images/tati_logo.jpg">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
 </head>
+
 <body>
     <div class="sim-layout">
         <header class="sim-topbar">
-            <a href="javascript:void(0)" class="btn-back" onclick="history.back(); return false;">
-                <i class="fa-solid fa-arrow-left"></i>
-                <span data-i18n="nav.back_chat">Voltar ao Chat</span>
+            <a href="activities.html" class="nav-item logout">
+                <i class="fa-solid fa-right-from-bracket"></i> <span data-i18n="nav.back">Sair</span>
             </a>
             <div class="topbar-brand-center">
                 <img src="/assets/images/tati_logo.jpg" alt="Tati" class="topbar-logo"
@@ -98,13 +100,16 @@
                 </div>
                 <div class="feedback-field">
                     <label data-i18n="feedback.message">Mensagem</label>
-                    <textarea id="feedback-message" rows="5" data-i18n-placeholder="feedback.message_ph" placeholder="Descreva o problema, sugestão ou feedback..."></textarea>
+                    <textarea id="feedback-message" rows="5" data-i18n-placeholder="feedback.message_ph"
+                        placeholder="Descreva o problema, sugestão ou feedback..."></textarea>
                 </div>
                 <div id="feedback-status" class="feedback-status" style="display: none;"></div>
             </div>
             <div class="feedback-modal-footer">
-                <button class="btn-feedback-cancel" onclick="closeFeedbackModal()" data-i18n="feedback.cancel">Cancelar</button>
-                <button class="btn-feedback-send" onclick="sendFeedback()" data-i18n="feedback.send">Enviar Feedback</button>
+                <button class="btn-feedback-cancel" onclick="closeFeedbackModal()"
+                    data-i18n="feedback.cancel">Cancelar</button>
+                <button class="btn-feedback-send" onclick="sendFeedback()" data-i18n="feedback.send">Enviar
+                    Feedback</button>
             </div>
         </div>
     </div>
@@ -119,7 +124,8 @@
                     <p id="sim-diff" class="sim-diff">Intermediário</p>
                 </div>
                 <div class="sim-modal-controls">
-                    <button class="btn-sim-mode-toggle" id="btn-sim-mode" onclick="toggleSimMode()" title="Alternar Chat/Voz">
+                    <button class="btn-sim-mode-toggle" id="btn-sim-mode" onclick="toggleSimMode()"
+                        title="Alternar Chat/Voz">
                         <i class="fa-solid fa-keyboard"></i>
                     </button>
                     <button class="btn-close" onclick="closeSimulation()">
@@ -133,7 +139,7 @@
                     <div class="sim-user-avatar">??</div>
                     <span class="sim-user-name">Carregando...</span>
                 </div>
-                
+
                 <div class="sim-chat-area" id="sim-chat-area">
                     <div class="sim-welcome">
                         <i class="fa-solid fa-comments"></i>
@@ -145,15 +151,16 @@
                 <div id="sim-typing" class="typing-indicator" style="display: none; margin-bottom: 1rem;">
                     <span></span><span></span><span></span>
                 </div>
-                
+
                 <!-- Input de texto -->
                 <div class="sim-input-area" id="sim-input-area" style="display:none;">
-                    <input type="text" id="sim-text-input" data-i18n-placeholder="sim.input_ph" placeholder="Digite sua mensagem..." onkeypress="if(event.key==='Enter')sendSimMessage()">
+                    <input type="text" id="sim-text-input" data-i18n-placeholder="sim.input_ph"
+                        placeholder="Digite sua mensagem..." onkeypress="if(event.key==='Enter')sendSimMessage()">
                     <button class="btn-send-sim" onclick="sendSimMessage()">
                         <i class="fa-solid fa-paper-plane"></i>
                     </button>
                 </div>
-                
+
                 <!-- Botão de gravação de voz -->
                 <div class="sim-voice-area" id="sim-voice-area" style="display:none;">
                     <button class="btn-sim-mic" id="btn-sim-mic" onclick="toggleSimRecording()">
@@ -164,8 +171,10 @@
                 </div>
             </div>
             <div class="sim-modal-footer">
-                <button class="btn-start-sim" onclick="startSimulation()" id="btn-start" data-i18n="sim.start">Iniciar Simulação</button>
-                <button class="btn-end-sim" onclick="endSimulation()" id="btn-end" style="display:none;" data-i18n="sim.end">Finalizar</button>
+                <button class="btn-start-sim" onclick="startSimulation()" id="btn-start" data-i18n="sim.start">Iniciar
+                    Simulação</button>
+                <button class="btn-end-sim" onclick="endSimulation()" id="btn-end" style="display:none;"
+                    data-i18n="sim.end">Finalizar</button>
             </div>
         </div>
     </div>
@@ -175,4 +184,5 @@
     <script src="/js/simulation.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 </body>
+
 </html>

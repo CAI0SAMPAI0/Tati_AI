@@ -1,5 +1,37 @@
 /* competitions.css — Tati AI Competitions */
+/* ── CAVE FIX: Box-sizing global para prevenir overflow ────────── */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
 
+/* ── CAVE FIX: Impede scroll horizontal no root ─────────────────── */
+html {
+    overflow-x: hidden;
+    /* CAVE FIX: reserva espaço da scrollbar vertical ANTES de ela aparecer.
+       Isso previne o "layout shift" de ~17px no Windows Chrome/Edge que
+       empurra o conteúdo e cria scroll horizontal em 1920px+ */
+    scrollbar-gutter: stable;
+}
+
+body {
+    overflow-x: hidden;
+    max-width: 100%;
+    width: 100%;
+}
+
+/* ── CAVE FIX: Garante que imagens e mídia nunca estouram ────────── */
+img,
+video,
+iframe,
+table {
+    max-width: 100%;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RANKING BANNER
+   ════════════════════════════════════════════════════════════════ */
 .ranking-banner {
     display: flex;
     align-items: center;
@@ -10,12 +42,38 @@
     border-radius: 20px;
     margin-bottom: 2rem;
     box-shadow: 0 12px 32px rgba(124, 58, 237, 0.2);
+    /* CAVE FIX: evita overflow do banner */
+    width: 100%;
+    min-width: 0;
 }
 
-.banner-icon { font-size: 3rem; color: #fbbf24; }
-.banner-content h3 { margin: 0; font-size: 1.5rem; }
-.banner-content p { margin: 0.5rem 0 0 0; opacity: 0.9; }
+.banner-icon {
+    font-size: 3rem;
+    color: #fbbf24;
+    flex-shrink: 0;
+    /* CAVE FIX: ícone não encolhe */
+}
 
+.banner-content {
+    min-width: 0;
+    /* CAVE FIX: permite que texto quebre dentro do flex */
+}
+
+.banner-content h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    word-break: break-word;
+}
+
+.banner-content p {
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+    word-break: break-word;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   COUNTDOWN
+   ════════════════════════════════════════════════════════════════ */
 .countdown-card {
     background: linear-gradient(135deg, var(--primary), #4c1d95);
     border-radius: 16px;
@@ -23,6 +81,7 @@
     margin-bottom: 1.5rem;
     color: white;
     text-align: center;
+    width: 100%;
 }
 
 .countdown-timer {
@@ -30,6 +89,8 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
+    flex-wrap: wrap;
+    /* CAVE FIX: quebra em múltiplas linhas se necessário */
 }
 
 .countdown-unit {
@@ -45,6 +106,9 @@
     font-weight: 900;
 }
 
+/* ════════════════════════════════════════════════════════════════
+   WINNERS PODIUM
+   ════════════════════════════════════════════════════════════════ */
 .winners-podium {
     display: flex;
     align-items: flex-end;
@@ -52,6 +116,8 @@
     gap: 1rem;
     padding-top: 2rem;
     margin-bottom: 3rem;
+    flex-wrap: wrap;
+    /* CAVE FIX: não deixa cards caírem para fora */
 }
 
 .winner-card {
@@ -60,9 +126,11 @@
     border-radius: 16px 16px 8px 8px;
     padding: 1.5rem;
     text-align: center;
-    width: 100%;
+    /* CAVE FIX: usa flex para crescer mas respeita max-width */
+    flex: 1 1 140px;
     max-width: 200px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    min-width: 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .winner-card.first {
@@ -72,9 +140,21 @@
     order: 2;
 }
 
-.winner-card.second { height: 200px; border-color: #9ca3af; order: 1; }
-.winner-card.third { height: 180px; border-color: #cd7f32; order: 3; }
+.winner-card.second {
+    height: 200px;
+    border-color: #9ca3af;
+    order: 1;
+}
 
+.winner-card.third {
+    height: 180px;
+    border-color: #cd7f32;
+    order: 3;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   USER POSITION CARD
+   ════════════════════════════════════════════════════════════════ */
 .user-position-card {
     background: var(--surface);
     border: 2px solid var(--primary);
@@ -84,24 +164,62 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 2rem;
+    /* CAVE FIX: evita overflow */
+    width: 100%;
+    min-width: 0;
 }
 
-.user-position-info { display: flex; align-items: center; gap: 1.5rem; }
-.user-rank { font-size: 2rem; font-weight: 900; color: var(--primary); }
-.user-stats { display: flex; gap: 1.5rem; }
-.user-stat { display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted); }
-.user-stat i { color: var(--primary); }
+.user-position-info {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    min-width: 0;
+    /* CAVE FIX */
+}
 
+.user-rank {
+    font-size: 2rem;
+    font-weight: 900;
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.user-stats {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    /* CAVE FIX: stats não estouram */
+}
+
+.user-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.user-stat i {
+    color: var(--primary);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RANKING TABLE
+   ════════════════════════════════════════════════════════════════ */
 .ranking-container {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 16px;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
 }
 
 .ranking-table {
     width: 100%;
     border-collapse: collapse;
+    /* CAVE FIX: min-width menor para caber em mais telas sem scroll lateral */
+    min-width: 320px;
 }
 
 .ranking-table th {
@@ -110,6 +228,7 @@
     background: var(--bg);
     color: var(--text-muted);
     font-size: 0.75rem;
+    white-space: nowrap;
 }
 
 .ranking-table td {
@@ -119,4 +238,254 @@
 
 .ranking-table tr.current-user {
     background: rgba(124, 58, 237, 0.05);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RESPONSIVIDADE — TABLET (1024px)
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+    .winners-podium {
+        gap: 0.75rem;
+    }
+
+    .winner-card {
+        padding: 1rem;
+        max-width: 180px;
+    }
+
+    .info-grid-2col {
+        gap: 1rem;
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RESPONSIVIDADE — TABLET PORTRAIT / MOBILE (768px)
+   CAVE FIX: Unificado em um único bloco — sem duplicação!
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+    /* Banner */
+    .ranking-banner {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+        padding: 1.5rem;
+    }
+
+    .banner-icon {
+        font-size: 2.5rem;
+    }
+
+    .banner-content h3 {
+        font-size: 1.35rem;
+    }
+
+    /* Countdown: 2 colunas para não amontoar */
+    .countdown-timer {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        /* reset do flex-wrap quando vira grid */
+    }
+
+    .countdown-unit {
+        min-width: unset;
+    }
+
+    /* Pódio: empilha verticalmente */
+    .winners-podium {
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+        padding-top: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .winner-card {
+        max-width: 100%;
+        width: 100%;
+        /* CAVE FIX: remove alturas fixas que quebravam o layout */
+        height: auto;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        text-align: left;
+        padding: 1rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        border-radius: 16px;
+    }
+
+    /* Força ordem correta 1º, 2º, 3º na lista */
+    .winner-card.first {
+        order: 1;
+    }
+
+    .winner-card.second {
+        order: 2;
+    }
+
+    .winner-card.third {
+        order: 3;
+    }
+
+    .winner-medal {
+        font-size: 2rem;
+        margin-top: 0;
+        width: 70px;
+        flex-shrink: 0;
+        text-align: center;
+    }
+
+    /* Info grid */
+    .info-grid-2col {
+        grid-template-columns: 1fr;
+    }
+
+    /* User position card */
+    .user-position-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1.25rem;
+        padding: 1.25rem;
+        text-align: center;
+    }
+
+    .user-position-info {
+        flex-direction: column;
+        gap: 0.5rem;
+        width: 100%;
+    }
+
+    .user-stats {
+        display: flex;
+        justify-content: center;
+        width: 100%;
+        gap: 0.75rem;
+    }
+
+    .user-stat {
+        flex-direction: column;
+        align-items: flex-start;
+        font-size: 0.85rem;
+        white-space: normal;
+    }
+    .ranking-container {
+        margin: 0 0rem;
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RESPONSIVIDADE — SMALL MOBILE (480px)
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+
+    .section-header h2 {
+        font-size: 1.5rem;
+    }
+
+    .section-header p {
+        font-size: 0.9rem;
+    }
+
+    .user-rank {
+        font-size: 1.75rem;
+    }
+
+    .user-details strong {
+        font-size: 1rem;
+    }
+
+    /* Countdown ainda menor */
+    .countdown-unit span {
+        font-size: 1.25rem;
+    }
+
+    .countdown-unit small {
+        font-size: 0.65rem;
+    }
+
+    /* Tabela: fontes e padding reduzidos */
+    .ranking-table th,
+    .ranking-table td {
+        padding: 1rem 0.75rem;
+    }
+
+    .ranking-table td {
+        font-size: 0.85rem;
+        padding-left: 2%;
+    }
+
+    .ranking-container {
+        margin: 0 0rem;
+    }
+
+    /* CAVE FIX: trunca nome longo sem quebrar linha */
+    .ranking-table td:nth-child(2) {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 120px;
+    }
+
+    /* CAVE FIX: esconde colunas menos importantes para evitar scroll excessivo */
+    .ranking-table th:nth-child(4),
+    .ranking-table td:nth-child(4),
+    .ranking-table th:nth-child(5),
+    .ranking-table td:nth-child(5),
+    .ranking-table th:nth-child(6),
+    .ranking-table td:nth-child(6),
+    .ranking-table th:nth-child(7),
+    .ranking-table td:nth-child(7) {
+        display: none;
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RESPONSIVIDADE — TINY MOBILE (375px / 320px)
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 375px) {
+
+    .ranking-banner {
+        padding: 1rem;
+        border-radius: 14px;
+    }
+
+    .banner-content h3 {
+        font-size: 1.15rem;
+    }
+
+    .countdown-card {
+        padding: 1rem;
+    }
+
+    .user-position-card {
+        padding: 1rem;
+    }
+
+    .user-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .winner-card {
+        padding: 0.875rem;
+    }
+
+    /* CAVE FIX: User rank menor em telas minúsculas */
+    .user-rank {
+        font-size: 1.5rem;
+    }
+
+    .ranking-table td {
+        font-size: 0.8rem;
+        padding: 0.55rem 0.5rem;
+    }
+
+    /* CAVE FIX: esconde mais uma coluna na tela de 320px */
+    .ranking-table th:nth-child(3),
+    .ranking-table td:nth-child(3) {
+        display: none;
+    }
+    .ranking-container {
+        margin: 0 0rem;
+    }
 }

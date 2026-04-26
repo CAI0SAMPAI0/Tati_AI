@@ -1,7 +1,7 @@
 # Router de autenticação: login, registro, Google OAuth, recuperação de senha.
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
@@ -92,13 +92,44 @@ def _build_token_response(user: dict) -> dict:
 
 
 @router.post("/login")
-async def login(form: OAuth2PasswordRequestForm = Depends()):
-    user = _find_user(form.username)
-    if not user or not verify_password(form.password, user["password"]):
+@router.post("/login_form")
+async def login(
+    request: Request,
+    form: OAuth2PasswordRequestForm = Depends(lambda: None) # Faz o form ser opcional
+):
+    # Tenta obter dados do Form primeiro (padrão OAuth2)
+    username = None
+    password = None
+
+    try:
+        # Tenta ler como form-data (OAuth2PasswordRequestForm)
+        form_data = await request.form()
+        username = form_data.get("username")
+        password = form_data.get("password")
+    except:
+        pass
+
+    # Se não veio no form, tenta no JSON (suporte para apiPost do frontend)
+    if not username or not password:
+        try:
+            json_data = await request.json()
+            username = json_data.get("username") or json_data.get("identifier")
+            password = json_data.get("password")
+        except:
+            pass
+
+    if not username or not password:
+        raise HTTPException(
+            status_code=422, 
+            detail="Credenciais não fornecidas ou formato inválido. Use form-data ou JSON."
+        )
+
+    user = _find_user(username)
+    if not user:
         raise HTTPException(status_code=401, detail="Usuário ou senha incorretos")
     
-    password_ok = verify_password(form.password, user["password"])
-    temp_ok = user.get("temp_password") and verify_password(form.password, user["temp_password"])
+    password_ok = verify_password(password, user["password"])
+    temp_ok = user.get("temp_password") and verify_password(password, user["temp_password"])
 
     if not password_ok and not temp_ok:
         raise HTTPException(status_code=401, detail="Usuário ou senha incorretos")

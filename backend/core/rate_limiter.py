@@ -24,8 +24,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         # Regras específicas por rota
         self.routes_config = {
-            '/auth/login': {'max_requests': 5, 'window': 300},
-            '/auth/forgot-password': {'max_requests': 3, 'window': 3600},
+            '/auth/login': {'max_requests': 20, 'window': 60},  # Aumentado para 20/min em dev
+            '/auth/login_form': {'max_requests': 20, 'window': 60},
+            '/auth/forgot-password': {'max_requests': 10, 'window': 3600},
             '/validation/validate-document': {'max_requests': 20, 'window': 60},
             '/chat': {'max_requests': 50, 'window': 3600},
         }
@@ -62,6 +63,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                             'Retry-After': str(reset_at),
                             'X-RateLimit-Remaining': '0',
                             'X-RateLimit-Reset': str(reset_at),
+                            'Access-Control-Allow-Origin': request.headers.get('Origin', '*'),
+                            'Access-Control-Allow-Credentials': 'true',
                         }
                     )
                 

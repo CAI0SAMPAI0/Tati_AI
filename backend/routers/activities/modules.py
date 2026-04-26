@@ -272,6 +272,24 @@ async def list_modules(user=Depends(get_current_user)):
         qid = p["quiz_id"]
         attempts_map[qid] = attempts_map.get(qid, 0) + 1
 
+    status_map = {}
+    try:
+        status_rows = (
+            db.table("user_exercise_attempts")
+            .select("exercise_id, status")
+            .eq("username", username)
+            .eq("activity_type", "quiz")
+            .execute()
+            .data
+        ) or []
+        for row in status_rows:
+            ex_id = row.get("exercise_id")
+            if ex_id:
+                status_map[str(ex_id)] = row.get("status") or "pending"
+    except Exception:
+        # Mantém compatibilidade com bancos sem a tabela de tentativas unificada.
+        status_map = {}
+
     filtered = []
     for m in modules_data:
         lvls = m.get("levels") or []
@@ -287,6 +305,9 @@ async def list_modules(user=Depends(get_current_user)):
             quizzes = m.get("quizzes", [])
             for q in quizzes:
                 q["attempts"] = attempts_map.get(q["id"], 0)
+                if m.get("id") == PERSONALIZED_MODULE_ID:
+                    default_status = "pending" if q["attempts"] == 0 else "done"
+                    q["status"] = status_map.get(str(q["id"]), default_status)
             m["has_quiz"] = len(quizzes) > 0
             m["has_flashcards"] = isinstance(m.get("flashcards"), list) and len(m.get("flashcards", [])) > 0
             filtered.append(m)
@@ -329,6 +350,8 @@ async def analyze_flashcard_answer(payload: FlashcardAnalyzeIn, user=Depends(get
 
 @router.post("/personalized/generate")
 async def generate_personalized(user=Depends(get_current_user)):
+    username = user["username"]
+
     # rate limit 3 gerações 
     try:
         from services.upstash import cache_get, cache_set
@@ -341,7 +364,6 @@ async def generate_personalized(user=Depends(get_current_user)):
         pass  # Se o cache falhar, deixa passar
     """Aluno solicita geração de exercícios baseados nos seus erros."""
     from services.exercise_generator import generate_exercises_from_history
-    username = user["username"]
     db = get_client()
 
     # Pega as últimas conversas para contexto

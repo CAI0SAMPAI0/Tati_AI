@@ -4,53 +4,167 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tati AI — Quiz</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <title>Tati AI — Quiz Interativo</title>
+    <meta name="description" content="Aprimore seu inglês com os quizzes interativos da Tati AI.">
+    <meta name="theme-color" content="#6C63FF">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
-    <link rel="stylesheet" href="styles/global.css">
-    <link rel="stylesheet" href="styles/quiz.css">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="/styles/global.css">
+    <link rel="stylesheet" href="/styles/quiz.css">
 </head>
 
-<body class="quiz-page">
-    <header class="quiz-header">
-        <button class="btn-back" onclick="window.location.href='activities.html'"><i class="fa-solid fa-arrow-left"></i>
-            Voltar</button>
-        <div class="quiz-title-area">
-            <h1 id="quiz-title">Carregando...</h1>
-            <span id="quiz-progress-text">Pergunta 0 de 0</span>
-        </div>
-        <div class="header-spacer"></div>
-    </header>
+<body class="quiz-page bg-light">
 
-    <main class="quiz-container">
-        <div class="progress-bar-wrap">
-            <div class="progress-bar-fill" id="quiz-progress-bar"></div>
-        </div>
-
-        <div id="quiz-content" class="quiz-card">
-            <div class="loading-spinner">
-                <i class="fa-solid fa-spinner fa-spin"></i>
+    <!-- Header -->
+    <header class="quiz-header bg-white border-bottom shadow-sm">
+        <div class="container d-flex align-items-center justify-content-between py-3">
+            <button class="btn btn-light-brand btn-sm" onclick="window.location.href='/activities.html'">
+                <i class="fa-solid fa-chevron-left me-2"></i>
+                <span data-i18n="nav.back">Voltar</span>
+            </button>
+            
+            <div class="quiz-title-area text-center">
+                <span id="quiz-category" class="text-uppercase fs-10 fw-bold text-primary tracking-wider" data-i18n="act.tab_quiz">QUIZ</span>
+                <h1 id="quiz-title" class="h5 mb-0 fw-bold text-dark">...</h1>
+            </div>
+            
+            <div class="quiz-stats">
+                <span id="exercise-status-badge" class="exercise-status status-pending" style="display:none;">
+                    <i id="exercise-status-icon" class="fa-regular fa-clock"></i>
+                    <span id="exercise-status-text">Pendente</span>
+                </span>
+                <span id="quiz-progress-text" class="badge bg-soft-primary text-primary fw-bold">0 / 0</span>
             </div>
         </div>
+    </header>
 
-        <div id="quiz-result" class="result-card" style="display:none;">
-            <div class="result-icon" id="result-icon">🏆</div>
-            <h2 id="result-title">Parabéns!</h2>
-            <p id="result-score">Você acertou 0 de 0 questões.</p>
-            <div id="result-feedback"></div>
-            <button class="btn-primary" onclick="window.location.href='activities.html'">Voltar para Atividades</button>
+    <!-- Main Content -->
+    <main class="quiz-container container py-5">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-8">
+
+                <!-- Progress Bar + Labels -->
+                <div id="progress-wrapper" style="display:none;" class="mb-4">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span id="progress-label" class="small fw-bold text-muted">Pergunta 1 de 5</span>
+                        <span id="progress-pct" class="small fw-bold text-primary">20% concluído</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar bg-primary" id="quiz-progress-bar" role="progressbar" style="width: 0%; transition: width 0.4s ease;"></div>
+                    </div>
+                </div>
+
+                <!-- Quiz Interaction Area -->
+                <div id="quiz-content" class="card border-0 shadow-sm">
+                    <div class="card-body p-4 p-md-5">
+
+                        <!-- Introdução -->
+                        <div id="quiz-intro" class="quiz-intro text-center py-4">
+                            <div class="avatar-text avatar-xxl bg-soft-primary text-primary mx-auto mb-4">
+                                <i class="fa-solid fa-bullseye fs-30"></i>
+                            </div>
+                            <h2 id="intro-title" class="fw-bold text-dark mb-3">Prepare-se!</h2>
+                            <p id="intro-desc" class="text-muted mb-4">Este quiz ajudará você a consolidar seus conhecimentos.</p>
+                            <button class="btn btn-primary btn-lg px-5 fw-bold" onclick="startQuiz()" data-i18n="act.btn_start">Iniciar Quiz</button>
+                        </div>
+
+                        <!-- Question Area -->
+                        <div id="question-area" style="display:none;">
+                            <div class="question-header mb-4">
+                                <h3 class="question-text fw-bold text-dark" id="question-text"></h3>
+                            </div>
+
+                            <div class="options-list d-grid gap-3" id="options-list">
+                                <!-- Options inserted dynamically -->
+                            </div>
+
+                            <!-- Explanation Block (shown after answering) -->
+                            <div id="explanation-block" class="explanation-box animated fadeIn" style="display:none;">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <i id="explanation-icon" class="fa-solid fa-circle-xmark fs-18"></i>
+                                    <strong id="explanation-status">Incorreto.</strong>
+                                </div>
+                                <p class="mb-1 fw-semibold text-dark" style="font-size:0.9rem;" data-i18n="act.explanation_label">Explicação:</p>
+                                <p id="explanation-text" class="mb-0" style="font-size:0.9rem; line-height:1.6;"></p>
+                            </div>
+                        </div>
+
+                        <!-- Loading State -->
+                        <div id="quiz-loading" class="text-center py-5" style="display:none;">
+                            <div class="spinner-border text-primary mb-3" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="text-muted" data-i18n="gen.loading">Carregando...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Result Card -->
+                <div id="quiz-result" class="card border-0 shadow-lg text-center" style="display:none;">
+                    <div class="card-body p-5">
+                        <!-- Circular Progress -->
+                        <div class="circular-progress mx-auto mb-3">
+                            <svg viewBox="0 0 150 150">
+                                <circle class="bg" cx="75" cy="75" r="60"></circle>
+                                <circle class="fg" id="result-circle-fg" cx="75" cy="75" r="60"
+                                    style="stroke-dasharray: 377; stroke-dashoffset: 377;"></circle>
+                            </svg>
+                            <div class="percentage" id="result-pct-text">0%</div>
+                        </div>
+
+                        <div class="mb-2" style="font-size:2rem;" id="result-emoji">💪</div>
+                        <h2 id="result-title" class="fw-bold text-dark mb-2">Bom trabalho!</h2>
+                        <p id="result-score" class="fs-18 text-muted mb-5">Você acertou 0 de 0 questões.</p>
+                        
+                        <div class="result-actions d-flex gap-3 justify-content-center flex-wrap">
+                            <button class="btn btn-outline-primary btn-lg px-4 fw-bold" onclick="restartQuiz()">
+                                <i class="fa-solid fa-rotate-right me-2"></i>
+                                <span data-i18n="act.quiz_redo">Refazer</span>
+                            </button>
+                            <button class="btn btn-primary btn-lg px-4 fw-bold" onclick="window.location.href='/activities.html'">
+                                <span data-i18n="act.quiz_close">Voltar para Atividades</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
         </div>
     </main>
 
-    <footer class="quiz-footer">
-        <button id="btn-next" class="btn-next" disabled onclick="handleNext()">Próxima</button>
+    <!-- Footer Actions -->
+    <footer class="quiz-footer bg-white border-top py-3 fixed-bottom shadow-lg" id="quiz-footer" style="display:none;">
+        <div class="container d-flex justify-content-between align-items-center">
+            <div id="footer-feedback" class="d-flex align-items-center gap-2" style="display:none !important; visibility:hidden;">
+                <!-- Subtle feedback icon shown in footer after answer -->
+            </div>
+            <div class="ms-auto">
+                <button id="btn-next" class="btn btn-primary btn-lg px-5 fw-bold d-flex align-items-center gap-2" disabled onclick="handleNext()">
+                    <span id="btn-next-text" data-i18n="act.quiz_next">Verificar</span>
+                    <i class="fa-solid fa-arrow-right" id="btn-next-icon"></i>
+                </button>
+            </div>
+        </div>
     </footer>
 
-    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <!-- Scripts -->
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/auth.js"></script>
     <script src="/js/quiz.js"></script>
-    </body>
-    </html>
+    <script src="/js/pwa.js"></script>
+</body>
+
+</html>

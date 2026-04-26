@@ -5,6 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tati AI — Atividades</title>
+    <meta name="theme-color" content="#6C63FF">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="/manifest.json">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
         crossorigin="anonymous">
@@ -21,7 +25,7 @@
         <div class="topbar-left">
             <button class="btn-menu" id="btn-menu-open" onclick="openSidebar()"><i
                     class="fa-solid fa-bars"></i></button>
-            <div class="topbar-logo">Teacher<span>Tati</span></div>
+            <a href="chat.html" class="topbar-logo">Teacher<span>Tati</span></a>
         </div>
 
         <div class="topbar-right">
@@ -116,6 +120,9 @@
                         <i class="fa-solid fa-theater-masks"></i> <span
                             data-i18n="act.tab_simulations">Simulações</span>
                     </button>
+                    <button class="tab-btn" onclick="switchSubTab('podcasts')">
+                        <i class="fa-solid fa-podcast"></i> <span data-i18n="act.tab_podcasts">Podcasts</span>
+                    </button>
                 </nav>
 
                 <!-- TAB: QUIZZES -->
@@ -150,6 +157,17 @@
                         <h3 data-i18n="act.sim_empty_title">Simulações de Conversas</h3>
                         <p data-i18n="act.sim_empty_sub">Pratique situações reais como aeroporto, restaurante e
                             entrevistas de emprego.</p>
+                    </div>
+                </div>
+
+                <!-- TAB: PODCASTS -->
+                <div id="sub-content-podcasts" class="sub-panel">
+                    <div class="section-header-compact">
+                        <h3 data-i18n="act.podcast_title">Podcasts Recomendados</h3>
+                        <p data-i18n="act.podcast_subtitle">Melhore sua escuta e pronúncia com conteúdos do seu nível.</p>
+                    </div>
+                    <div class="podcast-grid" id="podcast-list-container">
+                        <!-- Podcast cards -->
                     </div>
                 </div>
             </div>
@@ -209,33 +227,12 @@
         </div>
     </div>
 
-    <!-- Modal para Exercício de Escrita -->
-    <div class="modal-overlay" id="writing-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 data-i18n="act.writing_modal_title">Exercício de Escrita</h3>
-                <button class="btn-close-modal" onclick="closeWritingModal()">&times;</button>
-            </div>
-            <form id="writing-form" onsubmit="handleWritingSubmit(event)">
-                <div class="form-row">
-                    <label for="writing-theme" data-i18n="act.writing_theme_label">Tema do Exercício *</label>
-                    <input type="text" id="writing-theme" data-i18n-placeholder="act.writing_theme_ph"
-                        placeholder="Ex: Descreva suas últimas férias" required>
-                </div>
-                <div class="form-row">
-                    <label for="writing-content" data-i18n="act.writing_content_label">Sua Resposta *</label>
-                    <textarea id="writing-content" rows="8" data-i18n-placeholder="act.writing_content_ph"
-                        placeholder="Escreva seu texto aqui..." required></textarea>
-                </div>
-                <button type="submit" class="btn-submit-feedback" data-i18n="act.writing_submit_btn">Enviar
-                    Exercício</button>
-            </form>
-        </div>
-    </div>
-
     <!-- Notificações -->
     <div id="notif-modal">
-        <div class="notif-header" data-i18n="act.notif_title">Notificações</div>
+        <div class="notif-header">
+            <span data-i18n="act.notif_title">Notificações</span>
+            <button class="notif-mark-all-btn" type="button" onclick="markAllActivitiesNotifRead()" data-i18n="act.notif_mark_all">Marcar todas como lidas</button>
+        </div>
         <div id="notif-list"></div>
     </div>
 
@@ -243,6 +240,7 @@
     <script src="js/i18n.js"></script>
     <script src="js/api.js"></script>
     <script src="js/activities_ui.js"></script>
+    <script src="js/pwa.js"></script>
 </body>
 
 </html>

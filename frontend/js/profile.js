@@ -1,4 +1,4 @@
-if (!requireAuth()) throw new Error('Unauthenticated');
+﻿if (!requireAuth()) throw new Error('Unauthenticated');
 
 window.addEventListener('DOMContentLoaded', () => {
     _loadProfile();
@@ -139,36 +139,31 @@ async function _loadSubscription() {
     const expiresDate = sub.expires_at ? new Date(sub.expires_at).toLocaleDateString(I18n.getLang() === 'pt-BR' ? 'pt-BR' : 'en-US') : '—';
 
     el.innerHTML = `
-      <div style="
-        background:rgba(167,139,250,0.06);
-        border:1px solid rgba(167,139,250,0.2);
-        border-radius:12px;padding:1rem 1.25rem;
-        display:flex;flex-direction:column;gap:0.75rem;
-      ">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
-          <div style="font-size:1rem;font-weight:700;color:var(--text);">${planLabel}</div>
-          <span style="
-            background:${statusColor}22;
-            color:${statusColor};
-            border:1px solid ${statusColor}55;
-            border-radius:99px;padding:0.2rem 0.75rem;
-            font-size:0.75rem;font-weight:700;
-          ">${statusLabel}</span>
+      <div class="subscription-card">
+        <div class="sub-header">
+          <div class="sub-plan-label">${planLabel}</div>
+          <span class="sub-status-badge" style="background:${statusColor}22; color:${statusColor}; border:1px solid ${statusColor}55;">
+            ${statusLabel}
+          </span>
         </div>
-        <div style="display:flex;gap:1.5rem;flex-wrap:wrap;">
-          <div>
-            <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.2rem;">${t('sub.vencimento')}</div>
-            <div style="font-weight:600;color:var(--text);">${expiresDate}</div>
+        <div class="sub-meta-row">
+          <div class="sub-meta-item">
+            <div class="sub-meta-label">${t('sub.vencimento')}</div>
+            <div class="sub-meta-value">${expiresDate}</div>
           </div>
-          <div>
-            <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.2rem;">${t('sub.days_remaining')}</div>
-            <div style="font-weight:600;color:var(--text);">${sub.days_left ?? '—'}</div>
+          <div class="sub-meta-item">
+            <div class="sub-meta-label">${t('sub.days_remaining')}</div>
+            <div class="sub-meta-value">${sub.days_left ?? '—'}</div>
           </div>
         </div>
-        <a href="payment.html" style="
-          display:inline-flex;align-items:center;gap:0.4rem;
-          font-size:0.82rem;color:#a78bfa;text-decoration:none;font-weight:600;
-        "><i class="fa-solid fa-rotate"></i> ${t('sub.renew_change')}</a>
+        <div class="sub-actions">
+          <a href="payment.html" class="sub-link">
+            <i class="fa-solid fa-rotate"></i> ${t('sub.renew_change')}
+          </a>
+          <button type="button" class="btn-cancel-subscription" onclick="cancelSubscription()">
+            <i class="fa-solid fa-ban"></i> ${t('sub.cancel_button')}
+          </button>
+        </div>
       </div>
     `;
   } catch (e) {
@@ -326,7 +321,7 @@ async function handleAvatarUpload(event) {
   try {
     const { ok, data } = await apiUpload('/profile/avatar', formData);
     if (ok) {
-      statusEl.textContent = '✓ Foto atualizada!';
+      statusEl.textContent = 'âœ“ Foto atualizada!';
       statusEl.className   = 'avatar-status success';
       const current = getUser() || {};
       saveSession(getToken(), { ...current, avatar_url: data.avatar_url });
@@ -354,6 +349,35 @@ function _showFeedback(el, msg, type) {
 function togglePwVisibility(inputId, btn) { togglePw(inputId, btn); }
 function logout() { authLogout(); }
 
+async function cancelSubscription() {
+  if (!window._cancelSubscriptionConfirmUntil || Date.now() > window._cancelSubscriptionConfirmUntil) {
+    window._cancelSubscriptionConfirmUntil = Date.now() + 5000;
+    showToast(t('sub.cancel_confirm_toast'), 'warning');
+    return;
+  }
+  window._cancelSubscriptionConfirmUntil = 0;
+
+  try {
+    const { ok, data } = await apiPost('/payments/cancel', {});
+    if (!ok) {
+      showToast(data?.detail || t('sub.cancel_error'), 'error');
+      return;
+    }
+
+    const current = getUser() || {};
+    saveSession(getToken(), { ...current, plan_type: null, is_premium_active: false });
+
+    showToast(t('sub.cancel_success'), 'success');
+    await Promise.all([_loadSubscription(), _loadPlanAction(), _loadProfile()]);
+  } catch (e) {
+    showToast(t('sub.cancel_connection_error'), 'error');
+  }
+}
+
+function startTour() {
+    window.location.href = 'chat.html?tour=true';
+}
+
 function openSidebar() {
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
@@ -367,3 +391,4 @@ function closeSidebarNav() {
     if (sidebar) sidebar.classList.remove('open');
     if (overlay) overlay.classList.remove('visible');
 }
+

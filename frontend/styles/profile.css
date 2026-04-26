@@ -247,20 +247,112 @@
     color: #34d399;
 }
 
-/* Stats */
+/* Stats: 3 colunas compactas */
 .profile-stats {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
+    display: flex;
+    justify-content: center;
+    gap: 6rem;
+    margin: 12px;
+    text-align: center;
 }
 
-.stat-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 1.25rem;
-    text-align: center;
-    transition: border-color 0.2s;
+@media (max-width: 480px) {
+    .profile-stats {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+    }
+}
+
+/* Subscription Card */
+.subscription-card {
+    background: rgba(167, 139, 250, 0.06);
+    border: 1px solid rgba(167, 139, 250, 0.2);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.sub-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.sub-plan-label {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.sub-status-badge {
+    border-radius: 99px;
+    padding: 0.2rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.sub-meta-row {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.sub-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.sub-meta-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+.sub-meta-value {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.sub-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 0.25rem;
+}
+
+.sub-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    color: #a78bfa;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.btn-cancel-subscription {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    width: fit-content;
+    padding: 0.5rem 0.9rem;
+    border-radius: 8px;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    background: rgba(239, 68, 68, 0.08);
+    color: #f87171;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
 .stat-card:hover {
@@ -273,6 +365,7 @@
     color: var(--primary);
     letter-spacing: -0.03em;
     margin-bottom: 0.25rem;
+
 }
 
 .stat-label {
@@ -422,6 +515,27 @@
     font-size: 0.85rem;
 }
 
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.65rem 1.25rem;
+    background: rgba(124, 58, 237, 0.08);
+    color: var(--primary);
+    border: 1px solid rgba(124, 58, 237, 0.35);
+    border-radius: 9px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+    background: rgba(124, 58, 237, 0.16);
+    border-color: rgba(124, 58, 237, 0.55);
+    transform: translateY(-1px);
+}
+
 .btn-save-secondary {
     background: transparent;
     color: var(--primary);
@@ -484,6 +598,28 @@
     background: rgba(239, 68, 68, 0.2);
 }
 
+.btn-cancel-subscription {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    width: fit-content;
+    padding: 0.5rem 0.9rem;
+    border-radius: 8px;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    background: rgba(239, 68, 68, 0.08);
+    color: #f87171;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-cancel-subscription:hover {
+    background: rgba(239, 68, 68, 0.16);
+    border-color: rgba(239, 68, 68, 0.55);
+}
+
 /* ══════════════════════════════════════════════════════════════════
    RESPONSIVE
 ══════════════════════════════════════════════════════════════════ */
@@ -505,7 +641,7 @@
     }
 
     .profile-stats {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 
@@ -613,6 +749,7 @@
     .stat-card {
         padding: 0.875rem 0.5rem;
         border-radius: 10px;
+        align-items: center;
     }
 
     .stat-value {

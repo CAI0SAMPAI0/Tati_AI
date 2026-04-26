@@ -249,31 +249,52 @@ async def get_previous_month_winners(current_user: dict = Depends(get_current_us
     last_month_start = last_month_end.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     rankings = _calculate_rankings(db, last_month_start, last_month_end)
-    winners = rankings[:3]
+    
+    # Formata mês anterior (ex: 03/2024)
+    month_label = f"{last_month_start.month:02d}/{last_month_start.year}"
 
-    return [
-        {
-            "username": r["username"],
-            "name": r.get("name", r["username"]),
-            "score": r.get("score", 0),
-        }
-        for r in winners
-    ]
+    return {
+        "month": month_label,
+        "winners": [
+            {
+                "username": r["username"],
+                "name": r.get("name", r["username"]),
+                "score": r.get("score", 0),
+                "position": i + 1
+            }
+            for i, r in enumerate(rankings[:3])
+        ]
+    }
 
 
 def _calculate_rankings(db, start_date, end_date=None):
     """Calcula o ranking de engajamento para um período usando study_sessions."""
     iso_start = start_date.isoformat()
+    
+    # Filtro opcional de fim de período (para winners do mês anterior)
+    query_sessions = db.table("study_sessions").select("username, activity_type").gte("created_at", iso_start)
+    query_messages = db.table("messages").select("username").eq("role", "user").gte("created_at", iso_start)
+    
+    if end_date:
+        iso_end = end_date.isoformat()
+        query_sessions = query_sessions.lte("created_at", iso_end)
+        query_messages = query_messages.lte("created_at", iso_end)
 
     # Filtrar usuários staff para não aparecer no ranking
     try:
+        from core.config import settings
+        staff_usernames = set(settings.staff_roles)
+        # Adiciona os do banco por garantia
         access = db.table("student_access").select("username, role").execute().data or []
-        staff_usernames = {a["username"] for a in access if a.get("role") in ("professor", "professora", "programador", "admin")}
-    except:
+        for a in access:
+            if a.get("role") in ("professor", "professora", "programador", "admin"):
+                staff_usernames.add(a["username"])
+    except Exception as e:
+        print(f"[Ranking] Erro ao buscar staff: {e}")
         staff_usernames = set()
 
-    sessions = db.table("study_sessions").select("username, activity_type").gte("created_at", iso_start).execute().data
-
+    sessions_data = query_sessions.execute().data or []
+    
     points_map = {
         "quiz": 7,
         "flashcard": 3,
@@ -283,38 +304,105 @@ def _calculate_rankings(db, start_date, end_date=None):
 
     user_scores = {}
 
-    for s in sessions:
-        u = s["username"]
-        if u in staff_usernames:
+    for s in sessions_data:
+        u = s.get("username")
+        if not u or u in staff_usernames:
             continue
         atype = s.get("activity_type", "")
         if u not in user_scores:
-            user_scores[u] = {"username": u, "score": 0, "messages": 0, "quizzes": 0, "flashcards": 0, "exercises": 0, "tokens": 0}
+            user_scores[u] = {"username": u, "score": 0, "messages": 0, "quizzes": 0, "flashcards": 0, "exercises": 0, "tokens": 0, "simulations": 0}
+        
         pts = points_map.get(atype, 0)
         user_scores[u]["score"] += pts
+        
         if atype == "quiz":
             user_scores[u]["quizzes"] += 1
         elif atype == "flashcard":
             user_scores[u]["flashcards"] += 1
         elif atype == "exercise":
             user_scores[u]["exercises"] += 1
+        elif atype == "simulation":
+            user_scores[u]["simulations"] += 1
 
-    messages = db.table("messages").select("username").eq("role", "user").gte("created_at", iso_start).execute().data
-    for m in messages:
-        u = m["username"]
-        if u in staff_usernames:
+    messages_data = query_messages.execute().data or []
+    for m in messages_data:
+        u = m.get("username")
+        if not u or u in staff_usernames:
             continue
         if u not in user_scores:
-            user_scores[u] = {"username": u, "score": 0, "messages": 0, "quizzes": 0, "flashcards": 0, "exercises": 0, "tokens": 0}
+            user_scores[u] = {"username": u, "score": 0, "messages": 0, "quizzes": 0, "flashcards": 0, "exercises": 0, "tokens": 0, "simulations": 0}
         user_scores[u]["score"] += 8  # message points = 8
         user_scores[u]["messages"] += 1
 
     usernames = list(user_scores.keys())
     if usernames:
-        users = db.table("users").select("username, name").in_("username", usernames).execute().data
-        for u in users:
-            if u["username"] in user_scores:
-                user_scores[u["username"]]["name"] = u.get("name") or u["username"]
+        try:
+            # Tenta buscar nomes reais
+            users = db.table("users").select("username, name").in_("username", usernames).execute().data or []
+            for u_info in users:
+                uname = u_info.get("username")
+                if uname in user_scores:
+                    user_scores[uname]["name"] = u_info.get("name") or uname
+        except Exception as e:
+            print(f"[Ranking] Erro ao buscar nomes: {e}")
+
+    # Garante que todos tenham um 'name'
+    for u in user_scores.values():
+        if not u.get("name"):
+            u["name"] = u["username"]
 
     rankings = sorted(user_scores.values(), key=lambda x: (-x["score"], -x["messages"]))
     return rankings
+
+
+# ─── Plano de Estudos Semanal ───────────────────────────────────────────────
+
+from services.weekly_plan import (
+    get_or_generate_weekly_plan,
+    check_plan_progress,
+    generate_transition_exercises,
+)
+
+
+@router.get("/weekly-plan")
+async def get_weekly_plan(user: dict = Depends(get_current_user)):
+    """Retorna o plano da semana atual com status de progresso por tópico."""
+    plan = await get_or_generate_weekly_plan(
+        username=user["username"],
+        level=user.get("level", "Intermediate"),
+        focus=user.get("focus", "General Conversation"),
+    )
+    return plan
+
+
+@router.get("/weekly-plan/progress")
+async def get_plan_progress(user: dict = Depends(get_current_user)):
+    """
+    Verifica e retorna o progresso real do aluno nos tópicos do plano desta semana.
+    Analisa o histórico de mensagens para cada tópico.
+    """
+    progress = await check_plan_progress(username=user["username"])
+    return {"progress": progress}
+
+
+@router.post("/weekly-plan/transition")
+async def start_plan_transition(user: dict = Depends(get_current_user)):
+    """
+    Inicia a transição de plano:
+      1. Verifica progresso final da semana
+      2. Gera exercícios de revisão com RAG (5-10 questões, tipo aleatório)
+      3. Invalida o plano atual para que um novo seja gerado na próxima consulta
+    Retorna os exercícios para o modal de transição no frontend.
+    """
+    username = user["username"]
+
+    # Atualiza progresso antes de transicionar
+    await check_plan_progress(username=username)
+
+    # Gera exercícios de transição com RAG
+    result = await generate_transition_exercises(username=username)
+
+    if not result:
+        return {"error": "Não foi possível gerar os exercícios. Tente novamente."}, 500
+
+    return result

@@ -1,0 +1,472 @@
+.podcast-body {
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  background:
+    radial-gradient(1000px 450px at 10% -10%, color-mix(in srgb, var(--primary) 18%, transparent), transparent 70%),
+    radial-gradient(900px 380px at 90% 0%, color-mix(in srgb, var(--secondary) 20%, transparent), transparent 72%),
+    var(--bg);
+}
+
+.podcast-view-shell {
+  width: min(1200px, 100% - 2rem);
+  margin: 86px auto 2.2rem;
+  display: grid;
+  gap: 1.3rem;
+}
+
+.podcast-hero {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 88%, var(--primary) 12%), var(--surface));
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  border-radius: 24px;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.4rem;
+}
+
+.podcast-hero-copy {
+  min-width: 0;
+}
+
+.hero-kicker {
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--primary);
+  font-weight: 800;
+  margin-bottom: 0.4rem;
+}
+
+.podcast-hero h1 {
+  margin: 0;
+  font-size: clamp(1.4rem, 2.2vw, 2.15rem);
+}
+
+.hero-desc {
+  margin: 0.55rem 0 0;
+  color: var(--text-muted);
+  max-width: 66ch;
+  line-height: 1.55;
+}
+
+.hero-meta {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.hero-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.36rem;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 36%, transparent);
+  background: color-mix(in srgb, var(--surface) 75%, transparent);
+  border-radius: 999px;
+  padding: 0.38rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.hero-chip.is-primary {
+  color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  background: color-mix(in srgb, var(--primary) 11%, var(--surface));
+}
+
+.podcast-content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 1rem;
+}
+
+.podcast-content-grid.is-single-column {
+  grid-template-columns: 1fr;
+}
+
+.media-card,
+.transcript-card,
+.exercises-section {
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 92%, var(--primary) 8%);
+  border-radius: 22px;
+  box-shadow: var(--shadow-sm);
+}
+
+.media-card {
+  overflow: hidden;
+}
+
+.media-embed {
+  position: relative;
+  width: 100%;
+  border-bottom: 1px solid var(--border);
+  background: #080a16;
+}
+
+.media-video {
+  aspect-ratio: 16 / 9;
+}
+
+.media-audio {
+  aspect-ratio: 16 / 7;
+}
+
+.media-embed iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.embed-fallback {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 1.2rem;
+  color: var(--text-muted);
+}
+
+.embed-fallback .btn-open-source {
+  margin-top: 0.9rem;
+}
+
+.media-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  padding: 0.9rem 1rem 1rem;
+}
+
+.btn-open-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.88rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--primary) 42%, transparent);
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+  color: var(--primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.btn-open-source:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--primary) 62%, transparent);
+}
+
+.transcript-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 250px;
+}
+
+.transcript-head {
+  padding: 1rem 1rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.transcript-head h2 {
+  margin: 0;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  font-size: 1.02rem;
+}
+
+.transcript-tabs {
+  margin-top: 0.8rem;
+  display: inline-flex;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 35%, transparent);
+  border-radius: 11px;
+  overflow: hidden;
+}
+
+.transcript-tab {
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  padding: 0.45rem 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.transcript-tab.is-active {
+  background: color-mix(in srgb, var(--primary) 20%, var(--surface));
+  color: var(--primary);
+}
+
+.transcript-list {
+  padding: 0.8rem;
+  display: grid;
+  gap: 0.6rem;
+  max-height: 440px;
+  overflow-y: auto;
+}
+
+.transcript-line {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.65rem;
+  align-items: start;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 16%, transparent);
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  border-radius: 12px;
+  padding: 0.65rem;
+}
+
+.transcript-time {
+  font-weight: 800;
+  color: var(--primary);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+}
+
+.transcript-line p {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.transcript-empty {
+  min-height: 120px;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 0.6rem;
+}
+
+.exercises-section {
+  padding: 1.2rem;
+}
+
+.exercise-loading {
+  min-height: 180px;
+  display: grid;
+  gap: 0.8rem;
+  place-content: center;
+  justify-items: center;
+  text-align: center;
+}
+
+.practice-head h2 {
+  margin-top: 0;
+  margin-bottom: 0.4rem;
+}
+
+.practice-head p {
+  margin-top: 0;
+  color: var(--text-muted);
+}
+
+.ex-card {
+  border-top: 1px dashed color-mix(in srgb, var(--text-muted) 35%, transparent);
+  padding-top: 1rem;
+  margin-top: 1rem;
+}
+
+.ex-title {
+  font-size: 1rem;
+  font-weight: 800;
+  margin-bottom: 0.7rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.question-text {
+  margin-top: 0;
+  margin-bottom: 0.8rem;
+  line-height: 1.55;
+}
+
+.translation-note {
+  margin-top: 0.58rem;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.writing-area textarea {
+  width: 100%;
+  min-height: 120px;
+  border: 2px solid color-mix(in srgb, var(--text-muted) 28%, transparent);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 0.8rem;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.writing-area textarea:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--primary) 55%, transparent);
+}
+
+.question-options {
+  display: grid;
+  gap: 0.62rem;
+}
+
+.option-btn {
+  border: 1px solid color-mix(in srgb, var(--text-muted) 40%, transparent);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  color: var(--text);
+  border-radius: 11px;
+  padding: 0.72rem;
+  text-align: left;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.option-btn:hover {
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+}
+
+.option-btn.selected {
+  border-color: color-mix(in srgb, var(--primary) 50%, transparent);
+  background: color-mix(in srgb, var(--primary) 16%, var(--surface));
+}
+
+.voice-area {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  gap: 0.8rem;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--border));
+  padding: 1rem;
+}
+
+.phrase-to-say {
+  font-size: 1.22rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.btn-mic-rec {
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--primary);
+  color: #fff;
+  cursor: pointer;
+  font-size: 1.45rem;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--primary) 45%, transparent);
+}
+
+.btn-mic-rec.recording {
+  animation: pulseRecord 1.2s ease-in-out infinite;
+}
+
+@keyframes pulseRecord {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55);
+  }
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 14px rgba(239, 68, 68, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.btn-submit-ex {
+  margin-top: 0.85rem;
+  border: 0;
+  border-radius: 10px;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 800;
+  padding: 0.62rem 1.1rem;
+  cursor: pointer;
+}
+
+.btn-submit-ex:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.feedback-box {
+  margin-top: 0.85rem;
+  border-radius: 11px;
+  border: 1px solid color-mix(in srgb, #22c55e 36%, transparent);
+  background: color-mix(in srgb, #22c55e 12%, transparent);
+  color: color-mix(in srgb, #22c55e 78%, #ffffff 22%);
+  padding: 0.65rem 0.8rem;
+  display: none;
+}
+
+.score-badge {
+  font-weight: 800;
+}
+
+.reveal-block {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.48s ease, transform 0.48s ease;
+}
+
+.reveal-block.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 1023.98px) {
+  .podcast-content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .transcript-list {
+    max-height: 300px;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .podcast-view-shell {
+    width: min(100% - 1rem, 1200px);
+    margin-top: 76px;
+  }
+
+  .podcast-hero {
+    border-radius: 18px;
+    padding: 1rem;
+    flex-direction: column;
+  }
+
+  .hero-meta {
+    justify-content: flex-start;
+  }
+
+  .media-card,
+  .transcript-card,
+  .exercises-section {
+    border-radius: 18px;
+  }
+
+  .media-audio {
+    aspect-ratio: 16 / 10;
+  }
+
+  .phrase-to-say {
+    font-size: 1.04rem;
+  }
+
+  .btn-submit-ex {
+    width: 100%;
+  }
+}

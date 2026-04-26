@@ -5,13 +5,160 @@ Admin: cria questões manualmente ou dispara geração por IA.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
 from routers.deps import get_current_user, require_staff
 from services.database import get_client
 from services.llm import groq_chat, GroqKeyError
 
+
+PERSONALIZED_MODULE_ID = "00000000-0000-0000-0000-000000000001"
+
+
+def _normalize_lang(lang: str | None) -> str:
+    """Normaliza idioma para os códigos aceitos pelo app."""
+    raw = (lang or "").split(",")[0].strip().lower()
+    if raw in ("en", "en-us"):
+        return "en-US"
+    if raw in ("en-uk", "en-gb"):
+        return "en-UK"
+    if raw in ("pt", "pt-br"):
+        return "pt-BR"
+    return "pt-BR"
+
+
+def _get_lang(request: Request) -> str:
+    """Detecta idioma do header Accept-Language enviado pelo frontend."""
+    return _normalize_lang(request.headers.get("Accept-Language"))
+
+
+def _looks_portuguese(text: str) -> bool:
+    sample = (text or "").lower()
+    markers = (
+        "alternativa correta",
+        "as outras opções",
+        "estão incorretas",
+        "porque é",
+        "responde à pergunta",
+        "gramática",
+        "vocabulário",
+        "usamos",
+    )
+    return any(marker in sample for marker in markers)
+
+
+def _looks_english(text: str) -> bool:
+    sample = (text or "").lower()
+    markers = (
+        "correct answer",
+        "other options",
+        "incorrect in this context",
+        "because it",
+        "answers the question",
+        "grammar",
+        "vocabulary",
+        "is used with",
+    )
+    return any(marker in sample for marker in markers)
+
+
+def gerar_explicacao_detalhada(pergunta_lower: str, alternativa_correta: str, opcoes: list[str], lang: str = "pt-BR") -> str:
+    """
+    Gera explicação para a alternativa correta no idioma do usuário.
+    lang: 'pt-BR' | 'en-US' | 'en-UK'
+    """
+    is_en = lang.startswith("en")
+
+    if not alternativa_correta:
+        return "This is the correct answer." if is_en else "Esta é a alternativa correta."
+
+    if "am" in pergunta_lower or "is" in pergunta_lower or "are" in pergunta_lower:
+        if alternativa_correta.strip() == "am":
+            return ("'Am' is used with the personal pronoun 'I'. The correct form is: I am."
+                    if is_en else
+                    "Usamos 'am' com o pronome pessoal 'I' (eu). A forma correta é: I am.")
+        elif alternativa_correta.strip() == "is":
+            return ("'Is' is used with third-person singular pronouns (he, she, it) or singular nouns."
+                    if is_en else
+                    "Usamos 'is' com pronomes pessoais da terceira pessoa do singular (he, she, it) ou com nomes singulares.")
+        elif alternativa_correta.strip() == "are":
+            return ("'Are' is used with second-person pronouns (you), first-person plural (we), and third-person plural (they)."
+                    if is_en else
+                    "Usamos 'are' com pronomes pessoais da segunda pessoa (you), primeira pessoa do plural (we) e terceira pessoa do plural (they).")
+
+    elif "happy" in pergunta_lower or "sad" in pergunta_lower or "tired" in pergunta_lower:
+        return (f"'{alternativa_correta}' is correct because it accurately describes the emotional state or condition mentioned in the question."
+                if is_en else
+                f"A alternativa correta é '{alternativa_correta}' porque descreve adequadamente o estado emocional ou condição mencionada na pergunta.")
+
+    elif any(w in pergunta_lower for w in ["what", "where", "when", "who", "why", "how"]):
+        return (f"'{alternativa_correta}' is correct because it directly answers the question using appropriate vocabulary and grammar."
+                if is_en else
+                f"A alternativa correta é '{alternativa_correta}' porque responde diretamente à pergunta feita, usando o vocabulário e a estrutura gramatical apropriados.")
+
+    elif alternativa_correta.endswith('s') and len(alternativa_correta) > 3:
+        return (f"'{alternativa_correta}' is correct because it is in the plural form, as indicated by the context or sentence structure."
+                if is_en else
+                f"A alternativa correta é '{alternativa_correta}' porque está no plural, conforme indicado pelo contexto da pergunta ou pela estrutura da frase.")
+
+    elif alternativa_correta in ['a', 'an', 'the']:
+        articles_en = {
+            'a':   "We use 'a' before words that begin with a consonant sound.",
+            'an':  "We use 'an' before words that begin with a vowel sound.",
+            'the': "We use 'the' to refer to something specific that has already been mentioned or is known to both speakers.",
+        }
+        articles_pt = {
+            'a':   "Usamos 'a' antes de palavras que começam com som de consoante.",
+            'an':  "Usamos 'an' antes de palavras que começam com som de vogal.",
+            'the': "Usamos 'the' para nos referir a algo específico que já foi mencionado ou é conhecido por ambos.",
+        }
+        return (articles_en.get(alternativa_correta, f"The article '{alternativa_correta}' is correct in this context.")
+                if is_en else
+                articles_pt.get(alternativa_correta, f"O artigo '{alternativa_correta}' está correto neste contexto."))
+
+    # Genérica
+    other_opts = ", ".join(f"'{o}'" for o in opcoes if o != alternativa_correta)
+    if is_en:
+        return (f"'{alternativa_correta}' is the correct answer because it best completes the sentence "
+                f"or answers the question according to English grammar and vocabulary rules. "
+                f"The other options ({other_opts}) are incorrect in this context.")
+    return (f"A alternativa correta é '{alternativa_correta}' porque é a que melhor completa a frase "
+            f"ou responde à pergunta conforme as regras de gramática e vocabulário em inglês. "
+            f"As outras opções ({other_opts}) estão incorretas neste contexto.")
+
+
+def ensure_explanation_language(
+    current_explanation: str | None,
+    question_text: str,
+    options: list[str],
+    correct_index: int,
+    lang: str,
+) -> str:
+    """
+    Garante que a explicação fique no idioma do app.
+    Se estiver ausente ou em idioma diferente, regenera explicação padrão no idioma correto.
+    """
+    explanation = (current_explanation or "").strip()
+    safe_options = options or []
+    safe_idx = correct_index if isinstance(correct_index, int) else 0
+    if safe_idx < 0 or safe_idx >= len(safe_options):
+        safe_idx = 0
+    correct_option = safe_options[safe_idx] if safe_options else ""
+    q_lower = (question_text or "").lower()
+    normalized_lang = _normalize_lang(lang)
+    wants_en = normalized_lang.startswith("en")
+
+    if not explanation:
+        return gerar_explicacao_detalhada(q_lower, correct_option, safe_options, normalized_lang)
+
+    if wants_en and _looks_portuguese(explanation):
+        return gerar_explicacao_detalhada(q_lower, correct_option, safe_options, normalized_lang)
+
+    if (not wants_en) and _looks_english(explanation):
+        return gerar_explicacao_detalhada(q_lower, correct_option, safe_options, normalized_lang)
+
+    return explanation
 router = APIRouter()
 
 
@@ -45,14 +192,17 @@ class AIGenerateBody(BaseModel):
 
 
 @router.get("/{quiz_id}")
-async def get_quiz(quiz_id: str, current_user: dict = Depends(get_current_user)):
-    """Retorna quiz com questões (sem revelar a resposta certa)."""
+async def get_quiz(quiz_id: str, request: Request, current_user: dict = Depends(get_current_user)):
+    """Retorna quiz com questões. Explicações no idioma do usuário via Accept-Language."""
     db = get_client()
     quiz = db.table("quizzes").select("*").eq("id", quiz_id).limit(1).execute().data
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz não encontrado")
+    quiz_row = quiz[0]
+    username = current_user["username"]
+    lang = _get_lang(request)
 
-    questions = (
+    questions_raw = (
         db.table("quiz_questions")
         .select("id, question, options, order, explanation, correct_index")
         .eq("quiz_id", quiz_id)
@@ -61,19 +211,70 @@ async def get_quiz(quiz_id: str, current_user: dict = Depends(get_current_user))
         .data
     )
 
-    # Não envia correct_index para o aluno
-    return {**quiz[0], "questions": questions}
+    questions = []
+    for q in questions_raw:
+        q["explanation"] = ensure_explanation_language(
+            q.get("explanation"),
+            q.get("question", ""),
+            q.get("options") or [],
+            q.get("correct_index", 0),
+            lang,
+        )
+        questions.append(q)
+
+    # Atualiza status da prática personalizada ao abrir o quiz: pending -> done
+    if quiz_row.get("module_id") == PERSONALIZED_MODULE_ID:
+        try:
+            new_status = "done"
+            attempt = (
+                db.table("user_exercise_attempts")
+                .select("id, status")
+                .eq("username", username)
+                .eq("exercise_id", quiz_id)
+                .eq("activity_type", "quiz")
+                .limit(1)
+                .execute()
+                .data
+            )
+            if attempt:
+                current_status = (attempt[0].get("status") or "").lower()
+                if current_status == "corrected":
+                    new_status = "corrected"
+                else:
+                    db.table("user_exercise_attempts").update(
+                        {"status": "done"}
+                    ).eq("id", attempt[0]["id"]).execute()
+            else:
+                db.table("user_exercise_attempts").insert(
+                    {
+                        "username": username,
+                        "exercise_id": quiz_id,
+                        "module_id": PERSONALIZED_MODULE_ID,
+                        "activity_type": "quiz",
+                        "status": "done",
+                    }
+                ).execute()
+            quiz_row["status"] = new_status
+        except Exception:
+            # Mantém fluxo do quiz mesmo se tabela auxiliar não existir.
+            quiz_row["status"] = quiz_row.get("status") or "done"
+
+    return {**quiz_row, "questions": questions}
 
 
 @router.post("/{quiz_id}/submit")
 async def submit_quiz(
-    quiz_id: str, body: QuizSubmit, current_user: dict = Depends(get_current_user)
+    quiz_id: str,
+    body: QuizSubmit,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
 ):
     """Aluno submete respostas — calcula score e distribui troféus."""
     db = get_client()
     username = current_user["username"]
+    lang = _get_lang(request)
 
-    questions = (
+    questions_raw = (
         db.table("quiz_questions")
         .select("id, correct_index, explanation, options, question")
         .eq("quiz_id", quiz_id)
@@ -81,6 +282,18 @@ async def submit_quiz(
         .execute()
         .data
     )
+    
+    # Garante explicações no idioma do app para retorno consistente.
+    questions = []
+    for q in questions_raw:
+        q["explanation"] = ensure_explanation_language(
+            q.get("explanation"),
+            q.get("question", ""),
+            q.get("options") or [],
+            q.get("correct_index", 0),
+            lang,
+        )
+        questions.append(q)
     if not questions:
         raise HTTPException(status_code=404, detail="Quiz sem questões")
     if len(body.answers) != len(questions):
@@ -142,6 +355,40 @@ async def submit_quiz(
 
     # Distribui troféus
     trophies_earned = await _check_trophies(username, score, db)
+
+    # Atualiza status da prática personalizada para "corrected".
+    if module_id == PERSONALIZED_MODULE_ID:
+        try:
+            attempt = (
+                db.table("user_exercise_attempts")
+                .select("id")
+                .eq("username", username)
+                .eq("exercise_id", quiz_id)
+                .eq("activity_type", "quiz")
+                .limit(1)
+                .execute()
+                .data
+            )
+            payload = {
+                "module_id": module_id,
+                "activity_type": "quiz",
+                "status": "corrected",
+                "score": score,
+            }
+            if attempt:
+                db.table("user_exercise_attempts").update(payload).eq(
+                    "id", attempt[0]["id"]
+                ).execute()
+            else:
+                db.table("user_exercise_attempts").insert(
+                    {
+                        **payload,
+                        "username": username,
+                        "exercise_id": quiz_id,
+                    }
+                ).execute()
+        except Exception:
+            pass
     
     # Atualiza ofensiva (streak)
     from services.streaks import record_study_day
@@ -291,6 +538,13 @@ Rules:
 
     if not questions:
         raise HTTPException(status_code=502, detail="IA não gerou questões. Tente com um contexto maior.")
+
+    # Valida e garante que cada questão tenha explicação
+    for q in questions:
+        if not q.get("explanation") or not q["explanation"].strip():
+            # Gera explicação básica se faltante
+            correct_option = q["options"][q["correct_index"]] if q.get("options") and len(q["options"]) > q["correct_index"] else "alternativa correta"
+            q["explanation"] = f"A alternativa correta é: {correct_option}"
 
     # Salva as questões geradas no banco
     db = get_client()

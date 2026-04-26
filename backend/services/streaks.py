@@ -178,6 +178,7 @@ def record_study_day(username: str) -> dict:
         streak_data["today_messages"] = msg_count
         
         last_date_str = streak_data.get("last_study_date")
+        previous_streak = int(streak_data.get("current_streak") or 0)
         study_dates = streak_data.get("study_dates", [])
         
         # Se já atingiu a meta hoje, não faz nada
@@ -229,6 +230,15 @@ def record_study_day(username: str) -> dict:
             check_streak_trophies(username, streak_data.get("longest_streak", 0))
         except Exception as e:
             print(f"[Streak Trophy] Erro: {e}")
+
+        try:
+            from services.notifications import notify_streak_milestone, should_notify_streak_milestone
+
+            new_streak = int(streak_data.get("current_streak") or 0)
+            if should_notify_streak_milestone(previous_streak, new_streak):
+                notify_streak_milestone(username, new_streak)
+        except Exception as e:
+            print(f"[Streak Notif] Erro: {e}")
             
         return streak_data
     except Exception as e:

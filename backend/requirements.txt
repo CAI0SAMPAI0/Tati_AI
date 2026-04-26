@@ -29,3 +29,5 @@ upstash-redis
 python-dateutil
 reportlab
 edge-tts
+apscheduler
+pywebpush

@@ -52,4 +52,4 @@ class RoleChecker:
             )
         return user
     
-require_staff = RoleChecker("professor", "professora", "programador", "Tatiana", "Tati", 'Professora')
+require_staff = RoleChecker("professor", "professora", "programador", "Tatiana", "Tati", "Professora", "Programador", "admin", "Admin")

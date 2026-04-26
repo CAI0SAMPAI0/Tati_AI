@@ -45,6 +45,13 @@ def award_trophy(username: str, trophy_name: str) -> bool:
                 pass
         except Exception:
             pass
+
+        try:
+            from services.notifications import notify_trophy_earned
+
+            notify_trophy_earned(username, trophy_name)
+        except Exception as exc:
+            print(f"[Trophy Service] Erro ao notificar troféu: {exc}")
             
         return True
     except Exception as e:

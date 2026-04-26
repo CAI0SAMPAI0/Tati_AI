@@ -195,3 +195,6 @@ async function _withBtn(btnId, loadingLabel, resetLabel, fn) {
     if (span) span.textContent = resetLabel;
   }
 }
+/* Leia o prd.md e use a automação que tem no app para tirar prints das páginas do app em diversos tamanhos de telas
+   para você ajustar a responsividade. crie uma conta de administrador com acesso a tudo para isso, coloque esperas
+   para os elementos das páginas carregarem. Use o plyawright para a automação. */
