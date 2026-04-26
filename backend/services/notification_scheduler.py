@@ -29,7 +29,7 @@ def start_notification_scheduler() -> None:
     scheduler.add_job(
         dispatch_streak_engagement_notifications,
         trigger="cron",
-        hour=19,
+        hour=17,
         minute=0,
         kwargs={"mode": "reminder"},
         id="streak-evening-reminder",
@@ -46,4 +46,4 @@ def start_notification_scheduler() -> None:
     )
     scheduler.start()
     _scheduler = scheduler
-    print("[Notif Scheduler] Inicializado (19h reminder / 9h streak broken)")
+    print("[Notif Scheduler] Inicializado (17h reminder / 9h streak broken)")
