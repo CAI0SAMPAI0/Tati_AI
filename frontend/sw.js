@@ -1,4 +1,4 @@
-const SW_VERSION = 'v3';
+const SW_VERSION = 'v4';
 const STATIC_CACHE = `tati-static-${SW_VERSION}`;
 const RUNTIME_CACHE = `tati-runtime-${SW_VERSION}`;
 
@@ -14,6 +14,21 @@ const STATIC_ASSETS = [
   '/styles/login.css',
   '/styles/activities.css',
   '/styles/quiz.css',
+  '/styles/dashboard.css',
+  '/styles/chat.css',
+  '/styles/goals.css',
+  '/styles/achievements.css',
+  '/styles/competitions.css',
+  '/styles/modal.css',
+  '/styles/notifications.css',
+  '/styles/onboarding.css',
+  '/styles/payment.css',
+  '/styles/profile.css',
+  '/styles/progress.css',
+  '/styles/settings.css',
+  '/styles/simulation.css',
+  '/styles/vocab.css',
+  '/styles/voice.css',
   '/js/api.js',
   '/js/auth.js',
   '/js/i18n.js',

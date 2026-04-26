@@ -369,7 +369,7 @@ function showToast(msg, type = 'info') {
   async function ping() {
     if (!getToken()) return;
     try {
-      await fetch(API_BASE + '/auth/login', {  // endpoint leve que sempre existe
+      await fetch(API_BASE + '/cors-test', {  // endpoint leve que aceita GET/HEAD
         method: 'HEAD',
         headers: authHeaders(),
       }).catch(() => { }); // silencioso

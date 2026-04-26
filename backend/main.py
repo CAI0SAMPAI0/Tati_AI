@@ -5,8 +5,9 @@ Este arquivo inicializa a aplicação FastAPI, configura middlewares (CORS, Rate
 integra o Sentry para monitoramento de erros e centraliza o roteamento de todos os módulos.
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from dotenv import load_dotenv
 from pathlib import Path
 import os
@@ -55,6 +56,16 @@ app = FastAPI(
     description="API para o aplicativo de ensino de inglês Teacher Tati",
     version="2.0.0",
 )
+
+class ForceHTTPSMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Se houver X-Forwarded-Proto = https, força o scope scheme para https
+        # Isso garante que redirecionamentos gerados pelo FastAPI usem https://
+        if request.headers.get("x-forwarded-proto") == "https":
+            request.scope["scheme"] = "https"
+        return await call_next(request)
+
+app.add_middleware(ForceHTTPSMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
