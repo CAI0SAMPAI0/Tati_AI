@@ -1,4 +1,4 @@
-const SW_VERSION = 'v4';
+const SW_VERSION = 'v5';
 const STATIC_CACHE = `tati-static-${SW_VERSION}`;
 const RUNTIME_CACHE = `tati-runtime-${SW_VERSION}`;
 
@@ -33,6 +33,14 @@ const STATIC_ASSETS = [
   '/js/auth.js',
   '/js/i18n.js',
   '/js/pwa.js',
+  '/js/chat.js',
+  '/js/onboarding.js',
+  '/js/voice.js',
+  '/js/activities_ui.js',
+  '/js/progress_bradge.js',
+  '/js/notifications.js',
+  '/styles/word_tooltip.css',
+  '/styles/transitions.css',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
 ];

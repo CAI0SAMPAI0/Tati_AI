@@ -69,7 +69,13 @@ app.add_middleware(ForceHTTPSMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:8080", "http://localhost:8080", "https://tati-ai.vercel.app"],
+    allow_origins=[
+        "http://127.0.0.1:8080", 
+        "http://localhost:8080", 
+        "https://tati-ai.vercel.app",
+        "https://tati-ai.vercel.app/",
+        "https://tati-ai-git-main-caio-andrades-projects.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

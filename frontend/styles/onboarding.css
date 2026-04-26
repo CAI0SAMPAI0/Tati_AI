@@ -45,15 +45,23 @@
   z-index: 9002;
   width: 320px;
   max-width: calc(100vw - 32px);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
+  background: var(--surface, #1e1e2e);
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: var(--radius-xl, 20px);
   padding: 1.25rem 1.375rem 1.125rem;
-  box-shadow: var(--shadow-lg), 0 0 32px hsla(var(--hue), 80%, 58%, 0.12);
+  box-shadow: var(--shadow-lg), 0 0 32px hsla(var(--hue, 258), 80%, 58%, 0.12);
   pointer-events: auto;
-  animation: ob-fadein 220ms var(--ease-spring);
+  animation: ob-fadein 220ms var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
   will-change: transform;
+  color: var(--text, #fff);
 }
+
+/* ── Positioning Helper Classes (used by JS) ─────────────────── */
+.ob-tooltip-top { margin-top: 0; }
+.ob-tooltip-bottom { margin-top: 0; }
+.ob-tooltip-left { margin-left: 0; }
+.ob-tooltip-right { margin-left: 0; }
+.ob-tooltip-center { transform: translate(-50%, -50%); }
 
 @keyframes ob-fadein {
   from { opacity: 0; transform: scale(0.95) translateY(6px); }

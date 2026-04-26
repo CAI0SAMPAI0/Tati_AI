@@ -23,7 +23,7 @@ const ONBOARDING_STEPS_STUDENT = [
   },
   {
     // Voice mode: Agora destaca o botão de gravar apenas se estiver em modo voz
-    target: '#btn-record',
+    target: '#btn-mic',
     position: 'top',
     icon: '🎤',
     title: 'Voice Recording',
@@ -100,14 +100,20 @@ let _onDone = null;
 // ─── API pública ─────────────────────────────────────────────────────────────
 
 async function initOnboardingIfNeeded() {
+  // 0. Force tour if URL has ?tour=true
+  const urlParams = new URLSearchParams(window.location.search);
+  const forceTour = urlParams.get('tour') === 'true';
+
   // 1. Check localStorage first (fast path)
-  if (localStorage.getItem(STORAGE_KEY)) return;
+  if (!forceTour && localStorage.getItem(STORAGE_KEY)) return;
 
   // 2. Check backend flag (handles multi-device / new browser)
-  try {
-    const done = await _checkBackendFlag();
-    if (done) return;
-  } catch (_) { /* fallback ao localStorage */ }
+  if (!forceTour) {
+    try {
+      const done = await _checkBackendFlag();
+      if (done) return;
+    } catch (_) { /* fallback ao localStorage */ }
+  }
 
   // 3. Pequeno delay para a página terminar de renderizar
   setTimeout(startOnboarding, 800);

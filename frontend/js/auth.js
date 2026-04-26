@@ -22,7 +22,15 @@ function switchTab(tab) {
 
 // ── Mensagens ─────────────────────────────────────────────────────────────────
 
-function _showError(msg)   { _setMsg('error-msg',   msg, true);  }
+function _showError(msg) {
+  let finalMsg = msg;
+  if (Array.isArray(msg)) {
+    finalMsg = msg.map(err => err.msg || JSON.stringify(err)).join(' | ');
+  } else if (typeof msg === 'object' && msg !== null) {
+    finalMsg = msg.detail || msg.message || JSON.stringify(msg);
+  }
+  _setMsg('error-msg', finalMsg, true);
+}
 function _showSuccess(msg) { _setMsg('success-msg', msg, true);  }
 function _clearMessages()  { _setMsg('error-msg',   '',  false); _setMsg('success-msg', '', false); }
 
