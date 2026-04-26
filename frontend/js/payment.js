@@ -190,7 +190,13 @@ async function handlePayment() {
 
   pixResult.classList.remove('visible');
   pixResult.style.display = 'none';
+  
+  // Proteção contra múltiplos cliques
+  if (btn.disabled) return;
+  
   btn.disabled = true;
+  const originalBtnContent = btn.innerHTML;
+  btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${t('payment.processing') || 'Processing...'}`;
   loading.style.display = 'block';
 
   try {
@@ -200,21 +206,19 @@ async function handlePayment() {
       if (!updateRes.ok) console.warn("Aviso: Falha ao salvar CPF no perfil, mas tentando prosseguir com pagamento...", updateRes.data);
     } catch (profileErr) {
       console.error("Erro ao atualizar perfil:", profileErr);
-      // Não bloqueia o pagamento se apenas o save no profile falhar (o Asaas pode ter sucesso se o CPF já estiver lá)
     }
 
     // 2. Cria a cobrança no Asaas
-    const value = selectedPlan === 'basic' ? 19.90 : 39.90;
     const payload = {
       billingType: selectedMethod,
       planType: selectedPlan,
-      // value e description removidos — vêm do banco agora
     };
 
     const res = await apiPost('/payments/subscribe', payload);
     if (!res.ok) throw new Error(res.data?.detail || t('gen.error'));
 
     const data = res.data;
+    showToast(t('gen.success') || 'Payment generated!', 'success');
 
     if (selectedMethod === 'PIX') {
       // Exibe QR Code
@@ -238,6 +242,8 @@ async function handlePayment() {
 
   } catch (err) {
     const errorMsg = err.message || 'Erro desconhecido';
+    btn.disabled = false; // Reabilita apenas em caso de erro
+    btn.innerHTML = originalBtnContent;
 
     // Mensagens de erro mais amigáveis
     if (errorMsg.includes('Documento inválido')) {
@@ -248,8 +254,9 @@ async function handlePayment() {
       showToast('Erro: ' + errorMsg, 'error');
     }
   } finally {
-    btn.disabled = false;
     loading.style.display = 'none';
+    // Nota: O botão permanece desabilitado se houver sucesso para evitar novas cobranças acidentais.
+    // Se o usuário quiser tentar de novo (trocar método), ele pode atualizar a página ou mudar de aba.
   }
 }
 

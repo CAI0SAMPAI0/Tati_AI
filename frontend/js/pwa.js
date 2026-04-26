@@ -1,61 +1,52 @@
 (() => {
   if (!('serviceWorker' in navigator)) return;
 
-  const INSTALL_BTN_ID = 'pwa-install-btn';
+  const STORAGE_KEY_PWA = 'tati_pwa_toast_seen_v10';
   let deferredPrompt = null;
 
   function isInstalled() {
     return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   }
 
-  function getInstallLabel() {
+  function getToastMessage() {
     const lang = (typeof I18n !== 'undefined' && typeof I18n.getLang === 'function')
       ? I18n.getLang()
       : (localStorage.getItem('tati_lang') || 'pt-BR');
-    return String(lang).startsWith('en') ? 'Install app' : 'Instalar app';
-  }
-
-  function getButton() {
-    let btn = document.getElementById(INSTALL_BTN_ID);
-    if (!btn) {
-      btn = document.createElement('button');
-      btn.id = INSTALL_BTN_ID;
-      btn.type = 'button';
-      btn.style.cssText = [
-        'position:fixed',
-        'right:16px',
-        'bottom:16px',
-        'z-index:1100',
-        'display:none',
-        'align-items:center',
-        'gap:8px',
-        'padding:10px 14px',
-        'border:0',
-        'border-radius:999px',
-        'background:#3454d1',
-        'color:#fff',
-        'font-weight:700',
-        'font-size:13px',
-        'box-shadow:0 8px 24px rgba(0,0,0,.18)',
-        'cursor:pointer',
-      ].join(';');
-      btn.innerHTML = '<i class="fa-solid fa-download"></i><span></span>';
-      document.body.appendChild(btn);
+    
+    if (String(lang).startsWith('en')) {
+      return '✨ Want to use Tati AI as an app? Click on your browser menu and select "Install" or "Add to Home Screen".';
     }
-    const span = btn.querySelector('span');
-    if (span) span.textContent = getInstallLabel();
-    return btn;
+    return '✨ Deseja usar o Tati AI como aplicativo? Clique no menu do seu navegador e selecione "Instalar" ou "Adicionar à Tela de Início".';
   }
 
-  function showInstallButton() {
-    if (isInstalled() || !deferredPrompt) return;
-    const btn = getButton();
-    btn.style.display = 'inline-flex';
-  }
+  function showInstallToast() {
+    // Só mostra se não estiver instalado, se não viu ainda nesta atualização, e se estiver em uma página "logada"
+    const isLogged = !!localStorage.getItem('token');
+    if (isInstalled() || localStorage.getItem(STORAGE_KEY_PWA) || !isLogged) return;
 
-  function hideInstallButton() {
-    const btn = document.getElementById(INSTALL_BTN_ID);
-    if (btn) btn.style.display = 'none';
+    if (typeof Toastify === 'function') {
+      Toastify({
+        text: getToastMessage(),
+        duration: 10000,
+        close: true,
+        gravity: "top", 
+        position: "center",
+        stopOnFocus: true,
+        style: {
+          background: "linear-gradient(135deg, #6C63FF 0%, #3f37c9 100%)",
+          borderRadius: "12px",
+          fontWeight: "600",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+          padding: "16px 24px",
+          color: "#fff",
+          fontSize: "14px",
+          lineHeight: "1.5"
+        },
+        onClick: function(){} 
+      }).showToast();
+
+      localStorage.setItem(STORAGE_KEY_PWA, '1');
+    }
   }
 
   async function registerServiceWorker() {
@@ -69,31 +60,20 @@
     }
   }
 
-  window.addEventListener('load', registerServiceWorker);
+  window.addEventListener('load', () => {
+    registerServiceWorker();
+    // Pequeno delay para não brigar com outros carregamentos
+    setTimeout(showInstallToast, 3000);
+  });
 
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault();
     deferredPrompt = event;
-    showInstallButton();
+    // Não mostra botão fixo, guarda o prompt se precisar chamar via algum botão específico no futuro
   });
 
   window.addEventListener('appinstalled', () => {
     deferredPrompt = null;
-    hideInstallButton();
-  });
-
-  document.addEventListener('click', async (event) => {
-    const btn = event.target.closest(`#${INSTALL_BTN_ID}`);
-    if (!btn || !deferredPrompt) return;
-
-    btn.disabled = true;
-    try {
-      await deferredPrompt.prompt();
-      await deferredPrompt.userChoice;
-    } finally {
-      deferredPrompt = null;
-      hideInstallButton();
-      btn.disabled = false;
-    }
+    localStorage.setItem(STORAGE_KEY_PWA, '1');
   });
 })();
