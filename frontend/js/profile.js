@@ -14,11 +14,15 @@ async function loadUserData() {
     
     try {
         const streakData = await apiGet('/users/streak');
-        document.getElementById('streak-count-text').textContent = streakData.current_streak || 0;
-        document.getElementById('trophy-count-text').textContent = `${streakData.trophies_earned || 0}/50`;
+        const streakEl = document.getElementById('streak-count-text');
+        if (streakEl) streakEl.textContent = streakData.current_streak || 0;
         
-        const displayName = user.name || user.username || t('act.user_fallback');
-        document.getElementById('header-user-name').textContent = displayName;
+        const trophyEl = document.getElementById('trophy-count-text');
+        if (trophyEl) trophyEl.textContent = `${streakData.trophies_earned || 0}/50`;
+        
+        const displayName = user.name || user.username || (typeof t === 'function' ? t('act.user_fallback') : 'User');
+        const headerNameEl = document.getElementById('header-user-name');
+        if (headerNameEl) headerNameEl.textContent = displayName;
 
         const avatarImg = document.getElementById('header-user-avatar-img');
         const avatarFallback = document.getElementById('header-user-avatar');
@@ -52,13 +56,17 @@ function _populateProfile(data) {
   const initialsEl = document.getElementById('profile-avatar');
 
   if (data.avatar_url) {
-    photoImg.src             = data.avatar_url;
-    photoImg.style.display   = 'block';
-    initialsEl.style.display = 'none';
+    if (photoImg) {
+      photoImg.src             = data.avatar_url;
+      photoImg.style.display   = 'block';
+    }
+    if (initialsEl) initialsEl.style.display = 'none';
   } else {
-    initialsEl.textContent   = initials;
-    initialsEl.style.display = 'flex';
-    photoImg.style.display   = 'none';
+    if (initialsEl) {
+      initialsEl.textContent   = initials;
+      initialsEl.style.display = 'flex';
+    }
+    if (photoImg) photoImg.style.display = 'none';
   }
 
   _setVal('profile-name',     name);
@@ -97,7 +105,8 @@ async function _loadSubscription() {
     if (btnSave) {
       btnSave.parentElement.insertBefore(container, btnSave);
     } else {
-      document.querySelector('.profile-sections')?.appendChild(container);
+      const sections = document.querySelector('.profile-sections');
+      if (sections) sections.appendChild(container);
     }
   }
 
@@ -113,6 +122,34 @@ async function _loadSubscription() {
     const sub = await apiGet('/payments/status');
     const el  = document.getElementById('sub-content');
     if (!el) return;
+
+    const user = getUser();
+    const SPECIAL_USERNAMES = ["tati", "tati.ai", "admin", "Professora", "Tatiana", "programador", "Programador", "caio.sampaio", "professor"];
+    const isSpecialByUsername = SPECIAL_USERNAMES.includes(user?.username) || user?.is_exempt;
+
+    if (isSpecialByUsername) {
+        el.innerHTML = `
+          <div class="subscription-card">
+            <div class="sub-header">
+              <div class="sub-plan-label">${t('sub.plan_full')}</div>
+              <span class="sub-status-badge" style="background:#4ade8022; color:#4ade80; border:1px solid #4ade8055;">
+                ${t('sub.status_active')}
+              </span>
+            </div>
+            <div class="sub-meta-row">
+              <div class="sub-meta-item">
+                <div class="sub-meta-label">${t('sub.vencimento')}</div>
+                <div class="sub-meta-value">31/12/2099</div>
+              </div>
+              <div class="sub-meta-item">
+                <div class="sub-meta-label">${t('sub.days_remaining')}</div>
+                <div class="sub-meta-value">9999</div>
+              </div>
+            </div>
+          </div>
+        `;
+        return;
+    }
 
     if (!sub || !sub.has_subscription || sub.status === 'expired' || sub.status === 'cancelled') {
       el.innerHTML = `
@@ -138,6 +175,19 @@ async function _loadSubscription() {
     const statusColor = sub.status === 'active' ? '#4ade80' : sub.status === 'grace' ? '#fbbf24' : '#f87171';
     const expiresDate = sub.expires_at ? new Date(sub.expires_at).toLocaleDateString(I18n.getLang() === 'pt-BR' ? 'pt-BR' : 'en-US') : '—';
 
+    // Hide actions for special users
+    const isSpecialSub = sub.expires_at === '2099-12-31' || sub.days_left === 9999;
+    const actionsHtml = isSpecialSub ? '' : `
+        <div class="sub-actions">
+          <a href="payment.html" class="sub-link">
+            <i class="fa-solid fa-rotate"></i> ${t('sub.renew_change')}
+          </a>
+          <button type="button" class="btn-cancel-subscription" onclick="cancelSubscription()">
+            <i class="fa-solid fa-ban"></i> ${t('sub.cancel_button')}
+          </button>
+        </div>
+    `;
+
     el.innerHTML = `
       <div class="subscription-card">
         <div class="sub-header">
@@ -156,14 +206,7 @@ async function _loadSubscription() {
             <div class="sub-meta-value">${sub.days_left ?? '—'}</div>
           </div>
         </div>
-        <div class="sub-actions">
-          <a href="payment.html" class="sub-link">
-            <i class="fa-solid fa-rotate"></i> ${t('sub.renew_change')}
-          </a>
-          <button type="button" class="btn-cancel-subscription" onclick="cancelSubscription()">
-            <i class="fa-solid fa-ban"></i> ${t('sub.cancel_button')}
-          </button>
-        </div>
+        ${actionsHtml}
       </div>
     `;
   } catch (e) {
@@ -309,9 +352,11 @@ async function handleAvatarUpload(event) {
   reader.onload = e => {
     const photoImg   = document.getElementById('profile-avatar-img');
     const initialsEl = document.getElementById('profile-avatar');
-    photoImg.src             = e.target.result;
-    photoImg.style.display   = 'block';
-    initialsEl.style.display = 'none';
+    if (photoImg) {
+      photoImg.src             = e.target.result;
+      photoImg.style.display   = 'block';
+    }
+    if (initialsEl) initialsEl.style.display = 'none';
   };
   reader.readAsDataURL(file);
 
@@ -340,14 +385,36 @@ async function handleAvatarUpload(event) {
 }
 
 function _showFeedback(el, msg, type) {
+  if (!el) return;
   el.textContent   = msg;
   el.className     = `save-feedback show ${type}`;
   el.style.display = 'block';
   setTimeout(() => { el.style.display = 'none'; el.classList.remove('show'); }, 4000);
 }
 
-function togglePwVisibility(inputId, btn) { togglePw(inputId, btn); }
-function logout() { authLogout(); }
+function togglePwVisibility(inputId, btn) { 
+  if (typeof togglePw === 'function') {
+    togglePw(inputId, btn); 
+  } else {
+    const input = document.getElementById(inputId);
+    if (input) {
+      const isPw = input.type === 'password';
+      input.type = isPw ? 'text' : 'password';
+      const icon = btn.querySelector('i');
+      if (icon) icon.className = isPw ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+    }
+  }
+}
+
+function logout() {
+  if (typeof authLogout === 'function') {
+    authLogout();
+  } else {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/index.html';
+  }
+}
 
 async function cancelSubscription() {
   if (!window._cancelSubscriptionConfirmUntil || Date.now() > window._cancelSubscriptionConfirmUntil) {
@@ -391,4 +458,3 @@ function closeSidebarNav() {
     if (sidebar) sidebar.classList.remove('open');
     if (overlay) overlay.classList.remove('visible');
 }
-

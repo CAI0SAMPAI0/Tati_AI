@@ -198,9 +198,35 @@ const Onboarding = (() => {
       _positionTooltip(null, 'center');
       return;
     }
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // Se o elemento estiver na sidebar e ela estiver fechada (mobile), abre ela
+    const isInsideSidebar = el.closest('.sidebar');
+    const sidebar = document.getElementById('sidebar');
+    if (isInsideSidebar && sidebar && sidebar.classList.contains('collapsed')) {
+      if (typeof toggleSidebar === 'function') {
+        toggleSidebar();
+        // Trava a sidebar aberta durante o passo
+        sidebar.dataset.tourLocked = 'true';
+      }
+    } else if (!isInsideSidebar && sidebar && sidebar.dataset.tourLocked === 'true') {
+      // Fecha se o próximo passo for fora
+      if (typeof toggleSidebar === 'function') toggleSidebar();
+      delete sidebar.dataset.tourLocked;
+    }
+
+    // Scroll mais agressivo
+    const elementTop = el.getBoundingClientRect().top + window.pageYOffset;
+    window.scrollTo({ top: elementTop - (window.innerHeight / 3), behavior: 'smooth' });
+
+    // Delay maior para mobile/tablet pois scroll e transição de sidebar demoram
+    const isMobile = window.innerWidth <= 768;
     setTimeout(() => {
       const rect = el.getBoundingClientRect();
+      // Se rect for invisível, tenta novamente em breve
+      if (rect.width === 0 || rect.height === 0) {
+          _positionSpotlight(step);
+          return;
+      }
       _spotlight.style.cssText = `
         display: block;
         top:    ${rect.top - padding}px;
@@ -209,15 +235,23 @@ const Onboarding = (() => {
         height: ${rect.height + padding * 2}px;
       `;
       _positionTooltip(rect, step.position);
-    }, 250);
+    }, isMobile ? 500 : 300);
   }
 
   function _positionTooltip(rect, position) {
     const tt = _tooltip;
-    const gap = 16;
-    tt.className = 'ob-tooltip-' + position;
+    const gap = 12;
+    const isMobile = window.innerWidth <= 768;
+    
+    // Força passos iniciais no topo no mobile para evitar sobreposição
+    let finalPosition = position;
+    if (isMobile && (_currentStep === 0 || _steps[_currentStep].target === '#chat-messages')) {
+        finalPosition = 'top';
+    }
+    
+    tt.className = 'ob-tooltip-' + finalPosition;
 
-    if (!rect || position === 'center') {
+    if (!rect || finalPosition === 'center') {
       tt.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%, -50%);';
       return;
     }
@@ -227,15 +261,25 @@ const Onboarding = (() => {
       const tw = tt.offsetWidth, th = tt.offsetHeight;
       const vw = window.innerWidth, vh = window.innerHeight;
       let top, left;
-      switch (position) {
+      
+      switch (finalPosition) {
         case 'bottom': top = rect.bottom + gap; left = rect.left + rect.width / 2 - tw / 2; break;
         case 'top':    top = rect.top - th - gap; left = rect.left + rect.width / 2 - tw / 2; break;
         case 'right':  top = rect.top + rect.height / 2 - th / 2; left = rect.right + gap; break;
         case 'left':   top = rect.top + rect.height / 2 - th / 2; left = rect.left - tw - gap; break;
         default:       top = rect.bottom + gap; left = rect.left + rect.width / 2 - tw / 2;
       }
-      top = Math.max(8, Math.min(top, vh - th - 8));
-      left = Math.max(8, Math.min(left, vw - tw - 8));
+      
+      // Ajuste fino para não sair da tela lateralmente
+      left = Math.max(10, Math.min(left, vw - tw - 10));
+      
+      // Se for mobile e o passo for do chat, força topo absoluto se necessário
+      if (isMobile && _steps[_currentStep].target === '#chat-messages') {
+          top = Math.max(10, rect.top - th - gap);
+      } else {
+          top = Math.max(10, Math.min(top, vh - th - 10));
+      }
+
       tt.style.top = top + 'px'; tt.style.left = left + 'px';
     }, 0);
   }
