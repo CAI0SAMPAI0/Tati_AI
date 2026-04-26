@@ -20,6 +20,8 @@ SPECIAL_USERS = {
     "Tatiana",
     "programador",
     "Programador",
+    "caio.sampaio",
+    "professor",
 }
 
 # Feriados nacionais fixos (mês, dia) — adicione os móveis via banco se quiser
@@ -118,13 +120,14 @@ async def get_access_info(user: dict = Depends(get_current_user)):
     is_exempt  = user.get("is_exempt", False) or username in SPECIAL_USERS
     plan_type  = user.get("plan_type")
 
-    # Admin ou Usuário Especial → sempre liberado
+    # Admin ou Usuário Especial → sempre liberado com data infinita
     if is_admin or is_exempt:
         return _access_response(
             is_admin=is_admin,
             full=True,
             activities=True,
             can_access_dashboard=can_access_dashboard,
+            expires_at="2099-12-31", # Visual apenas
         )
 
     # Até 30/06/2026 (inclusive) → período gratuito para todos os alunos
@@ -211,6 +214,21 @@ async def change_due_date(
 @router.get("/subscription")
 async def get_subscription(user: dict = Depends(get_current_user)):
     """Retorna detalhes da assinatura atual."""
+    username = user.get("username")
+    is_special = username in SPECIAL_USERS or user.get("is_exempt")
+
+    if is_special:
+        return {
+            "has_subscription":  True,
+            "plan_type":         "full",
+            "status":            "active",
+            "expires_at":        "2099-12-31",
+            "days_left":         9999,
+            "in_grace_period":   False,
+            "preferred_due_day": 5,
+            "next_due_date":     "2099-12-31",
+        }
+
     sub = _get_active_subscription(user["username"])
     if not sub:
         return {"has_subscription": False}

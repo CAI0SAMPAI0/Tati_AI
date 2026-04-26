@@ -393,6 +393,21 @@ async def list_plans(current_user: dict = Depends(get_current_user)):
 @router.get("/status")
 async def get_status(current_user: dict = Depends(get_current_user)):
     """Retorna status da assinatura atual do usuário."""
+    from routers.users.permissions import SPECIAL_USERS
+    username = current_user.get("username")
+    is_special = username in SPECIAL_USERS or current_user.get("is_exempt")
+
+    if is_special:
+        return {
+            "has_subscription":      True,
+            "plan_type":             "full",
+            "status":                "active",
+            "expires_at":            "2099-12-31",
+            "days_left":             9999,
+            "asaas_subscription_id": f"special_{username}",
+            "preferred_due_day":     5,
+        }
+
     db  = get_client()
     sub = db.table("subscriptions").select(
         "plan_type, status, expires_at, asaas_subscription_id, preferred_due_day"
