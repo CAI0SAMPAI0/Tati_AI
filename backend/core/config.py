@@ -24,8 +24,12 @@ class Settings(BaseSettings):
     llm_provider: str = 'groq'
     claude_model: str = 'claude-3-5-sonnet-20241022'
     gemini_model: str = 'gemini-2.0-flash'
-    anthropic_api_key: str = ''
-    gemini_api_key: str = ''
+    
+    # Gemini Multi-key
+    gemini_api_key: str = ""
+    gemini_api_key_1: str = ""
+    gemini_api_key_2: str = ""
+    gemini_api_key_3: str = ""
 
     # Prompt do Sistema
     system_prompt: str = (
@@ -51,6 +55,11 @@ class Settings(BaseSettings):
         "5. The report MUST contain ONLY pedagogical content (Theory, Examples, Exercises). It is STRICTLY FORBIDDEN to include any conversational filler, polite closings, or chat messages like 'I hope this helps' or 'Let me know if you have questions' inside the report response.\n"
         "6. Tailor the language and complexity strictly to the student's level.\n"
         "7. VOICE MODE RESTRICTION: In full-screen Voice Mode, explain that PDFs are generated in Chat Mode.\n"
+        "PRONUNCIATION DRILLS:\n"
+        "1. When the student makes a pronunciation error or when you want to practice a specific phrase, you MUST trigger a drill.\n"
+        "2. To trigger a drill, include the marker '[DRILL: phrase to repeat]' at the end of your response.\n"
+        "3. Encourage the student to repeat exactly what you said.\n"
+        "Example: 'Your pronunciation of \"thought\" was a bit off. Let\'s try again! [DRILL: I thought about it]'"
     )
     
     # Groq Multi-key
@@ -90,6 +99,16 @@ class Settings(BaseSettings):
     asaas_environment: str = Field('sandbox', validation_alias='ASAAS_ENVIRONMENT')
     asaas_webhook_token: str = "" 
 
+    # Cloudinary (Imagens)
+    cloudinary_cloud_name: str = ""
+    cloudinary_api_key: str = ""
+    cloudinary_api_secret: str = ""
+
+    # Tavily Search
+    tavily_api_key: str = ""
+    tavily_api_key_1: str = ""
+    tavily_api_key_2: str = ""
+
     model_config = SettingsConfigDict(env_file='.env', extra='ignore', case_sensitive=False)
 
     def __init__(self, **values):
@@ -112,9 +131,20 @@ class Settings(BaseSettings):
         return [k.strip() for k in candidates if k.strip()]
 
     @property
+    def gemini_keys(self) -> list[str]:
+        candidates = [self.gemini_api_key, self.gemini_api_key_1, 
+                      self.gemini_api_key_2, self.gemini_api_key_3]
+        return [k.strip() for k in candidates if k.strip()]
+
+    @property
     def eleven_keys(self) -> list[str]:
         candidates = [self.elevenlabs_api_key, self.elevenlabs_api_key_1, 
                       self.elevenlabs_api_key_2, self.elevenlabs_api_key_3]
+        return [k.strip() for k in candidates if k.strip()]
+    
+    @property
+    def tavily_keys(self) -> list[str]:
+        candidates = [self.tavily_api_key, self.tavily_api_key_1, self.tavily_api_key_2]
         return [k.strip() for k in candidates if k.strip()]
     
     @property
