@@ -62,14 +62,14 @@ debug_ui/
 frontend/debug_ui/
 frontend/js/debug_bypass.js
 debug_ui.py
+.ruff_cache
+.sentryclirc
+test_admin.py
+
 
 # Temp
 *.tmp
 *.log
-
-# Screenshots and images (root)
-Captura de tela *.png
-mentoria.expert_dashboard_conquistas_.png
 
 # Web
 node_modules/
@@ -81,3 +81,12 @@ backend/services/file_gen.py
 agents/
 design_system/
 Tati_AI.zip
+.verdent/
+frontend_antigo
+
+PRD.md
+IMPLEMENTATION_PLAN.md
+
+backend/scratch/
+scripts/i18n-dry-report.json
+.mcp.json

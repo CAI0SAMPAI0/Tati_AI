@@ -1594,11 +1594,8 @@ frontend/
 
 **Objetivo:** Aprimorar a fluidez da conversa e introduzir recursos de prática ativa com podcasts e teleprompter.
 
-#### Sprint 12 (Extra) — Teleprompter, Podcast e Correções Críticas
+#### Sprint 12 (Extra) — Podcast e Correções Críticas
 
-- [X] **Teleprompter com Reconhecimento de Voz**
-  - [X] Implementar overlay de Teleprompter no chat com timer.
-  - [X] Integrar Web Speech API para exibir texto em tempo real durante a gravação.
 - [X] **Correção de Fluxo STT (Mensagem do Usuário)**
   - [X] Garantir que a transcrição apareça imediatamente após o envio do áudio.
   - [X] Implementar placeholder "🎤 Transcrevendo..." para feedback instantâneo.

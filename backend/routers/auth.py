@@ -1,336 +1,151 @@
-# Router de autenticação: login, registro, Google OAuth, recuperação de senha.
-from datetime import datetime, timezone
+"""
+routers/auth.py
+Autenticação: login, registro, Google OAuth, recuperação e troca de senha.
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+Endpoints de gestão de alunos (stats, students) foram movidos para
+``routers/admin/dashboard.py`` para separação de domínios.
+"""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
-from google.auth.transport import requests as google_requests
-from google.oauth2 import id_token
 from pydantic import BaseModel
 
-from core.config import settings
-from core.security import (
-    create_access_token,
-    generate_temp_password,
-    hash_password,
-    verify_password,
-)
-from routers.deps import get_current_user, require_staff
-from services.database import get_client
-from services.email import send_reset_email
+from routers.deps import get_current_user
+from services.auth_service import AuthService
 
 router = APIRouter()
 
 
-# ── Models 
+async def _warm_up_tavily(username: str, level: str) -> None:
+    """Pré-carrega podcasts personalizados via Tavily em background após login."""
+    try:
+        from services.podcast_discovery import discover_personalized_podcasts
+        await discover_personalized_podcasts(username, username, level)
+    except Exception as exc:
+        print(f'[Auth] Erro no pré-carregamento Tavily para {username}: {exc}')
+
+
+
+# ── Models ────────────────────────────────────────────────────────────────────
 
 
 class RegisterBody(BaseModel):
+    """Dados para criação de conta."""
+
     name: str
     email: str
     username: str
     password: str
-    level: str = "Beginner"
+    level: str = 'Beginner'
 
 
 class GoogleBody(BaseModel):
-    token: str
+    """Google OAuth credential token."""
+
+    credential: str
 
 
 class ForgotPasswordBody(BaseModel):
+    """Identificador para recuperação de senha."""
+
     identifier: str
 
 
 class ChangePasswordBody(BaseModel):
+    """Dados para troca de senha autenticada."""
+
     current_password: str
     new_password: str
 
 
-class StudentUpdate(BaseModel):
-    level: str | None = None
-    custom_prompt: str | None = None
+# ── Login ─────────────────────────────────────────────────────────────────────
 
 
-# ── Helpers 
-
-
-def _find_user(identifier: str, fields: str = "username, name, email, password, role, level, focus") -> dict | None:
-    db = get_client()
-    ident = identifier.strip().lower()
-    for column in ("username", "email"):
-        rows = db.table("users").select(fields).eq(column, ident).limit(1).execute().data
-        if rows:
-            return rows[0]
-    return None
-
-
-def _build_token_response(user: dict) -> dict:
-    token_payload = {
-        "sub": user["username"],
-        "role": user.get("role", "student"),
-        "level": user.get("level", "Beginner")
-    }
-    token = create_access_token(token_payload)
-    
-    # Ativa assinatura automática para usuários especiais
-    from routers.users.permissions import SPECIAL_USERS
-    username = user["username"]
-    if username in SPECIAL_USERS:
-        try:
-            from routers.payments.asaas import _activate_special_user_subscription
-            _activate_special_user_subscription(username, "full")
-        except Exception as e:
-            print(f"[Auth] Erro ao ativar subscription para {username}: {e}")
-    
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user": {k: v for k, v in user.items() if k != "password"},
-    }
-
-
-# ── Login ─
-
-
-@router.post("/login")
-@router.post("/login_form")
+@router.post('/login')
+@router.post('/login_form')
 async def login(
     request: Request,
-    form: OAuth2PasswordRequestForm = Depends(lambda: None) # Faz o form ser opcional
-):
-    # Tenta obter dados do Form primeiro (padrão OAuth2)
+    background_tasks: BackgroundTasks,
+    form: OAuth2PasswordRequestForm = Depends(lambda: None),
+) -> dict:
+    """Autentica via form-data (OAuth2) ou JSON.
+
+    Após autenticação bem-sucedida, dispara em background o pré-carregamento
+    de podcasts personalizados via Tavily para que a próxima visita
+    às atividades já tenha conteúdo preparado.
+    """
     username = None
     password = None
 
+    # Tenta ler como form-data (OAuth2PasswordRequestForm)
     try:
-        # Tenta ler como form-data (OAuth2PasswordRequestForm)
         form_data = await request.form()
-        username = form_data.get("username")
-        password = form_data.get("password")
-    except:
+        username = form_data.get('username')
+        password = form_data.get('password')
+    except Exception:
         pass
 
-    # Se não veio no form, tenta no JSON (suporte para apiPost do frontend)
+    # Fallback: tenta JSON (suporte para apiPost do frontend)
     if not username or not password:
         try:
             json_data = await request.json()
-            username = json_data.get("username") or json_data.get("identifier")
-            password = json_data.get("password")
-        except:
+            username = json_data.get('username') or json_data.get('identifier')
+            password = json_data.get('password')
+        except Exception:
             pass
 
     if not username or not password:
         raise HTTPException(
-            status_code=422, 
-            detail="Credenciais não fornecidas ou formato inválido. Use form-data ou JSON."
+            status_code=422,
+            detail='Credenciais não fornecidas ou formato inválido.',
         )
 
-    user = _find_user(username)
-    if not user:
-        raise HTTPException(status_code=401, detail="Usuário ou senha incorretos")
-    
-    password_ok = verify_password(password, user["password"])
-    temp_ok = user.get("temp_password") and verify_password(password, user["temp_password"])
+    result = await AuthService.authenticate_user(username, password)
 
-    if not password_ok and not temp_ok:
-        raise HTTPException(status_code=401, detail="Usuário ou senha incorretos")
+    # Warm-up Tavily em background sem bloquear o login
+    user_level = result.get('level', 'Beginner') if isinstance(result, dict) else 'Beginner'
+    background_tasks.add_task(_warm_up_tavily, str(username), str(user_level))
 
-    # Se usou a senha temporária, limpa ela
-    if temp_ok:
-        get_client().table("users").update({"temp_password": None}).eq("username", user["username"]).execute()
-
-    return _build_token_response(user)
+    return result
 
 
-# ── Register 
+
+# ── Register ──────────────────────────────────────────────────────────────────
 
 
-@router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register(body: RegisterBody):
-    if len(body.password) < 6:
-        raise HTTPException(status_code=400, detail="Senha deve ter pelo menos 6 caracteres")
-
-    db = get_client()
-    username = body.username.strip().lower()
-    email = body.email.strip().lower()
-
-    existing = (
-        db.table("users")
-        .select("username")
-        .or_(f"username.eq.{username},email.eq.{email}")
-        .execute()
-        .data
-    )
-    if existing:
-        raise HTTPException(status_code=409, detail="Username ou e-mail já cadastrado")
-
-    db.table("users").insert({
-        "username": username,
-        "name": body.name.strip(),
-        "email": email,
-        "password": hash_password(body.password),
-        "role": "student",
-        "level": body.level,
-        "focus": "General Conversation",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }).execute()
-
-    return {"ok": True, "message": "Conta criada com sucesso"}
+@router.post('/register', status_code=status.HTTP_201_CREATED)
+async def register(body: RegisterBody) -> dict:
+    """Cria nova conta de estudante."""
+    return await AuthService.register_student(body)
 
 
-# ── Google OAuth 
+# ── Google OAuth ──────────────────────────────────────────────────────────────
 
 
-@router.post("/google")
-async def google_login(body: GoogleBody):
-    if not settings.google_client_id:
-        raise HTTPException(status_code=503, detail="Google OAuth não configurado")
-
-    try:
-        info = id_token.verify_oauth2_token(
-            body.token,
-            google_requests.Request(),
-            settings.google_client_id,
-            clock_skew_in_seconds=60,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=401, detail=f"Token Google inválido: {exc}")
-
-    email = info.get("email", "").lower()
-    name = info.get("name", email.split("@")[0])
-    base_username = email.split("@")[0].replace(".", "_").lower()
-
-    db = get_client()
-    rows = db.table("users").select("username, name, email, role, level, focus").eq("email", email).limit(1).execute().data
-
-    if rows:
-        return _build_token_response(rows[0])
-
-    # Garante username único
-    username = base_username
-    suffix = 1
-    while db.table("users").select("username").eq("username", username).execute().data:
-        username = f"{base_username}{suffix}"
-        suffix += 1
-
-    new_user = {
-        "username": username,
-        "name": name,
-        "email": email,
-        "password": "google_authenticated",
-        "role": "student",
-        "level": "Beginner",
-        "focus": "General Conversation",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    db.table("users").insert(new_user).execute()
-
-    return _build_token_response({k: v for k, v in new_user.items() if k != "password"} | {"username": username})
+@router.post('/google')
+async def google_login(body: GoogleBody) -> dict:
+    """Authenticates via Google OAuth2. Creates account if needed."""
+    return await AuthService.google_login(body.credential)
 
 
-# ── Forgot password 
+# ── Forgot password ──────────────────────────────────────────────────────────
 
 
-@router.post("/forgot-password")
-async def forgot_password(body: ForgotPasswordBody):
-    user = _find_user(body.identifier, "username, name, email, password")
-    if not user:
-        return {"ok": True, "message": "Se o usuário existir, um e-mail será enviado."}
-
-    if user["password"] == "google_authenticated":
-        return {"ok": False, "message": "Esta conta usa login pelo Google."}
-
-    temp_password = generate_temp_password()
-    get_client().table("users").update({"temp_password": hash_password(temp_password)}).eq("username", user["username"]).execute()
-
-    email_sent = send_reset_email(user["email"], user.get("name") or user["username"], temp_password)
-
-    if not email_sent and not settings.smtp_user:
-        return {
-            "ok": True,
-            "dev_mode": True,
-            "message": f"SMTP não configurado. Senha temporária (apenas em dev): {temp_password}",
-            "temp_password": temp_password,
-        }
-    if not email_sent:
-        raise HTTPException(status_code=500, detail="Erro ao enviar e-mail. Tente novamente.")
-
-    return {"ok": True, "message": "E-mail enviado! Verifique sua caixa de entrada."}
+@router.post('/forgot-password')
+async def forgot_password(body: ForgotPasswordBody) -> dict:
+    """Envia senha temporária por e-mail."""
+    return await AuthService.process_forgot_password(body.identifier)
 
 
-# ── Change password (autenticado) 
+# ── Change password (autenticado) ─────────────────────────────────────────────
 
 
-@router.put("/password")
-async def change_password(body: ChangePasswordBody, current_user: dict = Depends(get_current_user)):
-    db = get_client()
-    rows = db.table("users").select("password").eq("username", current_user["username"]).limit(1).execute().data
-    if not rows:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
-
-    stored = rows[0]["password"]
-    if stored == "google_authenticated":
-        raise HTTPException(status_code=400, detail="Conta Google não usa senha local")
-    if not verify_password(body.current_password, stored):
-        raise HTTPException(status_code=401, detail="Senha atual incorreta")
-    if len(body.new_password) < 6:
-        raise HTTPException(status_code=400, detail="Nova senha deve ter pelo menos 6 caracteres")
-
-    db.table("users").update({"password": hash_password(body.new_password)}).eq("username", current_user["username"]).execute()
-    return {"ok": True}
-
-
-# ── Staff endpoints 
-
-
-@router.get("/stats")
-async def get_stats(current_user: dict = Depends(require_staff)):
-    from datetime import date
-    db = get_client()
-    students = db.table("users").select("username").eq("role", "student").execute()
-    messages = db.table("messages").select("id").eq("role", "user").execute()
-    today_msgs = db.table("messages").select("username").eq("role", "user").eq("date", date.today().isoformat()).execute()
-    return {
-        "total_students": len(students.data),
-        "total_messages": len(messages.data),
-        "active_today": len({m["username"] for m in today_msgs.data}),
-    }
-
-
-@router.get("/students")
-async def get_students(current_user: dict = Depends(require_staff)):
-    db = get_client()
-    students = (
-        db.table("users")
-        .select("username, name, level, focus, created_at, custom_prompt")
-        .eq("role", "student")
-        .order("created_at", desc=True)
-        .execute()
-        .data
-    )
-    return [
-        {
-            **s,
-            "total_messages": len(db.table("messages").select("id").eq("username", s["username"]).eq("role", "user").execute().data),
-            "last_active": (db.table("messages").select("date").eq("username", s["username"]).order("id", desc=True).limit(1).execute().data or [{}])[0].get("date", "---"),
-        }
-        for s in students
-    ]
-
-
-@router.delete("/students/{username}", status_code=204)
-async def delete_student(username: str, current_user: dict = Depends(require_staff)):
-    db = get_client()
-    if not db.table("users").select("username").eq("username", username).execute().data:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
-    db.table("messages").delete().eq("username", username).execute()
-    db.table("conversations").delete().eq("username", username).execute()
-    db.table("users").delete().eq("username", username).execute()
-
-
-@router.put("/students/{username}")
-async def update_student(username: str, body: StudentUpdate, current_user: dict = Depends(require_staff)):
-    update_data = {k: v for k, v in body.model_dump().items() if v is not None}
-    if not update_data:
-        raise HTTPException(status_code=400, detail="Nenhum campo para atualizar")
-    get_client().table("users").update(update_data).eq("username", username).execute()
-    return {"ok": True}
+@router.put('/password')
+async def change_password(
+    body: ChangePasswordBody,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Troca a senha do usuário autenticado."""
+    return await AuthService.change_password(current_user, body)

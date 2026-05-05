@@ -2,6 +2,7 @@
 Serviço Upstash Redis para cache e rate limiting.
 Usado para melhorar performance e controlar limites de requisições.
 """
+
 from typing import Optional
 import os
 import json
@@ -9,53 +10,56 @@ import json
 
 class UpstashService:
     """Serviço singleton para Upstash Redis."""
-    
+
     _instance = None
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
         return cls._instance
-    
+
     def __init__(self):
         if self._initialized:
             return
-        
+
         self._redis = None
         self._enabled = False
-        
+
         # Tenta inicializar o Redis
         try:
             upstash_url = os.getenv('UPSTASH_REDIS_URL')
             upstash_token = os.getenv('UPSTASH_REDIS_TOKEN')
-            
+
             if upstash_url and upstash_token:
                 from upstash_redis import Redis
+
                 self._redis = Redis(url=upstash_url, token=upstash_token)
                 self._enabled = True
-                print("[Upstash] OK Conectado ao Redis")
+                print('[Upstash] OK Conectado ao Redis')
             else:
-                print("[Upstash] ⚠️ UPSTASH_REDIS_URL ou UPSTASH_REDIS_TOKEN não configurado")
+                print(
+                    '[Upstash] ⚠️ UPSTASH_REDIS_URL ou UPSTASH_REDIS_TOKEN não configurado'
+                )
         except ImportError:
-            print("[Upstash] WARNING Pacote upstash-redis não instalado")
+            print('[Upstash] WARNING Pacote upstash-redis não instalado')
         except Exception as e:
-            print(f"[Upstash] WARNING Erro ao conectar: {e}")
-        
+            print(f'[Upstash] WARNING Erro ao conectar: {e}')
+
         self._initialized = True
-    
+
     @property
     def enabled(self) -> bool:
         """Verifica se o Redis está habilitado."""
         return self._enabled
-    
+
     @property
     def redis(self):
         """Retorna a instância do Redis."""
         return self._redis
-    
+
     # ── Helpers de cache ──────────────────────────────────────────────
-    
+
     async def cache_get(self, key: str) -> Optional[dict]:
         """Retorna um valor do cache."""
         if not self._enabled or not self._redis:
@@ -63,14 +67,15 @@ class UpstashService:
 
         try:
             import asyncio
+
             value = await asyncio.to_thread(self._redis.get, key)
             if value:
                 return json.loads(value)
         except Exception as e:
-            print(f"[Upstash] Erro ao obter cache: {e}")
+            print(f'[Upstash] Erro ao obter cache: {e}')
 
         return None
-    
+
     async def cache_set(self, key: str, value: dict, ttl: int = 3600) -> bool:
         """
         Salva um valor no cache.
@@ -81,12 +86,13 @@ class UpstashService:
 
         try:
             import asyncio
+
             await asyncio.to_thread(self._redis.set, key, json.dumps(value), ex=ttl)
             return True
         except Exception as e:
-            print(f"[Upstash] Erro ao salvar cache: {e}")
+            print(f'[Upstash] Erro ao salvar cache: {e}')
             return False
-    
+
     async def cache_delete(self, key: str) -> bool:
         """Remove um valor do cache."""
         if not self._enabled or not self._redis:
@@ -94,19 +100,17 @@ class UpstashService:
 
         try:
             import asyncio
+
             await asyncio.to_thread(self._redis.delete, key)
             return True
         except Exception as e:
-            print(f"[Upstash] Erro ao deletar cache: {e}")
+            print(f'[Upstash] Erro ao deletar cache: {e}')
             return False
-    
+
     # ── Rate Limiting ─────────────────────────────────────────────────
-    
+
     async def rate_limit_check(
-        self,
-        key: str,
-        max_requests: int = 10,
-        window_seconds: int = 60
+        self, key: str, max_requests: int = 10, window_seconds: int = 60
     ) -> dict:
         """
         Verifica se uma requisição está dentro do limite.
@@ -141,21 +145,21 @@ class UpstashService:
                 'reset_at': window_seconds,
             }
         except Exception as e:
-            print(f"[Upstash] Erro no rate limit: {e}")
+            print(f'[Upstash] Erro no rate limit: {e}')
             # Desabilita Redis para próximas chamadas
             self._enabled = False
             # Em caso de erro, permite a requisição
             return {'allowed': True, 'remaining': -1, 'reset_at': 0}
-    
+
     # ── Cache de sessão de usuário ────────────────────────────────────
-    
+
     def user_cache_key(self, username: str, prefix: str = 'user') -> str:
         """Gera uma chave de cache para o usuário."""
-        return f"{prefix}:{username}"
-    
+        return f'{prefix}:{username}'
+
     def rate_limit_key(self, identifier: str, action: str) -> str:
         """Gera uma chave de rate limit."""
-        return f"ratelimit:{action}:{identifier}"
+        return f'ratelimit:{action}:{identifier}'
 
 
 # Singleton
@@ -165,22 +169,23 @@ upstash_service = UpstashService()
 async def invalidate_user_cache(username: str):
     """Invalida todo o cache de um usuário de uma vez."""
     keys = [
-        f"profile:{username}",
-        f"xp:{username}",
-        f"streak:{username}",
-        f"vocabulary:{username}",
-        f"trophies:{username}",
-        f"trophies_all:{username}",
-        f"modules:list:{username}",
-        f"report:weekly:{username}",
-        f"report:monthly:{username}",
-        f"study_time:{username}",
+        f'profile:{username}',
+        f'xp:{username}',
+        f'streak:{username}',
+        f'vocabulary:{username}',
+        f'trophies:{username}',
+        f'trophies_all:{username}',
+        f'modules:list:{username}',
+        f'report:weekly:{username}',
+        f'report:monthly:{username}',
+        f'study_time:{username}',
     ]
     for key in keys:
         await cache_delete(key)
 
 
 # ── Funções de conveniência ──────────────────────────────────────────────
+
 
 async def cache_get(key: str) -> Optional[dict]:
     """Retorna um valor do cache."""
@@ -198,9 +203,7 @@ async def cache_delete(key: str) -> bool:
 
 
 async def rate_limit_check(
-    key: str,
-    max_requests: int = 10,
-    window_seconds: int = 60
+    key: str, max_requests: int = 10, window_seconds: int = 60
 ) -> dict:
     """Verifica se uma requisição está dentro do limite."""
     return await upstash_service.rate_limit_check(key, max_requests, window_seconds)

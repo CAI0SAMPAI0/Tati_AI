@@ -1,10 +1,12 @@
-from functools import lru_cache
 from supabase import Client, create_client
 from core.config import settings
 
 # acessa o supabase e evita bug de reconexão
 
-_client = create_client(settings.supabase_url, settings.supabase_service_key or settings.supabase_key)
+_client = create_client(
+    settings.supabase_url, settings.supabase_service_key or settings.supabase_key
+)
+
 
 def get_client() -> Client:
     global _client
@@ -12,6 +14,6 @@ def get_client() -> Client:
         try:
             _client = create_client(settings.supabase_url, settings.supabase_key)
         except Exception as e:
-            print(f"[Database] Erro ao criar cliente: {e}")
+            print(f'[Database] Erro ao criar cliente: {e}')
             _client = create_client(settings.supabase_url, settings.supabase_key)
     return _client

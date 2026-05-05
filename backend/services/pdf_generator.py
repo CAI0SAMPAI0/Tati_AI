@@ -8,21 +8,18 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.lib import colors
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Image
-)
-from reportlab.platypus.flowables import KeepTogether
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
 
 # ── Cores da Teacher Tati ─────────────────────────────────────────────────────
-PRIMARY   = colors.HexColor('#7828C8')   # roxo
+PRIMARY = colors.HexColor('#7828C8')  # roxo
 PRIMARY_L = colors.HexColor('#9D50E0')
-DARK      = colors.HexColor('#1a1a2e')
-MUTED     = colors.HexColor('#6b7280')
-WHITE     = colors.white
-BG_LIGHT  = colors.HexColor('#f5f0ff')
+DARK = colors.HexColor('#1a1a2e')
+MUTED = colors.HexColor('#6b7280')
+WHITE = colors.white
+BG_LIGHT = colors.HexColor('#f5f0ff')
 
 # ── Caminhos ──────────────────────────────────────────────────────────────────
-_BASE_DIR  = Path(__file__).parent.parent
+_BASE_DIR = Path(__file__).parent.parent
 _LOGO_PATH = _BASE_DIR.parent / 'frontend' / 'assets' / 'images' / 'tati_logo.jpg'
 
 
@@ -33,39 +30,91 @@ def _make_styles():
         return ParagraphStyle(name, parent=base['Normal'], **kw)
 
     return {
-        'h1': ps('H1', fontSize=20, textColor=PRIMARY, spaceAfter=6,
-                 spaceBefore=10, fontName='Helvetica-Bold', leading=24),
-        'h2': ps('H2', fontSize=15, textColor=PRIMARY_L, spaceAfter=4,
-                 spaceBefore=8, fontName='Helvetica-Bold', leading=18),
-        'h3': ps('H3', fontSize=12, textColor=DARK, spaceAfter=3,
-                 spaceBefore=6, fontName='Helvetica-Bold', leading=15),
-        'body': ps('Body', fontSize=11, textColor=DARK, spaceAfter=4,
-                   leading=16, fontName='Helvetica'),
-        'bullet': ps('Bullet', fontSize=11, textColor=DARK, spaceAfter=3,
-                     leading=15, leftIndent=12, fontName='Helvetica',
-                     bulletIndent=0),
-        'subbullet': ps('SubBullet', fontSize=11, textColor=DARK, spaceAfter=3,
-                        leading=15, leftIndent=24, fontName='Helvetica',
-                        bulletIndent=12),
-        'numbered': ps('Numbered', fontSize=11, textColor=DARK, spaceAfter=3,
-                       leading=15, leftIndent=16, fontName='Helvetica'),
+        'h1': ps(
+            'H1',
+            fontSize=20,
+            textColor=PRIMARY,
+            spaceAfter=6,
+            spaceBefore=10,
+            fontName='Helvetica-Bold',
+            leading=24,
+        ),
+        'h2': ps(
+            'H2',
+            fontSize=15,
+            textColor=PRIMARY_L,
+            spaceAfter=4,
+            spaceBefore=8,
+            fontName='Helvetica-Bold',
+            leading=18,
+        ),
+        'h3': ps(
+            'H3',
+            fontSize=12,
+            textColor=DARK,
+            spaceAfter=3,
+            spaceBefore=6,
+            fontName='Helvetica-Bold',
+            leading=15,
+        ),
+        'body': ps(
+            'Body',
+            fontSize=11,
+            textColor=DARK,
+            spaceAfter=4,
+            leading=16,
+            fontName='Helvetica',
+        ),
+        'bullet': ps(
+            'Bullet',
+            fontSize=11,
+            textColor=DARK,
+            spaceAfter=3,
+            leading=15,
+            leftIndent=12,
+            fontName='Helvetica',
+            bulletIndent=0,
+        ),
+        'subbullet': ps(
+            'SubBullet',
+            fontSize=11,
+            textColor=DARK,
+            spaceAfter=3,
+            leading=15,
+            leftIndent=24,
+            fontName='Helvetica',
+            bulletIndent=12,
+        ),
+        'numbered': ps(
+            'Numbered',
+            fontSize=11,
+            textColor=DARK,
+            spaceAfter=3,
+            leading=15,
+            leftIndent=16,
+            fontName='Helvetica',
+        ),
     }
 
 
 def _clean(text: str) -> str:
     """Remove/substitui caracteres problemáticos para o PDF."""
     subs = {
-        '\u2018': "'", '\u2019': "'",
-        '\u201c': '"', '\u201d': '"',
-        '\u2013': '-', '\u2014': '--',
-        '\u2022': '-', '\u2026': '...',
+        '\u2018': "'",
+        '\u2019': "'",
+        '\u201c': '"',
+        '\u201d': '"',
+        '\u2013': '-',
+        '\u2014': '--',
+        '\u2022': '-',
+        '\u2026': '...',
     }
     for k, v in subs.items():
         text = text.replace(k, v)
     # Remove markdown bold/italic e converte para tags HTML do ReportLab
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
     text = re.sub(r'\*(.+?)\*', r'<i>\1</i>', text)
-    
+
     # Remove apenas caracteres que REALMENTE quebram o ReportLab (fora do Latin-1 básico)
     # Mas preserva acentuação (á, é, í, ó, ú, ç, etc)
     # Emojis e caracteres asiáticos/árabes ainda serão removidos para evitar erros de fonte.
@@ -86,8 +135,10 @@ def _header_footer(canvas, doc):
             str(_LOGO_PATH),
             doc.leftMargin,
             h - doc.topMargin + 4 * mm,
-            width=logo_w, height=logo_h,
-            preserveAspectRatio=True, mask='auto'
+            width=logo_w,
+            height=logo_h,
+            preserveAspectRatio=True,
+            mask='auto',
         )
         title_x = doc.leftMargin + logo_w + 4 * mm
     else:
@@ -95,26 +146,38 @@ def _header_footer(canvas, doc):
 
     canvas.setFont('Helvetica-Bold', 13)
     canvas.setFillColor(PRIMARY)
-    canvas.drawString(title_x, h - doc.topMargin + 8 * mm, 'STUDY REPORT - Teacher Tati')
+    canvas.drawString(
+        title_x, h - doc.topMargin + 8 * mm, 'STUDY REPORT - Teacher Tati'
+    )
 
     # Linha separadora do header
     canvas.setStrokeColor(PRIMARY)
     canvas.setLineWidth(1)
-    canvas.line(doc.leftMargin, h - doc.topMargin + 2 * mm,
-                w - doc.rightMargin, h - doc.topMargin + 2 * mm)
+    canvas.line(
+        doc.leftMargin,
+        h - doc.topMargin + 2 * mm,
+        w - doc.rightMargin,
+        h - doc.topMargin + 2 * mm,
+    )
 
     # ── Footer ────────────────────────────────────────────────────────────────
     canvas.setStrokeColor(MUTED)
     canvas.setLineWidth(0.5)
-    canvas.line(doc.leftMargin, doc.bottomMargin - 4 * mm,
-                w - doc.rightMargin, doc.bottomMargin - 4 * mm)
+    canvas.line(
+        doc.leftMargin,
+        doc.bottomMargin - 4 * mm,
+        w - doc.rightMargin,
+        doc.bottomMargin - 4 * mm,
+    )
 
     canvas.setFont('Helvetica', 8)
     canvas.setFillColor(MUTED)
     date_str = datetime.now().strftime('%Y-%m-%d %H:%M')
-    canvas.drawString(doc.leftMargin,
-                      doc.bottomMargin - 9 * mm,
-                      f'Page {doc.page} - Generated on {date_str} - Teacher Tati AI')
+    canvas.drawString(
+        doc.leftMargin,
+        doc.bottomMargin - 9 * mm,
+        f'Page {doc.page} - Generated on {date_str} - Teacher Tati AI',
+    )
 
     canvas.restoreState()
 
@@ -150,8 +213,9 @@ def generate_report_pdf(content_markdown: str, filename: str = 'report.pdf') -> 
             text = _clean(line[2:])
             story.append(Spacer(1, 4 * mm))
             story.append(Paragraph(text, styles['h1']))
-            story.append(HRFlowable(width='100%', thickness=1,
-                                    color=PRIMARY_L, spaceAfter=3))
+            story.append(
+                HRFlowable(width='100%', thickness=1, color=PRIMARY_L, spaceAfter=3)
+            )
             continue
 
         if line.startswith('## '):

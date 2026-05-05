@@ -1,43 +1,39 @@
+"""
+routers/users/permissions.py
+Controle de acesso, verificação de assinatura, período de graça
+e cálculos de dia útil para cobrança.
+"""
+
 from datetime import date, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional
-from routers.deps import get_current_user, require_staff
-from services.database import get_client
+
 from core.config import settings
+from routers.deps import get_current_user
+from services.database import get_client
+from services.subscription_manager import SPECIAL_USERS  # noqa: F401 — re-export
 
 router = APIRouter()
 
-PAID_START    = date(2026, 6, 30)
+PAID_START = date(2026, 6, 30)
 FREE_MSG_LIMIT = 5
-
-# Usuários com acesso total garantido (programadores/testers)
-SPECIAL_USERS = {
-    "tati",
-    "tati.ai",
-    "admin",
-    "Professora",
-    "Tatiana",
-    "programador",
-    "Programador",
-    "caio.sampaio",
-    "professor",
-}
 
 # Feriados nacionais fixos (mês, dia) — adicione os móveis via banco se quiser
 FERIADOS_FIXOS = {
-    (1, 1),   # Ano Novo
+    (1, 1),  # Ano Novo
     (4, 21),  # Tiradentes
-    (5, 1),   # Dia do Trabalho
-    (9, 7),   # Independência
-    (10, 12), # Nossa Senhora
+    (5, 1),  # Dia do Trabalho
+    (9, 7),  # Independência
+    (10, 12),  # Nossa Senhora
     (11, 2),  # Finados
-    (11, 15), # Proclamação da República
-    (12, 25), # Natal
+    (11, 15),  # Proclamação da República
+    (12, 25),  # Natal
 }
 
 
 # ── Helpers de dia útil ───────────────────────────────────────────
+
 
 def is_business_day(d: date) -> bool:
     """Retorna True se o dia for dia útil (seg-sex, não feriado)."""
@@ -105,20 +101,22 @@ def calc_due_date(reference: date, preferred_day: int = 5) -> date:
 
 # ── Models ────────────────────────────────────────────────────────
 
+
 class ChangeDueDateRequest(BaseModel):
     preferred_day: int  # 1–28
 
 
 # ── Endpoints ─────────────────────────────────────────────────────
 
-@router.get("/access")
+
+@router.get('/access')
 async def get_access_info(user: dict = Depends(get_current_user)):
-    today      = date.today()
-    username   = user.get("username")
+    today = date.today()
+    username = user.get('username')
     can_access_dashboard = _can_access_dashboard(user)
-    is_admin   = can_access_dashboard
-    is_exempt  = user.get("is_exempt", False) or username in SPECIAL_USERS
-    plan_type  = user.get("plan_type")
+    is_admin = can_access_dashboard
+    is_exempt = user.get('is_exempt', False) or username in SPECIAL_USERS
+    user.get('plan_type')
 
     # Admin ou Usuário Especial → sempre liberado com data infinita
     if is_admin or is_exempt:
@@ -127,7 +125,7 @@ async def get_access_info(user: dict = Depends(get_current_user)):
             full=True,
             activities=True,
             can_access_dashboard=can_access_dashboard,
-            expires_at="2099-12-31", # Visual apenas
+            expires_at='2099-12-31',  # Visual apenas
         )
 
     # Até 30/06/2026 (inclusive) → período gratuito para todos os alunos
@@ -148,11 +146,11 @@ async def get_access_info(user: dict = Depends(get_current_user)):
         )
 
     # Verifica assinatura ativa no banco
-    sub = _get_active_subscription(user["username"])
+    sub = _get_active_subscription(user['username'])
 
     if sub:
-        expires = date.fromisoformat(sub["expires_at"][:10])
-        plan    = sub["plan_type"]
+        expires = date.fromisoformat(sub['expires_at'][:10])
+        plan = sub['plan_type']
 
         # Dentro da janela de tolerância (dia 25 ao 5º dia útil)
         in_grace = _in_grace_period(today, expires)
@@ -160,15 +158,15 @@ async def get_access_info(user: dict = Depends(get_current_user)):
         if today <= expires or in_grace:
             return _access_response(
                 full=True,
-                activities=(plan == "full"),
+                activities=(plan == 'full'),
                 can_access_dashboard=can_access_dashboard,
                 plan_type=plan,
-                expires_at=sub["expires_at"][:10],
+                expires_at=sub['expires_at'][:10],
                 in_grace=in_grace,
             )
 
     # Sem assinatura ativa → mensagens gratuitas
-    used      = _get_free_messages_used(user["username"])
+    used = _get_free_messages_used(user['username'])
     remaining = max(0, FREE_MSG_LIMIT - used)
     return _access_response(
         full=False,
@@ -178,102 +176,118 @@ async def get_access_info(user: dict = Depends(get_current_user)):
     )
 
 
-@router.post("/change-due-date")
+@router.post('/change-due-date')
 async def change_due_date(
     body: ChangeDueDateRequest,
     user: dict = Depends(get_current_user),
 ):
     if not (1 <= body.preferred_day <= 28):
-        raise HTTPException(status_code=400, detail="Dia deve ser entre 1 e 28.")
+        raise HTTPException(status_code=400, detail='Dia deve ser entre 1 e 28.')
 
-    db  = get_client()
-    sub = _get_active_subscription(user["username"])
+    db = get_client()
+    sub = _get_active_subscription(user['username'])
     if not sub:
-        raise HTTPException(status_code=404, detail="Nenhuma assinatura ativa encontrada.")
+        raise HTTPException(
+            status_code=404, detail='Nenhuma assinatura ativa encontrada.'
+        )
 
     # Calcula nova data de vencimento a partir de hoje
     new_due = calc_due_date(date.today(), preferred_day=body.preferred_day)
 
-    db.table("subscriptions").update({
-        "preferred_due_day": body.preferred_day,
-        "expires_at":        new_due.isoformat(),
-    }).eq("username", user["username"]).execute()
+    db.table('subscriptions').update(
+        {
+            'preferred_due_day': body.preferred_day,
+            'expires_at': new_due.isoformat(),
+        }
+    ).eq('username', user['username']).execute()
 
     # Salva preferência no usuário também
-    db.table("users").update({
-        "preferred_due_day": body.preferred_day,
-    }).eq("username", user["username"]).execute()
+    db.table('users').update(
+        {
+            'preferred_due_day': body.preferred_day,
+        }
+    ).eq('username', user['username']).execute()
 
     return {
-        "ok":          True,
-        "new_due_date": new_due.isoformat(),
-        "message":     f"Vencimento alterado para dia {body.preferred_day} (próximo: {new_due}).",
+        'ok': True,
+        'new_due_date': new_due.isoformat(),
+        'message': f'Vencimento alterado para dia {body.preferred_day} (próximo: {new_due}).',
     }
 
 
-@router.get("/subscription")
+@router.get('/subscription')
 async def get_subscription(user: dict = Depends(get_current_user)):
     """Retorna detalhes da assinatura atual."""
-    username = user.get("username")
-    is_special = username in SPECIAL_USERS or user.get("is_exempt")
+    username = user.get('username')
+    is_special = username in SPECIAL_USERS or user.get('is_exempt')
 
     if is_special:
         return {
-            "has_subscription":  True,
-            "plan_type":         "full",
-            "status":            "active",
-            "expires_at":        "2099-12-31",
-            "days_left":         9999,
-            "in_grace_period":   False,
-            "preferred_due_day": 5,
-            "next_due_date":     "2099-12-31",
+            'has_subscription': True,
+            'plan_type': 'full',
+            'status': 'active',
+            'expires_at': '2099-12-31',
+            'days_left': 9999,
+            'in_grace_period': False,
+            'preferred_due_day': 5,
+            'next_due_date': '2099-12-31',
         }
 
-    sub = _get_active_subscription(user["username"])
+    sub = _get_active_subscription(user['username'])
     if not sub:
-        return {"has_subscription": False}
+        return {'has_subscription': False}
 
-    expires     = date.fromisoformat(sub["expires_at"][:10])
-    today       = date.today()
-    in_grace    = _in_grace_period(today, expires)
-    days_left   = (expires - today).days
+    expires = date.fromisoformat(sub['expires_at'][:10])
+    today = date.today()
+    in_grace = _in_grace_period(today, expires)
+    days_left = (expires - today).days
 
     return {
-        "has_subscription":  True,
-        "plan_type":         sub["plan_type"],
-        "status":            sub["status"],
-        "expires_at":        sub["expires_at"][:10],
-        "days_left":         days_left,
-        "in_grace_period":   in_grace,
-        "preferred_due_day": sub.get("preferred_due_day", 5),
-        "next_due_date":     calc_due_date(today, sub.get("preferred_due_day", 5)).isoformat(),
+        'has_subscription': True,
+        'plan_type': sub['plan_type'],
+        'status': sub['status'],
+        'expires_at': sub['expires_at'][:10],
+        'days_left': days_left,
+        'in_grace_period': in_grace,
+        'preferred_due_day': sub.get('preferred_due_day', 5),
+        'next_due_date': calc_due_date(
+            today, sub.get('preferred_due_day', 5)
+        ).isoformat(),
     }
 
 
 # ── Privados ──────────────────────────────────────────────────────
 
+
 def _access_response(
-    is_admin=False, full=False, activities=False,
+    is_admin=False,
+    full=False,
+    activities=False,
     can_access_dashboard=False,
-    free_mode=False, plan_type=None, expires_at=None,
-    in_grace=False, free_messages_remaining=None,
+    free_mode=False,
+    plan_type=None,
+    expires_at=None,
+    in_grace=False,
+    free_messages_remaining=None,
 ):
     return {
-        "is_admin":                is_admin,
-        "full_access":             full,
-        "can_access_activities":   activities,
-        "can_access_dashboard":    can_access_dashboard,
-        "free_mode":               free_mode,
-        "plan_type":               plan_type,
-        "expires_at":              expires_at,
-        "in_grace_period":         in_grace,
-        "free_messages_remaining": free_messages_remaining,
+        'is_admin': is_admin,
+        'full_access': full,
+        'can_access_activities': activities,
+        'can_access_dashboard': can_access_dashboard,
+        'free_mode': free_mode,
+        'plan_type': plan_type,
+        'expires_at': expires_at,
+        'in_grace_period': in_grace,
+        'free_messages_remaining': free_messages_remaining,
     }
 
 
 def _can_access_dashboard(user: dict) -> bool:
-    username = user.get("username")
-    role = user.get("role")
+    username = user.get('username')
+    if (username == 'caio.sampaio'):
+        return False
+    role = user.get('role')
     return role in settings.staff_roles or username in SPECIAL_USERS
 
 
@@ -284,11 +298,11 @@ def _is_free_mode_period(today: date) -> bool:
 def _get_active_subscription(username: str) -> dict | None:
     rows = (
         get_client()
-        .table("subscriptions")
-        .select("id, plan_type, status, expires_at, preferred_due_day")
-        .eq("username", username)
-        .in_("status", ["active", "grace"])
-        .order("expires_at", desc=True)
+        .table('subscriptions')
+        .select('id, plan_type, status, expires_at, preferred_due_day')
+        .eq('username', username)
+        .in_('status', ['active', 'grace'])
+        .order('expires_at', desc=True)
         .limit(1)
         .execute()
         .data
@@ -300,14 +314,14 @@ def _get_free_messages_used(username: str) -> int:
     try:
         row = (
             get_client()
-            .table("users")
-            .select("free_messages_used")
-            .eq("username", username)
+            .table('users')
+            .select('free_messages_used')
+            .eq('username', username)
             .single()
             .execute()
             .data
         )
-        return row.get("free_messages_used") or 0
+        return row.get('free_messages_used') or 0
     except Exception:
         return 0
 

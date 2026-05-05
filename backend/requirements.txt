@@ -31,3 +31,7 @@ reportlab
 edge-tts
 apscheduler
 pywebpush
+youtube-transcript-api
+python-pptx
+openpyxl
+markdown

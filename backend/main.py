@@ -1,143 +1,125 @@
 """
-Teacher Tati API - Entry Point
+Teacher Tati API — Entry Point
 
-Este arquivo inicializa a aplicação FastAPI, configura middlewares (CORS, Rate Limiting),
-integra o Sentry para monitoramento de erros e centraliza o roteamento de todos os módulos.
+Inicializa a aplicação FastAPI, configura middlewares (CORS, GZip,
+Rate Limiting, HTTPS), integra o Sentry para monitoramento e
+centraliza o roteamento via ``register_all_routers``.
 """
 
+from __future__ import annotations
+
+from pathlib import Path
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
-from dotenv import load_dotenv
-from pathlib import Path
-import os
 
-# Força o carregamento do .env da raiz do projeto para garantir consistência nas chaves
-env_path = Path(__file__).parent.parent / ".env"
+# Força o carregamento do .env da raiz do projeto
+env_path = Path(__file__).parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
-# Sentry - Inicialização crítica para captura de exceções em tempo de execução
+# Sentry — Inicialização crítica para captura de exceções
 from core.sentry_config import init_sentry
+
 try:
     init_sentry()
 except Exception as e:
-    print(f"[Startup] Erro ao iniciar Sentry: {e}")
+    print(f'[Startup] Erro ao iniciar Sentry: {e}')
 
-# Importação dos roteadores de cada domínio da aplicação
-from routers.auth import router as auth_router
-# ... (restante dos imports)
-from routers.users.profile import router as profile_router
-from routers.users.permissions import router as permissions_router
-from routers.users.streaks import router as streaks_router
-from routers.users.progress import router as progress_router
-from routers.users.vocabulary import router as vocab_router
-from routers.users.goals import router as goals_router
-from routers.users.xp import router as xp_router
-from routers.challenges import router as challenges_router
-from routers.admin.dashboard import router as dashboard_router
-from routers.ai.chat import router as chat_router
-from routers.simulation import router as simulation_router
-from routers.ai.avatar import router as avatar_router
-from routers.activities.modules import router as modules_router
-from routers.activities.quizzes import router as quizzes_router
-from routers.activities.podcasts import router as podcasts_router
-from routers.activities.trophies import router as trophies_router
-from routers.activities.submissions import router as submissions_router
-from routers.activities.ranking import router as ranking_router
-from routers.payments import asaas_router as payments_router
-from routers.users.onboarding import router as onboarding_router
-from routers.users.daily_summary import router as daily_summary_router
-from routers.notifications import router as notifications_router
-from routers.validation import router as validation_router
-from services.notification_scheduler import start_notification_scheduler
+
+# ── App ───────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
-    title="Teacher Tati AI",
-    description="API para o aplicativo de ensino de inglês Teacher Tati",
-    version="2.0.0",
+    title='Teacher Tati AI',
+    description='API para o aplicativo de ensino de inglês Teacher Tati',
+    version='2.0.0',
 )
 
+
+# ── Middlewares ───────────────────────────────────────────────────────────────
+
+
 class ForceHTTPSMiddleware(BaseHTTPMiddleware):
+    """Força scheme HTTPS quando X-Forwarded-Proto indica proxy SSL."""
+
     async def dispatch(self, request: Request, call_next):
-        # Se houver X-Forwarded-Proto = https, força o scope scheme para https
-        # Isso garante que redirecionamentos gerados pelo FastAPI usem https://
-        if request.headers.get("x-forwarded-proto") == "https":
-            request.scope["scheme"] = "https"
+        if request.scope.get('type') == 'websocket':
+            return await call_next(request)
+            
+        if request.headers.get('x-forwarded-proto') == 'https':
+            request.scope['scheme'] = 'https'
         return await call_next(request)
 
+
 app.add_middleware(ForceHTTPSMiddleware)
+
+# GZip — comprime respostas > 500 bytes (melhora ~60% em payloads JSON)
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://127.0.0.1:8080", 
-        "http://localhost:8080", 
-        "https://tati-ai.vercel.app",
-        "https://tati-ai.vercel.app/",
-        "https://tati-ai-git-main-caio-andrades-projects.vercel.app"
+        'http://127.0.0.1:8080',
+        'http://localhost:8080',
+        'http://127.0.0.1:8000',
+        'http://localhost:8000',
+        'http://127.0.0.1:3000',
+        'http://localhost:3000',
+        'https://tati-ai.vercel.app',
+        'https://tati-ai.vercel.app/',
+        'https://tati-ai-git-main-caio-andrades-projects.vercel.app',
     ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=['*'],
+    allow_headers=['*'],
+    allow_origin_regex='http://(localhost|127\.0\.0\.1):[0-9]+',
 )
 
 # Rate Limiting (Upstash Redis)
 from core.rate_limiter import setup_rate_limiting
+
 setup_rate_limiting(app)
 
-# ── Auth ──────────────────────────────────────────────────────
-app.include_router(auth_router,      prefix="/auth",      tags=["auth"])
 
-# ── Users ─────────────────────────────────────────────────────
-app.include_router(profile_router,   prefix="/profile",   tags=["users"])
-app.include_router(permissions_router, prefix="/users/permissions", tags=["users"])
-app.include_router(streaks_router, prefix="/users", tags=["users"])
-app.include_router(progress_router, prefix="/users", tags=["users"])
-app.include_router(vocab_router, prefix="/users", tags=["users"])
-app.include_router(goals_router, prefix="/users", tags=["users"])
-app.include_router(xp_router, prefix="/users", tags=["users"])
+# ── Routers (registro centralizado) ──────────────────────────────────────────
 
-# ── Admin ─────────────────────────────────────────────────────
-app.include_router(dashboard_router, prefix="/dashboard", tags=["admin"])
+from routers import register_all_routers
 
-# ── Challenges ────────────────────────────────────────────────
-app.include_router(challenges_router, tags=["challenges"])
-app.include_router(chat_router,      prefix="/chat",      tags=["ai"])
-app.include_router(chat_router,      prefix="/voice",     tags=["ai"])
-app.include_router(avatar_router,    prefix="/avatar",    tags=["ai"])
-
-# ── Simulation ────────────────────────────────────────────────
-app.include_router(simulation_router, tags=["simulation"])
-
-# ── Activities ────────────────────────────────────────────────
-app.include_router(modules_router,   prefix="/activities/modules",  tags=["activities"])
-app.include_router(quizzes_router,   prefix="/activities/quizzes",  tags=["activities"])
-app.include_router(podcasts_router,  prefix="/activities/podcasts", tags=["activities"])
-app.include_router(trophies_router,  prefix="/activities/trophies", tags=["activities"])
-app.include_router(submissions_router, prefix="/activities/submissions", tags=["activities"])
-app.include_router(ranking_router, prefix="/activities/ranking", tags=["activities"])
-
-# ── Payments ──────────────────────────────────────────────────
-app.include_router(payments_router,  prefix="/payments",   tags=["payments"])
-app.include_router(onboarding_router, tags=["users"])
-app.include_router(daily_summary_router, tags=["users"])
-app.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
-
-# ── Validation ────────────────────────────────────────────────
-app.include_router(validation_router, prefix="/validation", tags=["validation"])
-
-# ── Health ────────────────────────────────────────────────────────
-@app.get("/cors-test")
-async def cors_test():
-    return {"origins": ["https://tati-ai.vercel.app"]}
+register_all_routers(app)
 
 
-@app.on_event("startup")
-async def startup_notifications():
-    start_notification_scheduler()
+# ── Health ────────────────────────────────────────────────────────────────────
 
 
-if __name__ == "__main__":
+@app.get('/cors-test')
+async def cors_test() -> dict:
+    """Endpoint leve para verificar CORS e keep-alive."""
+    return {'origins': ['https://tati-ai.vercel.app']}
+
+
+# ── Startup Events ───────────────────────────────────────────────────────────
+
+
+@app.on_event('startup')
+async def startup_notifications() -> None:
+    """Inicia o scheduler de notificações e lembretes."""
+    from services.notification_scheduler import notification_scheduler
+
+    notification_scheduler.start()
+
+
+# ── Entrypoint ────────────────────────────────────────────────────────────────
+
+if __name__ == '__main__':
     import uvicorn
+
     from core.config import settings
-    uvicorn.run("main:app", host="0.0.0.0", port=settings.port, reload=settings.debug)
+
+    uvicorn.run(
+        'main:app',
+        host='0.0.0.0',
+        port=settings.port,
+        reload=settings.debug,
+    )

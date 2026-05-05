@@ -1,117 +1,326 @@
 """
-Serviço centralizado para verificação e entrega de troféus.
+services/trophy_service.py
+Serviço para gerenciamento de troféus e conquistas.
 """
-from datetime import datetime, timezone
+
+from typing import List, Dict, Any
+from fastapi.concurrency import run_in_threadpool
 from services.database import get_client
+from services.upstash import cache_get, cache_set
 
-def award_trophy(username: str, trophy_name: str) -> bool:
-    """Premia um usuário com um troféu pelo NOME, se ele ainda não tiver."""
-    db = get_client()
-    try:
-        # 1. Busca o ID do troféu pelo nome
-        trophy = db.table("trophies").select("id").eq("name", trophy_name).single().execute().data
-        if not trophy:
-            print(f"[Trophy Service] Troféu não encontrado: {trophy_name}")
-            return False
-        
-        trophy_id = trophy["id"]
-        
-        # 2. Tenta inserir na tabela user_trophies (UNIQUE constraint username+trophy_id evita duplicata)
-        db.table("user_trophies").insert({
-            "username": username,
-            "trophy_id": trophy_id,
-            "earned_at": datetime.now(timezone.utc).isoformat()
-        }).execute()
-        
-        print(f"[Trophy Service] Troféu '{trophy_name}' concedido a {username}")
-        
-        # Invalida caches relacionados
-        try:
-            import asyncio
-            from services.upstash import cache_delete
+
+class TrophyService:
+    def __init__(self):
+        self.db = get_client()
+
+    async def get_user_trophies(self, username: str) -> List[Dict[str, Any]]:
+        cache_key = f'trophies:{username}'
+        cached = await cache_get(cache_key)
+        if cached:
+            return cached
+
+        def _fetch():
+            res = (
+                self.db.table('user_trophies')
+                .select('earned_at, trophies(name, description, icon, category)')
+                .eq('username', username)
+                .order('earned_at', desc=True)
+                .execute()
+            )
+            trophies = []
+            for row in res.data:
+                t = row.get('trophies', {})
+                trophies.append(
+                    {
+                        'title': t.get('name'),
+                        'description': t.get('description'),
+                        'icon': t.get('icon'),
+                        'category': t.get('category'),
+                        'earned_at': row.get('earned_at'),
+                    }
+                )
+            return trophies
+
+        trophies = await run_in_threadpool(_fetch)
+        await cache_set(cache_key, trophies, ttl=300)
+        return trophies
+
+    async def list_achievements(self, username: str) -> List[Dict[str, Any]]:
+        """Retorna todos os troféus do sistema com o status de desbloqueio do usuário."""
+        # Mapeamento completo para garantir inglês na interface
+        TRANSLATIONS = {
+            # Quizzes
+            'Primeiro Quiz': 'First Quiz',
+            'Quizzer Iniciante': 'Novice Quizzer',
+            'Quizzer': 'Active Quizzer',
+            'Quizzer Avançado': 'Advanced Quizzer',
+            'Mestre dos Quizzes': 'Quiz Master',
+            'Mestre Supremo': 'Supreme Master',
+            'Perfeccionista': 'Perfectionist',
             
-            async def _invalidate():
-                await cache_delete(f"trophies:{username}")
-                await cache_delete(f"trophies_all:{username}")
-                await cache_delete(f"streak:{username}")
-                
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    loop.create_task(_invalidate())
-                else:
-                    loop.run_until_complete(_invalidate())
-            except Exception:
-                pass
-        except Exception:
-            pass
-
-        try:
-            from services.notifications import notify_trophy_earned
-
-            notify_trophy_earned(username, trophy_name)
-        except Exception as exc:
-            print(f"[Trophy Service] Erro ao notificar troféu: {exc}")
+            # Streaks
+            'Primeiro Dia': 'First Day',
+            'Ofensiva de 3 Dias': '3-Day Streak',
+            'Ofensiva de 7 Dias': '7-Day Streak',
+            'Ofensiva de 14 Dias': '14-Day Streak',
+            'Ofensiva de 30 Dias': '30-Day Streak',
+            'Ofensiva de 60 Dias': '60-Day Streak',
+            'Ofensiva de 100 Dias': '100-Day Streak',
+            'Ofensiva de 365 Dias': '365-Day Streak',
+            'Sempre Alerta': 'Always Alert',
             
-        return True
-    except Exception as e:
-        # Se cair aqui, provavelmente já tem o troféu (Unique constraint violation) ou erro de banco
-        if "duplicate key" not in str(e).lower():
-            print(f"[Trophy Service] Erro ao premiar '{trophy_name}' para {username}: {e}")
-        return False
+            # Milestones & Messages
+            'Primeira Mensagem': 'First Message',
+            '100 Mensagens': '100 Messages',
+            '500 Mensagens': '500 Messages',
+            'Primeira Simulação': 'First Simulation',
+            'Ator Iniciante': 'Novice Actor',
+            'Estrela de Simulação': 'Simulation Star',
+            'Explorador': 'Explorer',
+            'Madrugador': 'Early Bird',
+            'Coruja': 'Night Owl',
+            'Final de Semana': 'Weekend Warrior',
+            
+            # Social
+            'Popular': 'Popular',
+            'Comunicador': 'Communicator',
+            'Falante': 'Talkative',
+            'Social': 'Social',
+            'Conversador': 'Chatty Student',
+            
+            # Credits & Tycoon
+            'Primeiro Crédito': 'First Credit',
+            'Economizador': 'Saver',
+            'Colecionador': 'Collector',
+            'Rico': 'Wealthy',
+            'Magnata': 'Tycoon',
+            
+            # Time
+            'Primeira Hora': 'First Hour',
+            'Mestre do Tempo': 'Time Master',
+            'Tempo Supremo': 'Supreme Time',
+            'Viajante do Tempo': 'Time Traveler',
+            
+            # Vocabulary
+            'Vocabulário 10': 'Vocabulary 10',
+            'Vocabulário 50': 'Vocabulary 50',
+            'Vocabulário 100': 'Vocabulary 100',
+            'Poliglota': 'Polyglot',
+            'Dicionário Vivo': 'Living Dictionary',
+            
+            # Goals & Ranking
+            'Primeira Meta': 'First Goal',
+            'Focado': 'Focused',
+            'Objetivo': 'Goal Getter',
+            'Top 10': 'Top 10',
+            'Top 3': 'Top 3',
+            'Campeão': 'Champion',
+
+            # Categorias
+            'questions': 'Questions',
+            'streak': 'Streak',
+            'specialist': 'Specialist',
+            'milestones': 'Milestones',
+            'social': 'Social',
+            'credits': 'Credits',
+            'time': 'Time',
+            'vocabulary': 'Vocabulary',
+            'goals': 'Goals',
+            'ranking': 'Ranking'
+        }
+
+        def _fetch():
+            # 1. Busca todos os troféus cadastrados
+            all_trophies = self.db.table('trophies').select('*').execute().data or []
+            
+            # 2. Busca troféus conquistados pelo usuário
+            earned = self.db.table('user_trophies').select('trophy_id').eq('username', username).execute().data or []
+            earned_ids = {t['trophy_id'] for t in earned}
+            
+            # 3. Formata para o frontend
+            result = []
+            for t in all_trophies:
+                name = t['name']
+                cat = t['category']
+                result.append({
+                    'id': t['id'],
+                    'title': TRANSLATIONS.get(name, name),
+                    'description': t['description'],
+                    'icon': t['icon'],
+                    'category': TRANSLATIONS.get(cat, cat),
+                    'unlocked': t['id'] in earned_ids
+                })
+            return result
+            
+        return await run_in_threadpool(_fetch)
+
+    async def check_and_award_trophies(self, username: str) -> List[Dict[str, Any]]:
+        def _check():
+            progress = (
+                self.db.table('user_progress')
+                .select('id')
+                .eq('username', username)
+                .execute()
+                .data
+                or []
+            )
+            total_done = len(progress)
+            existing = (
+                self.db.table('user_trophies')
+                .select('trophy_id')
+                .eq('username', username)
+                .execute()
+                .data
+                or []
+            )
+            existing_ids = {t['trophy_id'] for t in existing}
+            all_trophies = (
+                self.db.table('trophies').select('id, name, icon').execute().data or []
+            )
+            trophy_map = {t['name']: t for t in all_trophies}
+
+            earned = []
+            definitions = [
+                {'name': 'First Quiz', 'req': 1},
+                {'name': 'Novice Quizzer', 'req': 5},
+                {'name': 'Active Quizzer', 'req': 10},
+                {'name': 'Quiz Master', 'req': 50},
+            ]
+            for d in definitions:
+                t_info = trophy_map.get(d['name'])
+                if (
+                    t_info
+                    and t_info['id'] not in existing_ids
+                    and total_done >= d['req']
+                ):
+                    self.db.table('user_trophies').insert(
+                        {'username': username, 'trophy_id': t_info['id']}
+                    ).execute()
+                    from services.notifications import notify_trophy_earned
+
+                    notify_trophy_earned(username, t_info['name'], t_info['icon'])
+                    earned.append({'title': t_info['name'], 'icon': t_info['icon']})
+            return earned
+
+        return await run_in_threadpool(_check)
+
+    async def award_specialist_badge(self, username: str, topic_title: str):
+        """Atribui uma badge de especialista baseada em um tópico específico concluído."""
+        def _award():
+            # 1. Cria ou recupera a definição do troféu de especialista
+            badge_name = f'Specialist: {topic_title}'
+            
+            # Verifica se já existe a definição na tabela global de troféus
+            t_res = self.db.table('trophies').select('id, icon').eq('name', badge_name).execute().data
+            if t_res:
+                trophy_id = t_res[0]['id']
+                icon = t_res[0]['icon']
+            else:
+                # Cria uma nova definição de badge dinâmica
+                new_t = {
+                    'name': badge_name,
+                    'description': f'Mastered the topic: {topic_title}',
+                    'icon': '🎓',
+                    'category': 'specialist'
+                }
+                insert_res = self.db.table('trophies').insert(new_t).execute().data
+                if not insert_res: return
+                trophy_id = insert_res[0]['id']
+                icon = '🎓'
+
+            # 2. Atribui ao usuário se não tiver
+            existing = self.db.table('user_trophies').select('id').eq('username', username).eq('trophy_id', trophy_id).execute().data
+            if not existing:
+                self.db.table('user_trophies').insert({'username': username, 'trophy_id': trophy_id}).execute()
+                from services.notifications import notify_trophy_earned
+                notify_trophy_earned(username, badge_name, icon)
+                print(f'[Trophy] Awarded Specialist Badge: {topic_title} to {username}')
+
+        await run_in_threadpool(_award)
+
 
 def check_chat_trophies(username: str):
-    """Verifica troféus relacionados ao chat (ex: Primeira Mensagem)."""
-    db = get_client()
-    try:
-        # Conta mensagens do usuário
-        res = db.table("messages").select("id", count="exact").eq("username", username).eq("role", "user").execute()
-        count = res.count or 0
-        
-        if count >= 1:
-            award_trophy(username, "Primeira Mensagem")
-        if count >= 100:
-            award_trophy(username, "100 Mensagens")
-        if count >= 500:
-            award_trophy(username, "500 Mensagens")
-            
-    except Exception as e:
-        print(f"[Trophy Service] Erro check_chat_trophies: {e}")
+    """Função legada/auxiliar para o chat disparar checagem em background."""
+    from services.database import get_client
 
-def check_streak_trophies(username: str, streak_days: int):
-    """Verifica troféus baseados em dias seguidos (streak)."""
-    # Nomes exatos do Banco de Dados
-    if streak_days >= 1: award_trophy(username, "Primeiro Dia")
-    if streak_days >= 3: award_trophy(username, "Ofensiva de 3 Dias")
-    if streak_days >= 7: award_trophy(username, "Ofensiva de 7 Dias")
-    if streak_days >= 14: award_trophy(username, "Ofensiva de 14 Dias")
-    if streak_days >= 30: award_trophy(username, "Ofensiva de 30 Dias")
-    if streak_days >= 60: award_trophy(username, "Ofensiva de 60 Dias")
-    if streak_days >= 100: award_trophy(username, "Ofensiva de 100 Dias")
-    if streak_days >= 365: award_trophy(username, "Ofensiva de 365 Dias")
-
-def check_all_trophies(username: str):
-    """Roda uma verificação completa (útil para migrações ou quando o usuário reclama)."""
     db = get_client()
-    
-    # 1. Chat
-    check_chat_trophies(username)
-    
-    # 2. Streak/Dias
-    from services.streaks import get_streak
-    streak_data = get_streak(username)
-    # Verificamos tanto o current quanto o longest para garantir que se ele teve 40 dias no passado ele ganhe
-    longest = streak_data.get("longest_streak", 0)
-    check_streak_trophies(username, longest)
-    
-    # 3. Quizzes (Mestre dos Quizzes, etc)
-    try:
-        res = db.table("user_progress").select("id", count="exact").eq("username", username).execute()
-        q_count = res.count or 0
-        if q_count >= 1: award_trophy(username, "Primeiro Quiz")
-        if q_count >= 5: award_trophy(username, "Quizzer Iniciante")
-        if q_count >= 10: award_trophy(username, "Quizzer")
-        if q_count >= 25: award_trophy(username, "Quizzer Avançado")
-        if q_count >= 50: award_trophy(username, "Mestre dos Quizzes")
-        if q_count >= 100: award_trophy(username, "Mestre Supremo")
-    except: pass
+    # Lógica simplificada para checagem rápida
+    # Poderia chamar TrophyService().check_and_award_trophies mas aqui é síncrono para run_in_threadpool
+    progress = (
+        db.table('messages')
+        .select('id', count='exact')
+        .eq('username', username)
+        .eq('role', 'user')
+        .execute()
+        .count
+    )
+    if progress and progress >= 10:
+        # Tenta dar o troféu de "Conversador"
+        t = (
+            db.table('trophies')
+            .select('id, name, icon')
+            .eq('name', 'Chatty Student')
+            .execute()
+            .data
+        )
+        if t:
+            existing = (
+                db.table('user_trophies')
+                .select('id')
+                .eq('username', username)
+                .eq('trophy_id', t[0]['id'])
+                .execute()
+                .data
+            )
+            if not existing:
+                db.table('user_trophies').insert(
+                    {'username': username, 'trophy_id': t[0]['id']}
+                ).execute()
+                from services.notifications import notify_trophy_earned
+
+                notify_trophy_earned(username, t[0]['name'], t[0]['icon'])
+                print(f'[Trophy] Awarded Chatty Student to {username}')
+
+
+def check_streak_trophies(username: str, longest_streak: int):
+    """Verifica troféus baseados em dias consecutivos (streak)."""
+    from services.database import get_client
+
+    db = get_client()
+
+    # Mapeamento de marcos de streak para nomes de troféus
+    milestones = [
+        (7, 'Week Warrior'),
+        (30, 'Monthly Master'),
+        (100, 'Diamond Learner'),
+        (365, 'Year Champion'),
+    ]
+
+    for days, trophy_name in milestones:
+        if longest_streak >= days:
+            # Busca ID do troféu
+            t = (
+                db.table('trophies')
+                .select('id, name, icon')
+                .eq('name', trophy_name)
+                .execute()
+                .data
+            )
+            if t:
+                # Verifica se já possui
+                existing = (
+                    db.table('user_trophies')
+                    .select('id')
+                    .eq('username', username)
+                    .eq('trophy_id', t[0]['id'])
+                    .execute()
+                    .data
+                )
+                if not existing:
+                    db.table('user_trophies').insert(
+                        {'username': username, 'trophy_id': t[0]['id']}
+                    ).execute()
+                    from services.notifications import notify_trophy_earned
+
+                    notify_trophy_earned(username, t[0]['name'], t[0]['icon'])
+                    print(f'[Trophy] Awarded {trophy_name} to {username}')

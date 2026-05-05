@@ -1,13 +1,14 @@
 """
 Router de Caderno de Vocabulário Pessoal.
+Refatorado para usar UserService e padrão async.
 """
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from typing import Optional, List
-from datetime import datetime, timezone
+
 from routers.deps import get_current_user
-from services.database import get_client
-from services.upstash import cache_get, cache_set, cache_delete
+from services.user_service import UserService
 
 router = APIRouter()
 
@@ -16,84 +17,32 @@ class VocabWord(BaseModel):
     term: str
     translation: Optional[str] = None
     example: Optional[str] = None
-    status: str = "new"  # new, learning, learned
-
-    def dict(self, *args, **kwargs):
-        return super().model_dump(*args, **kwargs)
+    status: str = 'new'
 
 
 class VocabUpdate(BaseModel):
     words: List[VocabWord]
 
 
-@router.get("/vocabulary")
-async def get_vocabulary(current_user: dict = Depends(get_current_user)):
+@router.get('')
+async def get_vocabulary(
+    user=Depends(get_current_user), service: UserService = Depends()
+):
     """Retorna vocabulário do usuário."""
-    username = current_user["username"]
-    cache_key = f"vocabulary:{username}"
-    cached = await cache_get(cache_key)
-    if cached:
-        return cached
-
-    db = get_client()
-    try:
-        row = db.table("users").select("vocabulary").eq("username", username).single().execute().data
-        words = row.get("vocabulary", []) if row else []
-    except Exception:
-        words = []
-
-    result = {"words": words, "total": len(words)}
-    await cache_set(cache_key, result, ttl=600)  # 10 minutos
-    return result
+    return await service.get_vocabulary(user['username'])
 
 
-@router.post("/vocabulary")
-async def save_vocabulary(body: VocabUpdate, current_user: dict = Depends(get_current_user)):
-    """Salva vocabulário do usuário."""
-    username = current_user["username"]
-    db = get_client()
-    words_data = [w.dict() for w in body.words]
-    db.table("users").update({"vocabulary": words_data}).eq("username", username).execute()
-    await cache_delete(f"vocabulary:{username}")  # invalida ao salvar
-    return {"ok": True, "total": len(words_data)}
-
-
-@router.post("/vocabulary/add")
-async def add_word(body: VocabWord, current_user: dict = Depends(get_current_user)):
+@router.post('/add')
+async def add_word(
+    body: VocabWord, user=Depends(get_current_user), service: UserService = Depends()
+):
     """Adiciona uma palavra ao vocabulário."""
-    username = current_user["username"]
-    db = get_client()
-    
-    try:
-        row = (
-            db.table("users")
-            .select("vocabulary")
-            .eq("username", username)
-            .single()
-            .execute()
-            .data
-        )
-        
-        words = row.get("vocabulary", []) if row else []
-        
-        # Verifica se já existe
-        existing = next((w for w in words if w.get("term") == body.term), None)
-        if existing:
-            return {"ok": False, "message": "Word already exists"}
-        
-        words.append({
-            "term": body.term,
-            "translation": body.translation,
-            "example": body.example,
-            "status": body.status,
-            "added_at": datetime.now(timezone.utc).isoformat()
-        })
-        
-        db.table("users").update({
-            "vocabulary": words
-        }).eq("username", username).execute()
-        
-        await cache_delete(f"vocabulary:{username}")  # invalida ao adicionar palavra
-        return {"ok": True, "total": len(words)}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+    return await service.add_vocabulary_word(user['username'], body.model_dump())
+
+
+@router.delete('/{term}')
+async def delete_word(
+    term: str, user=Depends(get_current_user), service: UserService = Depends()
+):
+    """Remove uma palavra do vocabulário."""
+    return await service.delete_vocabulary_word(user['username'], term)

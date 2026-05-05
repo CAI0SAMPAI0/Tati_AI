@@ -1,587 +1,339 @@
-# painel professor / programador -> insights, erros gramaticais, recomendações, relatórios.
+"""
+routers/admin/dashboard.py
+Router do painel administrativo.
+"""
 
 from __future__ import annotations
 
-import json
-import re
-from collections import Counter
-
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from typing import Optional
 
-from routers.deps import get_current_user, require_staff
-from services.database import get_client
-from services.llm import GroqKeyError, groq_chat
+from routers.deps import require_staff, get_current_user
+from services.dashboard_service import DashboardService
+from services.llm import groq_chat
 
 router = APIRouter()
 
-LANG_INSTRUCTION = {
-    "pt-BR": "Respond entirely in Brazilian Portuguese (pt-BR).",
-    "en-US": "Respond entirely in English (US).",
-    "en-UK": "Respond entirely in English (UK).",
-}
-DEFAULT_LANG = "pt-BR"
 
-
-# ── Models ────────────────────────────────────────────────────────────────────
+# ── Models ─────────────────────────────────────────────────────────────────────
 
 
 class StudentUpdate(BaseModel):
-    level: str | None = None
-    custom_prompt: str | None = None
+    """Payload para atualizar dados de um aluno."""
+
+    level: Optional[str] = None
+    custom_prompt: Optional[str] = None
 
 
-class GrammarError(BaseModel):
-    category: str
-    count: int
-    example: str | None = None
+# ── Estatísticas e visão geral ─────────────────────────────────────────────────
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ── Estatísticas e visão geral ─────────────────────────────────────────────────
 
 
-def _lang_instruction(lang: str) -> str:
-    return LANG_INSTRUCTION.get(lang, LANG_INSTRUCTION[DEFAULT_LANG])
-
-
-def _clean_json(text: str) -> str:
-    return text.replace("```json", "").replace("```", "").strip()
-
-
-def _student_messages(username: str, limit: int = 40) -> list[dict]:
-    return (
-        get_client()
-        .table("messages")
-        .select("role, content, date")
-        .eq("username", username)
-        .order("id", desc=False)
-        .limit(limit)
-        .execute()
-        .data
+@router.post('/generate-from-url')
+async def generate_from_url_endpoint(
+    req: UrlGenerationRequest,
+    user: dict = Depends(get_current_user)
+):
+    """Gera um módulo completo a partir de uma URL externa."""
+    from services.url_to_module import url_to_module_service
+    result = await url_to_module_service.generate_from_url(
+        req.url, 
+        user['username'], 
+        req.level
     )
-
-
-def _get_student(username: str) -> dict | None:
-    rows = (
-        get_client()
-        .table("users")
-        .select("name, level, focus, created_at")
-        .eq("username", username)
-        .limit(1)
-        .execute()
-        .data
-    )
-    return rows[0] if rows else None
-
-
-def _extract_grammar_errors(data: dict) -> list[dict]:
-    errors = data.get("errors")
-    if not isinstance(errors, list):
-        return []
-    result = []
-    for item in errors:
-        if not isinstance(item, dict):
-            continue
-        try:
-            count = max(0, int(item.get("count", 0)))
-        except (TypeError, ValueError):
-            count = 0
-        example = item.get("example")
-        result.append(GrammarError(
-            category=str(item.get("category", "Unknown")).strip() or "Unknown",
-            count=count,
-            example=str(example).strip() if isinstance(example, str) else None,
-        ).model_dump())
+    if not result.get('ok'):
+        raise HTTPException(status_code=400, detail=result.get('error'))
     return result
 
 
-def _feedback_based_errors(messages: list[dict]) -> list[dict]:
-    """Extrai erros diretamente do feedback da Tati nas mensagens assistant."""
-    feedback_line = re.compile(
-        r"^\s*-\s*['\"]?(?P<wrong>[^'\"]+?)['\"]?\s*[→>-]+\s*should be\s*['\"]?(?P<right>[^'\"]+?)['\"]?"
-        r"(?:\s*\((?P<reason>.+)\))?\s*$",
-        flags=re.IGNORECASE,
+@router.get('/stats')
+async def get_stats(service: DashboardService = Depends()) -> dict:
+    """Estatísticas rápidas do dashboard."""
+    return await service.get_quick_stats()
+
+
+@router.get('/stats/my')
+async def get_my_stats(
+    user: dict = Depends(get_current_user), service: DashboardService = Depends()
+) -> dict:
+    """Estatísticas do aluno logado (usado no perfil e achievements)."""
+    return await service.get_user_stats(user['username'])
+
+
+@router.get('/reports/overview')
+async def get_reports_overview(service: DashboardService = Depends()) -> dict:
+    """Visão geral de relatórios com dados reais do banco."""
+    return await service.get_reports_overview()
+
+
+# ── Alunos ─────────────────────────────────────────────────────────────────────
+
+
+@router.get('/students')
+async def get_students(service: DashboardService = Depends()) -> list:
+    """Lista todos os alunos com metadados completos."""
+    return await service.get_students_list()
+
+
+@router.put('/students/{username}')
+async def update_student(
+    username: str,
+    body: StudentUpdate,
+    service: DashboardService = Depends(),
+) -> dict:
+    """Atualiza nível e/ou prompt customizado de um aluno."""
+    return await service.update_student(
+        username,
+        level=body.level,
+        custom_prompt=body.custom_prompt,
     )
-    counts: dict[str, dict] = {}
-    for msg in messages:
-        if msg.get("role") != "assistant" or "feedback" not in (msg.get("content") or "").lower():
-            continue
-        for line in msg["content"].splitlines():
-            match = feedback_line.match(line.strip())
-            if not match:
-                continue
-            wrong = (match.group("wrong") or "").strip()
-            right = (match.group("right") or "").strip()
-            reason = (match.group("reason") or "").strip()
-            category = reason.split(":")[0].strip() if reason else "Corrected by teacher feedback"
-            example = f"{wrong} → {right}" if wrong and right else None
-            if category not in counts:
-                counts[category] = {"category": category, "count": 0, "example": example}
-            counts[category]["count"] += 1
-    return [GrammarError(**v).model_dump() for v in counts.values()]
 
 
-async def _call_groq_safe(messages: list[dict], max_tokens: int = 1500, temperature: float = 0.4) -> str:
-    from core.config import settings
-    if not settings.groq_keys:
-        raise HTTPException(status_code=503, detail="Nenhuma GROQ_API_KEY configurada no .env")
+@router.delete('/students/{username}', status_code=200)
+async def delete_student(username: str) -> dict:
+    """Remove um aluno do sistema."""
+    from services.database import get_client
+
+    get_client().table('users').delete().eq('username', username).execute()
+    return {'ok': True}
+
+
+# ── Análises por aluno ─────────────────────────────────────────────────────────
+
+
+@router.get('/students/{username}/insight')
+async def get_insight(
+    username: str,
+    lang: str = 'en-US',
+    service: DashboardService = Depends(),
+) -> dict:
+    """Gera insight pedagógico sobre um aluno via IA (English only)."""
+    from services.database import get_client
+
+    db = get_client()
+    rows = (
+        db.table('messages')
+        .select('content')
+        .eq('username', username)
+        .eq('role', 'user')
+        .order('created_at', desc=True)
+        .limit(20)
+        .execute()
+        .data
+        or []
+    )
+    context = ' | '.join(r.get('content', '') for r in rows)[:1500]
+    prompt = (
+        f'Generate a short pedagogical report (strictly in English) for student "{username}" '
+        f'based on their recent messages. Be specific. Messages: {context}'
+    )
     try:
-        return await groq_chat(messages, max_tokens=max_tokens, temperature=temperature)
-    except GroqKeyError as exc:
-        err = str(exc).lower()
-        if "invalid_api_key" in err or "401" in err:
-            raise HTTPException(status_code=401, detail="Chave(s) GROQ inválida(s)")
-        if "rate" in err or "429" in err:
-            raise HTTPException(status_code=429, detail="Cota esgotada. Aguarde e tente novamente.")
+        insight = await groq_chat([{'role': 'user', 'content': prompt}])
+        return {'insight': insight}
+    except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
+@router.get('/students/{username}/grammar-errors')
+async def get_grammar_errors(
+    username: str,
+    lang: str = 'en-US',
+    service: DashboardService = Depends(),
+) -> dict:
+    """Analisa erros gramaticais recorrentes de um aluno."""
+    return await service.get_grammar_errors(username, lang)
 
 
-@router.get("/stats")
-async def get_stats(current_user: dict = Depends(require_staff)):
-    from datetime import date
+@router.get('/students/{username}/recommendations')
+async def get_recommendations(
+    username: str,
+    lang: str = 'en-US',
+    service: DashboardService = Depends(),
+) -> dict:
+    """Retorna interesses e recomendações pedagógicas para um aluno."""
+    return await service.get_recommendations(username, lang)
+
+
+# ── Simulações, Flashcards, Submissões ─────────────────────────────────────────
+
+
+@router.get('/simulations')
+async def list_simulations(service: DashboardService = Depends()) -> list:
+    """Lista todas as simulações registradas."""
+    return await service.get_all_simulations()
+
+
+@router.get('/simulations/{simulation_id}')
+async def get_simulation(simulation_id: str):
+    """Detalhes de uma simulação."""
+    from services.database import get_client
+
     db = get_client()
-    today = date.today().isoformat()
-    students = db.table("users").select("username").eq("role", "student").execute()
-    messages = db.table("messages").select("id").eq("role", "user").execute()
-    active_today = db.table("messages").select("username").eq("role", "user").gte("created_at", today).execute()
-    return {
-        "total_students": len(students.data),
-        "total_messages": len(messages.data),
-        "active_today": len({m["username"] for m in active_today.data}),
-    }
+    res = db.table('simulations').select('*').eq('id', simulation_id).limit(1).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail='Simulação não encontrada')
+    return res.data[0]
 
 
-@router.get("/students")
-async def get_students(current_user: dict = Depends(require_staff)):
+@router.post('/simulations')
+async def create_simulation(data: dict, service: DashboardService = Depends()):
+    """Cria uma nova simulação (manual ou via IA se is_ai_generated)."""
+    if data.get('is_ai_generated') or data.get('use_ai_generation'):
+        return await service.generate_simulation(
+            data.get('topic') or data.get('name', 'Nova Simulação'), 
+            data.get('level') or data.get('difficulty', 'beginner'), 
+            data.get('instructions', '')
+        )
+    
+    from services.database import get_client
     db = get_client()
-    students = (
-        db.table("users")
-        .select("username, name, level, focus, created_at, custom_prompt, profile")
-        .eq("role", "student")
-        .order("created_at", desc=True)
-        .execute()
-        .data
-    )
-    res = []
-    for s in students:
-        # Extrai avatar do profile JSON (coluna avatar_url não existe direto)
-        avatar = None
-        profile = s.get("profile") or {}
-        if isinstance(profile, dict):
-            avatar = profile.get("avatar_url")
-        
-        # Busca última mensagem com timestamp real
-        last_msg = (
-            db.table("messages")
-            .select("created_at, date")
-            .eq("username", s["username"])
-            .order("created_at", desc=True)
-            .limit(1)
-            .execute()
-            .data
-        )
-        
-        # Usa created_at se disponível, senão date
-        last_active = None
-        if last_msg:
-            last_active = last_msg[0].get("created_at") or last_msg[0].get("date")
-        
-        total_msgs = (
-            db.table("messages")
-            .select("id", count="exact")
-            .eq("username", s["username"])
-            .eq("role", "user")
-            .execute()
-            .count or 0
-        )
-        res.append({
-            **s,
-            "avatar_url": avatar,
-            "total_messages": total_msgs,
-            "last_active": last_active,
-        })
-    return res
+    
+    # Limpeza de dados para evitar erro de coluna inexistente
+    allowed_fields = {'name', 'slug', 'description', 'icon', 'difficulty', 'system_prompt', 'is_active'}
+    filtered_data = {k: v for k, v in data.items() if k in allowed_fields}
+    
+    if 'difficulty' in filtered_data and filtered_data['difficulty']:
+        filtered_data['difficulty'] = filtered_data['difficulty'].lower()
+    
+    # Garantir is_active=True para que o RLS não esconda o registro (Fix 23506)
+    if 'is_active' not in filtered_data:
+        filtered_data['is_active'] = True
+    
+    # Garantir campos obrigatórios
+    if 'system_prompt' not in filtered_data or not filtered_data['system_prompt']:
+        filtered_data['system_prompt'] = f"You are a helpful assistant for the scenario {filtered_data.get('name', 'English Practice')}."
+    
+    if 'difficulty' not in filtered_data:
+        filtered_data['difficulty'] = str(data.get('level') or data.get('difficulty') or 'all').lower()
+
+    return db.table('simulations').insert(filtered_data).execute()
 
 
-@router.put("/students/{username}")
-async def update_student(username: str, body: StudentUpdate, current_user: dict = Depends(require_staff)):
-    update_data = {k: v for k, v in body.model_dump().items() if v is not None}
-    if not update_data:
-        raise HTTPException(status_code=400, detail="Nenhum campo para atualizar")
-    get_client().table("users").update(update_data).eq("username", username).execute()
+@router.put('/simulations/{simulation_id}')
+async def update_simulation(simulation_id: str, data: dict):
+    """Atualiza uma simulação."""
+    from services.database import get_client
+    db = get_client()
+    
+    allowed_fields = {'name', 'slug', 'description', 'icon', 'difficulty', 'system_prompt', 'greeting', 'is_active'}
+    filtered_data = {k: v for k, v in data.items() if k in allowed_fields}
+    
+    if 'difficulty' in filtered_data and filtered_data['difficulty']:
+        filtered_data['difficulty'] = filtered_data['difficulty'].lower()
+        
+    return db.table('simulations').update(filtered_data).eq('id', simulation_id).execute()
+
+
+@router.delete('/simulations/{simulation_id}')
+async def delete_simulation(simulation_id: str):
+    """Exclui uma simulação."""
+    from services.database import get_client
+
+    db = get_client()
+    return db.table('simulations').delete().eq('id', simulation_id).execute()
+
+
+@router.get('/modules')
+async def list_all_modules():
+    """Lista todos os módulos (quizzes e conteúdos), ignorando flashcards."""
+    from services.database import get_client
+    db = get_client()
+    res = db.table('modules').select('*').is_('flashcards', 'null').order('created_at', desc=True).execute()
+    return res.data or []
+
+
+@router.put('/modules/{module_id}')
+async def update_module_admin(module_id: str, data: dict):
+    """Atualiza metadados de um módulo."""
+    from services.database import get_client
+    db = get_client()
+    return db.table('modules').update(data).eq('id', module_id).execute()
+
+
+@router.delete('/modules/{module_id}')
+async def delete_module_admin(module_id: str):
+    """Remove um módulo e seus dependentes."""
+    from services.activity_service import ActivityService
+    service = ActivityService()
+    success = await service.delete_module(module_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Não foi possível excluir o módulo")
     return {"ok": True}
 
 
-@router.delete("/students/{username}", status_code=204)
-async def delete_student(username: str, current_user: dict = Depends(require_staff)):
-    db = get_client()
-    if not db.table("users").select("username").eq("username", username).execute().data:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
-    db.table("messages").delete().eq("username", username).execute()
-    db.table("conversations").delete().eq("username", username).execute()
-    db.table("users").delete().eq("username", username).execute()
-
-
-@router.get("/students/{username}/insight")
-async def get_student_insight(
-    username: str,
-    lang: str = Query(default=DEFAULT_LANG),
-    current_user: dict = Depends(require_staff),
-):
-    student = _get_student(username)
-    if not student:
-        raise HTTPException(status_code=404, detail="Aluno não encontrado")
-
-    messages = _student_messages(username)
-    if not messages:
-        return {"insight": "Este aluno ainda não enviou mensagens."}
-
-    history_text = "\n\n".join(
-        f"{'Student' if m['role'] == 'user' else 'Teacher Tati'}: {m['content']}"
-        for m in messages
-    )
-    prompt = (
-        f"You are an expert English language pedagogy assistant.\n\n"
-        f"LANGUAGE RULE: {_lang_instruction(lang)}\n\n"
-        f"Student: {student.get('name', username)} | Level: {student.get('level')} | "
-        f"Focus: {student.get('focus')} | Since: {student.get('created_at')}\n\n"
-        f"Conversation ({len(messages)} messages):\n---\n{history_text}\n---\n\n"
-        f"Provide a concise pedagogical report covering:\n"
-        f"1. Strong Points\n2. Main Difficulties\n3. Estimated Real Level\n"
-        f"4. 3-5 Actionable Recommendations\n5. Motivation & Engagement\n\n"
-        f"Be specific, cite examples, professional but warm.\nRemember: {_lang_instruction(lang)}"
-    )
-
-    result = await _call_groq_safe([{"role": "user", "content": prompt}], max_tokens=1500, temperature=0.4)
-    return {"insight": result}
-
-
-@router.get("/students/{username}/grammar-errors")
-async def get_grammar_errors(
-    username: str,
-    lang: str = Query(default=DEFAULT_LANG),
-    current_user: dict = Depends(require_staff),
-):
-    student = _get_student(username)
-    if not student:
-        raise HTTPException(status_code=404, detail="Aluno não encontrado")
-
-    messages = _student_messages(username)
-    user_text = "\n\n".join(m["content"] for m in messages if m["role"] == "user")
-
-    prompt = (
-        f"You are an expert English language pedagogy assistant.\n\n"
-        f"LANGUAGE RULE: {_lang_instruction(lang)}\n\n"
-        f"Student: {student.get('name', username)} | Level: {student.get('level')}\n\n"
-        f"Student messages:\n---\n{user_text}\n---\n\n"
-        f"Identify grammar/spelling mistakes. Include even single occurrences (count=1).\n\n"
-        f'Return ONLY valid JSON: {{"errors": [{{"category": "...", "count": N, "example": "..."}}]}}\n'
-        f"No markdown, no extra text."
-    )
-
-    result = await _call_groq_safe([{"role": "user", "content": prompt}], max_tokens=1200, temperature=0.2)
-
+@router.get('/flashcards')
+async def get_dashboard_flashcards() -> list:
+    """Lista flashcards globais ou de admin."""
+    from services.database import get_client
     try:
-        data = json.loads(_clean_json(result))
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=502, detail="Formato inválido retornado pela IA.")
-
-    errors = _extract_grammar_errors(data)
-    if not errors:
-        errors = _feedback_based_errors(messages)
-    return {"errors": errors}
-
-
-@router.get("/students/{username}/recommendations")
-async def get_recommendations(
-    username: str,
-    lang: str = Query(default=DEFAULT_LANG),
-    current_user: dict = Depends(require_staff),
-):
-    student = _get_student(username)
-    if not student:
-        raise HTTPException(status_code=404, detail="Aluno não encontrado")
-
-    messages = _student_messages(username)
-    user_text = "\n\n".join(m["content"] for m in messages if m["role"] == "user")
-
-    prompt = (
-        f"You are an expert English language pedagogy assistant.\n\n"
-        f"LANGUAGE RULE: {_lang_instruction(lang)}\n\n"
-        f"Student: {student.get('name', username)} | Level: {student.get('level')} | Focus: {student.get('focus')}\n\n"
-        f"Student messages:\n---\n{user_text}\n---\n\n"
-        f"Analyze struggles, goals, and interests. Provide 3-5 actionable recommendations.\n\n"
-        f'Return ONLY valid JSON: {{"recommendations": ["..."], "interests": ["..."]}}\n'
-        f"No markdown, no extra text."
-    )
-
-    result = await _call_groq_safe([{"role": "user", "content": prompt}], max_tokens=1200, temperature=0.2)
-
-    try:
-        data = json.loads(_clean_json(result))
-        recommendations = data.get("recommendations", [])
-        interests = data.get("interests", [])
-        if not isinstance(recommendations, list) or not isinstance(interests, list):
-            raise ValueError("Campos inválidos")
-    except (json.JSONDecodeError, ValueError) as exc:
-        raise HTTPException(status_code=502, detail=f"Formato inválido: {exc}")
-
-    return {"recommendations": recommendations, "interests": interests}
-
-
-# backend/routers/dashboard.py
-# substitua o endpoint get_overview_report completo
-
-@router.get("/reports/overview")
-async def get_overview_report(current_user: dict = Depends(require_staff)):
-    from datetime import date, timedelta
-    from collections import defaultdict
-    db = get_client()
-    today = date.today()
-
-    students = db.table("users").select("username, level").eq("role", "student").execute()
-    messages = db.table("messages").select("id").eq("role", "user").execute()
-    active_today_rows = db.table("messages").select("username").eq("role", "user").gte("created_at", today.isoformat()).execute()
-
-    # ── Level distribution ────────────────────────────────────────
-    level_map = {
-        "beginner": "Beginner",
-        "pre-intermediate": "Pre-Intermediate",
-        "pre intermediate": "Pre-Intermediate",
-        "intermediate": "Intermediate",
-        "business english": "Business English",
-        "business": "Business English",
-        "advanced": "Advanced",
-    }
-    counts: Counter = Counter()
-    for s in students.data:
-        normalized = (s.get("level") or "").strip().lower()
-        key = level_map.get(normalized, "Outros")
-        counts[key] += 1
-
-    level_distribution = {k: counts[k] for k in [
-        "Beginner", "Pre-Intermediate", "Intermediate",
-        "Business English", "Advanced", "Outros"
-    ]}
-    # removendo outros do gráfico redondo
-    if counts.get("Outros"):
-        level_distribution["Outros"] = counts["Outros"]
-
-    # ── Weekly activity (últimos 7 dias, Seg→Dom) ─────────────────
-    weekly_counts = defaultdict(int)
-    for i in range(7):
-        day = today - timedelta(days=today.weekday()) + timedelta(days=i)  # Seg=0 → Dom=6
-        weekly_counts[day.isoformat()] = 0
-
-    last_7_start = (today - timedelta(days=today.weekday())).isoformat()  # segunda desta semana
-    weekly_rows = (
-        db.table("messages")
-        .select("date")
-        .eq("role", "user")
-        .gte("date", last_7_start)
-        .lte("date", today.isoformat())
-        .execute()
-    )
-    for row in weekly_rows.data:
-        d = row.get("date")
-        if d in weekly_counts:
-            weekly_counts[d] += 1
-
-    # Ordena Seg→Dom
-    monday = today - timedelta(days=today.weekday())
-    weekly_activity = [
-        weekly_counts.get((monday + timedelta(days=i)).isoformat(), 0)
-        for i in range(7)
-    ]
-
-    # ── Heatmap (últimas 4 semanas, 28 dias, Seg→Dom) ─────────────
-    heatmap_counts = {}
-    start_4w = today - timedelta(days=today.weekday() + 21)  # 4 semanas atrás (segunda)
-    heatmap_rows = (
-        db.table("messages")
-        .select("date")
-        .eq("role", "user")
-        .gte("date", start_4w.isoformat())
-        .lte("date", today.isoformat())
-        .execute()
-    )
-    for row in heatmap_rows.data:
-        d = row.get("date")
-        if d:
-            heatmap_counts[d] = heatmap_counts.get(d, 0) + 1
-
-    max_day = max(heatmap_counts.values(), default=1)
-
-    heatmap = []
-    for week in range(4):
-        monday_w = start_4w + timedelta(weeks=week)
-        for day_offset in range(7):
-            d = (monday_w + timedelta(days=day_offset)).isoformat()
-            raw = heatmap_counts.get(d, 0)
-            # Normaliza para 0-4 (nível do heatmap)
-            level = 0
-            if raw > 0:
-                level = min(4, max(1, round((raw / max_day) * 4)))
-            heatmap.append(level)
-
-    return {
-        "total_students": len(students.data),
-        "total_messages": len(messages.data),
-        "active_today": len({m["username"] for m in active_today_rows.data}),
-        "level_distribution": level_distribution,
-        "weekly_activity": weekly_activity,
-        "heatmap": heatmap,
-    }
-
-
-@router.get("/difficulties")
-async def get_overview_difficulties(current_user: dict = Depends(require_staff)):
-    try:
-        db = get_client()
-        rows = db.table("users").select("username, current_difficulty").eq("role", "student").execute()
-        alerts = [
-            r for r in rows.data
-            if r.get("current_difficulty") and str(r["current_difficulty"]).strip().lower() != "null"
-        ]
-        return {"alerts": alerts[:10]}
-    except Exception as exc:
-        print(f"Erro ao buscar dificuldades: {exc}")
-        return {"alerts": []}
-
-
-# ── Simulation Management ─────────────────────────────────────────────────────
-
-class SimulationCreate(BaseModel):
-    name: str
-    description: str
-    icon: str = "🎭"
-    difficulty: str = "beginner"
-    system_prompt: str = ""
-    use_ai_generation: bool = False
-
-
-@router.get("/simulations")
-async def get_simulations(current_user: dict = Depends(require_staff)):
-    """Lista simulações criadas pelo professor."""
-    db = get_client()
-    try:
-        rows = db.table("simulations").select("*").order("created_at", desc=True).execute()
-        return {"simulations": rows.data or []}
+        # Flashcards são armazenados na tabela modules com o campo flashcards preenchido
+        res = get_client().table('modules').select('*').not_.is_('flashcards', 'null').order('created_at', desc=True).execute()
+        data = res.data or []
+        for d in data:
+            fc = d.get('flashcards')
+            d['card_count'] = len(fc) if isinstance(fc, list) else 0
+        return data
     except Exception:
-        return {"simulations": []}
+        return []
 
 
-@router.post("/simulations")
-async def create_simulation(body: SimulationCreate, current_user: dict = Depends(require_staff)):
-    """Cria nova simulação (manual ou com IA)."""
+@router.post('/flashcards')
+async def create_flashcard_deck(data: dict, service: DashboardService = Depends()):
+    """Cria um novo deck de flashcards."""
+    from services.database import get_client
     db = get_client()
     
-    # Se use_ai_generation, gera o system prompt com IA
-    system_prompt = body.system_prompt
-    if body.use_ai_generation:
-        try:
-            # Busca contexto no RAG baseado no nome da simulação
-            from services.rag_search import obter_contexto_rag
-            rag_context = obter_contexto_rag(f"{body.name} {body.description}").contexto
-            context_str = f"\nUse este material como base para o cenário:\n---\n{rag_context}\n---\n" if rag_context else ""
-
-            import asyncio
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                result = await groq_chat([
-                    {"role": "user", "content": f"""
-Create a roleplay scenario system prompt for an English teacher AI.
-Scenario: {body.name}
-Description: {body.description}
-Difficulty: {body.difficulty}
-{context_str}
-
-CRITICAL: The AI must ALWAYS respond entirely in ENGLISH only. Never respond in Portuguese.
-Create a detailed system prompt that instructs the AI to play a specific role
-in this scenario. Include:
-1. The character the AI should play
-2. How to start the conversation naturally
-3. What to ask/say throughout
-4. How to give gentle corrections
-5. Keep responses natural and concise (2-3 sentences max)
-6. Use relevant vocabulary for this scenario
-7. ALWAYS respond in English only
-"""}
-                ])
-                system_prompt = result if isinstance(result, str) else result.get("content", body.system_prompt)
-            finally:
-                loop.close()
-        except Exception as e:
-            print(f"[Sim AI Gen] Erro: {e}")
-    
-    sim_data = {
-        "name": body.name,
-        "description": body.description,
-        "icon": body.icon,
-        "difficulty": body.difficulty,
-        "system_prompt": system_prompt,
-        "created_by": current_user["username"],
+    payload = {
+        'title': data.get('title'),
+        'description': data.get('description'),
+        'level': str(data.get('level') or 'all').lower(),
+        'flashcards': data.get('flashcards', []),
+        'is_published': True
     }
-    
-    try:
-        db.table("simulations").insert(sim_data).execute()
-        return {"ok": True, "simulation": sim_data}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return db.table('modules').insert(payload).execute()
 
 
-@router.get("/simulations/{sim_id}")
-async def get_simulation(sim_id: str, current_user: dict = Depends(require_staff)):
-    """Retorna detalhes de uma simulação específica."""
-    db = get_client()
-    try:
-        res = db.table("simulations").select("*").eq("id", sim_id).single().execute()
-        if not res.data:
-            raise HTTPException(status_code=404, detail="Simulação não encontrada")
-        return res.data
-    except Exception as e:
-        if isinstance(e, HTTPException): raise e
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.put("/simulations/{sim_id}")
-async def update_simulation(sim_id: str, body: SimulationCreate, current_user: dict = Depends(require_staff)):
-    """Atualiza uma simulação existente."""
+@router.put('/flashcards/{deck_id}')
+async def update_flashcard_deck(deck_id: str, data: dict):
+    """Atualiza um deck de flashcards."""
+    from services.database import get_client
     db = get_client()
     
-    system_prompt = body.system_prompt
-    # Se use_ai_generation estiver ligado, gera o prompt novamente (opcional)
-    if body.use_ai_generation:
-        # (Lógica de geração com IA aqui se desejado, mas geralmente ao editar o professor quer manter o prompt manual)
-        # Se quiser permitir regerar ao editar, pode manter a lógica similar ao POST
-        pass
-
-    sim_data = {
-        "name": body.name,
-        "description": body.description,
-        "icon": body.icon,
-        "difficulty": body.difficulty,
-        "system_prompt": system_prompt,
+    payload = {
+        'title': data.get('title'),
+        'description': data.get('description'),
+        'level': str(data.get('level')).lower() if data.get('level') else None,
+        'flashcards': data.get('flashcards')
     }
+    # Filtra None
+    payload = {k: v for k, v in payload.items() if v is not None}
     
-    try:
-        db.table("simulations").update(sim_data).eq("id", sim_id).execute()
-        return {"ok": True}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return db.table('modules').update(payload).eq('id', deck_id).execute()
 
 
-@router.delete("/simulations/{sim_id}")
-async def delete_simulation(sim_id: str, current_user: dict = Depends(require_staff)):
-    """Remove uma simulação."""
-    db = get_client()
-    try:
-        db.table("simulations").delete().eq("id", sim_id).execute()
-        return {"ok": True}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
+@router.delete('/flashcards/{deck_id}')
+async def delete_flashcard_deck(deck_id: str):
+    """Exclui um deck de flashcards usando o ActivityService para tratar dependências."""
+    from services.activity_service import ActivityService
+    service = ActivityService()
+    success = await service.delete_module(deck_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Não foi possível excluir o baralho (ex: existem progresso de alunos vinculados)")
+    return {"ok": True}
+
+
+@router.get('/submissions/all')
+async def get_all_submissions(service: DashboardService = Depends()) -> list:
+    """Lista todas as submissões usando o ActivityService."""
+    from services.activity_service import ActivityService
+    act_service = ActivityService()
+    return await act_service.get_all_submissions()
+
+
+@router.get('/difficulties')
+async def get_difficulties(service: DashboardService = Depends()) -> dict:
+    """Retorna distribuição de dificuldades/níveis."""
+    return await service.get_difficulties_stats()

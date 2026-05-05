@@ -2,11 +2,13 @@
 Serviço de validação e identificação de documentos (CPF, CNPJ e formatos internacionais).
 Inclui validação algorítmica e detecção de tipo de documento.
 """
+
 import re
 from typing import Optional
 
 
 # ── Helpers de validação ──────────────────────────────────────────────────────
+
 
 def _multiply_and_sum(digits: list[int], weights: list[int]) -> int:
     """Multiplica dígitos pelos pesos e soma os resultados."""
@@ -22,6 +24,7 @@ def _calculate_digit(digits: list[int], weights: list[int]) -> int:
 
 # ── Validação de CPF ──────────────────────────────────────────────────────────
 
+
 def validate_cpf(cpf: str) -> bool:
     """
     Valida CPF brasileiro (xxx.xxx.xxx-xx).
@@ -29,32 +32,33 @@ def validate_cpf(cpf: str) -> bool:
     """
     # Limpa formatação
     cpf = re.sub(r'[^\d]', '', cpf)
-    
+
     # Verificações básicas
     if len(cpf) != 11:
         return False
-    
+
     # Rejeita CPFs com todos os dígitos iguais (ex: 111.111.111-11)
     if cpf == cpf[0] * 11:
         return False
-    
+
     # Verifica primeiro dígito verificador
     digits = [int(d) for d in cpf[:9]]
     weights1 = list(range(10, 1, -1))  # [10, 9, 8, 7, 6, 5, 4, 3, 2]
     digit1 = _calculate_digit(digits, weights1)
-    
+
     if int(cpf[9]) != digit1:
         return False
-    
+
     # Verifica segundo dígito verificador
     digits.append(digit1)
     weights2 = list(range(11, 1, -1))  # [11, 10, 9, 8, 7, 6, 5, 4, 3, 2]
     digit2 = _calculate_digit(digits, weights2)
-    
+
     return int(cpf[10]) == digit2
 
 
 # ── Validação de CNPJ ─────────────────────────────────────────────────────────
+
 
 def validate_cnpj(cnpj: str) -> bool:
     """
@@ -63,32 +67,33 @@ def validate_cnpj(cnpj: str) -> bool:
     """
     # Limpa formatação
     cnpj = re.sub(r'[^\d]', '', cnpj)
-    
+
     # Verificações básicas
     if len(cnpj) != 14:
         return False
-    
+
     # Rejeita CNPJs com todos os dígitos iguais
     if cnpj == cnpj[0] * 14:
         return False
-    
+
     # Separa dígitos base e verifica primeiro dígito verificador
     digits = [int(d) for d in cnpj[:12]]
     weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
     digit1 = _calculate_digit(digits, weights1)
-    
+
     if int(cnpj[12]) != digit1:
         return False
-    
+
     # Verifica segundo dígito verificador
     digits.append(digit1)
     weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
     digit2 = _calculate_digit(digits, weights2)
-    
+
     return int(cnpj[13]) == digit2
 
 
 # ── Identificação do tipo de documento ────────────────────────────────────────
+
 
 def identify_document(doc: str) -> Optional[str]:
     """
@@ -96,16 +101,17 @@ def identify_document(doc: str) -> Optional[str]:
     Retorna: 'cpf', 'cnpj', ou None se não identificar.
     """
     doc = re.sub(r'[^\d]', '', doc)
-    
+
     if len(doc) == 11:
         return 'cpf' if validate_cpf(doc) else None
     elif len(doc) == 14:
         return 'cnpj' if validate_cnpj(doc) else None
-    
+
     return None
 
 
 # ── Validação de documentos internacionais ────────────────────────────────────
+
 
 def validate_us_ssn(ssn: str) -> bool:
     """
@@ -113,23 +119,23 @@ def validate_us_ssn(ssn: str) -> bool:
     Validação básica de formato (não verifica se existe no SSA).
     """
     ssn = re.sub(r'[^\d]', '', ssn)
-    
+
     if len(ssn) != 9:
         return False
-    
+
     # Verificações básicas da SSA
     area = int(ssn[:3])
     group = int(ssn[3:5])
     serial = int(ssn[5:])
-    
+
     # Área não pode ser 000, 666, ou 900-999
     if area == 0 or area == 666 or area >= 900:
         return False
-    
+
     # Grupo e serial não podem ser 00 ou 0000
     if group == 0 or serial == 0:
         return False
-    
+
     return True
 
 
@@ -139,20 +145,20 @@ def validate_uk_nino(nino: str) -> bool:
     Formato: AA 12 34 56 A
     """
     nino = re.sub(r'[\s]', '', nino).upper()
-    
+
     # Padrão regex para NINO
     pattern = r'^[A-CEGHJ-PR-TW-Z][A-CEGHJ-NPR-TW-Z]\d{6}[A-D]$'
-    
+
     # Prefixos inválidos
     invalid_prefixes = ['BG', 'GB', 'NK', 'KN', 'TN', 'NT', 'ZZ']
     prefix = nino[:2]
-    
+
     if not re.match(pattern, nino):
         return False
-    
+
     if prefix in invalid_prefixes:
         return False
-    
+
     return True
 
 
@@ -162,10 +168,10 @@ def validate_canadian_sin(sin: str) -> bool:
     Usa algoritmo Luhn modificado específico do Canadá.
     """
     sin = re.sub(r'[^\d]', '', sin)
-    
+
     if len(sin) != 9:
         return False
-    
+
     # Algoritmo específico do SIN canadense
     # Posições: 1 2 3 4 5 6 7 8 9
     # Multiplicar posições pares (2,4,6,8) por 2
@@ -177,14 +183,14 @@ def validate_canadian_sin(sin: str) -> bool:
             if digit > 9:
                 digit = digit - 9  # Soma dos dígitos (ex: 14 → 1+4=5)
         total += digit
-    
+
     return total % 10 == 0
 
 
 def validate_international_document(doc: str, country_code: str = 'BR') -> dict:
     """
     Valida documento de identificação baseado no código do país.
-    
+
     Retorna dict com:
     - valid: bool
     - type: str (cpf, cnpj, ssn, nino, sin, etc.)
@@ -192,7 +198,7 @@ def validate_international_document(doc: str, country_code: str = 'BR') -> dict:
     - message: str (mensagem de erro ou sucesso)
     """
     doc = doc.strip()
-    
+
     validators = {
         'BR': [
             ('cpf', validate_cpf, format_cpf),
@@ -208,9 +214,9 @@ def validate_international_document(doc: str, country_code: str = 'BR') -> dict:
             ('sin', validate_canadian_sin, format_ca_sin),
         ],
     }
-    
+
     country_validators = validators.get(country_code.upper(), validators['BR'])
-    
+
     for doc_type, validate_func, format_func in country_validators:
         if validate_func(doc):
             return {
@@ -219,7 +225,7 @@ def validate_international_document(doc: str, country_code: str = 'BR') -> dict:
                 'formatted': format_func(doc),
                 'message': f'{doc_type.upper()} válido',
             }
-    
+
     return {
         'valid': False,
         'type': None,
@@ -229,6 +235,7 @@ def validate_international_document(doc: str, country_code: str = 'BR') -> dict:
 
 
 # ── Funções de formatação ─────────────────────────────────────────────────────
+
 
 def format_cpf(cpf: str) -> str:
     """Formata CPF: xxx.xxx.xxx-xx"""
@@ -264,13 +271,14 @@ def format_ca_sin(sin: str) -> str:
 
 # ── Validação unificada (auto-detect) ─────────────────────────────────────────
 
+
 def validate_document_auto(doc: str) -> dict:
     """
     Tenta validar o documento automaticamente, detectando o tipo.
     Ordem de verificação: CPF → CNPJ → SSN → NINO → SIN
     """
     doc_clean = re.sub(r'[^\d]', '', doc)
-    
+
     # Tenta CPF brasileiro
     if len(doc_clean) == 11 and validate_cpf(doc_clean):
         return {
@@ -280,7 +288,7 @@ def validate_document_auto(doc: str) -> dict:
             'formatted': format_cpf(doc_clean),
             'message': 'CPF válido',
         }
-    
+
     # Tenta CNPJ brasileiro
     if len(doc_clean) == 14 and validate_cnpj(doc_clean):
         return {
@@ -290,7 +298,7 @@ def validate_document_auto(doc: str) -> dict:
             'formatted': format_cnpj(doc_clean),
             'message': 'CNPJ válido',
         }
-    
+
     # Tenta SSN americano
     if len(doc_clean) == 9 and validate_us_ssn(doc_clean):
         return {
@@ -300,7 +308,7 @@ def validate_document_auto(doc: str) -> dict:
             'formatted': format_us_ssn(doc_clean),
             'message': 'SSN válido',
         }
-    
+
     # Tenta Canadian SIN
     if len(doc_clean) == 9 and validate_canadian_sin(doc_clean):
         return {
@@ -310,7 +318,7 @@ def validate_document_auto(doc: str) -> dict:
             'formatted': format_ca_sin(doc_clean),
             'message': 'SIN válido',
         }
-    
+
     # Tenta UK NINO (pode ter letras)
     if validate_uk_nino(doc.strip()):
         return {
@@ -320,7 +328,7 @@ def validate_document_auto(doc: str) -> dict:
             'formatted': doc.strip().upper(),
             'message': 'NINO válido',
         }
-    
+
     return {
         'valid': False,
         'type': None,

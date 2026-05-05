@@ -1,0 +1,38 @@
+'use client';
+
+import { ThemeProvider } from './theme-provider';
+import { AuthProvider } from './auth-provider';
+import { QueryProvider } from './query-provider';
+import { I18nProvider } from './i18n-provider';
+import { Toaster } from 'react-hot-toast';
+import { RegisterServiceWorker } from '@/components/pwa/register-sw';
+
+export function AppProviders({ children }: { children: React.ReactNode }) {
+  return (
+    <ThemeProvider>
+      <QueryProvider>
+        <AuthProvider>
+          <I18nProvider>
+            {children}
+          </I18nProvider>
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              style: {
+                background: 'var(--surface)',
+                color: 'var(--text)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                fontFamily: 'var(--font-body)',
+                fontSize: '0.875rem',
+              },
+              success: { iconTheme: { primary: 'hsl(152 68% 42%)', secondary: 'white' } },
+              error: { iconTheme: { primary: 'hsl(355 78% 60%)', secondary: 'white' } },
+            }}
+          />
+          <RegisterServiceWorker />
+        </AuthProvider>
+      </QueryProvider>
+    </ThemeProvider>
+  );
+}

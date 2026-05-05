@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_CHROMA_PATH = os.path.join(_BASE_DIR, "data", "chroma_db")
+_CHROMA_PATH = os.path.join(_BASE_DIR, 'data', 'chroma_db')
 
 # Lazy initialization — carrega apenas na primeira chamada real
 _embeddings = None
@@ -19,11 +19,14 @@ def _get_vectorstore():
     if _vectorstore is None:
         from langchain_chroma import Chroma
         from langchain_huggingface import HuggingFaceEndpointEmbeddings
+
         _embeddings = HuggingFaceEndpointEmbeddings(
-            model="sentence-transformers/all-MiniLM-L6-v2",
-            huggingfacehub_api_token=os.getenv("HUGGING_FACE_KEY", "")
+            model='sentence-transformers/all-MiniLM-L6-v2',
+            huggingfacehub_api_token=os.getenv('HUGGING_FACE_KEY', ''),
         )
-        _vectorstore = Chroma(persist_directory=_CHROMA_PATH, embedding_function=_embeddings)
+        _vectorstore = Chroma(
+            persist_directory=_CHROMA_PATH, embedding_function=_embeddings
+        )
     return _vectorstore
 
 
@@ -37,24 +40,24 @@ def obter_contexto_rag(pergunta: str) -> RAGResult:
     """Busca no ChromaDB e retorna contexto + fontes formatados."""
     try:
         vs = _get_vectorstore()
-        docs = vs.as_retriever(search_kwargs={"k": 3}).invoke(pergunta)
+        docs = vs.as_retriever(search_kwargs={'k': 3}).invoke(pergunta)
         if not docs:
             return RAGResult(
-                contexto="Nenhum trecho encontrado na biblioteca para esta pergunta.",
-                fontes="",
+                contexto='Nenhum trecho encontrado na biblioteca para esta pergunta.',
+                fontes='',
             )
 
-        contexto = "\n".join(
-            f"\n--- Trecho {i + 1} ---\n{doc.page_content}"
+        contexto = '\n'.join(
+            f'\n--- Trecho {i + 1} ---\n{doc.page_content}'
             for i, doc in enumerate(docs)
         )
         fontes_set = {
-            f"📄 {doc.metadata.get('title', doc.metadata.get('source', 'Desconhecido'))} "
-            f"(Pág: {doc.metadata.get('page', 'N/A')})"
+            f'📄 {doc.metadata.get("title", doc.metadata.get("source", "Desconhecido"))} '
+            f'(Pág: {doc.metadata.get("page", "N/A")})'
             for doc in docs
         }
-        return RAGResult(contexto=contexto, fontes="\n".join(fontes_set))
+        return RAGResult(contexto=contexto, fontes='\n'.join(fontes_set))
 
     except Exception as exc:
-        print(f"⚠️ Erro silencioso no RAG: {exc}")
-        return RAGResult(contexto="", fontes="")
+        print(f'⚠️ Erro silencioso no RAG: {exc}')
+        return RAGResult(contexto='', fontes='')
