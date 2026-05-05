@@ -44,6 +44,7 @@ interface ChatFilePayload {
   content: string;
   conversation_id?: string | null;
   caption?: string;
+  origin?: 'chat';
 }
 
 type OutgoingPayload = ChatTextPayload | ChatAudioPayload | ChatFilePayload | { type: 'ping' };

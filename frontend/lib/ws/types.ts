@@ -10,6 +10,7 @@ export type WsMessageType =
   | 'drill_result'
   | 'free_warning'
   | 'new_title'
+  | 'pdf_generated'
   | 'error';
 
 export type WsOrigin = 'chat' | 'voice';
@@ -21,6 +22,8 @@ export interface WsIncomingMessage {
   text?: string; // for transcription
   title?: string;
   audio?: string; // base64
+  pdf_b64?: string; // base64
+  filename?: string;
   result?: unknown;
   message?: string;
 }
