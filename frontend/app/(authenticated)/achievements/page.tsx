@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { 
-  Trophy, 
-  Flame, 
-  Target, 
-  Clock, 
-  Coins, 
-  Star, 
+import {
+  Trophy,
+  Flame,
+  Target,
+  Clock,
+  Coins,
+  Star,
   Users,
   Medal,
   ChevronRight,
@@ -42,7 +42,7 @@ interface Medal {
 }
 
 export default function AchievementsPage() {
-  
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [filter, setFilter] = useState('all');
 
@@ -65,10 +65,21 @@ export default function AchievementsPage() {
     { id: 'streak', icon: <Flame size={16} />, label: 'Streak' },
     { id: 'credits', icon: <Coins size={16} />, label: 'Credits' },
     { id: 'time', icon: <Clock size={16} />, label: 'Time' },
-    { id: 'milestones', icon: <Star size={16} />, label: 'Marcos' },
+    { id: 'milestones', icon: <Star size={16} />, label: 'Milestones' },
   ];
 
-  const filteredMedals = (medals || []).filter((m) => filter === 'all' || m.category === filter);
+  const categoryMap: Record<string, string[]> = {
+    questions: ['question', 'questions', 'quiz', 'quizzes'],
+    streak: ['streak'],
+    credits: ['credit', 'credits', 'xp', 'score'],
+    time: ['time', 'study_time', 'hours'],
+    milestones: ['milestone', 'milestones', 'goal', 'goals'],
+  };
+  const filteredMedals = (medals || []).filter((m) => {
+    if (filter === 'all') return true;
+    const cat = String(m.category || '').toLowerCase();
+    return (categoryMap[filter] || []).some((token) => cat.includes(token));
+  });
 
   const trophyCount = stats?.trophies_earned || 0;
   const trophyProgress = (trophyCount / 50) * 100;
@@ -104,52 +115,52 @@ export default function AchievementsPage() {
               <div className="flex-1 text-center md:text-left">
                 <div className="text-5xl font-black text-text leading-none mb-1">{streak?.current_streak || 0}</div>
                 <p className="text-xs font-bold text-text-subtle uppercase tracking-widest">{'days streak'}</p>
-                
+
                 <div className="grid grid-cols-2 gap-4 mt-6">
-                   <div>
-                      <p className="text-[0.6rem] font-bold text-text-muted uppercase">{'Longest streak'}</p>
-                      <p className="text-sm font-bold text-text">{streak?.longest_streak || 0} days</p>
-                   </div>
-                   <div>
-                      <p className="text-[0.6rem] font-bold text-text-muted uppercase">Total XP</p>
-                      <p className="text-sm font-bold text-text">{stats?.total_xp || 0}</p>
-                   </div>
+                  <div>
+                    <p className="text-[0.6rem] font-bold text-text-muted uppercase">{'Longest streak'}</p>
+                    <p className="text-sm font-bold text-text">{streak?.longest_streak || 0} days</p>
+                  </div>
+                  <div>
+                    <p className="text-[0.6rem] font-bold text-text-muted uppercase">Total XP</p>
+                    <p className="text-sm font-bold text-text">{stats?.total_xp || 0}</p>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Trophy Progress Card */}
             <div className="bg-surface border border-border rounded-3xl p-6 space-y-6 group hover:border-primary/30 transition-all">
-               <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold uppercase tracking-widest text-text-subtle">Trophy Progress</h3>
-                  <div className="flex items-baseline gap-1">
-                     <span className="text-2xl font-black text-primary">{trophyCount}</span>
-                     <span className="text-xs font-bold text-text-muted">/50</span>
-                  </div>
-               </div>
-               
-               <div className="space-y-2">
-                  <div className="w-full h-3 bg-bg border border-border rounded-full overflow-hidden p-0.5">
-                     <div className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-1000" style={{width: `${trophyProgress}%`}} />
-                  </div>
-                  <div className="flex justify-between text-[0.6rem] font-black text-text-subtle uppercase tracking-tighter">
-                     <span className="text-orange-400">Bronze</span>
-                     <span className="text-slate-400">Silver</span>
-                     <span className="text-yellow-400">Gold</span>
-                     <span className="text-indigo-400">Platinum</span>
-                  </div>
-               </div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-text-subtle">Trophy Progress</h3>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-black text-primary">{trophyCount}</span>
+                  <span className="text-xs font-bold text-text-muted">/50</span>
+                </div>
+              </div>
 
-               <div className="flex gap-2">
-                  {[1,2,3,4].map(i => (
-                    <div key={i} className={cn(
-                      "flex-1 h-8 rounded-lg flex items-center justify-center border border-border transition-all",
-                      trophyCount >= i * 12 ? "bg-primary/10 border-primary/30 text-primary" : "bg-bg-secondary opacity-30 grayscale"
-                    )}>
-                      <Medal size={16} />
-                    </div>
-                  ))}
-               </div>
+              <div className="space-y-2">
+                <div className="w-full h-3 bg-bg border border-border rounded-full overflow-hidden p-0.5">
+                  <div className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-1000" style={{ width: `${trophyProgress}%` }} />
+                </div>
+                <div className="flex justify-between text-[0.6rem] font-black text-text-subtle uppercase tracking-tighter">
+                  <span className="text-orange-400">Bronze</span>
+                  <span className="text-slate-400">Silver</span>
+                  <span className="text-yellow-400">Gold</span>
+                  <span className="text-indigo-400">Platinum</span>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className={cn(
+                    "flex-1 h-8 rounded-lg flex items-center justify-center border border-border transition-all",
+                    trophyCount >= i * 12 ? "bg-primary/10 border-primary/30 text-primary" : "bg-bg-secondary opacity-30 grayscale"
+                  )}>
+                    <Medal size={16} />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -162,8 +173,8 @@ export default function AchievementsPage() {
                   onClick={() => setFilter(c.id)}
                   className={cn(
                     "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border",
-                    filter === c.id 
-                      ? "bg-primary text-white border-primary shadow-glow" 
+                    filter === c.id
+                      ? "bg-primary text-white border-primary shadow-glow"
                       : "bg-surface border-border text-text-muted hover:border-primary/40 hover:text-text"
                   )}
                 >

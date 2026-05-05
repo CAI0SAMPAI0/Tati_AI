@@ -23,7 +23,7 @@ class SimulationService:
     async def get_scenario_details(self, scenario_id: str) -> Optional[Dict[str, Any]]:
         return await run_in_threadpool(get_scenario, scenario_id)
 
-    async def start_session(self, username: str, scenario_id: str) -> Dict[str, Any]:
+    async def start_session(self, username: str, scenario_id: str, user_level: str = 'Beginner') -> Dict[str, Any]:
         """Inicializa uma nova sessão de simulação e retorna o ID da conversa com a primeira mensagem da IA."""
         import uuid
         conv_id = f"sim_{uuid.uuid4().hex[:8]}"
@@ -56,6 +56,13 @@ class SimulationService:
         )
         if 'TATI' not in system_prompt.upper() and 'TATIANA' not in system_prompt.upper():
             system_prompt = f"{tati_instruction}\n{system_prompt}"
+            
+        level_rule = (
+            f"STUDENT LEVEL: {user_level}. "
+            "Adapt your vocabulary and sentence length to this level. "
+            "If Beginner or Pre-Intermediate, use short simple sentences and slower pacing."
+        )
+        system_prompt = f"{system_prompt}\n\n{level_rule}"
 
         if 'ENGLISH ONLY' not in system_prompt.upper():
             system_prompt += '\n\nCRITICAL: Respond ENTIRELY in English.'
@@ -104,6 +111,7 @@ class SimulationService:
         content: str,
         scenario_id: str,
         conversation_id: Optional[str] = None,
+        user_level: str = 'Beginner',
     ) -> Dict[str, Any]:
         conv_id = conversation_id or f'sim_{username}_{scenario_id}'
 
@@ -138,6 +146,13 @@ class SimulationService:
         )
         if 'TATI' not in system_prompt.upper() and 'TATIANA' not in system_prompt.upper():
             system_prompt = f"{tati_instruction}\n{system_prompt}"
+            
+        level_rule = (
+            f"STUDENT LEVEL: {user_level}. "
+            "Adapt your vocabulary and sentence length to this level. "
+            "If Beginner or Pre-Intermediate, keep language simple."
+        )
+        system_prompt = f"{system_prompt}\n\n{level_rule}"
 
         if 'ENGLISH ONLY' not in system_prompt.upper():
             system_prompt += '\n\nCRITICAL: Respond ENTIRELY in English.'

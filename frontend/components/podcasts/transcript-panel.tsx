@@ -17,17 +17,10 @@ interface TranscriptPanelProps {
 }
 
 export function TranscriptPanel({ segments, onPhraseClick }: TranscriptPanelProps) {
-  
+
   const [mode, setMode] = useState<'source' | 'translated'>('source');
 
-  if (!segments || segments.length === 0) {
-    return (
-      <div className="p-8 text-center bg-surface border border-border rounded-2xl">
-        <FileText className="mx-auto mb-3 text-text-subtle opacity-20" size={40} />
-        <p className="text-sm text-text-muted">{'No transcript available for this content.'}</p>
-      </div>
-    );
-  }
+  if (!segments || segments.length === 0) return null;
 
   return (
     <div className="bg-surface border border-border rounded-2xl overflow-hidden flex flex-col h-full shadow-sm">
@@ -36,7 +29,7 @@ export function TranscriptPanel({ segments, onPhraseClick }: TranscriptPanelProp
           <FileText size={18} className="text-primary" />
           {'Guided transcript'}
         </h3>
-        
+
         <div className="flex bg-bg border border-border rounded-lg p-0.5">
           <button
             onClick={() => setMode('source')}
@@ -61,8 +54,8 @@ export function TranscriptPanel({ segments, onPhraseClick }: TranscriptPanelProp
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[500px] scrollbar-thin">
         {segments.map((segment, idx) => (
-          <div 
-            key={idx} 
+          <div
+            key={idx}
             className={cn(
               "flex gap-4 group transition-all duration-200 p-2 rounded-xl border border-transparent",
               onPhraseClick && "cursor-pointer hover:bg-primary/5 hover:border-primary/10 active:scale-[0.98]"

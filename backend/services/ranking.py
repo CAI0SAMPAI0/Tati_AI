@@ -14,10 +14,11 @@ ACTION_POINTS = {
 }
 
 
-def _empty_stats(username: str, user_map: dict) -> dict:
+def _empty_stats(username: str, user_map: dict, level_map: dict) -> dict:
     return {
         'username': username,
         'name': user_map.get(username) or username,
+        'level': (level_map or {}.get(username)) or 'Beginner',
         'avatar_url': None,
         'score': 0,
         'messages': 0,
@@ -69,7 +70,7 @@ def get_ranking_data(username: str) -> dict:
             if not u or u in staff_usernames:
                 continue
             if u not in stats:
-                stats[u] = _empty_stats(u, {})
+                stats[u] = _empty_stats(u, {}, {})
 
             atype = a.get('activity_type')
             if atype in ACTION_POINTS:
@@ -86,12 +87,12 @@ def get_ranking_data(username: str) -> dict:
             stats[u]['score'] += ACTION_POINTS['message']
             stats[u]['messages'] += 1
 
-        # Tenta buscar nomes reais para todos no stats
+        # Tenta buscar nomes e níveis reais para todos no stats
         if stats:
             usernames = list(stats.keys())
             users = (
                 db.table('users')
-                .select('username, name')
+                .select('username, name, level, avatar_url, profile')
                 .in_('username', usernames)
                 .execute()
                 .data
@@ -101,7 +102,8 @@ def get_ranking_data(username: str) -> dict:
                 uname = u_info.get('username')
                 if uname in stats:
                     stats[uname]['name'] = u_info.get('name') or uname
-
+                    stats[uname]['level'] = u_info.get('level') or 'Beginner'
+                    stats[uname]['avatar_url'] = u_info.get('avatar_url') or (u_info.get('profile') or {}).get('avatar_url')
         ranking = sorted(stats.values(), key=lambda x: x['score'], reverse=True)
 
         return {
@@ -123,12 +125,18 @@ def get_ranking_by_level(username: str) -> dict:
     start_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     try:
-        # 1. Busca todos os usuários e seus níveis (excluindo admins conhecidos)
-        excluded_admins = {'programador', 'professor', 'admin', 'tatiana', 'caio'}
-        all_users = db.table('users').select('username, name, level').execute().data or []
-        
-        # Filtra a lista de usuários logo no início
-        all_users = [u for u in all_users if u['username'].lower() not in excluded_admins]
+        from core.config import settings
+        # 1. Busca todos os usuários e seus níveis (excluindo staff por role real)
+        try:
+            all_users = db.table('users').select('username, name, level, avatar_url, profile').execute().data or []
+        except Exception:
+            all_users = db.table('users').select('username, name, level, profile').execute().data or []
+        staff_usernames = set(settings.staff_roles)
+        access = db.table('student_access').select('username, role').execute().data or []
+        for a in access:
+            if a.get('role') in ('professor', 'professora', 'programador', 'admin'):
+                staff_usernames.add(a.get('username'))
+        all_users = [u for u in all_users if (u.get('username') and u.get('username') not in staff_usernames)]
         
         user_level_map = {u['username']: u.get('level', 'Beginner') for u in all_users}
         user_name_map = {u['username']: u.get('name') or u['username'] for u in all_users}
@@ -140,9 +148,11 @@ def get_ranking_by_level(username: str) -> dict:
         stats = {}
         for u_name in user_level_map.keys():
             # Passa o mapa de nomes para a função auxiliar
-            stats[u_name] = _empty_stats(u_name, user_name_map)
+            stats[u_name] = _empty_stats(u_name, user_name_map, user_level_map)
             stats[u_name]['level'] = user_level_map[u_name]
-
+            user_row = next((u for u in all_users if u.get('username') == u_name), None)
+            if user_row:
+                stats[u_name]['avatar_url'] = user_row.get('avatar_url') or (user_row.get('profile') or {}).get('avatar_url')
         for a in actions:
             u = a.get('username')
             if u in stats:

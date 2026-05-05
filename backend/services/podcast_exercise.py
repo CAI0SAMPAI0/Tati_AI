@@ -35,21 +35,31 @@ class PodcastExerciseService:
         if not transcript_context.strip():
             transcript_context = f"Topic/Description: {podcast.get('description', '')}"
             print(f"[exercise] WARNING: sem transcrição, usando description como fallback")
+            
+        level = str(podcast.get('level') or 'Beginner')
+        level_lower = level.lower()
+        is_beginner = any(token in level_lower for token in ['a1', 'a2', 'beginner', 'pre-intermediate'])
+        difficulty_rule = (
+            "Use short, simple English (CEFR A1-A2). Prefer common words, short sentences and direct questions."
+            if is_beginner
+            else "Use clear English aligned to the student's level. Avoid unnecessary complexity."
+        )
+        
 
         system_prompt = (
             f"You are Teacher TATI, a professional English teacher. Your goal is to create engaging and specific exercises for the podcast '{podcast.get('title')}'.\n\n"
+            f'STUDENT LEVEL: {level}\n'
             f"CONTENT FOR EXERCISES:\n{transcript_context}\n\n"
             "INSTRUCTIONS:\n"
-            "1. Generate between 3 and 5 exercises. Mix types randomly.\n"
-            "2. 'writing': Create a deep, specific question about the content that requires an answer only someone who understood the video would know.\n"
-            "3. 'choice': Create a multiple-choice question with 4 plausible options. 'correct_index' must be 0-3.\n"
-            "4. 'voice': Select a short, meaningful sentence VERBATIM from the transcript. This is for the student to practice speaking.\n\n"
+            "1. Generate between 4 and 8 exercises. Mix types randomly.\n"
+            "2. ALL exercises MUST be type 'voice'.\n"
+            "3. Each exercise must ask the student to listen and answer by speaking in English.\n"
+            "4. Each 'phrase' must be short, clear and directly based on the transcript content.\n\n"
+            f"5. LANGUAGE: return all questions, options and hints in English only. {difficulty_rule}\n\n"
             "RESPONSE FORMAT (STRICT JSON ONLY):\n"
             "{\n"
             '  "exercises": [\n'
-            '    {"type": "writing", "question": "...", "translation_hint": "Translate/Hint in Portuguese..."},\n'
-            '    {"type": "choice", "question": "...", "options": ["A","B","C","D"], "correct_index": 0, "translation_hint": "..."},\n'
-            '    {"type": "voice", "phrase": "exact sentence from transcript", "translation_hint": "..."}\n'
+           '    {"type": "voice", "question": "Listen and answer with your voice: ...", "phrase": "expected spoken sentence", "translation_hint": "..."}\n'
             '  ]\n'
             "}\n"
             "CRITICAL: Do not include any text outside the JSON. Be specific to the content provided."
@@ -178,18 +188,7 @@ class PodcastExerciseService:
                             'tts_text': phrase,
                         }
                     )
-            elif ex_type == 'writing':
-                question = str(ex.get('question', '')).strip()
-                if question:
-                    normalized.append(
-                        {
-                            'type': 'writing',
-                            'question': question,
-                            'translation_hint': str(
-                                ex.get('translation_hint', '')
-                            ).strip(),
-                        }
-                    )
+                continue
 
         if terms:
             normalized = [ex for ex in normalized if self._is_relevant(ex, terms)]
@@ -197,7 +196,7 @@ class PodcastExerciseService:
         if len(normalized) < 3:
             return self.get_fallback_exercises(title, ui_lang)
 
-        return {'exercises': normalized[:5]}
+        return {'exercises': normalized[:8]}
 
     def _is_relevant(self, ex: Dict[str, Any], terms: Set[str]) -> bool:
         text = ' '.join(
@@ -211,28 +210,26 @@ class PodcastExerciseService:
         return bool(ex_terms.intersection(terms))
 
     def get_fallback_exercises(self, title: str, ui_lang: str) -> Dict[str, Any]:
-        writing_q = self._pick_lang(
-            f"Com base no vídeo '{title}', qual foi o ponto mais interessante?",
-            f"Based on '{title}', what was the most interesting point?",
-            ui_lang,
-        )
         return {
             'exercises': [
                 {
-                    'type': 'writing',
-                    'question': writing_q,
-                    'translation_hint': 'Detail...',
-                },
-                {
-                    'type': 'choice',
-                    'question': 'What is it about?',
-                    'options': ['A', 'B', 'C', 'D'],
-                    'correct_index': 0,
+                    'type': 'voice',
+                    'question': f"Listen and answer with your voice: What is the main idea of '{title}'?",
+                    'phrase': 'The main idea is to improve English communication skills.',
+                    'translation_hint': 'Speak in one short sentence.',
                 },
                 {
                     'type': 'voice',
+                    'question': 'Listen and answer with your voice: What new word or phrase did you hear?',
+                    'phrase': 'I heard a useful phrase about daily conversation.',
+                    'translation_hint': 'Use simple words.',
+                },
+                {
+                    'type': 'voice',
+                    'question': 'Listen and answer with your voice: What did you learn from this video?',
                     'phrase': 'I learned something new today.',
                     'translation_hint': 'Learned...',
+                    'translation_hint': 'Say it slowly and clearly.',
                 },
             ]
         }

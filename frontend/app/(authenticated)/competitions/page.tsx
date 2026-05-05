@@ -167,7 +167,7 @@ export default function CompetitionsPage() {
                                   </div>
                                   <div className="min-w-0">
                                      <p className="text-sm font-bold text-text truncate max-w-[150px] md:max-w-xs">{r.name || r.username} {r.username === user?.username && <span className="text-[0.6rem] ml-2 text-primary font-black uppercase tracking-tighter">(You)</span>}</p>
-                                     <p className="text-[0.65rem] text-text-muted uppercase font-bold tracking-wider">{r.level || 'Beginner'}</p>
+                                     <p className="text-[0.65rem] text-text-muted uppercase font-bold tracking-wider">{r.level || '-'}</p>
                                   </div>
                                </div>
                             </td>

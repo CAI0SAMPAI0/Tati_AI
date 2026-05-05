@@ -50,7 +50,12 @@ async def discover_personalized_podcasts(user_id: str, username: str, user_level
     if not keys:
         return
 
-    search_query = f'REAL English educational YouTube videos (5 to 15 minutes) for students about {recent_text[:60]} level {user_level}'
+    search_query = (
+        'REAL English educational YouTube videos in English, with teachers/native speakers, '
+        'between 5 and 25 minutes (never long/full course), including channels like '
+        '"English in Brazil by Carina Fragozo" and "Julia Contessoto", '
+        f'for students about {recent_text[:60]} level {user_level}'
+    )
     search_context = ''
     success_tavily = False
 
@@ -82,8 +87,9 @@ async def discover_personalized_podcasts(user_id: str, username: str, user_level
     # 3. GROQ ANALISA E FORMATA
     prompt = (
         f'You are a pedagogical curator. Analyze this search context: {search_context}\n\n'
-        f'Based on student interests and English level {user_level}, pick the 3 best REAL AND ACTIVE YouTube videos.\n'
-        'Return ONLY a JSON list of objects: [{"id": "slug", "title": "...", "embed_url": "..."}].'
+        f'Based on student interests and English level {user_level}, pick the 6 best REAL AND ACTIVE YouTube videos.\n'
+        'STRICT RULES: videos must be in English, from teachers/educational channels, and between 5 and 25 minutes; avoid full courses and multi-hour videos.\n'
+        'Return ONLY a JSON list of objects: [{"id": "slug", "title": "...", "embed_url": "...", "duration": "MM:SS or HH:MM:SS"}].'
     )
 
     try:
@@ -115,7 +121,12 @@ async def discover_personalized_podcasts(user_id: str, username: str, user_level
             video_data_list.append((p, video_id))
 
         verifications = await asyncio.gather(*tasks_verify)
-
+        
+        existing_podcasts = await run_in_threadpool(
+            lambda: db.table('podcasts').select('id').eq('user_id', username).execute().data or []
+        )
+        existing_ids = {str(r.get('id')) for r in existing_podcasts if r.get('id')}
+        created_titles: list[str] = []
         valid_count = 0
         for i, is_ok in enumerate(verifications):
             if not is_ok:
@@ -133,6 +144,8 @@ async def discover_personalized_podcasts(user_id: str, username: str, user_level
             # Upsert em threadpool
             await run_in_threadpool(lambda: db.table('podcasts').upsert(p).execute())
             valid_count += 1
+            if str(p['id']) not in existing_ids:
+                created_titles.append(p.get('title') or 'New podcast')
 
         # Dispara notificação de nova atividade (async/fire-and-forget logic)
         try:
@@ -147,12 +160,12 @@ async def discover_personalized_podcasts(user_id: str, username: str, user_level
                 .execute()
                 .data
             )
-            if user_row:
+            if user_row and created_titles:
                 notify_new_activity(
                     username=username,
                     student_name=user_row.get('name') or username,
                     student_email=user_row.get('email'),
-                    activity_title=f"New podcast: {p['title']}",
+                    activity_title=f"New podcast: {created_titles[0] if created_titles else 'New podcast'}",
                     activity_url='https://tati-ai.vercel.app/activities.html?tab=podcasts',
                 )
         except Exception as e:

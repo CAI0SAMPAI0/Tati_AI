@@ -207,6 +207,34 @@ def _calculate_rankings(db, start_date, end_date=None):
             }
         user_scores[u]['score'] += 8
         user_scores[u]['messages'] += 1
-
+        
+    if user_scores:
+        usernames = list(user_scores.keys())
+        try:
+            users_info = (
+                db.table('users')
+                .select('username, name, level, avatar_url, profile')
+                .in_('username', usernames)
+                .execute()
+                .data
+                or []
+            )
+        except Exception:
+            # Compatibilidade com bancos que ainda não têm coluna top-level avatar_url
+            users_info = (
+                db.table('users')
+                .select('username, name, level, profile')
+                .in_('username', usernames)
+                .execute()
+                .data
+                or []
+            )
+        for row in users_info:
+            uname = row.get('username')
+            if uname in user_scores:
+                user_scores[uname]['name'] = row.get('name') or uname
+                user_scores[uname]['level'] = row.get('level') or 'Beginner'
+                user_scores[uname]['avatar_url'] = row.get('avatar_url') or (row.get('profile') or {}).get('avatar_url')
+                
     rankings = sorted(user_scores.values(), key=lambda x: (-x['score'], -x['messages']))
     return rankings

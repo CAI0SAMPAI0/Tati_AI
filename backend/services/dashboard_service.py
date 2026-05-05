@@ -69,7 +69,7 @@ class DashboardService:
                 self.db.table('users')
                 .select(
                     'username, name, email, level, focus, profile, '
-                    'created_at, role, streak_data'
+                    'created_at, role, streak_data', 'avatar_url'
                 )
                 .order('created_at', desc=True)
                 .limit(200)
@@ -113,6 +113,7 @@ class DashboardService:
                 uname = user.get('username', '')
                 user['total_messages'] = msg_count.get(uname, 0)
                 user['last_active'] = last_active.get(uname)
+                user['avatar_url'] = user.get('avatar_url', '')
 
             return users
 

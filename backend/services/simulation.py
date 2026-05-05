@@ -1,11 +1,51 @@
-"""
-Serviço de Simulação de Conversas Reais.
-Agora totalmente integrado ao Banco de Dados (Supabase).
-"""
-
 from typing import Optional
 from services.database import get_client
 from core.level_utils import matches_level
+
+DEFAULT_SIMULATIONS = [
+    {
+        'id': 'sim-default-1',
+        'name': 'Coffee Shop Order',
+        'description': 'Order a drink and snack politely.',
+        'difficulty': 'Beginner',
+        'system_prompt': 'You are Tati, a barista. Roleplay a coffee shop. Keep it practical and friendly.',
+    },
+    {
+        'id': 'sim-default-2',
+        'name': 'Hotel Check-in',
+        'description': 'Check in, ask about breakfast and Wi‑Fi.',
+        'difficulty': 'Pre-Intermediate',
+        'system_prompt': 'You are Tati at a hotel front desk. Ask simple check-in questions and answer naturally.',
+    },
+    {
+        'id': 'sim-default-3',
+        'name': 'Job Interview Basics',
+        'description': 'Practice common interview questions.',
+        'difficulty': 'Intermediate',
+        'system_prompt': 'You are Tati, an interviewer. Ask one interview question at a time and give short follow-ups.',
+    },
+    {
+        'id': 'sim-default-4',
+        'name': 'Airport Immigration',
+        'description': 'Answer travel and document questions.',
+        'difficulty': 'Intermediate',
+        'system_prompt': 'You are Tati, an immigration officer. Ask clear travel questions and react realistically.',
+    },
+    {
+        'id': 'sim-default-5',
+        'name': 'Client Meeting',
+        'description': 'Discuss project status and priorities.',
+        'difficulty': 'Advanced',
+        'system_prompt': 'You are Tati in a professional meeting. Encourage clear explanations and negotiation language.',
+    },
+    {
+        'id': 'sim-default-6',
+        'name': 'Debate a News Topic',
+        'description': 'Discuss opinions with arguments and examples.',
+        'difficulty': 'Advanced',
+        'system_prompt': 'You are Tati moderating a discussion. Ask for opinions, reasons, examples and counterpoints.',
+    },
+]
 
 
 def get_all_scenarios(level: Optional[str] = None) -> list[dict]:
@@ -17,7 +57,8 @@ def get_all_scenarios(level: Optional[str] = None) -> list[dict]:
         data = res.data or []
         
         # Filtra usando a lógica unificada
-        filtered = [s for s in data if matches_level(level, s.get('difficulty'))]
+        merged = data if data else DEFAULT_SIMULATIONS
+        filtered = [s for s in merged if matches_level(level, s.get('difficulty'))]
         return filtered
     except Exception as e:
         print(f'[Simulation Service] Erro ao buscar cenários: {e}')
@@ -34,7 +75,7 @@ def get_scenario(scenario_id: str) -> Optional[dict]:
         return res.data
     except Exception as e:
         print(f'[Simulation Service] Erro ao buscar cenário {scenario_id}: {e}')
-        return None
+        return next((s for s in DEFAULT_SIMULATIONS if s['id'] == scenario_id), None)
 
 
 def get_scenario_prompt(scenario_id: str) -> Optional[str]:

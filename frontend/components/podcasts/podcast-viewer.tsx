@@ -1,27 +1,35 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import { TranscriptPanel } from './transcript-panel';
 import { PronunciationPractice } from './pronunciation-practice';
 import { Button } from '@/components/ui/button';
-import { 
-  ArrowUpRight, 
-  CirclePlay, 
+import {
+  ArrowUpRight,
+  CirclePlay,
   Waves,
   Sparkles,
   Info
 } from 'lucide-react';
 import { type Podcast } from '@/lib/api/types/podcast';
 import { cn } from '@/lib/utils';
+import { apiGet } from '@/lib/api/client';
 
 interface PodcastViewerProps {
   podcast: Podcast;
 }
 
 export function PodcastViewer({ podcast }: PodcastViewerProps) {
-  
+
   const [practicePhrase, setPracticePhrase] = useState<string | null>(null);
+  const [exerciseIndex, setExerciseIndex] = useState(0);
+  const { data: generated } = useQuery<{ exercises: Array<Record<string, any>> }>({
+    queryKey: ['podcast-exercises', podcast.id],
+    queryFn: () => apiGet(`/activities/podcasts/${podcast.id}/exercises`),
+    staleTime: 1000 * 60 * 30,
+  });
 
   const safeEmbedUrl = useMemo(() => {
     if (!podcast.embed_url) return '';
@@ -46,10 +54,16 @@ export function PodcastViewer({ podcast }: PodcastViewerProps) {
     return 'bg-bg-secondary text-text-muted border-border';
   }, [podcast.level]);
 
+  const exercises = generated?.exercises || [];
+  const currentExercise = exercises[exerciseIndex];
+  useEffect(() => {
+    if (exerciseIndex > 0 && exerciseIndex >= exercises.length) setExerciseIndex(0);
+  }, [exerciseIndex, exercises.length, podcast.id]);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
       {/* Player Section */}
-      <div className="md:col-span-2 space-y-6">
+      <div className="min-[1100px]:col-span-2 space-y-6">
         <div className="relative aspect-video bg-black rounded-3xl overflow-hidden shadow-2xl group border border-border">
           {safeEmbedUrl ? (
             <iframe
@@ -65,8 +79,8 @@ export function PodcastViewer({ podcast }: PodcastViewerProps) {
               <Info size={48} className="text-text-subtle opacity-20 mb-4" />
               <p className="text-text-muted mb-4">{'Unable to load the embedded player for this content.'}</p>
               {podcast.external_url && (
-                <Button 
-                  variant="secondary" 
+                <Button
+                  variant="secondary"
                   onClick={() => podcast.external_url && window.open(podcast.external_url, '_blank')}
                   className="gap-2"
                 >
@@ -114,11 +128,11 @@ export function PodcastViewer({ podcast }: PodcastViewerProps) {
               </div>
             </div>
           )}
-          
+
           <div className="pt-2">
-            <Button 
-              variant="secondary" 
-              size="sm" 
+            <Button
+              variant="secondary"
+              size="sm"
               className="gap-2 text-xs"
               onClick={() => podcast.external_url && window.open(podcast.external_url, '_blank')}
             >
@@ -130,27 +144,69 @@ export function PodcastViewer({ podcast }: PodcastViewerProps) {
       </div>
 
       {/* Transcript Section */}
-      <div className="md:col-span-1 h-fit md:sticky md:top-24 space-y-6">
-        <TranscriptPanel 
-          segments={podcast.transcript_segments} 
+      <div className="min-[1100px]:col-span-1 h-fit min-[1100px]:sticky min-[1100px]:top-24 space-y-6">
+        <TranscriptPanel
+          segments={podcast.transcript_segments}
           onPhraseClick={(text) => setPracticePhrase(text)}
         />
-        
+
         {practicePhrase ? (
-          <PronunciationPractice 
-            phrase={practicePhrase} 
-            podcastId={podcast.id} 
-            onClose={() => setPracticePhrase(null)} 
+          <PronunciationPractice
+            phrase={practicePhrase}
+            podcastId={podcast.id}
+            onClose={() => setPracticePhrase(null)}
           />
         ) : (
-          <div className="p-6 bg-surface border border-border rounded-2xl space-y-4">
+          <div className="p-7 bg-surface border border-border rounded-2xl space-y-5 min-h-[360px]">
             <h4 className="text-sm font-bold text-text flex items-center gap-2">
               <Sparkles size={16} className="text-primary" />
               {'Podcast Practice'}
             </h4>
-            <p className="text-xs text-text-muted">
-              {'Watch or listen to the content above and answer Teacher Tati questions.'}
-            </p>
+            {exercises.length ? (
+              <div className="space-y-4">
+                <div className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest">
+                  Exercise {exerciseIndex + 1} of {exercises.length}
+                </div>
+                <div className="rounded-xl border border-border bg-bg-secondary/40 p-4 min-h-[170px]">
+                  {currentExercise?.type === 'voice' ? (
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold text-primary uppercase tracking-wider">Pronunciation</p>
+                      <p className="text-sm font-semibold text-text">{String(currentExercise?.question || 'Listen and answer with your voice.')}</p>
+                      <p className="text-sm text-text">{String(currentExercise?.phrase || '')}</p>
+                      <button className="text-xs font-bold text-primary underline" onClick={() => setPracticePhrase(String(currentExercise?.phrase || ''))}>
+                        Practice this sentence
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-text">{String(currentExercise?.question || '')}</p>
+                      {currentExercise?.translation_hint && <p className="text-xs text-text-muted">{String(currentExercise.translation_hint)}</p>}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setExerciseIndex((i) => Math.max(0, i - 1))}
+                    disabled={exerciseIndex === 0}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => setExerciseIndex((i) => Math.min(exercises.length - 1, i + 1))}
+                    disabled={exerciseIndex >= exercises.length - 1}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-text-muted">
+                {'Watch or listen to the content above and answer Teacher Tati questions.'}
+              </p>
+            )}
           </div>
         )}
       </div>

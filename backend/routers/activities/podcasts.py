@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import re
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
@@ -141,6 +142,31 @@ def _extract_youtube_watch_url(item: Dict[str, Any]) -> Optional[str]:
         return f'https://www.youtube.com/watch?v={video_id}'
     return None
 
+def _format_seconds_to_mmss(total_seconds: int) -> str:
+    """Formata segundos para MM:SS."""
+    if total_seconds <= 0:
+        return '--:--'
+    h = total_seconds // 3600
+    m = (total_seconds % 3600) // 60
+    s = total_seconds % 60
+    return f'{h:02d}:{m:02d}:{s:02d}' if h > 0 else f'{m:02d}:{s:02d}'
+
+
+async def _fetch_youtube_duration_seconds(item: Dict[str, Any]) -> int:
+    import httpx
+    watch_url = _extract_youtube_watch_url(item)
+    if not watch_url:
+        return 0
+    try:
+        async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
+            resp = await client.get(watch_url)
+        if resp.status_code != 200:
+            return 0
+        match = re.search(r'"lengthSeconds":"(\d+)"', resp.text)
+        return int(match.group(1)) if match else 0
+    except Exception:
+        return 0
+
 
 def _sanitize_podcast_entry(raw_entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     embed_url = str(raw_entry.get('embed_url', '')).strip()
@@ -209,15 +235,18 @@ async def get_podcast_recommendations(
             return 0
         return 0
 
-    # Beginner / Pre-Intermediate: máx 15 minutos
-    # Intermediate / Advanced: máx 20 minutos
-    is_high_level = user_level in ['B1', 'B2', 'C1', 'C2', 'Intermediate', 'Advanced']
-    MAX_DURATION_SECONDS = (20 * 60) if is_high_level else (15 * 60)
+    # Para todos os níveis: entre 5 e 25 minutos
+    MIN_DURATION_SECONDS = 5 * 60
+    MAX_DURATION_SECONDS = 25 * 60
+    banned_tokens = ['full course', '6 hour', '8 hour', '10 hour', 'live stream', 'livestream']
     
     filtered_duration = []
     for item in visible_catalog:
+        title_desc = f"{item.get('title', '')} {item.get('description', '')}".lower()
+        if any(token in title_desc for token in banned_tokens):
+            continue
         dur = _duration_to_seconds(str(item.get("duration", "")))
-        if dur > MAX_DURATION_SECONDS:
+        if dur < MIN_DURATION_SECONDS or dur > MAX_DURATION_SECONDS:
             continue
         filtered_duration.append(item)
     
@@ -238,7 +267,17 @@ async def get_podcast_details(podcast_id: str):
     rows = db.table('podcasts').select('*').eq('id', podcast_id).limit(1).execute().data
     if not rows:
         raise HTTPException(status_code=404, detail='Podcast not found')
-    return rows[0]
+    item = rows[0]
+    exact_seconds = await _fetch_youtube_duration_seconds(item)
+    if exact_seconds > 0:
+        exact_duration = _format_seconds_to_mmss(exact_seconds)
+        if str(item.get('duration') or '') != exact_duration:
+            item['duration'] = exact_duration
+            try:
+                db.table('podcasts').update({'duration': exact_duration}).eq('id', podcast_id).execute()
+            except Exception:
+                pass
+    return item
 
 
 @router.get('/{podcast_id}/exercises')
