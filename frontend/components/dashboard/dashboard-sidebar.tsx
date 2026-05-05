@@ -1,16 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { 
-  PieChart, 
-  Users, 
-  LineChart, 
-  BookOpen, 
-  Layers, 
-  FileSignature, 
-  Drama, 
-  MessageSquare, 
-  Settings, 
+import {
+  PieChart,
+  Users,
+  LineChart,
+  BookOpen,
+  Layers,
+  FileSignature,
+  Drama,
+  MessageSquare,
+  Settings,
   X
 } from 'lucide-react';
 
@@ -63,8 +63,17 @@ export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose 
       >
         <div className="p-6 shrink-0 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold">
-              T
+            <div className="w-7 h-7 rounded-lg overflow-hidden bg-primary/20 flex items-center justify-center text-primary">
+              <img
+                src="/images/tati_logo.jpg"
+                alt="Tati"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                  (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                }}
+              />
+              <span className="hidden text-xs font-bold">T</span>
             </div>
             <div>
               <div className="font-display text-[0.9rem] font-bold tracking-tight text-text">Teacher Tati</div>

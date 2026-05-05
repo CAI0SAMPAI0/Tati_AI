@@ -33,7 +33,7 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
   });
 
   return (
-    <header className="h-16 flex items-center justify-between px-4 border-b border-border bg-bg sticky top-0 z-50">
+    <header className="h-16 flex items-center justify-between px-1 border-b border-border bg-bg sticky top-0 z-50">
       <div className="flex items-center gap-3">
         {onToggleMenu && (
           <button
@@ -43,7 +43,7 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
             <Menu size={20} />
           </button>
         )}
-        <Link href="/chat" className="font-display text-lg font-bold tracking-tight">
+        <Link href="/chat" className="font-display text-lg font-bold tracking-tight pl-2">
           Teacher <span className="text-primary">Tati</span>
         </Link>
       </div>
