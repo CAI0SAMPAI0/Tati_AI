@@ -1,5 +1,3 @@
-import { progress } from "framer-motion";
-
 export const enUS = {
   nav: {
     chat: 'Chat',

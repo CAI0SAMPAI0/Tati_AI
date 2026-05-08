@@ -76,6 +76,6 @@ export function DialogModal({ isOpen, onClose, title, children, size = 'md' }: M
 }
 
 // Helper local para cn (já que não queremos importar de fora para um componente UI simples se possível)
-function cn(...classes: any[]) {
+function cn(...classes: (string | boolean | undefined | null)[]) {
   return classes.filter(Boolean).join(' ');
 }

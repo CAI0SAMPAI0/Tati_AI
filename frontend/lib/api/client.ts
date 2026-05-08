@@ -239,7 +239,7 @@ export async function apiGetCached<T = unknown>(path: string): Promise<T> {
   return apiGet<T>(path);
 }
 
-export function invalidateCache(_path: string): void {
+export function invalidateCache(): void {
   // Mantido para compatibilidade com código legado durante migração para TanStack Query.
 }
 

@@ -76,7 +76,7 @@ export class ChatSocket {
     try {
       // Mantém compatibilidade com legado enviando token como subprotocolo.
       this.ws = new WebSocket(`${WS_BASE}/chat/ws`, ['access_token', token]);
-    } catch (errorEvent) {
+    } catch {
       this.scheduleReconnect();
       return;
     }
