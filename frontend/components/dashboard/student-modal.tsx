@@ -289,7 +289,7 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                     disabled={isAnalyzingInterests}
                   >
                     {isAnalyzingInterests ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                    {isAnalyzingInterests ? '⏳ Analyzing...' : 'Analyze Interests'}
+                    {isAnalyzingInterests ? 'Analyzing...' : 'Analyze Interests'}
                   </Button>
                </div>
 
