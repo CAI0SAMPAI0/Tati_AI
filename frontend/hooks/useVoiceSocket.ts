@@ -101,7 +101,7 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
               id: `user-${Date.now()}`,
               conversation_id: currentId || '',
               role: 'user',
-              content: msg.text,
+              content: msg.text || '',
               created_at: new Date().toISOString(),
             };
             return [...filtered, newUserMsg];
