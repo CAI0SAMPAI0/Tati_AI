@@ -216,9 +216,20 @@ async def chat_ws(
                 continue
 
             print(f'[WS] Processando: {msg.get("type")}')
-            pending_drill_target = await service.process_chat_message(
-                websocket, msg, username, pending_drill_target, simulation_id=simulation_id
-            )
+            try:
+                pending_drill_target = await service.process_chat_message(
+                    websocket, msg, username, pending_drill_target, simulation_id=simulation_id
+                )
+            except Exception as e:
+                print(f'[WS] Erro ao processar mensagem: {e}')
+                import traceback
+                traceback.print_exc()
+                try:
+                    await websocket.send_json({
+                        'type': 'error',
+                        'message': 'Desculpe, tive um problema de conexão. Por favor, tente novamente.'
+                    })
+                except: pass
             print(f'[WS] Processamento finalizado')
 
     except WebSocketDisconnect:

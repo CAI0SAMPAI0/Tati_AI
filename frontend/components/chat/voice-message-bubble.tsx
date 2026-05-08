@@ -1,27 +1,38 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Message } from '@/lib/api/types';
+import { ClickableText } from './clickable-text';
 
 interface VoiceMessageBubbleProps {
   message: Message;
+  onWordClick?: (word: string, x: number, y: number) => void;
 }
 
-export function VoiceMessageBubble({ message }: VoiceMessageBubbleProps) {
+export function VoiceMessageBubble({ message, onWordClick }: VoiceMessageBubbleProps) {
   const isUser = message.role === 'user';
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Sincroniza o áudio se ele mudar (durante o stream ou após carregar)
+  useEffect(() => {
+    if (message.audio_b64) {
+      const newSrc = `data:audio/mp3;base64,${message.audio_b64}`;
+      if (!audioRef.current) {
+        audioRef.current = new Audio(newSrc);
+        audioRef.current.onplay = () => setIsPlaying(true);
+        audioRef.current.onpause = () => setIsPlaying(false);
+        audioRef.current.onended = () => setIsPlaying(false);
+      } else if (audioRef.current.src !== newSrc) {
+        audioRef.current.src = newSrc;
+      }
+    }
+  }, [message.audio_b64]);
   
   const toggleAudio = () => {
     if (!message.audio_b64) return;
-
-    if (isPlaying && audioRef.current) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-      return;
-    }
 
     if (!audioRef.current) {
       audioRef.current = new Audio(`data:audio/mp3;base64,${message.audio_b64}`);
@@ -29,8 +40,16 @@ export function VoiceMessageBubble({ message }: VoiceMessageBubbleProps) {
       audioRef.current.onpause = () => setIsPlaying(false);
       audioRef.current.onended = () => setIsPlaying(false);
     }
-    
-    audioRef.current.play().catch(console.error);
+
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      // Se já terminou, volta pro início para poder repetir
+      if (audioRef.current.ended || audioRef.current.currentTime > 0) {
+        audioRef.current.currentTime = 0;
+      }
+      audioRef.current.play().catch(console.error);
+    }
   };
   
   return (
@@ -40,7 +59,7 @@ export function VoiceMessageBubble({ message }: VoiceMessageBubbleProps) {
     )}>
       <div className="flex items-center gap-2 px-2">
         <span className="text-[0.55rem] font-black text-text-subtle uppercase tracking-[0.2em]">
-          {isUser ? 'Você' : 'Teacher Tati'}
+          {isUser ? 'You' : 'Teacher Tati'}
         </span>
       </div>
       <div className="flex items-end gap-2">
@@ -50,13 +69,22 @@ export function VoiceMessageBubble({ message }: VoiceMessageBubbleProps) {
             ? "bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-xl border-primary/20 text-text rounded-tr-md hover:border-primary/40"
             : "bg-surface/90 dark:bg-[#151726]/80 backdrop-blur-2xl border-border/60 dark:border-white/10 text-text rounded-tl-md hover:border-primary/30 shadow-primary/5",
         )}>
-          {message.content}
+          {isUser ? (
+             message.content
+          ) : (
+            <ClickableText 
+              content={message.content} 
+              onWordClick={onWordClick || (() => {})} 
+            />
+          )}
         </div>
-        {!isUser && message.audio_b64 && (
+        {!isUser && (
           <button 
             onClick={toggleAudio}
+            disabled={!message.audio_b64}
             className={cn(
               "p-2.5 rounded-full transition-all duration-300 shadow-lg active:scale-90 shrink-0",
+              !message.audio_b64 && "opacity-30 cursor-not-allowed grayscale",
               isPlaying 
                 ? "bg-primary text-white scale-110" 
                 : "bg-surface dark:bg-white/5 text-text-subtle hover:text-primary hover:scale-110 border border-border/40"

@@ -126,25 +126,42 @@ async def rename_conversation(
     return result.data[0] if result.data else None
 
 
+import asyncio
+from fastapi.concurrency import run_in_threadpool
+
+async def _execute_db(func, retries=3):
+    """Helper para executar chamadas de banco com retry."""
+    for attempt in range(retries):
+        try:
+            return await run_in_threadpool(func)
+        except Exception as e:
+            err_str = str(e).lower()
+            if ('disconnected' in err_str or 'connection' in err_str or 'protocol' in err_str) and attempt < retries - 1:
+                print(f'[History DB] Connection issue, retrying ({attempt+1}/{retries})...')
+                await asyncio.sleep(0.5 * (attempt + 1))
+                continue
+            raise e
+
 # ─── Messages ─────────────────────────────────────────────────────────────────
 
 
 async def load_history(conversation_id: str) -> list[dict]:
     """Carrega mensagens no formato esperado pela LLM: role + content."""
-    try:
+    def _fetch():
         db = get_client()
-        # O nome da coluna link no seu banco é session_id (tipo text)
-        result = (
+        return (
             db.table('messages')
-            .select('role, content, audio_b64, created_at')
+            .select('id, role, content, audio_b64, created_at')
             .eq('session_id', conversation_id)
             .order('created_at', desc=True)
             .limit(100) # Reduce history limit to prevent TPM errors and prevent message loss
             .execute()
         )
-        
+    
+    try:
+        result = await _execute_db(_fetch)
         messages = result.data or []
-        # messages.reverse() # chronological order
+        messages.reverse() # chronological order
         
         history = []
         for msg in messages:
@@ -165,38 +182,35 @@ async def save_message(
     if not conversation_id:
         print(f'WARNING [save_message]: Skipping save as conversation_id is null for user {username}')
         return {}
-        
-    try:
+
+    def _save():
         db = get_client()
         now = datetime.now(timezone.utc)
-        content = content.replace('\x00', '').replace('\u0000', '')
+        clean_content = content.replace('\x00', '').replace('\u0000', '')
         msg = {
             'session_id': conversation_id,
             'username': username,
             'role': role,
-            'content': content,
+            'content': clean_content,
             'date': now.strftime('%Y-%m-%d'),
         }
 
-        # Salva áudio se fornecido
         if audio_b64:
             msg['audio_b64'] = audio_b64
 
-        result = db.table('messages').insert(msg).execute()
+        res = db.table('messages').insert(msg).execute()
 
         # Atualiza updated_at da conversa
         db.table('conversations').update({'updated_at': _now()}).eq(
             'id', conversation_id
         ).execute()
 
-        return result.data[0] if result.data else {}
+        return res.data[0] if res.data else {}
+        
+    try:
+        return await _execute_db(_save)
     except Exception as e:
         print(f'ERROR [save_message]: {e}')
-        # Se falhar por FK com 'sessions', avisamos o log
-        if 'sessions' in str(e).lower():
-            print(
-                "CRITICAL: A tabela 'messages' tem uma FK para 'sessions' mas estamos tentando linkar com 'conversations'."
-            )
         raise e
 
 

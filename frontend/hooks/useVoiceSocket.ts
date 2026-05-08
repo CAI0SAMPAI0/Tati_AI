@@ -62,12 +62,15 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
       convIdRef.current = conversationId;
       apiGet<Message[]>(ENDPOINTS.CONVERSATION_MESSAGES(conversationId))
         .then(history => {
-          setMessages(history);
-          // Se a última mensagem for da IA e tiver áudio, toca ela (saudação inicial de simulação)
-          const lastMsg = history[history.length - 1];
-          if (lastMsg && lastMsg.role === 'assistant' && lastMsg.audio_b64) {
-            setLastAudio(lastMsg.audio_b64);
-            setState('speaking');
+          // Só atualiza se houver histórico real para não sobrescrever a mensagem inicial das simulações
+          if (history && history.length > 0) {
+            setMessages(history);
+            // Se a última mensagem for da IA e tiver áudio, toca ela (saudação inicial de simulação)
+            const lastMsg = history[history.length - 1];
+            if (lastMsg && lastMsg.role === 'assistant' && lastMsg.audio_b64) {
+              setLastAudio(lastMsg.audio_b64);
+              setState('speaking');
+            }
           }
         })
         .catch(err => console.error('Error fetching voice history:', err));
@@ -85,14 +88,24 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
         if (msg.text) {
           setState('processing');
           setTranscription(msg.text);
-          const newUserMsg: Message = {
-            id: `user-${Date.now()}`,
-            conversation_id: currentId || '',
-            role: 'user',
-            content: msg.text,
-            created_at: new Date().toISOString(),
-          };
-          setMessages((prev) => [...prev, newUserMsg]);
+          setMessages((prev) => {
+            // Remove apenas as mensagens que EXPLICITAMENTE começam com o prefixo temporário
+            // Mensagens sem ID ou com IDs normais são mantidas
+            const filtered = prev.filter(m => {
+              if (m.id && typeof m.id === 'string' && m.id.startsWith('voice-temp-')) {
+                return false;
+              }
+              return true;
+            });
+            const newUserMsg: Message = {
+              id: `user-${Date.now()}`,
+              conversation_id: currentId || '',
+              role: 'user',
+              content: msg.text,
+              created_at: new Date().toISOString(),
+            };
+            return [...filtered, newUserMsg];
+          });
         }
         break;
 
@@ -201,6 +214,17 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
     }
 
     setState('processing');
+
+    // Add optimistic user message
+    const tempUserMsg: Message = {
+      id: `voice-temp-${Date.now()}`,
+      conversation_id: convId,
+      role: 'user',
+      content: '🎙 Recording...',
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, tempUserMsg]);
+
     const msg: WsOutgoingMessage = {
       type: 'audio',
       audio: base64,

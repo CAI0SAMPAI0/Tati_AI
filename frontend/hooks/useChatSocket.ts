@@ -239,7 +239,7 @@ export function useChatSocket(conversationId: string | null) {
         id: `user-audio-temp`,
         conversation_id: currentId || '',
         role: 'user',
-        content: '🎤 [Mensagem de Voz]',
+        content: 'Voice message',
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, newUserMsg]);

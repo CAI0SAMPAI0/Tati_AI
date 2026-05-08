@@ -28,6 +28,19 @@ class ChatService:
     def __init__(self):
         self.db = get_client()
 
+    async def _execute_db(self, func, retries=3):
+        """Helper para executar chamadas de banco com retry em caso de desconexão."""
+        for attempt in range(retries):
+            try:
+                return await run_in_threadpool(func)
+            except Exception as e:
+                err_str = str(e).lower()
+                if ('disconnected' in err_str or 'connection' in err_str or 'protocol' in err_str) and attempt < retries - 1:
+                    print(f'[ChatService] DB connection issue, retrying ({attempt+1}/{retries})...')
+                    await asyncio.sleep(0.5 * (attempt + 1))
+                    continue
+                raise e
+
     async def get_user_profile(self, username: str) -> UserProfile:
         def _fetch():
             return (
@@ -39,7 +52,12 @@ class ChatService:
                 .data
             )
 
-        rows = await run_in_threadpool(_fetch)
+        try:
+            rows = await self._execute_db(_fetch)
+        except Exception as e:
+            print(f'[ChatService] Error fetching user profile: {e}')
+            rows = []
+        
         data = rows[0] if rows else {}
         return UserProfile(
             username=username,
@@ -67,7 +85,12 @@ class ChatService:
                 .data
             )
 
-        user_rows = await run_in_threadpool(_fetch_user)
+        try:
+            user_rows = await self._execute_db(_fetch_user)
+        except Exception as e:
+            print(f'[ChatService] Error checking access: {e}')
+            return {'allowed': True, 'reason': None, 'free_messages_remaining': None}
+        
         user = user_rows[0] if user_rows else {}
 
         is_admin = user.get('role') in settings.staff_roles
@@ -166,7 +189,7 @@ class ChatService:
 
         # Streak e metadados (rápido)
         from services.streaks import record_study_day
-        asyncio.create_task(run_in_threadpool(record_study_day, username))
+        asyncio.create_task(record_study_day(username))
 
         # 5. LLM Response - OTIMIZAÇÃO: Busca RAG, Perfil e Sentimento em PARALELO
         # Só buscamos RAG se a mensagem for relevante (mais de 10 caracteres)
@@ -183,18 +206,14 @@ class ChatService:
 
         # Podcasts reais (busca rápida)
         def _fetch_pods():
-            try:
-                return (self.db.table('podcasts').select('title, category').eq('user_id', username).order('created_at', desc=True).limit(5).execute().data)
-            except Exception: return []
-        tasks.append(run_in_threadpool(_fetch_pods))
+            return (self.db.table('podcasts').select('title, category').eq('user_id', username).order('created_at', desc=True).limit(5).execute().data)
+        tasks.append(self._execute_db(_fetch_pods))
 
         # Busca prompt de simulação em paralelo se houver
         if simulation_id:
             def _fetch_sim():
-                try:
-                    return self.db.table('simulations').select('system_prompt').eq('id', simulation_id).limit(1).execute().data
-                except Exception: return []
-            tasks.append(run_in_threadpool(_fetch_sim))
+                return self.db.table('simulations').select('system_prompt').eq('id', simulation_id).limit(1).execute().data
+            tasks.append(self._execute_db(_fetch_sim))
         else:
             async def _dummy_sim(): return []
             tasks.append(_dummy_sim())
@@ -336,8 +355,7 @@ class ChatService:
 
             # 2. Record Streak
             from services.streaks import record_study_day
-
-            await run_in_threadpool(record_study_day, username)
+            await record_study_day(username)
         except Exception as e:
             print(f'[Chat Background] Erro: {e}')
 

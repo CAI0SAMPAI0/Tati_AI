@@ -32,6 +32,19 @@ class GamificationService:
     def __init__(self):
         self.db = get_client()
 
+    async def _execute_db(self, func, retries=3):
+        """Helper para executar chamadas de banco com retry."""
+        for attempt in range(retries):
+            try:
+                return await run_in_threadpool(func)
+            except Exception as e:
+                err_str = str(e).lower()
+                if ('disconnected' in err_str or 'connection' in err_str or 'protocol' in err_str) and attempt < retries - 1:
+                    print(f'[Gamification DB] Connection issue, retrying ({attempt+1}/{retries})...')
+                    await asyncio.sleep(0.5 * (attempt + 1))
+                    continue
+                raise e
+
     async def get_user_xp(self, username: str) -> Dict[str, Any]:
         """Busca dados de XP e nível do usuário."""
 
@@ -45,7 +58,7 @@ class GamificationService:
             )
             return res.data.get('xp_data') if res.data else None
 
-        data = await run_in_threadpool(_fetch)
+        data = await self._execute_db(_fetch)
         if not data:
             return {'xp': 0, 'level': 'A1', 'level_progress': 0, 'xp_to_next': 500}
         return data
@@ -78,7 +91,7 @@ class GamificationService:
                 'username', username
             ).execute()
 
-        await run_in_threadpool(_update)
+        await self._execute_db(_update)
         updated_data['level_up'] = level_up
         return updated_data
 
@@ -133,7 +146,7 @@ class GamificationService:
 
             return data
 
-        data = await run_in_threadpool(_fetch)
+        data = await self._execute_db(_fetch)
         if not data.get('current_streak'):
             data['current_streak'] = 0
         if not data.get('longest_streak'):
@@ -177,5 +190,5 @@ class GamificationService:
                 'username', username
             ).execute()
 
-        await run_in_threadpool(_update)
+        await self._execute_db(_update)
         return updated_streak

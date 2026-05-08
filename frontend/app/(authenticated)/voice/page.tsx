@@ -19,6 +19,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useVoiceSocket } from '@/hooks/useVoiceSocket';
 import { VoiceAvatar } from '@/components/chat/voice-avatar';
 import { VoiceMessageBubble } from '@/components/chat/voice-message-bubble';
+import WordTooltip from '@/components/chat/word-tooltip';
 import { apiGet, apiPost } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import toast from 'react-hot-toast';
@@ -41,6 +42,9 @@ function VoicePageContent() {
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
+
+  const [activeWord, setActiveWord] = useState<string | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
   const [volume, setVolume] = useState(1);
   const [speed, setSpeed] = useState(1);
@@ -179,9 +183,19 @@ function VoicePageContent() {
     }
   };
 
+  const handleWordClick = (word: string, x: number, y: number) => {
+    setActiveWord(word);
+    setTooltipPos({ x, y });
+  };
+
   const startRecording = async () => {
     // Permite gravar se tiver convId OU se não for uma simulação (chat livre)
     if (!convId && !!simulationId) return;
+    
+    // Pause any playing audio from Tati
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
     
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -218,6 +232,9 @@ function VoicePageContent() {
       audioRef.current.pause();
       setState('idle');
     } else if (audioRef.current.src) {
+      if (audioRef.current.ended) {
+        audioRef.current.currentTime = 0;
+      }
       audioRef.current.play().catch(() => {});
       setState('speaking');
     }
@@ -266,9 +283,12 @@ function VoicePageContent() {
         <div className="flex flex-col items-center gap-2 sm:gap-8 mt-2 md:mt-0">
           <div className="cursor-pointer hover:scale-105 active:scale-95 transition-all duration-700 scale-[0.6] sm:scale-90 md:scale-100" onClick={() => {
             if (!convId) return;
-            if (state === 'idle') startRecording();
-            if (state === 'speaking') togglePlayback();
-            if (audioRef.current?.src && audioRef.current.paused) audioRef.current.play().catch(() => {});
+            if (state === 'idle' && !audioRef.current?.src) startRecording();
+            else if (state === 'speaking') togglePlayback();
+            else if (audioRef.current?.src) {
+              if (audioRef.current.ended) audioRef.current.currentTime = 0;
+              audioRef.current.play().catch(() => {});
+            }
           }}>
             <VoiceAvatar state={state} audioElement={audioRef.current} />
           </div>
@@ -323,11 +343,13 @@ function VoicePageContent() {
                  </div>
               ) : (
                 <>
-                  {messages.map((m) => (
-                    <motion.div key={m.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                      <VoiceMessageBubble message={m} />
-                    </motion.div>
-                  ))}
+                  <div className="w-full flex flex-col gap-6 sm:gap-8">
+                    {messages.map((m) => (
+                      <motion.div key={m.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full">
+                        <VoiceMessageBubble message={m} onWordClick={handleWordClick} />
+                      </motion.div>
+                    ))}
+                  </div>
                   {state === 'processing' && (
                     <div className="flex gap-2 items-center px-4 py-2 text-text-subtle animate-pulse">
                       <div className="w-2 h-2 rounded-full bg-primary" />
@@ -390,6 +412,14 @@ function VoicePageContent() {
           </p>
         </footer>
       </motion.div>
+
+      {activeWord && (
+        <WordTooltip 
+          word={activeWord} 
+          position={tooltipPos} 
+          onClose={() => setActiveWord(null)} 
+        />
+      )}
 
       <AnimatePresence>
         {isSummaryOpen && (
