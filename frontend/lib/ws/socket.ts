@@ -77,6 +77,24 @@ export class TatiWebSocket {
     }
   }
 
+  waitUntilOpen(timeoutMs = 6000): Promise<void> {
+    if (this.ws?.readyState === WebSocket.OPEN) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const start = Date.now();
+      const timer = setInterval(() => {
+        if (this.ws?.readyState === WebSocket.OPEN) {
+          clearInterval(timer);
+          resolve();
+          return;
+        }
+        if (Date.now() - start > timeoutMs) {
+          clearInterval(timer);
+          reject(new Error('WebSocket timeout'));
+        }
+      }, 120);
+    });
+  }
+
   disconnect(): void {
     this.destroyed = true;
     this.stopPing();

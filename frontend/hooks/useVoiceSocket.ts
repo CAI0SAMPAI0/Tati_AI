@@ -15,10 +15,51 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
   const [lastAudio, setLastAudio] = useState<string | null>(null);
   const [transcription, setTranscription] = useState('');
   const socketRef = useRef<TatiWebSocket | null>(null);
+  const [activeConvId, setActiveConvId] = useState<string | null>(conversationId)
+  const convIdRef = useRef<string | null>(conversationId);
+
+  // Sync ref with state
+  useEffect(() => {
+    convIdRef.current = activeConvId;
+  }, [activeConvId]);
+
+  // Criar nova conversa se não houver conversationId e o usuário tentar gravar
+  const ensureConversation = useCallback(async () => {
+    if (convIdRef.current) return convIdRef.current;
+
+    try {
+      const { apiPost } = await import('@/lib/api/client');
+      const res = await apiPost<any>('/voice/conversations', {
+        title: 'Voice Conversation',
+        is_simulation: !!simulationId,
+        simulation_id: simulationId || undefined,
+      });
+
+      if (res.ok && res.data?.id) {
+        const newConvId = res.data.id;
+        convIdRef.current = newConvId;
+        setActiveConvId(newConvId);
+        // Tenta atualizar a URL se possível para manter o estado
+        if (typeof window !== 'undefined') {
+           const url = new URL(window.location.href);
+           url.searchParams.set('conv_id', newConvId);
+           window.history.replaceState({}, '', url.toString());
+        }
+        console.log('[VoiceSocket] Nova conversa criada:', newConvId);
+        return newConvId;
+      }
+    } catch (err) {
+      console.error('[VoiceSocket] Erro ao criar conversa:', err);
+    }
+    return null;
+  }, [simulationId]);
+
 
   // Carregar histórico inicial se houver convId
   useEffect(() => {
     if (conversationId) {
+      setActiveConvId(conversationId);
+      convIdRef.current = conversationId;
       apiGet<Message[]>(ENDPOINTS.CONVERSATION_MESSAGES(conversationId))
         .then(history => {
           setMessages(history);
@@ -32,10 +73,13 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
         .catch(err => console.error('Error fetching voice history:', err));
     } else {
       setMessages([]);
+      setActiveConvId(null);
+      convIdRef.current = null;
     }
   }, [conversationId]);
 
   const handleMessage = useCallback((msg: WsIncomingMessage) => {
+    const currentId = convIdRef.current;
     switch (msg.type) {
       case 'transcription':
         if (msg.text) {
@@ -43,7 +87,7 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
           setTranscription(msg.text);
           const newUserMsg: Message = {
             id: `user-${Date.now()}`,
-            conversation_id: conversationId || '',
+            conversation_id: currentId || '',
             role: 'user',
             content: msg.text,
             created_at: new Date().toISOString(),
@@ -51,7 +95,7 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
           setMessages((prev) => [...prev, newUserMsg]);
         }
         break;
-      
+
       case 'stream_start':
         setState('processing');
         setTranscription('');
@@ -69,7 +113,7 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
             }
             return [...prev, {
               id: `ai-${Date.now()}`,
-              conversation_id: conversationId || '',
+              conversation_id: currentId || '',
               role: 'assistant',
               content: tokenContent,
               created_at: new Date().toISOString(),
@@ -77,28 +121,28 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
           });
         }
         break;
-      
+
       case 'audio_response':
         if (msg.audio) {
           setLastAudio(msg.audio);
           setState('speaking');
           if (msg.content) {
             setMessages((prev) => {
-               const last = prev[prev.length - 1];
-               if (last && last.role === 'assistant') {
-                 if (last.content === msg.content) {
-                   return [...prev.slice(0, -1), { ...last, audio_b64: msg.audio }];
-                 }
-                 return [...prev.slice(0, -1), { ...last, content: msg.content || '', audio_b64: msg.audio }];
-               }
-               return [...prev, {
-                  id: `ai-${Date.now()}`,
-                  conversation_id: conversationId || '',
-                  role: 'assistant',
-                  content: msg.content || '',
-                  created_at: new Date().toISOString(),
-                  audio_b64: msg.audio
-               }];
+              const last = prev[prev.length - 1];
+              if (last && last.role === 'assistant') {
+                if (last.content === msg.content) {
+                  return [...prev.slice(0, -1), { ...last, audio_b64: msg.audio }];
+                }
+                return [...prev.slice(0, -1), { ...last, content: msg.content || '', audio_b64: msg.audio }];
+              }
+              return [...prev, {
+                id: `ai-${Date.now()}`,
+                conversation_id: currentId || '',
+                role: 'assistant',
+                content: msg.content || '',
+                created_at: new Date().toISOString(),
+                audio_b64: msg.audio
+              }];
             });
           }
         }
@@ -113,14 +157,13 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
         console.error('Voice WS Error:', msg.message);
         break;
     }
-  }, [conversationId]);
+  }, []);
 
-  // Re-conecta o WebSocket sempre que o token ou a função de mensagem mudar (que depende do convId)
+  // Re-conecta o WebSocket sempre que o token ou a função de mensagem mudar
+  // Agora handleMessage é estável, então só reconecta se simulationId mudar ou token
   useEffect(() => {
     if (!token) return;
 
-    // Se não tivermos conversationId e não for simulação, esperamos
-    // Mas no caso de simulação, o backend pode precisar do simulation_id no query param
     const ws = new TatiWebSocket({
       origin: 'voice',
       simulationId: simulationId || undefined,
@@ -135,12 +178,25 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
     };
   }, [token, handleMessage, simulationId]);
 
-  const sendAudio = useCallback((base64: string) => {
+  const sendAudio = useCallback(async (base64: string) => {
     if (!socketRef.current) return;
-    
-    // Se ainda não temos conversationId, não enviamos para evitar erro no banco
-    if (!conversationId) {
-      console.warn('Attempted to send audio without conversationId');
+
+    // Garante que tem uma conversationId antes de enviar
+    let convId = convIdRef.current;
+    if (!convId) {
+      convId = await ensureConversation();
+      if (!convId) {
+        console.error('[VoiceSocket] Não foi possível criar conversa');
+        setState('idle');
+        return;
+      }
+    }
+
+    try {
+      await socketRef.current.waitUntilOpen();
+    } catch (e) {
+      console.error('[VoiceSocket] Socket not ready:', e);
+      setState('idle');
       return;
     }
 
@@ -148,11 +204,11 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
     const msg: WsOutgoingMessage = {
       type: 'audio',
       audio: base64,
-      conversation_id: conversationId,
+      conversation_id: convId,
       origin: 'voice',
     };
     socketRef.current.send(msg);
-  }, [conversationId]);
+  }, [ensureConversation]);
 
   return {
     messages,
@@ -162,5 +218,6 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
     lastAudio,
     transcription,
     sendAudio,
+    activeConvId
   };
 }

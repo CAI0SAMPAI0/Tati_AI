@@ -139,18 +139,18 @@ async def load_history(conversation_id: str) -> list[dict]:
             .select('role, content, audio_b64, created_at')
             .eq('session_id', conversation_id)
             .order('created_at', desc=True)
-            .limit(10) # Reduce history limit to prevent TPM errors
+            .limit(100) # Reduce history limit to prevent TPM errors and prevent message loss
             .execute()
         )
         
         messages = result.data or []
-        messages.reverse() # chronological order
+        # messages.reverse() # chronological order
         
         history = []
         for msg in messages:
             content = msg.get('content') or ''
-            if len(content) > 1000:
-                content = content[:1000] + '\n\n[Texto truncado devido ao limite de tamanho]'
+            if len(content) > 2000:
+                content = content[:2000] + '\n\n[Texto truncado devido ao limite de tamanho]'
             history.append({'role': msg.get('role', 'user'), 'content': content})
             
         return history

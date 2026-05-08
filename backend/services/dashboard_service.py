@@ -65,18 +65,38 @@ class DashboardService:
         """Lista alunos com metadados completos."""
 
         def _fetch() -> List[Dict[str, Any]]:
-            users = (
-                self.db.table('users')
-                .select(
-                    'username, name, email, level, focus, profile, '
-                    'created_at, role, streak_data', 'avatar_url'
+            # Tentativa de busca com avatar_url
+            try:
+                users = (
+                    self.db.table('users')
+                    .select(
+                        'username, name, email, level, focus, profile, '
+                        'created_at, role, streak_data, avatar_url'
+                    )
+                    .order('created_at', desc=True)
+                    .limit(200)
+                    .execute()
+                    .data
+                    or []
                 )
-                .order('created_at', desc=True)
-                .limit(200)
-                .execute()
-                .data
-                or []
-            )
+            except Exception as e:
+                # Fallback se a coluna avatar_url não existir (erro 42703)
+                if 'avatar_url' in str(e):
+                    print("[DashboardService] Coluna 'avatar_url' não encontrada. Usando fallback via 'profile'.")
+                    users = (
+                        self.db.table('users')
+                        .select(
+                            'username, name, email, level, focus, profile, '
+                            'created_at, role, streak_data'
+                        )
+                        .order('created_at', desc=True)
+                        .limit(200)
+                        .execute()
+                        .data
+                        or []
+                    )
+                else:
+                    raise e
 
             # Contagem de mensagens por usuário (batch)
             msg_rows = (
@@ -113,7 +133,12 @@ class DashboardService:
                 uname = user.get('username', '')
                 user['total_messages'] = msg_count.get(uname, 0)
                 user['last_active'] = last_active.get(uname)
-                user['avatar_url'] = user.get('avatar_url', '')
+                
+                # Sincroniza avatar_url da coluna top-level ou do JSON profile
+                avatar = user.get('avatar_url')
+                if not avatar:
+                    avatar = (user.get('profile') or {}).get('avatar_url', '')
+                user['avatar_url'] = avatar
 
             return users
 

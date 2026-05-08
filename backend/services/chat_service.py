@@ -53,7 +53,7 @@ class ChatService:
         """Verifica se o usuário pode enviar mensagens."""
         today = date.today()
         PAID_START = date(2026, 6, 30)
-        FREE_MSG_LIMIT = 5
+        FREE_MSG_LIMIT = 100
 
         def _fetch_user():
             return (
@@ -112,8 +112,10 @@ class ChatService:
 
         # 1. Transcrição ou Extração de Arquivo
         if msg_type == 'audio':
+            print(f'[ChatService] Transcrevendo áudio para {username}...')
             audio_bytes = base64.b64decode(msg.get('audio', ''))
             content = await transcribe_audio(audio_bytes, filename='input.webm')
+            print(f'[ChatService] Transcrição concluída: "{content[:50]}..."')
             await websocket.send_json({'type': 'transcription', 'text': content})
         elif msg_type == 'file':
             filename = msg.get('filename', 'file.txt')
@@ -158,7 +160,8 @@ class ChatService:
         if not history:
             await auto_title(conv_id, username, content[:50])
 
-        await save_message(conv_id, username, 'user', content)
+        user_audio_b64 = msg.get('audio') if msg_type == 'audio' else None
+        await save_message(conv_id, username, 'user', content, audio_b64=user_audio_b64)
         history.append({'role': 'user', 'content': content})
 
         # Streak e metadados (rápido)
@@ -256,7 +259,7 @@ class ChatService:
         await websocket.send_json({'type': 'stream_start', 'conversation_id': conv_id})
         full_response = ''
         # Limite de tokens para velocidade
-        max_tokens = 800 if is_voice_mode else 1500
+        max_tokens = 1000 if is_voice_mode else 1500
         
         is_pdf_generation = False
         pdf_filename = f"tati_doc_{conv_id}.pdf"
@@ -388,7 +391,13 @@ class ChatService:
     async def _check_auto_exercise(
         self, username: str, response: str, websocket: WebSocket
     ):
-        markers = ['should be', 'correct form', 'mistake', 'incorrect', '✅ correct']
+        markers = [
+            'should be', 'correct form', 'mistake', 'incorrect', '✅ correct',
+            'grammar error', 'wrong', 'you said', 'instead of', 'proper way',
+            'common mistake', 'remember that', 'note that', 'actually',
+            'o correto é', 'você disse', 'forma correta', 'erro comum'
+        ]
+        
         if any(m in response.lower() for m in markers):
             from services.upstash import cache_get, cache_set
 
@@ -397,15 +406,16 @@ class ChatService:
             count = (int(cached) + 1) if cached else 1
             await cache_set(error_key, str(count), ttl=604800)
 
-            if count >= 5:
+            if count >= 2:
                 await cache_set(error_key, '0', ttl=604800)
                 from services.exercise_generator import generate_exercises_from_history
 
-                await generate_exercises_from_history(
+                quiz_id = await generate_exercises_from_history(
                     username, 'Context simulated from history'
                 )
-                await websocket.send_json(
-                    {'type': 'status', 'text': '🎯 Nova atividade gerada!'}
+                if quiz_id:
+                    await websocket.send_json(
+                    {'type': 'status', 'text': '🎯 New practice activity created based on your errors!'}
                 )
 
     async def extract_text_from_file(self, filename: str, content_b64: str) -> str:

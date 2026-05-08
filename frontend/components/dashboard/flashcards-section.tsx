@@ -27,6 +27,7 @@ interface FlashcardDeck {
   description?: string;
   card_count?: number;
   level?: string;
+  flashcards?: Array<{ front: string; back: string }>;
 }
 
 interface FormState {
@@ -35,6 +36,7 @@ interface FormState {
   card_count: number;
   level: string;
   ai_theme: string;
+  flashcards: Array<{ front: string; back: string }>;
 }
 
 const EMPTY_FORM: FormState = {
@@ -43,6 +45,7 @@ const EMPTY_FORM: FormState = {
   card_count: 10,
   level: 'all',
   ai_theme: '',
+  flashcards: [],
 };
 
 export function FlashcardsSection() {
@@ -84,21 +87,55 @@ export function FlashcardsSection() {
     }
   };
 
-  const openModal = (deck?: FlashcardDeck) => {
+  const openModal = async (deck?: FlashcardDeck) => {
     if (deck) {
       setEditingDeck(deck);
-      setFormData({
-        title: deck.title,
-        description: deck.description || '',
-        card_count: deck.card_count || 20,
-        level: deck.level || 'all',
-        ai_theme: '',
-      });
+      // Busca detalhes completos para pegar os cards
+      try {
+        const details = await apiGet<any>(`/activities/modules/${deck.id}`);
+        setFormData({
+          title: details.title || deck.title,
+          description: details.description || deck.description || '',
+          card_count: details.flashcards?.length || deck.card_count || 10,
+          level: details.level || deck.level || 'all',
+          ai_theme: '',
+          flashcards: details.flashcards || []
+        });
+      } catch (err) {
+        setFormData({
+          title: deck.title,
+          description: deck.description || '',
+          card_count: deck.card_count || 10,
+          level: deck.level || 'all',
+          ai_theme: '',
+          flashcards: []
+        });
+      }
     } else {
       setEditingDeck(null);
       setFormData(EMPTY_FORM);
     }
     setIsModalOpen(true);
+  };
+
+  const addManualCard = () => {
+    setFormData(prev => ({
+      ...prev,
+      flashcards: [...prev.flashcards, { front: '', back: '' }]
+    }));
+  };
+
+  const removeCard = (idx: number) => {
+    setFormData(prev => ({
+      ...prev,
+      flashcards: prev.flashcards.filter((_, i) => i !== idx)
+    }));
+  };
+
+  const updateCard = (idx: number, field: 'front' | 'back', value: string) => {
+    const newCards = [...formData.flashcards];
+    newCards[idx] = { ...newCards[idx], [field]: value };
+    setFormData(prev => ({ ...prev, flashcards: newCards }));
   };
 
   const handleGenerateWithAI = async () => {
@@ -139,8 +176,9 @@ export function FlashcardsSection() {
       const payload = {
         title: formData.title.trim(),
         description: formData.description.trim(),
-        card_count: Number(formData.card_count) || 20,
+        card_count: formData.flashcards.length || Number(formData.card_count) || 10,
         level: formData.level,
+        flashcards: formData.flashcards
       };
 
       let res;
@@ -183,11 +221,11 @@ export function FlashcardsSection() {
               onChange={(e) => setFilterLevel(e.target.value)}
             >
               <option value="all">All Levels</option>
-              <option value="Beginner">Beginner</option>
-              <option value="Pre-Intermediate">Pre-Intermediate</option>
-              <option value="Intermediate">Intermediate</option>
-              <option value="Business English">Business English</option>
-              <option value="Advanced">Advanced</option>
+              <option value="beginner">Beginner</option>
+              <option value="pre-intermediate">Pre-Intermediate</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="business english">Business English</option>
+              <option value="advanced">Advanced</option>
             </select>
          </div>
          <Button className="gap-2" onClick={() => openModal()}>
@@ -273,11 +311,11 @@ export function FlashcardsSection() {
               </div>
 
               <Input
-                label="Card count"
+                label="Target Card Count"
                 type="number"
                 value={String(formData.card_count)}
                 onChange={set('card_count')}
-                min="5"
+                min="1"
                 max="100"
               />
             </div>
@@ -289,13 +327,51 @@ export function FlashcardsSection() {
               placeholder="Optional description"
             />
 
+            {/* Manual Cards Section */}
+            <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-bold text-primary flex items-center gap-2">
+                  <Layers size={16} /> Manual Cards ({formData.flashcards.length})
+                </h4>
+                <Button variant="secondary" size="sm" onClick={addManualCard} className="h-7 text-[0.65rem] gap-1">
+                  <Plus size={12} /> Add Card
+                </Button>
+              </div>
+
+              {formData.flashcards.length > 0 ? (
+                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
+                  {formData.flashcards.map((card, idx) => (
+                    <div key={idx} className="grid grid-cols-[1fr,1fr,auto] gap-2 items-start bg-surface p-2 rounded-xl border border-border group">
+                      <input 
+                        className="bg-transparent border-b border-border text-xs py-1 outline-none focus:border-primary transition-all"
+                        placeholder="Front (term)"
+                        value={card.front}
+                        onChange={(e) => updateCard(idx, 'front', e.target.value)}
+                      />
+                      <input 
+                        className="bg-transparent border-b border-border text-xs py-1 outline-none focus:border-primary transition-all"
+                        placeholder="Back (meaning)"
+                        value={card.back}
+                        onChange={(e) => updateCard(idx, 'back', e.target.value)}
+                      />
+                      <button onClick={() => removeCard(idx)} className="text-text-subtle hover:text-danger p-1">
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[0.65rem] text-text-muted italic text-center py-1">No manual cards added yet.</p>
+              )}
+            </div>
+
             <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 space-y-3">
               <h4 className="text-sm font-bold text-primary flex items-center gap-2">
-                <Sparkles size={16} /> {'Generate with AI'}
+                <Sparkles size={16} /> {'AI Generation'}
               </h4>
               <textarea
                 placeholder={'E.g.: Verbs of Movement, Travel...'}
-                className="w-full min-h-[80px] p-3.5 bg-surface border border-border rounded-xl text-sm outline-none focus:border-primary/50 transition-all resize-none"
+                className="w-full min-h-[60px] p-3.5 bg-surface border border-border rounded-xl text-sm outline-none focus:border-primary/50 transition-all resize-none"
                 value={formData.ai_theme}
                 onChange={(e) => setFormData(prev => ({ ...prev, ai_theme: e.target.value }))}
               />
@@ -320,3 +396,4 @@ export function FlashcardsSection() {
     </div>
   );
 }
+

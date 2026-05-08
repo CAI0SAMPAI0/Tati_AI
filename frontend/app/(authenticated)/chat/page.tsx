@@ -62,7 +62,7 @@ export default function ChatPage() {
     }
   }, [currentConvId, setMessages]);
 
-  const handleSelectConv = useCallback((id: string, title: string) => {
+  const handleSelectConv = useCallback((id: string) => {
     setSidebarOpen(false);
     router.push(`/chat?conv_id=${id}`);
   }, [router]);
@@ -99,6 +99,62 @@ export default function ChatPage() {
 
     if (convId) {
       sendMessage(text, convId);
+    }
+  };
+
+  const handleSendAudio = async (base64: string) => {
+    let convId = currentConvId;
+
+    if (!convId) {
+      try {
+        const res = await apiPost<Conversation>(ENDPOINTS.CONVERSATIONS, {
+          title: 'Vocal Message...'
+        });
+        if (res.ok) {
+          convId = res.data.id;
+          setCurrentConvId(convId);
+          setConvTitle(res.data.title);
+          router.replace(`/chat?conv_id=${convId}`, { scroll: false });
+        } else {
+          toast.error('Could not create conversation for audio.');
+          return;
+        }
+      } catch (err) {
+        console.error('Error creating conversation for audio:', err);
+        return;
+      }
+    }
+
+    if (convId) {
+      sendAudio(base64, convId);
+    }
+  };
+
+  const handleSendFile = async (filename: string, base64: string, caption?: string) => {
+    let convId = currentConvId;
+
+    if (!convId) {
+      try {
+        const res = await apiPost<Conversation>(ENDPOINTS.CONVERSATIONS, {
+          title: `File: ${filename}`
+        });
+        if (res.ok) {
+          convId = res.data.id;
+          setCurrentConvId(convId);
+          setConvTitle(res.data.title);
+          router.replace(`/chat?conv_id=${convId}`, { scroll: false });
+        } else {
+          toast.error('Could not create conversation for file.');
+          return;
+        }
+      } catch (err) {
+        console.error('Error creating conversation for file:', err);
+        return;
+      }
+    }
+
+    if (convId) {
+      sendFile(filename, base64, caption, convId);
     }
   };
 
@@ -167,8 +223,8 @@ export default function ChatPage() {
 
             <ChatInput
               onSend={handleSend}
-              onSendAudio={sendAudio}
-              onSendFile={sendFile}
+              onSendAudio={handleSendAudio}
+              onSendFile={handleSendFile}
               disabled={false}
               isStreaming={isStreaming}
             />

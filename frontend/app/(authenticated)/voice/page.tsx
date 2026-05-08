@@ -60,7 +60,29 @@ function VoicePageContent() {
     lastAudio,
     transcription,
     sendAudio,
+    activeConvId,
   } = useVoiceSocket(convId);
+
+  // Sincroniza convId local com o activeConvId do hook (importante para novas conversas)
+  useEffect(() => {
+    if (activeConvId && activeConvId !== convId) {
+      setConvId(activeConvId);
+    }
+  }, [activeConvId, convId]);
+
+  // Safety timeout for "processing" state
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (state === 'processing') {
+      timer = setTimeout(() => {
+        if (state === 'processing') {
+          console.warn('[VoicePage] Processing timeout - forcing idle');
+          setState('idle');
+        }
+      }, 15000); // 15s safety
+    }
+    return () => clearTimeout(timer);
+  }, [state, setState]);
 
   // Load simulation details if needed
   useEffect(() => {
@@ -158,7 +180,9 @@ function VoicePageContent() {
   };
 
   const startRecording = async () => {
-    if (!convId) return;
+    // Permite gravar se tiver convId OU se não for uma simulação (chat livre)
+    if (!convId && !!simulationId) return;
+    
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);

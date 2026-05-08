@@ -141,9 +141,9 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
         <div className="flex bg-bg-secondary p-1 rounded-xl overflow-x-auto no-scrollbar shrink-0">
           {[
             { id: 'info', icon: <User size={14} />, label: 'Profile' },
-            { id: 'prompt', icon: <AlertCircle size={14} />, label: '🧩 Prompt' },
-            { id: 'insight', icon: <Brain size={14} />, label: '🧠 Insight' },
-            { id: 'interests', icon: <Target size={14} />, label: '🎯 Interests' },
+            { id: 'prompt', icon: <AlertCircle size={14} />, label: 'Prompt' },
+            { id: 'insight', icon: <Brain size={14} />, label: 'Insight' },
+            { id: 'interests', icon: <Target size={14} />, label: 'Interests' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -253,7 +253,7 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                       className="flex-1 gap-2"
                     >
                       {isGenerating ? <RefreshCw size={16} className="animate-spin" /> : <Brain size={16} />}
-                      {isGenerating ? '⏳ Analyzing...' : '🧠 Generate Insight'}
+                      {isGenerating ? '⏳ Analyzing...' : 'Generate Insight'}
                     </Button>
                     <Button 
                       variant="secondary"
@@ -289,7 +289,7 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                     disabled={isAnalyzingInterests}
                   >
                     {isAnalyzingInterests ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                    {isAnalyzingInterests ? '⏳ Analyzing...' : '🎯 Analyze Interests'}
+                    {isAnalyzingInterests ? '⏳ Analyzing...' : 'Analyze Interests'}
                   </Button>
                </div>
 

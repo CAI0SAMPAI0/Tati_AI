@@ -174,11 +174,20 @@ export function useChatSocket(conversationId: string | null) {
     };
   }, [token, handleMessage]);
 
-  const sendMessage = useCallback((text: string, overrideConvId?: string) => {
+  const sendMessage = useCallback(async (text: string, overrideConvId?: string) => {
     if (!socketRef.current) return;
+    
+    try {
+      await socketRef.current.waitUntilOpen();
+    } catch (e) {
+      console.error('Socket not ready:', e);
+      return;
+    }
 
     const currentId = overrideConvId ?? convIdRef.current;
-    if (overrideConvId) convIdRef.current = overrideConvId;
+    if (overrideConvId) {
+      convIdRef.current = overrideConvId;
+    }
 
     const sent = socketRef.current.send({
       type: 'text',
@@ -202,10 +211,20 @@ export function useChatSocket(conversationId: string | null) {
     });
   }, []);
 
-  const sendAudio = useCallback((base64: string) => {
+  const sendAudio = useCallback(async (base64: string, overrideConvId?: string) => {
     if (!socketRef.current) return;
     
-    const currentId = convIdRef.current;
+    try {
+      await socketRef.current.waitUntilOpen();
+    } catch (e) {
+      console.error('Socket not ready:', e);
+      return;
+    }
+
+    const currentId = overrideConvId ?? convIdRef.current;
+    if (overrideConvId) {
+      convIdRef.current = overrideConvId;
+    }
     
     // We send 'audio' type as per the websocket protocol
     const sent = socketRef.current.send({
@@ -227,10 +246,20 @@ export function useChatSocket(conversationId: string | null) {
     }
   }, []);
 
-  const sendFile = useCallback((filename: string, base64: string, caption?: string) => {
+  const sendFile = useCallback(async (filename: string, base64: string, caption?: string, overrideConvId?: string) => {
     if (!socketRef.current) return;
 
-    const currentId = convIdRef.current;
+    try {
+      await socketRef.current.waitUntilOpen();
+    } catch (e) {
+      console.error('Socket not ready:', e);
+      return;
+    }
+
+    const currentId = overrideConvId ?? convIdRef.current;
+    if (overrideConvId) {
+      convIdRef.current = overrideConvId;
+    }
     
     const sent = socketRef.current.send({
       type: 'file',

@@ -373,6 +373,31 @@ export function ModulesSection() {
     }));
   };
 
+  const addManualQuestion = () => {
+    setFormData(prev => {
+      const current = prev.generated_content || { quiz_title: prev.title || 'Quiz', questions: [] };
+      return {
+        ...prev,
+        generated_content: {
+          ...current,
+          questions: [
+            ...current.questions,
+            { question: '', options: ['', '', '', ''], correct_index: 0, explanation: '' }
+          ]
+        }
+      };
+    });
+  };
+
+  const removeQuestion = (idx: number) => {
+    if (!formData.generated_content) return;
+    const newQuestions = formData.generated_content.questions.filter((_, i) => i !== idx);
+    setFormData(prev => ({
+      ...prev,
+      generated_content: { ...prev.generated_content!, questions: newQuestions }
+    }));
+  };
+
   const getYoutubeEmbedId = (url: string) => {
     const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{11})/);
     return match ? match[1] : null;
@@ -635,47 +660,111 @@ export function ModulesSection() {
 
           <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 space-y-4">
             <div className="flex items-center justify-between">
-              <h4 className="text-sm font-bold text-primary flex items-center gap-2">
-                <Sparkles size={16} /> Generate with AI
+              <h4 className="text-sm font-bold text-primary flex-1 flex items-center gap-2">
+                <HelpCircle size={16} /> Quiz Questions
               </h4>
-              <div className="flex items-center gap-2">
-                <Input
-                  className="w-16"
-                  label='Questions'
-                  type="number"
-                  value={String(formData.num_questions)}
-                  onChange={set('num_questions')}
-                  min="5"
-                  max="100"
-                />
-              </div>
+              <Button variant="secondary" size="sm" onClick={addManualQuestion} className="h-8 gap-1.5 text-[0.7rem]">
+                <Plus size={14} /> Add Question
+              </Button>
             </div>
-            <textarea
-              placeholder="E.g.: Create a module about Present Perfect..."
-              className="w-full min-h-[100px] p-3.5 bg-surface border border-border rounded-xl text-sm outline-none focus:border-primary/50 transition-all resize-none"
-              value={formData.ai_prompt}
-              onChange={(e) => setFormData(prev => ({ ...prev, ai_prompt: e.target.value }))}
-            ></textarea>
-            <div className="flex gap-2 w-full">
-              <Button
-                variant="secondary"
-                className="flex-1 gap-2"
-                onClick={handleGenerateWithAI}
-                loading={isGenerating}
-                disabled={!formData.ai_prompt.trim()}
-              >
-                <Sparkles size={14} />
-                Generate Quiz
-              </Button>
-              <Button
-                variant="secondary"
-                className="flex-1 gap-2"
-                onClick={handleGenerateMindmap}
-                disabled={!formData.ai_prompt.trim() && !formData.title.trim()}
-              >
-                <Sparkles size={14} />
-                Map
-              </Button>
+
+            {formData.generated_content && formData.generated_content.questions.length > 0 ? (
+               <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                  {formData.generated_content.questions.map((q, qIdx) => (
+                    <div key={qIdx} className="p-4 bg-surface border border-border rounded-xl space-y-3 relative group">
+                      <button 
+                        onClick={() => removeQuestion(qIdx)}
+                        className="absolute top-2 right-2 p-1 text-text-subtle hover:text-danger opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                      
+                      <div className="flex gap-2">
+                        <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[0.65rem] shrink-0 mt-2">
+                          {qIdx + 1}
+                        </span>
+                        <input 
+                          className="flex-1 bg-transparent border-b border-border text-sm py-1 outline-none focus:border-primary transition-all"
+                          placeholder="Question text..."
+                          value={q.question}
+                          onChange={(e) => updateQuestion(qIdx, 'question', e.target.value)}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 pl-7">
+                        {q.options.map((opt, oIdx) => (
+                          <div key={oIdx} className="relative">
+                            <input 
+                              className={cn(
+                                "w-full pl-2 pr-6 py-1.5 bg-bg/50 border rounded-lg text-xs outline-none transition-all",
+                                q.correct_index === oIdx ? "border-success bg-success/5" : "border-border"
+                              )}
+                              placeholder={`Option ${oIdx + 1}`}
+                              value={opt}
+                              onChange={(e) => {
+                                const newOpts = [...q.options];
+                                newOpts[oIdx] = e.target.value;
+                                updateQuestion(qIdx, 'options', newOpts);
+                              }}
+                            />
+                            <button 
+                              onClick={() => updateQuestion(qIdx, 'correct_index', oIdx)}
+                              className={cn("absolute right-1.5 top-1/2 -translate-y-1/2", q.correct_index === oIdx ? "text-success" : "text-text-subtle")}
+                            >
+                              <CheckCircle2 size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+               </div>
+            ) : (
+              <p className="text-[0.65rem] text-text-muted italic text-center py-2">No manual questions added yet.</p>
+            )}
+
+            <div className="border-t border-primary/10 pt-4">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-bold text-primary flex items-center gap-2">
+                  <Sparkles size={16} /> AI Generation
+                </h4>
+                <div className="flex items-center gap-2">
+                  <Input
+                    className="w-16 h-8 text-xs"
+                    label='Count'
+                    type="number"
+                    value={String(formData.num_questions)}
+                    onChange={set('num_questions')}
+                  />
+                </div>
+              </div>
+              <textarea
+                placeholder="E.g.: Create a quiz about verbs..."
+                className="w-full min-h-[60px] p-3.5 bg-surface border border-border rounded-xl text-sm outline-none focus:border-primary/50 transition-all resize-none mb-3"
+                value={formData.ai_prompt}
+                onChange={(e) => setFormData(prev => ({ ...prev, ai_prompt: e.target.value }))}
+              ></textarea>
+              <div className="flex gap-2 w-full">
+                <Button
+                  variant="secondary"
+                  className="flex-1 gap-2 h-9 text-xs"
+                  onClick={handleGenerateWithAI}
+                  loading={isGenerating}
+                  disabled={!formData.ai_prompt.trim()}
+                >
+                  <Sparkles size={14} />
+                  AI Quiz
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="flex-1 gap-2 h-9 text-xs"
+                  onClick={handleGenerateMindmap}
+                  disabled={!formData.ai_prompt.trim() && !formData.title.trim()}
+                >
+                  <Sparkles size={14} />
+                  AI Map
+                </Button>
+              </div>
             </div>
           </div>
 

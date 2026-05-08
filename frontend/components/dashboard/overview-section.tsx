@@ -22,7 +22,7 @@ export function OverviewSection({ stats, students, difficulties, onSeeAllStudent
           icon={<Users size={24} />} 
           value={stats?.total_students ?? '—'} 
           label={'Total Students'} 
-          trend="↑ Ativo"
+          trend="↑ Active"
           trendUp
         />
         <StatCard 
@@ -35,7 +35,7 @@ export function OverviewSection({ stats, students, difficulties, onSeeAllStudent
           value={stats?.active_today ?? '—'} 
           label={'Active Today'} 
           highlight
-          trend="Hoje"
+          trend="Today"
           trendUp
         />
       </div>
