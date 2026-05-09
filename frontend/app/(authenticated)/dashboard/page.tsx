@@ -129,7 +129,8 @@ export default function DashboardPage() {
                   submissions: 'Corrections',
                   modules: 'Modules',
                   flashcards: 'Flashcards',
-                  simulations: 'Simulations'
+                  simulations: 'Simulations',
+                  premium: 'Premium Hub'
                 }[activeSection] || activeSection}
               </h1>
               <p className="text-[0.7rem] text-text-muted font-medium uppercase tracking-wider">
@@ -138,11 +139,13 @@ export default function DashboardPage() {
                   students: 'Student management',
                   reports: 'Overview and class metrics',
                   submissions: 'Student answers to review',
-                  modules: 'Management of modules and activities',
-                  flashcards: 'Vocabulary deck management',
-                  simulations: 'Manage real-life conversation simulations'
-                }[activeSection] || 'Management'}
+                  modules: 'Educational contents',
+                  flashcards: 'Study decks',
+                  simulations: 'Real-world scenarios',
+                  premium: 'Premium materials & payments'
+                }[activeSection]}
               </p>
+
             </div>
           </div>
         </header>
