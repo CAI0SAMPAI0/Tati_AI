@@ -29,6 +29,7 @@ interface SimulationRow {
   difficulty: string;
   is_published: boolean;
   system_prompt?: string;
+  emoji?: string;
 }
 
 
@@ -37,6 +38,7 @@ interface FormState {
   description: string;
   difficulty: string;
   system_prompt: string;
+  emoji: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -44,6 +46,7 @@ const EMPTY_FORM: FormState = {
   description: '',
   difficulty: 'all',
   system_prompt: '',
+  emoji: '🎭',
 };
 
 export default function SimulationsSection() {
@@ -97,6 +100,7 @@ export default function SimulationsSection() {
         description: sim.description || '',
         difficulty: (sim.difficulty || 'beginner').toLowerCase(),
         system_prompt: sim.system_prompt || '',
+        emoji: sim.emoji || '🎭',
       });
     } else {
       setEditingSim(null);
@@ -158,6 +162,7 @@ export default function SimulationsSection() {
         description: (formData.description || '').trim(),
         difficulty: formData.difficulty,
         system_prompt: formData.system_prompt,
+        emoji: formData.emoji,
       };
 
       const res = editingSim
@@ -298,12 +303,24 @@ export default function SimulationsSection() {
         title={editingSim ? 'Edit Simulation' : 'Create Simulation'}
       >
         <div className="space-y-4">
-          <Input
-            label={'Simulation Name'}
-            value={formData.name}
-            onChange={setField('name')}
-            placeholder="Ex: Job Interview at Google"
-          />
+          <div className="grid grid-cols-4 gap-4">
+            <div className="col-span-3">
+              <Input
+                label={'Simulation Name'}
+                value={formData.name}
+                onChange={setField('name')}
+                placeholder="Ex: Job Interview at Google"
+              />
+            </div>
+            <div>
+              <Input
+                label={'Emoji'}
+                value={formData.emoji}
+                onChange={setField('emoji')}
+                placeholder="🎭"
+              />
+            </div>
+          </div>
           <div className="mb-4">
             <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">Level</label>
             <select

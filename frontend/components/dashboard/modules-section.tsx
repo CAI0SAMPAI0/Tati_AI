@@ -268,30 +268,6 @@ export function ModulesSection() {
     }
   };
 
-  const handleGenerateMindmap = async () => {
-    if (!formData.ai_prompt.trim() && !formData.title.trim()) {
-      toast.error('Informe um tema (título ou prompt) para o mapa mental.');
-      return;
-    }
-    const toastId = toast.loading('Gerando mapa mental...');
-    try {
-      const res = await apiPost<{ markdown: string }>('/activities/modules/admin/generate-mindmap', {
-        theme: formData.ai_prompt || formData.title,
-        level: formData.level
-      });
-      if (res.ok && res.data) {
-        setFormData(prev => ({
-          ...prev,
-          description: prev.description + (prev.description ? '\n\n' : '') + res.data!.markdown
-        }));
-        toast.success('Mental map generated!', { id: toastId });
-      } else {
-        toast.error('Error generating mental map.', { id: toastId });
-      }
-    } catch {
-      toast.error('Connection error.', { id: toastId });
-    }
-  };
 
   const handleSaveWithReview = async () => {
     if (!formData.generated_content) return;
@@ -744,27 +720,18 @@ export function ModulesSection() {
                 value={formData.ai_prompt}
                 onChange={(e) => setFormData(prev => ({ ...prev, ai_prompt: e.target.value }))}
               ></textarea>
-              <div className="flex gap-2 w-full">
-                <Button
-                  variant="secondary"
-                  className="flex-1 gap-2 h-9 text-xs"
-                  onClick={handleGenerateWithAI}
-                  loading={isGenerating}
-                  disabled={!formData.ai_prompt.trim()}
-                >
-                  <Sparkles size={14} />
-                  AI Quiz
-                </Button>
-                <Button
-                  variant="secondary"
-                  className="flex-1 gap-2 h-9 text-xs"
-                  onClick={handleGenerateMindmap}
-                  disabled={!formData.ai_prompt.trim() && !formData.title.trim()}
-                >
-                  <Sparkles size={14} />
-                  AI Map
-                </Button>
-              </div>
+        <div className="flex gap-2 w-full">
+          <Button
+            variant="secondary"
+            className="flex-1 gap-2 h-9 text-xs"
+            onClick={handleGenerateWithAI}
+            loading={isGenerating}
+            disabled={!formData.ai_prompt.trim()}
+          >
+            <Sparkles size={14} />
+            AI Quiz
+          </Button>
+        </div>
             </div>
           </div>
 

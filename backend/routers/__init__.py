@@ -59,8 +59,12 @@ def register_all_routers(app: FastAPI) -> None:
 
     # ── Admin ─────────────────────────────────────────────────
     from routers.admin.dashboard import router as dashboard_router
+    from routers.admin.premium import router as admin_premium_router
 
     app.include_router(dashboard_router, prefix='/dashboard', tags=['admin'])
+    app.include_router(
+        admin_premium_router, prefix='/admin/premium', tags=['admin']
+    )
 
     # ── AI ────────────────────────────────────────────────────
     from routers.ai.chat import router as chat_router
@@ -94,6 +98,7 @@ def register_all_routers(app: FastAPI) -> None:
     from routers.activities.ranking import router as ranking_router
     from routers.activities.flashcards import router as flashcards_router
     from routers.activities.achievements import router as achievements_router
+    from routers.activities.premium import router as student_premium_router
 
     app.include_router(
         modules_router,
@@ -131,6 +136,11 @@ def register_all_routers(app: FastAPI) -> None:
     app.include_router(
         achievements_router,
         prefix='/activities/achievements',
+        tags=['activities'],
+    )
+    app.include_router(
+        student_premium_router,
+        prefix='/activities/premium',
         tags=['activities'],
     )
 

@@ -11,12 +11,13 @@ import {
   Drama,
   MessageSquare,
   Settings,
-  X
+  X,
+  Zap
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
-export type DashSection = 'overview' | 'students' | 'reports' | 'modules' | 'flashcards' | 'simulations';
+export type DashSection = 'overview' | 'students' | 'reports' | 'modules' | 'flashcards' | 'simulations' | 'premium';
 
 interface DashboardSidebarProps {
   activeSection: DashSection;
@@ -33,6 +34,7 @@ export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose 
     { id: 'modules', icon: <BookOpen size={20} />, label: 'Modules' },
     { id: 'flashcards', icon: <Layers size={20} />, label: 'Flashcards' },
     { id: 'simulations', icon: <Drama size={20} />, label: 'Simulations' },
+    { id: 'premium', icon: <Zap size={20} />, label: 'Premium Hub' },
   ];
 
   return (

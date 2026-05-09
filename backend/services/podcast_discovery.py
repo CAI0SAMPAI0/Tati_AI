@@ -195,6 +195,6 @@ async def discover_personalized_podcasts(user_id: str, username: str, user_level
 
             await run_in_threadpool(invalidate_podcast_recommendations_cache, username)
 
-        print(f'[Discovery] ✅ Tavily achou {valid_count} vídeos para {username}!')
+        #print(f'[Discovery] ✅ Tavily achou {valid_count} vídeos para {username}!')
     except Exception as e:
         print(f'[Discovery] Erro no processamento: {e}')

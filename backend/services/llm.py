@@ -20,7 +20,7 @@ def _is_auth_error(exc: Exception) -> bool:
 
 def _is_rate_error(exc: Exception) -> bool:
     msg = str(exc).lower()
-    return '429' in msg or 'rate_limit' in msg or 'quota' in msg
+    return '429' in msg or '413' in msg or 'rate_limit' in msg or 'quota' in msg or 'seconds of audio' in msg
 
 
 def _should_try_next_key(exc: Exception) -> bool:
@@ -60,7 +60,7 @@ async def transcribe_audio(
 
             resp = await client.audio.transcriptions.create(
                 file=(filename, audio_bytes),
-                model='whisper-large-v3-turbo',
+                model='whisper-large-v3',
                 response_format='text',
                 prompt=effective_prompt,
             )

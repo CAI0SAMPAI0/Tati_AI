@@ -12,6 +12,7 @@ import { ReportsSection } from '@/components/dashboard/reports-section';
 import { ModulesSection } from '@/components/dashboard/modules-section';
 import  SimulationsSection  from '@/components/dashboard/simulations-section';
 import { FlashcardsSection } from '@/components/dashboard/flashcards-section';
+import { PremiumSection } from '@/components/dashboard/premium-section';
 import { StudentModal } from '@/components/dashboard/student-modal';
 import { apiGet } from '@/lib/api/client';
 
@@ -160,6 +161,7 @@ export default function DashboardPage() {
           {activeSection === 'modules' && <ModulesSection />}
           {activeSection === 'simulations' && <SimulationsSection />}
           {activeSection === 'flashcards' && <FlashcardsSection />}
+          {activeSection === 'premium' && <PremiumSection />}
 
           {activeSection === 'students' && (
             <div className="bg-surface border border-border rounded-2xl overflow-hidden">

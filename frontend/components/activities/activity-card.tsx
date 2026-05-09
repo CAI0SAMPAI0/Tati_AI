@@ -12,6 +12,7 @@ interface ActivityCardProps {
   meta?: Array<{ icon: React.ReactNode; label: string }>;
   onClick?: () => void;
   imageUrl?: string;
+  emoji?: string;
   actionLabel?: string;
   isOutline?: boolean;
   score?: number;
@@ -25,6 +26,7 @@ export function ActivityCard({
   meta,
   onClick,
   imageUrl,
+  emoji,
   actionLabel,
   isOutline,
   score
@@ -61,23 +63,30 @@ export function ActivityCard({
         </div>
       )}
 
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="text-sm font-bold text-text leading-tight group-hover:text-primary transition-colors">
-          {title}
-        </h3>
-        {status && (
-          <div className="flex items-center gap-2">
-            {score !== undefined && (
-              <span className="text-[0.65rem] font-black text-primary bg-primary/10 px-1.5 py-0.5 rounded-lg shrink-0">
-                {score}/100
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-sm font-bold text-text leading-tight group-hover:text-primary transition-colors">
+            {title}
+          </h3>
+          {status && (
+            <div className="flex items-center gap-2">
+              {score !== undefined && (
+                <span className="text-[0.65rem] font-black text-primary bg-primary/10 px-1.5 py-0.5 rounded-lg shrink-0">
+                  {score}/100
+                </span>
+              )}
+              <span className={cn(
+                "text-[0.65rem] font-bold px-2 py-0.5 rounded-full border shrink-0 uppercase tracking-wider",
+                statusConfig[status].className
+              )}>
+                {statusConfig[status].label}
               </span>
-            )}
-            <span className={cn(
-              "text-[0.65rem] font-bold px-2 py-0.5 rounded-full border shrink-0 uppercase tracking-wider",
-              statusConfig[status].className
-            )}>
-              {statusConfig[status].label}
-            </span>
+            </div>
+          )}
+        </div>
+        {emoji && (
+          <div className="text-4xl py-1 animate-in zoom-in-50 duration-500 drop-shadow-sm">
+            {emoji}
           </div>
         )}
       </div>

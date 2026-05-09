@@ -76,6 +76,13 @@ export const ENDPOINTS = {
   ADMIN_SIMULATION_DETAIL: (id: string) => `/dashboard/simulations/${id}`,
   ADMIN_STUDENTS: '/dashboard/students',
   ADMIN_DIFFICULTIES: '/dashboard/difficulties',
+  ADMIN_PREMIUM: '/admin/premium',
+  ADMIN_PREMIUM_UPLOAD: '/admin/premium/upload',
+
+  // Premium (Aluno)
+  PREMIUM_HUB: '/activities/premium',
+  PREMIUM_ACCESS: (id: string) => `/activities/premium/${id}/access`,
+  PREMIUM_BUY: (id: string) => `/activities/premium/${id}/buy`,
 
   // Keep-alive
   CORS_TEST: '/cors-test',

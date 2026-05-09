@@ -71,23 +71,6 @@ async def admin_generate_flashcards(data: dict, service: ActivityService = Depen
     )
 
 
-@router.post('/admin/generate-mindmap')
-async def admin_generate_mindmap(data: dict):
-    """Gera um mapa mental via IA usando Markdown."""
-    from services.llm import groq_chat
-    prompt = (
-        f"Create a hierarchical study mind map about '{data.get('theme')}' for an English learning module. "
-        f"Level: {data.get('level', 'Intermediate')}. "
-        "Use Markdown bulleted lists to represent the tree structure. "
-        "Do NOT use markdown code blocks like ```markdown. Just return the text directly."
-    )
-    try:
-        res = await groq_chat([{'role': 'user', 'content': prompt}])
-        return {'markdown': res.strip()}
-    except Exception as e:
-        return {'markdown': f"Error generating mind map: {e}"}
-
-
 # ── Dynamic routes (/{module_id} must come LAST) ──────────────────────────────
 
 @router.put('/admin/{module_id}')

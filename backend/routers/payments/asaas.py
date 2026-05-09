@@ -478,6 +478,29 @@ async def asaas_webhook(request: Request):
         payment_id = payment.get('id', '')
         subscription_id = payment.get('subscription', '')  # ID da assinatura no Asaas
         ext_ref = payment.get('externalReference', '')
+        
+        # ── Processamento de Conteúdo Premium ─────────────────────────────
+        if ext_ref.startswith('PREMIUM:'):
+            parts = ext_ref.split(':')
+            if len(parts) >= 3:
+                content_id = parts[1]
+                username = parts[2]
+                
+                if event in ('PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED'):
+                    get_client().table('premium_purchases').update({
+                        'status': 'confirmed'
+                    }).eq('username', username).eq('content_id', content_id).execute()
+                    print(f'[Webhook] ✅ Compra Premium liberada: {username} - Content: {content_id}')
+                
+                elif event in ('PAYMENT_REFUNDED', 'CHARGEBACK_REQUESTED', 'PAYMENT_DELETED'):
+                    get_client().table('premium_purchases').update({
+                        'status': 'revoked'
+                    }).eq('username', username).eq('content_id', content_id).execute()
+                    print(f'[Webhook] ❌ Compra Premium revogada: {username} - Content: {content_id}')
+            
+            return {'ok': True}
+
+        # ── Processamento de Assinaturas ─────────────────────────────────
         parts = ext_ref.split('|') if '|' in ext_ref else [ext_ref, 'basic']
         username = parts[0]
         plan_type = parts[1] if len(parts) > 1 else 'basic'

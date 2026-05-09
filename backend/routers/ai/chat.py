@@ -184,9 +184,9 @@ async def chat_ws(
         await websocket.close(code=4001, reason='Token inválido')
         return
 
-    print(f'[WS] Aceitando conexÃ£o com subprotocol: {subprotocol}')
+    #print(f'[WS] Aceitando conexÃ£o com subprotocol: {subprotocol}')
     await websocket.accept(subprotocol=subprotocol)
-    print(f'[WS] ConexÃ£o aceita para: {payload.get("sub")}')
+    #print(f'[WS] ConexÃ£o aceita para: {payload.get("sub")}')
     username = payload['sub']
     pending_drill_target = None
 

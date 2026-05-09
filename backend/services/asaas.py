@@ -152,6 +152,40 @@ async def get_subscription_payments(subscription_id: str) -> list:
             return []
 
 
+# ── Pagamentos Avulsos ─────────────────────────────────────────────────────────
+
+
+async def create_payment(
+    customer_id: str,
+    billing_type: str,
+    value: float,
+    due_date: str,
+    description: str = None,
+    external_reference: str = None,
+) -> dict:
+    """Cria uma cobrança avulsa (Pix, Boleto ou Cartão)."""
+    url = f'{get_base_url()}/payments'
+    payload = {
+        'customer': customer_id,
+        'billingType': billing_type,
+        'value': value,
+        'dueDate': due_date,
+        'description': description,
+        'externalReference': external_reference,
+    }
+    payload = {k: v for k, v in payload.items() if v is not None}
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.post(
+                url, json=payload, headers=get_headers(), timeout=20
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as exc:
+            print(f'[Asaas] Erro ao criar pagamento: {exc.response.text}')
+            raise Exception(f'Erro Asaas: {exc.response.text}')
+
+
 # ── PIX ───────────────────────────────────────────────────────────────────────
 
 
@@ -163,5 +197,6 @@ async def get_pix_qr_code(payment_id: str) -> dict:
             resp.raise_for_status()
             return resp.json()
         except Exception as exc:
-            print(f'[Asaas] Erro ao obter QR Code Pix: {exc}')
-            raise
+            # Apenas loga o erro, não quebra o fluxo
+            print(f'[Asaas] Aviso: QR Code indisponível para {payment_id}: {exc}')
+            return {"encodedImage": None, "payload": None}

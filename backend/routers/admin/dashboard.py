@@ -192,7 +192,7 @@ async def create_simulation(data: dict, service: DashboardService = Depends()):
     db = get_client()
     
     # Limpeza de dados para evitar erro de coluna inexistente
-    allowed_fields = {'name', 'slug', 'description', 'icon', 'difficulty', 'system_prompt', 'is_active'}
+    allowed_fields = {'name', 'slug', 'description', 'icon', 'emoji', 'difficulty', 'system_prompt', 'is_active'}
     filtered_data = {k: v for k, v in data.items() if k in allowed_fields}
     
     if 'difficulty' in filtered_data and filtered_data['difficulty']:
@@ -235,7 +235,7 @@ async def update_simulation(simulation_id: str, data: dict):
     from services.database import get_client
     db = get_client()
     
-    allowed_fields = {'name', 'slug', 'description', 'icon', 'difficulty', 'system_prompt', 'greeting', 'is_active'}
+    allowed_fields = {'name', 'slug', 'description', 'icon', 'emoji', 'difficulty', 'system_prompt', 'greeting', 'is_active'}
     filtered_data = {k: v for k, v in data.items() if k in allowed_fields}
     
     if 'difficulty' in filtered_data and filtered_data['difficulty']:

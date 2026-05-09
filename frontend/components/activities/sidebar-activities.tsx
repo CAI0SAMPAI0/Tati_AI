@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, User, Trophy, ChartBar, MessageSquare, X, TrendingUp } from 'lucide-react';
+import { BookOpen, User, Trophy, ChartBar, MessageSquare, X, TrendingUp, Zap } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
 
 interface SidebarActivitiesProps {
   isOpen: boolean;
@@ -14,9 +15,14 @@ interface SidebarActivitiesProps {
 export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
   
   const pathname = usePathname();
+  const { user } = useAuth();
+
+  // Durante a fase de testes, apenas o professor/programador vê o Hub Premium
+  const isAdminOrSpecial = user?.is_admin || user?.role === 'admin' || user?.role === 'teacher' || user?.username === 'Caio' || user?.username === 'caio' || user?.email?.includes('caio');
 
   const navItems = [
     { href: '/activities', icon: <BookOpen size={20} />, label: 'Activities' },
+    ...(isAdminOrSpecial ? [{ href: '/hub-premium', icon: <Zap size={20} />, label: 'Premium Hub' }] : []),
     { href: '/progress', icon: <TrendingUp size={20} />, label: 'Progress' },
     { href: '/achievements', icon: <Trophy size={20} />, label: 'Achievements' },
     { href: '/competitions', icon: <ChartBar size={20} />, label: 'Competitions' },

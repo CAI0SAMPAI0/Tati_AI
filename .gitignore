@@ -39,17 +39,12 @@ ngrok.exe
 ngrok.yml
 rhubarb.exe
 
-# AI dev tools
-.qwen/
-.claude/
-.gemini/
 
 # Dev docs (not for production)
 backend/TESTING_GUIDE.md
 backend/EXTERNAL_SERVICES_CONFIG.md
 backend/STUDENT_FEATURES_SUGGESTIONS.md
 backend/IMPLEMENTATION_STATUS.md
-
 
 # Test files
 tests/
@@ -59,13 +54,10 @@ test_*.py
 .pytest_cache/
 pytest-cache-files-*/
 debug_ui/
-frontend/debug_ui/
-frontend/js/debug_bypass.js
 debug_ui.py
 .ruff_cache
 .sentryclirc
 test_admin.py
-
 
 # Temp
 *.tmp
@@ -81,8 +73,6 @@ backend/services/file_gen.py
 agents/
 design_system/
 Tati_AI.zip
-.verdent/
-frontend_antigo
 
 PRD.md
 IMPLEMENTATION_PLAN.md
