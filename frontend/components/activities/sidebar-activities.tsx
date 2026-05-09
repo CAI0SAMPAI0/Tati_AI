@@ -18,7 +18,7 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
   const { user } = useAuth();
 
   // Durante a fase de testes, apenas o professor/programador vê o Hub Premium
-  const isAdminOrSpecial = user?.is_admin || user?.role === 'admin' || user?.role === 'teacher' || user?.username === 'Caio' || user?.username === 'caio' || user?.email?.includes('caio');
+  const isAdminOrSpecial = user?.role === 'admin' || user?.role === 'teacher' || user?.username === 'Caio' || user?.username === 'caio' || user?.email?.toLowerCase().includes('caio');
 
   const navItems = [
     { href: '/activities', icon: <BookOpen size={20} />, label: 'Activities' },
