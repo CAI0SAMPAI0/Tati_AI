@@ -135,6 +135,7 @@ export default function SimulationsSection() {
           description: updatedSim.description || '',
           difficulty: updatedSim.difficulty || 'all',
           system_prompt: updatedSim.system_prompt || '',
+          emoji: updatedSim.emoji || '🎭',
         });
 
         await invalidateSimulations();

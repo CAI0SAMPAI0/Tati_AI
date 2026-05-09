@@ -12,10 +12,12 @@ import {
   MessageSquare,
   Settings,
   X,
-  Zap
+  Zap,
+  GraduationCap
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
 
 export type DashSection = 'overview' | 'students' | 'reports' | 'modules' | 'flashcards' | 'simulations' | 'premium';
 
@@ -65,20 +67,24 @@ export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose 
       >
         <div className="p-6 shrink-0 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg overflow-hidden bg-primary/20 flex items-center justify-center text-primary">
+            <div className="w-8 h-8 rounded-lg overflow-hidden bg-primary/20 flex items-center justify-center text-primary shrink-0 border border-primary/10">
               <img
                 src="/images/tati_logo.jpg"
-                alt="Tati"
+                alt="Tati AI"
                 className="w-full h-full object-cover"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                  (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const fallback = target.nextElementSibling as HTMLElement;
+                  if (fallback) fallback.style.display = 'flex';
                 }}
               />
-              <span className="hidden text-xs font-bold">T</span>
+              <div style={{ display: 'none' }} className="w-full h-full items-center justify-center bg-primary text-white">
+                <GraduationCap size={16} />
+              </div>
             </div>
-            <div>
-              <div className="font-display text-[0.9rem] font-bold tracking-tight text-text">Teacher Tati</div>
+            <div className="min-w-0">
+              <div className="font-display text-[0.9rem] font-bold tracking-tight text-text truncate">Teacher Tati</div>
               <div className="text-[0.65rem] font-bold text-primary uppercase tracking-widest leading-none">Dashboard</div>
             </div>
           </div>
