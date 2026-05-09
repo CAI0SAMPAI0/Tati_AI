@@ -195,7 +195,7 @@ export default function PremiumHubPage() {
 
                 <div className="mt-auto">
                   <Button 
-                    variant={item.is_purchased ? "secondary" : "default"}
+                    variant={item.is_purchased ? "secondary" : "primary"}
                     className="w-full justify-between group/btn"
                     onClick={() => handleAccess(item)}
                     loading={isInitiatingPayment && selectedItem?.id === item.id}
