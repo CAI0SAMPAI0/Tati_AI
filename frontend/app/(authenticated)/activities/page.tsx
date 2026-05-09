@@ -49,6 +49,7 @@ interface SimulationItem {
   name: string;
   description?: string;
   difficulty?: string;
+  icon?: string;
 }
 interface PodcastItem {
   id: string;
@@ -376,7 +377,7 @@ export default function ActivitiesPage() {
                     {simulations.length > 0 ? simulations.map((s) => (
                       <ActivityCard
                         key={s.id}
-                        title={s.name}
+                        title={s.icon ? `${s.icon} ${s.name}` : s.name}
                         description={s.description || 'Choose a scenario and practice English in everyday situations'}
                         type="simulation"
                         onClick={() => router.push(`/voice?simulation_id=${s.id}`)}

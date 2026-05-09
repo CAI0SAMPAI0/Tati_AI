@@ -247,6 +247,65 @@ def notify_new_activity(
         print(f'[Notif] Erro ao enviar e-mail de nova atividade: {exc}')
 
 
+def notify_all_students(
+    category: str,
+    title: str,
+    message: str,
+    url: str = '/activities',
+    send_email: bool = False
+) -> None:
+    """
+    Notifica todos os alunos sobre novos conteúdos (Simulações, Quizzes, etc).
+    Evita duplicados baseados na mensagem e categoria.
+    """
+    import asyncio
+    from services.database import get_client
+    
+    db = get_client()
+    try:
+        res = db.table('users').select('username, name, email').execute()
+        users = res.data or []
+        
+        for u in users:
+            username = u.get('username')
+            if not username: continue
+            
+            # Verificação de duplicados (mesma categoria e mensagem nas últimas 24h)
+            try:
+                check = db.table('notifications')\
+                    .select('id')\
+                    .eq('username', username)\
+                    .eq('category', category)\
+                    .eq('body', message)\
+                    .limit(1)\
+                    .execute()
+                if check.data:
+                    continue
+            except:
+                pass
+
+            create_notification(
+                username=username,
+                category=category,
+                title=title,
+                message=message,
+                send_push=True,
+                push_url=url
+            )
+            
+            if send_email and u.get('email'):
+                try:
+                    from services.email import EmailSender
+                    EmailSender().send_new_activity_email(
+                        u['email'], u.get('name', username), message, f'https://tati-ai.vercel.app{url}'
+                    )
+                except:
+                    pass
+                    
+    except Exception as e:
+        print(f'[Notif] Erro ao notificar todos: {e}')
+
+
 def notify_welcome(username: str, name: str) -> None:
     create_notification(
         username=username,

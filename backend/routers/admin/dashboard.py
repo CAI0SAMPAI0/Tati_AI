@@ -206,10 +206,27 @@ async def create_simulation(data: dict, service: DashboardService = Depends()):
     if 'system_prompt' not in filtered_data or not filtered_data['system_prompt']:
         filtered_data['system_prompt'] = f"You are a helpful assistant for the scenario {filtered_data.get('name', 'English Practice')}."
     
-    if 'difficulty' not in filtered_data:
+    if 'difficulty' in filtered_data:
         filtered_data['difficulty'] = str(data.get('level') or data.get('difficulty') or 'all').lower()
 
-    return db.table('simulations').insert(filtered_data).execute()
+    res = db.table('simulations').insert(filtered_data).execute()
+
+    # Desabilitado: Notificação global de nova simulação
+    """
+    if res.data:
+        try:
+            from services.notifications import notify_all_students
+            notify_all_students(
+                category='new_simulation',
+                title='New Simulation Available! 🎭',
+                message=f"New scenario: {filtered_data.get('name', 'English Practice')}. Try it now!",
+                url='/simulation.html'
+            )
+        except Exception as e:
+            print(f'[Admin] Erro ao notificar simulação: {e}')
+    """
+
+    return res
 
 
 @router.put('/simulations/{simulation_id}')
@@ -293,7 +310,24 @@ async def create_flashcard_deck(data: dict, service: DashboardService = Depends(
         'flashcards': data.get('flashcards', []),
         'is_published': True
     }
-    return db.table('modules').insert(payload).execute()
+    res = db.table('modules').insert(payload).execute()
+    
+    # Desabilitado: Notificação global de flashcards
+    """
+    if res.data:
+        try:
+            from services.notifications import notify_all_students
+            notify_all_students(
+                category='new_flashcards',
+                title='New Flashcards! 🗂️',
+                message=f"New deck: {payload['title']}. Boost your vocabulary!",
+                url='/activities.html?tab=flashcards'
+            )
+        except Exception as e:
+            print(f'[Admin] Erro ao notificar flashcards: {e}')
+    """
+            
+    return res
 
 
 @router.put('/flashcards/{deck_id}')

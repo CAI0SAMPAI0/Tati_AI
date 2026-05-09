@@ -128,11 +128,41 @@ async def discover_personalized_podcasts(user_id: str, username: str, user_level
         existing_ids = {str(r.get('id')) for r in existing_podcasts if r.get('id')}
         created_titles: list[str] = []
         valid_count = 0
+        notifiable_titles: list[str] = []
+        
+        # Filtros de visibilidade (sincronizados com podcasts.py)
+        MIN_DURATION_SECONDS = 5 * 60
+        MAX_DURATION_SECONDS = 25 * 60
+        BANNED_TOKENS = [
+            'full course', '6 hour', '8 hour', '10 hour', 'live stream', 'livestream',
+            '60 minutes', '60 mins', '45 minutes', '45 mins', '30 minutes', '30 mins',
+            '1 hour', '2 hours', '3 hours', '1 hr', '2 hr', '3 hr'
+        ]
+
+        def _duration_to_seconds(dur_str: str) -> int:
+            if not dur_str or ':' not in dur_str: return 0
+            parts = dur_str.split(':')
+            try:
+                if len(parts) == 2: return int(parts[0]) * 60 + int(parts[1])
+                elif len(parts) == 3: return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+            except: return 0
+            return 0
+
         for i, is_ok in enumerate(verifications):
             if not is_ok:
                 continue
             
             p, video_id = video_data_list[i]
+            
+            # Checa se o vídeo passaria pelos filtros de visibilidade do router
+            title_desc = f"{p.get('title', '')} {p.get('description', '')}".lower()
+            dur_sec = _duration_to_seconds(p.get('duration', ''))
+            
+            is_visible = True
+            if any(token in title_desc for token in BANNED_TOKENS):
+                is_visible = False
+            if dur_sec > 0 and (dur_sec < MIN_DURATION_SECONDS or dur_sec > MAX_DURATION_SECONDS):
+                is_visible = False
 
             p['user_id'] = username
             p['level'] = user_level  # Garante que o nível não seja nulo
@@ -144,32 +174,19 @@ async def discover_personalized_podcasts(user_id: str, username: str, user_level
             # Upsert em threadpool
             await run_in_threadpool(lambda: db.table('podcasts').upsert(p).execute())
             valid_count += 1
-            if str(p['id']) not in existing_ids:
-                created_titles.append(p.get('title') or 'New podcast')
+            
+            if str(p['id']) not in existing_ids and is_visible:
+                # notifiable_titles.append(p.get('title') or 'New podcast')
+                pass
 
-        # Dispara notificação de nova atividade (async/fire-and-forget logic)
+        # Desabilitado conforme solicitação do usuário: Notificações apenas para troféus e ofensiva
+        """
         try:
             from services.notifications import notify_new_activity
-
-            db_inner = get_client()
-            user_row = (
-                db_inner.table('users')
-                .select('name, email')
-                .eq('username', username)
-                .single()
-                .execute()
-                .data
-            )
-            if user_row and created_titles:
-                notify_new_activity(
-                    username=username,
-                    student_name=user_row.get('name') or username,
-                    student_email=user_row.get('email'),
-                    activity_title=f"New podcast: {created_titles[0] if created_titles else 'New podcast'}",
-                    activity_url='https://tati-ai.vercel.app/activities.html?tab=podcasts',
-                )
+            ...
         except Exception as e:
             print(f'[Discovery] Erro ao notificar podcast: {e}')
+        """
 
         if valid_count > 0:
             from routers.activities.podcasts import (

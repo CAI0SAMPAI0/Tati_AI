@@ -408,6 +408,21 @@ class ActivityService:
                     if prepared_questions:
                         self.db.table('quiz_questions').insert(prepared_questions).execute()
 
+            # Desabilitado: Notificação global de nova atividade
+            """
+            if not module_id and filtered_data.get('is_published'):
+                try:
+                    from services.notifications import notify_all_students
+                    notify_all_students(
+                        category='new_module',
+                        title='New Activity Available! 📚',
+                        message=f"New quiz available: {filtered_data.get('title', 'English Practice')}. Try it now!",
+                        url='/activities.html'
+                    )
+                except Exception as e:
+                    print(f'[ActivityService] Erro ao notificar novo módulo: {e}')
+            """
+
             return res.data[0] if res.data else {}
 
         result = await run_in_threadpool(_save)

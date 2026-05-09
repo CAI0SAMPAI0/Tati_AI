@@ -339,6 +339,7 @@ class DashboardService:
 
     async def get_all_simulations(self) -> List[Dict[str, Any]]:
         """Lista todas as simulações registradas (templates para o admin)."""
+        from services.simulation import DEFAULT_SIMULATIONS
 
         def _fetch() -> List[Dict[str, Any]]:
             try:
@@ -350,10 +351,17 @@ class DashboardService:
                     .execute()
                     .data
                 )
-                return result or []
+                db_data = result or []
+                
+                # Mescla com os padrões fixos por slug
+                scenarios_by_slug = {s['slug']: s for s in DEFAULT_SIMULATIONS}
+                for s in db_data:
+                    scenarios_by_slug[s['slug']] = s
+                    
+                return list(scenarios_by_slug.values())
             except Exception as e:
                 print(f'[DashboardService] Erro ao buscar simulações: {e}')
-                return []
+                return DEFAULT_SIMULATIONS
 
         return await run_in_threadpool(_fetch)
 

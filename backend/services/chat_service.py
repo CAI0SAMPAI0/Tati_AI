@@ -384,10 +384,14 @@ class ChatService:
             if audio_b64 and not is_pdf_generation:
                 await websocket.send_json({'type': 'audio_response', 'audio': audio_b64, 'content': full_response})
 
-            # 2. Podcast Discovery (AGORA DEPOIS DO TTS)
-            from services.podcast_discovery import discover_personalized_podcasts
-            profile = await self.get_user_profile(username)
-            asyncio.create_task(discover_personalized_podcasts(username, username, profile.level))
+            # 1. Podcast Discovery (Atraso de 2s para não impactar a resposta imediata)
+            async def _delayed_discovery():
+                await asyncio.sleep(2)
+                from services.podcast_discovery import discover_personalized_podcasts
+                profile = await self.get_user_profile(username)
+                await discover_personalized_podcasts(username, username, profile.level)
+            
+            asyncio.create_task(_delayed_discovery())
 
             # 2. Trophies
             from services.trophy_service import check_chat_trophies
@@ -413,7 +417,9 @@ class ChatService:
             'should be', 'correct form', 'mistake', 'incorrect', '✅ correct',
             'grammar error', 'wrong', 'you said', 'instead of', 'proper way',
             'common mistake', 'remember that', 'note that', 'actually',
-            'o correto é', 'você disse', 'forma correta', 'erro comum'
+            'o correto é', 'você disse', 'forma correta', 'erro comum',
+            'correction', 'the correct', 'better to say', 'would be better',
+            'correto seria', 'correção'
         ]
         
         if any(m in response.lower() for m in markers):
@@ -424,17 +430,19 @@ class ChatService:
             count = (int(cached) + 1) if cached else 1
             await cache_set(error_key, str(count), ttl=604800)
 
-            if count >= 2:
+            # Sprint 9: Agrupar pelo menos 5 erros antes de gerar os exercícios
+            if count >= 5:
                 await cache_set(error_key, '0', ttl=604800)
                 from services.exercise_generator import generate_exercises_from_history
 
                 quiz_id = await generate_exercises_from_history(
                     username, 'Context simulated from history'
                 )
-                if quiz_id:
-                    await websocket.send_json(
-                    {'type': 'status', 'text': '🎯 New practice activity created based on your errors!'}
-                )
+                # Desabilitado: Notificação de chat sobre nova atividade personalizada
+                # if quiz_id:
+                #    await websocket.send_json(
+                #    {'type': 'status', 'text': '🎯 New practice activity created based on your errors!'}
+                # )
 
     async def extract_text_from_file(self, filename: str, content_b64: str) -> str:
         ext = filename.lower().rsplit('.', 1)[-1] if '.' in filename else ''

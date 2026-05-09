@@ -238,7 +238,11 @@ async def get_podcast_recommendations(
     # Para todos os níveis: entre 5 e 25 minutos
     MIN_DURATION_SECONDS = 5 * 60
     MAX_DURATION_SECONDS = 25 * 60
-    banned_tokens = ['full course', '6 hour', '8 hour', '10 hour', 'live stream', 'livestream']
+    banned_tokens = [
+        'full course', '6 hour', '8 hour', '10 hour', 'live stream', 'livestream',
+        '60 minutes', '60 mins', '45 minutes', '45 mins', '30 minutes', '30 mins',
+        '1 hour', '2 hours', '3 hours', '1 hr', '2 hr', '3 hr'
+    ]
     
     filtered_duration = []
     for item in visible_catalog:

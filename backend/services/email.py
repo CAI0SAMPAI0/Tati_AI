@@ -1,48 +1,86 @@
 from __future__ import annotations
 
-import base64
 import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
 
-import resend
 from core.config import settings
 
 
 class EmailSender:
-
     def __init__(self) -> None:
-        resend.api_key = settings.resend_api_key
-        self._FROM = 'Teacher Tati <tatiai@resend.dev>'
-        self._ready = bool(settings.resend_api_key)
+        self.smtp_host = getattr(settings, 'smtp_host', 'smtp.gmail.com')
+        # 1. Correção: Garantir que a porta seja um número inteiro
+        self.smtp_port = int(getattr(settings, 'smtp_port', 465)) 
+        self.smtp_user = getattr(settings, 'smtp_user', '')
+        self.smtp_password = getattr(settings, 'smtp_password', '')
+        
+        # 2. Correção: O remetente TEM que ser o mesmo e-mail usado no SMTP_USER
+        self._FROM = f'Teacher Tati <{self.smtp_user}>' 
+        
+        self._ready = bool(self.smtp_host and self.smtp_user and self.smtp_password)
 
     def _send(self, to_email: str, subject: str, html: str, attachments: list | None = None) -> bool:
         if not self._ready:
-            print(f'[EmailSender] Resend not configured. Email to {to_email}: {subject}')
+            print(f'[EmailSender] SMTP not configured. Email to {to_email}: {subject}')
             return False
+
+        msg = MIMEMultipart()
+        msg['From'] = self._FROM
+        msg['To'] = to_email
+        msg['Subject'] = subject
+
+        msg.attach(MIMEText(html, 'html'))
+
+        if attachments:
+            for file_path in attachments:
+                if os.path.exists(file_path):
+                    with open(file_path, 'rb') as f:
+                        part = MIMEApplication(f.read(), Name=os.path.basename(file_path))
+                        part['Content-Disposition'] = f'attachment; filename="{os.path.basename(file_path)}"'
+                        msg.attach(part)
 
         try:
-            params: dict = {
-                'from': self._FROM,
-                'to': to_email,
-                'subject': subject,
-                'html': html,
-            }
-            if attachments:
-                att_list = []
-                for file_path in attachments:
-                    if os.path.exists(file_path):
-                        with open(file_path, 'rb') as f:
-                            att_list.append({
-                                'filename': os.path.basename(file_path),
-                                'content': base64.b64encode(f.read()).decode(),
-                            })
-                if att_list:
-                    params['attachments'] = att_list
+            # 3. Correção: Suporte dual (SSL Implícito vs STARTTLS)
+            # Port 465: Requer SMTP_SSL (conexão já nasce criptografada)
+            # Port 587: Requer SMTP + STARTTLS (apresentação em texto e depois criptografa)
+            
+            if self.smtp_port == 465:
+                server_class = smtplib.SMTP_SSL
+                use_starttls = False
+            else:
+                server_class = smtplib.SMTP
+                use_starttls = True
 
-            resend.Emails.send(params)
+            with server_class(self.smtp_host, self.smtp_port, timeout=15) as server:
+                server.set_debuglevel(0)
+                server.ehlo()
+                
+                if use_starttls and server.has_extn('STARTTLS'):
+                    server.starttls()
+                    server.ehlo()
+                
+                server.login(self.smtp_user, self.smtp_password)
+                server.send_message(msg)
             return True
-        except Exception as exc:
-            print(f'[EmailSender] Resend error: {exc}')
+        except smtplib.SMTPConnectError:
+            print(f'[EmailSender] Connection Failed: Could not connect to {self.smtp_host}:{self.smtp_port}')
             return False
+        except smtplib.SMTPAuthenticationError:
+            print(f'[EmailSender] Auth Failed: Invalid username or password (check App Password)')
+            return False
+        except smtplib.SMTPException as smtpe:
+            print(f'[EmailSender] SMTP Protocol Error: {smtpe}')
+            return False
+        except Exception as exc:
+            print(f'[EmailSender] Unexpected Error: {exc}')
+            return False
+
+    # =====================================================================
+    # Seus métodos abaixo continuam inalterados! O "motor" já foi trocado.
+    # =====================================================================
 
     def send_report_email(self, to_email: str, name: str, pdf_path: str, lang: str = 'en-US') -> bool:
         t = {
@@ -91,9 +129,7 @@ class EmailSender:
 </div>
 """
 
-    def send_submission_notification(
-        self, student_name: str, activity_title: str
-    ) -> bool:
+    def send_submission_notification(self, student_name: str, activity_title: str) -> bool:
         subject = f'New submission: {activity_title}'
         html = f"""
 <div style="font-family:Arial,sans-serif;max-width:600px;">
@@ -103,15 +139,11 @@ class EmailSender:
 <p>Access the dashboard to review it.</p>
 </div>
 """
-        admin_email = settings.smtp_user or 'onboarding@resend.dev'
+        admin_email = self.smtp_user or 'admin@seudominio.com'
         return self._send(admin_email, subject, html)
 
     def send_feedback_notification(
-        self,
-        student_name: str,
-        student_email: str,
-        category: str,
-        message: str,
+        self, student_name: str, student_email: str, category: str, message: str,
     ) -> bool:
         category_labels = {
             'bug': '🐛 Bug',
@@ -130,16 +162,11 @@ class EmailSender:
 <p><strong>Message:</strong><br>{message.replace(chr(10), '<br>')}</p>
 </div>
 """
-        admin_email = settings.smtp_user or 'onboarding@resend.dev'
+        admin_email = self.smtp_user or 'admin@seudominio.com'
         return self._send(admin_email, subject, html)
 
     def send_correction_notification(
-        self,
-        student_name: str,
-        student_email: str,
-        activity_title: str,
-        score: int,
-        feedback: str,
+        self, student_name: str, student_email: str, activity_title: str, score: int, feedback: str,
     ) -> bool:
         subject = f'Activity Graded: {activity_title}'
 
@@ -231,11 +258,7 @@ View My Trophies 🏆
         return self._send(to_email, subject, html)
 
     def send_new_activity_email(
-        self,
-        to_email: str,
-        name: str,
-        activity_title: str,
-        activity_url: str = 'https://tati-ai.vercel.app/activities',
+        self, to_email: str, name: str, activity_title: str, activity_url: str = 'https://tati-ai.vercel.app/activities',
     ) -> bool:
         subject = f'📚 New activity available: {activity_title} — Teacher Tati'
         html = f"""

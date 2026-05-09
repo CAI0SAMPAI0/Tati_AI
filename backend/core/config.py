@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     smtp_password: str = ''
     smtp_from: str = ''
     resend_api_key: str = ''
+    mailjet_api_key: str = ''
+    mailjet_secret_key: str = ''
 
     # Push notifications (Web Push / VAPID)
     vapid_public_key: str = ''

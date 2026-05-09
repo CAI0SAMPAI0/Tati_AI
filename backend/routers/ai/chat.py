@@ -155,9 +155,9 @@ async def chat_ws(
     simulation_id: str | None = Query(None),
     service: ChatService = Depends(),
 ):
-    print(f'--- [WS DEBUG START] ---')
+    '''print(f'--- [WS DEBUG START] ---')
     print(f'[WS] Query Token: {token[:10] if token else "None"}')
-    print(f'[WS] Headers: {dict(websocket.headers)}')
+    print(f'[WS] Headers: {dict(websocket.headers)}')'''
     
     from core.security import decode_token
 
@@ -165,7 +165,7 @@ async def chat_ws(
     ws_token = token
     subprotocol = None
     header_protocols = websocket.headers.get('sec-websocket-protocol', '')
-    print(f'[WS] Sec-WebSocket-Protocol Header: {header_protocols}')
+    #print(f'[WS] Sec-WebSocket-Protocol Header: {header_protocols}')
     
     if header_protocols:
         protocols = [p.strip() for p in header_protocols.split(',')]
@@ -175,9 +175,9 @@ async def chat_ws(
                 subprotocol = 'access_token'
                 print(f'[WS] Extracted token from subprotocol: {ws_token[:10]}...')
 
-    print(f'[WS] Final ws_token: {ws_token[:10] if ws_token else "None"}')
+    # print(f'[WS] Final ws_token: {ws_token[:10] if ws_token else "None"}')
     payload = decode_token(ws_token) if ws_token else None
-    print(f'[WS] Payload: {payload}')
+    # print(f'[WS] Payload: {payload}')
 
     if not payload:
         print(f'[WS] Rejeitando: Payload nulo')
@@ -194,17 +194,15 @@ async def chat_ws(
     if simulation_id:
         try:
             # Tenta pegar o conv_id do query se existir, ou espera a primeira mensagem
-            # Mas o melhor é checar se já existe histórico para o simulation_id + username
             from services.history import load_history
-            # Como não temos conv_id ainda (talvez), vamos esperar a primeira mensagem do user 
-            # OU se o frontend passar o conv_id no query, podemos usar.
+            # Como não temos conv_id ainda (talvez), espera a primeira mensagem do user 
             pass
         except Exception: pass
 
     try:
         while True:
             raw = await websocket.receive_text()
-            print(f'[WS] Mensagem recebida: {raw[:50]}...')
+            # print(f'[WS] Mensagem recebida: {raw[:50]}...')
             try:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
@@ -215,7 +213,7 @@ async def chat_ws(
                 await websocket.send_json({'type': 'pong'})
                 continue
 
-            print(f'[WS] Processando: {msg.get("type")}')
+            #print(f'[WS] Processando: {msg.get("type")}')
             try:
                 pending_drill_target = await service.process_chat_message(
                     websocket, msg, username, pending_drill_target, simulation_id=simulation_id
@@ -230,12 +228,12 @@ async def chat_ws(
                         'message': 'Desculpe, tive um problema de conexão. Por favor, tente novamente.'
                     })
                 except: pass
-            print(f'[WS] Processamento finalizado')
+            #print(f'[WS] Processamento finalizado')
 
     except WebSocketDisconnect:
-        print(f'[WS] Cliente desconectado')
+        # print(f'[WS] Cliente desconectado')
         pass
     except Exception as exc:
-        print(f'[WS] Erro CRÍTICO: {exc}')
+        #print(f'[WS] Erro CRÍTICO: {exc}')
         import traceback
         traceback.print_exc()

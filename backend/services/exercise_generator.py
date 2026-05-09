@@ -191,6 +191,15 @@ async def generate_exercises_from_history(
         except Exception:
             pass
 
+        # Notifica o usuário sobre o novo exercício personalizado (DESABILITADO)
+        """
+        try:
+            from services.notifications import notify_new_activity
+            ...
+        except Exception as e:
+             print(f'[ExerciseGen] Erro ao notificar: {e}')
+        """
+
         print(f'[ExerciseGen] Quiz gerado com sucesso: {quiz_id} para {username}')
         return quiz_id
 
