@@ -159,6 +159,30 @@ export default function SettingsPage() {
             </div>
       </section>
 
+      {/* App Installation */}
+      <section className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
+        <div className="p-6 border-b border-border bg-bg-secondary/30 flex items-center gap-3">
+          <Smartphone size={20} className="text-primary" />
+          <h2 className="font-bold text-sm uppercase tracking-wider">Mobile App</h2>
+        </div>
+        <div className="p-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-bold text-text mb-0.5">Install Tati AI</p>
+              <p className="text-xs text-text-muted">Get the native app for Android or add to Home Screen on iOS</p>
+            </div>
+            <Button
+              variant="secondary"
+              className="gap-2 text-xs font-bold"
+              onClick={() => router.push('/install')}
+            >
+              <Download size={14} />
+              Install App
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* Tour */}
       <section className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
         <div className="p-6 border-b border-border bg-bg-secondary/30 flex items-center gap-3">
