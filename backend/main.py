@@ -29,7 +29,7 @@ except Exception as e:
     print(f'[Startup] Erro ao iniciar Sentry: {e}')
 
 
-# ── App ───────────────────────────────────────────────────────────────────────
+#  App 
 
 app = FastAPI(
     title='Teacher Tati AI',
@@ -38,7 +38,7 @@ app = FastAPI(
 )
 
 
-# ── Middlewares ───────────────────────────────────────────────────────────────
+#  Middlewares 
 
 
 class ForceHTTPSMiddleware(BaseHTTPMiddleware):
@@ -67,6 +67,7 @@ app.add_middleware(
         'http://localhost:8000',
         'http://127.0.0.1:3000',
         'http://localhost:3000',
+        'http://192.168.1.3:3000',  # Local IP for mobile device access
         'https://tati-ai.vercel.app',
         'https://tati-ai.vercel.app/',
         'https://tati-ai-git-main-caio-andrades-projects.vercel.app',
@@ -74,7 +75,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
-    allow_origin_regex='http://(localhost|127\.0\.0\.1):[0-9]+',
+    allow_origin_regex='http://(localhost|127\.0\.0\.1|192\.168\.1\.3):[0-9]+',
 )
 
 # Rate Limiting (Upstash Redis)
@@ -83,14 +84,14 @@ from core.rate_limiter import setup_rate_limiting
 setup_rate_limiting(app)
 
 
-# ── Routers (registro centralizado) ──────────────────────────────────────────
+#  Routers (registro centralizado) 
 
 from routers import register_all_routers
 
 register_all_routers(app)
 
 
-# ── Health ────────────────────────────────────────────────────────────────────
+#  Health 
 
 
 @app.get('/cors-test')
@@ -99,7 +100,7 @@ async def cors_test() -> dict:
     return {'origins': ['https://tati-ai.vercel.app']}
 
 
-# ── Startup Events ───────────────────────────────────────────────────────────
+#  Startup Events 
 
 
 @app.on_event('startup')
@@ -110,7 +111,7 @@ async def startup_notifications() -> None:
     notification_scheduler.start()
 
 
-# ── Entrypoint ────────────────────────────────────────────────────────────────
+#  Entrypoint 
 
 if __name__ == '__main__':
     import uvicorn
