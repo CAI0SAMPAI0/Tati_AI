@@ -28,7 +28,12 @@ class ActivityService:
             query = self.db.table('modules').select('*, quizzes(*)').eq('is_published', True)
             try:
                 data = query.order('created_at', desc=True).execute().data or []
-            except:
+                print(f"[ActivityService] Módulos carregados: {len(data)}")
+                for m in data:
+                    if m.get('id') == '00000000-0000-0000-0000-000000000001':
+                        print(f"[ActivityService] Módulo mestre encontrado com {len(m.get('quizzes', []))} quizzes.")
+            except Exception as e:
+                print(f"[ActivityService] Erro ao buscar módulos: {e}")
                 data = query.execute().data or []
             
             # Se logado, busca submissões do usuário para estes módulos
@@ -44,7 +49,11 @@ class ActivityService:
 
             # Filtro e anexação de status
             filtered = []
+            MASTER_MODULE_ID = '00000000-0000-0000-0000-000000000001'
             for m in data:
+                if m.get('id') == MASTER_MODULE_ID:
+                    continue
+
                 # Anexa status do usuário
                 score = submissions_map.get(m['id'])
                 m['user_status'] = {
@@ -138,6 +147,30 @@ class ActivityService:
         except Exception as e:
             print(f'[ActivityService] Erro ao buscar submissões: {e}')
             return []
+
+    async def get_weekly_tasks(self, username: str) -> Dict[str, Any]:
+        """Consolida atividades pendentes para o Weekly Goal."""
+        def _fetch():
+            # 1. Busca IDs de quizzes concluídos via submissions
+            done_quizzes = self.db.table('activity_submissions').select('metadata').eq('username', username).eq('activity_type', 'quiz').execute().data or []
+            done_ids = {str(r['metadata'].get('quiz_id')) for r in done_quizzes if r.get('metadata') and r['metadata'].get('quiz_id')}
+
+            # 2. Quizzes pendentes (não feitos)
+            all_quizzes = self.db.table('quizzes').select('id, title, description, module_id').eq('username', username).eq('is_active', True).execute().data or []
+            pending_quizzes = [q for q in all_quizzes if str(q['id']) not in done_ids]
+
+            # 3. Exercícios IA (personalized_quiz) pendentes via attempts
+            attempts = self.db.table('user_exercise_attempts').select('exercise_id').eq('username', username).eq('status', 'pending').execute().data or []
+            
+            # 4. Simulações pendentes
+            sims = self.db.table('simulation_attempts').select('simulation_id').eq('username', username).eq('status', 'not_started').execute().data or []
+            
+            return {
+                'quizzes': pending_quizzes,
+                'ai_exercises': attempts,
+                'simulations': sims
+            }
+        return await run_in_threadpool(_fetch)
 
     async def get_all_submissions(self) -> List[Dict[str, Any]]:
         """Busca todas as submissões (admin)."""
