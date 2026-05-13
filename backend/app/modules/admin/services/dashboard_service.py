@@ -190,44 +190,99 @@ class DashboardService:
     # ── Relatórios ──────────────────────────────────────────────────────────
 
     async def get_reports_overview(self) -> Dict[str, Any]:
-        """Visão geral de performance da turma."""
-        
+        """Visão geral de performance da turma — retorna dados para os gráficos do frontend."""
+
         def _fetch():
             try:
-                res = self.db.table('user_errors').select('category', count='exact').execute()
-                total_errors = res.count or 0
-                
-                # Agrupamento simples por categoria
-                cat_res = self.db.table('user_errors').select('category').execute().data or []
-                by_category = {}
-                for r in cat_res:
-                    cat = r.get('category', 'others')
-                    by_category[cat] = by_category.get(cat, 0) + 1
-                    
+                # ── Atividade semanal (mensagens por dia nos últimos 7 dias) ──────
+                weekly_activity = [0] * 7
+                today = date.today()
+                # Segunda-feira = índice 0, Domingo = índice 6
+                week_start = today - timedelta(days=today.weekday())
+
+                try:
+                    since_iso = datetime.combine(week_start, datetime.min.time()).replace(tzinfo=timezone.utc).isoformat()
+                    msg_rows = (
+                        self.db.table('messages')
+                        .select('date, created_at')
+                        .eq('role', 'user')
+                        .gte('created_at', since_iso)
+                        .execute()
+                        .data
+                        or []
+                    )
+                    for r in msg_rows:
+                        raw = r.get('created_at') or r.get('date') or ''
+                        try:
+                            dt = parse_dt(raw)
+                            day_idx = (dt.date() - week_start).days
+                            if 0 <= day_idx < 7:
+                                weekly_activity[day_idx] += 1
+                        except Exception:
+                            pass
+                except Exception as e:
+                    print(f'[DashboardService] Erro ao buscar atividade semanal: {e}')
+
+                # ── Distribuição de níveis ─────────────────────────────────────────
+                level_distribution: Dict[str, int] = {}
+                try:
+                    user_rows = self.db.table('users').select('level').execute().data or []
+                    for r in user_rows:
+                        lvl = r.get('level') or 'Unknown'
+                        level_distribution[lvl] = level_distribution.get(lvl, 0) + 1
+                except Exception as e:
+                    print(f'[DashboardService] Erro ao buscar níveis: {e}')
+
                 return {
-                    'total_errors_logged': total_errors,
-                    'by_category': by_category
+                    'weekly_activity': weekly_activity,
+                    'level_distribution': level_distribution,
                 }
-            except Exception:
-                return {'total_errors_logged': 0, 'by_category': {}}
+            except Exception as e:
+                print(f'[DashboardService] Erro crítico em get_reports_overview: {e}')
+                return {
+                    'weekly_activity': [0, 0, 0, 0, 0, 0, 0],
+                    'level_distribution': {},
+                }
 
         return await run_in_threadpool(_fetch)
+
 
     async def get_difficulties_stats(self) -> Dict[str, Any]:
         """Retorna distribuição de dificuldades/níveis dos alunos."""
         def _fetch():
             try:
-                res = self.db.table('users').select('level').execute().data or []
-                stats = {}
-                for r in res:
+                user_rows = self.db.table('users').select('username, level, created_at').execute().data or []
+                level_dist: Dict[str, int] = {}
+                alerts = []
+
+                for r in user_rows:
                     lvl = r.get('level') or 'Unknown'
-                    stats[lvl] = stats.get(lvl, 0) + 1
-                return stats
+                    level_dist[lvl] = level_dist.get(lvl, 0) + 1
+
+                    # Alerta: aluno no nível mais básico há mais de 30 dias
+                    if lvl in ('Beginner', 'A1', 'Unknown'):
+                        created = r.get('created_at') or ''
+                        try:
+                            dt = parse_dt(created)
+                            days_since = (datetime.now(timezone.utc) - dt).days
+                            if days_since > 30:
+                                alerts.append({
+                                    'username': r.get('username', '?'),
+                                    'current_difficulty': f'{lvl} ({days_since}d)',
+                                })
+                        except Exception:
+                            pass
+
+                return {
+                    'level_distribution': level_dist,
+                    'alerts': alerts[:10],  # máximo 10 alertas
+                }
             except Exception as e:
-                print(f"[DashboardService] Erro em get_difficulties_stats: {e}")
-                return {}
+                print(f'[DashboardService] Erro em get_difficulties_stats: {e}')
+                return {'level_distribution': {}, 'alerts': []}
 
         return await run_in_threadpool(_fetch)
+
 
     async def get_all_simulations(self) -> List[Dict[str, Any]]:
         """Lista todas as simulações cadastradas."""
