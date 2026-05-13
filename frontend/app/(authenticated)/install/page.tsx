@@ -93,7 +93,7 @@ export default function InstallPage() {
                  Use Tati AI directly in your browser or install it as a desktop app.
                </p>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                 <Button variant="outline" className="gap-2 font-bold" onClick={() => window.open('https://tati-ai.vercel.app', '_blank')}>
+                 <Button variant="secondary" className="gap-2 font-bold" onClick={() => window.open('https://tati-ai.vercel.app', '_blank')}>
                    Open Web Version
                  </Button>
                  <Button className="gap-2 font-bold opacity-50 cursor-not-allowed">
