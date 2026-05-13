@@ -215,7 +215,8 @@ function VoicePageContent() {
       recorder.start();
       setState('listening');
     } catch (err) {
-      toast.error('Connection error. Check if the server is running.');
+      console.error('Mic error:', err);
+      toast.error('Erro de microfone: ' + (err instanceof Error ? err.message : 'Permissão negada ou sem microfone.'));
     }
   };
 

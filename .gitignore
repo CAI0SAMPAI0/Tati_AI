@@ -98,6 +98,5 @@ coverage.xml
 *.db
 
 # Mobile Builds
-*.apk
 *.aab
 mobile_app/capacitor/www/

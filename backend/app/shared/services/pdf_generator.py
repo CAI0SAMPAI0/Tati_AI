@@ -20,7 +20,11 @@ BG_LIGHT = colors.HexColor('#f5f0ff')
 
 # ── Caminhos ──────────────────────────────────────────────────────────────────
 _BASE_DIR = Path(__file__).parent.parent
-_LOGO_PATH = _BASE_DIR.parent / 'frontend' / 'assets' / 'images' / 'tati_logo.jpg'
+_LOGO_CANDIDATES = [
+    Path(__file__).parent.parent.parent.parent / 'assets' / 'images' / 'tati_logo.jpg',
+    Path(__file__).parent.parent.parent.parent.parent / 'frontend' / 'public' / 'images' / 'tati_logo.jpg',
+]
+_LOGO_PATH = next((p for p in _LOGO_CANDIDATES if p.exists()), None)
 
 
 def _make_styles():
@@ -128,7 +132,7 @@ def _header_footer(canvas, doc):
 
     # ── Header ────────────────────────────────────────────────────────────────
     # Logo (se existir)
-    if _LOGO_PATH.exists():
+    if _LOGO_PATH:
         logo_h = 14 * mm
         logo_w = logo_h  # quadrado
         canvas.drawImage(

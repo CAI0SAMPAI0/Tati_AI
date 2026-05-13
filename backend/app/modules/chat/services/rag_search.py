@@ -59,5 +59,5 @@ def obter_contexto_rag(pergunta: str) -> RAGResult:
         return RAGResult(contexto=contexto, fontes='\n'.join(fontes_set))
 
     except Exception as exc:
-        print(f'⚠️ Erro silencioso no RAG: {exc}')
+        #print(f'⚠️ Erro silencioso no RAG: {exc}')
         return RAGResult(contexto='', fontes='')

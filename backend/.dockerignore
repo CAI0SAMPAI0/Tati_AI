@@ -15,7 +15,6 @@ pip-delete-this-directory.txt
 .github
 .env
 data/
-assets/
 tests/
 scratch/
 check_db.py

@@ -24,14 +24,16 @@ export class TatiWebSocket {
     if (!token) return;
 
     const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-    const path = this.config.origin === 'voice' ? '/voice/ws' : '/chat/ws';
-    const baseUrl = isLocal ? 'ws://127.0.0.1:8000' : WS_BASE.replace('http', 'ws');
+    const baseUrl = 'ws://127.0.0.1:8000'; // 8001 local, 8000 deploy
+    const path = '/chat/ws';
     const wsUrl = baseUrl + path;
 
     let finalUrl = `${wsUrl}?token=${token}`;
     if (this.config.simulationId) {
       finalUrl += `&simulation_id=${this.config.simulationId}`;
     }
+    
+    console.log('[DEBUG] Tentando conectar em:', finalUrl);
 
     try {
       this.ws = new WebSocket(finalUrl);

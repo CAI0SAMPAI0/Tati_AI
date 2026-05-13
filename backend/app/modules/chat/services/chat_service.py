@@ -135,10 +135,10 @@ class ChatService:
 
         # 1. Transcrição ou Extração de Arquivo
         if msg_type == 'audio':
-            #print(f'[ChatService] Transcrevendo áudio para {username}...')
+            print(f'[ChatService] Transcrevendo áudio para {username}...')
             audio_bytes = base64.b64decode(msg.get('audio', ''))
             content = await transcribe_audio(audio_bytes, filename='input.webm')
-            #print(f'[ChatService] Transcrição concluída: "{content[:50]}..."')
+            print(f'[ChatService] Transcrição concluída: "{content[:50]}..."')
             await websocket.send_json({'type': 'transcription', 'text': content})
         elif msg_type == 'file':
             filename = msg.get('filename', 'file.txt')

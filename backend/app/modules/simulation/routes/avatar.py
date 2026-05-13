@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 
 router = APIRouter()
 
-_AVATAR_DIR = Path(__file__).parent.parent.parent / 'assets' / 'avatar'
+_AVATAR_DIR = Path(__file__).parent.parent.parent.parent.parent / 'assets' / 'avatar'
 
 _FRAME_FILES: dict[str, str] = {
     'normal': 'avatar_tati_normal.png',
@@ -18,6 +18,12 @@ _FRAME_FILES: dict[str, str] = {
     'bem_aberta': 'avatar_tati_bem_aberta.png',
     'ouvindo': 'avatar_tati_ouvindo.png',
     'piscando': 'avatar_tati_piscando.png',
+    'frame_A': 'frame_A.png',
+    'frame_B': 'frame_B.png',
+    'frame_C': 'frame_C.png',
+    'frame_D': 'frame_D.png',
+    'frame_E': 'frame_E.png',
+    'frame_F': 'frame_F.png',
 }
 
 _EXT_TO_MIME = {

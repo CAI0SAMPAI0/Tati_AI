@@ -48,10 +48,10 @@ async def transcribe_audio(
             # Whisper prompt: verbatim transcription, support mixed PT/EN
             # Expanded common English verbs to improve contextual accuracy
             default_prompt = (
-                'Transcreva exatamente o que foi dito, palavra por palavra. Não traduza. '
-                'Suporta Português e Inglês misturados. '
+                'Transcreva exatamente o que foi dito, palavra por palavra. Ignore ruídos de fundo, cliques ou respiração. '
+                'Se não houver fala clara, não transcreva nada. '
                 'Context: English learning practice. Phonetic accuracy is critical. '
-                "Pay close attention to common verbs: 'buy' (not by/bye), 'eat', 'order', 'want', 'need', 'go', 'work', 'study', 'think', 'believe', 'understand', 'explain', 'practice', 'improve', 'learn'. "
+                "Pay close attention to common verbs: 'buy', 'eat', 'order', 'want', 'need', 'go', 'work', 'study', 'think', 'believe', 'understand', 'explain', 'practice', 'improve', 'learn'. "
                 "Distinguish between 'can' and 'can't', 'do' and 'does', 'did' and 'done'."
             )
             effective_prompt = (

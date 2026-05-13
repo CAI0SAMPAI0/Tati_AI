@@ -15,8 +15,8 @@ FILES_DIR.mkdir(exist_ok=True)
 
 # caminho da logo
 _LOGO_CANDIDATES = [
-    Path(__file__).parent.parent / "frontend" / "assets" / "images" / "tati_logo.jpg",
-    Path(__file__).parent.parent / "assets" / "images" / "tati_logo.jpg",
+    Path(__file__).parent.parent.parent.parent / "assets" / "images" / "tati_logo.jpg",
+    Path(__file__).parent.parent.parent.parent.parent / "frontend" / "public" / "images" / "tati_logo.jpg",
 ]
 LOGO_PATH = next((p for p in _LOGO_CANDIDATES if p.exists()), None)
 

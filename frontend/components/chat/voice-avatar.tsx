@@ -12,6 +12,12 @@ interface AvatarFrames {
   meio?: string;
   bem_aberta?: string;
   ouvindo?: string;
+  frame_A?: string;
+  frame_B?: string;
+  frame_C?: string;
+  frame_D?: string;
+  frame_E?: string;
+  frame_F?: string;
 }
 
 interface VoiceAvatarProps {
@@ -93,10 +99,15 @@ export function VoiceAvatar({ state, audioElement }: VoiceAvatarProps) {
 
           if (avgVolume < 10) {
             setCurrentFrame(getFrameUrl(frames.normal));
-          } else if (avgVolume < 50) {
-            setCurrentFrame(getFrameUrl(frames.meio || frames.normal));
           } else {
-            setCurrentFrame(getFrameUrl(frames.bem_aberta || frames.normal));
+            // Animação baseada no volume usando os frames A-F
+            const framesList = [frames.frame_A, frames.frame_B, frames.frame_C, frames.frame_D, frames.frame_E, frames.frame_F].filter(Boolean);
+            if (framesList.length > 0) {
+              const index = Math.floor((avgVolume / 100) * framesList.length);
+              setCurrentFrame(getFrameUrl(framesList[Math.min(index, framesList.length - 1)]));
+            } else {
+              setCurrentFrame(getFrameUrl(frames.bem_aberta || frames.normal));
+            }
           }
         }, 60);
       } catch (e) {
