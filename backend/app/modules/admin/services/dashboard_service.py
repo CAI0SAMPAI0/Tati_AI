@@ -228,3 +228,94 @@ class DashboardService:
                 return {}
 
         return await run_in_threadpool(_fetch)
+
+    async def get_all_simulations(self) -> List[Dict[str, Any]]:
+        """Lista todas as simulações cadastradas."""
+        def _fetch():
+            try:
+                res = self.db.table('simulations').select('*').order('created_at', desc=True).execute()
+                return res.data or []
+            except Exception as e:
+                print(f"[DashboardService] Erro em get_all_simulations: {e}")
+                return []
+        return await run_in_threadpool(_fetch)
+
+    async def get_user_stats(self, username: str) -> Dict[str, Any]:
+        """Estatísticas específicas de um aluno."""
+        def _fetch():
+            try:
+                user_res = self.db.table('users').select('xp, level, focus').eq('username', username).limit(1).execute()
+                user_data = user_res.data[0] if user_res.data else {}
+                
+                msg_res = self.db.table('messages').select('id', count='exact').eq('username', username).eq('role', 'user').execute()
+                total_messages = msg_res.count or 0
+                
+                err_res = self.db.table('user_errors').select('id', count='exact').eq('username', username).execute()
+                total_errors = err_res.count or 0
+                
+                return {
+                    'xp': user_data.get('xp', 0),
+                    'level': user_data.get('level', 'Beginner'),
+                    'focus': user_data.get('focus', 'General English'),
+                    'total_messages': total_messages,
+                    'total_errors': total_errors
+                }
+            except Exception as e:
+                print(f"[DashboardService] Erro em get_user_stats: {e}")
+                return {}
+        return await run_in_threadpool(_fetch)
+
+    async def update_student(self, username: str, level: Optional[str] = None, custom_prompt: Optional[str] = None) -> dict:
+        """Atualiza nível e/ou prompt de um aluno."""
+        payload = {}
+        if level: payload['level'] = level
+        if custom_prompt: payload['custom_prompt'] = custom_prompt
+        if not payload: return {'ok': True}
+        def _exec():
+            return self.db.table('users').update(payload).eq('username', username).execute()
+        await run_in_threadpool(_exec)
+        return {'ok': True}
+
+    async def get_grammar_errors(self, username: str, lang: str = 'en-US') -> dict:
+        """Analisa erros gramaticais de um aluno."""
+        def _fetch():
+            try:
+                res = self.db.table('user_errors').select('*').eq('username', username).order('created_at', desc=True).limit(50).execute()
+                return {'errors': res.data or []}
+            except Exception:
+                return {'errors': []}
+        return await run_in_threadpool(_fetch)
+
+    async def get_recommendations(self, username: str, lang: str = 'en-US') -> dict:
+        """Retorna recomendações pedagógicas."""
+        # Simplificado por enquanto
+        return {
+            'recommendations': [
+                'Pratique mais conversação sobre temas do seu dia a dia.',
+                'Assista a vídeos curtos sobre gramática básica.',
+                'Tente usar novas palavras do seu vocabulário nas conversas.'
+            ]
+        }
+
+    async def generate_simulation(self, topic: str, level: str, instructions: str) -> dict:
+        """Gera um cenário de simulação via IA."""
+        from app.modules.chat.services.llm import groq_chat
+        import json, re
+        
+        prompt = (
+            f"Create a professional English practice scenario about: {topic}.\n"
+            f"Target Student Level: {level}. Extra Instructions: {instructions}.\n"
+            "Return ONLY a JSON with: name, slug (url-friendly), description, difficulty (matching level), system_prompt (the persona), greeting (first message)."
+        )
+        try:
+            resp_str = await groq_chat([{'role': 'user', 'content': prompt}])
+            match = re.search(r'\{.*\}', resp_str, re.DOTALL)
+            if match:
+                data = json.loads(match.group(0))
+                # Garante que is_active seja True para RLS
+                data['is_active'] = True
+                res = self.db.table('simulations').insert(data).execute()
+                return res.data[0] if res.data else {'error': 'Falha ao salvar no banco'}
+            return {'error': 'IA retornou formato inválido'}
+        except Exception as e:
+            return {'error': str(e)}

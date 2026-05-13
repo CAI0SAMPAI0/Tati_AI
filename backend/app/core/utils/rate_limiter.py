@@ -60,7 +60,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         # Verifica rate limit SOMENTE se Redis está disponível e habilitado
         svc = upstash_mod.upstash_service
-        if svc and svc.enabled and getattr(svc, '_redis', None) is not None:
+        use_redis = svc and svc.enabled and getattr(svc, '_redis', None) is not None
+        result = {'allowed': True}
+
+        if use_redis:
             try:
                 limit_key = svc.rate_limit_key(identifier, request.url.path)
                 result = await svc.rate_limit_check(
@@ -87,21 +90,20 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                             'Access-Control-Allow-Credentials': 'true',
                         },
                     )
-
-                response = await call_next(request)
-                response.headers['X-RateLimit-Remaining'] = str(
-                    result.get('remaining', -1)
-                )
-                response.headers['X-RateLimit-Reset'] = str(result.get('reset_at', 0))
-                return response
             except Exception as e:
-                print(f'[RateLimiter] Erro: {e}')
-                # Desabilita rate limiting permanentemente após erro
+                print(f'[RateLimiter] Erro no Redis: {e}')
                 svc._enabled = False
                 svc._redis = None
 
-        # Se Redis não está disponível/desabilitado, permite sem controle
-        return await call_next(request)
+        # Prossegue com a requisição (FORA do try do Redis)
+        response = await call_next(request)
+        
+        # Adiciona headers se o Redis foi usado com sucesso
+        if use_redis and result.get('allowed'):
+            response.headers['X-RateLimit-Remaining'] = str(result.get('remaining', -1))
+            response.headers['X-RateLimit-Reset'] = str(result.get('reset_at', 0))
+            
+        return response
 
     def _get_identifier(self, request: Request) -> str:
         """Obtém o identificador do usuário (IP ou username via sub do token)."""

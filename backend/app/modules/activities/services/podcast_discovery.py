@@ -70,7 +70,6 @@ async def discover_personalized_podcasts(user_id: str, username: str, user_level
         def _count_recent(since_iso):
             return db.table('podcasts').select('id', count='exact').eq('user_id', username).gte('created_at', since_iso).execute()
 
-        from app.core.config import settings
 
         daily_res = await run_in_threadpool(_count_recent, start_of_day)
         if (daily_res.count or 0) >= getattr(settings, 'video_limit_per_day', 3):
