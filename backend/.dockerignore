@@ -8,16 +8,12 @@ venv/
 .venv/
 pip-log.txt
 pip-delete-this-directory.txt
-.toast
-.lucid
 .pytest_cache
 .ruff_cache
 .vscode
 .git
 .github
 .env
-Dockerfile
-docker-compose.yml
 data/
 assets/
 tests/
