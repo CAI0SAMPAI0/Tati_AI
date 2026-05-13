@@ -87,7 +87,7 @@ export default function QuizPage() {
     if (!quiz?.questions) return;
 
     // 1. Embaralha as perguntas
-    const questionsCopy = shuffleArray(quiz.questions).map(q => {
+    const questionsCopy = shuffleArray(quiz.questions).map((q: any) => {
       // 2. Embaralha as opções de cada pergunta
       const originalCorrectOption = q.options[q.correct_index];
       const newOptions = shuffleArray(q.options);

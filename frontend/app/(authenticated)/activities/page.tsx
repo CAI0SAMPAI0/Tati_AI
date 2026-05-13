@@ -269,7 +269,7 @@ export default function ActivitiesPage() {
               <>
                 {activeTab === 'quiz' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {quizzes.length > 0 ? quizzes.map((q) => (
+                    {quizzes.length > 0 ? quizzes.map((q: any) => (
                       <ActivityCard
                         key={q.id}
                         title={q.title}
@@ -291,7 +291,7 @@ export default function ActivitiesPage() {
                 {activeTab === 'exercises' && (
                   <div className="space-y-12">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {exercises.length > 0 ? exercises.map((q) => (
+                      {exercises.length > 0 ? exercises.map((q: any) => (
                         <ActivityCard
                           key={q.id}
                           title={q.title}
