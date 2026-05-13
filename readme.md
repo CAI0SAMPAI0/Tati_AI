@@ -10,7 +10,7 @@ O projeto segue uma arquitetura de **Backend Monolítico Modular** com **Fronten
 
 ### Visão Geral da Stack
 - **Backend:** FastAPI (Python 3.12)
-- **Frontend:** Vanilla JavaScript, HTML5, CSS3 (Custom Properties)
+- **Frontend:** Next.js (React), TypeScript, Tailwind CSS
 - **Banco de Dados:** PostgreSQL (via Supabase)
 - **Cache & Rate Limit:** Upstash Redis
 - **IA/LLM:** Groq (Llama 3), Claude, Gemini
@@ -47,12 +47,21 @@ O projeto segue uma arquitetura de **Backend Monolítico Modular** com **Fronten
 
 ## 📂 Estrutura de Módulos (Backend)
 
-- `core/`: Configurações globais, segurança (JWT) e middlewares.
-- `routers/`: Definição de endpoints divididos por domínio (auth, user, ai, payments).
-- `services/`: Lógica de negócio pura e integrações externas.
-  - `llm.py`: Gestão de modelos e áudio.
-  - `xp_system.py`: Regras de gamificação.
-  - `asaas.py`: Integração financeira.
+A arquitetura do backend segue o padrão **Domain-Driven Design (DDD)** modular para alta escalabilidade e separação de conceitos:
+
+- `app/`
+  - `core/`: Infraestrutura global (configurações, segurança, banco de dados, dependências e utils).
+  - `modules/`: Módulos independentes agrupados por domínio de negócio:
+    - `activities/`: Hub, flashcards, quizzes, podcasts e desafios.
+    - `admin/`: Gestão da plataforma e dashboards.
+    - `auth/`: Autenticação e rotas de segurança.
+    - `chat/`: LLMs, RAG e orquestração de IA.
+    - `notifications/`: Disparos, agendamentos e push.
+    - `payments/`: Webhooks, assinaturas e Asaas.
+    - `simulation/`: Simulações de conversação.
+    - `users/`: Perfis, XP, streaks, metas e onboarding.
+  - `shared/`: Código reaproveitável (helpers, serviços externos como Cloudinary, envio de e-mails, etc).
+  - `routers_init.py`: Arquivo centralizador elegante de inicialização das rotas.
 - `migrations/`: Scripts SQL para estruturação do banco de dados.
 
 ---
