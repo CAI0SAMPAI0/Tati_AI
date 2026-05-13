@@ -7,6 +7,7 @@ import {
   Search,
 } from 'lucide-react';
 import { DashboardSidebar, type DashSection } from '@/components/dashboard/dashboard-sidebar';
+import { WeeklyGoal } from '@/components/dashboard/weekly-goal';
 import { OverviewSection } from '@/components/dashboard/overview-section';
 import { ReportsSection } from '@/components/dashboard/reports-section';
 import { ModulesSection } from '@/components/dashboard/modules-section';
@@ -152,12 +153,15 @@ export default function DashboardPage() {
 
         <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto animate-fade-in overflow-y-auto custom-scrollbar">
           {activeSection === 'overview' && (
-            <OverviewSection 
-              stats={stats} 
-              students={students || []} 
-              difficulties={difficulties}
-              onSeeAllStudents={() => setActiveSection('students')}
-            />
+            <>
+              <WeeklyGoal />
+              <OverviewSection 
+                stats={stats} 
+                students={students || []} 
+                difficulties={difficulties}
+                onSeeAllStudents={() => setActiveSection('students')}
+              />
+            </>
           )}
 
           {activeSection === 'reports' && <ReportsSection />}
@@ -224,7 +228,7 @@ export default function DashboardPage() {
                           {s.total_messages ?? 0}
                         </td>
                         <td className="px-5 py-3 text-xs text-text-subtle">
-                          {s.created_at ? new Date(s.created_at).toLocaleDateString() : '—'}
+                          {s.last_active ? new Date(s.last_active).toLocaleDateString() : '—'}
                         </td>
                       </tr>
                     ))}

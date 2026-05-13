@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import { useRouter } from 'next/navigation';
+
 import { TranscriptPanel } from './transcript-panel';
 import { PronunciationPractice } from './pronunciation-practice';
 import { Button } from '@/components/ui/button';
@@ -11,20 +13,34 @@ import {
   CirclePlay,
   Waves,
   Sparkles,
-  Info
+  Info,
+  CheckCircle
 } from 'lucide-react';
 import { type Podcast } from '@/lib/api/types/podcast';
 import { cn } from '@/lib/utils';
-import { apiGet } from '@/lib/api/client';
+import { apiGet, apiPost } from '@/lib/api/client';
 
 interface PodcastViewerProps {
   podcast: Podcast;
 }
 
 export function PodcastViewer({ podcast }: PodcastViewerProps) {
-
+  const router = useRouter();
   const [practicePhrase, setPracticePhrase] = useState<string | null>(null);
   const [exerciseIndex, setExerciseIndex] = useState(0);
+  const [isCompleting, setIsCompleting] = useState(false);
+
+  const handleComplete = async () => {
+    setIsCompleting(true);
+    try {
+      await apiPost(`/activities/podcasts/${podcast.id}/complete`, {});
+      router.push('/activities');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsCompleting(false);
+    }
+  };
   const { data: generated } = useQuery<{ exercises: Array<Record<string, any>> }>({
     queryKey: ['podcast-exercises', podcast.id],
     queryFn: () => apiGet(`/activities/podcasts/${podcast.id}/exercises`),
@@ -184,7 +200,7 @@ export function PodcastViewer({ podcast }: PodcastViewerProps) {
                     </div>
                   )}
                 </div>
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-2 mt-4 pt-4 border-t border-border">
                   <Button
                     variant="secondary"
                     size="sm"
@@ -193,13 +209,24 @@ export function PodcastViewer({ podcast }: PodcastViewerProps) {
                   >
                     Back
                   </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => setExerciseIndex((i) => Math.min(exercises.length - 1, i + 1))}
-                    disabled={exerciseIndex >= exercises.length - 1}
-                  >
-                    Next
-                  </Button>
+                  {exerciseIndex >= exercises.length - 1 ? (
+                    <Button
+                      size="sm"
+                      onClick={handleComplete}
+                      disabled={isCompleting}
+                      className="bg-success text-white hover:bg-success/90 border-transparent"
+                    >
+                      {isCompleting ? <Sparkles size={16} className="mr-2 animate-pulse" /> : <CheckCircle size={16} className="mr-2" />}
+                      Mark as Done
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => setExerciseIndex((i) => Math.min(exercises.length - 1, i + 1))}
+                    >
+                      Next
+                    </Button>
+                  )}
                 </div>
               </div>
             ) : (

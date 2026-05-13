@@ -32,6 +32,8 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
     refetchInterval: 60000,
   });
 
+  const isHubOnly = (user as any)?.is_hub_only;
+
   return (
     <header className="h-16 flex items-center justify-between px-1 border-b border-border bg-bg sticky top-0 z-50">
       <div className="flex items-center gap-3">
@@ -43,7 +45,7 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
             <Menu size={20} />
           </button>
         )}
-        <Link href="/chat" className="font-display text-lg font-bold tracking-tight pl-2">
+        <Link href={isHubOnly ? "/activities/hub" : "/chat"} className="font-display text-lg font-bold tracking-tight pl-2">
           Teacher <span className="text-primary">Tati</span>
         </Link>
       </div>
@@ -55,23 +57,29 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
               Beta
             </span>
           </Button>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-text-subtle">
-            <CircleAlert size={18} />
-          </Button>
+          {!isHubOnly && (
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-text-subtle">
+              <CircleAlert size={18} />
+            </Button>
+          )}
         </div>
 
         <div className="flex items-center gap-3 md:gap-5">
-          <div className="flex items-center gap-1.5 text-orange-500 font-bold text-sm" title="Streak">
-            <Flame size={18} fill="currentColor" />
-            <span>{streakData?.current_streak ?? user?.streak ?? 0}</span>
-          </div>
+          {!isHubOnly && (
+            <>
+              <div className="flex items-center gap-1.5 text-orange-500 font-bold text-sm" title="Streak">
+                <Flame size={18} fill="currentColor" />
+                <span>{streakData?.current_streak ?? user?.streak ?? 0}</span>
+              </div>
 
-          <div className="flex items-center gap-1.5 text-yellow-500 font-bold text-sm" title="Achievements">        
-            <Trophy size={18} fill="currentColor" />
-            <span className="text-text-muted font-medium">
-              {streakData?.trophies_earned ?? 0}/50
-            </span>
-          </div>
+              <div className="flex items-center gap-1.5 text-yellow-500 font-bold text-sm" title="Achievements">        
+                <Trophy size={18} fill="currentColor" />
+                <span className="text-text-muted font-medium">
+                  {streakData?.trophies_earned ?? 0}/50
+                </span>
+              </div>
+            </>
+          )}
 
           <NotificationsDropdown />
 

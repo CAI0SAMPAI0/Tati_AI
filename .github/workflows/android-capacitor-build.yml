@@ -1,0 +1,55 @@
+name: Build Android (Capacitor)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  build-android:
+    name: Build Capacitor Android
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: ${{ runner.tool_cache }}/android-sdk
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies (capacitor shell)
+        working-directory: mobile_app/capacitor
+        run: |
+          npm ci || npm install
+
+      - name: Ensure Android project exists (skip if already present)
+        run: |
+          if [ ! -d "mobile_app/capacitor/android" ]; then
+            echo "No android directory yet. Attempting to initialize Capacitor Android project..."
+            npx --yes @capacitor/cli@latest sync --cwd mobile_app/capacitor || true
+          else
+            echo "Android directory exists"
+          fi
+
+      - name: Setup Android SDK
+        uses: r0adkll/setup-android@v2
+        with:
+          api-level: 33
+          target: android-33
+          build-tools: 33.0.2
+
+      - name: Build Android (Gradle)
+        working-directory: mobile_app/capacitor/android
+        run: |
+          chmod +x ./gradlew || true
+          ./gradlew assembleRelease || ./gradlew assembleDebug
+
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: mobile_app/capacitor/android/app/build/outputs/**/app-*.apk

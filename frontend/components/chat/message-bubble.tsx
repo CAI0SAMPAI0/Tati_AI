@@ -5,20 +5,43 @@ import type { Message } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
 import { ClickableText } from './clickable-text';
 import { AudioPlayer } from './audio-player';
+import { useState } from 'react';
+import { Pencil, Check, X } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: Message;
   isStreaming?: boolean;
   onWordClick?: (word: string, x: number, y: number) => void;
+  onEdit?: (messageId: string, newContent: string) => Promise<void>;
 }
 
-export function MessageBubble({ message, isStreaming, onWordClick }: MessageBubbleProps) {
+export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: MessageBubbleProps) {
   const isUser = message.role === 'user';
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(message.content);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!onEdit || editContent.trim() === message.content) {
+      setIsEditing(false);
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      await onEdit(message.id, editContent);
+      setIsEditing(false);
+    } catch (err) {
+      console.error('Error saving message:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div
       className={cn(
-        'flex gap-3 max-w-[85%] animate-fade-in',
+        'flex gap-3 max-w-[85%] animate-fade-in group',
         isUser ? 'ml-auto flex-row-reverse' : 'mr-auto'
       )}
     >
@@ -32,19 +55,67 @@ export function MessageBubble({ message, isStreaming, onWordClick }: MessageBubb
       <div className={cn('flex flex-col gap-1', isUser ? 'items-end' : 'items-start')}>
         <div
           className={cn(
-            'px-4 py-2.5 rounded-2xl text-[0.9375rem] leading-relaxed break-words shadow-sm transition-all',
+            'relative px-4 py-2.5 rounded-2xl text-[0.9375rem] leading-relaxed break-words shadow-sm transition-all',
             isUser
               ? 'bg-primary text-white rounded-br-sm'
               : 'bg-surface border border-border text-text rounded-bl-sm hover:border-primary/20'
           )}
         >
-          {isUser ? (
-            <p className="whitespace-pre-wrap">{message.content}</p>
+          {isEditing ? (
+            <div className="flex flex-col gap-2 min-w-[200px]">
+              <textarea
+                className="w-full bg-white/10 text-white border border-white/20 rounded-lg p-2 text-sm outline-none focus:border-white/40 resize-none"
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                autoFocus
+                rows={Math.max(2, editContent.split('\n').length)}
+              />
+              <div className="flex justify-end gap-1.5">
+                <button
+                  onClick={() => {
+                    setIsEditing(false);
+                    setEditContent(message.content);
+                  }}
+                  className="p-1 hover:bg-white/10 rounded-md transition-colors"
+                  disabled={isSaving}
+                >
+                  <X size={14} />
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="p-1 bg-white/20 hover:bg-white/30 rounded-md transition-colors flex items-center gap-1 px-2"
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Check size={14} />
+                  )}
+                  <span className="text-[0.7rem] font-bold">Save</span>
+                </button>
+              </div>
+            </div>
           ) : (
-            <ClickableText 
-              content={message.content} 
-              onWordClick={onWordClick || (() => {})} 
-            />
+            <>
+              {isUser ? (
+                <p className="whitespace-pre-wrap">{message.content}</p>
+              ) : (
+                <ClickableText 
+                  content={message.content} 
+                  onWordClick={onWordClick || (() => {})} 
+                />
+              )}
+              
+              {isUser && onEdit && !isStreaming && (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="absolute -left-8 top-1/2 -translate-y-1/2 p-1.5 text-text-subtle hover:text-primary opacity-0 group-hover:opacity-100 transition-all bg-surface border border-border rounded-lg shadow-sm"
+                  title="Edit message"
+                >
+                  <Pencil size={12} />
+                </button>
+              )}
+            </>
           )}
         </div>
 
@@ -53,13 +124,13 @@ export function MessageBubble({ message, isStreaming, onWordClick }: MessageBubb
             <a
               href={`data:application/pdf;base64,${message.pdf_b64}`}
               download={message.pdf_filename || 'Teacher_Tati_Document.pdf'}
-              className="flex items-center gap-3 bg-surface border border-border hover:border-primary/50 hover:bg-primary/5 rounded-xl p-3 text-text transition-all group"
+              className="flex items-center gap-3 bg-surface border border-border hover:border-primary/50 hover:bg-primary/5 rounded-xl p-3 text-text transition-all group/pdf"
             >
               <div className="w-10 h-10 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2"/><path d="M8 17h2"/><path d="M14 13h2"/><path d="M14 17h2"/></svg>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold truncate group-hover:text-primary transition-colors">
+                <p className="text-sm font-bold truncate group-hover/pdf:text-primary transition-colors">
                   {message.pdf_filename || 'Teacher_Tati_Document.pdf'}
                 </p>
                 <p className="text-xs text-text-muted mt-0.5 font-medium">
@@ -81,3 +152,4 @@ export function MessageBubble({ message, isStreaming, onWordClick }: MessageBubb
     </div>
   );
 }
+

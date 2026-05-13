@@ -1,0 +1,263 @@
+from __future__ import annotations
+
+import json
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
+from pydantic import BaseModel
+
+from app.core.dependencies.auth import get_current_user
+from app.modules.chat.services.chat_service import ChatService
+from app.shared.services.history import (
+    create_conversation,
+    delete_conversation,
+    list_conversations,
+    load_history,
+    rename_conversation,
+    update_message,
+)
+from app.modules.chat.services.llm import text_to_speech, groq_chat
+from app.core.config import settings
+
+router = APIRouter()
+
+
+# ── Models ────────────────────────────────────────────────────────────────────
+class RenameConversationBody(BaseModel):
+    title: str
+
+
+class EditMessageBody(BaseModel):
+    content: str
+
+
+class TTSRequest(BaseModel):
+    text: str
+
+
+class CreateConversationBody(BaseModel):
+    title: str = 'Nova conversa'
+    is_simulation: bool = False
+    simulation_id: str | None = None
+
+
+# ── REST endpoints ────────────────────────────────────────────────────────────
+
+
+@router.post('/conversations', status_code=status.HTTP_201_CREATED)
+async def new_conversation(
+    body: CreateConversationBody = CreateConversationBody(),
+    current_user: dict = Depends(get_current_user),
+):
+    return await create_conversation(
+        username=current_user['username'],
+        title=body.title,
+        model=settings.llm_provider,
+        is_simulation=body.is_simulation,
+        simulation_id=body.simulation_id,
+    )
+
+
+@router.get('/conversations')
+async def get_conversations(current_user: dict = Depends(get_current_user)):
+    return await list_conversations(current_user['username'])
+
+
+@router.delete(
+    '/conversations/{conversation_id}', status_code=status.HTTP_204_NO_CONTENT
+)
+async def remove_conversation(
+    conversation_id: str, current_user: dict = Depends(get_current_user)
+):
+    if not await delete_conversation(conversation_id, current_user['username']):
+        raise HTTPException(status_code=404, detail='Conversa não encontrada')
+
+
+@router.patch('/conversations/{conversation_id}/title')
+async def update_title(
+    conversation_id: str,
+    body: RenameConversationBody,
+    current_user: dict = Depends(get_current_user),
+):
+    conv = await rename_conversation(
+        conversation_id, current_user['username'], body.title
+    )
+    if not conv:
+        raise HTTPException(status_code=404, detail='Conversa não encontrada')
+    return conv
+
+
+@router.get('/conversations/{conversation_id}/messages')
+async def get_history(
+    conversation_id: str, current_user: dict = Depends(get_current_user)
+):
+    messages = await load_history(conversation_id)
+    if messages is None:
+        raise HTTPException(status_code=404, detail='Conversa não encontrada')
+    return [
+        m
+        for m in messages
+        if not (
+            m.get('role') == 'system'
+            and m.get('content', '').startswith('SUMMARY_CACHE_')
+        )
+    ]
+
+
+@router.patch('/conversations/{conversation_id}/messages/{message_id}')
+async def edit_message(
+    conversation_id: str,
+    message_id: str,
+    body: EditMessageBody,
+    current_user: dict = Depends(get_current_user),
+):
+    # message_id pode ser int ou str dependendo do banco, tentamos converter
+    try:
+        m_id = int(message_id)
+    except ValueError:
+        m_id = message_id
+
+    msg = await update_message(m_id, current_user['username'], body.content)
+    if not msg:
+        raise HTTPException(status_code=404, detail='Mensagem não encontrada')
+    return msg
+
+
+@router.get('/conversations/{conversation_id}/summary')
+async def get_summary(
+    conversation_id: str,
+    lang: str = Query(default='pt'),
+    current_user: dict = Depends(get_current_user),
+):
+    # Restaurado lógica de resumo simplificada para manter compatibilidade
+    history = await load_history(conversation_id)
+    if not history or len(history) < 2:
+        raise HTTPException(400, 'Poucas mensagens')
+
+    text = '\n'.join(
+        [
+            f'{m["role"]}: {m["content"]}'
+            for m in history
+            if m['role'] in ('user', 'assistant')
+        ]
+    )
+
+    if lang.lower().startswith('en'):
+        prompt = f'Generate a pedagogical summary in English for this conversation:\n{text}'
+    else:
+        prompt = f'Gere um resumo pedagógico em Português para esta conversa:\n{text}'
+
+    try:
+        res = await groq_chat([{'role': 'user', 'content': prompt}])
+        return {'summary': res}
+    except Exception as e:
+        print(f"Error in summary: {e}")
+        raise HTTPException(500, 'Erro ao gerar resumo')
+
+
+@router.post('/tts')
+async def tts_word(body: TTSRequest, current_user: dict = Depends(get_current_user)):
+    audio_b64 = await text_to_speech(body.text)
+    if not audio_b64:
+        raise HTTPException(status_code=503, detail='TTS indisponível')
+    return {'audio': audio_b64}
+
+
+# ── WebSocket ─────────────────────────────────────────────────────────────────
+
+
+@router.websocket('/ws')
+async def chat_ws(
+    websocket: WebSocket,
+    token: str | None = Query(None),
+    simulation_id: str | None = Query(None),
+    service: ChatService = Depends(),
+):
+    '''print(f'--- [WS DEBUG START] ---')
+    print(f'[WS] Query Token: {token[:10] if token else "None"}')
+    print(f'[WS] Headers: {dict(websocket.headers)}')'''
+    
+    from app.core.security import decode_token
+
+    # Restaurar suporte a Sec-WebSocket-Protocol (comum em SPAs)
+    ws_token = token
+    subprotocol = None
+    header_protocols = websocket.headers.get('sec-websocket-protocol', '')
+    #print(f'[WS] Sec-WebSocket-Protocol Header: {header_protocols}')
+    
+    if header_protocols:
+        protocols = [p.strip() for p in header_protocols.split(',')]
+        for p in protocols:
+            if p != 'access_token' and not ws_token:
+                ws_token = p
+                subprotocol = 'access_token'
+                print(f'[WS] Extracted token from subprotocol: {ws_token[:10]}...')
+
+    # print(f'[WS] Final ws_token: {ws_token[:10] if ws_token else "None"}')
+    payload = decode_token(ws_token) if ws_token else None
+    # print(f'[WS] Payload: {payload}')
+
+    if not payload:
+        print(f'[WS] Rejeitando: Payload nulo')
+        await websocket.close(code=4001, reason='Token inválido')
+        return
+
+    #print(f'[WS] Aceitando conexÃ£o com subprotocol: {subprotocol}')
+    await websocket.accept(subprotocol=subprotocol)
+    #print(f'[WS] ConexÃ£o aceita para: {payload.get("sub")}')
+    username = payload['sub']
+    pending_drill_target = None
+
+    # Se for simulação e não tiver mensagens, envia saudação inicial
+    if simulation_id:
+        try:
+            # Tenta pegar o conv_id do query se existir, ou espera a primeira mensagem
+            from app.shared.services.history import load_history
+            # Como não temos conv_id ainda (talvez), espera a primeira mensagem do user 
+            pass
+        except Exception: pass
+
+    try:
+        while True:
+            raw = await websocket.receive_text()
+            # print(f'[WS] Mensagem recebida: {raw[:50]}...')
+            try:
+                msg = json.loads(raw)
+            except json.JSONDecodeError:
+                print(f'[WS] Erro de JSON: {raw}')
+                continue
+
+            if msg.get('type') == 'ping':
+                await websocket.send_json({'type': 'pong'})
+                continue
+
+            #print(f'[WS] Processando: {msg.get("type")}')
+            try:
+                pending_drill_target = await service.process_chat_message(
+                    websocket, msg, username, pending_drill_target, simulation_id=simulation_id
+                )
+            except Exception as e:
+                print(f'[WS] Erro ao processar mensagem: {e}')
+                import traceback
+                traceback.print_exc()
+                try:
+                    await websocket.send_json({
+                        'type': 'error',
+                        'message': 'Desculpe, tive um problema de conexão. Por favor, tente novamente.'
+                    })
+                except: pass
+            #print(f'[WS] Processamento finalizado')
+
+    except WebSocketDisconnect:
+        # print(f'[WS] Cliente desconectado')
+        pass
+    except Exception as exc:
+        #print(f'[WS] Erro CRÍTICO: {exc}')
+        import traceback
+        traceback.print_exc()

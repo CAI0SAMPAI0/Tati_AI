@@ -10,6 +10,8 @@ import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { WeeklyPlanHeader } from '@/components/chat/weekly-plan-header';
+import { fetchWeeklyPlan } from '@/lib/api/weekly-plan';
 
 import { 
   Target, 
@@ -61,6 +63,17 @@ export default function GoalsPage() {
   const { data, isLoading, error } = useQuery<GoalsResponse>({
     queryKey: ['goals'],
     queryFn: () => apiGet<GoalsResponse>(ENDPOINTS.GOALS),
+  });
+
+  // Query weekly plan (AI-generated topics)
+  const {
+    data: weeklyPlan,
+    isLoading: weeklyLoading,
+    isError: weeklyError,
+  } = useQuery({
+    queryKey: ['weekly-plan'],
+    queryFn: fetchWeeklyPlan,
+    staleTime: 5 * 60 * 1000, // 5 min — o plano não muda a cada click
   });
 
   // Query streak for summary
@@ -143,6 +156,42 @@ export default function GoalsPage() {
               <p className="text-text-muted text-sm md:text-base">
                 Set and track your learning goals
               </p>
+            </div>
+
+            {/* Weekly AI Plan ─────────────────────────────────────────── */}
+            <div>
+              <h2 className="text-xl font-bold text-text mb-3">📅 This Week&apos;s Plan</h2>
+
+              {weeklyLoading && (
+                <div className="p-5 bg-surface border border-border rounded-3xl animate-pulse flex gap-4 items-center">
+                  <div className="w-10 h-10 rounded-full bg-bg-secondary shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-24 bg-bg-secondary rounded" />
+                    <div className="h-2 w-16 bg-bg-secondary rounded" />
+                  </div>
+                  <div className="flex gap-2">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-7 w-28 bg-bg-secondary rounded-full" />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!weeklyLoading && weeklyError && (
+                <div className="p-4 bg-danger/5 border border-danger/20 rounded-2xl text-sm text-danger">
+                  Failed to load weekly plan. The backend may be starting up — try refreshing.
+                </div>
+              )}
+
+              {!weeklyLoading && !weeklyError && weeklyPlan && weeklyPlan.topics.length > 0 && (
+                <WeeklyPlanHeader topics={weeklyPlan.topics} />
+              )}
+
+              {!weeklyLoading && !weeklyError && weeklyPlan && weeklyPlan.topics.length === 0 && (
+                <div className="p-5 bg-surface border border-dashed border-border rounded-3xl text-center text-text-muted text-sm">
+                  No weekly plan yet — it will be generated automatically on your next chat session.
+                </div>
+              )}
             </div>
 
             {/* Summary */}

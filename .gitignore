@@ -80,3 +80,24 @@ IMPLEMENTATION_PLAN.md
 backend/scratch/
 scripts/i18n-dry-report.json
 .mcp.json
+
+# Next.js / Frontend
+.next/
+out/
+.vercel/
+
+# Python Tools
+.mypy_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Databases
+*.sqlite
+*.sqlite3
+*.db
+
+# Mobile Builds
+*.apk
+*.aab
+mobile_app/capacitor/www/

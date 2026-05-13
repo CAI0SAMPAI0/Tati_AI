@@ -105,6 +105,8 @@ export default function LoginPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const isHubAccess = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('access') === 'hub';
+
   // Login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,7 +117,13 @@ export default function LoginPage() {
       const res = await loginWithCredentials(loginId, loginPw);
       if (!res.ok) { setError((res.data as any).detail || 'Invalid credentials.'); return; }
       saveSession(res.data.access_token, res.data.user);
-      router.push('/chat');
+      
+      const user = res.data.user as any;
+      if (isHubAccess || user.is_hub_only) {
+        router.push('/hub-premium');
+      } else {
+        router.push('/chat');
+      }
     } catch {
       setError('Connection error. Check if the server is running.');
     } finally {
@@ -131,7 +139,14 @@ export default function LoginPage() {
     if (regPassword.length < 6) { setError('Password must be at least 6 characters.'); return; }
     setLoading(true);
     try {
-      const res = await registerUser({ name: regName, email: regEmail, username: regUsername, password: regPassword, level: regLevel });
+      const res = await registerUser({ 
+        name: regName, 
+        email: regEmail, 
+        username: regUsername, 
+        password: regPassword, 
+        level: regLevel,
+        is_hub_only: isHubAccess
+      });
       if (!res.ok) { setError((res.data as any).detail || 'Error creating account.'); return; }
       setSuccess('Account created! Sign in now.');
       setTimeout(() => switchTab('login'), 1500);
@@ -205,8 +220,14 @@ export default function LoginPage() {
         {/* Right Panel */}
         <div className="flex items-center justify-center p-6 md:p-9 bg-surface">
           <div className="w-full max-w-[20rem]">
-            <h2 className="font-display text-[1.4rem] font-extrabold tracking-tight mb-1">{'Welcome'}</h2>
-            <p className="text-text-muted text-[0.83rem] mb-6">{'Sign in or create a new account'}</p>
+            <h2 className="font-display text-[1.4rem] font-extrabold tracking-tight mb-1">
+              {isHubAccess ? 'Join Premium Hub' : 'Welcome'}
+            </h2>
+            <p className="text-text-muted text-[0.83rem] mb-6">
+              {isHubAccess 
+                ? 'Create an account to access exclusive materials and downloads.' 
+                : 'Sign in or create a new account'}
+            </p>
 
             {/* Tabs */}
             {activeTab !== 'forgot' && (

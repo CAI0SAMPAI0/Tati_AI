@@ -15,13 +15,14 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi.responses import JSONResponse
 
 # Força o carregamento do .env da raiz do projeto
 env_path = Path(__file__).parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
 # Sentry — Inicialização crítica para captura de exceções
-from core.sentry_config import init_sentry
+from app.core.utils.sentry_config import init_sentry
 
 try:
     init_sentry()
@@ -68,6 +69,8 @@ app.add_middleware(
         'http://127.0.0.1:3000',
         'http://localhost:3000',
         'http://192.168.1.3:3000',  # Local IP for mobile device access
+        'capacitor://localhost',      # Capacitor iOS origin
+        'http://localhost',           # Capacitor Android origin
         'https://tati-ai.vercel.app',
         'https://tati-ai.vercel.app/',
         'https://tati-ai-git-main-caio-andrades-projects.vercel.app',
@@ -75,29 +78,30 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
-    allow_origin_regex='http://(localhost|127\.0\.0\.1|192\.168\.1\.3):[0-9]+',
+    allow_origin_regex=r'http://(localhost|127\.0\.0\.1|192\.168\.1\.3):[0-9]+',
 )
 
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    import time
+    start_time = time.time()
+    response = await call_next(request)
+    duration = time.time() - start_time
+    print(f"[{request.method}] {request.url.path} - {response.status_code} ({duration:.2f}s)")
+    return response
+
 # Rate Limiting (Upstash Redis)
-from core.rate_limiter import setup_rate_limiting
+from app.core.utils.rate_limiter import setup_rate_limiting
 
 setup_rate_limiting(app)
 
 
 #  Routers (registro centralizado) 
 
-from routers import register_all_routers
+from app.routers_init import register_all_routers
 
 register_all_routers(app)
 
-
-#  Health 
-
-
-@app.get('/cors-test')
-async def cors_test() -> dict:
-    """Endpoint leve para verificar CORS e keep-alive."""
-    return {'origins': ['https://tati-ai.vercel.app']}
 
 
 #  Startup Events 
@@ -106,17 +110,54 @@ async def cors_test() -> dict:
 @app.on_event('startup')
 async def startup_notifications() -> None:
     """Inicia o scheduler de notificações e lembretes."""
-    from services.notification_scheduler import notification_scheduler
+    # pyright: ignore[reportMissingImports]
+    from app.modules.notifications.services.notification_scheduler import notification_scheduler
 
     notification_scheduler.start()
 
 
 #  Entrypoint 
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Captura qualquer erro não tratado e loga o traceback completo."""
+    import traceback
+    error_detail = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    print(f"\n❌ [CRITICAL ERROR] {request.method} {request.url.path}")
+    print(error_detail)
+    
+    # Tenta extrair o corpo da requisição para debug (se possível)
+    try:
+        # Nota: read_body_once() logic omitted for simplicity, 
+        # but we use request._body if it was already read
+        pass
+    except:
+        pass
+
+    response = JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal Server Error",
+            "error": str(exc),
+            "path": request.url.path
+        }
+    )
+    # Adiciona cabeçalhos CORS manualmente para que o erro seja visível no frontend
+    origin = request.headers.get("Origin") or request.headers.get("origin")
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    else:
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        
+    response.headers["Access-Control-Allow-Methods"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
+
 if __name__ == '__main__':
     import uvicorn
 
-    from core.config import settings
+    from app.core.config import settings
 
     uvicorn.run(
         'main:app',

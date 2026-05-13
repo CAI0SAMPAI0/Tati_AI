@@ -23,6 +23,8 @@ export const ENDPOINTS = {
   PROGRESS: '/users/progress',
   PROGRESS_WEEKLY: '/users/progress/reports/weekly',
   PROGRESS_MONTHLY: '/users/progress/reports/monthly',
+  PROGRESS_WEEKLY_PLAN: '/users/progress/weekly-plan',
+  PROGRESS_WEEKLY_PLAN_PROGRESS: '/users/progress/weekly-plan/progress',
   STREAK: '/users/streak',
   XP: '/users/xp',
 
@@ -35,6 +37,7 @@ export const ENDPOINTS = {
   // Chat
   CONVERSATIONS: '/chat/conversations',
   CONVERSATION_MESSAGES: (id: string) => `/chat/conversations/${id}/messages`,
+  EDIT_MESSAGE: (convId: string, msgId: string) => `/chat/conversations/${convId}/messages/${msgId}`,
   CONVERSATION_SUMMARY: (id: string) => `/chat/conversations/${id}/summary`,
   CHAT_DOWNLOAD_REPORT: '/chat/download_report',
   CHAT_TTS: '/chat/tts',
@@ -70,8 +73,8 @@ export const ENDPOINTS = {
   // Admin
   ADMIN_MODULES: '/activities/modules/admin',
   ADMIN_MODULE_ALL: '/activities/modules/admin/all',
-  ADMIN_MODULE_GENERATE_QUIZ: '/activities/modules/admin/generate-quiz',
-  ADMIN_MODULE_GENERATE_FLASHCARDS: '/activities/modules/admin/generate-flashcards',
+  ADMIN_MODULE_GENERATE_QUIZ: '/admin/modules/generate-quiz',
+  ADMIN_MODULE_GENERATE_FLASHCARDS: '/admin/modules/generate-flashcards',
   ADMIN_SIMULATIONS: '/dashboard/simulations',
   ADMIN_SIMULATION_DETAIL: (id: string) => `/dashboard/simulations/${id}`,
   ADMIN_STUDENTS: '/dashboard/students',

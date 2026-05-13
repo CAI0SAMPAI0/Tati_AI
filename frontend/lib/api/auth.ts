@@ -23,6 +23,7 @@ export async function registerUser(payload: {
   username: string;
   password: string;
   level: string;
+  is_hub_only?: boolean;
 }): Promise<{ ok: boolean; status: number; data: User }> {
   return apiPost<User>('/auth/register', payload);
 }

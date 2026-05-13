@@ -6,8 +6,10 @@ import { Sidebar } from '@/components/chat/sidebar';
 import { ChatTopbar } from '@/components/chat/topbar';
 import { MessageList } from '@/components/chat/message-list';
 import { ChatInput } from '@/components/chat/chat-input';
+import { WeeklyPlanHeader } from '@/components/chat/weekly-plan-header';
+import { fetchWeeklyPlan } from '@/lib/api/weekly-plan';
 import { useChatSocket } from '@/hooks/useChatSocket';
-import { apiGet, apiPost } from '@/lib/api/client';
+import { apiGet, apiPost, apiPatch } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import type { Message, Conversation } from '@/lib/api/types';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -130,6 +132,28 @@ export default function ChatPage() {
     }
   };
 
+  const handleEditMessage = async (messageId: string, newContent: string) => {
+    if (!currentConvId) return;
+
+    try {
+      const res = await apiPatch<Message>(ENDPOINTS.EDIT_MESSAGE(currentConvId, messageId), {
+        content: newContent
+      });
+
+      if (res.ok) {
+        setMessages((prev) => prev.map(m => 
+          m.id === messageId ? { ...m, content: newContent } : m
+        ));
+        toast.success('Message updated.');
+      } else {
+        toast.error('Could not update message.');
+      }
+    } catch (err) {
+      console.error('Error editing message:', err);
+      toast.error('Error connecting to server.');
+    }
+  };
+
   const handleSendFile = async (filename: string, base64: string, caption?: string) => {
     let convId = currentConvId;
 
@@ -187,9 +211,11 @@ export default function ChatPage() {
 
   const { data: weeklyPlan } = useQuery({
     queryKey: ['weekly-plan'],
-    queryFn: () => apiGet<any>('/users/progress/weekly-plan'),
-    refetchInterval: 30000,
+    queryFn: fetchWeeklyPlan,
+    staleTime: 5 * 60 * 1000,
   });
+
+  const weeklyTopics = weeklyPlan?.topics ?? [];
 
   return (
     <div className="flex h-screen bg-bg overflow-hidden selection:bg-primary/20">
@@ -215,21 +241,20 @@ export default function ChatPage() {
             messages={messages}
             isStreaming={isStreaming}
             streamingContent={streamingContent}
+            onEdit={handleEditMessage}
           />
         </div>
-
-        <div className="p-2 md:p-6 bg-gradient-to-t from-bg via-bg/80 to-transparent">
-          <div className="max-w-4xl mx-auto w-full">
-
-            <ChatInput
-              onSend={handleSend}
-              onSendAudio={handleSendAudio}
-              onSendFile={handleSendFile}
-              disabled={false}
-              isStreaming={isStreaming}
-            />
+          <div className="p-2 md:p-6 bg-gradient-to-t from-bg via-bg/80 to-transparent">
+            <div className="max-w-4xl mx-auto w-full">
+              <ChatInput
+                onSend={handleSend}
+                onSendAudio={handleSendAudio}
+                onSendFile={handleSendFile}
+                disabled={false}
+                isStreaming={isStreaming}
+              />
+            </div>
           </div>
-        </div>
       </div>
 
       <AnimatePresence>

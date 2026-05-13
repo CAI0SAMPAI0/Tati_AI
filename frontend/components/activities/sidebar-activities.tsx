@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BookOpen, User, Trophy, ChartBar, MessageSquare, X, TrendingUp, Zap } from 'lucide-react';
+import { LuGoal } from 'react-icons/lu';
 
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,13 +21,18 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
   // Durante a fase de testes, apenas o professor/programador vê o Hub Premium
   const isAdminOrSpecial = user?.role === 'admin' || user?.role === 'teacher' || user?.username === 'Caio' || user?.username === 'caio' || user?.email?.toLowerCase().includes('caio');
 
-  const navItems = [
-    { href: '/activities', icon: <BookOpen size={20} />, label: 'Activities' },
-    ...(isAdminOrSpecial ? [{ href: '/hub-premium', icon: <Zap size={20} />, label: 'Premium Hub' }] : []),
-    { href: '/progress', icon: <TrendingUp size={20} />, label: 'Progress' },
-    { href: '/achievements', icon: <Trophy size={20} />, label: 'Achievements' },
-    { href: '/competitions', icon: <ChartBar size={20} />, label: 'Competitions' },
-  ];
+  const isHubOnly = (user as any)?.is_hub_only;
+
+  const navItems = isHubOnly 
+    ? [{ href: '/activities/hub', icon: <Zap size={20} />, label: 'Hub' }]
+    : [
+        { href: '/activities', icon: <BookOpen size={20} />, label: 'Activities' },
+        { href: '/activities/hub', icon: <Zap size={20} />, label: 'Hub' },
+        { href: '/progress', icon: <TrendingUp size={20} />, label: 'Progress' },
+        { href: '/goals', icon: <LuGoal size={20} />, label: 'Goals' },
+        { href: '/achievements', icon: <Trophy size={20} />, label: 'Achievements' },
+        { href: '/competitions', icon: <ChartBar size={20} />, label: 'Competitions' },
+      ];
 
   return (
     <>

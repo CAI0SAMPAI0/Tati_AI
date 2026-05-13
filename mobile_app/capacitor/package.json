@@ -1,0 +1,17 @@
+{
+  "name": "tatiai-mobile-shell",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "echo 'Use the frontend dev server at http://localhost:3000'",
+    "build": "echo 'Production build performed on frontend; then copy to native projects'"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^5.0.0",
+    "@capacitor/core": "^5.0.0"
+  },
+  "dependencies": {
+    "@capacitor/android": "^5.7.8"
+  }
+}

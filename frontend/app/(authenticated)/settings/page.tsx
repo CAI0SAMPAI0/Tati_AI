@@ -9,7 +9,9 @@ import {
   Moon,
   Sun,
   Save,
-  RotateCcw
+  RotateCcw,
+  Smartphone,
+  Download
 } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 

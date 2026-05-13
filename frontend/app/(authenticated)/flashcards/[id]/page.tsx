@@ -14,6 +14,7 @@ import { SidebarActivities } from '@/components/activities/sidebar-activities';
 interface Flashcard {
   front: string;
   back: string;
+  image_url?: string;
 }
 
 interface Deck {
@@ -29,6 +30,7 @@ function normalizeCard(raw: any): Flashcard {
   return {
     front: raw.front ?? raw.word ?? raw.term ?? raw.question ?? vals[0] ?? '',
     back:  raw.back  ?? raw.definition ?? raw.meaning ?? raw.answer ?? vals[1] ?? '',
+    image_url: raw.image_url ?? raw.imageUrl ?? raw.image ?? null
   };
 }
 
@@ -111,10 +113,8 @@ export default function FlashcardDeckPage() {
   };
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col md:flex-row">
-      <SidebarActivities isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-      <div className="flex-1 flex flex-col min-w-0 md:ml-[280px]">
+    <div className="min-h-screen bg-bg flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         <MainHeader onToggleMenu={() => setSidebarOpen(true)} />
 
         <main className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center">
@@ -139,7 +139,7 @@ export default function FlashcardDeckPage() {
             {!finished ? (
               <div className="w-full flex flex-col items-center" style={{ perspective: '1000px' }}>
                 <div
-                  className="w-full h-80 relative cursor-pointer"
+                  className="w-full h-[500px] relative cursor-pointer"
                   onClick={() => setIsFlipped(f => !f)}
                 >
                   <motion.div
@@ -153,34 +153,68 @@ export default function FlashcardDeckPage() {
                       className="absolute inset-0 bg-surface border-2 border-border hover:border-primary/30 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-center shadow-xl"
                       style={{ backfaceVisibility: 'hidden' }}
                     >
-                      <Button
-                        variant="ghost" size="sm"
-                        onClick={(e) => playAudio(currentCard.front, e)}
-                        className="absolute top-0 right-0 rounded-full h-10 w-10 text-primary hover:bg-primary/10"
-                      >
-                        <Volume2 size={20} />
-                      </Button>
-                      <h2 className="text-3xl md:text-4xl font-display font-bold text-text mb-2">
-                        {currentCard.front}
-                      </h2>
-                      <p className="text-xs text-text-muted absolute bottom-8">Tap to flip</p>
+                      <div className="flex flex-col items-center gap-6">
+                        <h2 className="text-4xl md:text-6xl font-display font-bold text-text tracking-tight">
+                          {currentCard.front}
+                        </h2>
+                        <Button
+                          variant="secondary" size="lg"
+                          onClick={(e) => playAudio(currentCard.front, e)}
+                          className="rounded-full h-14 w-14 text-primary bg-primary/10 hover:bg-primary/20 border-none shadow-sm transition-all hover:scale-110"
+                        >
+                          <Volume2 size={28} />
+                        </Button>
+                      </div>
+                      <p className="text-[0.7rem] text-text-muted absolute bottom-10 uppercase tracking-[0.3em] font-bold opacity-50">Tap to flip</p>
                     </div>
 
                     {/* Back */}
                     <div
-                      className="absolute inset-0 bg-primary/5 border-2 border-primary/40 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-center shadow-xl"
+                      className="absolute inset-0 bg-surface border-2 border-primary/40 rounded-[2.5rem] flex flex-col overflow-hidden shadow-2xl"
                       style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
                     >
-                      <Button
-                        variant="ghost" size="sm"
-                        onClick={(e) => playAudio(currentCard.back, e)}
-                        className="absolute top-6 right-6 rounded-full h-10 w-10 text-primary hover:bg-primary/10"
-                      >
-                        <Volume2 size={20} />
-                      </Button>
-                      <h2 className="text-2xl md:text-3xl font-display font-medium text-primary">
-                        {currentCard.back}
-                      </h2>
+                      {currentCard.image_url ? (
+                        <>
+                          <div className="relative h-[45%] w-full flex items-center justify-center p-6">
+                            <img 
+                              src={currentCard.image_url} 
+                              alt={currentCard.front}
+                              className="max-w-full max-h-full object-contain drop-shadow-xl"
+                            />
+                          </div>
+                          
+                          <div className="flex-1 flex flex-col items-center justify-between p-8 md:p-10 text-center relative">
+                            <div className="flex-1 flex flex-col items-center justify-center space-y-6">
+                              <h2 className="text-xl md:text-2xl font-display font-bold text-text leading-relaxed max-w-md">
+                                {currentCard.back}
+                              </h2>
+                              
+                              <Button
+                                variant="secondary" size="md"
+                                onClick={(e) => playAudio(currentCard.back, e)}
+                                className="rounded-full h-12 w-12 text-primary bg-primary/10 hover:bg-primary/20 border-none shadow-sm transition-transform hover:scale-110"
+                              >
+                                <Volume2 size={22} />
+                              </Button>
+                            </div>
+
+                            <p className="text-[0.6rem] text-text-muted uppercase tracking-[0.3em] font-black opacity-30 mt-4">Explanation</p>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center p-12 text-center relative space-y-10">
+                           <h2 className="text-2xl md:text-4xl font-display font-medium text-text leading-tight max-w-md">
+                            {currentCard.back}
+                          </h2>
+                          <Button
+                            variant="secondary" size="lg"
+                            onClick={(e) => playAudio(currentCard.back, e)}
+                            className="rounded-full h-16 w-16 text-primary bg-primary/10 hover:bg-primary/20 border-none shadow-sm transition-transform hover:scale-110"
+                          >
+                            <Volume2 size={32} />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 </div>

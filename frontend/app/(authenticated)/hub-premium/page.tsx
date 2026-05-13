@@ -54,16 +54,7 @@ export default function PremiumHubPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Durante a fase de testes, apenas o professor/programador vê o Hub Premium
-  const isAdminOrSpecial = user?.role === 'admin' || user?.role === 'teacher' || user?.username === 'Caio' || user?.username === 'caio' || user?.email?.toLowerCase().includes('caio');
-
-  useEffect(() => {
-    if (user && !isAdminOrSpecial) {
-      router.replace('/dashboard');
-      toast.error('This area is currently under maintenance.');
-    }
-  }, [user, isAdminOrSpecial, router]);
-
+  // O acesso agora está liberado para todos os usuários logados.
   const [selectedItem, setSelectedItem] = useState<PremiumContent | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);

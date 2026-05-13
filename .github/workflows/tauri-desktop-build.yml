@@ -1,0 +1,51 @@
+name: Build Desktop (Tauri)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  build-tauri:
+    name: Tauri Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev libgtk-3-dev build-essential
+
+      - name: Install frontend deps (root project)
+        working-directory: frontend
+        run: |
+          npm ci || npm install
+          npm run build || true
+
+      - name: Install Tauri deps & build
+        working-directory: mobile_app/desktop
+        run: |
+          # assumes a tauri project scaffold exists in mobile_app/desktop
+          npm ci || npm install
+          npm run build || true
+          npm run tauri build || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-artifacts
+          path: |
+            mobile_app/desktop/src-tauri/target/release/bundle

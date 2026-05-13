@@ -87,7 +87,7 @@ export function ConversationList({ currentId, onSelect, onDelete }: Conversation
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-2 py-1 scrollbar-thin">
+    <div className="px-2 py-1">
       {groups && Object.entries(groups).map(([label, items]) => {
         if (items.length === 0) return null;
         return (

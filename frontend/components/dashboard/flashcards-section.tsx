@@ -10,9 +10,12 @@ import {
   PenLine,
   Eye,
   FileBox,
-  Sparkles
+  Sparkles,
+  Image as ImageIcon,
+  Upload,
+  Loader2
 } from 'lucide-react';
-import { apiGet, apiDelete, apiPost, apiPut } from '@/lib/api/client';
+import { apiGet, apiDelete, apiPost, apiPut, apiUpload } from '@/lib/api/client';
 
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
@@ -27,7 +30,13 @@ interface FlashcardDeck {
   description?: string;
   card_count?: number;
   level?: string;
-  flashcards?: Array<{ front: string; back: string }>;
+  flashcards?: Array<{ front: string; back: string; image_url?: string }>;
+}
+
+interface Flashcard {
+  front: string;
+  back: string;
+  image_url?: string;
 }
 
 interface FormState {
@@ -36,7 +45,8 @@ interface FormState {
   card_count: number;
   level: string;
   ai_theme: string;
-  flashcards: Array<{ front: string; back: string }>;
+  ai_with_images: boolean;
+  flashcards: Array<Flashcard>;
 }
 
 const EMPTY_FORM: FormState = {
@@ -45,6 +55,7 @@ const EMPTY_FORM: FormState = {
   card_count: 10,
   level: 'all',
   ai_theme: '',
+  ai_with_images: false,
   flashcards: [],
 };
 
@@ -99,6 +110,7 @@ export function FlashcardsSection() {
           card_count: details.flashcards?.length || deck.card_count || 10,
           level: details.level || deck.level || 'all',
           ai_theme: '',
+          ai_with_images: false,
           flashcards: details.flashcards || []
         });
       } catch (err) {
@@ -108,6 +120,7 @@ export function FlashcardsSection() {
           card_count: deck.card_count || 10,
           level: deck.level || 'all',
           ai_theme: '',
+          ai_with_images: false,
           flashcards: []
         });
       }
@@ -121,7 +134,7 @@ export function FlashcardsSection() {
   const addManualCard = () => {
     setFormData(prev => ({
       ...prev,
-      flashcards: [...prev.flashcards, { front: '', back: '' }]
+      flashcards: [...prev.flashcards, { front: '', back: '', image_url: '' }]
     }));
   };
 
@@ -132,10 +145,100 @@ export function FlashcardsSection() {
     }));
   };
 
-  const updateCard = (idx: number, field: 'front' | 'back', value: string) => {
+  const updateCard = (idx: number, field: keyof Flashcard, value: string) => {
     const newCards = [...formData.flashcards];
     newCards[idx] = { ...newCards[idx], [field]: value };
     setFormData(prev => ({ ...prev, flashcards: newCards }));
+  };
+
+  const [generatingImages, setGeneratingImages] = useState<Record<number, boolean>>({});
+  const [uploadingImages, setUploadingImages] = useState<Record<number, boolean>>({});
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
+
+  const handleImageUpload = async (idx: number, file: File) => {
+    if (!file) return;
+    
+    setUploadingImages(prev => ({ ...prev, [idx]: true }));
+    setImageErrors(prev => ({ ...prev, [idx]: false }));
+    
+    try {
+      console.log(`[Flashcards] Uploading image for card ${idx}...`);
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', file);
+      
+      const res = await apiUpload<{ url: string }>('/flashcard-assets/upload-image', formDataUpload);
+      console.log(`[Flashcards] Upload result:`, res);
+      
+      if (res.ok && res.data?.url) {
+        setImageErrors(prev => ({ ...prev, [idx]: false })); // Reset error
+        updateCard(idx, 'image_url', res.data.url);
+        toast.success('Image uploaded!');
+      } else {
+        const errorMsg = (res.data as any)?.detail || 'Upload failed';
+        toast.error(errorMsg);
+        console.error(`[Flashcards] Upload failed:`, res);
+      }
+    } catch (err) {
+      console.error(`[Flashcards] Upload error:`, err);
+      toast.error('Upload error');
+    } finally {
+      setUploadingImages(prev => ({ ...prev, [idx]: false }));
+    }
+  };
+
+  const handleUrlUpload = async (idx: number, url: string) => {
+    if (!url || !url.startsWith('http')) return;
+    // Prevent re-uploading if it's already a Cloudinary URL
+    if (url.includes('res.cloudinary.com')) return;
+    
+    setUploadingImages(prev => ({ ...prev, [idx]: true }));
+    setImageErrors(prev => ({ ...prev, [idx]: false }));
+    
+    try {
+      console.log(`[Flashcards] Uploading image from URL for card ${idx}...`);
+      const res = await apiPost<{ url: string }>('/flashcard-assets/upload-image-from-url', { url });
+      
+      if (res.ok && res.data?.url) {
+        setImageErrors(prev => ({ ...prev, [idx]: false }));
+        updateCard(idx, 'image_url', res.data.url);
+        toast.success('Image saved securely!');
+      } else {
+        console.error(`[Flashcards] URL upload failed:`, res);
+      }
+    } catch (err) {
+      console.error(`[Flashcards] URL upload error:`, err);
+    } finally {
+      setUploadingImages(prev => ({ ...prev, [idx]: false }));
+    }
+  };
+
+  const generateCardImage = async (idx: number) => {
+    const card = formData.flashcards[idx];
+    const prompt = card.front || card.back;
+    if (!prompt) return toast.error('Front or Back required for AI');
+
+    setGeneratingImages(prev => ({ ...prev, [idx]: true }));
+    setImageErrors(prev => ({ ...prev, [idx]: false }));
+    
+    try {
+      console.log(`[Flashcards] Generating image for: ${prompt}`);
+      const res = await apiPost<{ url: string }>('/flashcard-assets/ai-image', { prompt });
+      console.log(`[Flashcards] Generation result:`, res);
+      
+      if (res.ok && res.data?.url) {
+        setImageErrors(prev => ({ ...prev, [idx]: false })); // Reset error
+        updateCard(idx, 'image_url', res.data.url);
+        toast.success('Image ready!');
+      } else {
+        const errorMsg = (res.data as any)?.detail || 'Failed to generate image';
+        toast.error(errorMsg);
+      }
+    } catch (err) {
+      console.error(`[Flashcards] Generation error:`, err);
+      toast.error('Error generating image');
+    } finally {
+      setGeneratingImages(prev => ({ ...prev, [idx]: false }));
+    }
   };
 
   const handleGenerateWithAI = async () => {
@@ -146,7 +249,7 @@ export function FlashcardsSection() {
     setIsGenerating(true);
     try {
       const res = await apiPost<{ ok: boolean }>(ENDPOINTS.ADMIN_MODULE_GENERATE_FLASHCARDS, {
-        theme: formData.ai_theme,
+        theme: formData.ai_with_images ? `IMG:${formData.ai_theme}` : formData.ai_theme,
         instructions: '',
         level: formData.level,
         card_count: formData.card_count,
@@ -341,20 +444,107 @@ export function FlashcardsSection() {
               {formData.flashcards.length > 0 ? (
                 <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
                   {formData.flashcards.map((card, idx) => (
-                    <div key={idx} className="grid grid-cols-[1fr,1fr,auto] gap-2 items-start bg-surface p-2 rounded-xl border border-border group">
-                      <input 
-                        className="bg-transparent border-b border-border text-xs py-1 outline-none focus:border-primary transition-all"
-                        placeholder="Front (term)"
-                        value={card.front}
-                        onChange={(e) => updateCard(idx, 'front', e.target.value)}
-                      />
-                      <input 
-                        className="bg-transparent border-b border-border text-xs py-1 outline-none focus:border-primary transition-all"
-                        placeholder="Back (meaning)"
-                        value={card.back}
-                        onChange={(e) => updateCard(idx, 'back', e.target.value)}
-                      />
-                      <button onClick={() => removeCard(idx)} className="text-text-subtle hover:text-danger p-1">
+                    <div key={idx} className="grid grid-cols-[50px,1fr,1fr,auto] gap-2 items-center bg-surface p-2 rounded-xl border border-border group">
+                      {/* Image Preview / Upload */}
+                      <div 
+                        className="w-[50px] h-[50px] rounded-lg bg-input border border-border overflow-hidden flex items-center justify-center relative cursor-pointer group/img"
+                        onClick={() => document.getElementById(`file-upload-${idx}`)?.click()}
+                        title="Click to upload image"
+                      >
+                        {card.image_url ? (
+                          <img 
+                            key={card.image_url}
+                            src={card.image_url} 
+                            alt="" 
+                            className="w-full h-full object-cover"
+                            onError={() => {
+                              console.error(`[Flashcards] Error loading image for card ${idx}: ${card.image_url}`);
+                              setImageErrors(prev => ({ ...prev, [idx]: true }));
+                            }}
+                            onLoad={() => {
+                              setImageErrors(prev => ({ ...prev, [idx]: false }));
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <ImageIcon size={16} className="text-text-muted opacity-30" />
+                          </div>
+                        )}
+                        
+                        {/* Overlay with Upload Icon */}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-all flex items-center justify-center">
+                          <Upload size={14} className="text-white" />
+                        </div>
+
+                        {(generatingImages[idx] || uploadingImages[idx]) && (
+                          <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                            <Loader2 size={16} className="text-primary animate-spin" />
+                          </div>
+                        )}
+                        
+                        <input 
+                          type="file" 
+                          id={`file-upload-${idx}`} 
+                          className="hidden" 
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleImageUpload(idx, file);
+                            e.target.value = ''; // Reset for same file re-upload
+                          }}
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <input 
+                          className="bg-transparent border-b border-border text-xs py-1 outline-none focus:border-primary transition-all"
+                          placeholder="Front (term)"
+                          value={card.front}
+                          onChange={(e) => updateCard(idx, 'front', e.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <input 
+                          className="bg-transparent border-b border-border text-xs py-1 outline-none focus:border-primary transition-all"
+                          placeholder="Back (meaning)"
+                          value={card.back}
+                          onChange={(e) => updateCard(idx, 'back', e.target.value)}
+                        />
+                        <div className="flex items-center gap-2 mt-1">
+                           <input 
+                            className="flex-1 bg-transparent border-b border-border text-[0.6rem] py-0.5 outline-none focus:border-primary transition-all opacity-70"
+                            placeholder="Image URL"
+                            value={card.image_url || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              // Basic fix for Google Search links: try to extract the original URL or at least prevent the direct imgres link
+                              if (val.includes('imgres?q=')) {
+                                const urlParams = new URLSearchParams(val.split('?')[1]);
+                                const imgUrl = urlParams.get('imgurl');
+                                if (imgUrl) {
+                                  setImageErrors(prev => ({ ...prev, [idx]: false }));
+                                  updateCard(idx, 'image_url', decodeURIComponent(imgUrl));
+                                  return;
+                                }
+                              }
+                              setImageErrors(prev => ({ ...prev, [idx]: false }));
+                              updateCard(idx, 'image_url', val);
+                            }}
+                            onBlur={(e) => {
+                              handleUrlUpload(idx, e.target.value);
+                            }}
+                          />
+                          <button 
+                            onClick={() => generateCardImage(idx)}
+                            disabled={generatingImages[idx]}
+                            className={`p-1 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-all ${generatingImages[idx] ? 'animate-pulse' : ''}`}
+                            title="Generate/Search Image"
+                          >
+                            <Sparkles size={10} />
+                          </button>
+                        </div>
+                      </div>
+                      <button onClick={() => removeCard(idx)} className="text-text-subtle hover:text-danger p-1 self-center">
                         <Trash2 size={12} />
                       </button>
                     </div>
@@ -371,10 +561,22 @@ export function FlashcardsSection() {
               </h4>
               <textarea
                 placeholder={'E.g.: Verbs of Movement, Travel...'}
-                className="w-full min-h-[60px] p-3.5 bg-surface border border-border rounded-xl text-sm outline-none focus:border-primary/50 transition-all resize-none"
+                className="w-full min-h-[60px] p-3.5 bg-surface border border-border rounded-xl text-sm outline-none focus:border-primary/50 transition-all resize-none mb-2"
                 value={formData.ai_theme}
                 onChange={(e) => setFormData(prev => ({ ...prev, ai_theme: e.target.value }))}
               />
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <input 
+                  type="checkbox" 
+                  id="ai_with_images"
+                  checked={formData.ai_with_images}
+                  onChange={(e) => setFormData(prev => ({ ...prev, ai_with_images: e.target.checked }))}
+                  className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                />
+                <label htmlFor="ai_with_images" className="text-xs font-medium text-text-muted cursor-pointer">
+                  Generate images for all cards (Slower)
+                </label>
+              </div>
               <Button
                 variant="secondary"
                 className="w-full gap-2"

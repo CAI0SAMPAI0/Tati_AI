@@ -1,0 +1,47 @@
+name: Build iOS (Capacitor)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  build-ios:
+    name: Build Capacitor iOS
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies (capacitor shell)
+        working-directory: mobile_app/capacitor
+        run: |
+          npm ci || npm install
+
+      - name: Sync Capacitor iOS
+        run: |
+          npx cap sync ios --cwd mobile_app/capacitor
+
+      - name: Install CocoaPods
+        run: |
+          sudo gem install cocoapods || true
+          (cd mobile_app/capacitor/ios/App && pod install) || true
+
+      - name: Attempt Xcode build (unsigned)
+        working-directory: mobile_app/capacitor/ios/App
+        run: |
+          set -o pipefail
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -derivedDataPath build | tee xcodebuild.log || true
+
+      - name: Upload build logs/artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-logs
+          path: |
+            mobile_app/capacitor/ios/App/xcodebuild.log
+            mobile_app/capacitor/ios/App/build

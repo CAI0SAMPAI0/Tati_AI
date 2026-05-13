@@ -2,20 +2,24 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { 
-  HelpCircle, 
-  Layers, 
-  Drama, 
-  Podcast, 
+import {
+  HelpCircle,
+  Layers,
+  Drama,
+  Podcast,
   Play,
   FileBox,
   History,
   Search,
-  Sparkles
+  Sparkles,
+  Clock,
+  ChevronRight
 } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
 import { ActivityCard } from '@/components/activities/activity-card';
+import { WeeklyPlanHeader } from '@/components/chat/weekly-plan-header';
+import { fetchWeeklyPlan } from '@/lib/api/weekly-plan';
 import { apiGet } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 
@@ -83,31 +87,19 @@ interface UserError {
 }
 
 export default function ActivitiesPage() {
-  
+
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('quiz');
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Persistence: Load last tab on mount
-  useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('tati_last_activity_tab');
-      if (saved) {
-        // Simple validation to ensure the saved value is a valid TabType
-        if (['quiz', 'flashcards', 'simulations', 'podcasts', 'exercises'].includes(saved)) {
-          // We set it inside a timeout or use a separate state to avoid hydration issues
-          // But for now, we'll just update it in a useEffect below for safety
-        }
-      }
-    }
-  });
-
   // Effect to load and save
   useEffect(() => {
-    const saved = localStorage.getItem('tati_last_activity_tab') as TabType;
-    if (saved && saved !== activeTab) {
-      setActiveTab(saved);
+    if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('tati_last_activity_tab') as TabType;
+        if (saved && ['quiz', 'flashcards', 'simulations', 'podcasts', 'exercises'].includes(saved)) {
+            setActiveTab(saved);
+        }
     }
   }, []);
 
@@ -116,10 +108,16 @@ export default function ActivitiesPage() {
   }, [activeTab]);
 
   // Fetching real data
-  const { data: modules, isLoading: modulesLoading } = useQuery<ModuleItem[]>({
+  const { data: modules = [], isLoading: modulesLoading } = useQuery<ModuleItem[]>({
     queryKey: ['activities-modules'],
     queryFn: () => apiGet<ModuleItem[]>(ENDPOINTS.ACTIVITIES_MODULES),
   });
+
+  const { data: masterModule, isLoading: masterLoading } = useQuery<any>({
+    queryKey: ['activities-master-module'],
+    queryFn: () => apiGet<any>(`/admin/modules/personalized`),
+  });
+
   const { data: simulationsRaw = [] } = useQuery<SimulationItem[]>({
     queryKey: ['activities-simulations'],
     queryFn: () => apiGet<SimulationItem[]>('/simulation/scenarios'),
@@ -136,9 +134,24 @@ export default function ActivitiesPage() {
     queryKey: ['activities-flashcards'],
     queryFn: () => apiGet<FlashcardDeck[]>('/activities/flashcards/my'),
   });
+  const { data: podcastProgress } = useQuery({
+    queryKey: ['activities-podcasts-progress'],
+    queryFn: () => apiGet<{ completed: string[] }>('/activities/podcasts/progress'),
+  });
+  const { data: simulationProgress } = useQuery({
+    queryKey: ['activities-simulations-progress'],
+    queryFn: () => apiGet<{ completed: string[] }>('/simulation/progress'),
+  });
   const { data: userErrors = [] } = useQuery<UserError[]>({
     queryKey: ['activities-user-errors'],
     queryFn: () => apiGet<UserError[]>('/users/progress/errors/recent'),
+  });
+
+  // Weekly plan
+  const { data: weeklyPlan } = useQuery({
+    queryKey: ['weekly-plan-v2'],
+    queryFn: fetchWeeklyPlan,
+    staleTime: 5 * 60 * 1000,
   });
 
   const quizzes = useMemo(() => {
@@ -148,10 +161,10 @@ export default function ActivitiesPage() {
       if (m.id === PERSONALIZED_MODULE_ID) return;
       (m.quizzes || []).forEach((q) => {
         if (!searchQuery || q.title.toLowerCase().includes(searchQuery.toLowerCase()) || m.title.toLowerCase().includes(searchQuery.toLowerCase())) {
-          list.push({ 
-            ...q, 
+          list.push({
+            ...q,
             module_title: m.title,
-            user_status: m.user_status 
+            user_status: m.user_status
           });
         }
       });
@@ -160,23 +173,20 @@ export default function ActivitiesPage() {
   }, [modules, searchQuery]);
 
   const exercises = useMemo(() => {
-    if (!modules) return [];
-    const list: Array<QuizItem> = [];
-    modules.forEach(m => {
-      if (m.id !== PERSONALIZED_MODULE_ID) return;
-      (m.quizzes || []).forEach((q) => {
-        if (!searchQuery || q.title.toLowerCase().includes(searchQuery.toLowerCase())) {
-          list.push(q);
-        }
-      });
-    });
-    return list;
-  }, [modules, searchQuery]);
+    if (!masterModule || !masterModule.quizzes) return [];
+    return masterModule.quizzes.filter((q: any) =>
+      !searchQuery || q.title.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [masterModule, searchQuery]);
 
   const flashcards = useMemo(() => {
     if (!flashcardsRaw) return [];
-    if (!searchQuery) return flashcardsRaw;
-    return flashcardsRaw.filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    const filtered = flashcardsRaw.filter(f =>
+      f.title !== 'Vocabulary Review' &&
+      f.title !== 'Revisão de Vocabulário'
+    );
+    if (!searchQuery) return filtered;
+    return filtered.filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [flashcardsRaw, searchQuery]);
 
   const simulations = useMemo(() => {
@@ -196,13 +206,13 @@ export default function ActivitiesPage() {
     { id: 'exercises', icon: <Sparkles size={18} />, label: 'AI Exercises', count: exercises.length },
     { id: 'flashcards', icon: <Layers size={18} />, label: 'Flashcards', count: flashcards.length },
     { id: 'simulations', icon: <Drama size={18} />, label: 'Simulations', count: simulations.length },
-    { id: 'podcasts', icon: <Podcast size={18} />, label: 'Podcasts', count: podcasts.length },
+    { id: 'podcasts', icon: <Podcast size={18} />, label: 'Podcasts', count: Math.min(podcasts.length, 15) },
   ];
 
   return (
     <div className="min-h-screen bg-bg flex flex-col md:flex-row">
       <SidebarActivities isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      
+
       <div className="flex-1 flex flex-col min-w-0 md:ml-[280px]">
         <MainHeader onToggleMenu={() => setSidebarOpen(true)} />
 
@@ -216,10 +226,10 @@ export default function ActivitiesPage() {
                 {'Practice vocabulary, grammar and pronunciation. Earn points in the ranking!'}
               </p>
             </div>
-            
+
             <div className="relative w-full md:w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle" size={18} />
-              <input 
+              <input
                 type="text"
                 placeholder={'Search activity...'}
                 className="w-full pl-10 pr-4 py-2.5 bg-surface border border-border rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
@@ -229,16 +239,16 @@ export default function ActivitiesPage() {
             </div>
           </header>
 
-          <nav className="flex gap-2 overflow-x-auto pb-1 mb-8 scrollbar-none border-b border-border sticky top-16 bg-bg/90 backdrop-blur-md z-10">
+          <nav className="flex flex-col sm:flex-row flex-wrap gap-2 sm:overflow-x-auto pb-1 mb-8 scrollbar-none border-b border-border bg-bg z-10">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "flex items-center gap-2.5 px-5 py-3 rounded-t-xl text-sm font-bold transition-all whitespace-nowrap relative top-[1px]",
+                  "flex items-center gap-2.5 px-5 py-3 rounded-xl sm:rounded-t-xl sm:rounded-b-none text-sm font-bold transition-all whitespace-nowrap w-full sm:w-auto",
                   activeTab === tab.id
-                    ? "bg-surface border-x border-t border-border text-primary border-b-bg"
-                    : "text-text-muted hover:text-text border-x border-t border-transparent"
+                    ? "bg-surface border border-border sm:border-b-bg text-primary"
+                    : "text-text-muted hover:text-text border border-transparent"
                 )}
               >
                 {tab.icon}
@@ -263,7 +273,7 @@ export default function ActivitiesPage() {
                       <ActivityCard
                         key={q.id}
                         title={q.title}
-                        description={q.description || 'Practice your knowledge about '}
+                        description={q.description || 'Practice your knowledge.'}
                         type="quiz"
                         status={q.user_status?.is_done ? 'done' : 'new'}
                         score={q.user_status?.score}
@@ -335,15 +345,16 @@ export default function ActivitiesPage() {
 
                 {activeTab === 'podcasts' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {podcasts.length > 0 ? podcasts.map((p) => (
+                    {podcasts.length > 0 ? podcasts.slice(0, 15).map((p) => (
                       <ActivityCard
                         key={p.id}
                         title={p.title}
                         description={p.description || 'Get ready to listen and practice.'}
                         imageUrl={p.thumbnail}
                         type="podcast"
+                        status={podcastProgress?.completed?.includes(p.id) ? 'done' : 'pending'}
                         onClick={() => router.push(`/podcasts/${p.id}`)}
-                        actionLabel="Play"
+                        actionLabel={podcastProgress?.completed?.includes(p.id) ? 'Redo' : 'Play'}
                       />
                     )) : (
                       <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
@@ -361,6 +372,7 @@ export default function ActivitiesPage() {
                         title={f.title}
                         description={f.description || 'Your vocabulary flashcards will be generated here soon.'}
                         type="flashcard"
+                        status="pending"
                         onClick={() => router.push(`/flashcards/${f.id}`)}
                         meta={[{ icon: <FileBox size={14} />, label: `${f.card_count} cards` }]}
                       />
@@ -382,6 +394,7 @@ export default function ActivitiesPage() {
                         emoji={s.emoji || s.icon}
                         description={s.description || 'Choose a scenario and practice English in everyday situations'}
                         type="simulation"
+                        status={simulationProgress?.completed?.includes(s.id) ? 'done' : 'pending'}
                         onClick={() => router.push(`/voice?simulation_id=${s.id}`)}
                         meta={[{ icon: <Play size={14} />, label: s.difficulty || 'normal' }]}
                       />
@@ -393,38 +406,6 @@ export default function ActivitiesPage() {
                   </div>
                 )}
               </>
-            )}
-            
-            {submissions.length > 0 && activeTab === 'quiz' && (
-              <div className="pt-12">
-                <h4 className="text-lg font-bold flex items-center gap-2 mb-6">
-                  <History size={20} className="text-primary" />
-                  Activities history
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {submissions.slice(0, 6).map((s) => (
-                    <div key={s.id} className="bg-surface border border-border p-4 rounded-xl flex items-center justify-between hover:border-primary/30 transition-all cursor-pointer">
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold truncate">{s.module?.title || 'Atividade'}</p>
-                        <p className="text-[0.65rem] text-text-muted mt-0.5">{new Date(s.created_at).toLocaleDateString()}</p>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-xs font-black text-primary bg-primary/10 px-2 py-1 rounded-lg">
-                          {s.score}/100
-                        </span>
-                        <span className={cn(
-                          "text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-tighter",
-                          (s.status === 'corrected' || s.status === 'done' || s.activity_type === 'quiz') 
-                            ? "bg-success/10 text-success border-success/20" 
-                            : "bg-warning/10 text-warning border-warning/20"
-                        )}>
-                          {s.activity_type === 'quiz' ? 'done' : s.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
             )}
           </div>
         </main>

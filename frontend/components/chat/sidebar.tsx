@@ -161,31 +161,20 @@ export function Sidebar({
           <span>{'New conversation'}</span>
         </button>
 
-        <div className="h-px bg-border mx-3 my-2" />
+        <div className="h-px bg-border mx-3 my-2 shrink-0" />
 
-        {/* Weekly Plan */}
-        <WeeklyPlan />
+        {/* Scrollable middle section */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col min-h-0">
+          {/* Weekly Plan */}
+          <div className="px-3 py-1">
+            <WeeklyPlan />
+          </div>
 
-        {dueVocab.length > 0 && (
-          <button 
-            onClick={() => router.push('/vocab/review')}
-            className="mx-3 mt-1 mb-2 p-3 bg-primary/10 border border-primary/20 rounded-xl flex items-center gap-3 hover:bg-primary/20 transition-all group animate-in slide-in-from-left duration-500"
-          >
-            <div className="w-9 h-9 rounded-lg bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform shrink-0">
-              <Brain size={18} />
-            </div>
-            <div className="text-left min-w-0">
-              <p className="text-[0.7rem] font-black text-primary uppercase tracking-wider leading-none mb-1">Memory Due</p>
-              <p className="text-[0.65rem] font-bold text-text-muted truncate">{dueVocab.length} words to review</p>
-            </div>
-            <ChevronRight size={12} className="ml-auto text-primary/40 group-hover:translate-x-0.5 transition-transform" />
-          </button>
-        )}
 
-        <div className="h-px bg-border mx-3 my-2" />
-
-        {/* Conversation List */}
-        <ConversationList currentId={currentConvId} onSelect={onSelectConv} />
+          <div className="flex-1">
+            <ConversationList currentId={currentConvId} onSelect={onSelectConv} />
+          </div>
+        </div>
 
         {/* Footer */}
         <div className="mt-auto border-t border-border p-3 flex items-center gap-1.5">
