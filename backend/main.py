@@ -81,14 +81,6 @@ app.add_middleware(
     allow_origin_regex=r'http://(localhost|127\.0\.0\.1|192\.168\.1\.3):[0-9]+',
 )
 
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    import time
-    start_time = time.time()
-    response = await call_next(request)
-    duration = time.time() - start_time
-    print(f"[{request.method}] {request.url.path} - {response.status_code} ({duration:.2f}s)")
-    return response
 
 # Rate Limiting (Upstash Redis)
 from app.core.utils.rate_limiter import setup_rate_limiting
@@ -121,15 +113,8 @@ async def startup_notifications() -> None:
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Captura qualquer erro não tratado e loga o traceback completo."""
-    import traceback
-    error_detail = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-    print(f"\n❌ [CRITICAL ERROR] {request.method} {request.url.path}")
-    print(error_detail)
-    
-    # Tenta extrair o corpo da requisição para debug (se possível)
+    print(f"❌ [ERROR] {request.method} {request.url.path} -> {type(exc).__name__}: {str(exc)}")
     try:
-        # Nota: read_body_once() logic omitted for simplicity, 
-        # but we use request._body if it was already read
         pass
     except:
         pass

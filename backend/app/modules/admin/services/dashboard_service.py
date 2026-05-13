@@ -212,3 +212,19 @@ class DashboardService:
                 return {'total_errors_logged': 0, 'by_category': {}}
 
         return await run_in_threadpool(_fetch)
+
+    async def get_difficulties_stats(self) -> Dict[str, Any]:
+        """Retorna distribuição de dificuldades/níveis dos alunos."""
+        def _fetch():
+            try:
+                res = self.db.table('users').select('level').execute().data or []
+                stats = {}
+                for r in res:
+                    lvl = r.get('level') or 'Unknown'
+                    stats[lvl] = stats.get(lvl, 0) + 1
+                return stats
+            except Exception as e:
+                print(f"[DashboardService] Erro em get_difficulties_stats: {e}")
+                return {}
+
+        return await run_in_threadpool(_fetch)
