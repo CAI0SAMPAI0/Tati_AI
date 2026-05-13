@@ -73,7 +73,7 @@ export function PixModal({ qrCode, payload, value, title, invoiceUrl, onClose }:
             <div className="grid grid-cols-1 gap-3 pt-2">
               {invoiceUrl && (
                 <Button 
-                  variant="outline" 
+                  variant="secondary" 
                   className="w-full gap-2 border-primary/30 text-primary hover:bg-primary/5"
                   onClick={() => window.open(invoiceUrl, '_blank')}
                 >
