@@ -50,26 +50,6 @@ export default function HubPage() {
     queryFn: () => apiGet<PremiumContent[]>('/activities/hub'),
   });
 
-  useEffect(() => {
-    if (isLoaded && user) {
-      const isAdmin = user.role === 'admin';
-      const isBlockedUser = user.username === 'caio.sampaio';
-      
-      if (!isAdmin || isBlockedUser) {
-        toast.error('Acesso restrito apenas para administradores.');
-        router.push('/chat');
-      }
-    }
-  }, [user, isLoaded, router]);
-
-  if (!isLoaded || !user || user.role !== 'admin' || user.username === 'caio.sampaio') {
-    return (
-      <div className="min-h-screen bg-bg flex items-center justify-center">
-        <Spinner />
-      </div>
-    );
-  }
-
   const checkoutMutation = useMutation({
     mutationFn: async ({ contentId, doc, method }: { contentId: string, doc: string, method: string }) => {
       // 1. Atualiza CPF se necessário
@@ -101,6 +81,28 @@ export default function HubPage() {
       toast.error(detail);
     }
   });
+
+  useEffect(() => {
+    if (isLoaded && user) {
+      const isAdmin = user.role === 'admin';
+      const isBlockedUser = user.username === 'caio.sampaio';
+      
+      if (!isAdmin || isBlockedUser) {
+        toast.error('Acesso restrito apenas para administradores.');
+        router.push('/chat');
+      }
+    }
+  }, [user, isLoaded, router]);
+
+  const isAdmin = user?.role === 'admin' && user?.username !== 'caio.sampaio';
+
+  if (!isLoaded || !user || !isAdmin) {
+    return (
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
 
   const handleAction = async (item: PremiumContent) => {
     if (!item.has_access) {

@@ -12,6 +12,7 @@
     "@capacitor/core": "^5.0.0"
   },
   "dependencies": {
-    "@capacitor/android": "^5.7.8"
+    "@capacitor/android": "^5.7.8",
+    "@capacitor/ios": "^5.7.8"
   }
 }
