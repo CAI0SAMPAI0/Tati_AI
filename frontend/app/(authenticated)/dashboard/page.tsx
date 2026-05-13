@@ -22,25 +22,50 @@ import { useRouter } from 'next/navigation';
 import { usePermissions } from '@/hooks/usePermissions';
 import { Spinner } from '@/components/ui/spinner';
 
+import { useSearchParams } from 'next/navigation';
+
 export default function DashboardPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { canAccessDashboard, isLoading: permissionsLoading } = usePermissions();
-  const [activeSection, setActiveSection] = useState<DashSection>('overview');
+  
+  // Get tab from URL or localStorage
+  const getInitialTab = (): DashSection => {
+    const tabParam = searchParams.get('tab') as DashSection;
+    if (tabParam && ['overview', 'students', 'reports', 'modules', 'flashcards', 'simulations', 'premium'].includes(tabParam)) {
+      return tabParam;
+    }
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('tati_last_dashboard_tab') as DashSection;
+      if (saved && ['overview', 'students', 'reports', 'modules', 'flashcards', 'simulations', 'premium'].includes(saved)) {
+        return saved;
+      }
+    }
+    return 'overview';
+  };
+
+  const [activeSection, setActiveSection] = useState<DashSection>(getInitialTab());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Persistence: Load last section on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('tati_last_dashboard_tab') as DashSection;
-    if (saved && saved !== activeSection) {
-      setActiveSection(saved);
-    }
-  }, []);
+  // Update URL and storage when section changes
+  const handleSetSection = (section: DashSection) => {
+    setActiveSection(section);
+    localStorage.setItem('tati_last_dashboard_tab', section);
+    
+    // Update URL without full page reload
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', section);
+    router.push(`/dashboard?${params.toString()}`, { scroll: false });
+  };
 
-  // Persistence: Save section on change
+  // Sync tab if URL changes (e.g., browser back/forward)
   useEffect(() => {
-    localStorage.setItem('tati_last_dashboard_tab', activeSection);
-  }, [activeSection]);
+    const tabParam = searchParams.get('tab') as DashSection;
+    if (tabParam && tabParam !== activeSection) {
+      setActiveSection(tabParam);
+    }
+  }, [searchParams]);
 
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
@@ -108,7 +133,7 @@ export default function DashboardPage() {
     <div className="flex h-screen bg-bg overflow-hidden">
       <DashboardSidebar 
         activeSection={activeSection} 
-        onSetSection={setActiveSection}
+        onSetSection={handleSetSection}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />

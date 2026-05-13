@@ -113,6 +113,7 @@ export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose 
           ))}
         </nav>
 
+
         <div className="p-4 border-t border-border space-y-2 shrink-0">
           <Link
             href="/chat"
