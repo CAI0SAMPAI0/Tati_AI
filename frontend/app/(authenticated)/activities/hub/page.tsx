@@ -12,6 +12,9 @@ import { CheckoutModal } from '@/components/payment/checkout-modal';
 import { PixModal } from '@/components/payment/pix-modal';
 import { RedirectModal } from '@/components/payment/redirect-modal';
 import toast from 'react-hot-toast';
+import { useAuth } from '@/providers/auth-provider';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 interface PremiumContent {
   id: string;
@@ -35,6 +38,8 @@ interface CheckoutResponse {
 }
 
 export default function HubPage() {
+  const { user, isLoaded } = useAuth();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<PremiumContent | null>(null);
   const [pixData, setPixData] = useState<CheckoutResponse | null>(null);
@@ -44,6 +49,26 @@ export default function HubPage() {
     queryKey: ['hub-contents'],
     queryFn: () => apiGet<PremiumContent[]>('/activities/hub'),
   });
+
+  useEffect(() => {
+    if (isLoaded && user) {
+      const isAdmin = user.role === 'admin';
+      const isBlockedUser = user.username === 'caio.sampaio';
+      
+      if (!isAdmin || isBlockedUser) {
+        toast.error('Acesso restrito apenas para administradores.');
+        router.push('/chat');
+      }
+    }
+  }, [user, isLoaded, router]);
+
+  if (!isLoaded || !user || user.role !== 'admin' || user.username === 'caio.sampaio') {
+    return (
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
 
   const checkoutMutation = useMutation({
     mutationFn: async ({ contentId, doc, method }: { contentId: string, doc: string, method: string }) => {

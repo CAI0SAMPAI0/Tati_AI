@@ -6,6 +6,7 @@ import { QueryProvider } from './query-provider';
 import { I18nProvider } from './i18n-provider';
 import { Toaster } from 'react-hot-toast';
 import { RegisterServiceWorker } from '@/components/pwa/register-sw';
+import { CapacitorHandler } from '@/components/pwa/capacitor-handler';
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -31,6 +32,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
             }}
           />
           <RegisterServiceWorker />
+          <CapacitorHandler />
         </AuthProvider>
       </QueryProvider>
     </ThemeProvider>
