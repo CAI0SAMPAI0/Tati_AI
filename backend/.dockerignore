@@ -18,11 +18,9 @@ pip-delete-this-directory.txt
 .env
 Dockerfile
 docker-compose.yml
-requirements.txt
-runtime.txt
-Procfile
 data/
 assets/
 tests/
 scratch/
 check_db.py
+token.json
