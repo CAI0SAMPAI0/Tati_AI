@@ -35,3 +35,4 @@ youtube-transcript-api
 python-pptx
 openpyxl
 markdown
+cloudinary
