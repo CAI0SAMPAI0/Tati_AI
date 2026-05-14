@@ -1,6 +1,6 @@
 {
   "framework": "nextjs",
-  "installCommand": "npm install",
-  "buildCommand": "npm run build",
+  "installCommand": "npm install --prefix=../..",
+  "buildCommand": "npm run build --workspace @tati/hub-site",
   "outputDirectory": ".next"
 }
