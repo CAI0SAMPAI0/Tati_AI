@@ -18,6 +18,7 @@ from app.core.security import decode_token
 from app.core.database import get_client
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl='auth/login')
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl='auth/login', auto_error=False)
 
 # Colunas necessárias para autenticação — evita SELECT * que puxa
 # campos pesados como ``vocabulary`` (JSON potencialmente enorme).
@@ -59,6 +60,39 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
             status_code=status.HTTP_404_NOT_FOUND,
             detail='Usuário não encontrado',
         )
+
+    user = rows[0]
+    from app.core.config import settings
+
+    user['is_staff'] = user.get('role') in settings.staff_roles
+    return user
+
+
+def get_current_user_optional(
+    token: str | None = Depends(oauth2_scheme_optional),
+) -> dict | None:
+    """Retorna usuário autenticado quando token existe; caso contrário, None."""
+    if not token:
+        return None
+    payload = decode_token(token)
+    if not payload:
+        return None
+
+    username = payload.get('sub')
+    if not username:
+        return None
+
+    db = get_client()
+    rows = (
+        db.table('users')
+        .select(_USER_AUTH_FIELDS)
+        .eq('username', username)
+        .limit(1)
+        .execute()
+        .data
+    )
+    if not rows:
+        return None
 
     user = rows[0]
     from app.core.config import settings

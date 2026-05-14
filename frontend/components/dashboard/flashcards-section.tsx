@@ -365,9 +365,6 @@ export function FlashcardsSection() {
                <button onClick={() => openModal(d)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border">
                   <PenLine size={16} />
                </button>
-               <button className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border">
-                  <Eye size={16} />
-               </button>
                <button
                   onClick={() => handleDelete(d.id)}
                   className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle border border-border"

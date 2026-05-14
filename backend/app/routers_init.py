@@ -111,6 +111,7 @@ def register_all_routers(app: FastAPI) -> None:
         tags=['activities'],
     )
     
+    
     app.include_router(
         quizzes_router,
         prefix='/activities/quizzes',
@@ -168,6 +169,13 @@ def register_all_routers(app: FastAPI) -> None:
     app.include_router(
         hub_router,
         prefix='/activities/hub',
+        tags=['activities'],
+    )
+
+    # Alias para /activities/weekly-goal (DEVE VIR POR ÚLTIMO para não sombrear /hub)
+    app.include_router(
+        modules_router,
+        prefix='/activities',
         tags=['activities'],
     )
 

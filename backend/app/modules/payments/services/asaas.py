@@ -212,3 +212,37 @@ async def get_pix_qr_code(payment_id: str) -> dict:
             # Apenas loga o erro, não quebra o fluxo
             print(f'[Asaas] Aviso: QR Code indisponível para {payment_id}: {exc}')
             return {"encodedImage": None, "payload": None}
+        
+
+# ── Status do Pagamento ───────────────────────────────────────────────────────
+
+
+async def get_payment_status(payment_id: str) -> dict | None:
+    """Busca o status atual de um pagamento."""
+    payment = await get_payment(payment_id)
+    if not payment:
+        return None
+
+    return {
+        'id': payment.get('id'),
+        'status': payment.get('status'),  # PENDING, CONFIRMED, OVERDUE, REFUNDED, etc.
+        'billingType': payment.get('billingType'),
+        'value': payment.get('value'),
+        'dueDate': payment.get('dueDate'),
+        'confirmationDate': payment.get('confirmationDate'),
+        'description': payment.get('description'),
+        'externalReference': payment.get('externalReference'),
+    }
+
+
+async def cancel_payment(payment_id: str) -> bool:
+    """Cancela um pagamento pendente no Asaas."""
+    url = f'{get_base_url()}/payments/{payment_id}'
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.delete(url, headers=get_headers(), timeout=20)
+            resp.raise_for_status()
+            return True
+        except Exception as exc:
+            print(f'[Asaas] Erro ao cancelar pagamento {payment_id}: {exc}')
+            return False

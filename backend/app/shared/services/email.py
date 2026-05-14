@@ -268,6 +268,25 @@ class EmailSender:
 """
         return self._send(to_email, subject, html)
 
+    def send_payment_refused(self, to_email: str, name: str, payment_method: str, reason: str = "Não foi possível processar seu pagamento.") -> bool:
+        subject = "❌ Pagamento não aprovado — Teacher Tati"
+        html = f"""
+<div style="font-family:Arial,sans-serif;max-width:600px;background:#fef2f2;padding:20px;border-radius:16px;color:#334155;">
+<h2 style="color:#dc2626;margin-top:0;">Pagamento Não Aprovado</h2>
+<p>Olá <strong>{name}</strong>,</p>
+<p>Infelizmente, seu pagamento via <strong>{payment_method}</strong> não foi aprovado.</p>
+<div style="background:#fff;border:1px solid #fecaca;border-radius:12px;padding:20px;margin:20px 0;">
+    <p style="color:#dc2626;font-size:14px;margin:0 0 10px 0;font-weight:600;">Motivo:</p>
+    <p style="color:#64748b;font-size:14px;margin:0;">{reason}</p>
+</div>
+<p style="font-size:14px;color:#64748b;margin-bottom:20px;">Não se preocupe! Você pode tentar novamente com outra forma de pagamento ou regularizar sua situação.</p>
+<a href="https://tati-ai.vercel.app/payment" style="display:inline-block;background:#6366f1;color:#fff;padding:12px 24px;border-radius:12px;text-decoration:none;font-weight:bold;box-shadow:0 4px 6px -1px rgba(99, 102, 241, 0.2);">Tentar Novamente →</a>
+<hr style="border:0;border-top:1px solid #fecaca;margin:20px 0;">
+<p style="font-size:12px;color:#94a3b8;text-align:center;">Equipe Teacher Tati</p>
+</div>
+"""
+        return self._send(to_email, subject, html)
+
 
 # Backwards-compatible 'resend' shim expected by tests.
 class _ResendShim:

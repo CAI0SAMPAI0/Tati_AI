@@ -43,7 +43,7 @@ export default function HubPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<PremiumContent | null>(null);
   const [pixData, setPixData] = useState<CheckoutResponse | null>(null);
-  const [redirectData, setRedirectData] = useState<{ url: string, value: number, title: string, method: any } | null>(null);
+  const [redirectData, setRedirectData] = useState<{ url: string, value: number, title: string, method: any, paymentId: string } | null>(null);
 
   const { data: contents = [], isLoading, refetch } = useQuery<PremiumContent[]>({
     queryKey: ['hub-contents'],
@@ -72,7 +72,8 @@ export default function HubPage() {
           url: res.invoiceUrl,
           value: res.value,
           title: res.title,
-          method: res.billingType
+          method: res.billingType,
+          paymentId: res.paymentId
         });
       }
     },
@@ -85,18 +86,18 @@ export default function HubPage() {
   useEffect(() => {
     if (isLoaded && user) {
       const isAdmin = user.role === 'admin';
-      const isBlockedUser = user.username === 'caio.sampaio';
+      const isProgrammer = user.role === 'programador';
       
-      if (!isAdmin || isBlockedUser) {
-        toast.error('Acesso restrito apenas para administradores.');
+      if (!isAdmin && !isProgrammer) {
+        toast.error('Acesso restrito apenas para administradores ou desenvolvedores.');
         router.push('/chat');
       }
     }
   }, [user, isLoaded, router]);
 
-  const isAdmin = user?.role === 'admin' && user?.username !== 'caio.sampaio';
+  const hasAccessToHub = user?.role === 'admin' || user?.role === 'programador';
 
-  if (!isLoaded || !user || !isAdmin) {
+  if (!isLoaded || !user || !hasAccessToHub) {
     return (
       <div className="min-h-screen bg-bg flex items-center justify-center">
         <Spinner />
@@ -233,10 +234,14 @@ export default function HubPage() {
           payload={pixData.pixCopyPaste || ''}
           value={pixData.value}
           title={pixData.title}
-          invoiceUrl={pixData.invoiceUrl}
+          paymentId={pixData.paymentId}
           onClose={() => {
             setPixData(null);
             refetch();
+          }}
+          onSuccess={() => {
+            refetch();
+            toast.success('Conteúdo liberado!');
           }}
         />
       )}
@@ -247,9 +252,14 @@ export default function HubPage() {
           url={redirectData.url}
           value={redirectData.value}
           title={redirectData.title}
+          paymentId={redirectData.paymentId}
           onClose={() => {
             setRedirectData(null);
             refetch();
+          }}
+          onSuccess={() => {
+            refetch();
+            toast.success('Pagamento confirmado!');
           }}
         />
       )}

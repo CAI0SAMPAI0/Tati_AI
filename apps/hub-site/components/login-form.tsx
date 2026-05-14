@@ -1,0 +1,470 @@
+'use client';
+
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import { ArrowLeft, Eye, EyeOff, KeyRound } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import {
+  loginWithCredentials,
+  loginWithGoogle,
+  registerUser,
+} from '@tati/hub-core';
+import { useHubAuth } from '@/components/auth-provider';
+
+type AuthTab = 'login' | 'register';
+
+type GoogleCredentialResponse = {
+  credential: string;
+};
+
+export function LoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user, saveSession } = useHubAuth();
+  const googleBtnRef = useRef<HTMLDivElement>(null);
+
+  const [activeTab, setActiveTab] = useState<AuthTab>(
+    searchParams.get('tab') === 'register' ? 'register' : 'login',
+  );
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [registerName, setRegisterName] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerUsername, setRegisterUsername] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+  const [registerLevel, setRegisterLevel] = useState('Beginner');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      router.replace('/');
+    }
+  }, [router, user]);
+
+  useEffect(() => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) return;
+
+    let cancelled = false;
+
+    const initGoogle = (retries = 0) => {
+      if (cancelled) return;
+
+      const google = (window as typeof window & {
+        google?: {
+          accounts?: {
+            id?: {
+              initialize: (config: Record<string, unknown>) => void;
+              renderButton: (element: HTMLElement, options: Record<string, unknown>) => void;
+            };
+          };
+        };
+      }).google;
+
+      if (!google?.accounts?.id) {
+        if (retries < 15) {
+          window.setTimeout(() => initGoogle(retries + 1), 500);
+        }
+        return;
+      }
+
+      google.accounts.id.initialize({
+        client_id: clientId,
+        callback: handleGoogleCredential,
+        auto_select: false,
+        cancel_on_tap_outside: true,
+        ux_mode: 'popup',
+      });
+
+      if (googleBtnRef.current) {
+        google.accounts.id.renderButton(googleBtnRef.current, {
+          type: 'standard',
+          shape: 'rectangular',
+          theme: 'filled_black',
+          text: 'continue_with',
+          size: 'large',
+          width: googleBtnRef.current.clientWidth || 320,
+        });
+      }
+    };
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => initGoogle();
+    document.head.appendChild(script);
+
+    return () => {
+      cancelled = true;
+      script.remove();
+    };
+  }, []);
+
+  function clearMessages() {
+    setError('');
+    setSuccess('');
+  }
+
+  function handleAuthSuccess(accessToken: string, nextUser: Parameters<typeof saveSession>[1]) {
+    saveSession(accessToken, nextUser);
+    router.push('/');
+  }
+
+  async function handleGoogleCredential(response: GoogleCredentialResponse) {
+    clearMessages();
+    setLoading(true);
+
+    try {
+      const result = await loginWithGoogle(response.credential);
+      handleAuthSuccess(result.data.access_token, result.data.user);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nao foi possivel autenticar com Google.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    clearMessages();
+
+    if (!identifier || !password) {
+      setError('Preencha usuário/e-mail e senha.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await loginWithCredentials(identifier, password);
+      handleAuthSuccess(response.data.access_token, response.data.user);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possivel autenticar.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRegister(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    clearMessages();
+
+    if (!registerName || !registerEmail || !registerUsername || !registerPassword) {
+      setError('Preencha todos os campos para criar sua conta.');
+      return;
+    }
+
+    if (registerPassword.length < 6) {
+      setError('A senha precisa ter pelo menos 6 caracteres.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await registerUser({
+        name: registerName,
+        email: registerEmail,
+        username: registerUsername,
+        password: registerPassword,
+        level: registerLevel,
+      });
+
+      setSuccess('Conta criada. Agora você já pode entrar no hub.');
+      setActiveTab('login');
+      setIdentifier(registerEmail);
+      setPassword(registerPassword);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possivel criar a conta.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-zinc-950 flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-6xl">
+        <div className="grid overflow-hidden rounded-3xl border border-white/10 bg-zinc-900 shadow-2xl md:grid-cols-[1.1fr_0.9fr]">
+
+          {/* LEFT */}
+          <section className="relative hidden overflow-hidden border-r border-white/5 bg-zinc-950 px-11 py-14 md:flex md:flex-col md:justify-center">
+            <div className="absolute -left-20 -top-20 h-80 w-80 rounded-full bg-violet-500/10 blur-3xl" />
+
+            <div className="relative z-10">
+              <p className="mb-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-violet-400">
+                Tati Hub Premium
+              </p>
+
+              <h1 className="mb-4 text-4xl font-semibold leading-tight tracking-tight text-zinc-50">
+                Entre ou crie sua conta Tati AI.
+              </h1>
+
+              <p className="mb-7 text-sm leading-7 text-zinc-500">
+                Quem já tem acesso à Tati AI usa a mesma conta. Quem ainda não tem
+                acesso pode criar agora ou entrar com Google.
+              </p>
+
+              <div className="flex flex-wrap gap-2">
+                {[
+                  'Materiais personalizados',
+                  'E-books exclusivos',
+                  'Exercícios comentados',
+                ].map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full border border-white/10 px-4 py-1.5 text-xs text-zinc-500"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* RIGHT */}
+          <section className="flex max-h-screen flex-col overflow-y-auto px-6 py-10 md:px-9">
+            <Link
+              href="/"
+              className="mb-7 inline-flex items-center gap-1.5 text-sm text-zinc-500 transition hover:text-zinc-200"
+            >
+              <ArrowLeft size={15} />
+              Voltar ao catálogo
+            </Link>
+
+            <div className="mb-6">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-400">
+                <KeyRound size={20} />
+              </div>
+
+              <h2 className="mb-1 text-2xl font-semibold tracking-tight text-zinc-50">
+                {activeTab === 'login' ? 'Entrar no hub' : 'Criar conta'}
+              </h2>
+
+              <p className="text-sm leading-6 text-zinc-500">
+                {activeTab === 'login'
+                  ? 'Use sua conta da Tati AI ou entre com Google.'
+                  : 'Crie uma conta para comprar e acessar materiais do Hub Premium.'}
+              </p>
+            </div>
+
+            {/* Tabs */}
+            <div className="mb-5 flex rounded-xl border border-white/10 bg-white/5 p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  clearMessages();
+                  setActiveTab('login');
+                }}
+                className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${activeTab === 'login'
+                  ? 'bg-zinc-800 text-zinc-50'
+                  : 'text-zinc-500 hover:text-zinc-200'
+                  }`}
+              >
+                Entrar
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  clearMessages();
+                  setActiveTab('register');
+                }}
+                className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${activeTab === 'register'
+                  ? 'bg-zinc-800 text-zinc-50'
+                  : 'text-zinc-500 hover:text-zinc-200'
+                  }`}
+              >
+                Criar conta
+              </button>
+            </div>
+
+            {/* Alerts */}
+            {error && (
+              <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                {error}
+              </div>
+            )}
+
+            {success && (
+              <div className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400">
+                {success}
+              </div>
+            )}
+
+            {/* GOOGLE */}
+            <div className="relative mb-4">
+              <button
+                type="button"
+                disabled={loading}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-zinc-200 transition hover:bg-white/10"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                </svg>
+
+                <span>Continuar com Google</span>
+              </button>
+
+              <div
+                ref={googleBtnRef}
+                className="absolute inset-0 overflow-hidden rounded-xl opacity-0"
+              />
+            </div>
+
+            <div className="mb-5 flex items-center gap-3">
+              <span className="h-px flex-1 bg-white/10" />
+              <span className="text-[11px] uppercase tracking-[0.15em] text-zinc-600">
+                ou
+              </span>
+              <span className="h-px flex-1 bg-white/10" />
+            </div>
+
+            {/* LOGIN */}
+            {activeTab === 'login' ? (
+              <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium text-zinc-400">
+                    Usuário ou e-mail
+                  </span>
+
+                  <input
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder="voce@exemplo.com"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-50 outline-none transition focus:border-violet-500/50"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium text-zinc-400">
+                    Senha
+                  </span>
+
+                  <div className="relative">
+                    <input
+                      type={showLoginPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Sua senha"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-4 pr-12 text-sm text-zinc-50 outline-none transition focus:border-violet-500/50"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center justify-center text-zinc-500 transition hover:text-zinc-300"
+                    >
+                      {showLoginPassword ? (
+                        <EyeOff size={18} />
+                      ) : (
+                        <Eye size={18} />
+                      )}
+                    </button>
+                  </div>
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="mt-1 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading ? 'Entrando...' : 'Entrar no hub'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleRegister} className="flex flex-col gap-4">
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium text-zinc-400">
+                    Nome completo
+                  </span>
+
+                  <input
+                    value={registerName}
+                    onChange={(e) => setRegisterName(e.target.value)}
+                    placeholder="Seu nome"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-50 outline-none transition focus:border-violet-500/50"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium text-zinc-400">
+                    E-mail
+                  </span>
+
+                  <input
+                    type="email"
+                    value={registerEmail}
+                    onChange={(e) => setRegisterEmail(e.target.value)}
+                    placeholder="voce@exemplo.com"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-50 outline-none transition focus:border-violet-500/50"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium text-zinc-400">
+                    Usuário
+                  </span>
+
+                  <input
+                    value={registerUsername}
+                    onChange={(e) => setRegisterUsername(e.target.value)}
+                    placeholder="seuusuario"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-50 outline-none transition focus:border-violet-500/50"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium text-zinc-400">
+                    Senha
+                  </span>
+
+                  <div className="relative">
+                    <input
+                      type={showRegisterPassword ? 'text' : 'password'}
+                      value={registerPassword}
+                      onChange={(e) => setRegisterPassword(e.target.value)}
+                      placeholder="Mínimo de 6 caracteres"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-4 pr-12 text-sm text-zinc-50 outline-none transition focus:border-violet-500/50"
+                    />
+
+                    <button
+                      type="button"
+                      aria-label={
+                        showRegisterPassword
+                          ? 'Ocultar senha'
+                          : 'Mostrar senha'
+                      }
+                      onClick={() => setShowRegisterPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center justify-center text-zinc-500 transition hover:text-zinc-300"
+                    >
+                      {showRegisterPassword ? (
+                        <EyeOff size={18} />
+                      ) : (
+                        <Eye size={18} />
+                      )}
+                    </button>
+                  </div>
+                </label>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="mt-1 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading ? 'Criando conta...' : 'Criar conta'}
+                </button>
+              </form>
+            )}
+          </section>
+        </div>
+      </div>
+    </main>
+  );
+}

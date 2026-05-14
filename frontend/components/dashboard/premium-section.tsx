@@ -195,14 +195,14 @@ export function PremiumSection() {
                 {item.description}
               </p>
             </div>
-            <div className="grid grid-cols-3 gap-2 mt-auto pt-2">
-              <button onClick={() => openModal(item)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle">
+            <div className="grid grid-cols-3 gap-2 mt-auto pt-2 border-t border-border">
+              <button onClick={() => openModal(item)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle group/edit" title="Edit content">
                 <PenLine size={16} />
               </button>
-              <button onClick={() => handleToggleActive(item)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle">
+              <button onClick={() => handleToggleActive(item)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-warning/10 hover:text-warning transition-all text-text-subtle group/toggle" title={item.is_active ? 'Inactivate content' : 'Activate content'}>
                 {item.is_active ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
-              <button onClick={() => handleDelete(item.id)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle">
+              <button onClick={() => handleDelete(item.id)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle group/delete" title="Delete content permanently">
                 <Trash2 size={16} />
               </button>
             </div>

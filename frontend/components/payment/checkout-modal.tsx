@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { CreditCard, Zap, Check } from 'lucide-react';
+import { CreditCard, Zap, Check, X, ShieldCheck, Landmark } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
@@ -26,7 +25,6 @@ interface CheckoutModalProps {
 }
 
 export function CheckoutModal({ plan, onClose, onConfirm, isProcessing, title = 'Upgrade to Premium' }: CheckoutModalProps) {
-  
   const [doc, setDoc] = useState('');
   const [method, setMethod] = useState('PIX');
 
@@ -47,67 +45,99 @@ export function CheckoutModal({ plan, onClose, onConfirm, isProcessing, title = 
   };
 
   const methods = [
-    { id: 'PIX', label: 'PIX', icon: Zap },
-    { id: 'CREDIT_CARD', label: 'Cartão', icon: CreditCard },
-    { id: 'BOLETO', label: 'Boleto', icon: Check },
+    { id: 'PIX', label: 'PIX', icon: Zap, sub: 'Instantâneo' },
+    { id: 'CREDIT_CARD', label: 'Cartão', icon: CreditCard, sub: 'Crédito' },
+    { id: 'BOLETO', label: 'Boleto', icon: Landmark, sub: '1-2 dias' },
   ];
 
+  const handleConfirm = () => {
+    const rawDoc = doc.replace(/\D/g, '');
+    if (rawDoc.length < 11) {
+      toast.error('Por favor, informe um CPF ou CNPJ válido.');
+      return;
+    }
+    onConfirm(rawDoc, method);
+  };
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-bg/80 backdrop-blur-sm">
-      <div className="bg-surface border border-border rounded-3xl w-full max-w-sm shadow-2xl p-6 space-y-6 animate-in fade-in zoom-in duration-300">
-        <div className="space-y-1">
-          <h2 className="text-xl font-bold text-text">{title}</h2>
-          <p className="text-sm text-text-muted">{plan.name} • R$ {plan.price.toFixed(2)}</p>
-        </div>
-
-        <div className="space-y-3">
-          <label className="text-xs font-bold uppercase tracking-wider text-text-muted">Forma de Pagamento</label>
-          <div className="grid grid-cols-3 gap-2">
-            {methods.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => setMethod(m.id)}
-                disabled={isProcessing}
-                className={cn(
-                  "flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border transition-all",
-                  method === m.id 
-                    ? "border-primary bg-primary/5 text-primary" 
-                    : "border-border hover:border-primary/50 text-text-muted"
-                )}
-              >
-                <m.icon size={20} />
-                <span className="text-[10px] font-bold">{m.label}</span>
-              </button>
-            ))}
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-bg/80 backdrop-blur-md animate-in fade-in duration-300">
+      <div className="bg-surface border border-border rounded-[2.5rem] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+        {/* Header */}
+        <div className="p-6 border-b border-border flex justify-between items-center bg-surface-hover/50">
+          <div>
+            <h2 className="text-xl font-black text-text">{title}</h2>
+            <p className="text-xs text-text-muted font-bold uppercase tracking-widest">{plan.name}</p>
           </div>
+          <button 
+            onClick={onClose} 
+            className="p-2 rounded-full hover:bg-bg text-text-muted transition-colors"
+            disabled={isProcessing}
+          >
+            <X size={20} />
+          </button>
         </div>
 
-        <Input
-          label={'CPF ou CNPJ'}
-          placeholder="000.000.000-00"
-          value={doc}
-          onChange={(e) => setDoc(formatDoc(e.target.value))}
-          className="bg-bg"
-          disabled={isProcessing}
-        />
+        <div className="p-8 space-y-8">
+          {/* Price Tag */}
+          <div className="flex items-center justify-between p-4 bg-primary/5 rounded-3xl border border-primary/10">
+            <span className="text-sm font-bold text-text-muted">Total a pagar:</span>
+            <span className="text-3xl font-display font-black text-primary">R$ {plan.price.toFixed(2)}</span>
+          </div>
 
-        <div className="flex gap-3">
-          <Button variant="secondary" className="flex-1" onClick={onClose} disabled={isProcessing}>
-            {'Cancelar'}
-          </Button>
-          <Button 
-            className="flex-1" 
-            onClick={() => {
-              if (doc.replace(/\D/g, '').length < 11) {
-                toast.error('Informe um CPF/CNPJ válido.');
-                return;
-              }
-              onConfirm(doc.replace(/\D/g, ''), method);
-            }}
-            loading={isProcessing}
-          >
-            {'Pagar Agora'}
-          </Button>
+          {/* Payment Method Selector */}
+          <div className="space-y-3">
+            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">Forma de Pagamento</label>
+            <div className="grid grid-cols-3 gap-3">
+              {methods.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setMethod(m.id)}
+                  disabled={isProcessing}
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-2 p-4 rounded-3xl border-2 transition-all duration-300",
+                    method === m.id
+                      ? "border-primary bg-primary/5 text-primary shadow-lg shadow-primary/10 scale-105"
+                      : "border-border hover:border-primary/30 text-text-muted bg-surface"
+                  )}
+                >
+                  <m.icon size={24} strokeWidth={method === m.id ? 2.5 : 2} />
+                  <div className="text-center">
+                    <p className="text-[10px] font-black uppercase tracking-wider">{m.label}</p>
+                    <p className={cn("text-[8px] font-bold", method === m.id ? "text-primary/70" : "text-text-subtle opacity-0")}>{m.sub}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Document Input */}
+          <div className="space-y-3">
+            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">Seu CPF ou CNPJ (para nota fiscal)</label>
+            <Input
+              placeholder="000.000.000-00"
+              value={doc}
+              onChange={(e) => setDoc(formatDoc(e.target.value))}
+              className="bg-bg-secondary h-14 text-lg font-mono rounded-2xl border-border focus:ring-primary/20"
+              disabled={isProcessing}
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="space-y-4 pt-2">
+            <Button
+              className="w-full h-16 text-lg font-black rounded-2xl shadow-xl shadow-primary/20 gap-3 group transition-all hover:scale-[1.02]"
+              onClick={handleConfirm}
+              loading={isProcessing}
+            >
+              Confirmar Pagamento
+              <Zap size={20} fill="currentColor" className="group-hover:animate-bounce" />
+            </Button>
+            
+            <div className="flex items-center justify-center gap-2 text-[10px] text-text-muted">
+              <ShieldCheck size={14} className="text-success" />
+              Ambiente Seguro & Criptografado
+            </div>
+          </div>
         </div>
       </div>
     </div>
