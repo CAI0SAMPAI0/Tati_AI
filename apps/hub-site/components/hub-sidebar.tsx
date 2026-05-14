@@ -1,6 +1,6 @@
 'use client'
 
-import { LogOut, Receipt, LayoutGrid, Home, Zap } from 'lucide-react'
+import { LogOut, Receipt, LayoutGrid, Home } from 'lucide-react'
 import Link from 'next/link'
 
 type NavItem = {
@@ -51,22 +51,24 @@ export function HubSidebar({
 
     return (
         <aside className="hidden md:flex w-[260px] min-h-screen flex-col border-r border-white/10 bg-gradient-to-b from-[#140f24] via-[#120f1d] to-[#09090b] backdrop-blur-xl">
-            <div className="border-b border-white/10 px-6 py-6">
-                <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-600/20 text-violet-400 shadow-[0_0_25px_rgba(139,92,246,0.35)]">
-                        <img src="/images/tati_logo.jpg" alt="Tati AI" />
-                    </div>
+  <div className="border-b border-white/10 px-6 py-6">
+    <div className="flex items-center gap-3">
+      <img
+        src="/images/tati_logo.jpg"
+        alt="Tati AI"
+        className="h-11 w-11 rounded-2xl object-cover shadow-[0_0_25px_rgba(139,92,246,0.35)]"
+      />
 
-                    <div>
-                        <p className="text-[15px] font-semibold tracking-tight text-white">
-                            Tati's Hub
-                        </p>
-                        <p className="text-xs text-zinc-500">
-                            Premium Platform
-                        </p>
-                    </div>
-                </div>
-            </div>
+      <div>
+        <p className="text-[15px] font-semibold tracking-tight text-white">
+          Tati's Hub
+        </p>
+        <p className="text-xs text-zinc-500">
+          Premium Platform
+        </p>
+      </div>
+    </div>
+  </div>
 
             <div className="px-6 py-5">
                 <div className="flex items-center gap-3 rounded-2xl border border-violet-500/10 bg-white/[0.03] p-3 backdrop-blur-md">

@@ -5,7 +5,9 @@ import {
   apiGet,
   apiPost,
   clearStoredSession,
+  getAccessToken,
   HUB_ENDPOINTS,
+  resolveApiBase,
   type AuthenticatedCheckoutPayload,
   type HubPaymentStatusResponse,
   type GuestCheckoutPayload,
@@ -169,10 +171,11 @@ export function HubHome() {
 
   async function handleAccess(item: PremiumCatalogItem) {
     try {
-      const token = localStorage.getItem('token');
+      const token = getAccessToken();
+      const base = resolveApiBase();
 
       window.open(
-        `${process.env.NEXT_PUBLIC_API_URL}/activities/hub/${item.id}/download?token=${token}`,
+        `${base}/activities/hub/${item.id}/download?token=${token}`,
         '_blank'
       );
     } catch (err) {
@@ -258,17 +261,21 @@ export function HubHome() {
         {!user ? (
           <div className="border-b border-violet-500/10 bg-black/20 backdrop-blur-xl">
             <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-              <div className="flex items-center gap-2 text-lg font-semibold text-white">
-                <Zap className="text-violet-400" size={18} />
-                Tati's Hub
-              </div>
+        <div className="flex items-center gap-2 text-lg font-semibold text-white">
+          <img
+            src="/images/tati_logo.jpg"
+            alt="Tati AI"
+            className="h-8 w-8 rounded-lg object-cover"
+          />
+          Tati's Hub
+        </div>
 
-              <Link
-                href="/login"
-                className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium transition hover:bg-violet-500"
-              >
-                Entrar
-              </Link>
+        <Link
+          href="/login?tab=register"
+          className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium transition hover:bg-violet-500"
+        >
+          Entrar
+        </Link>
             </div>
           </div>
         ) : null}
@@ -403,9 +410,9 @@ export function HubHome() {
         </div>
       </main>
 
-      {previewItem ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-violet-500/20 bg-[#120d1d] shadow-[0_0_60px_rgba(139,92,246,0.25)]">
+  {previewItem ? (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+    <div className="w-full max-w-2xl overflow-y-auto max-h-[90vh] rounded-3xl border border-violet-500/20 bg-[#120d1d] shadow-[0_0_60px_rgba(139,92,246,0.25)]">
             <div className="relative border-b border-white/5 p-8">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.18),transparent_70%)]" />
 
@@ -523,9 +530,9 @@ export function HubHome() {
         </div>
       ) : null}
 
-      {selectedItem ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-xl rounded-3xl border border-violet-500/20 bg-[#120d1d] p-8 shadow-[0_0_60px_rgba(139,92,246,0.25)]">
+  {selectedItem ? (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+    <div className="w-full max-w-xl overflow-y-auto max-h-[90vh] rounded-3xl border border-violet-500/20 bg-[#120d1d] p-8 shadow-[0_0_60px_rgba(139,92,246,0.25)]">
             <div className="mb-6 flex items-start justify-between">
               <div>
                 <p className="mb-2 text-xs uppercase tracking-[0.2em] text-violet-400">
@@ -609,7 +616,7 @@ export function HubHome() {
                       <img
                         src={resolvePixImageSrc(checkoutResult.pixQrCode) as string}
                         alt="PIX"
-                        className="mx-auto h-52 w-52 rounded-2xl bg-white p-3"
+                        className="mx-auto h-44 w-44 rounded-2xl bg-white p-2"
                       />
                     ) : null}
 

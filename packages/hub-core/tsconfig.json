@@ -9,6 +9,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
+    "types": ["node"],
     "noEmit": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"]

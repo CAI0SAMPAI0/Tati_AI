@@ -25,7 +25,7 @@ export class ApiClientError<T = unknown> extends Error {
 
 const DEFAULT_REMOTE_API_BASE = 'https://tatiai-production.up.railway.app';
 
-function resolveApiBase(): string {
+export function resolveApiBase(): string {
   return process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_REMOTE_API_BASE;
 }
 
