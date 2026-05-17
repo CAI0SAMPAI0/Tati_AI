@@ -132,10 +132,10 @@ export default function CatalogPageClient({ initialItems }: CatalogPageClientPro
           <input
             type="search"
             className="input-hub w-full pl-10"
-            placeholder="Pesquisar materiais..."
+            placeholder="Search materials..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            aria-label="Pesquisar materiais"
+            aria-label="Search materials..."
           />
         </div>
       </div>
