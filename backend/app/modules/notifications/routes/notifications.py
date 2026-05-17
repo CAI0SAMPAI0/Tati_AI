@@ -4,6 +4,7 @@ Refatorado para usar NotificationService.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
+from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
 
 from app.core.dependencies.auth import get_current_user
 from app.modules.notifications.services.notification_service import NotificationService
@@ -29,9 +30,13 @@ async def mark_all_read(user=Depends(get_current_user), service: NotificationSer
     return {'status': 'success'}
 
 @router.post('/{notification_id}/read')
-async def mark_read(notification_id: str, service: NotificationService = Depends()):
+async def mark_read(
+    notification_id: str,
+    user=Depends(get_current_user),
+    service: NotificationService = Depends(),
+):
     """Marca notificação como lida."""
-    success = await service.mark_as_read(notification_id)
+    success = await service.mark_as_read(notification_id, user['username'])
     if not success:
-        raise HTTPException(status_code=404, detail='Notificação não encontrada')
+        raise ContentNotFoundError(detail='Notificação não encontrada')
     return {'status': 'success'}

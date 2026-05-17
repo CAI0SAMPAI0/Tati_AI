@@ -1,19 +1,25 @@
 from __future__ import annotations
 import json
 from typing import Dict, Any, List, Optional
+from app.core.dependencies.db import get_db
+from fastapi import Depends
+from supabase import Client
 
 from fastapi.concurrency import run_in_threadpool
 
-from app.modules.chat.services.llm import groq_chat
+from app.modules.chat.services.llm import groq_chat_json
 from app.modules.chat.services.prompt_builder import build_exercise_prompt
-from app.core.database import get_client
 
 PERSONALIZED_MODULE_ID = '00000000-0000-0000-0000-000000000001'
 
 
 class ExerciseGeneratorService:
-    def __init__(self):
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)) -> None:
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
 
     async def generate_exercises_from_targets(
         self,
@@ -41,24 +47,14 @@ class ExerciseGeneratorService:
         # Monta contexto estruturado dos erros
         error_context = self._build_error_context(primary_targets)
         
-        # Registra tentativa de geração se não houver um attempt_id prévio
+        # Busca nível do aluno para adequar dificuldade
+        user_level = 'Intermediate'
         try:
-            if not attempt_id:
-                attempt_res = self.db.table('user_exercise_attempts').insert({
-                    'username': username,
-                    'exercise_id': None,
-                    'module_id': PERSONALIZED_MODULE_ID,
-                    'activity_type': f'pattern_based_{exercise_type}_generation',
-                    'status': 'generating',
-                    'target_patterns': [t.get('pattern_key') for t in primary_targets],
-                }).execute()
-                if attempt_res and attempt_res.data:
-                    attempt_id = attempt_res.data[0].get('id')
-            else:
-                # Se já temos um attempt_id (lock), apenas atualizamos os patterns nele
-                self.db.table('user_exercise_attempts').update({
-                    'target_patterns': [t.get('pattern_key') for t in primary_targets]
-                }).eq('id', attempt_id).execute()
+            def _get_lvl():
+                return self.db.table('users').select('level').eq('username', username).single().execute()
+            user_res = await run_in_threadpool(_get_lvl)
+            if user_res.data:
+                user_level = user_res.data.get('level', 'Intermediate')
         except Exception:
             pass
 
@@ -66,7 +62,8 @@ class ExerciseGeneratorService:
         exercise_data = await self._generate_exercise_content(
             error_context=error_context,
             exercise_type=exercise_type,
-            targets=primary_targets
+            targets=primary_targets,
+            user_level=user_level
         )
         
         if not exercise_data:
@@ -124,7 +121,8 @@ Frequência: {frequency} ocorrências
         self,
         error_context: str,
         exercise_type: str,
-        targets: List[Dict[str, Any]]
+        targets: List[Dict[str, Any]],
+        user_level: str = 'Intermediate'
     ) -> Optional[Dict[str, Any]]:
         """
         Chama o LLM para gerar o exercício baseado nos padrões específicos.
@@ -180,26 +178,18 @@ Frequência: {frequency} ocorrências
         }
 
         # Use centralized prompt builder (ensures consistent rules)
-        prompt = build_exercise_prompt(error_context, exercise_type, targets)
+        prompt = build_exercise_prompt(error_context, exercise_type, targets, user_level=user_level)
 
         try:
-            res = await groq_chat(
+            data = await groq_chat_json(
                 messages=[{'role': 'user', 'content': prompt}],
                 max_tokens=1500,
                 temperature=0.1,  # Temperatura muito baixa para seguir os padrões estritamente
             )
 
-            # Parse seguro do JSON
-            start = res.find('{')
-            end = res.rfind('}') + 1
-            if start == -1 or end <= start:
-                raise ValueError('JSON não encontrado na resposta')
-                
-            data = json.loads(res[start:end])
-
             # Validação básica
-            if 'exercises' not in data or not data['exercises']:
-                raise ValueError('Nenhum exercício gerado')
+            if not data or 'exercises' not in data or not data['exercises']:
+                raise ValueError('Nenhum exercício gerado ou JSON inválido retornado')
 
             # Sanitização das opções: remover rótulos A)/B)/1. etc e garantir presença da resposta correta
             import re

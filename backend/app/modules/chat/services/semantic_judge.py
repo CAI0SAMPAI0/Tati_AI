@@ -2,18 +2,24 @@
 services/semantic_judge.py
 IA-as-a-Judge para verificar se objetivos pedagógicos foram atingidos na conversa.
 """
+from app.core.dependencies.db import get_db
+from fastapi import Depends
+from supabase import Client
 
 import json
 import re
 from datetime import datetime
 from typing import List, Dict, Any
 from app.modules.chat.services.llm import groq_chat
-from app.core.database import get_client
 from fastapi.concurrency import run_in_threadpool
 
 class SemanticJudgeService:
-    def __init__(self):
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)) -> None:
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
 
     async def check_topics_completion(self, username: str, conversation_text: str):
         """
@@ -52,9 +58,12 @@ class SemanticJudgeService:
         """
         
         try:
-            raw_res = await groq_chat([{"role": "user", "content": prompt}], temperature=0.1)
-            match = re.search(r'\{.*\}', raw_res, re.DOTALL)
-            data = json.loads(match.group(0)) if match else {}
+            from app.modules.chat.services.llm import groq_chat_json
+            data = await groq_chat_json([{"role": "user", "content": prompt}], temperature=0.1)
+            
+            if not data:
+                return []
+
             completed_ids = data.get("completed_ids", [])
             
             if completed_ids:

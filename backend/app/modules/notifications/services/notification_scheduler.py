@@ -1,5 +1,4 @@
 """
-services/notification_scheduler.py
 Agendador com streak style Duolingo: notificações progressivas e persistentes.
 """
 
@@ -8,8 +7,10 @@ from datetime import datetime, timedelta, timezone, date
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi.concurrency import run_in_threadpool
 
-from app.core.database import get_client
 from app.modules.notifications.services.notification_service import NotificationService
+from supabase import Client
+from fastapi import Depends
+from app.core.dependencies.db import get_db
 
 
 # ============================================================
@@ -58,7 +59,7 @@ class NotificationScheduler:
     def __init__(self):
         self.scheduler = AsyncIOScheduler()
         self.ns = NotificationService()
-        self.db = get_client()
+        self.db = get_db()
 
     def start(self):
         """Inicia todos os jobs agendados."""

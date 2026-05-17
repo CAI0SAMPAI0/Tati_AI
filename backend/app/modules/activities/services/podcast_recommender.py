@@ -188,11 +188,9 @@ class PodcastRecommender:
             f'Messages:\n{history_text}\n'
         )
         try:
-            raw = ''
-            async for token in stream_llm(prompt, []):
-                raw += token
-            payload = json.loads(self._extract_json_blob(raw))
-            interests = payload.get('interests', [])
+            from app.modules.chat.services.llm import groq_chat_json
+            payload = await groq_chat_json([{"role": "user", "content": prompt}])
+            interests = payload.get('interests', []) if payload else []
             return [str(i).strip().lower() for i in interests if i][:5], 'llm'
         except Exception:
             pass

@@ -2,15 +2,21 @@
 services/submission_service.py
 Serviço para submissão e correção de atividades abertas.
 """
+from app.core.dependencies.db import get_db
+from fastapi import Depends
+from supabase import Client
 
 from typing import List, Dict, Any, Optional
 from fastapi.concurrency import run_in_threadpool
-from app.core.database import get_client
 
 
 class SubmissionService:
-    def __init__(self):
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)) -> None:
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
 
     async def submit_activity(self, username: str, payload: Any) -> str:
         """Aluno envia atividade."""

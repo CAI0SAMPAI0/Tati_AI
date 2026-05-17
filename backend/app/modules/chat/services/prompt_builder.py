@@ -123,7 +123,7 @@ def build_effective_prompt(
     return ''.join(parts)
 
 
-def build_exercise_prompt(error_context: str, exercise_type: str = 'quiz', targets: list[dict] | None = None) -> str:
+def build_exercise_prompt(error_context: str, exercise_type: str = 'quiz', targets: list[dict] | None = None, user_level: str = 'Intermediate') -> str:
     """
     Constrói um prompt focado para geração de exercícios a partir de um contexto de erros.
     Garante instruções estritas: usar somente os padrões fornecidos, não usar rótulos A/B/C/D
@@ -141,7 +141,8 @@ def build_exercise_prompt(error_context: str, exercise_type: str = 'quiz', targe
 
     instr = type_map.get(exercise_type, type_map['quiz'])
 
-    prompt = f"""You are an expert English teacher. Your goal is to generate exercises that EXCLUSIVELY target the student's specific English mistakes provided below.
+    prompt = f"""You are an expert English teacher for a student at the {user_level} level. 
+Your goal is to generate exercises that EXCLUSIVELY target the student's specific English mistakes provided below.
 
 ERROR PATTERNS TO TARGET:
 {error_context}
@@ -150,17 +151,20 @@ INSTRUCTION:
 {instr}
 
 STRICT CONSTRAINTS:
-1. DO NOT generate general English questions (like "How are you?", "What is your name?", "Where are you from?").
-2. DO NOT use examples from your internal knowledge unless they directly relate to the patterns above.
-3. EVERY question must specifically test the student's ability to distinguish between the "Incorrect" and "Correct" forms provided in the patterns.
-4. FOR GRAMMAR ERRORS (like Subject-Verb Agreement, Verb Tenses): Use "fill-in-the-blank" format. Example: "I ____ (am/are/is) a student."
-5. THE INCORRECT FORMS must be present as distractors.
-6. DO NOT use labels like 'A)', 'B)', 'C)', 'D)' in the options. Return ONLY the plain text of the options.
-7. Return ONLY valid JSON.
-8. If the student made a mistake like "I are", the question MUST be about that specific subject-verb agreement.
-9. THE EXPLANATION MUST BE IN PORTUGUESE and explain WHY the incorrect form was wrong based on the specific pattern.
-10. DO NOT include the correct answer in the question text. For example, instead of "What is the correct way to say 'I am a teacher'?", use "Choose the correct form to complete the sentence: I ___ a teacher."
-11. Use the "Pattern Label" or a generic instruction as the title/description if appropriate, but keep the question text neutral.
+1. THE EXERCISE CONTENT (QUESTIONS AND OPTIONS) MUST BE ENTIRELY IN ENGLISH.
+2. DO NOT generate general English questions (like "How are you?", "What is your name?").
+3. DO NOT use examples from your internal knowledge unless they directly relate to the patterns above.
+4. EVERY question must specifically test the student's ability to distinguish between the "Incorrect" and "Correct" forms provided in the patterns.
+5. FOR GRAMMAR ERRORS (like Subject-Verb Agreement, Verb Tenses): Use "fill-in-the-blank" format. Example: "I ____ (am/are/is) a student."
+6. THE INCORRECT FORMS must be present as distractors.
+7. DO NOT use labels like 'A)', 'B)', 'C)', 'D)' in the options. Return ONLY the plain text of the options.
+8. Return ONLY valid JSON.
+9. If the student made a mistake like "I are", the question MUST be about that specific subject-verb agreement.
+10. THE EXPLANATION MUST BE IN PORTUGUESE and explain WHY the incorrect form was wrong based on the specific pattern.
+11. DO NOT include the correct answer in the question text.
+12. ADJUST THE DIFFICULTY to match a {user_level} student. Use appropriate vocabulary and sentence complexity.
+13. If the student is Beginner, keep sentences very short. If Advanced, use more natural and complex contexts.
+14. THE TITLE AND DESCRIPTION MUST BE IN ENGLISH. Only the "explanation" field should be in Portuguese.
 
 Return example shape:
 {{"title": "...", "description": "...", "exercises": [{{"question": "...", "options": ["...","..."], "correct_index": 0, "explanation": "...", "target_pattern": "pattern_key"}}]}}

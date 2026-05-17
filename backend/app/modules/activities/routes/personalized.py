@@ -61,10 +61,10 @@ async def get_personalized_module(current_user: dict = Depends(get_current_user)
                 ex_title = f"Monthly Review - {now.strftime('%B %Y')}"
             elif is_saturday and not has_weekly:
                 target_type = 'weekly'
-                ex_title = f"Weekly Review - {now.strftime('%d/%m')}"
+                ex_title = f"Weekly Review - {now.strftime('%m/%d')}"
             elif not has_daily:
                 target_type = 'daily'
-                ex_title = f"Daily Practice - {now.strftime('%d/%m')}"
+                ex_title = f"Daily Practice - {now.strftime('%m/%d')}"
 
         if target_type:
             # Trava a geração com um lock no banco

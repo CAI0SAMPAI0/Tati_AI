@@ -7,6 +7,8 @@ export interface User {
   level: string;
   plan_type: string | null;
   avatar_url?: string | null;
+  cpf?: string | null;
+  cpf_cnpj?: string | null;
   xp?: number;
   streak?: number;
   nickname?: string;

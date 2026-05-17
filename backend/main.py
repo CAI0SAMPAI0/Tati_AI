@@ -22,6 +22,7 @@ env_path = Path(__file__).parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
 # Sentry — Inicialização crítica para captura de exceções
+from app.core.config import settings
 from app.core.utils.sentry_config import init_sentry
 
 try:
@@ -113,17 +114,17 @@ async def startup_notifications() -> None:
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Captura qualquer erro não tratado e loga o traceback completo."""
+    # Sempre logamos no console/servidor
     print(f"❌ [ERROR] {request.method} {request.url.path} -> {type(exc).__name__}: {str(exc)}")
-    try:
-        pass
-    except:
-        pass
+    
+    # Em produção, escondemos o erro detalhado do usuário para evitar vazamento de dados
+    error_detail = str(exc) if settings.debug else "Ocorreu um erro interno. Por favor, tente novamente mais tarde."
 
     response = JSONResponse(
         status_code=500,
         content={
             "detail": "Internal Server Error",
-            "error": str(exc),
+            "error": error_detail,
             "path": request.url.path
         }
     )
@@ -139,10 +140,16 @@ async def global_exception_handler(request: Request, exc: Exception):
     response.headers["Access-Control-Allow-Headers"] = "*"
     return response
 
+@app.get('/health')
+async def health():
+    return {
+        'status': 'ok',
+        "service": "Teacher Tati API",
+        "version": "2.0.0"
+    }
+    
 if __name__ == '__main__':
     import uvicorn
-
-    from app.core.config import settings
 
     uvicorn.run(
         'main:app',

@@ -5,13 +5,19 @@ Serviço para gerenciamento de quizzes e geração dinâmica de questões.
 
 from typing import List, Dict, Any, Optional
 from fastapi.concurrency import run_in_threadpool
-from app.core.database import get_client
 from app.modules.chat.services.llm import groq_chat
+from fastapi import Depends
+from supabase import Client
+from app.core.dependencies.db import get_db
 
 
 class QuizService:
-    def __init__(self):
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)) -> None:
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
 
     async def get_quiz(self, quiz_id: str) -> Optional[Dict[str, Any]]:
         """Busca um quiz e suas questões."""
@@ -122,23 +128,22 @@ class QuizService:
 
     async def generate_dynamic_quiz(self, topic: str, level: str, num_questions: int = 5) -> Dict[str, Any]:
         """Gera um quiz dinâmico usando LLM baseado em um tópico."""
+        from app.modules.chat.services.llm import groq_chat_json
         prompt = (
             f'Create a professional English language pedagogical quiz strictly about the topic "{topic}". '
             f'Target student level: {level}. '
             f'Generate exactly {num_questions} multiple choice questions. '
-            f'CRITICAL: All questions MUST focus specifically on "{topic}". Avoid generic grammar questions that are not directly related to this theme. '
-            f'Return ONLY valid JSON (no markdown, no extra text): '
-            f'{{"title": "{topic} Practice", "questions": [{{"question": "...", "options": ["A", "B", "C", "D"], "correct_index": 0, "explanation": "..."}}]}}. '
-            f'All content must be in English.'
+            f'CRITICAL: All questions and options MUST be in English. '
+            f'THE EXPLANATION FIELD MUST BE IN PORTUGUESE to help the student understand. '
+            f'Avoid generic questions; focus strictly on "{topic}". '
+            f'Return ONLY valid JSON: '
+            f'{{"title": "...", "questions": [{{"question": "...", "options": ["...", "...", "..."], "correct_index": 0, "explanation": "..."}}]}}.'
         )
 
         try:
-            res = await groq_chat([{'role': 'user', 'content': prompt}])
-            import json
-            import re
-            match = re.search(r'\{.*\}', res, re.DOTALL)
-            data = json.loads(match.group(0)) if match else {}
-            # Ensure quiz_title field for frontend compatibility
+            data = await groq_chat_json([{'role': 'user', 'content': prompt}])
+            if not data:
+                return {}
             if 'title' in data and 'quiz_title' not in data:
                 data['quiz_title'] = data['title']
             return data

@@ -30,11 +30,29 @@ export function formatDateTime(isoString?: string | null): string {
     return '—';
   }
   return date.toLocaleString('en-US', { 
+    month: '2-digit',
     day: '2-digit', 
-    month: '2-digit', 
-    year: '2-digit',
+    year: 'numeric',
     hour: '2-digit', 
     minute: '2-digit' 
+  });
+}
+
+export function formatDate(isoString?: string | null): string {
+  let date: Date;
+  if (isoString) {
+    const iso =
+      isoString.includes('Z') || isoString.includes('+')
+        ? isoString
+        : isoString + 'Z';
+    date = new Date(iso);
+  } else {
+    return '—';
+  }
+  return date.toLocaleDateString('en-US', { 
+    month: '2-digit',
+    day: '2-digit', 
+    year: 'numeric'
   });
 }
 
@@ -76,7 +94,6 @@ export function canAccessDashboard(
   user: { role?: string; username?: string } | null,
   access: { can_access_dashboard?: boolean } | null = null,
 ): boolean {
-  // UsuÃ¡rio caio.sampaio nÃ£o deve ter acesso ao dashboard nem ver o Ã­cone
   if (user?.username === 'caio.sampaio') return false;
 
   if (access && Object.prototype.hasOwnProperty.call(access, 'can_access_dashboard')) {

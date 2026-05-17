@@ -1,18 +1,27 @@
 """
 services/vocabulary_srs.py
 Gerencia a lógica de Repetição Espaçada (SRS) para o vocabulário do aluno.
+from app.core.dependencies.db import get_db
+from fastapi import Depends
+from supabase import Client
 Algoritmo: SuperMemo-2 (SM-2) adaptado.
 """
 
 import json
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
-from app.core.database import get_client
 from fastapi.concurrency import run_in_threadpool
+from fastapi import Depends
+from supabase import Client
+from app.core.dependencies.db import get_db
 
 class VocabularySRSService:
-    def __init__(self):
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)) -> None:
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
 
     async def add_to_srs(self, username: str, word: str, definition: str = '', example: str = ''):
         """Adiciona uma nova palavra ao ciclo de revisão SRS do aluno."""
@@ -32,14 +41,14 @@ class VocabularySRSService:
         
         await run_in_threadpool(_add)
 
-    async def record_review(self, entry_id: str, quality_score: int):
+    async def record_review(self, entry_id: str, quality_score: int, username: str):
         """
         Atualiza os dados de SRS após uma revisão.
         quality_score: 0-5 (0=esqueci total, 5=fácil demais)
         """
         def _update():
-            # 1. Recupera estado atual
-            res = self.db.table('user_vocabulary').select('*').eq('id', entry_id).single().execute()
+            # 1. Recupera estado atual e valida propriedade
+            res = self.db.table('user_vocabulary').select('*').eq('id', entry_id).eq('username', username).single().execute()
             if not res.data: return
             
             data = res.data

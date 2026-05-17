@@ -166,14 +166,9 @@ async def discover_personalized_podcasts(user_id: str, username: str, user_level
     )
 
     try:
-        full_resp = await groq_chat([{'role': 'user', 'content': prompt}])
-        match = re.search(r'\[\s*\{.*\}\s*\]', full_resp, re.DOTALL)
-        if not match:
-            return
-
-        try:
-            podcasts = json.loads(match.group(0))
-        except Exception:
+        from app.modules.chat.services.llm import groq_chat_json
+        podcasts = await groq_chat_json([{'role': 'user', 'content': prompt}])
+        if not podcasts or not isinstance(podcasts, list):
             return
 
         from app.modules.activities.routes.podcasts import _http_fetch_ok

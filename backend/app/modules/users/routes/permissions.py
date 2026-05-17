@@ -7,11 +7,13 @@ e cálculos de dia útil para cobrança.
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
+from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
 from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.dependencies.auth import get_current_user
-from app.core.database import get_client
+from supabase import Client
+from app.core.dependencies.db import get_db
 from app.modules.payments.services.subscription_manager import SPECIAL_USERS
 
 router = APIRouter()
@@ -110,7 +112,10 @@ class ChangeDueDateRequest(BaseModel):
 
 
 @router.get('/access')
-async def get_access_info(user: dict = Depends(get_current_user)):
+async def get_access_info(
+    user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db)
+):
     today = date.today()
     username = user.get('username')
     can_access_dashboard = _can_access_dashboard(user)
@@ -146,7 +151,7 @@ async def get_access_info(user: dict = Depends(get_current_user)):
         )
 
     # Verifica assinatura ativa no banco
-    sub = _get_active_subscription(user['username'])
+    sub = _get_active_subscription(user['username'], db)
 
     if sub:
         expires = date.fromisoformat(sub['expires_at'][:10])
@@ -166,7 +171,7 @@ async def get_access_info(user: dict = Depends(get_current_user)):
             )
 
     # Sem assinatura ativa → mensagens gratuitas
-    used = _get_free_messages_used(user['username'])
+    used = _get_free_messages_used(user['username'], db)
     remaining = max(0, FREE_MSG_LIMIT - used)
     return _access_response(
         full=False,
@@ -180,16 +185,13 @@ async def get_access_info(user: dict = Depends(get_current_user)):
 async def change_due_date(
     body: ChangeDueDateRequest,
     user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
 ):
     if not (1 <= body.preferred_day <= 28):
-        raise HTTPException(status_code=400, detail='Dia deve ser entre 1 e 28.')
-
-    db = get_client()
-    sub = _get_active_subscription(user['username'])
+        raise BusinessLogicError(detail='Dia deve ser entre 1 e 28.')
+    sub = _get_active_subscription(user['username'], db)
     if not sub:
-        raise HTTPException(
-            status_code=404, detail='Nenhuma assinatura ativa encontrada.'
-        )
+        raise ContentNotFoundError(detail='Nenhuma assinatura ativa encontrada.')
 
     # Calcula nova data de vencimento a partir de hoje
     new_due = calc_due_date(date.today(), preferred_day=body.preferred_day)
@@ -216,7 +218,10 @@ async def change_due_date(
 
 
 @router.get('/subscription')
-async def get_subscription(user: dict = Depends(get_current_user)):
+async def get_subscription(
+    user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
+):
     """Retorna detalhes da assinatura atual."""
     username = user.get('username')
     is_special = username in SPECIAL_USERS or user.get('is_exempt')
@@ -233,7 +238,7 @@ async def get_subscription(user: dict = Depends(get_current_user)):
             'next_due_date': '2099-12-31',
         }
 
-    sub = _get_active_subscription(user['username'])
+    sub = _get_active_subscription(user['username'], db)
     if not sub:
         return {'has_subscription': False}
 
@@ -295,10 +300,9 @@ def _is_free_mode_period(today: date) -> bool:
     return today <= PAID_START
 
 
-def _get_active_subscription(username: str) -> dict | None:
+def _get_active_subscription(username: str, db: Client) -> dict | None:
     rows = (
-        get_client()
-        .table('subscriptions')
+        db.table('subscriptions')
         .select('id, plan_type, status, expires_at, preferred_due_day')
         .eq('username', username)
         .in_('status', ['active', 'grace'])
@@ -310,11 +314,10 @@ def _get_active_subscription(username: str) -> dict | None:
     return rows[0] if rows else None
 
 
-def _get_free_messages_used(username: str) -> int:
+def _get_free_messages_used(username: str, db: Client) -> int:
     try:
         row = (
-            get_client()
-            .table('users')
+            db.table('users')
             .select('free_messages_used')
             .eq('username', username)
             .single()

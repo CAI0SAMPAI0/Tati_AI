@@ -6,16 +6,22 @@ Serviço para gerenciamento de simulações de conversas.
 import base64
 from typing import List, Dict, Any, Optional
 from fastapi.concurrency import run_in_threadpool
+from fastapi import Depends
+from supabase import Client
+from app.core.dependencies.db import get_db
 
-from app.core.database import get_client
 from app.modules.simulation.services.simulation import get_all_scenarios, get_scenario, evaluate_simulation
 from app.modules.chat.services.llm import groq_chat, transcribe_audio, text_to_speech
 from app.shared.services.history import save_message
 
 
 class SimulationService:
-    def __init__(self):
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)) -> None:
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
 
     async def list_scenarios(self, level: Optional[str] = None) -> List[Dict[str, Any]]:
         return await run_in_threadpool(get_all_scenarios, level)

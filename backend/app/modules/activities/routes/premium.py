@@ -4,6 +4,7 @@ Router para o Hub de Conteúdos Premium (Visão do Aluno).
 """
 
 from fastapi import APIRouter, Depends, HTTPException
+from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
 from typing import List, Dict, Any
 from datetime import date, timedelta
 
@@ -27,7 +28,7 @@ async def _get_or_create_asaas_customer(user_db: dict) -> str:
                .replace('.', '').replace('-', '').replace('/', '').strip())
     
     if not raw_doc:
-        raise HTTPException(status_code=400, detail="CPF/CNPJ é obrigatório para compras.")
+        raise BusinessLogicError(detail="CPF/CNPJ é obrigatório para compras.")
     
     customer = await get_customer_by_email(email)
     if customer:
@@ -82,7 +83,7 @@ async def buy_premium_content(
     # 1. Busca detalhes do conteúdo
     content = db.table('premium_content').select('*').eq('id', content_id).single().execute().data
     if not content:
-        raise HTTPException(status_code=404, detail="Conteúdo não encontrado")
+        raise ContentNotFoundError(detail="Conteúdo não encontrado")
     
     if content['price'] <= 0:
         return {"message": "Este conteúdo é gratuito.", "free": True}
@@ -90,7 +91,7 @@ async def buy_premium_content(
     # 2. Busca dados completos do usuário
     user_db = db.table('users').select('*').eq('username', username).single().execute().data
     if not user_db:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+        raise UserNotFoundError(detail="Usuário não encontrado")
 
     # 3. Garante Customer no Asaas
     customer_id = await _get_or_create_asaas_customer(user_db)

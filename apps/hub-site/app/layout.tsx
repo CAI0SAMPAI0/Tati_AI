@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
-import { DM_Sans, Sora } from 'next/font/google';
+import { Sora, DM_Sans } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/components/auth-provider';
+import HubLayoutWrapper from '@/components/HubLayoutWrapper';
 
 const sora = Sora({
   subsets: ['latin'],
@@ -19,16 +20,25 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'Tati Hub Premium',
-  description: 'Catálogo público do hub premium da Tati AI com compra avulsa de materiais.',
+  title: "Tati Hub | Taty's English Class",
+  description:
+    'Catálogo de materiais premium da Teacher Tati — e-books, exercícios e guias de estudo.',
+  icons: {
+    icon: '/images/tati_logo.jpg',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" className={`${sora.variable} ${dmSans.variable}`}>
-      <body>
-        <div className="grain-overlay" />
-        <AuthProvider>{children}</AuthProvider>
+      <head>
+        <link rel="icon" href="/images/tati_logo.jpg" />
+      </head>
+      <body className="min-h-screen bg-bg font-body text-ink antialiased">
+        <span className="grain-overlay" aria-hidden />
+        <AuthProvider>
+          <HubLayoutWrapper>{children}</HubLayoutWrapper>
+        </AuthProvider>
       </body>
     </html>
   );

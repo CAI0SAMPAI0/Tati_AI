@@ -49,9 +49,15 @@ class PronunciationMatcher:
         """
         
         try:
-            raw_res = await groq_chat([{"role": "user", "content": prompt}], temperature=0.2)
-            match = re.search(r'\{.*\}', raw_res, re.DOTALL)
-            data = json.loads(match.group(0)) if match else {}
+            from app.modules.chat.services.llm import groq_chat_json
+            data = await groq_chat_json([{"role": "user", "content": prompt}], temperature=0.2)
+            
+            if not data:
+                 return {
+                    "score": 50,
+                    "feedback": "Tati ouviu você, mas não conseguiu gerar um score preciso agora.",
+                    "transcription": transcription
+                }
             
             return {
                 "score": data.get("score", 0),

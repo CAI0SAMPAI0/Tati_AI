@@ -1,6 +1,7 @@
 """
 services/progress_report.py
 Gera relatórios de evolução pedagógica em PDF para os alunos.
+
 """
 
 import os
@@ -10,12 +11,19 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from app.core.database import get_client
 from fastapi.concurrency import run_in_threadpool
+from fastapi import Depends
+from supabase import Client
+from app.core.dependencies.db import get_db
+
 
 class ProgressReportService:
-    def __init__(self):
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)) -> None:
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
 
     async def generate_student_report(self, username: str, lang: str = 'en-US') -> str:
         """

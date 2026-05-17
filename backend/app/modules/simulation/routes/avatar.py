@@ -6,6 +6,7 @@ import base64
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
+from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
@@ -56,12 +57,10 @@ async def get_avatar_frames():
 @router.get('/frame/{frame_name}')
 async def get_single_frame(frame_name: str):
     if frame_name not in _FRAME_FILES:
-        raise HTTPException(status_code=404, detail='Frame não encontrado')
+        raise ContentNotFoundError(detail='Frame não encontrado')
     data = _load_frame_b64(_FRAME_FILES[frame_name])
     if not data:
-        raise HTTPException(
-            status_code=404, detail=f'Arquivo {_FRAME_FILES[frame_name]} não encontrado'
-        )
+        raise ContentNotFoundError(detail=f'Arquivo {_FRAME_FILES[frame_name]} não encontrado')
     return {'frame': data, 'has_frame': True}
 
 

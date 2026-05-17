@@ -36,3 +36,7 @@ python-pptx
 openpyxl
 markdown
 cloudinary
+pdf2image
+Pillow
+google-api-python-client
+google-auth-httplib2

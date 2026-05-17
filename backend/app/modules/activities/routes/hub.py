@@ -3,8 +3,9 @@ routers/activities/hub.py
 Gerencia o Hub de conteúdos premium (Kiwify style).
 """
 
+from app.core.exceptions import AuthenticationRequiredError
 from datetime import date, timedelta, datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from app.core.database import get_client
 from app.core.dependencies.auth import get_current_user, get_current_user_optional
 from typing import List, Optional
@@ -12,25 +13,102 @@ from pydantic import BaseModel
 from app.core.security import hash_password, generate_temp_password
 from app.shared.services.document_validator import validate_document_auto
 from app.shared.services.upstash import cache_delete
+from app.core.exceptions import PremiumAccessDeniedError, ContentNotFoundError, AuthenticationRequiredError, InvalidDocumentError
+
 
 router = APIRouter()
 
 class PremiumContent(BaseModel):
     id: str
     title: str
-    description: Optional[str]
+    description: Optional[str] = None
     price: float
     type: str
-    content_source: Optional[str]
-    thumbnail_url: Optional[str]
-    emoji: Optional[str]
-    is_active: bool
+    content_source: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    preview_url: Optional[str] = None
+    emoji: Optional[str] = None
+    category: Optional[str] = 'other'
+    is_featured: Optional[bool] = False
+    processing_status: Optional[str] = None
+    is_active: bool = True
     has_access: bool = False
+
+    class Config:
+        extra = 'ignore'
 
 
 def _hub_log(message: str) -> None:
     now = datetime.now(timezone.utc).isoformat()
     print(f"[Hub][{now}] {message}")
+
+
+@router.post("/admin/reprocess/{content_id}")
+async def admin_reprocess_content(content_id: str, user: dict = Depends(get_current_user)):
+    """Reset processing_status e dispara reprocessamento de um material. Apenas admin."""
+    if user.get('role') not in ('admin', 'programmer', 'programador'):
+        raise HTTPException(status_code=403, detail="Acesso restrito a administradores.")
+
+    db = get_client()
+    content = db.table('premium_content').select('*').eq('id', content_id).single().execute()
+    if not content.data:
+        raise ContentNotFoundError()
+
+    item = content.data
+    source = item.get('content_source', '')
+
+    _hub_log(f"admin_reprocess_requested content_id={content_id} source={source} current_status={item.get('processing_status')}")
+
+    if not source:
+        raise HTTPException(status_code=400, detail="Material sem arquivo fonte configurado.")
+
+    # Reseta o status
+    db.table('premium_content').update({
+        'processing_status': 'pending',
+        'secure_pages': None,
+    }).eq('id', content_id).execute()
+
+    import asyncio
+
+    async def _do_reprocess():
+        import tempfile, os
+        try:
+            from app.shared.services.secure_document_service import SecureDocumentService
+            svc = SecureDocumentService()
+
+            # Baixa o PDF do Supabase Storage para um arquivo temporário
+            file_bytes = db.storage.from_('module-files').download(source)
+            filename = os.path.basename(source)
+            suffix = os.path.splitext(filename)[1] or '.pdf'
+
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                tmp.write(file_bytes)
+                tmp_path = tmp.name
+
+            _hub_log(f"admin_reprocess_pdf_downloaded content_id={content_id} tmp={tmp_path} size={len(file_bytes)}b")
+
+            result = svc.secure_process_document(tmp_path, filename, content_id)
+
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
+            _hub_log(f"admin_reprocess_done content_id={content_id} result={result}")
+        except Exception as e:
+            _hub_log(f"admin_reprocess_error content_id={content_id} error={e}")
+            db.table('premium_content').update({
+                'processing_status': 'failed',
+            }).eq('id', content_id).execute()
+
+    asyncio.create_task(_do_reprocess())
+
+    return {
+        'ok': True,
+        'message': f'Reprocessamento de "{item["title"]}" iniciado. Acompanhe os logs do servidor.',
+        'content_id': content_id,
+        'source': source,
+    }
 
 
 @router.get("", response_model=List[PremiumContent])
@@ -76,16 +154,44 @@ async def list_premium_content(user: Optional[dict] = Depends(get_current_user_o
 
     # 3. Formata resposta
     result = []
+    from app.core.config import settings
+    
+    from app.shared.services.secure_document_service import public_preview_url
+
     for c in contents:
-        # Se for admin ou programador, libera acesso automático para teste
+        if float(c.get('price') or 0) <= 0:
+            continue
+
         from app.modules.payments.services.subscription_manager import SPECIAL_USERS
         has_access = False
         if user and username:
-            has_access = c['id'] in purchased_ids or username in SPECIAL_USERS or user.get('role') == 'admin'
-        
+            has_access = (
+                c['id'] in purchased_ids
+                or username in SPECIAL_USERS
+                or user.get('role') == 'admin'
+            )
+
+        preview_path = c.get('preview_path')
+        preview_url = public_preview_url(preview_path) if preview_path else c.get('thumbnail_url')
+        if preview_url and not str(preview_url).startswith('http'):
+            preview_url = f"{settings.supabase_url}/storage/v1/object/public/hub-previews/{preview_url}"
+
+        category = (c.get('category') or 'other').lower()
+
         result.append({
-            **c,
-            "has_access": has_access
+            'id': c['id'],
+            'title': c['title'],
+            'description': c.get('description'),
+            'price': c['price'],
+            'type': c.get('type', 'file'),
+            'thumbnail_url': c.get('thumbnail_url'),
+            'preview_url': preview_url,
+            'emoji': c.get('emoji'),
+            'category': category,
+            'is_featured': bool(c.get('is_featured')),
+            'processing_status': c.get('processing_status'),
+            'is_active': c.get('is_active', True),
+            'has_access': has_access,
         })
 
     return result
@@ -96,33 +202,237 @@ async def list_premium_content_public(user: Optional[dict] = Depends(get_current
     return await list_premium_content(user)
 
 @router.get("/{content_id}/access")
-async def get_content_access(content_id: str, user: dict = Depends(get_current_user)):
+async def get_content_access(
+    content_id: str, 
+    request: Request,
+    user: dict = Depends(get_current_user),
+    authorization: Optional[str] = Header(None)
+):
     """Retorna o link de acesso/download se o usuário tiver permissão."""
     db = get_client()
     username = user.get('username')
 
+    # Extrai o token para passar para as URLs das páginas
+    raw_token = None
+    if authorization and authorization.startswith("Bearer "):
+        raw_token = authorization.split(" ")[1]
+
     # 1. Verifica se tem acesso
+    from app.modules.payments.services.subscription_manager import SPECIAL_USERS
+    is_special = username in SPECIAL_USERS or user.get('role') == 'admin'
+
+    if not is_special:
+        # Verifica na tabela clássica premium_purchases
+        purchase = db.table('premium_purchases')\
+            .select('id, status')\
+            .eq('username', username)\
+            .eq('content_id', content_id)\
+            .eq('status', 'confirmed')\
+            .execute()
+
+        has_access = bool(purchase.data)
+        _hub_log(f"access_check username={username} content_id={content_id} premium_purchases={purchase.data}")
+
+        # Fallback: verifica nas tabelas orders + order_items (fluxo hub-site público)
+        if not has_access:
+            order_items = db.table('order_items')\
+                .select('order_id, orders!inner(id, username, status, asaas_id)')\
+                .eq('content_id', content_id)\
+                .execute()
+
+            _hub_log(f"access_check_orders username={username} content_id={content_id} order_items={order_items.data}")
+
+            from app.modules.payments.services.asaas import get_payment_status as asaas_get_payment_status
+
+            for oi in (order_items.data or []):
+                order = oi.get('orders', {})
+                if order.get('username') != username:
+                    continue
+
+                if order.get('status') == 'confirmed':
+                    has_access = True
+                    break
+
+                # Se está pendente, verifica diretamente no Asaas
+                if order.get('status') == 'pending' and order.get('asaas_id'):
+                    try:
+                        asaas_data = await asaas_get_payment_status(order['asaas_id'])
+                        asaas_status = asaas_data.get('status', '') if asaas_data else ''
+                        _hub_log(f"asaas_direct_check order_id={order['id']} asaas_id={order['asaas_id']} asaas_status={asaas_status}")
+
+                        if asaas_status in ('RECEIVED', 'CONFIRMED'):
+                            has_access = True
+                            # Sincroniza tudo no banco
+                            db.table('orders').update({
+                                'status': 'confirmed',
+                                'confirmed_at': datetime.now(timezone.utc).isoformat()
+                            }).eq('id', order['id']).execute()
+
+                            try:
+                                db.table('premium_purchases').upsert({
+                                    'username': username,
+                                    'content_id': content_id,
+                                    'status': 'confirmed',
+                                    'asaas_payment_id': order['asaas_id'],
+                                }, on_conflict='username,content_id').execute()
+                            except Exception:
+                                db.table('premium_purchases').insert({
+                                    'username': username,
+                                    'content_id': content_id,
+                                    'status': 'confirmed',
+                                    'asaas_payment_id': order['asaas_id'],
+                                }).execute()
+
+                            _hub_log(f"access_granted_via_asaas_direct username={username} content_id={content_id}")
+                            break
+                    except Exception as e:
+                        _hub_log(f"asaas_direct_check ERROR: {e}")
+
+        if not has_access:
+            raise PremiumAccessDeniedError()
+
+    # 2. Busca informações do conteúdo
+    content = db.table('premium_content').select('*').eq('id', content_id).single().execute()
+    if not content.data:
+        raise ContentNotFoundError()
+
+    item = content.data
+
+    # 3. Verifica se é um documento seguro (Imagens)
+    if item.get('is_secure'):
+        status = item.get('processing_status', 'pending')
+        if status in ('pending', 'processing'):
+            raise HTTPException(
+                status_code=409,
+                detail="Material em processamento seguro. Por favor, aguarde alguns segundos."
+            )
+
+        if status in ('ready', 'skipped') and item.get('secure_pages'):
+            pages = item['secure_pages']
+            secure_urls = []
+            external_links = []
+            
+            # Detecta e extrai metadata escondido no array (hack inteligente para evitar alteração de DB)
+            if pages and isinstance(pages[-1], str) and pages[-1].startswith('{"external_links"'):
+                import json
+                try:
+                    meta = json.loads(pages.pop())
+                    external_links = meta.get("external_links", [])
+                except:
+                    pass
+
+            # Detecta a base URL da requisição atual para montar o link completo
+            api_base = str(request.base_url).rstrip('/')
+            # Removido /api pois o servidor Python não usa esse prefixo nas rotas
+
+            for i in range(len(pages)):
+                token_suffix = f"?token={raw_token}" if raw_token else ""
+                secure_urls.append(f"{api_base}/activities/hub/{content_id}/pages/{i}{token_suffix}")
+
+            return {
+                "type": "secure_images",
+                "pages": secure_urls,
+                "total_pages": len(secure_urls),
+                "is_secure_viewer": True,
+                "title": item.get('title'),
+                "external_links": external_links
+            }
+
+    # 4. Caso contrário, fluxo antigo (Link direto ou Signed URL)
+    source = item['content_source']
+    if source and not source.startswith('http'):
+        from app.core.config import settings
+        # Gera Signed URL em vez de link público direto
+        res = db.storage.from_('module-files').create_signed_url(source, 900)
+        source = res['signedURL']
+
+    return {"url": source, "type": "direct"}
+
+import asyncio
+from starlette.concurrency import run_in_threadpool
+
+# Cache global em memória para imagens brutas (evita baixar do Supabase toda hora)
+_RAW_IMAGE_CACHE = {}
+
+@router.get("/{content_id}/pages/{page_index}")
+async def get_secure_page(
+    content_id: str, 
+    page_index: int, 
+    token: Optional[str] = None,
+    authorization: Optional[str] = Header(None)
+):
+    """Retorna a página de um documento seguro com marca d'água do email (Alta Performance)."""
+    db = get_client()
+    user = None
+    
+    # 1. Autenticação rápida
+    final_token = token
+    if not final_token and authorization and authorization.startswith("Bearer "):
+        final_token = authorization.split(" ")[1]
+    
+    if final_token:
+        from app.core.security import decode_token
+        payload = decode_token(final_token)
+        if payload:
+            username = payload['sub']
+            # Cache de usuários pode ser feito aqui futuramente, por enquanto query rápida
+            rows = db.table('users').select('username, email, role').eq('username', username).execute()
+            if rows.data:
+                user = rows.data[0]
+    
+    if not user:
+        raise AuthenticationRequiredError()
+
+    username = user.get('username')
+    email = user.get('email') or username
+
+    # 2. Verifica se tem acesso
     from app.modules.payments.services.subscription_manager import SPECIAL_USERS
     is_special = username in SPECIAL_USERS or user.get('role') == 'admin'
     
     if not is_special:
         purchase = db.table('premium_purchases').select('id').eq('username', username).eq('content_id', content_id).eq('status', 'confirmed').execute()
         if not purchase.data:
-            raise HTTPException(status_code=403, detail="Você não possui acesso a este conteúdo. Realize a compra para liberar.")
+            raise PremiumAccessDeniedError()
 
-    # 2. Busca o link original
-    content = db.table('premium_content').select('content_source').eq('id', content_id).single().execute()
-    if not content.data:
-        raise HTTPException(status_code=404, detail="Conteúdo não encontrado.")
+    # 3. Busca informações do conteúdo
+    content = db.table('premium_content').select('secure_pages').eq('id', content_id).single().execute()
+    if not content.data or not content.data.get('secure_pages'):
+        raise ContentNotFoundError()
     
-    source = content.data['content_source']
+    pages = content.data['secure_pages']
     
-    # 3. Formata URL (se for apenas nome de arquivo, assume Supabase Storage no bucket 'module-files')
-    if source and not source.startswith('http'):
-        from app.core.config import settings
-        source = f"{settings.supabase_url}/storage/v1/object/public/module-files/{source}"
+    # Remove metadata oculto da contagem
+    if pages and isinstance(pages[-1], str) and pages[-1].startswith('{"'):
+        pages = pages[:-1]
 
-    return {"url": source}
+    if page_index < 0 or page_index >= len(pages):
+        raise HTTPException(status_code=404, detail="Página não encontrada")
+        
+    storage_path = pages[page_index]
+    
+    # 4. Baixa a imagem do Supabase usando CACHE em RAM (Acelera 1000x)
+    file_data = _RAW_IMAGE_CACHE.get(storage_path)
+    
+    if not file_data:
+        try:
+            # Roda download em threadpool para não congelar o servidor
+            file_data = await run_in_threadpool(db.storage.from_('hub-secure-pages').download, storage_path)
+            # Limita tamanho do cache para não estourar memória (max ~500 imagens de 500kb = 250MB)
+            if len(_RAW_IMAGE_CACHE) > 500:
+                _RAW_IMAGE_CACHE.pop(next(iter(_RAW_IMAGE_CACHE)))
+            _RAW_IMAGE_CACHE[storage_path] = file_data
+        except Exception as e:
+            print(f"[Hub] Erro ao baixar página {storage_path}: {e}")
+            raise HTTPException(status_code=500, detail="Erro ao processar imagem")
+        
+    # 5. Aplica a marca d'água de forma assíncrona para não travar outras requisições
+    from app.shared.services.secure_document_service import apply_watermark
+    from fastapi.responses import Response
+    
+    watermarked_image = await run_in_threadpool(apply_watermark, file_data, email)
+    
+    return Response(content=watermarked_image, media_type="image/webp")
 
 @router.get("/{content_id}/download")
 async def download_premium_content(
@@ -149,7 +459,7 @@ async def download_premium_content(
                 user = rows.data[0]
     
     if not user:
-        raise HTTPException(status_code=401, detail="Não autenticado.")
+        raise AuthenticationRequiredError()
 
     username = user.get('username')
 
@@ -160,18 +470,25 @@ async def download_premium_content(
     if not is_special:
         purchase = db.table('premium_purchases').select('id').eq('username', username).eq('content_id', content_id).eq('status', 'confirmed').execute()
         if not purchase.data:
-            raise HTTPException(status_code=403, detail="Acesso negado.")
+            raise PremiumAccessDeniedError()
 
     # 2. Busca informações do conteúdo
     content = db.table('premium_content').select('*').eq('id', content_id).single().execute()
     if not content.data:
-        raise HTTPException(status_code=404, detail="Conteúdo não encontrado.")
+        raise ContentNotFoundError()
     
     item = content.data
+
+    if item.get('is_secure'):
+        raise HTTPException(
+            status_code=403,
+            detail='Download desativado. Use o visualizador seguro no navegador.',
+        )
+
     source = item['content_source']
-    
+
     if not source:
-        raise HTTPException(status_code=404, detail="Arquivo não configurado.")
+        raise ContentNotFoundError()
 
     # 3. Se for URL externa (não Supabase), apenas redireciona
     if source.startswith('http'):
@@ -257,7 +574,7 @@ async def _persist_user_document(username: str, cpf: str) -> str:
 
     validation = validate_document_auto(raw_doc)
     if not validation['valid']:
-        raise HTTPException(status_code=400, detail=f'Documento inválido: {validation["message"]}')
+        raise InvalidDocumentError(detail=f'Documento inválido: {validation["message"]}')
 
     formatted = validation.get('formatted') or raw_doc
     db = get_client()
@@ -370,7 +687,7 @@ async def hub_checkout(body: HubCheckoutRequest, user: dict = Depends(get_curren
 
     content = db.table('premium_content').select('*').eq('id', body.content_id).single().execute()
     if not content.data:
-        raise HTTPException(status_code=404, detail='Conteúdo não encontrado.')
+        raise ContentNotFoundError("Conteúdo não encontrado.")
 
     item = content.data
     value = float(item['price'])
@@ -459,14 +776,14 @@ async def hub_checkout_guest(body: GuestCheckoutRequest):
     db = get_client()
     raw_doc = _normalize_document(body.cpf)
     if len(raw_doc) not in (11, 14):
-        raise HTTPException(status_code=400, detail='CPF/CNPJ inválido.')
+        raise InvalidDocumentError(detail="CPF/CNPJ inválido.")
 
     username = _get_or_create_guest_user(body.name, body.email, raw_doc)
     _hub_log(f"guest_checkout_start username={username} content_id={body.content_id} billingType={body.billingType}")
 
     content = db.table('premium_content').select('*').eq('id', body.content_id).single().execute()
     if not content.data:
-        raise HTTPException(status_code=404, detail='Conteúdo não encontrado.')
+        raise ContentNotFoundError("Conteúdo não encontrado.")
     item = content.data
     value = float(item['price'])
 
@@ -547,11 +864,11 @@ async def hub_payment_status(payment_id: str, user: dict = Depends(get_current_u
     )
 
     if not purchase:
-        raise HTTPException(status_code=404, detail='Pagamento não encontrado.')
+        raise ContentNotFoundError("Pagamento não encontrado.")
 
     payment_data = await _sync_premium_purchase_payment(payment_id, user['username'])
     if not payment_data:
-        raise HTTPException(status_code=404, detail='Pagamento não encontrado no Asaas.')
+        raise ContentNotFoundError("Pagamento não encontrado no Asaas.")
 
     checkout_url = (
         payment_data.get('invoiceUrl')

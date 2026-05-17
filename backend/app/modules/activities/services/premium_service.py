@@ -5,14 +5,28 @@ Serviço para gerenciamento de conteúdos premium e controle de acesso.
 
 from typing import List, Dict, Any, Optional
 import uuid
-from fastapi import HTTPException, UploadFile
+import os
+from fastapi import UploadFile, HTTPException
+from fastapi import Depends
+from supabase import Client
+from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
+from app.core.dependencies.db import get_db
 from fastapi.concurrency import run_in_threadpool
-from app.core.database import get_client
+from app.shared.services.secure_document_service import (
+    SecureDocumentService,
+    public_preview_url,
+    VALID_CATEGORIES,
+)
 
 class PremiumService:
-    def __init__(self):
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)) -> None:
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
         self.bucket = "module-files"
+        self.secure_service = SecureDocumentService()
 
     async def list_content_for_student(self, username: str) -> List[Dict[str, Any]]:
         """Lista conteúdos premium com status de compra para o aluno."""
@@ -40,24 +54,37 @@ class PremiumService:
             # Busca o conteúdo
             content = self.db.table('premium_content').select('*').eq('id', content_id).single().execute().data
             if not content:
-                raise HTTPException(status_code=404, detail="Conteúdo não encontrado")
+                raise ContentNotFoundError(detail="Conteúdo não encontrado")
             
-            # Se for gratuito ou o usuário comprou
-            if content['price'] == 0:
-                authorized = True
-            else:
-                purchase = self.db.table('premium_purchases').select('*').eq('username', username).eq('content_id', content_id).eq('status', 'confirmed').execute().data
-                authorized = len(purchase) > 0
-            
+            purchase = self.db.table('premium_purchases').select('*').eq('username', username).eq('content_id', content_id).eq('status', 'confirmed').execute().data
+            from app.modules.payments.services.subscription_manager import SPECIAL_USERS
+            user_row = self.db.table('users').select('role').eq('username', username).limit(1).execute().data
+            role = user_row[0]['role'] if user_row else None
+            is_special = username in SPECIAL_USERS or role == 'admin'
+            authorized = len(purchase) > 0 or is_special
+
             if not authorized:
-                raise HTTPException(status_code=403, detail="Acesso negado. Compra necessária.")
-            
-            # Se for um link externo, retorna o link
+                raise PremiumAccessDeniedError(detail="Acesso negado. Compra necessária.")
+
             if content['type'] == 'link':
                 return content['content_source']
-            
-            # Se for um arquivo no storage, gera Signed URL
-            # O content_source deve ser o path no bucket
+
+            if content.get('is_secure') and content.get('processing_status') in ('ready', 'skipped') and content.get('secure_pages'):
+                pages = content['secure_pages']
+                secure_urls = []
+                for p in pages:
+                    res = self.db.storage.from_('hub-secure-pages').create_signed_url(p, 1800)
+                    secure_urls.append(res['signedURL'])
+
+                return {
+                    "type": "secure_images",
+                    "pages": secure_urls,
+                    "total_pages": len(secure_urls),
+                    "is_secure_viewer": True,
+                    "title": content.get('title'),
+                }
+
+            # Caso contrário, fluxo antigo (Signed URL do arquivo original)
             file_path = content['content_source']
             try:
                 # Expira em 15 minutos (900 segundos)
@@ -77,36 +104,119 @@ class PremiumService:
             return self.db.table('premium_content').select('*').order('created_at', desc=True).execute().data or []
         return await run_in_threadpool(_fetch)
 
+    def _validate_create_payload(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        price = float(data.get('price') or 0)
+        if price <= 0:
+            raise BusinessLogicError(detail='Preço deve ser maior que zero.')
+
+        category = (data.get('category') or 'other').lower()
+        if category not in VALID_CATEGORIES:
+            raise BusinessLogicError(detail=f'Categoria inválida. Use: {", ".join(sorted(VALID_CATEGORIES))}')
+
+        data['category'] = category
+        data['price'] = price
+        data.setdefault('processing_status', 'pending')
+        return data
+
     async def create_content(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Cria um novo conteúdo premium."""
+        """Cria conteúdo premium e dispara processamento seguro para arquivos PDF."""
+        data = self._validate_create_payload(dict(data))
+
         def _insert():
             res = self.db.table('premium_content').insert(data).execute()
             return res.data[0]
-        return await run_in_threadpool(_insert)
+
+        content = await run_in_threadpool(_insert)
+
+        source = content.get('content_source')
+        content_type = content.get('type')
+
+        if content_type in ('file', 'pdf') and source and not str(source).startswith('http'):
+            import asyncio
+            asyncio.create_task(self._trigger_secure_processing(content))
+
+        return content
+
+    async def _trigger_secure_processing(self, content: Dict[str, Any]) -> None:
+        """Baixa PDF do storage e processa em thread pool."""
+        content_id = content['id']
+        source = content['content_source']
+        temp_path = os.path.join('temp', str(source).replace('/', '_'))
+
+        def _run():
+            try:
+                print(f'[PremiumService] Processamento seguro: {content_id}')
+                file_data = self.db.storage.from_(self.bucket).download(source)
+                os.makedirs(os.path.dirname(temp_path) or 'temp', exist_ok=True)
+                with open(temp_path, 'wb') as f:
+                    f.write(file_data)
+
+                result = self.secure_service.secure_process_document(
+                    local_path=temp_path,
+                    filename=os.path.basename(str(source)),
+                    content_id=content_id,
+                )
+                if not result.get('success'):
+                    print(f'[PremiumService] Falha: {result.get("error")}')
+            except Exception as e:
+                print(f'[PremiumService] Falha no processamento: {e}')
+                self.secure_service._set_processing_status(content_id, 'failed', str(e))
+            finally:
+                try:
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                except OSError:
+                    pass
+
+        await run_in_threadpool(_run)
 
     async def update_content(self, content_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Atualiza um conteúdo existente."""
+        """Atualiza um conteúdo existente e processa o arquivo caso ele seja alterado."""
+        payload = dict(data)
+        if 'category' in payload and payload['category']:
+            cat = str(payload['category']).lower()
+            if cat not in VALID_CATEGORIES:
+                raise BusinessLogicError(detail=f'Categoria inválida. Use: {", ".join(sorted(VALID_CATEGORIES))}')
+            payload['category'] = cat
+        if 'price' in payload and float(payload.get('price') or 0) <= 0:
+            raise BusinessLogicError(detail='Preço deve ser maior que zero.')
+
+        source_changed = (
+            'content_source' in payload
+            and payload['content_source']
+            and not str(payload['content_source']).startswith('http')
+        )
+
+        if source_changed:
+            payload['processing_status'] = 'pending'
+
         def _update():
-            res = self.db.table('premium_content').update(data).eq('id', content_id).execute()
+            res = self.db.table('premium_content').update(payload).eq('id', content_id).execute()
             return res.data[0]
-        return await run_in_threadpool(_update)
+            
+        content = await run_in_threadpool(_update)
+        
+        if source_changed and content.get('type') in ('file', 'pdf'):
+            import asyncio
+            asyncio.create_task(self._trigger_secure_processing(content))
+            
+        return content
 
     async def delete_content(self, content_id: str) -> bool:
         """
-        Tenta excluir um conteúdo. 
-        Se houver compras vinculadas, faz um 'Soft Delete' (desativa) para manter integridade.
+        Exclui um conteúdo premium fisicamente do banco de dados.
+        Remove também todas as compras e itens de pedido relacionados para evitar violação de chaves estrangeiras.
         """
         def _delete():
-            try:
-                # Tenta deletar fisicamente
-                self.db.table('premium_content').delete().eq('id', content_id).execute()
-                return True
-            except Exception as e:
-                # Se der erro de FK (compras existentes), apenas desativa e oculta
-                if '23503' in str(e) or 'foreign key' in str(e).lower():
-                    self.db.table('premium_content').update({'is_active': False}).eq('id', content_id).execute()
-                    return True
-                raise e
+            # 1. Remove compras vinculadas
+            self.db.table('premium_purchases').delete().eq('content_id', content_id).execute()
+            
+            # 2. Remove itens de pedidos vinculados
+            self.db.table('order_items').delete().eq('content_id', content_id).execute()
+            
+            # 3. Remove o conteúdo fisicamente
+            self.db.table('premium_content').delete().eq('id', content_id).execute()
+            return True
         return await run_in_threadpool(_delete)
 
     async def upload_file(self, file: UploadFile) -> str:
@@ -127,3 +237,114 @@ class PremiumService:
             return file_path
         
         return await run_in_threadpool(_upload)
+
+
+    def _normalize_public_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        if not item:
+            return item
+        raw_cat = item.get('category')
+        item['category'] = (str(raw_cat).lower() if raw_cat else 'other')
+        if item['category'] not in VALID_CATEGORIES:
+            item['category'] = 'other'
+        item.setdefault('is_featured', False)
+        preview_path = item.get('preview_path')
+        if preview_path:
+            item['preview_url'] = public_preview_url(preview_path)
+        elif item.get('thumbnail_url'):
+            item['preview_url'] = item['thumbnail_url']
+        for key in ('preview_path', 'emoji', 'secure_pages', 'content_source', 'original_drive_id'):
+            item.pop(key, None)
+        return item
+
+    async def list_public_catalog(self) -> List[Dict[str, Any]]:
+        """Lista todo o conteúdo premium disponível para compra (não requer login)."""
+        def _fetch():
+            rows = (
+                self.db.table('premium_content')
+                .select('*')
+                .eq('is_active', True)
+                .order('created_at', desc=True)
+                .execute()
+                .data
+                or []
+            )
+            rows = [r for r in rows if float(r.get('price') or 0) > 0]
+            return [self._normalize_public_item(row) for row in rows]
+
+        return await run_in_threadpool(_fetch)
+
+    async def get_public_item(self, item_id: str) -> Optional[Dict[str, Any]]:
+        """Busca um item específico para o catálogo público."""
+        def _fetch():
+            fields = (
+                "id, title, description, price, type, thumbnail_url, preview_path, "
+                "category, is_featured, processing_status, created_at"
+            )
+            try:
+                item = (
+                    self.db.table('premium_content')
+                    .select(fields)
+                    .eq('id', item_id)
+                    .eq('is_active', True)
+                    .single()
+                    .execute()
+                    .data
+                )
+            except Exception:
+                basic_fields = "id, title, description, price, type, thumbnail_url, created_at"
+                item = (
+                    self.db.table('premium_content')
+                    .select(basic_fields)
+                    .eq('id', item_id)
+                    .eq('is_active', True)
+                    .single()
+                    .execute()
+                    .data
+                )
+            if item and float(item.get('price') or 0) <= 0:
+                return None
+            return self._normalize_public_item(item) if item else None
+
+        return await run_in_threadpool(_fetch)
+
+    async def list_user_orders(self, username: str) -> List[Dict[str, Any]]:
+        """Lista pedidos do hub-site para o usuário autenticado."""
+        def _fetch():
+            orders = (
+                self.db.table('orders')
+                .select('id, status, total_amount, payment_method, created_at')
+                .eq('username', username)
+                .order('created_at', desc=True)
+                .execute()
+                .data
+                or []
+            )
+            result = []
+            for order in orders:
+                items = (
+                    self.db.table('order_items')
+                    .select('content_id, price')
+                    .eq('order_id', order['id'])
+                    .execute()
+                    .data
+                    or []
+                )
+                enriched = []
+                for item in items:
+                    content_res = (
+                        self.db.table('premium_content')
+                        .select('title')
+                        .eq('id', item['content_id'])
+                        .limit(1)
+                        .execute()
+                    )
+                    content = (content_res.data or [None])[0]
+                    enriched.append({
+                        'content_id': item['content_id'],
+                        'price': item['price'],
+                        'title': (content or {}).get('title', 'Material'),
+                    })
+                result.append({**order, 'items': enriched})
+            return result
+
+        return await run_in_threadpool(_fetch)

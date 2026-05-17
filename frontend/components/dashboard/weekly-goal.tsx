@@ -23,7 +23,7 @@ export function WeeklyGoal() {
   if (isLoading) return <div className="p-8 flex justify-center"><Spinner /></div>;
   if (!data) return null;
 
-  const totalTasks = (data.quizzes?.length || 0) + (data.ai_exercises?.length || 0) + (data.simulations?.length || 0);
+  const totalTasks = (data.quizzes?.length || 0) + (data.simulations?.length || 0);
 
   if (totalTasks === 0) return null;
 
@@ -48,12 +48,7 @@ export function WeeklyGoal() {
             <p className="text-sm font-bold">{data.quizzes.length} Quizzes</p>
           </div>
         )}
-        {data.ai_exercises.length > 0 && (
-          <div onClick={() => router.push('/activities')} className="p-4 bg-bg-secondary rounded-2xl cursor-pointer hover:bg-primary/5 transition-all">
-            <Sparkles className="text-primary mb-2" />
-            <p className="text-sm font-bold">{data.ai_exercises.length} AI Exercises</p>
-          </div>
-        )}
+
         {data.simulations.length > 0 && (
           <div onClick={() => router.push('/activities')} className="p-4 bg-bg-secondary rounded-2xl cursor-pointer hover:bg-primary/5 transition-all">
             <Drama className="text-success mb-2" />

@@ -16,17 +16,23 @@ from fastapi import WebSocket
 from fastapi.concurrency import run_in_threadpool
 
 from app.core.config import settings
-from app.core.database import get_client
 from app.modules.chat.services.llm import stream_llm, text_to_speech, transcribe_audio
 from app.shared.services.history import save_message, load_history, load_llm_history, auto_title
 from app.modules.chat.services.prompt_builder import UserProfile, build_effective_prompt
 from app.modules.chat.services.rag_search import obter_contexto_rag, RAGResult
 from app.modules.activities.services.pronunciation_matcher import match_pronunciation
+from app.core.dependencies.db import get_db
+from fastapi import Depends
+from supabase import Client
 
 
 class ChatService:
-    def __init__(self):
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)) -> None:
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
 
     async def _execute_db(self, func, retries=3):
         """Helper para executar chamadas de banco com retry em caso de desconexão."""
@@ -130,15 +136,27 @@ class ChatService:
     ) -> Optional[str]:
         content = msg.get('content', '').strip()
         conv_id = msg.get('conversation_id')
+        
+        # 0. Segurança: Valida se a conversa pertence ao usuário
+        if conv_id:
+            def _check_conv():
+                return self.db.table('conversations').select('username').eq('id', conv_id).execute().data
+            
+            conv_rows = await self._execute_db(_check_conv)
+            if conv_rows and conv_rows[0]['username'] != username:
+                print(f"[ChatSecurity] Alerta: Usuário {username} tentou acessar conversa {conv_id} de {conv_rows[0]['username']}")
+                await websocket.send_json({'type': 'error', 'message': 'Acesso negado à conversa.'})
+                return pending_drill_target
+
         is_voice_mode = msg.get('origin') == 'voice'
         msg_type = msg.get('type')
 
         # 1. Transcrição ou Extração de Arquivo
         if msg_type == 'audio':
-            print(f'[ChatService] Transcrevendo áudio para {username}...')
+            #print(f'[ChatService] Transcrevendo áudio para {username}...')
             audio_bytes = base64.b64decode(msg.get('audio', ''))
             content = await transcribe_audio(audio_bytes, filename='input.webm')
-            print(f'[ChatService] Transcrição concluída: "{content[:50]}..."')
+            #print(f'[ChatService] Transcrição concluída: "{content[:50]}..."')
             await websocket.send_json({'type': 'transcription', 'text': content})
         elif msg_type == 'file':
             filename = msg.get('filename', 'file.txt')

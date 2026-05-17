@@ -206,3 +206,8 @@ def register_all_routers(app: FastAPI) -> None:
     from app.modules.users.routes.bootstrap import router as bootstrap_router
 
     app.include_router(bootstrap_router, prefix='/users', tags=['users'])
+
+    # ── Public ──────────────────────────────────────────────
+    from app.modules.activities.routes.public import router as public_router
+
+    app.include_router(public_router, prefix='/catalog', tags=['public'])

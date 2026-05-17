@@ -13,6 +13,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
 from app.core.dependencies.auth import get_current_user
+from app.core.dependencies.db import get_db
+from supabase import Client
 from app.modules.auth.services.auth_service import AuthService
 
 router = APIRouter()
@@ -69,6 +71,7 @@ async def login(
     request: Request,
     background_tasks: BackgroundTasks,
     form: OAuth2PasswordRequestForm = Depends(lambda: None),
+    db: Client = Depends(get_db),
 ) -> dict:
     """Autentica via form-data (OAuth2) ou JSON.
 
@@ -102,7 +105,7 @@ async def login(
             detail='Credenciais não fornecidas ou formato inválido.',
         )
 
-    result = await AuthService.authenticate_user(username, password)
+    result = await AuthService.authenticate_user(db, username, password)
 
     # Warm-up Tavily em background sem bloquear o login
     user_level = result.get('level', 'Beginner') if isinstance(result, dict) else 'Beginner'
@@ -116,27 +119,27 @@ async def login(
 
 
 @router.post('/register', status_code=status.HTTP_201_CREATED)
-async def register(body: RegisterBody) -> dict:
+async def register(body: RegisterBody, db: Client = Depends(get_db)) -> dict:
     """Cria nova conta de estudante."""
-    return await AuthService.register_student(body)
+    return await AuthService.register_student(db, body)
 
 
 # ── Google OAuth ──────────────────────────────────────────────────────────────
 
 
 @router.post('/google')
-async def google_login(body: GoogleBody) -> dict:
+async def google_login(body: GoogleBody, db: Client = Depends(get_db)) -> dict:
     """Authenticates via Google OAuth2. Creates account if needed."""
-    return await AuthService.google_login(body.credential)
+    return await AuthService.google_login(db, body.credential)
 
 
 # ── Forgot password ──────────────────────────────────────────────────────────
 
 
 @router.post('/forgot-password')
-async def forgot_password(body: ForgotPasswordBody) -> dict:
+async def forgot_password(body: ForgotPasswordBody, db: Client = Depends(get_db)) -> dict:
     """Envia senha temporária por e-mail."""
-    return await AuthService.process_forgot_password(body.identifier)
+    return await AuthService.process_forgot_password(db, body.identifier)
 
 
 # ── Change password (autenticado) ─────────────────────────────────────────────
@@ -146,6 +149,7 @@ async def forgot_password(body: ForgotPasswordBody) -> dict:
 async def change_password(
     body: ChangePasswordBody,
     current_user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db)
 ) -> dict:
     """Troca a senha do usuário autenticado."""
-    return await AuthService.change_password(current_user, body)
+    return await AuthService.change_password(db, current_user, body)

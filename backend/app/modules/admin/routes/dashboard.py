@@ -4,11 +4,15 @@ Router do painel administrativo.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
+from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
 from pydantic import BaseModel
 from typing import Optional
 
 from app.core.dependencies.auth import require_staff, get_current_user
+from app.core.dependencies.db import get_db
+from supabase import Client
 from app.modules.admin.services.dashboard_service import DashboardService
+from app.modules.activities.services.activity_service import ActivityService
 from app.modules.chat.services.llm import groq_chat
 
 router = APIRouter()
@@ -37,7 +41,7 @@ class UrlGenerationRequest(BaseModel):
 @router.post('/generate-from-url')
 async def generate_from_url_endpoint(
     req: UrlGenerationRequest,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(require_staff)
 ):
     """Gera um módulo completo a partir de uma URL externa."""
     from app.modules.activities.services.url_to_module import url_to_module_service
@@ -47,12 +51,12 @@ async def generate_from_url_endpoint(
         req.level
     )
     if not result.get('ok'):
-        raise HTTPException(status_code=400, detail=result.get('error'))
+        raise BusinessLogicError(detail=result.get('error'))
     return result
 
 
 @router.get('/config-status')
-async def get_config_status(user=Depends(get_current_user)):
+async def get_config_status(user=Depends(require_staff)):
     """Verifica se as chaves principais estão configuradas (redigido)."""
     from app.core.config import settings
     return {
@@ -64,7 +68,7 @@ async def get_config_status(user=Depends(get_current_user)):
     }
 
 @router.get('/stats')
-async def get_stats(service: DashboardService = Depends()) -> dict:
+async def get_stats(service: DashboardService = Depends(), user=Depends(require_staff)) -> dict:
     """Estatísticas rápidas do dashboard."""
     return await service.get_quick_stats()
 
@@ -78,7 +82,7 @@ async def get_my_stats(
 
 
 @router.get('/reports/overview')
-async def get_reports_overview(service: DashboardService = Depends()) -> dict:
+async def get_reports_overview(service: DashboardService = Depends(), user=Depends(require_staff)) -> dict:
     """Visão geral de relatórios com dados reais do banco."""
     return await service.get_reports_overview()
 
@@ -87,7 +91,7 @@ async def get_reports_overview(service: DashboardService = Depends()) -> dict:
 
 
 @router.get('/students')
-async def get_students(service: DashboardService = Depends()) -> list:
+async def get_students(service: DashboardService = Depends(), user=Depends(require_staff)) -> list:
     """Lista todos os alunos com metadados completos."""
     return await service.get_students_list()
 
@@ -97,6 +101,7 @@ async def update_student(
     username: str,
     body: StudentUpdate,
     service: DashboardService = Depends(),
+    user=Depends(require_staff)
 ) -> dict:
     """Atualiza nível e/ou prompt customizado de um aluno."""
     return await service.update_student(
@@ -107,11 +112,13 @@ async def update_student(
 
 
 @router.delete('/students/{username}', status_code=200)
-async def delete_student(username: str) -> dict:
-    """Remove um aluno do sistema."""
-    from app.core.database import get_client
-
-    get_client().table('users').delete().eq('username', username).execute()
+async def delete_student(
+    username: str,
+    service: DashboardService = Depends(),
+    user=Depends(require_staff)
+) -> dict:
+    """Remove um aluno do sistema com limpeza de dependências."""
+    await service.delete_student(username)
     return {'ok': True}
 
 
@@ -123,11 +130,10 @@ async def get_insight(
     username: str,
     lang: str = 'en-US',
     service: DashboardService = Depends(),
+    db: Client = Depends(get_db),
+    user=Depends(require_staff)
 ) -> dict:
     """Gera insight pedagógico sobre um aluno via IA (English only)."""
-    from app.core.database import get_client
-
-    db = get_client()
     rows = (
         db.table('messages')
         .select('content')
@@ -156,6 +162,7 @@ async def get_grammar_errors(
     username: str,
     lang: str = 'en-US',
     service: DashboardService = Depends(),
+    user=Depends(require_staff)
 ) -> dict:
     """Analisa erros gramaticais recorrentes de um aluno."""
     return await service.get_grammar_errors(username, lang)
@@ -166,6 +173,7 @@ async def get_recommendations(
     username: str,
     lang: str = 'en-US',
     service: DashboardService = Depends(),
+    user=Depends(require_staff)
 ) -> dict:
     """Retorna interesses e recomendações pedagógicas para um aluno."""
     return await service.get_recommendations(username, lang)
@@ -175,25 +183,22 @@ async def get_recommendations(
 
 
 @router.get('/simulations')
-async def list_simulations(service: DashboardService = Depends()) -> list:
+async def list_simulations(service: DashboardService = Depends(), user=Depends(require_staff)) -> list:
     """Lista todas as simulações registradas."""
     return await service.get_all_simulations()
 
 
 @router.get('/simulations/{simulation_id}')
-async def get_simulation(simulation_id: str):
+async def get_simulation(simulation_id: str, db: Client = Depends(get_db), user=Depends(require_staff)):
     """Detalhes de uma simulação."""
-    from app.core.database import get_client
-
-    db = get_client()
     res = db.table('simulations').select('*').eq('id', simulation_id).limit(1).execute()
     if not res.data:
-        raise HTTPException(status_code=404, detail='Simulação não encontrada')
+        raise ContentNotFoundError(detail='Simulação não encontrada')
     return res.data[0]
 
 
 @router.post('/simulations')
-async def create_simulation(data: dict, service: DashboardService = Depends()):
+async def create_simulation(data: dict, service: DashboardService = Depends(), db: Client = Depends(get_db), user=Depends(require_staff)):
     """Cria uma nova simulação (manual ou via IA se is_ai_generated)."""
     if data.get('is_ai_generated') or data.get('use_ai_generation'):
         return await service.generate_simulation(
@@ -202,8 +207,6 @@ async def create_simulation(data: dict, service: DashboardService = Depends()):
             data.get('instructions', '')
         )
     
-    from app.core.database import get_client
-    db = get_client()
     
     # Limpeza de dados para evitar erro de coluna inexistente
     allowed_fields = {'name', 'slug', 'description', 'icon', 'emoji', 'difficulty', 'system_prompt', 'is_active'}
@@ -244,10 +247,8 @@ async def create_simulation(data: dict, service: DashboardService = Depends()):
 
 
 @router.put('/simulations/{simulation_id}')
-async def update_simulation(simulation_id: str, data: dict):
+async def update_simulation(simulation_id: str, data: dict, db: Client = Depends(get_db), user=Depends(require_staff)):
     """Atualiza uma simulação."""
-    from app.core.database import get_client
-    db = get_client()
     
     allowed_fields = {'name', 'slug', 'description', 'icon', 'emoji', 'difficulty', 'system_prompt', 'greeting', 'is_active'}
     filtered_data = {k: v for k, v in data.items() if k in allowed_fields}
@@ -259,51 +260,41 @@ async def update_simulation(simulation_id: str, data: dict):
 
 
 @router.delete('/simulations/{simulation_id}')
-async def delete_simulation(simulation_id: str):
+async def delete_simulation(simulation_id: str, db: Client = Depends(get_db), user=Depends(require_staff)):
     """Exclui uma simulação."""
-    from app.core.database import get_client
-
-    db = get_client()
     return db.table('simulations').delete().eq('id', simulation_id).execute()
 
 
 @router.get('/modules')
-async def list_all_modules():
+async def list_all_modules(db: Client = Depends(get_db), user=Depends(require_staff)):
     """Lista todos os módulos (quizzes e conteúdos), ignorando flashcards."""
-    from app.core.database import get_client
-    db = get_client()
     from app.modules.activities.routes.personalized import PERSONALIZED_MODULE_ID
     res = db.table('modules').select('*').is_('flashcards', 'null').neq('id', PERSONALIZED_MODULE_ID).order('created_at', desc=True).execute()
     return res.data or []
 
 
 @router.put('/modules/{module_id}')
-async def update_module_admin(module_id: str, data: dict):
+async def update_module_admin(module_id: str, data: dict, db: Client = Depends(get_db), user=Depends(require_staff)):
     """Atualiza metadados de um módulo."""
-    from app.core.database import get_client
-    db = get_client()
     return db.table('modules').update(data).eq('id', module_id).execute()
 
 
 @router.delete('/modules/{module_id}')
-async def delete_module_admin(module_id: str):
+async def delete_module_admin(module_id: str, service: ActivityService = Depends(), user=Depends(require_staff)):
     """Remove um módulo e seus dependentes."""
-    from app.modules.activities.services.activity_service import ActivityService
-    service = ActivityService()
     success = await service.delete_module(module_id)
     if not success:
-        raise HTTPException(status_code=400, detail="Não foi possível excluir o módulo")
+        raise BusinessLogicError(detail="Não foi possível excluir o módulo")
     return {"ok": True}
 
 
 @router.get('/flashcards')
-async def get_dashboard_flashcards() -> list:
+async def get_dashboard_flashcards(db: Client = Depends(get_db), user=Depends(require_staff)) -> list:
     """Lista flashcards globais ou de admin."""
-    from app.core.database import get_client
     try:
         # Flashcards são armazenados na tabela modules com o campo flashcards preenchido
         from app.modules.activities.routes.personalized import PERSONALIZED_MODULE_ID
-        res = get_client().table('modules').select('*').not_.is_('flashcards', 'null').neq('id', PERSONALIZED_MODULE_ID).order('created_at', desc=True).execute()
+        res = db.table('modules').select('*').not_.is_('flashcards', 'null').neq('id', PERSONALIZED_MODULE_ID).order('created_at', desc=True).execute()
         data = res.data or []
         for d in data:
             fc = d.get('flashcards')
@@ -314,11 +305,8 @@ async def get_dashboard_flashcards() -> list:
 
 
 @router.post('/flashcards')
-async def create_flashcard_deck(data: dict, service: DashboardService = Depends()):
+async def create_flashcard_deck(data: dict, service: DashboardService = Depends(), db: Client = Depends(get_db), user=Depends(require_staff)):
     """Cria um novo deck de flashcards."""
-    from app.core.database import get_client
-    db = get_client()
-    
     payload = {
         'title': data.get('title'),
         'description': data.get('description'),
@@ -332,11 +320,8 @@ async def create_flashcard_deck(data: dict, service: DashboardService = Depends(
 
 
 @router.put('/flashcards/{deck_id}')
-async def update_flashcard_deck(deck_id: str, data: dict):
+async def update_flashcard_deck(deck_id: str, data: dict, db: Client = Depends(get_db), user=Depends(require_staff)):
     """Atualiza um deck de flashcards."""
-    from app.core.database import get_client
-    db = get_client()
-    
     payload = {
         'title': data.get('title'),
         'description': data.get('description'),
@@ -350,25 +335,21 @@ async def update_flashcard_deck(deck_id: str, data: dict):
 
 
 @router.delete('/flashcards/{deck_id}')
-async def delete_flashcard_deck(deck_id: str):
+async def delete_flashcard_deck(deck_id: str, service: ActivityService = Depends(), user=Depends(require_staff)):
     """Exclui um deck de flashcards usando o ActivityService para tratar dependências."""
-    from app.modules.activities.services.activity_service import ActivityService
-    service = ActivityService()
     success = await service.delete_module(deck_id)
     if not success:
-        raise HTTPException(status_code=400, detail="Não foi possível excluir o baralho (ex: existem progresso de alunos vinculados)")
+        raise BusinessLogicError(detail="Não foi possível excluir o baralho (ex: existem progresso de alunos vinculados)")
     return {"ok": True}
 
 
 @router.get('/submissions/all')
-async def get_all_submissions(service: DashboardService = Depends()) -> list:
+async def get_all_submissions(act_service: ActivityService = Depends(), user=Depends(require_staff)) -> list:
     """Lista todas as submissões usando o ActivityService."""
-    from app.modules.activities.services.activity_service import ActivityService
-    act_service = ActivityService()
     return await act_service.get_all_submissions()
 
 
 @router.get('/difficulties')
-async def get_difficulties(service: DashboardService = Depends()) -> dict:
+async def get_difficulties(service: DashboardService = Depends(), user=Depends(require_staff)) -> dict:
     """Retorna distribuição de dificuldades/níveis."""
     return await service.get_difficulties_stats()

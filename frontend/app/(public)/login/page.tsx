@@ -96,7 +96,12 @@ export default function LoginPage() {
       const res = await loginWithGoogle(response.credential);
       if (!res.ok) { setError('Error authenticating with Google.'); return; }
       saveSession(res.data.access_token, res.data.user);
-      router.push('/chat');
+      const user = res.data.user as any;
+      if (isHubAccess || user.is_hub_only) {
+        window.location.href = process.env.NEXT_PUBLIC_HUB_SITE_URL || 'http://localhost:3001/materiais';
+      } else {
+        router.push('/chat');
+      }
     } catch {
       setError('Connection error. Check if the server is running.');
     } finally {
@@ -120,7 +125,8 @@ export default function LoginPage() {
       
       const user = res.data.user as any;
       if (isHubAccess || user.is_hub_only) {
-        router.push('/hub-premium');
+        // Redireciona para o novo Hub na porta 3001
+        window.location.href = process.env.NEXT_PUBLIC_HUB_SITE_URL || 'http://localhost:3001/materiais';
       } else {
         router.push('/chat');
       }

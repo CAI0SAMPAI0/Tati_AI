@@ -49,9 +49,30 @@ export interface PremiumCatalogItem {
   type: string;
   content_source?: string | null;
   thumbnail_url?: string | null;
+  preview_url?: string | null;
   emoji?: string | null;
+  category?: string | null;
+  is_featured?: boolean | null;
+  processing_status?: string | null;
   is_active?: boolean;
   has_access: boolean;
+}
+
+export interface SecureViewerAccess {
+  type: 'secure_images' | 'direct';
+  pages?: string[];
+  total_pages?: number;
+  is_secure_viewer?: boolean;
+  title?: string | null;
+  url?: string;
+  external_links?: {
+    uri: string;
+    page: number;
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  }[];
 }
 
 export interface PremiumCheckoutResponse {
@@ -89,4 +110,19 @@ export interface HubPaymentStatusResponse {
   pixQrCode?: string | null;
   pixCopyPaste?: string | null;
   raw?: Record<string, unknown> | null;
+}
+
+export interface HubOrderItem {
+  content_id: string;
+  title: string;
+  price: number;
+}
+
+export interface HubOrder {
+  id: string;
+  status: string;
+  total_amount: number;
+  payment_method?: string | null;
+  created_at?: string | null;
+  items: HubOrderItem[];
 }

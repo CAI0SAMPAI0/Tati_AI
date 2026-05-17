@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(freshUser);
       saveStoredSession({ token: current.token, user: freshUser, refreshToken: current.refreshToken });
     } catch (error) {
-      if (error instanceof ApiClientError && error.status === 401) {
+      if (error instanceof ApiClientError && (error.status === 401 || error.status === 404)) {
         logout();
       }
     }
@@ -77,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         saveStoredSession({ token: current.token, user: freshUser, refreshToken: current.refreshToken });
       })
       .catch((error) => {
-        if (error instanceof ApiClientError && error.status === 401) {
+        if (error instanceof ApiClientError && (error.status === 401 || error.status === 404)) {
           logout();
         }
       })

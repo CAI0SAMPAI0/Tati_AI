@@ -1,12 +1,14 @@
 """
-services/gamification_service.py
 Serviço central de gamificação: XP, Níveis, Streaks e Metas.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime, timezone, date
 from fastapi.concurrency import run_in_threadpool
-from app.core.database import get_client
+from fastapi import Depends
+from supabase import Client
+from app.core.dependencies.db import get_db
+import asyncio
 
 
 class GamificationService:
@@ -29,8 +31,12 @@ class GamificationService:
         'C2': {'min': 6000, 'max': 999999},
     }
 
-    def __init__(self):
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)) -> None:
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
 
     async def _execute_db(self, func, retries=3):
         """Helper para executar chamadas de banco com retry."""

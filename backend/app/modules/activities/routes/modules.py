@@ -4,6 +4,7 @@ IMPORTANT: Static routes must come BEFORE dynamic /{module_id} to avoid shadowin
 """
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
 from fastapi.concurrency import run_in_threadpool
 from typing import Optional
 
@@ -110,7 +111,7 @@ async def get_module(module_id: str, service: ActivityService = Depends()):
     """Detalhes de um módulo específico."""
     module = await service.get_module_details(module_id)
     if not module:
-        raise HTTPException(status_code=404, detail='Módulo não encontrado')
+        raise ContentNotFoundError(detail='Módulo não encontrado')
     return module
 
 
@@ -119,5 +120,5 @@ async def list_lessons(module_id: str, service: ActivityService = Depends()):
     """Lista lições de um módulo."""
     module = await service.get_module_details(module_id)
     if not module:
-        raise HTTPException(status_code=404, detail='Módulo não encontrado')
+        raise ContentNotFoundError(detail='Módulo não encontrado')
     return module.get('lessons', [])

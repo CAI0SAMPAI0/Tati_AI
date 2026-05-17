@@ -4,6 +4,7 @@ Refatorado para usar QuizService e padrão async.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
+from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
 from pydantic import BaseModel
 from typing import List
 
@@ -85,7 +86,7 @@ async def get_quiz(quiz_id: str, service: QuizService = Depends()):
     """Busca um quiz pelo ID."""
     quiz = await service.get_quiz(quiz_id)
     if not quiz:
-        raise HTTPException(status_code=404, detail='Quiz não encontrado')
+        raise ContentNotFoundError(detail='Quiz não encontrado')
     return quiz
 
 

@@ -1,16 +1,20 @@
 """
-services/notification_service.py
 Serviço central de notificações (Push e Alertas).
 """
 
 from typing import List, Dict, Any
 from fastapi.concurrency import run_in_threadpool
-from app.core.database import get_client
-
+from fastapi import Depends
+from supabase import Client
+from app.core.dependencies.db import get_db
 
 class NotificationService:
-    def __init__(self):
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)) -> None:
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
 
     async def get_user_notifications(
         self, username: str, limit: int = 10
@@ -31,13 +35,13 @@ class NotificationService:
 
         return await run_in_threadpool(_fetch)
 
-    async def mark_as_read(self, notification_id: str) -> bool:
-
+    async def mark_as_read(self, notification_id: str, username: str) -> bool:
         def _update():
             res = (
                 self.db.table('notifications')
                 .update({'is_read': True})
                 .eq('id', notification_id)
+                .eq('username', username)
                 .execute()
             )
             return bool(res.data)

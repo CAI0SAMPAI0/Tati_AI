@@ -2,17 +2,23 @@
 services/weekly_plan_service.py
 Gera e gerencia planos de estudo semanais personalizados.
 """
+from app.core.dependencies.db import get_db
+from fastapi import Depends
+from supabase import Client
 
 import json
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta, timezone
 from app.modules.chat.services.llm import groq_chat
-from app.core.database import get_client
 from fastapi.concurrency import run_in_threadpool
 
 class WeeklyPlanService:
-    def __init__(self):
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)) -> None:
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
 
     async def get_or_generate_plan(self, username: str, level: str, focus: str) -> Dict[str, Any]:
         """
@@ -67,10 +73,8 @@ class WeeklyPlanService:
         """
         
         try:
-            raw_res = await groq_chat([{"role": "user", "content": prompt}], temperature=0.7)
-            import re
-            match = re.search(r'\{.*\}', raw_res, re.DOTALL)
-            plan_data = json.loads(match.group(0)) if match else {}
+            from app.modules.chat.services.llm import groq_chat_json
+            plan_data = await groq_chat_json([{"role": "user", "content": prompt}], temperature=0.7)
             
             if plan_data:
                 await self._save_plan(username, plan_data)

@@ -2,6 +2,9 @@
 services/url_to_module.py
 Serviço para gerar módulos pedagógicos a partir de URLs externas (notícias, blogs, artigos).
 """
+from app.core.dependencies.db import get_db
+from fastapi import Depends
+from supabase import Client
 
 import json
 import re
@@ -9,13 +12,16 @@ from typing import Dict, Any, List
 import httpx
 from bs4 import BeautifulSoup
 from app.modules.chat.services.llm import groq_chat
-from app.core.database import get_client
 from fastapi.concurrency import run_in_threadpool
 from app.modules.activities.services.activity_service import ActivityService
 
 class UrlToModuleService:
-    def __init__(self):
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)) -> None:
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
         self.activity_service = ActivityService()
 
     async def generate_from_url(self, url: str, username: str, target_level: str = 'Intermediate') -> Dict[str, Any]:
@@ -73,9 +79,8 @@ class UrlToModuleService:
         """
         
         try:
-            raw_res = await groq_chat([{"role": "user", "content": prompt}], temperature=0.3)
-            match = re.search(r'\{.*\}', raw_res, re.DOTALL)
-            module_data = json.loads(match.group(0)) if match else {}
+            from app.modules.chat.services.llm import groq_chat_json
+            module_data = await groq_chat_json([{"role": "user", "content": prompt}], temperature=0.3)
             
             if not module_data:
                 return {"ok": False, "error": "IA failed to structure the module"}

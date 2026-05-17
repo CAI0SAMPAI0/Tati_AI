@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
 from fastapi import (
     APIRouter,
     Depends,
@@ -76,7 +77,7 @@ async def remove_conversation(
     conversation_id: str, current_user: dict = Depends(get_current_user)
 ):
     if not await delete_conversation(conversation_id, current_user['username']):
-        raise HTTPException(status_code=404, detail='Conversa não encontrada')
+        raise ContentNotFoundError(detail='Conversa não encontrada')
 
 
 @router.patch('/conversations/{conversation_id}/title')
@@ -89,7 +90,7 @@ async def update_title(
         conversation_id, current_user['username'], body.title
     )
     if not conv:
-        raise HTTPException(status_code=404, detail='Conversa não encontrada')
+        raise ContentNotFoundError(detail='Conversa não encontrada')
     return conv
 
 
@@ -97,9 +98,14 @@ async def update_title(
 async def get_history(
     conversation_id: str, current_user: dict = Depends(get_current_user)
 ):
+    from app.core.database import get_client
+    db = get_client()
+    # Verifica se a conversa pertence ao usuário
+    conv = db.table('conversations').select('username').eq('id', conversation_id).execute()
+    if not conv.data or conv.data[0]['username'] != current_user['username']:
+        raise ContentNotFoundError(detail='Conversa não encontrada')
+
     messages = await load_history(conversation_id)
-    if messages is None:
-        raise HTTPException(status_code=404, detail='Conversa não encontrada')
     return [
         m
         for m in messages
@@ -125,7 +131,7 @@ async def edit_message(
 
     msg = await update_message(m_id, current_user['username'], body.content)
     if not msg:
-        raise HTTPException(status_code=404, detail='Mensagem não encontrada')
+        raise ContentNotFoundError(detail='Mensagem não encontrada')
     return msg
 
 
@@ -135,6 +141,13 @@ async def get_summary(
     lang: str = Query(default='pt'),
     current_user: dict = Depends(get_current_user),
 ):
+    from app.core.database import get_client
+    db = get_client()
+    # Verifica se a conversa pertence ao usuário
+    conv = db.table('conversations').select('username').eq('id', conversation_id).execute()
+    if not conv.data or conv.data[0]['username'] != current_user['username']:
+        raise ContentNotFoundError(detail='Conversa não encontrada')
+
     # Restaurado lógica de resumo simplificada para manter compatibilidade
     history = await load_history(conversation_id)
     if not history or len(history) < 2:

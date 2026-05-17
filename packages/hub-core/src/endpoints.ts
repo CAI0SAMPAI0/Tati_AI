@@ -9,4 +9,5 @@ export const HUB_ENDPOINTS = {
   HUB_CHECKOUT: '/activities/hub/checkout',
   HUB_CHECKOUT_GUEST: '/activities/hub/checkout/guest',
   HUB_DOWNLOAD: (contentId: string) => `/hub/${contentId}/download`,
+  CATALOG_ORDERS: '/catalog/orders',
 } as const;

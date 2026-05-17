@@ -25,7 +25,6 @@ SPECIAL_USERS: set[str] = {
     'professor',
     'programador',
     'Tati',
-    'caio.sampaio'
 }
 
 

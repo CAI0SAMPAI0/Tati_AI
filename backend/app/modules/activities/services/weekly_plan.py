@@ -149,14 +149,14 @@ Status guide:
 - "not_started": no evidence of practice
 """
     try:
-        res = await groq_chat(
+        from app.modules.chat.services.llm import groq_chat_json
+        data = await groq_chat_json(
             messages=[{'role': 'user', 'content': prompt}],
-            max_tokens=500,
             temperature=0.3,
         )
-        start = res.find('{')
-        end = res.rfind('}') + 1
-        data = json.loads(res[start:end])
+
+        if not data:
+            return {}
 
         progress: dict[str, str] = {}
         for item in data.get('results', []):
@@ -303,15 +303,12 @@ IMPORTANT:
 - Return ONLY valid JSON, no markdown, no extra text
 """
         try:
-            res = await groq_chat(
+            from app.modules.chat.services.llm import groq_chat_json
+            data = await groq_chat_json(
                 messages=[{'role': 'user', 'content': prompt}],
-                max_tokens=1800,
                 temperature=0.65,
             )
-            start = res.find('{')
-            end = res.rfind('}') + 1
-            data = json.loads(res[start:end])
-            exercises = data.get('exercises', [])
+            exercises = data.get('exercises', []) if data else []
             for ex in exercises:
                 ex['_type'] = ex_type
             all_exercises.extend(exercises)
@@ -512,14 +509,11 @@ Return ONLY valid JSON, no markdown:
 }}"""
 
     try:
-        res = await groq_chat(
+        from app.modules.chat.services.llm import groq_chat_json
+        return await groq_chat_json(
             messages=[{'role': 'user', 'content': prompt}],
-            max_tokens=600,
             temperature=0.7,
         )
-        start = res.find('{')
-        end = res.rfind('}') + 1
-        return json.loads(res[start:end])
     except Exception as e:
         print(f'[WeeklyPlan] Erro ao gerar: {e}')
         return _fallback_plan(level, week_start, week_end)

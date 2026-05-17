@@ -8,14 +8,21 @@ from datetime import datetime, timezone
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
 
-from app.core.database import get_client
+from app.core.dependencies.db import get_db
 from app.shared.services.upstash import cache_get, cache_set, cache_delete
 from app.shared.services.document_validator import validate_document_auto
+from app.core.exceptions import UserNotFoundError, InvalidDocumentError
+from supabase import Client
+from fastapi import Depends
 
 
 class UserService:
-    def __init__(self):
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)):
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
 
     async def get_profile(self, username: str) -> Dict[str, Any]:
         cache_key = f'profile:{username}'
@@ -58,7 +65,7 @@ class UserService:
 
         result = await run_in_threadpool(_fetch)
         if not result:
-            raise HTTPException(status_code=404, detail='Usuário não encontrado')
+            raise UserNotFoundError()
 
         await cache_set(cache_key, result, ttl=600)
         return result
@@ -76,13 +83,13 @@ class UserService:
                 .data
             )
             if not rows:
-                raise HTTPException(404, 'Não encontrado')
+                raise UserNotFoundError()
 
             doc = body.get('cpf') or body.get('cpf_cnpj')
             if doc:
                 v = validate_document_auto(doc)
                 if not v['valid']:
-                    raise HTTPException(400, v['message'])
+                    raise InvalidDocumentError(v['message'])
                 if body.get('cpf'):
                     body['cpf'] = v['formatted']
                 if body.get('cpf_cnpj'):

@@ -249,6 +249,33 @@ class EmailSender:
 """
         return self._send(to_email, subject, html)
 
+    def send_welcome_hub_email(self, to_email: str, name: str, username: str, password: str) -> bool:
+        subject = "Boas-vindas ao Tati AI Hub! 🚀 Suas credenciais de acesso"
+        html = f"""
+<div style="font-family:Arial,sans-serif;max-width:600px;background:#0a0a0c;padding:30px;border-radius:24px;color:#ffffff;border:1px solid #222;">
+    <h2 style="color:#7c3aed;margin-top:0;">Seja bem-vindo(a) ao Hub, {name}! 🎉</h2>
+    <p style="color:#a1a1aa;line-height:1.6;">Sua conta foi criada automaticamente para que você possa acessar seus materiais. Use as credenciais abaixo para entrar:</p>
+    
+    <div style="background:#111114;border:1px solid #333;border-radius:16px;padding:25px;margin:25px 0;text-align:center;">
+        <p style="margin:0 0 10px 0;color:#71717a;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Seu Usuário</p>
+        <p style="margin:0 0 20px 0;font-size:18px;font-weight:bold;color:#ffffff;">{username}</p>
+        
+        <p style="margin:0 0 10px 0;color:#71717a;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Sua Senha Temporária</p>
+        <p style="margin:0 0 0 0;font-size:24px;font-weight:bold;color:#7c3aed;">{password}</p>
+    </div>
+    
+    <p style="color:#f87171;font-size:14px;font-weight:bold;">⚠️ IMPORTANTE: Por segurança, recomendamos que você altere sua senha imediatamente após o primeiro login nas configurações do seu perfil.</p>
+    
+    <div style="text-align:center;margin-top:30px;">
+        <a href="http://localhost:3001/login" style="display:inline-block;background:#7c3aed;color:#ffffff;padding:14px 28px;border-radius:14px;text-decoration:none;font-weight:bold;box-shadow:0 10px 20px rgba(124,58,237,0.3);">Acessar o Hub agora →</a>
+    </div>
+    
+    <hr style="border:0;border-top:1px solid #222;margin:30px 0;">
+    <p style="font-size:12px;color:#52525b;text-align:center;">Equipe Teacher Tati AI</p>
+</div>
+"""
+        return self._send(to_email, subject, html)
+
     def send_purchase_confirmation(self, to_email: str, name: str, item_title: str, download_url: str) -> bool:
         subject = f"✅ Compra confirmada: {item_title} — Teacher Tati"
         html = f"""

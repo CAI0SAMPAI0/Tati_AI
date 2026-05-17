@@ -73,8 +73,8 @@ export const ENDPOINTS = {
   // Admin
   ADMIN_MODULES: '/activities/modules/admin',
   ADMIN_MODULE_ALL: '/activities/modules/admin/all',
-  ADMIN_MODULE_GENERATE_QUIZ: '/admin/modules/generate-quiz',
-  ADMIN_MODULE_GENERATE_FLASHCARDS: '/admin/modules/generate-flashcards',
+  ADMIN_MODULE_GENERATE_QUIZ: '/activities/modules/admin/generate-quiz',
+  ADMIN_MODULE_GENERATE_FLASHCARDS: '/activities/modules/admin/generate-flashcards',
   ADMIN_SIMULATIONS: '/dashboard/simulations',
   ADMIN_SIMULATION_DETAIL: (id: string) => `/dashboard/simulations/${id}`,
   ADMIN_STUDENTS: '/dashboard/students',

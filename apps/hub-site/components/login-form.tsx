@@ -1,8 +1,9 @@
 'use client';
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Eye, EyeOff, KeyRound } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
+import BrandMark from '@/components/BrandMark';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   loginWithCredentials,
@@ -41,7 +42,7 @@ export function LoginForm() {
 
   useEffect(() => {
     if (user) {
-      router.replace('/');
+      router.replace('/materiais');
     }
   }, [router, user]);
 
@@ -112,7 +113,7 @@ export function LoginForm() {
 
   function handleAuthSuccess(accessToken: string, nextUser: Parameters<typeof saveSession>[1]) {
     saveSession(accessToken, nextUser);
-    router.push('/');
+    router.push('/materiais');
   }
 
   async function handleGoogleCredential(response: GoogleCredentialResponse) {
@@ -187,24 +188,24 @@ export function LoginForm() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 flex items-center justify-center px-4 py-10">
+    <main className="flex min-h-screen items-center justify-center bg-bg px-4 py-10">
       <div className="w-full max-w-6xl">
-        <div className="grid overflow-hidden rounded-3xl border border-white/10 bg-zinc-900 shadow-2xl md:grid-cols-[1.1fr_0.9fr]">
+        <div className="grid overflow-hidden rounded-hub border border-line bg-surface shadow-card md:grid-cols-[1fr_1fr]">
 
           {/* LEFT */}
-          <section className="relative hidden overflow-hidden border-r border-white/5 bg-zinc-950 px-11 py-14 md:flex md:flex-col md:justify-center">
-            <div className="absolute -left-20 -top-20 h-80 w-80 rounded-full bg-violet-500/10 blur-3xl" />
+          <section className="relative hidden overflow-hidden border-r border-line bg-primarySoft px-11 py-14 md:flex md:flex-col md:justify-center">
+            <div className="absolute -left-20 -top-20 h-80 w-80 rounded-full bg-primarySoft blur-3xl" />
 
             <div className="relative z-10">
-              <p className="mb-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-violet-400">
+              <p className="mb-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
                 Tati Hub Premium
               </p>
 
-              <h1 className="mb-4 text-4xl font-semibold leading-tight tracking-tight text-zinc-50">
+              <h1 className="mb-4 text-4xl font-semibold leading-tight tracking-tight text-ink">
                 Entre ou crie sua conta Tati AI.
               </h1>
 
-              <p className="mb-7 text-sm leading-7 text-zinc-500">
+              <p className="mb-7 text-sm leading-7 text-ink0">
                 Quem já tem acesso à Tati AI usa a mesma conta. Quem ainda não tem
                 acesso pode criar agora ou entrar com Google.
               </p>
@@ -217,7 +218,7 @@ export function LoginForm() {
                 ].map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-full border border-white/10 px-4 py-1.5 text-xs text-zinc-500"
+                    className="rounded-full border border-line px-4 py-1.5 text-xs text-ink0"
                   >
                     {tag}
                   </span>
@@ -229,23 +230,23 @@ export function LoginForm() {
           {/* RIGHT */}
           <section className="flex max-h-screen flex-col overflow-y-auto px-6 py-10 md:px-9">
             <Link
-              href="/"
-              className="mb-7 inline-flex items-center gap-1.5 text-sm text-zinc-500 transition hover:text-zinc-200"
+              href="/materiais"
+              className="mb-7 inline-flex items-center gap-1.5 text-sm text-ink0 transition hover:text-zinc-200"
             >
               <ArrowLeft size={15} />
               Voltar ao catálogo
             </Link>
 
             <div className="mb-6">
-              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-400">
-                <KeyRound size={20} />
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-primarySoft text-primary">
+                <BrandMark variant="compact" />
               </div>
 
-              <h2 className="mb-1 text-2xl font-semibold tracking-tight text-zinc-50">
+              <h2 className="mb-1 text-2xl font-semibold tracking-tight text-ink">
                 {activeTab === 'login' ? 'Entrar no hub' : 'Criar conta'}
               </h2>
 
-              <p className="text-sm leading-6 text-zinc-500">
+              <p className="text-sm leading-6 text-muted">
                 {activeTab === 'login'
                   ? 'Use sua conta da Tati AI ou entre com Google.'
                   : 'Crie uma conta para comprar e acessar materiais do Hub Premium.'}
@@ -253,7 +254,7 @@ export function LoginForm() {
             </div>
 
             {/* Tabs */}
-            <div className="mb-5 flex rounded-xl border border-white/10 bg-white/5 p-1">
+            <div className="mb-5 flex rounded-xl border border-line bg-bgSecondary p-1">
               <button
                 type="button"
                 onClick={() => {
@@ -261,8 +262,8 @@ export function LoginForm() {
                   setActiveTab('login');
                 }}
                 className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${activeTab === 'login'
-                  ? 'bg-zinc-800 text-zinc-50'
-                  : 'text-zinc-500 hover:text-zinc-200'
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'text-muted hover:text-ink'
                   }`}
               >
                 Entrar
@@ -275,8 +276,8 @@ export function LoginForm() {
                   setActiveTab('register');
                 }}
                 className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${activeTab === 'register'
-                  ? 'bg-zinc-800 text-zinc-50'
-                  : 'text-zinc-500 hover:text-zinc-200'
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'text-muted hover:text-ink'
                   }`}
               >
                 Criar conta
@@ -301,7 +302,7 @@ export function LoginForm() {
               <button
                 type="button"
                 disabled={loading}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-zinc-200 transition hover:bg-white/10"
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-bgSecondary px-4 py-3 text-sm font-medium text-zinc-200 transition hover:bg-white/10"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -331,7 +332,7 @@ export function LoginForm() {
             {activeTab === 'login' ? (
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-zinc-400">
+                  <span className="text-sm font-medium text-muted">
                     Usuário ou e-mail
                   </span>
 
@@ -339,12 +340,12 @@ export function LoginForm() {
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     placeholder="voce@exemplo.com"
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-50 outline-none transition focus:border-violet-500/50"
+                    className="w-full rounded-xl border border-line bg-bgSecondary px-4 py-3 text-sm text-ink outline-none transition focus:border-violet-500/50"
                   />
                 </label>
 
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-zinc-400">
+                  <span className="text-sm font-medium text-muted">
                     Senha
                   </span>
 
@@ -354,13 +355,13 @@ export function LoginForm() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Sua senha"
-                      className="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-4 pr-12 text-sm text-zinc-50 outline-none transition focus:border-violet-500/50"
+                      className="w-full rounded-xl border border-line bg-bgSecondary py-3 pl-4 pr-12 text-sm text-ink outline-none transition focus:border-violet-500/50"
                     />
 
                     <button
                       type="button"
                       onClick={() => setShowLoginPassword((v) => !v)}
-                      className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center justify-center text-zinc-500 transition hover:text-zinc-300"
+                      className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center justify-center text-ink0 transition hover:text-zinc-300"
                     >
                       {showLoginPassword ? (
                         <EyeOff size={18} />
@@ -374,7 +375,7 @@ export function LoginForm() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="mt-1 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="mt-1 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {loading ? 'Entrando...' : 'Entrar no hub'}
                 </button>
@@ -382,7 +383,7 @@ export function LoginForm() {
             ) : (
               <form onSubmit={handleRegister} className="flex flex-col gap-4">
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-zinc-400">
+                  <span className="text-sm font-medium text-muted">
                     Nome completo
                   </span>
 
@@ -390,12 +391,12 @@ export function LoginForm() {
                     value={registerName}
                     onChange={(e) => setRegisterName(e.target.value)}
                     placeholder="Seu nome"
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-50 outline-none transition focus:border-violet-500/50"
+                    className="w-full rounded-xl border border-line bg-bgSecondary px-4 py-3 text-sm text-ink outline-none transition focus:border-violet-500/50"
                   />
                 </label>
 
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-zinc-400">
+                  <span className="text-sm font-medium text-muted">
                     E-mail
                   </span>
 
@@ -404,12 +405,12 @@ export function LoginForm() {
                     value={registerEmail}
                     onChange={(e) => setRegisterEmail(e.target.value)}
                     placeholder="voce@exemplo.com"
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-50 outline-none transition focus:border-violet-500/50"
+                    className="w-full rounded-xl border border-line bg-bgSecondary px-4 py-3 text-sm text-ink outline-none transition focus:border-violet-500/50"
                   />
                 </label>
 
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-zinc-400">
+                  <span className="text-sm font-medium text-muted">
                     Usuário
                   </span>
 
@@ -417,12 +418,12 @@ export function LoginForm() {
                     value={registerUsername}
                     onChange={(e) => setRegisterUsername(e.target.value)}
                     placeholder="seuusuario"
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-50 outline-none transition focus:border-violet-500/50"
+                    className="w-full rounded-xl border border-line bg-bgSecondary px-4 py-3 text-sm text-ink outline-none transition focus:border-violet-500/50"
                   />
                 </label>
 
                 <label className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium text-zinc-400">
+                  <span className="text-sm font-medium text-muted">
                     Senha
                   </span>
 
@@ -432,7 +433,7 @@ export function LoginForm() {
                       value={registerPassword}
                       onChange={(e) => setRegisterPassword(e.target.value)}
                       placeholder="Mínimo de 6 caracteres"
-                      className="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-4 pr-12 text-sm text-zinc-50 outline-none transition focus:border-violet-500/50"
+                      className="w-full rounded-xl border border-line bg-bgSecondary py-3 pl-4 pr-12 text-sm text-ink outline-none transition focus:border-violet-500/50"
                     />
 
                     <button
@@ -443,7 +444,7 @@ export function LoginForm() {
                           : 'Mostrar senha'
                       }
                       onClick={() => setShowRegisterPassword((v) => !v)}
-                      className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center justify-center text-zinc-500 transition hover:text-zinc-300"
+                      className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center justify-center text-ink0 transition hover:text-zinc-300"
                     >
                       {showRegisterPassword ? (
                         <EyeOff size={18} />
@@ -456,7 +457,7 @@ export function LoginForm() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="mt-1 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="mt-1 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {loading ? 'Criando conta...' : 'Criar conta'}
                 </button>

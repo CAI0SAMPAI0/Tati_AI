@@ -198,6 +198,45 @@ async def groq_chat(
     raise GroqKeyError(f'Todas as chaves Groq falharam. Ãšltimo: {last_error}')
 
 
+async def groq_chat_json(
+    messages: list[dict],
+    max_tokens: int = 1500,
+    temperature: float = 0.4,
+    model: str = 'llama-3.3-70b-versatile',
+) -> dict:
+    """
+    Chama o Groq, garante que a saída seja tratada como JSON,
+    limpa tags markdown de código e faz o parse automático.
+    Retorna um dicionário vazio em caso de falha de parse ou de rede.
+    """
+    import json
+    import re
+    
+    # Injetamos uma instrução forte no final da última mensagem para forçar saída JSON pura
+    if messages and messages[-1]['role'] == 'user':
+        messages[-1]['content'] += "\n\nCRITICAL: You must respond ONLY with a valid JSON object. Do not include markdown blocks like ```json. Return the raw JSON directly."
+    
+    try:
+        raw_response = await groq_chat(messages, max_tokens, temperature, model)
+        
+        # Estratégia de limpeza: Tentar encontrar blocos markdown se a IA ignorar o aviso
+        clean_json = raw_response.strip()
+        match = re.search(r'```(?:json)?\s*(.*?)\s*```', clean_json, re.DOTALL)
+        if match:
+            clean_json = match.group(1)
+        else:
+            # Fallback robusto: Tenta extrair qualquer coisa entre as chaves principais
+            match = re.search(r'\{.*\}', clean_json, re.DOTALL)
+            if match:
+                clean_json = match.group(0)
+                
+        return json.loads(clean_json)
+    except Exception as e:
+        print(f"[LLM JSON] Falha severa ao extrair JSON: {e}")
+        return {}
+
+
+
 async def generate_visemes(audio_b64: str) -> list:
     """Tenta gerar visemas com Rhubarb. Retorna lista vazia em caso de falha."""
     import json
@@ -241,7 +280,6 @@ async def generate_image(prompt: str) -> str:
     # 1. Tenta DALL-E 3 se houver chave
     if settings.openai_api_key:
         try:
-            print(f"[LLM] Tentando gerar imagem com DALL-E 3 para: {prompt}")
             async with httpx.AsyncClient(timeout=60.0) as client:
                 resp = await client.post(
                     "https://api.openai.com/v1/images/generations",
@@ -251,7 +289,7 @@ async def generate_image(prompt: str) -> str:
                     },
                     json={
                         "model": "dall-e-3",
-                        "prompt": f"Realistic, high-quality educational illustration for English learning: {prompt}. Clear subject, no text, premium aesthetic.",
+                        "prompt": f"A highly aesthetic, professional photograph or illustration depicting exactly this concept or scene: '{prompt}'. The image MUST be clearly recognizable and directly related to the subject. No words, no text, clean composition, minimalist background.",
                         "n": 1,
                         "size": "1024x1024",
                         "quality": "standard",
@@ -260,7 +298,7 @@ async def generate_image(prompt: str) -> str:
                 if resp.status_code == 200:
                     data = resp.json()
                     url = data["data"][0]["url"]
-                    print(f"[LLM] DALL-E 3 sucesso: {url[:50]}...")
+                    url = data["data"][0]["url"]
                     return url
                 else:
                     print(f"[LLM] DALL-E 3 falhou ({resp.status_code}): {resp.text}")
@@ -268,7 +306,6 @@ async def generate_image(prompt: str) -> str:
             print(f"[LLM] Erro excepcional no DALL-E: {e}")
 
     # 2. Fallback para busca na internet (Tavily)
-    print(f"[LLM] Iniciando busca de imagem na internet para: {prompt}")
     return await search_image_on_internet(prompt)
 
 async def search_image_on_internet(query: str) -> str:

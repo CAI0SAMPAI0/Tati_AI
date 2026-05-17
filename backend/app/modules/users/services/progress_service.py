@@ -6,15 +6,20 @@ Serviço para gerenciamento de progresso, rankings e planos semanais.
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
 from fastapi.concurrency import run_in_threadpool
-
-from app.core.database import get_client
+from supabase import Client
+from fastapi import Depends
+from app.core.dependencies.db import get_db
 from app.shared.services.upstash import cache_get, cache_set, cache_delete
 from app.modules.users.services.progress_report import get_weekly_report, get_monthly_report
 
 
 class ProgressService:
-    def __init__(self):
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)):
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
 
     async def get_weekly_report(self, username: str) -> Dict[str, Any]:
         cache_key = f'report:weekly:{username}'

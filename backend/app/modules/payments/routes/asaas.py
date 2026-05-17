@@ -6,9 +6,10 @@ Referência da API Asaas: https://docs.asaas.com/docs
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
 from pydantic import BaseModel
 
 from app.core.config import settings
@@ -162,12 +163,10 @@ def _get_validated_user(username: str) -> dict:
         )
 
     if not user_db:
-        raise HTTPException(status_code=404, detail='Usuário não encontrado.')
+        raise UserNotFoundError(detail='Usuário não encontrado.')
 
     if not user_db.get('email'):
-        raise HTTPException(
-            status_code=400, detail='Usuário não possui e-mail cadastrado.'
-        )
+        raise BusinessLogicError(detail='Usuário não possui e-mail cadastrado.')
 
     # if user_db.get('username') in SPECIAL_USERS:
     #     raise HTTPException(
@@ -183,16 +182,11 @@ def _get_validated_user(username: str) -> dict:
     )
 
     if not raw_doc:
-        raise HTTPException(
-            status_code=400,
-            detail='CPF/CNPJ é obrigatório. Por favor, preencha no seu perfil.',
-        )
+        raise BusinessLogicError(detail='CPF/CNPJ é obrigatório. Por favor, preencha no seu perfil.',)
 
     validation = validate_document_auto(raw_doc)
     if not validation['valid']:
-        raise HTTPException(
-            status_code=400, detail=f'Documento inválido: {validation["message"]}'
-        )
+        raise BusinessLogicError(detail=f'Documento inválido: {validation["message"]}')
 
     user_db['_raw_doc'] = raw_doc
     return user_db
@@ -220,10 +214,7 @@ async def subscribe(
     username = current_user['username']
     if username not in SPECIAL_USERS:
         if date.today() < PAID_START:
-            raise HTTPException(
-                status_code=403,
-                detail='Planos e pagamentos só estarão disponíveis a partir de 30/06/2026.',
-            )
+            raise PremiumAccessDeniedError(detail='Planos e pagamentos só estarão disponíveis a partir de 30/06/2026.',)
 
     # 1. Busca o plano no banco — o valor vem daqui, nunca do frontend
     plan = (
@@ -235,9 +226,7 @@ async def subscribe(
         .data
     )
     if not plan:
-        raise HTTPException(
-            status_code=404, detail='Plano não encontrado ou indisponível.'
-        )
+        raise ContentNotFoundError(detail='Plano não encontrado ou indisponível.')
     plan = plan[0]
     value = float(plan['price'])
 
@@ -379,9 +368,7 @@ async def cancel(current_user: dict = Depends(get_current_user)):
     )
 
     if not sub:
-        raise HTTPException(
-            status_code=404, detail='Nenhuma assinatura ativa encontrada.'
-        )
+        raise ContentNotFoundError(detail='Nenhuma assinatura ativa encontrada.')
 
     asaas_id = sub[0].get('asaas_subscription_id')
 
@@ -411,7 +398,7 @@ async def change_due_date(
 ):
     """Troca o dia de vencimento da assinatura no banco e no Asaas."""
     if not (1 <= body.preferred_day <= 28):
-        raise HTTPException(status_code=400, detail='Dia deve ser entre 1 e 28.')
+        raise BusinessLogicError(detail='Dia deve ser entre 1 e 28.')
 
     db = get_client()
     sub = (
@@ -426,9 +413,7 @@ async def change_due_date(
     )
 
     if not sub:
-        raise HTTPException(
-            status_code=404, detail='Nenhuma assinatura ativa encontrada.'
-        )
+        raise ContentNotFoundError(detail='Nenhuma assinatura ativa encontrada.')
 
     new_due = calc_due_date(date.today(), body.preferred_day)
     asaas_id = sub[0].get('asaas_subscription_id')
@@ -533,7 +518,7 @@ async def get_payment_status_endpoint(
     """Retorna o status atualizado de um pagamento específico no Asaas."""
     status_data = await get_payment_status(payment_id)
     if not status_data:
-        raise HTTPException(status_code=404, detail='Pagamento não encontrado.')
+        raise ContentNotFoundError(detail='Pagamento não encontrado.')
 
     # Verifica se o pagamento pertence ao usuário
     db = get_client()
@@ -547,7 +532,7 @@ async def get_payment_status_endpoint(
     )
 
     if not sub:
-        raise HTTPException(status_code=403, detail='Acesso negado.')
+        raise PremiumAccessDeniedError(detail='Acesso negado.')
 
     return status_data
 
@@ -571,10 +556,10 @@ async def cancel_payment_endpoint(
     )
 
     if not sub:
-        raise HTTPException(status_code=404, detail='Pagamento não encontrado.')
+        raise ContentNotFoundError(detail='Pagamento não encontrado.')
 
     if sub[0].get('status') != 'pending':
-        raise HTTPException(status_code=400, detail='Só é possível cancelar pagamentos pendentes.')
+        raise BusinessLogicError(detail='Só é possível cancelar pagamentos pendentes.')
 
     # Cancela no Asaas
     success = await cancel_payment(payment_id)
@@ -596,11 +581,16 @@ async def asaas_webhook(request: Request):
     Configure a URL no painel Asaas em: Configurações > Integrações > Webhooks
     """
     try:
-        # Valida token do webhook
+        # Valida token do webhook (obrigatório)
         token = request.headers.get('asaas-access-token', '')
-        if settings.asaas_webhook_token and token != settings.asaas_webhook_token:
+        
+        if not settings.asaas_webhook_token:
+            _pay_log("CRITICAL: asaas_webhook_token not configured in settings")
+            raise HTTPException(status_code=500, detail="Webhook security token not configured")
+
+        if token != settings.asaas_webhook_token:
             _pay_log(f"webhook_invalid_token token={token}")
-            raise HTTPException(status_code=401, detail='Token inválido')
+            raise HTTPException(status_code=401, detail="Invalid webhook token")
 
         body = await request.json()
         event = body.get('event', '')
@@ -616,34 +606,82 @@ async def asaas_webhook(request: Request):
             return {'ok': True, 'duplicate': True}
         _mark_webhook_event_processed(event_key, body)
         
-        # ── Processamento de Conteúdo Premium ─────────────────────────────
-        if ext_ref.startswith('PREMIUM:'):
+        # ── Processamento de Conteúdo Premium (Novo Hub e Antigo) ─────────────
+        if ext_ref.startswith('PREMIUM:') or ext_ref.startswith('HUB:'):
             _pay_log(f"webhook_premium_event event={event} ext_ref={ext_ref} payment_id={payment_id}")
+            is_new_hub = ext_ref.startswith('HUB:')
             parts = ext_ref.split(':')
+
             if len(parts) >= 3:
                 content_id = parts[1]
                 username = parts[2]
-                
-                try:
-                    if event in ('PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED'):
-                        # 1. Libera no banco
-                        get_client().table('premium_purchases').update({
-                            'status': 'confirmed'
-                        }).eq('username', username).eq('content_id', content_id).execute()
-                        
-                        _pay_log(f'premium_purchase_confirmed username={username} content_id={content_id} payment_id={payment_id}')
-                        
-                        # 2. Envia e-mail de confirmação
-                        db = get_client()
+                db = get_client()
+
+                if event in ('PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED'):
+                    # 1. Upsert em premium_purchases (tabela clássica)
+                    try:
+                        upsert_res = db.table('premium_purchases').upsert({
+                            'username': username,
+                            'content_id': content_id,
+                            'status': 'confirmed',
+                            'asaas_payment_id': payment_id
+                        }, on_conflict='username,content_id').execute()
+                        _pay_log(f'premium_purchases_upsert ok username={username} content_id={content_id} result={upsert_res.data}')
+                    except Exception as e:
+                        _pay_log(f'premium_purchases_upsert ERROR: {e}')
+                        # Fallback: insert simples sem upsert
+                        try:
+                            db.table('premium_purchases').insert({
+                                'username': username,
+                                'content_id': content_id,
+                                'status': 'confirmed',
+                                'asaas_payment_id': payment_id
+                            }).execute()
+                            _pay_log(f'premium_purchases_insert_fallback ok username={username}')
+                        except Exception as e2:
+                            _pay_log(f'premium_purchases_insert_fallback ERROR: {e2}')
+
+                    # 2. Atualiza orders (tabela do novo hub) — busca por asaas_id OU por username+content via order_items
+                    if is_new_hub:
+                        try:
+                            # Atualização direta por asaas_id
+                            upd_res = db.table('orders').update({
+                                'status': 'confirmed',
+                                'confirmed_at': datetime.now(timezone.utc).isoformat()
+                            }).eq('asaas_id', payment_id).execute()
+                            _pay_log(f'orders_update ok asaas_id={payment_id} rows_updated={len(upd_res.data or [])}')
+
+                            # Se não encontrou por asaas_id, tenta via order_items
+                            if not upd_res.data:
+                                _pay_log(f'orders_update no rows by asaas_id — trying via order_items username={username} content_id={content_id}')
+                                oi_rows = db.table('order_items')\
+                                    .select('order_id, orders!inner(id, username, status)')\
+                                    .eq('content_id', content_id)\
+                                    .execute().data or []
+                                for oi in oi_rows:
+                                    o = oi.get('orders', {})
+                                    if o.get('username') == username and o.get('status') == 'pending':
+                                        db.table('orders').update({
+                                            'status': 'confirmed',
+                                            'asaas_id': payment_id,
+                                            'confirmed_at': datetime.now(timezone.utc).isoformat()
+                                        }).eq('id', o['id']).execute()
+                                        _pay_log(f'orders_update_via_order_items ok order_id={o["id"]}')
+                                        break
+                        except Exception as e:
+                            _pay_log(f'orders_update ERROR: {e}')
+
+                    _pay_log(f'premium_purchase_confirmed username={username} content_id={content_id} payment_id={payment_id}')
+
+                    # 3. Envia e-mail de confirmação
+                    try:
                         user_data = db.table('users').select('email, name').eq('username', username).single().execute().data
                         content_data = db.table('premium_content').select('title').eq('id', content_id).single().execute().data
-                        
+
                         if user_data and content_data:
                             from app.shared.services.email import EmailSender
-                            
                             sender = EmailSender()
-                            hub_url = f"{getattr(settings, 'frontend_url', 'https://tati-ai.vercel.app')}/activities/hub"
-                            
+                            hub_url = f"{getattr(settings, 'frontend_url', 'https://tati-ai.vercel.app')}/materiais"
                             sender.send_purchase_confirmation(
                                 to_email=user_data['email'],
                                 name=user_data.get('name') or username,
@@ -651,33 +689,29 @@ async def asaas_webhook(request: Request):
                                 download_url=hub_url
                             )
                             _pay_log(f'premium_confirmation_email_sent username={username} email={user_data["email"]}')
-                            
-                            # Notify WebSocket
+
                             await payment_notifier.notify_payment_status(
-                                username, 
-                                "confirmed", 
-                                payment_id, 
+                                username,
+                                "confirmed",
+                                payment_id,
                                 {"content_id": content_id, "title": content_data['title']}
                             )
-                    
-                    elif event in ('PAYMENT_REFUNDED', 'CHARGEBACK_REQUESTED', 'PAYMENT_DELETED'):
-                        get_client().table('premium_purchases').update({
+                    except Exception as e:
+                        _pay_log(f'premium_email_send ERROR: {e}')
+
+                elif event in ('PAYMENT_REFUNDED', 'CHARGEBACK_REQUESTED', 'PAYMENT_DELETED'):
+                    try:
+                        db.table('premium_purchases').update({
                             'status': 'revoked'
                         }).eq('username', username).eq('content_id', content_id).execute()
+
+                        if is_new_hub:
+                            db.table('orders').update({'status': 'revoked'}).eq('asaas_id', payment_id).execute()
+
                         _pay_log(f'premium_purchase_revoked username={username} content_id={content_id} payment_id={payment_id}')
-                        
-                        # Notify WebSocket
-                        await payment_notifier.notify_payment_status(
-                            username, 
-                            "refused", 
-                            payment_id, 
-                            {"content_id": content_id, "reason": "revoked"}
-                        )
-                except Exception as e:
-                    _pay_log(f'premium_webhook_error error={e}')
-                    import traceback
-                    traceback.print_exc()
-            
+                    except Exception as e:
+                        _pay_log(f'premium_revoke ERROR: {e}')
+
             return {'ok': True}
 
         # ── Processamento de Assinaturas ─────────────────────────────────

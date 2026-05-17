@@ -5,17 +5,16 @@ Repositório para gerenciar acesso a dados da tabela 'users'.
 
 from typing import Dict, Any, Optional
 from fastapi.concurrency import run_in_threadpool
-from app.core.database import get_client
-
+from supabase import Client
 
 class UserRepository:
     @staticmethod
     async def find_by_identifier(
+        db: Client,
         identifier: str,
         fields: str = 'username, name, email, password, role, level, focus',
     ) -> Optional[Dict[str, Any]]:
         def _fetch():
-            db = get_client()
             ident = identifier.strip().lower()
             for column in ('username', 'email'):
                 rows = (
@@ -34,10 +33,9 @@ class UserRepository:
 
     @staticmethod
     async def find_by_username(
-        username: str, fields: str = 'username'
+        db: Client, username: str, fields: str = 'username'
     ) -> Optional[Dict[str, Any]]:
         def _fetch():
-            db = get_client()
             rows = (
                 db.table('users')
                 .select(fields)
@@ -52,10 +50,9 @@ class UserRepository:
 
     @staticmethod
     async def find_by_email(
-        email: str, fields: str = 'username, name, email, role, level, focus'
+        db: Client, email: str, fields: str = 'username, name, email, role, level, focus'
     ) -> Optional[Dict[str, Any]]:
         def _fetch():
-            db = get_client()
             rows = (
                 db.table('users')
                 .select(fields)
@@ -69,9 +66,8 @@ class UserRepository:
         return await run_in_threadpool(_fetch)
 
     @staticmethod
-    async def check_exists_by_username_or_email(username: str, email: str) -> bool:
+    async def check_exists_by_username_or_email(db: Client, username: str, email: str) -> bool:
         def _fetch():
-            db = get_client()
             rows = (
                 db.table('users')
                 .select('username')
@@ -84,17 +80,15 @@ class UserRepository:
         return await run_in_threadpool(_fetch)
 
     @staticmethod
-    async def insert_user(user_data: Dict[str, Any]) -> None:
+    async def insert_user(db: Client, user_data: Dict[str, Any]) -> None:
         def _insert():
-            db = get_client()
             db.table('users').insert(user_data).execute()
 
         await run_in_threadpool(_insert)
 
     @staticmethod
-    async def update_user(username: str, update_data: Dict[str, Any]) -> None:
+    async def update_user(db: Client, username: str, update_data: Dict[str, Any]) -> None:
         def _update():
-            db = get_client()
             db.table('users').update(update_data).eq('username', username).execute()
 
         await run_in_threadpool(_update)

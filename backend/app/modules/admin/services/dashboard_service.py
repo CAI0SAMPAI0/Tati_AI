@@ -10,7 +10,11 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi.concurrency import run_in_threadpool
-from app.core.database import get_client
+from app.core.dependencies.db import get_db
+from fastapi import Depends
+from supabase import Client
+
+EXCLUDED_USERS = ['programador', 'professor', 'admin', 'caio', 'tati']
 
 def parse_dt(value: Any) -> datetime:
     """Helper global para parsing de datas ISO."""
@@ -29,8 +33,12 @@ def parse_dt(value: Any) -> datetime:
 class DashboardService:
     """Serviço de dados para o painel administrativo."""
 
-    def __init__(self) -> None:
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)) -> None:
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
 
     # ── Estatísticas rápidas ─────────────────────────────────────────────────
 
@@ -41,7 +49,13 @@ class DashboardService:
             today = date.today().isoformat()
 
             try:
-                res_users = self.db.table('users').select('username', count='exact').execute()
+                res_users = (
+                    self.db.table('users')
+                    .select('username', count='exact')
+                    .not_.in_('username', EXCLUDED_USERS)
+                    .neq('role', 'buyer')
+                    .execute()
+                )
                 total_students = res_users.count if res_users.count is not None else len(res_users.data)
             except Exception as e:
                 print(f"[DashboardService] Erro ao contar usuários: {e}")
@@ -117,6 +131,8 @@ class DashboardService:
                         'username, name, email, level, focus, '
                         'created_at, role'
                     )
+                    .not_.in_('username', EXCLUDED_USERS)
+                    .neq('role', 'buyer')
                     .limit(500)
                     .execute()
                     .data
@@ -134,9 +150,9 @@ class DashboardService:
             try:
                 msg_rows = (
                     self.db.table('messages')
-                    .select('username, date')
+                    .select('username, created_at, date')
                     .eq('role', 'user')
-                    .order('date', desc=True)
+                    .order('created_at', desc=True)
                     .limit(2000)
                     .execute()
                     .data
@@ -151,7 +167,8 @@ class DashboardService:
             for r in msg_rows:
                 uname = r.get('username')
                 if uname and uname not in last_activity:
-                    last_activity[uname] = r.get('date') or r.get('created_at', '')
+                    # Usa created_at (que tem hora) e faz fallback para date
+                    last_activity[uname] = r.get('created_at') or r.get('date', '')
 
             # Processa a lista final
             processed_users = []
@@ -226,7 +243,15 @@ class DashboardService:
                 # ── Distribuição de níveis ─────────────────────────────────────────
                 level_distribution: Dict[str, int] = {}
                 try:
-                    user_rows = self.db.table('users').select('level').execute().data or []
+                    user_rows = (
+                        self.db.table('users')
+                        .select('level')
+                        .not_.in_('username', EXCLUDED_USERS)
+                        .neq('role', 'buyer')
+                        .execute()
+                        .data
+                        or []
+                    )
                     for r in user_rows:
                         lvl = r.get('level') or 'Unknown'
                         level_distribution[lvl] = level_distribution.get(lvl, 0) + 1
@@ -248,40 +273,86 @@ class DashboardService:
 
 
     async def get_difficulties_stats(self) -> Dict[str, Any]:
-        """Retorna distribuição de dificuldades/níveis dos alunos."""
-        def _fetch():
-            try:
-                user_rows = self.db.table('users').select('username, level, created_at').execute().data or []
-                level_dist: Dict[str, int] = {}
-                alerts = []
+        """Retorna distribuição de dificuldades/níveis dos alunos e alertas baseados em IA."""
+        import asyncio
+        from app.modules.chat.services.llm import groq_chat
 
+        def _fetch_users():
+            try:
+                user_rows = (
+                    self.db.table('users')
+                    .select('username, level, created_at')
+                    .not_.in_('username', EXCLUDED_USERS)
+                    .neq('role', 'buyer')
+                    .execute()
+                    .data
+                    or []
+                )
+                level_dist: Dict[str, int] = {}
                 for r in user_rows:
                     lvl = r.get('level') or 'Unknown'
                     level_dist[lvl] = level_dist.get(lvl, 0) + 1
+                return level_dist
+            except Exception:
+                return {}
 
-                    # Alerta: aluno no nível mais básico há mais de 30 dias
-                    if lvl in ('Beginner', 'A1', 'Unknown'):
-                        created = r.get('created_at') or ''
-                        try:
-                            dt = parse_dt(created)
-                            days_since = (datetime.now(timezone.utc) - dt).days
-                            if days_since > 30:
-                                alerts.append({
-                                    'username': r.get('username', '?'),
-                                    'current_difficulty': f'{lvl} ({days_since}d)',
-                                })
-                        except Exception:
-                            pass
+        def _fetch_recent_active():
+            try:
+                # Busca as últimas 1000 mensagens para abranger mais alunos
+                res = self.db.table('messages').select('username, content').eq('role', 'user').not_.in_('username', EXCLUDED_USERS).order('created_at', desc=True).limit(1000).execute().data or []
+                user_msgs = {}
+                for r in res:
+                    u = r.get('username')
+                    if u:
+                        # Mantemos apenas as 10 mais recentes de cada um para análise
+                        if u not in user_msgs:
+                            user_msgs[u] = []
+                        if len(user_msgs[u]) < 10:
+                            user_msgs[u].append(r.get('content', ''))
+                
+                return list(user_msgs.items())
+            except Exception:
+                return []
 
-                return {
-                    'level_distribution': level_dist,
-                    'alerts': alerts[:10],  # máximo 10 alertas
-                }
-            except Exception as e:
-                print(f'[DashboardService] Erro em get_difficulties_stats: {e}')
-                return {'level_distribution': {}, 'alerts': []}
+        level_dist = await run_in_threadpool(_fetch_users)
+        top_users = await run_in_threadpool(_fetch_recent_active)
 
-        return await run_in_threadpool(_fetch)
+        alerts = []
+        sem = asyncio.Semaphore(5) # Limita chamadas paralelas para não travar o rate limit
+
+        async def analyze_user(username, msgs):
+            async with sem:
+                context = " | ".join(msgs[:10]) 
+                prompt = (
+                    f"Analyze these messages from an English learner and identify their main language difficulty or struggle in 2-4 words "
+                    f"(e.g. 'Past Tense', 'Vocabulary', 'Prepositions', 'Basic Phrasing'). "
+                    f"Return ONLY the 2-4 words, nothing else.\n"
+                    f"Messages: {context}"
+                )
+                try:
+                    difficulty = await groq_chat([{"role": "user", "content": prompt}], temperature=0.1)
+                    
+                    if len(difficulty) > 40:
+                        difficulty = "General Grammar"
+                        
+                    alerts.append({
+                        'username': username,
+                        'current_difficulty': difficulty.strip().replace('"', '')
+                    })
+                except Exception:
+                    pass
+
+        tasks = [analyze_user(u, msgs) for u, msgs in top_users]
+        if tasks:
+            await asyncio.gather(*tasks)
+
+        # Ordenar os alertas por username para consistência
+        alerts.sort(key=lambda x: x['username'])
+
+        return {
+            'level_distribution': level_dist,
+            'alerts': alerts,
+        }
 
 
     async def get_all_simulations(self) -> List[Dict[str, Any]]:
@@ -354,8 +425,7 @@ class DashboardService:
 
     async def generate_simulation(self, topic: str, level: str, instructions: str) -> dict:
         """Gera um cenário de simulação via IA."""
-        from app.modules.chat.services.llm import groq_chat
-        import json, re
+        from app.modules.chat.services.llm import groq_chat_json
         
         prompt = (
             f"Create a professional English practice scenario about: {topic}.\n"
@@ -363,10 +433,8 @@ class DashboardService:
             "Return ONLY a JSON with: name, slug (url-friendly), description, difficulty (matching level), system_prompt (the persona), greeting (first message)."
         )
         try:
-            resp_str = await groq_chat([{'role': 'user', 'content': prompt}])
-            match = re.search(r'\{.*\}', resp_str, re.DOTALL)
-            if match:
-                data = json.loads(match.group(0))
+            data = await groq_chat_json([{'role': 'user', 'content': prompt}])
+            if data:
                 # Garante que is_active seja True para RLS
                 data['is_active'] = True
                 res = self.db.table('simulations').insert(data).execute()
@@ -374,3 +442,69 @@ class DashboardService:
             return {'error': 'IA retornou formato inválido'}
         except Exception as e:
             return {'error': str(e)}
+
+    async def delete_student(self, username: str) -> bool:
+        """Exclui um aluno e todos os seus dados vinculados para evitar erros de FK."""
+        def _delete():
+            uname = username.strip().lower()
+            print(f"[DashboardService] Iniciando exclusão total do aluno: {uname}")
+            
+            # 1. Limpeza de pedidos e itens (Novo Hub)
+            try:
+                orders = self.db.table('orders').select('id').eq('username', uname).execute().data
+                if orders:
+                    order_ids = [o['id'] for o in orders]
+                    self.db.table('order_items').delete().in_('order_id', order_ids).execute()
+                    self.db.table('orders').delete().eq('username', uname).execute()
+            except Exception as e:
+                print(f"[DashboardService] Erro ao limpar orders/items para {uname}: {e}")
+
+            # 2. Limpeza de conversas e mensagens vinculadas
+            try:
+                convs = self.db.table('conversations').select('id').eq('username', uname).execute().data
+                if convs:
+                    conv_ids = [c['id'] for c in convs]
+                    self.db.table('messages').delete().in_('session_id', conv_ids).execute()
+                    self.db.table('conversations').delete().eq('username', uname).execute()
+            except Exception as e:
+                print(f"[DashboardService] Erro ao limpar conversas/mensagens para {uname}: {e}")
+
+            # 3. Tabelas que usam username como FK direta (Lista Expandida)
+            tables = [
+                'messages', # Tenta deletar direto também, caso existam órfãs
+                'activity_submissions',
+                'user_exercise_attempts',
+                'user_errors',
+                'user_vocabulary',
+                'notifications',
+                'premium_purchases',
+                'study_sessions',
+                'user_trophies',
+                'user_progress',
+                'user_actions',
+                'user_streaks',
+                'user_goals',
+                'user_stats',
+                'flashcards',
+                'user_feedback'
+            ]
+            
+            for table in tables:
+                try:
+                    self.db.table(table).delete().eq('username', uname).execute()
+                except Exception as e:
+                    # Log simplificado para evitar flood se a tabela não existir
+                    err_msg = str(e)
+                    if "PGRST205" not in err_msg: # Se não for "tabela não encontrada"
+                        print(f"[DashboardService] Erro ao limpar {table} para {uname}: {e}")
+            
+            # 4. Por fim, deleta o usuário
+            try:
+                res = self.db.table('users').delete().eq('username', uname).execute()
+                print(f"[DashboardService] Resultado da exclusão de users para {uname}: {res.data}")
+                return True
+            except Exception as e:
+                print(f"[DashboardService] ERRO CRÍTICO ao deletar usuário {uname}: {e}")
+                raise e
+            
+        return await run_in_threadpool(_delete)

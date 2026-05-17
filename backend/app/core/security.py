@@ -8,7 +8,6 @@ from jose import jwt
 
 from app.core.config import settings
 
-
 # jwt
 def create_access_token(data: dict, expires_minutes: int | None = None) -> str:
     expires = expires_minutes or settings.access_token_expire_minutes

@@ -34,6 +34,7 @@ interface PremiumContent {
   description: string;
   price: number;
   type: 'pdf' | 'link' | 'article' | 'video';
+  category?: string;
   content_source: string;
   thumbnail_url?: string;
   emoji?: string;
@@ -46,6 +47,7 @@ const EMPTY_FORM: Partial<PremiumContent> = {
   description: '',
   price: 0,
   type: 'pdf',
+  category: 'other',
   content_source: '',
   thumbnail_url: '',
   emoji: '✨',
@@ -103,6 +105,7 @@ export function PremiumSection() {
   const handleSave = async () => {
     if (!formData.title?.trim()) return toast.error('Title is required');
     if (!formData.content_source?.trim()) return toast.error('Content source/file is required');
+    if (!formData.category?.trim()) return toast.error('Category is required');
 
     setIsSaving(true);
     try {
@@ -221,7 +224,7 @@ export function PremiumSection() {
               <Input label="Title" value={formData.title} onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))} />
             </div>
             <div>
-              <Input label="Theme Emoji" value={formData.emoji} placeholder="🚀" onChange={(e) => setFormData(prev => ({ ...prev, emoji: e.target.value }))} />
+              <Input label="Theme Emoji" value={formData.emoji} placeholder="" onChange={(e) => setFormData(prev => ({ ...prev, emoji: e.target.value }))} />
             </div>
           </div>
 
@@ -235,7 +238,7 @@ export function PremiumSection() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">Type</label>
               <select
@@ -247,6 +250,22 @@ export function PremiumSection() {
                 <option value="link">External Link</option>
                 <option value="article">Article/Text</option>
                 <option value="video">Video URL</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">Category</label>
+              <select
+                className="w-full px-3.5 py-2.5 bg-input border border-border rounded-md text-text text-sm outline-none focus:border-border-focus transition-all"
+                value={formData.category}
+                onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+              >
+                <option value="grammar">Grammar</option>
+                <option value="speaking">Speaking</option>
+                <option value="travel">Travel</option>
+                <option value="business">Business</option>
+                <option value="vocabulary">Vocabulary</option>
+                <option value="writing">Writing</option>
+                <option value="other">Other</option>
               </select>
             </div>
             <div>

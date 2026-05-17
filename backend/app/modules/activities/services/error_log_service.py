@@ -1,6 +1,4 @@
 """
-services/error_log_service.py
-
 Captura, organiza e prioriza erros gramaticais e de vocabulário detectados no chat,
 com foco em geração de exercícios baseada em padrões reais de erro.
 """
@@ -13,12 +11,18 @@ from typing import Dict, Any, List, Optional, Tuple
 from fastapi.concurrency import run_in_threadpool
 
 from app.modules.chat.services.llm import groq_chat
-from app.core.database import get_client
+from supabase import Client
+from fastapi import Depends
+from app.core.dependencies.db import get_db
 
 
 class ErrorLogService:
-    def __init__(self):
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)) -> None:
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
 
     async def extract_errors_list(self, student_msg: str, teacher_msg: str) -> List[Dict[str, Any]]:
         """
@@ -56,15 +60,12 @@ Return ONLY a JSON object:
 }}
 """
         try:
-            # Usando temperatura baixa para consistência
-            raw_res = await groq_chat([{"role": "user", "content": prompt}], temperature=0.1)
+            from app.modules.chat.services.llm import groq_chat_json
+            data = await groq_chat_json([{"role": "user", "content": prompt}], temperature=0.1)
             
-            # Limpeza básica do JSON
-            match = re.search(r"\{.*\}", raw_res, re.DOTALL)
-            if not match:
+            if not data:
                 return []
 
-            data = json.loads(match.group(0))
             errors = data.get("errors", [])
 
             if not isinstance(errors, list):

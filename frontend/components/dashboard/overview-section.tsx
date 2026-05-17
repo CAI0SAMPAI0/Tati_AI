@@ -96,9 +96,9 @@ export function OverviewSection({ stats, students, difficulties, onSeeAllStudent
           <div className="p-5 border-b border-border">
             <h3 className="font-bold text-text">Class Difficulty Alerts</h3>
           </div>
-          <div className="overflow-x-auto">
+          <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
             <table className="w-full text-left border-collapse">
-              <thead className="bg-bg-secondary/50 text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest">
+              <thead className="bg-surface text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest sticky top-0 z-10 border-b border-border shadow-sm">
                 <tr>
                   <th className="px-5 py-3">🧑‍🎓 Student</th>
                   <th className="px-5 py-3">⚠️ Spotlight</th>

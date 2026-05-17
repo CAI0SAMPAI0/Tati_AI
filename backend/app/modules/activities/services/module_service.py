@@ -2,19 +2,25 @@
 services/module_service.py
 Serviço para gerenciamento de módulos, conteúdos e flashcards.
 """
+from app.core.dependencies.db import get_db
+from fastapi import Depends
+from supabase import Client
 
 from typing import List, Dict, Any
 import uuid
 import os
 from fastapi import UploadFile, HTTPException
 from fastapi.concurrency import run_in_threadpool
-from app.core.database import get_client
 from app.shared.services.upstash import cache_delete, cache_get, cache_set
 
 
 class ModuleService:
-    def __init__(self):
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)) -> None:
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
 
     async def list_all_admin(self) -> List[Dict[str, Any]]:
         """Lista todos os módulos para admin."""

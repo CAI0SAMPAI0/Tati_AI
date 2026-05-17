@@ -5,13 +5,19 @@ Serviço para gerenciamento de troféus e conquistas.
 
 from typing import List, Dict, Any
 from fastapi.concurrency import run_in_threadpool
-from app.core.database import get_client
 from app.shared.services.upstash import cache_get, cache_set
+from fastapi import Depends
+from supabase import Client
+from app.core.dependencies.db import get_db
 
 
 class TrophyService:
-    def __init__(self):
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)) -> None:
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
 
     async def get_user_trophies(self, username: str) -> List[Dict[str, Any]]:
         cache_key = f'trophies:{username}'

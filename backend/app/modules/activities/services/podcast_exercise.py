@@ -67,16 +67,9 @@ class PodcastExerciseService:
         )
 
         try:
-            from app.modules.chat.services.llm import groq_chat
-            from routers.activities.podcasts import _extract_json_blob
+            from app.modules.chat.services.llm import groq_chat_json
 
-            full_text = await groq_chat([{"role": "system", "content": system_prompt}], temperature=0.8)
-            print(f'[exercise] LLM raw response: {full_text[:500]}')
-            clean_json = _extract_json_blob(full_text)
-            print(f'[exercise] clean_json: {clean_json[:300]}')
-            payload = json.loads(clean_json)
-            
-            # Não filtramos com _is_relevant pois o LLM 70b é mais confiável e não queremos descartar as questões à toa
+            payload = await groq_chat_json([{"role": "system", "content": system_prompt}], temperature=0.8)
             return self._normalize_exercises_payload(
                 payload, podcast.get('title', ''), ui_lang, None
             )
@@ -260,11 +253,9 @@ class PodcastExerciseService:
             )
 
         try:
-            from app.modules.chat.services.llm import groq_chat
-            from routers.activities.podcasts import _extract_json_blob
+            from app.modules.chat.services.llm import groq_chat_json
 
-            full_text = await groq_chat([{"role": "system", "content": system_prompt}], temperature=0.3)
-            payload = json.loads(_extract_json_blob(full_text))
+            payload = await groq_chat_json([{"role": "system", "content": system_prompt}], temperature=0.3)
             return self._normalize_evaluation_payload(payload, ui_lang)
         except Exception:
             return self._normalize_evaluation_payload({}, ui_lang)

@@ -1,5 +1,11 @@
-import { HubHome } from '@/components/hub-home';
+'use client';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function HomePage() {
-  return <HubHome />;
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/materiais');
+  }, [router]);
+  return null;
 }

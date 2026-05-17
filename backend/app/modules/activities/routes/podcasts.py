@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Header
+from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
 from pydantic import BaseModel, Field
 
 from app.core.dependencies.auth import get_current_user
@@ -487,7 +488,7 @@ async def get_podcast_details(podcast_id: str):
     db = get_client()
     rows = db.table('podcasts').select('*').eq('id', podcast_id).limit(1).execute().data
     if not rows:
-        raise HTTPException(status_code=404, detail='Podcast not found')
+        raise ContentNotFoundError(detail='Podcast not found')
     item = rows[0]
     exact_seconds = await _fetch_youtube_duration_seconds(item)
     if exact_seconds > 0:
@@ -508,7 +509,7 @@ async def generate_podcast_exercises(podcast_id: str, lang: str = 'en-US'):
     db = get_client()
     rows = db.table('podcasts').select('*').eq('id', podcast_id).limit(1).execute().data
     if not rows:
-        raise HTTPException(status_code=404, detail='Podcast not found')
+        raise ContentNotFoundError(detail='Podcast not found')
     return await exercise_service.generate_exercises(rows[0], lang)
 
 
@@ -559,7 +560,7 @@ async def evaluate_pronunciation(
     try:
         audio_bytes = base64.b64decode(req.audio)
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid audio format (base64 expected)")
+        raise BusinessLogicError(detail="Invalid audio format (base64 expected)")
 
     result = await pronunciation_matcher.evaluate(audio_bytes, req.reference_text)
     

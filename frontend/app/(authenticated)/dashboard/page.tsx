@@ -7,7 +7,7 @@ import {
   Search,
 } from 'lucide-react';
 import { DashboardSidebar, type DashSection } from '@/components/dashboard/dashboard-sidebar';
-import { WeeklyGoal } from '@/components/dashboard/weekly-goal';
+
 import { OverviewSection } from '@/components/dashboard/overview-section';
 import { ReportsSection } from '@/components/dashboard/reports-section';
 import { ModulesSection } from '@/components/dashboard/modules-section';
@@ -17,7 +17,7 @@ import { PremiumSection } from '@/components/dashboard/premium-section';
 import { StudentModal } from '@/components/dashboard/student-modal';
 import { apiGet } from '@/lib/api/client';
 
-import { formatDateTime } from '@/lib/utils/index';
+import { formatDateTime, formatDate } from '@/lib/utils/index';
 import { useRouter } from 'next/navigation';
 import { usePermissions } from '@/hooks/usePermissions';
 import { Spinner } from '@/components/ui/spinner';
@@ -179,7 +179,6 @@ export default function DashboardPage() {
         <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto animate-fade-in overflow-y-auto custom-scrollbar">
           {activeSection === 'overview' && (
             <>
-              <WeeklyGoal />
               <OverviewSection 
                 stats={stats} 
                 students={students || []} 
@@ -253,7 +252,7 @@ export default function DashboardPage() {
                           {s.total_messages ?? 0}
                         </td>
                         <td className="px-5 py-3 text-xs text-text-subtle">
-                          {s.last_active ? new Date(s.last_active).toLocaleDateString() : '—'}
+                          {formatDate(s.created_at)}
                         </td>
                       </tr>
                     ))}

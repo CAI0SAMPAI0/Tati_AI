@@ -5,14 +5,20 @@ Serviço para gerenciamento de módulos, lições e progresso em atividades.
 
 from typing import List, Dict, Any, Optional
 from fastapi.concurrency import run_in_threadpool
-from app.core.database import get_client
 from app.shared.services.upstash import cache_get, cache_set, cache_delete
 from app.core.utils.level_utils import matches_level
+from fastapi import Depends
+from supabase import Client
+from app.core.dependencies.db import get_db
 
 
 class ActivityService:
-    def __init__(self):
-        self.db = get_client()
+    def __init__(self, db: Any = Depends(get_db)) -> None:
+        if db is None or str(type(db)).find('Depends') != -1:
+            from app.core.database import get_client
+            self.db = get_client()
+        else:
+            self.db = db
 
     async def list_modules(self, level: Optional[str] = None, username: Optional[str] = None) -> List[Dict[str, Any]]:
         """Lista módulos filtrados por nível e inclui status do usuário se logado."""
@@ -163,8 +169,11 @@ class ActivityService:
             # 3. Exercícios IA (personalized_quiz) pendentes via attempts
             attempts = self.db.table('user_exercise_attempts').select('exercise_id').eq('username', username).eq('status', 'pending').execute().data or []
             
-            # 4. Simulações pendentes
-            sims = self.db.table('simulation_attempts').select('simulation_id').eq('username', username).eq('status', 'not_started').execute().data or []
+            # 4. Simulações pendentes (Tabela pode não existir ainda)
+            try:
+                sims = self.db.table('simulation_attempts').select('simulation_id').eq('username', username).eq('status', 'not_started').execute().data or []
+            except Exception:
+                sims = []
             
             print(f"[WeeklyGoalDebug] User: {username}")
             print(f"[WeeklyGoalDebug] Done Quizzes: {len(done_ids)}")
@@ -309,12 +318,13 @@ class ActivityService:
             f'Return JSON: {{"ai_feedback": "...", "score": N}}'
         )
         try:
-            import json
-            import re
-            raw = await groq_chat([{'role': 'user', 'content': prompt}])
-            match = re.search(r'\{.*\}', raw, re.DOTALL)
-            data = json.loads(match.group(0)) if match else {}
-            ai_feedback = str(data.get('ai_feedback', raw))
+            from app.modules.chat.services.llm import groq_chat_json
+            data = await groq_chat_json([{'role': 'user', 'content': prompt}])
+            
+            if not data:
+                return {'ai_feedback': 'Could not generate feedback automatically.', 'score': 70}
+
+            ai_feedback = str(data.get('ai_feedback', ''))
             score = int(data.get('score', 70))
         except Exception as exc:
             print(f'[ActivityService] Erro na correção IA: {exc}')
@@ -536,9 +546,11 @@ class ActivityService:
             f'Focus strictly on "{theme}". All text in English.'
         )
         try:
-            raw = await groq_chat([{'role': 'user', 'content': prompt}])
-            match = re.search(r'\{.*\}', raw, re.DOTALL)
-            data = json.loads(match.group(0)) if match else {}
+            from app.modules.chat.services.llm import groq_chat_json
+            data = await groq_chat_json([{'role': 'user', 'content': prompt}])
+            
+            if not data:
+                return {'ok': False}
             
             cards = data.get('cards', [])
             

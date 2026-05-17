@@ -4,6 +4,7 @@ Router para gerenciamento de vocabulário pessoal e SRS.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
+from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
 from typing import List, Dict, Any
 from app.core.dependencies.auth import get_current_user
 from app.modules.activities.services.vocabulary_srs import vocabulary_srs_service
@@ -19,9 +20,9 @@ async def get_due_vocabulary(user: dict = Depends(get_current_user)):
 async def record_vocabulary_review(entry_id: str, quality_score: int, user: dict = Depends(get_current_user)):
     """Registra uma revisão de palavra e calcula próximo intervalo."""
     if not (0 <= quality_score <= 5):
-        raise HTTPException(status_code=400, detail="Score must be between 0 and 5")
+        raise BusinessLogicError(detail="Score must be between 0 and 5")
     
-    await vocabulary_srs_service.record_review(entry_id, quality_score)
+    await vocabulary_srs_service.record_review(entry_id, quality_score, user['username'])
     return {"ok": True}
 
 @router.post('/add')
@@ -29,7 +30,7 @@ async def add_word_manually(data: dict, user: dict = Depends(get_current_user)):
     """Adiciona manualmente uma palavra ao SRS."""
     word = data.get('word')
     if not word:
-        raise HTTPException(status_code=400, detail="Word is required")
+        raise BusinessLogicError(detail="Word is required")
         
     await vocabulary_srs_service.add_to_srs(
         user['username'],
