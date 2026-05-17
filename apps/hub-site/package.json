@@ -12,7 +12,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@tati/hub-core": "*",
     "lucide-react": "^0.468.0",
     "next": "14.2.29",
     "react": "^18.3.1",

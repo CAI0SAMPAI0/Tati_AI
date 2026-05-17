@@ -12,7 +12,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@tati/hub-core": "*",
     "@capacitor/app": "^8.1.0",
     "@capacitor/core": "^8.3.4",
     "@tanstack/react-query": "^5.100.6",
