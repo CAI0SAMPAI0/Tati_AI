@@ -2,7 +2,7 @@
 
 import { Sora, DM_Sans } from 'next/font/google';
 import './globals.css';
-import DeployBanner from '@/components/DeployBanner';
+import { AppProviders } from '@/providers/app-providers';
 
 const sora = Sora({
   subsets: ['latin'],

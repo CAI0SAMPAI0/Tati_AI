@@ -152,7 +152,7 @@ export default function CatalogPageClient({ initialItems }: CatalogPageClientPro
       
       {searchFiltered.length === 0 && (
         <div className="text-center py-20 text-muted border-2 border-dashed border-line rounded-2xl">
-          <p>Nenhum material encontrado com esses filtros.</p>
+          <p>No material found for these filters.</p>
         </div>
       )}
     </div>
