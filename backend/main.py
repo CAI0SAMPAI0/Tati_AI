@@ -75,6 +75,8 @@ app.add_middleware(
         'https://tati-ai.vercel.app',
         'https://tati-ai.vercel.app/',
         'https://tati-ai-git-main-caio-andrades-projects.vercel.app',
+        'https://tati-hub.vercel.app/',
+        'https://tati-hub.vercel.app'
     ],
     allow_credentials=True,
     allow_methods=['*'],
