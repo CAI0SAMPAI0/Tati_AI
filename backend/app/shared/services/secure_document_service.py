@@ -58,6 +58,41 @@ def _convert_to_pdf(input_path: str, output_dir: str) -> Optional[str]:
         print(f"[SecureDoc] Erro na conversão para PDF: {e}")
         return None
 
+# Extrai links do PDF (com coordenadas exatas para mapear botões sobre a imagem)
+# IMPORTANTE: Faz isso ANTES de apagar o arquivo
+def extract_links_from_pdf(pdf_path: str) -> List[Dict[str, Any]]:
+    """Extrai links de um PDF e retorna suas coordenadas normalizadas."""
+    extracted_links = []
+    try:
+        import fitz
+        doc = fitz.open(pdf_path)
+        for page_idx, page in enumerate(doc):
+            page_width = page.rect.width
+            page_height = page.rect.height
+            
+            for link in page.get_links():
+                uri = link.get("uri")
+                if uri and uri.startswith("http"):
+                    rect = link.get("from")
+                    if rect:
+                        left_pct = rect.x0 / page_width
+                        top_pct = rect.y0 / page_height
+                        width_pct = rect.width / page_width
+                        height_pct = rect.height / page_height
+                        
+                        extracted_links.append({
+                            "uri": uri,
+                            "page": page_idx,
+                            "left": round(left_pct, 4),
+                            "top": round(top_pct, 4),
+                            "width": round(width_pct, 4),
+                            "height": round(height_pct, 4)
+                        })
+        doc.close()
+    except Exception as e:
+        print(f"[SecureDoc] Erro ao extrair links do PDF: {e}")
+
+    return extracted_links
 
 VALID_CATEGORIES = frozenset({
     'grammar', 'speaking', 'travel', 'business', 'vocabulary', 'writing', 'other',
@@ -203,6 +238,7 @@ class SecureDocumentService:
         self._set_processing_status(content_id, 'processing')
 
         actual_pdf_path = local_path
+        extracted_links = extract_links_from_pdf(actual_pdf_path)
         is_converted = False
 
         # Se não for PDF, tenta converter usando LibreOffice
@@ -236,43 +272,6 @@ class SecureDocumentService:
         preview_path = self.upload_preview(image_paths[0], content_id)
         storage_paths = self.upload_pages_to_supabase(image_paths, content_id)
 
-        # Extrai links do PDF (com coordenadas exatas para mapear botões sobre a imagem)
-        # IMPORTANTE: Faz isso ANTES de apagar o arquivo
-        extracted_links = []
-        try:
-            import fitz
-            doc = fitz.open(actual_pdf_path)
-            for page_idx, page in enumerate(doc):
-                page_width = page.rect.width
-                page_height = page.rect.height
-                
-                for link in page.get_links():
-                    uri = link.get("uri")
-                    if uri and uri.startswith("http"):
-                        rect = link.get("from")
-                        if rect:
-                            left_pct = rect.x0 / page_width
-                            top_pct = rect.y0 / page_height
-                            width_pct = rect.width / page_width
-                            height_pct = rect.height / page_height
-                            
-                            extracted_links.append({
-                                "uri": uri,
-                                "page": page_idx,
-                                "left": round(left_pct, 4),
-                                "top": round(top_pct, 4),
-                                "width": round(width_pct, 4),
-                                "height": round(height_pct, 4)
-                            })
-            doc.close()
-        except Exception as e:
-            print(f"[SecureDoc] Erro ao extrair links do PDF: {e}")
-
-        # Adiciona os links detalhados como metadado
-        if extracted_links:
-            import json
-            storage_paths.append(json.dumps({"external_links": extracted_links}))
-
         for p in image_paths:
             try:
                 os.remove(p)
@@ -297,7 +296,8 @@ class SecureDocumentService:
             'original_drive_id': drive_id,
             'is_secure': True,
             'processing_status': 'ready',
-            'thumbnail_url': preview_path if preview_path else None
+            'thumbnail_url': preview_path if preview_path else None,
+            'external_links': extracted_links
         }
 
         self.db.table('premium_content').update(update_payload).eq('id', content_id).execute()
