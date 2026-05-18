@@ -10,7 +10,7 @@ export default function HeroBanner() {
         </p>
         <BrandMark variant="hero" subtitle="English Class" className="mb-4" />
         <h1 className="font-display text-2xl font-bold text-ink md:text-3xl">
-          Materiais curados pela Teacher Tati
+          Materiais criados pela Teacher Tati
         </h1>
         <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted md:text-base">
           E-books, planners e exercícios para acelerar seu inglês com o método da Tati.
