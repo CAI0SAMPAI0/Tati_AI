@@ -18,7 +18,7 @@ def _make_conv_id(username: str) -> str:
 async def create_conversation(
     username: str,
     title: str = 'Nova conversa',
-    model: str = 'claude',
+    model: str = 'groq',
     is_simulation: bool = False,
     simulation_id: str | None = None,
 ) -> dict:

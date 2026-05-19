@@ -58,8 +58,6 @@ def _convert_to_pdf(input_path: str, output_dir: str) -> Optional[str]:
         print(f"[SecureDoc] Erro na conversão para PDF: {e}")
         return None
 
-# Extrai links do PDF (com coordenadas exatas para mapear botões sobre a imagem)
-# IMPORTANTE: Faz isso ANTES de apagar o arquivo
 def extract_links_from_pdf(pdf_path: str) -> List[Dict[str, Any]]:
     """Extrai links de um PDF e retorna suas coordenadas normalizadas."""
     extracted_links = []
