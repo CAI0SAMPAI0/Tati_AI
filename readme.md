@@ -1,99 +1,115 @@
-# Teacher Tati — English Learning Platform Powered by AI
+# Tati AI (Teacher Tati) 🤖📚
 
-Teacher Tati é uma plataforma full-stack de ensino de inglês que utiliza Inteligência Artificial para proporcionar prática de conversação em tempo real, gamificação avançada e ferramentas administrativas completas.
+> **Tati AI** é uma plataforma avançada de ensino de inglês e hub de conteúdos premium que utiliza Inteligência Artificial para proporcionar prática de conversação em tempo real, gamificação, e uma experiência educacional moderna.
+
+O projeto adota uma arquitetura em **Monorepo** para gerenciar múltiplos aplicativos e pacotes de forma escalável e eficiente, conectando um backend poderoso em Python a frontends modernos em Next.js e Vanilla JS.
 
 ---
 
-## 🏗️ Arquitetura do Sistema
+## 🏗️ Arquitetura e Tecnologias
 
-O projeto segue uma arquitetura de **Backend Monolítico Modular** com **Frontend Desacoplado (Vanilla SPA-style)**.
+A stack tecnológica foi desenhada para altíssima performance, escalabilidade e facilidade de manutenção.
 
-### Visão Geral da Stack
-- **Backend:** FastAPI (Python 3.12)
-- **Frontend:** Next.js (React), TypeScript, Tailwind CSS
+### Tecnologias Principais
+- **Backend:** FastAPI (Python 3.12), Pydantic, Uvicorn
+- **Frontend Principal (Hub Premium):** Next.js (React), TypeScript, Tailwind CSS
+- **Frontend Legado:** Vanilla JS / HTML SPA
 - **Banco de Dados:** PostgreSQL (via Supabase)
-- **Cache & Rate Limit:** Upstash Redis
-- **IA/LLM:** Groq (Llama 3), Claude, Gemini
-- **Áudio (STT/TTS):** Whisper Large V3 / Edge TTS
-- **Pagamentos:** Asaas API
-- **Monitoramento:** Sentry
+- **Cache & Mensageria:** Redis (via Upstash)
+- **Modelos de IA:** Groq (Llama 3), Anthropic (Claude), Google GenAI (Gemini)
+- **Áudio (STT/TTS):** Whisper (OpenAI) / Edge TTS
+- **Autenticação:** JWT Customizado + Google Identity Services (OAuth)
+- **Pagamentos:** Integração com Asaas API
+- **Monitoramento e Logs:** Sentry
 
 ---
 
-## 🌊 Fluxos Principais
+## 📂 Estrutura do Monorepo
 
-### 1. Ciclo de Vida de uma Mensagem (Chat)
-1. **Entrada:** O usuário envia texto, áudio (Base64) ou arquivos (PDF/DOCX) via WebSocket.
-2. **Processamento Inicial:** 
-   - Se áudio, é transcrito via Whisper.
-   - Se arquivo, o texto é extraído e injetado no contexto.
-3. **Controle de Acesso:** O sistema verifica se o usuário possui mensagens gratuitas ou assinatura ativa (incluindo *grace period*).
-4. **Contextualização (RAG & Perfil):**
-   - Busca-se contexto relevante em documentos via RAG (se habilitado).
-   - O perfil do aluno (nível CEFR, interesses) é carregado.
-5. **Geração LLM:** O prompt é montado e enviado para o Groq (com rotação de chaves para evitar limites de taxa). A resposta é retornada via streaming.
-6. **Pós-processamento:** 
-   - O texto é convertido em áudio (TTS).
-   - A mensagem é salva no histórico.
-   - XP é atribuído e troféus são verificados.
+O repositório é gerenciado via **NPM Workspaces**.
 
-### 2. Gamificação e Progresso
-- **Sistema de XP:** Baseado no quadro europeu (CEFR). Ações como enviar mensagens, completar quizzes e manter *streaks* concedem XP.
-- **Níveis:** A1 (Iniciante) até C2 (Domínio Total).
-- **Troféus:** Sistema de conquistas automáticas (ex: "Primeira Mensagem", "Ofensiva de 7 dias").
-- **Ranking:** Ranking mensal dinâmico baseado no engajamento.
-
----
-
-## 📂 Estrutura de Módulos (Backend)
-
-A arquitetura do backend segue o padrão **Domain-Driven Design (DDD)** modular para alta escalabilidade e separação de conceitos:
-
-- `app/`
-  - `core/`: Infraestrutura global (configurações, segurança, banco de dados, dependências e utils).
-  - `modules/`: Módulos independentes agrupados por domínio de negócio:
-    - `activities/`: Hub, flashcards, quizzes, podcasts e desafios.
-    - `admin/`: Gestão da plataforma e dashboards.
-    - `auth/`: Autenticação e rotas de segurança.
-    - `chat/`: LLMs, RAG e orquestração de IA.
-    - `notifications/`: Disparos, agendamentos e push.
-    - `payments/`: Webhooks, assinaturas e Asaas.
-    - `simulation/`: Simulações de conversação.
-    - `users/`: Perfis, XP, streaks, metas e onboarding.
-  - `shared/`: Código reaproveitável (helpers, serviços externos como Cloudinary, envio de e-mails, etc).
-  - `routers_init.py`: Arquivo centralizador elegante de inicialização das rotas.
-- `migrations/`: Scripts SQL para estruturação do banco de dados.
-
----
-
-## 🛠️ Configuração e Instalação
-
-### Requisitos
-- Python 3.12+
-- Node.js (opcional, para serve local)
-- Chaves de API: Groq, Supabase, Asaas.
-
-### Instalação Rápida
-```bash
-# Backend
-cd backend
-python -m venv .venv
-source .venv/bin/activate # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env # Configure suas chaves
-uvicorn main:app --reload
-
-# Frontend
-cd frontend
-python -m http.server 8080
+```text
+/
+├── apps/
+│   └── hub-site/      # Frontend do Hub Premium (Next.js)
+├── packages/
+│   └── hub-core/      # Lógica de negócios compartilhada, SDK e Tipagens (TypeScript)
+├── backend/           # Backend Monolítico Modular (FastAPI)
+├── frontend/          # Frontend Web SPA Clássico
+├── mobile_app/        # Aplicação Mobile
+└── pwa/               # Scripts e assets para a versão PWA (Progressive Web App)
 ```
 
+### Detalhamento do Backend (DDD)
+O diretório `backend/` segue o padrão **Domain-Driven Design (DDD)** modular:
+- `app/core/`: Configurações globais, segurança, banco de dados e dependências.
+- `app/modules/`: Regras de negócio divididas por domínio (`activities`, `admin`, `auth`, `chat`, `payments`, `users`, etc).
+- `app/shared/`: Ferramentas globais (integrações com Cloudinary, e-mails via Resend, geração de PDFs).
+
 ---
 
-## 📄 Documentação Técnica
-Para detalhes sobre a API e esquemas de dados, acesse `/docs` (Swagger) com o backend rodando.
+## 🚀 Como Começar (Desenvolvimento Local)
+
+### 1. Pré-requisitos
+- **Node.js** (v18+) e NPM
+- **Python** (v3.12+)
+- Docker (opcional, para rodar dependências locais via docker-compose)
+
+### 2. Instalação Geral
+
+Na raiz do projeto, instale as dependências do monorepo (Frontends e Pacotes):
+```bash
+npm install
+```
+
+Configure o ambiente virtual do Backend:
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate  # ou .venv\Scripts\activate no Windows
+pip install -r requirements.txt
+cp .env.example .env       # Preencha com suas chaves de API (Supabase, Groq, etc)
+```
+
+### 3. Rodando o Projeto
+
+O arquivo `package.json` na raiz expõe comandos práticos para gerenciar os diferentes serviços:
+
+- **Iniciar o Backend FastAPI:**
+  ```bash
+  npm run dev
+  # ou manualmente dentro de /backend: uvicorn app.main:app --reload
+  ```
+
+- **Iniciar o Frontend do Hub Premium (Next.js):**
+  ```bash
+  npm run dev:hub
+  ```
+
+- **Iniciar o Frontend Clássico:**
+  ```bash
+  npm run dev:frontend
+  ```
 
 ---
 
-## ⚖️ Licença
-Proprietário. Todos os direitos reservados ao projeto Teacher Tati.
+## 🔒 Variáveis de Ambiente Necessárias
+
+O sistema exige a configuração de credenciais críticas no arquivo `.env` do backend e do frontend:
+- `SUPABASE_URL` e `SUPABASE_KEY`
+- `GROQ_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`
+- Chaves de integração: `ASAAS_API_KEY`, `RESEND_API_KEY`, `CLOUDINARY_URL`
+- OAuth: `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (no frontend hub-site)
+
+---
+
+## 🚢 Deploy
+
+A aplicação está preparada para deploys modernos:
+- **Backend:** Configurado para rodar no Railway / Vercel (via Dockerfile). O Docker multi-stage build instala bibliotecas de sistema necessárias como `poppler-utils` (para processamento de PDFs).
+- **Frontends:** Otimizados para deploy direto na Vercel utilizando Vercel Build Caching e CI/CD padrão do Next.js.
+
+---
+
+## 📄 Licença
+Proprietário. Todos os direitos reservados à equipe Tati AI.
