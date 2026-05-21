@@ -59,7 +59,6 @@ def _convert_to_pdf(input_path: str, output_dir: str) -> Optional[str]:
         return None
 
 def extract_links_from_pdf(pdf_path: str) -> List[Dict[str, Any]]:
-    """Extrai links de um PDF e retorna suas coordenadas normalizadas."""
     extracted_links = []
     try:
         import fitz
@@ -67,29 +66,29 @@ def extract_links_from_pdf(pdf_path: str) -> List[Dict[str, Any]]:
         for page_idx, page in enumerate(doc):
             page_width = page.rect.width
             page_height = page.rect.height
-            
+
             for link in page.get_links():
                 uri = link.get("uri")
                 if uri and uri.startswith("http"):
                     rect = link.get("from")
                     if rect:
-                        left_pct = rect.x0 / page_width
-                        top_pct = rect.y0 / page_height
-                        width_pct = rect.width / page_width
-                        height_pct = rect.height / page_height
-                        
+                        left_pct   = rect.x0 / page_width
+                        top_pct    = rect.y0 / page_height
+                        # ✅ Diferença explícita em vez de .width / .height
+                        width_pct  = (rect.x1 - rect.x0) / page_width
+                        height_pct = (rect.y1 - rect.y0) / page_height
+
                         extracted_links.append({
                             "uri": uri,
                             "page": page_idx,
-                            "left": round(left_pct, 4),
-                            "top": round(top_pct, 4),
-                            "width": round(width_pct, 4),
-                            "height": round(height_pct, 4)
+                            "left":   round(left_pct,   4),
+                            "top":    round(top_pct,    4),
+                            "width":  round(width_pct,  4),
+                            "height": round(height_pct, 4),
                         })
         doc.close()
     except Exception as e:
         print(f"[SecureDoc] Erro ao extrair links do PDF: {e}")
-
     return extracted_links
 
 VALID_CATEGORIES = frozenset({
@@ -153,7 +152,6 @@ class SecureDocumentService:
         error: Optional[str] = None,
     ) -> None:
         payload: Dict[str, Any] = {'processing_status': status}
-        # Ignorando processing_error pois a coluna não existe no banco
         try:
             self.db.table('premium_content').update(payload).eq('id', content_id).execute()
         except Exception as e:
@@ -185,12 +183,11 @@ class SecureDocumentService:
             for i, page in enumerate(pages):
                 img_name = f'page_{i + 1}.webp'
                 img_path = os.path.join(output_dir, img_name)
-                # Salva direto para testar se o conteúdo aparece
                 page.save(img_path, 'WEBP', quality=80)
                 image_paths.append(img_path)
             return image_paths
         except Exception as e:
-            print(f'[SecureDoc] Erro ao converter PDF: {e}')
+            print(f'[SecureDoc] Erro ao converter PDF em imagens: {e}')
             return []
 
     def upload_preview(self, first_page_path: str, content_id: str) -> Optional[str]:
@@ -232,13 +229,13 @@ class SecureDocumentService:
         filename: str,
         content_id: str,
     ) -> Dict[str, Any]:
-        """Orquestra: Drive backup → imagens → preview → páginas seguras."""
+        """Orquestra: Conversão para PDF → Extração de Links → Drive backup → imagens seguras."""
         self._set_processing_status(content_id, 'processing')
 
         actual_pdf_path = local_path
         is_converted = False
 
-        # Se não for PDF, tenta converter usando LibreOffice
+        # 1. SE NÃO FOR PDF, CONVERTE PRIMEIRO (Para que o PPTX gere um PDF com links clicáveis)
         if not local_path.lower().endswith('.pdf'):
             temp_conv_dir = os.path.join('temp', f'conv_{content_id}')
             os.makedirs(temp_conv_dir, exist_ok=True)
@@ -247,22 +244,22 @@ class SecureDocumentService:
             if converted_path:
                 actual_pdf_path = converted_path
                 is_converted = True
-                print(f"[SecureDoc] Arquivo convertido com sucesso: {actual_pdf_path}")
+                print(f"[SecureDoc] Arquivo convertido com sucesso para: {actual_pdf_path}")
             else:
                 self._set_processing_status(content_id, 'skipped', 'Falha ao converter para PDF ou formato não suportado.')
                 return {'success': False, 'error': 'Conversão falhou'}
 
+        # 2. AGORA QUE É GARANTIDO UM PDF, EXTRAI OS LINKS DELE
         extracted_links = extract_links_from_pdf(actual_pdf_path)
 
+        # 3. SEGUE O FLUXO NORMAL DE BACKUP E GERAÇÃO DE IMAGENS
         drive_id = self.upload_to_drive(local_path, filename)
         temp_dir = os.path.join('temp', f'process_{content_id}')
         
-        # Gera as imagens a partir do PDF (original ou convertido)
         image_paths = self.process_pdf_to_images(actual_pdf_path, temp_dir)
 
         if not image_paths:
-            self._set_processing_status(content_id, 'failed', 'Falha na conversão do PDF (Poppler/LibreOffice instalados?)')
-            # Limpa se foi convertido
+            self._set_processing_status(content_id, 'failed', 'Falha na conversão do PDF para imagens.')
             if is_converted and os.path.exists(actual_pdf_path):
                 try: os.remove(actual_pdf_path)
                 except: pass
@@ -271,13 +268,12 @@ class SecureDocumentService:
         preview_path = self.upload_preview(image_paths[0], content_id)
         storage_paths = self.upload_pages_to_supabase(image_paths, content_id)
 
+        # Limpeza das imagens locais geradas
         for p in image_paths:
-            try:
-                os.remove(p)
-            except OSError:
-                pass
+            try: os.remove(p)
+            except OSError: pass
 
-        # Limpa o PDF convertido e sua pasta temporária se houver
+        # Limpa o PDF convertido temporário se houver
         if is_converted and os.path.exists(actual_pdf_path):
             try:
                 os.remove(actual_pdf_path)
@@ -285,18 +281,22 @@ class SecureDocumentService:
             except:
                 pass
 
-        try:
-            shutil.rmtree(temp_dir, ignore_errors=True)
-        except OSError:
-            pass
+        try: shutil.rmtree(temp_dir, ignore_errors=True)
+        except OSError: pass
 
+        # Hack inteligente para evitar alteração de DB: salva os links no final do array de páginas
+        if extracted_links:
+            import json
+            storage_paths.append(json.dumps({"external_links": extracted_links}))
+
+        # Salva o payload com a lista completa de links encontrados
         update_payload: Dict[str, Any] = {
             'secure_pages': storage_paths,
             'original_drive_id': drive_id,
             'is_secure': True,
             'processing_status': 'ready',
             'thumbnail_url': preview_path if preview_path else None,
-            'external_links': extracted_links
+            # 'external_links': extracted_links  # Removido porque a tabela não possui essa coluna
         }
 
         self.db.table('premium_content').update(update_payload).eq('id', content_id).execute()
@@ -326,7 +326,6 @@ def apply_watermark(image_bytes: bytes, text: str) -> bytes:
         img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
         width, height = img.size
         
-        # Cria uma camada transparente para o texto
         watermark = Image.new('RGBA', (width, height), (0, 0, 0, 0))
         d = ImageDraw.Draw(watermark)
         
@@ -342,20 +341,15 @@ def apply_watermark(image_bytes: bytes, text: str) -> bytes:
         else:
             tw, th = d.textsize(text, font=font)
         
-        # Cor com opacidade (Cinza suave)
         fill_color = (150, 150, 150, 40)
         
-        # Repete em padrão
         sx, sy = tw + 150, th + 200
         for y in range(-height, height * 2, sy):
             for x in range(-width, width * 2, sx):
                 ox = x if (y // sy) % 2 == 0 else x - (sx // 2)
                 d.text((ox, y), text, fill=fill_color, font=font)
         
-        # Rotaciona
         watermark = watermark.rotate(35, expand=False, resample=Image.BICUBIC)
-        
-        # Combina
         img.paste(watermark, (0, 0), watermark)
         
         output = io.BytesIO()
@@ -364,4 +358,3 @@ def apply_watermark(image_bytes: bytes, text: str) -> bytes:
     except Exception as e:
         print(f"[SecureDoc] Erro ao aplicar marca d'água: {e}")
         return image_bytes
-

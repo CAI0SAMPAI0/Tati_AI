@@ -73,6 +73,7 @@ export default function SecureDocumentViewer({
         {access.pages?.map((url, index) => {
           // Filtra os links que pertencem a esta página específica
           const pageLinks = access.external_links?.filter(l => l.page === index) || [];
+          console.log('pageLinks para página', index, pageLinks);
           const storageUrl = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_URL || '';
           const safeUrl = url.startsWith('http') ? url : `${storageUrl}/${url}`;
 
@@ -107,20 +108,28 @@ export default function SecureDocumentViewer({
                   }}
                 />
 
-                {/* Links Mapeados (Botões Clicáveis Transparentes) */}
+                {/* Links Mapeados (Botões Clicáveis) */}
                 {pageLinks.map((link, i) => (
                   <a
                     key={`link-${index}-${i}`}
                     href={link.uri}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="absolute z-20 cursor-pointer rounded bg-primary/0 hover:bg-primary/10 transition-colors"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (link.uri) {
+                        window.open(link.uri, '_blank');
+                      }
+                    }}
+                    className="absolute block z-30 cursor-pointer rounded hover:bg-primary/10 transition-colors"
                     title={link.uri}
                     style={{
                       left: `${link.left * 100}%`,
                       top: `${link.top * 100}%`,
                       width: `${link.width * 100}%`,
                       height: `${link.height * 100}%`,
+                      backgroundColor: 'rgba(255,255,255,0.01)' // Invisible but solid hit-area
                     }}
                   />
                 ))}

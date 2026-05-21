@@ -86,6 +86,8 @@ export default function SecureDocumentViewer({
       <div className="space-y-6">
         {access.pages?.map((url, index) => {
           const pageLinks = access.external_links?.filter(l => l.page === index) || [];
+          console.log('pageLinks para página', index, pageLinks);
+
 
           return (
             <figure
