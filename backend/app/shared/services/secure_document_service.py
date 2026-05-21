@@ -236,7 +236,6 @@ class SecureDocumentService:
         self._set_processing_status(content_id, 'processing')
 
         actual_pdf_path = local_path
-        extracted_links = extract_links_from_pdf(actual_pdf_path)
         is_converted = False
 
         # Se não for PDF, tenta converter usando LibreOffice
@@ -252,6 +251,8 @@ class SecureDocumentService:
             else:
                 self._set_processing_status(content_id, 'skipped', 'Falha ao converter para PDF ou formato não suportado.')
                 return {'success': False, 'error': 'Conversão falhou'}
+
+        extracted_links = extract_links_from_pdf(actual_pdf_path)
 
         drive_id = self.upload_to_drive(local_path, filename)
         temp_dir = os.path.join('temp', f'process_{content_id}')
