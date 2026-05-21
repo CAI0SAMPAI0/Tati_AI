@@ -75,45 +75,15 @@ async def transcribe_audio(
 
 
 async def text_to_speech(text: str) -> str:
-    """Converte texto em audio base64. Edge TTS ou gTTS."""
-    print('[TTS] Tentando Edge TTS...')
-    result = await _tts_edge(text)
-    if result:
-        return result
-    print('[TTS] Usando gTTS como fallback final.')
-    return await _tts_gtts(text)
-
-
-async def _tts_edge(text: str) -> str:
-    """Edge TTS (Microsoft) - gratuito e boa qualidade."""
-    try:
-        import edge_tts
-
-        # JennyNeural é geralmente mais rápida e estável que Ava
-        communicate = edge_tts.Communicate(text, 'en-US-JennyNeural')
-        buf = io.BytesIO()
-        async for chunk in communicate.stream():
-            if chunk['type'] == 'audio':
-                buf.write(chunk['data'])
-        if buf.tell() == 0:
-            return ''
-        return base64.b64encode(buf.getvalue()).decode()
-    except Exception as exc:
-        print(f'[TTS] Edge TTS error: {exc}')
-        return ''
-
-
-async def _tts_gtts(text: str) -> str:
-    try:
-        from gtts import gTTS
-
-        tts = gTTS(text=text, lang='en')
-        buf = io.BytesIO()
-        tts.write_to_fp(buf)
-        return base64.b64encode(buf.getvalue()).decode()
-    except Exception as exc:
-        print(f'[TTS] gTTS error: {exc}')
-        return ''
+    """Converte texto em áudio base64 chamando o gerador com clonagem e fallbacks."""
+    from app.modules.chat.services.audio_generator import generate_teacher_audio
+    
+    audio_b64 = await generate_teacher_audio(text)
+    if audio_b64:
+        return audio_b64
+        
+    # Caso crítico absoluto em que tudo falhe, retorna string vazia
+    return ""
 
 
 async def stream_llm(
