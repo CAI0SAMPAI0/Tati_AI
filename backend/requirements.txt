@@ -43,3 +43,4 @@ google-auth-httplib2
 pydantic[email]
 tavily-python
 tavily
+PyMuPDF
