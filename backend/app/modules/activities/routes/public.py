@@ -100,14 +100,30 @@ async def public_checkout(body: CheckoutRequest, service: PremiumService = Depen
     customer_id = customer['id']
 
     due_date = (date.today() + timedelta(days=3)).isoformat()
-    payment = await create_payment(
-        customer_id=customer_id,
-        billing_type=body.billingType,
-        value=item['price'],
-        due_date=due_date,
-        description=f"Material: {item['title']}",
-        external_reference=f"HUB:{item['id']}:{username}"
-    )
+    print(f"[Checkout] billingType={body.billingType} customer_id={customer_id} value={item['price']}")
+    try:
+        payment = await create_payment(
+            customer_id=customer_id,
+            billing_type=body.billingType,
+            value=item['price'],
+            due_date=due_date,
+            description=f"Material: {item['title']}",
+            external_reference=f"HUB:{item['id']}:{username}"
+        )
+    except Exception as exc:
+        err_str = str(exc)
+        # Mensagens amigáveis para erros conhecidos do Asaas
+        if 'invalid_billingType' in err_str or 'Pix não está disponível' in err_str:
+            raise HTTPException(
+                status_code=422,
+                detail="Pagamento via Pix não está disponível no momento. Por favor, escolha Boleto ou Cartão de Crédito."
+            )
+        if 'invalid_environment' in err_str:
+            raise HTTPException(
+                status_code=503,
+                detail="Serviço de pagamento temporariamente indisponível. Tente novamente em instantes."
+            )
+        raise HTTPException(status_code=502, detail=f"Erro ao processar pagamento: {err_str}")
 
     payment_id = payment.get('id')
 
