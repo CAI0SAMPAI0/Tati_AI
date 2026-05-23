@@ -17,7 +17,10 @@ import {
   categoryLabel,
   categoryStyles,
   normalizeCategory,
+  resolvePrice,
+  formatPrice,
 } from '@/lib/catalog';
+import { useAuth } from '@/providers/auth-provider';
 
 const categoryIcons: Record<MaterialCategory, ElementType> = {
   grammar: BookOpen,
@@ -36,17 +39,17 @@ type ProductCardProps = {
 };
 
 export default function ProductCard({ item, showOwned, onAccessGranted }: ProductCardProps) {
+  const { user } = useAuth();
   const category = normalizeCategory(item.category);
   const styles = categoryStyles(category);
   const Icon = categoryIcons[category];
-  const priceLabel = `R$ ${item.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-  // Pega o valor original que vem do banco
+
+  // Resolve o preço correto com base no role do usuário logado
+  const price = resolvePrice(item, user?.role);
+  const priceLabel = formatPrice(price);
+
   const rawPreview = item.preview_url || item.thumbnail_url;
-
-  // Pega a URL da variável de ambiente (caso falte por algum motivo, deixa uma string vazia)
   const storageUrl = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_URL || '';
-
-  // Valida e monta o preview de forma limpa
   const preview = rawPreview
     ? (rawPreview.startsWith('http') ? rawPreview : `${storageUrl}/${rawPreview}`)
     : null;
@@ -119,8 +122,9 @@ export default function ProductCard({ item, showOwned, onAccessGranted }: Produc
           </Link>
         ) : (
           <div className="flex-shrink-0">
+            {/* Passa o preço já resolvido para o checkout — nunca o price bruto */}
             <CheckoutFlow
-              item={{ id: item.id, title: item.title, price: item.price }}
+              item={{ id: item.id, title: item.title, price }}
               onAccessGranted={onAccessGranted}
             />
           </div>

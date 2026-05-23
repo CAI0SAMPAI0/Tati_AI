@@ -12,6 +12,8 @@ class PremiumContentPublic(BaseModel):
     title: str
     description: Optional[str] = None
     price: float
+    price_students: Optional[float] = None   # preço para alunos da Tati AI
+    price_buyers: Optional[float] = None     # preço para clientes do Hub
     thumbnail_url: Optional[str] = None
     preview_url: Optional[str] = None
     category: Optional[str] = 'other'

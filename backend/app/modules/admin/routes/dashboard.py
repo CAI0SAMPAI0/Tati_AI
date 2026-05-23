@@ -353,3 +353,7 @@ async def get_all_submissions(act_service: ActivityService = Depends(), user=Dep
 async def get_difficulties(service: DashboardService = Depends(), user=Depends(require_staff)) -> dict:
     """Retorna distribuição de dificuldades/níveis."""
     return await service.get_difficulties_stats()
+
+@router.get('/buyers')
+async def get_buyers(service: DashboardService = Depends(), user=Depends(require_staff)) -> list:
+    return await service.get_buyers_list()

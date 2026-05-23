@@ -178,7 +178,9 @@ class PremiumService:
             if cat not in VALID_CATEGORIES:
                 raise BusinessLogicError(detail=f'Categoria inválida. Use: {", ".join(sorted(VALID_CATEGORIES))}')
             payload['category'] = cat
-        if 'price' in payload and float(payload.get('price') or 0) <= 0:
+        # Valida price legado apenas se enviado E se não houver price_students/price_buyers
+        has_new_prices = payload.get('price_students') or payload.get('price_buyers')
+        if 'price' in payload and not has_new_prices and float(payload.get('price') or 0) <= 0:
             raise BusinessLogicError(detail='Preço deve ser maior que zero.')
 
         source_changed = (
@@ -268,7 +270,11 @@ class PremiumService:
                 .data
                 or []
             )
-            rows = [r for r in rows if float(r.get('price') or 0) > 0]
+            # Mantém itens que tenham qualquer preço definido (students, buyers ou legado)
+            rows = [
+                r for r in rows
+                if float(r.get('price_students') or r.get('price_buyers') or r.get('price') or 0) > 0
+            ]
             return [self._normalize_public_item(row) for row in rows]
 
         return await run_in_threadpool(_fetch)
@@ -276,8 +282,10 @@ class PremiumService:
     async def get_public_item(self, item_id: str) -> Optional[Dict[str, Any]]:
         """Busca um item específico para o catálogo público."""
         def _fetch():
+            # Inclui price_students e price_buyers para resolução correta no frontend
             fields = (
-                "id, title, description, price, type, thumbnail_url, preview_path, "
+                "id, title, description, price, price_students, price_buyers, "
+                "type, thumbnail_url, preview_path, "
                 "category, is_featured, processing_status, created_at"
             )
             try:
@@ -291,7 +299,10 @@ class PremiumService:
                     .data
                 )
             except Exception:
-                basic_fields = "id, title, description, price, type, thumbnail_url, created_at"
+                basic_fields = (
+                    "id, title, description, price, price_students, price_buyers, "
+                    "type, thumbnail_url, created_at"
+                )
                 item = (
                     self.db.table('premium_content')
                     .select(basic_fields)
@@ -301,9 +312,13 @@ class PremiumService:
                     .execute()
                     .data
                 )
-            if item and float(item.get('price') or 0) <= 0:
+            if not item:
                 return None
-            return self._normalize_public_item(item) if item else None
+            # Descarta itens sem nenhum preço definido
+            has_price = float(item.get('price_students') or item.get('price_buyers') or item.get('price') or 0) > 0
+            if not has_price:
+                return None
+            return self._normalize_public_item(item)
 
         return await run_in_threadpool(_fetch)
 

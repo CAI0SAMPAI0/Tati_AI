@@ -78,6 +78,7 @@ export const ENDPOINTS = {
   ADMIN_SIMULATIONS: '/dashboard/simulations',
   ADMIN_SIMULATION_DETAIL: (id: string) => `/dashboard/simulations/${id}`,
   ADMIN_STUDENTS: '/dashboard/students',
+  ADMIN_BUYERS: '/dashboard/buyers',
   ADMIN_DIFFICULTIES: '/dashboard/difficulties',
   ADMIN_PREMIUM: '/admin/premium',
   ADMIN_PREMIUM_UPLOAD: '/admin/premium/upload',

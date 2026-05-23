@@ -11,7 +11,9 @@ export type CatalogMaterial = {
   id: string;
   title: string;
   description?: string | null;
-  price: number;
+  price: number;              // legado — mantido para compatibilidade
+  price_students?: number | null; // preço para alunos da Tati AI
+  price_buyers?: number | null;   // preço para clientes do Hub
   thumbnail_url?: string | null;
   preview_url?: string | null;
   category?: string | null;
@@ -20,6 +22,25 @@ export type CatalogMaterial = {
   type?: string | null;
   has_access?: boolean;
 };
+
+/**
+ * Resolve o preço correto com base no role do usuário.
+ * - 'buyer'   → price_buyers
+ * - qualquer outro (student, staff, sem login) → price_students
+ * Fallback para `price` legado se as colunas novas forem null/undefined.
+ */
+export function resolvePrice(item: CatalogMaterial, role?: string | null): number {
+  if (role === 'buyer') {
+    return item.price_buyers ?? item.price ?? 0;
+  }
+  return item.price_students ?? item.price ?? 0;
+}
+
+export function formatPrice(value: number): string {
+  return value === 0
+    ? 'Grátis'
+    : `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+}
 
 export const FILTER_OPTIONS = [
   { id: 'all', label: 'Todos' },

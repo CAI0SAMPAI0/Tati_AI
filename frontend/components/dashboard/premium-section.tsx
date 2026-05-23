@@ -14,9 +14,9 @@ import {
   Video,
   FileDigit,
   UploadCloud,
-  CheckCircle2,
   DollarSign,
-  SmilePlus
+  Users,
+  ShoppingBag,
 } from 'lucide-react';
 
 import { apiGet, apiPut, apiDelete, apiPost, apiUpload } from '@/lib/api/client';
@@ -32,7 +32,9 @@ interface PremiumContent {
   id: string;
   title: string;
   description: string;
-  price: number;
+  price: number;           // legado — mantido para compatibilidade
+  price_students: number;  // preço para alunos da Tati AI
+  price_buyers: number;    // preço para clientes do Hub
   type: 'pdf' | 'link' | 'article' | 'video';
   category?: string;
   content_source: string;
@@ -46,18 +48,20 @@ const EMPTY_FORM: Partial<PremiumContent> = {
   title: '',
   description: '',
   price: 0,
+  price_students: 0,
+  price_buyers: 0,
   type: 'pdf',
   category: 'other',
   content_source: '',
   thumbnail_url: '',
   emoji: '✨',
-  is_active: true
+  is_active: true,
 };
 
 export function PremiumSection() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -149,12 +153,15 @@ export function PremiumSection() {
     }
   };
 
+  const formatPrice = (val: number) =>
+    val === 0 ? 'FREE' : `R$ ${Number(val).toFixed(2)}`;
+
   const getIcon = (type: string) => {
     switch (type) {
-      case 'pdf': return <FileText size={20} />;
-      case 'link': return <LinkIcon size={20} />;
-      case 'video': return <Video size={20} />;
-      default: return <FileDigit size={20} />;
+      case 'pdf':     return <FileText size={20} />;
+      case 'link':    return <LinkIcon size={20} />;
+      case 'video':   return <Video size={20} />;
+      default:        return <FileDigit size={20} />;
     }
   };
 
@@ -171,9 +178,13 @@ export function PremiumSection() {
         </Button>
       </div>
 
+      {/* ── Cards ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {contents.map((item) => (
-          <div key={item.id} className="bg-surface border border-border p-5 rounded-2xl flex flex-col gap-4 group hover:border-primary/40 transition-all">
+          <div
+            key={item.id}
+            className="bg-surface border border-border p-5 rounded-2xl flex flex-col gap-4 group hover:border-primary/40 transition-all"
+          >
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="bg-primary/10 w-10 h-10 rounded-xl flex items-center justify-center text-primary">
@@ -181,31 +192,69 @@ export function PremiumSection() {
                 </div>
                 <div className="text-2xl">{item.emoji}</div>
               </div>
-              <div className="flex flex-col items-end gap-1">
-                <span className={cn("text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider",
-                  item.is_active ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'
-                )}>
-                  {item.is_active ? 'Active' : 'Inactive'}
-                </span>
-                <span className="text-xs font-bold text-primary">
-                  {item.price === 0 ? 'FREE' : `R$ ${item.price}`}
-                </span>
-              </div>
+              <span className={cn(
+                'text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider',
+                item.is_active
+                  ? 'bg-success/10 text-success border-success/20'
+                  : 'bg-warning/10 text-warning border-warning/20'
+              )}>
+                {item.is_active ? 'Active' : 'Inactive'}
+              </span>
             </div>
+
             <div>
               <h3 className="font-bold text-text truncate mb-1">{item.title}</h3>
               <p className="text-xs text-text-muted line-clamp-2 leading-relaxed">
                 {item.description}
               </p>
             </div>
+
+            {/* Preços separados por audiência */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/5 border border-primary/15">
+                <Users size={11} className="text-primary shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-[0.55rem] font-bold text-primary/70 uppercase tracking-wider leading-none mb-0.5">
+                    Tati AI
+                  </div>
+                  <div className="text-xs font-black text-primary truncate">
+                    {formatPrice(item.price_students ?? item.price ?? 0)}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-success/5 border border-success/15">
+                <ShoppingBag size={11} className="text-success shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-[0.55rem] font-bold text-success/70 uppercase tracking-wider leading-none mb-0.5">
+                    Hub
+                  </div>
+                  <div className="text-xs font-black text-success truncate">
+                    {formatPrice(item.price_buyers ?? item.price ?? 0)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-3 gap-2 mt-auto pt-2 border-t border-border">
-              <button onClick={() => openModal(item)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle group/edit" title="Edit content">
+              <button
+                onClick={() => openModal(item)}
+                className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle"
+                title="Edit content"
+              >
                 <PenLine size={16} />
               </button>
-              <button onClick={() => handleToggleActive(item)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-warning/10 hover:text-warning transition-all text-text-subtle group/toggle" title={item.is_active ? 'Inactivate content' : 'Activate content'}>
+              <button
+                onClick={() => handleToggleActive(item)}
+                className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-warning/10 hover:text-warning transition-all text-text-subtle"
+                title={item.is_active ? 'Inactivate' : 'Activate'}
+              >
                 {item.is_active ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
-              <button onClick={() => handleDelete(item.id)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle group/delete" title="Delete content permanently">
+              <button
+                onClick={() => handleDelete(item.id)}
+                className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle"
+                title="Delete permanently"
+              >
                 <Trash2 size={16} />
               </button>
             </div>
@@ -213,23 +262,37 @@ export function PremiumSection() {
         ))}
       </div>
 
+      {/* ── Modal ── */}
       <DialogModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={editingContent ? 'Edit Material' : 'New Premium Material'}
       >
         <div className="space-y-4">
+          {/* Título + Emoji */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="md:col-span-2">
-              <Input label="Title" value={formData.title} onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))} />
+              <Input
+                label="Title"
+                value={formData.title}
+                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+              />
             </div>
             <div>
-              <Input label="Theme Emoji" value={formData.emoji} placeholder="" onChange={(e) => setFormData(prev => ({ ...prev, emoji: e.target.value }))} />
+              <Input
+                label="Theme Emoji"
+                value={formData.emoji}
+                placeholder="✨"
+                onChange={(e) => setFormData(prev => ({ ...prev, emoji: e.target.value }))}
+              />
             </div>
           </div>
 
+          {/* Descrição */}
           <div>
-            <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">Description</label>
+            <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">
+              Description
+            </label>
             <textarea
               className="w-full min-h-[80px] px-3.5 py-2.5 bg-input border border-border rounded-md text-text text-sm outline-none focus:border-border-focus transition-all resize-none"
               value={formData.description}
@@ -238,9 +301,12 @@ export function PremiumSection() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Tipo + Categoria */}
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">Type</label>
+              <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">
+                Type
+              </label>
               <select
                 className="w-full px-3.5 py-2.5 bg-input border border-border rounded-md text-text text-sm outline-none focus:border-border-focus transition-all"
                 value={formData.type}
@@ -253,7 +319,9 @@ export function PremiumSection() {
               </select>
             </div>
             <div>
-              <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">Category</label>
+              <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">
+                Category
+              </label>
               <select
                 className="w-full px-3.5 py-2.5 bg-input border border-border rounded-md text-text text-sm outline-none focus:border-border-focus transition-all"
                 value={formData.category}
@@ -268,14 +336,71 @@ export function PremiumSection() {
                 <option value="other">Other</option>
               </select>
             </div>
-            <div>
-              <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider flex items-center gap-1">
-                <DollarSign size={12} /> Price (BRL)
-              </label>
-              <Input type="number" step="0.01" value={String(formData.price)} onChange={(e) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))} />
+          </div>
+
+          {/* ── Preços por audiência ── */}
+          <div>
+            <label className="block text-[0.73rem] font-semibold text-text-muted mb-2 uppercase tracking-wider flex items-center gap-1">
+              <DollarSign size={12} /> Pricing by Audience
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              {/* Students — Tati AI */}
+              <div className="p-3 rounded-xl border border-primary/20 bg-primary/5 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <Users size={13} className="text-primary" />
+                  <span className="text-[0.7rem] font-bold text-primary uppercase tracking-wider">
+                    Tati AI Students
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 bg-input border border-border rounded-md text-text text-sm outline-none focus:border-primary/50 transition-all"
+                  value={formData.price_students ?? ''}
+                  onChange={(e) =>
+                    setFormData(prev => ({
+                      ...prev,
+                      price_students: parseFloat(e.target.value) || 0,
+                    }))
+                  }
+                />
+                <p className="text-[0.65rem] text-text-muted leading-tight">
+                  Charged to users of the Tati AI app
+                </p>
+              </div>
+
+              {/* Buyers — Hub */}
+              <div className="p-3 rounded-xl border border-success/20 bg-success/5 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <ShoppingBag size={13} className="text-success" />
+                  <span className="text-[0.7rem] font-bold text-success uppercase tracking-wider">
+                    Hub Buyers
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 bg-input border border-border rounded-md text-text text-sm outline-none focus:border-success/50 transition-all"
+                  value={formData.price_buyers ?? ''}
+                  onChange={(e) =>
+                    setFormData(prev => ({
+                      ...prev,
+                      price_buyers: parseFloat(e.target.value) || 0,
+                    }))
+                  }
+                />
+                <p className="text-[0.65rem] text-text-muted leading-tight">
+                  Charged to Hub-only buyers
+                </p>
+              </div>
             </div>
           </div>
 
+          {/* Arquivo / URL */}
           <div>
             <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">
               {formData.type === 'link' || formData.type === 'video' ? 'URL Link' : 'File / Content Source'}
@@ -283,19 +408,27 @@ export function PremiumSection() {
             <div className="flex gap-2">
               <input
                 className="flex-1 px-3.5 py-2.5 bg-input border border-border rounded-md text-text text-sm outline-none focus:border-border-focus transition-all"
-                placeholder={formData.type === 'link' ? "https://notebooklm.google.com/..." : "File path or URL..."}
+                placeholder={
+                  formData.type === 'link'
+                    ? 'https://notebooklm.google.com/...'
+                    : 'File path or URL...'
+                }
                 value={formData.content_source}
                 onChange={(e) => setFormData(prev => ({ ...prev, content_source: e.target.value }))}
               />
               {formData.type !== 'link' && formData.type !== 'video' && (
                 <>
-                  <input ref={fileInputRef} type="file" className="hidden"
-                    onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])} />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+                  />
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
-                    className="px-3 py-2 bg-surface border border-border rounded-md hover:border-primary/50 transition-all text-text-muted hover:text-primary"
+                    className="px-3 py-2 bg-surface border border-border rounded-md hover:border-primary/50 transition-all text-text-muted hover:text-primary disabled:opacity-50"
                   >
                     <UploadCloud size={18} />
                   </button>

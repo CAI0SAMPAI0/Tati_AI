@@ -17,7 +17,10 @@ import {
   categoryLabel,
   categoryStyles,
   normalizeCategory,
+  resolvePrice,
+  formatPrice,
 } from '@/lib/catalog';
+import { useHubAuth } from '@/components/auth-provider';
 
 const categoryIcons: Record<MaterialCategory, ElementType> = {
   grammar: BookOpen,
@@ -36,14 +39,20 @@ type ProductCardProps = {
 };
 
 export default function ProductCard({ item, showOwned, onAccessGranted }: ProductCardProps) {
+  const { user } = useHubAuth();
   const category = normalizeCategory(item.category);
   const styles = categoryStyles(category);
   const Icon = categoryIcons[category];
-  const priceLabel = `R$ ${item.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+
+  // Usuários do hub-site sempre têm role='buyer' — mas usamos o campo real se disponível
+  const role = (user as any)?.role ?? 'buyer';
+  const price = resolvePrice(item, role);
+  const priceLabel = formatPrice(price);
+
   const rawPreview = item.preview_url || item.thumbnail_url;
   const storageUrl = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_URL || '';
-  const preview = rawPreview 
-    ? (rawPreview.startsWith('http') ? rawPreview : `${storageUrl}/${rawPreview}`) 
+  const preview = rawPreview
+    ? (rawPreview.startsWith('http') ? rawPreview : `${storageUrl}/${rawPreview}`)
     : null;
 
   return (
@@ -114,8 +123,9 @@ export default function ProductCard({ item, showOwned, onAccessGranted }: Produc
           </Link>
         ) : (
           <div className="flex-shrink-0">
+            {/* Passa o preço já resolvido — o checkout usa este valor */}
             <CheckoutFlow
-              item={{ id: item.id, title: item.title, price: item.price }}
+              item={{ id: item.id, title: item.title, price }}
               onAccessGranted={onAccessGranted}
             />
           </div>

@@ -85,7 +85,14 @@ async def buy_premium_content(
     if not content:
         raise ContentNotFoundError(detail="Conteúdo não encontrado")
     
-    if content['price'] <= 0:
+    # Resolve o preço correto conforme o role do usuário
+    user_role = user.get('role', '')
+    if user_role == 'buyer':
+        resolved_price = float(content.get('price_buyers') or content.get('price') or 0)
+    else:
+        resolved_price = float(content.get('price_students') or content.get('price') or 0)
+
+    if resolved_price <= 0:
         return {"message": "Este conteúdo é gratuito.", "free": True}
 
     # 2. Busca dados completos do usuário
@@ -105,7 +112,7 @@ async def buy_premium_content(
         payment = await create_payment(
             customer_id=customer_id,
             billing_type=billingType,
-            value=float(content['price']),
+            value=resolved_price,
             due_date=due_date,
             description=f"Tati AI - Premium: {content['title']}",
             external_reference=external_ref
@@ -148,6 +155,6 @@ async def buy_premium_content(
         "invoiceUrl": invoice_url,
         "pixQrCode": pix_qr_code,
         "pixCopyPaste": pix_copy_paste,
-        "value": content['price'],
+        "value": resolved_price,
         "title": content['title']
     }

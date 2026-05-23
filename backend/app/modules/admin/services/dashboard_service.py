@@ -1,9 +1,3 @@
-"""
-services/dashboard_service.py
-Serviço centralizado para o Dashboard Admin.
-Implementa queries reais ao banco de dados em vez de dados hardcoded.
-"""
-
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
@@ -56,10 +50,19 @@ class DashboardService:
                     .neq('role', 'buyer')
                     .execute()
                 )
+
+                res_buyers = (
+                    self.db.table('users')
+                    .select('username', count='exact')
+                    .eq('role', 'buyer')
+                    .execute()
+                )
                 total_students = res_users.count if res_users.count is not None else len(res_users.data)
+                total_buyers = res_buyers.count if res_buyers.count is not None else len(res_buyers.data)
             except Exception as e:
                 print(f"[DashboardService] Erro ao contar usuários: {e}")
                 total_students = 0
+                total_buyers = 0
 
             try:
                 # Tenta usar created_at, fallback para date
@@ -102,6 +105,7 @@ class DashboardService:
 
             return {
                 'total_students': total_students or 0,
+                'total_buyers': total_buyers or 0,
                 'total_messages': messages_today or 0,
                 'active_today': active_today,
             }
@@ -508,3 +512,89 @@ class DashboardService:
                 raise e
             
         return await run_in_threadpool(_delete)
+
+
+    async def get_buyers_list(self) -> List[Dict[str, Any]]:
+        """Lista usuários com role=buyer com total gasto via orders/order_items."""
+ 
+        def _fetch() -> List[Dict[str, Any]]:
+            try:
+                users = (
+                    self.db.table('users')
+                    .select('username, name, email, created_at, role')
+                    .eq('role', 'buyer')
+                    .limit(500)
+                    .execute()
+                    .data
+                    or []
+                )
+            except Exception as e:
+                print(f"[DashboardService] Erro ao buscar buyers: {e}")
+                return []
+ 
+            # Busca orders confirmadas com seus itens
+            # Fazemos dois fetches separados para evitar joins complexos via PostgREST
+            try:
+                orders_rows = (
+                    self.db.table('orders')
+                    .select('id, username, total_amount, status, confirmed_at, created_at, payment_method')
+                    .eq('status', 'confirmed')
+                    .execute()
+                    .data
+                    or []
+                )
+            except Exception as e:
+                print(f"[DashboardService] Erro ao buscar orders: {e}")
+                orders_rows = []
+ 
+            # Agrupa orders por username
+            orders_by_user: Dict[str, List[dict]] = {}
+            for o in orders_rows:
+                uname = o.get('username')
+                if uname:
+                    if uname not in orders_by_user:
+                        orders_by_user[uname] = []
+                    orders_by_user[uname].append(o)
+ 
+            processed = []
+            for u in users:
+                username = u.get('username')
+                if not username:
+                    continue
+ 
+                user_orders = orders_by_user.get(username, [])
+ 
+                total_spent = sum(
+                    float(o.get('total_amount') or 0)
+                    for o in user_orders
+                )
+                total_purchases = len(user_orders)
+ 
+                # Data da última compra confirmada
+                last_purchase_at = ''
+                if user_orders:
+                    dates = [o.get('confirmed_at') or o.get('created_at') or '' for o in user_orders]
+                    last_purchase_at = max(dates, default='')
+ 
+                u['total_purchases'] = total_purchases
+                u['total_spent'] = round(total_spent, 2)
+                u['last_purchase_at'] = last_purchase_at
+                u['last_active'] = last_purchase_at or u.get('created_at', '')
+                processed.append(u)
+ 
+            try:
+                processed.sort(
+                    key=lambda x: parse_dt(x.get('last_active')),
+                    reverse=True
+                )
+            except Exception:
+                pass
+ 
+            return processed
+ 
+        try:
+            return await run_in_threadpool(_fetch)
+        except Exception as e:
+            print(f"[DashboardService] Erro em get_buyers_list: {e}")
+            return []
+ 

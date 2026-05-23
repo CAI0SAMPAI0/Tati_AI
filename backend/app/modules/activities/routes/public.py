@@ -99,13 +99,18 @@ async def public_checkout(body: CheckoutRequest, service: PremiumService = Depen
         customer = await create_customer(name=body.name, email=clean_email, cpf_cnpj=raw_doc)
     customer_id = customer['id']
 
+    # Visitantes do hub-site são sempre compradores (buyers)
+    buyer_price = float(item.get('price_buyers') or item.get('price') or 0)
+    if buyer_price <= 0:
+        raise HTTPException(status_code=400, detail="Este material não possui preço configurado para compra.")
+
     due_date = (date.today() + timedelta(days=3)).isoformat()
-    print(f"[Checkout] billingType={body.billingType} customer_id={customer_id} value={item['price']}")
+    print(f"[Checkout] billingType={body.billingType} customer_id={customer_id} value={buyer_price}")
     try:
         payment = await create_payment(
             customer_id=customer_id,
             billing_type=body.billingType,
-            value=item['price'],
+            value=buyer_price,
             due_date=due_date,
             description=f"Material: {item['title']}",
             external_reference=f"HUB:{item['id']}:{username}"
@@ -129,7 +134,7 @@ async def public_checkout(body: CheckoutRequest, service: PremiumService = Depen
 
     order_res = db.table('orders').insert({
         'username': username,
-        'total_amount': item['price'],
+        'total_amount': buyer_price,
         'status': 'pending',
         'asaas_id': payment_id,
         'payment_method': body.billingType
@@ -140,7 +145,7 @@ async def public_checkout(body: CheckoutRequest, service: PremiumService = Depen
     db.table('order_items').insert({
         'order_id': order_id,
         'content_id': item['id'],
-        'price': item['price']
+        'price': buyer_price
     }).execute()
 
     pix_data = {}

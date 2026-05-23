@@ -1,8 +1,7 @@
 'use client';
 
-import { Users, MessageSquare, Zap, ChevronRight } from 'lucide-react';
+import { Users, MessageSquare, Zap, ShoppingBag, ChevronRight } from 'lucide-react';
 import { StatCard } from './stat-card';
-
 import { formatTime } from '@/lib/utils';
 
 interface OverviewSectionProps {
@@ -13,51 +12,84 @@ interface OverviewSectionProps {
 }
 
 export function OverviewSection({ stats, students, difficulties, onSeeAllStudents }: OverviewSectionProps) {
-  
-
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard 
-          icon={<Users size={24} />} 
-          value={stats?.total_students ?? '—'} 
-          label={'Total Students'} 
+      {/* ── Stat Cards: 4 colunas, separadas por produto ── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+        {/* Tati AI */}
+        <StatCard
+          icon={<Users size={24} />}
+          value={stats?.total_students ?? '—'}
+          label="Students (Tati AI)"
           trend="↑ Active"
           trendUp
         />
-        <StatCard 
-          icon={<MessageSquare size={24} />} 
-          value={stats?.total_messages ?? '—'} 
-          label={'Total Messages'} 
+        <StatCard
+          icon={<MessageSquare size={24} />}
+          value={stats?.total_messages ?? '—'}
+          label="Messages Today"
         />
-        <StatCard 
-          icon={<Zap size={24} />} 
-          value={stats?.active_today ?? '—'} 
-          label={'Active Today'} 
+
+        {/* Hub */}
+        <StatCard
+          icon={<ShoppingBag size={24} />}
+          value={stats?.total_buyers ?? '—'}
+          label="Buyers (Hub)"
+          trend="Hub clients"
+          trendUp
+        />
+        <StatCard
+          icon={<Zap size={24} />}
+          value={stats?.active_today ?? '—'}
+          label="Active Today"
           highlight
           trend="Today"
           trendUp
         />
       </div>
 
+      {/* ── Divisor visual entre produtos ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-primary/5 border border-primary/15">
+          <Users size={15} className="text-primary shrink-0" />
+          <span className="text-xs font-semibold text-primary">
+            Tati AI — English learning app (role: student / staff)
+          </span>
+        </div>
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-success/5 border border-success/15">
+          <ShoppingBag size={15} className="text-success shrink-0" />
+          <span className="text-xs font-semibold text-success">
+            Hub Premium — Material store (role: buyer)
+          </span>
+        </div>
+      </div>
+
+      {/* ── Tabelas ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Recent Students */}
         <div className="bg-surface border border-border rounded-2xl overflow-hidden">
           <div className="p-5 border-b border-border flex items-center justify-between">
-            <h3 className="font-bold text-text">{'Recent Students'}</h3>
-            <button 
+            <div className="flex items-center gap-2">
+              <Users size={16} className="text-primary" />
+              <h3 className="font-bold text-text">Recent Students</h3>
+              <span className="text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary uppercase tracking-wider">
+                Tati AI
+              </span>
+            </div>
+            <button
               onClick={onSeeAllStudents}
               className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
             >
-              {'See all →'} <ChevronRight size={14} />
+              See all <ChevronRight size={14} />
             </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead className="bg-bg-secondary/50 text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest">
                 <tr>
-                  <th className="px-5 py-3">{'Student'}</th>
-                  <th className="px-5 py-3">{'Level'}</th>
-                  <th className="px-5 py-3">{'Last active'}</th>
+                  <th className="px-5 py-3">Student</th>
+                  <th className="px-5 py-3">Level</th>
+                  <th className="px-5 py-3">Last active</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -92,6 +124,7 @@ export function OverviewSection({ stats, students, difficulties, onSeeAllStudent
           </div>
         </div>
 
+        {/* Class Difficulty Alerts */}
         <div className="bg-surface border border-border rounded-2xl overflow-hidden">
           <div className="p-5 border-b border-border">
             <h3 className="font-bold text-text">Class Difficulty Alerts</h3>
