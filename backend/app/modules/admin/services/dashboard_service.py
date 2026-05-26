@@ -448,34 +448,94 @@ class DashboardService:
             return {'error': str(e)}
 
     async def delete_student(self, username: str) -> bool:
-        """Exclui um aluno e todos os seus dados vinculados para evitar erros de FK."""
+        """Exclui um usuário (aluno ou buyer) e todos os seus dados vinculados — evita erros de FK."""
         def _delete():
-            uname = username.strip().lower()
-            print(f"[DashboardService] Iniciando exclusão total do aluno: {uname}")
-            
-            # 1. Limpeza de pedidos e itens (Novo Hub)
+            # ── 0. Resolve o username EXATO como está no banco (não forçar lowercase) ─
+            # O bug original: .lower() fazia o match falhar se o DB tinha capitalização
+            # diferente, resultando em orders não removidos e FK bloqueando a deleção.
             try:
-                orders = self.db.table('orders').select('id').eq('username', uname).execute().data
+                user_row = (
+                    self.db.table('users')
+                    .select('username')
+                    .eq('username', username.strip())
+                    .limit(1)
+                    .execute()
+                    .data
+                )
+                if not user_row:
+                    # Fallback: busca insensível a maiúsculas
+                    user_row = (
+                        self.db.table('users')
+                        .select('username')
+                        .ilike('username', username.strip())
+                        .limit(1)
+                        .execute()
+                        .data
+                    )
+                uname = user_row[0]['username'] if user_row else username.strip()
+            except Exception as e:
+                print(f"[DashboardService] Aviso ao resolver username exato: {e}")
+                uname = username.strip()
+
+            print(f"[DashboardService] Iniciando exclusão total do usuário: '{uname}'")
+
+            # ── 1. Limpeza de pedidos e itens (orders — FK crítica!) ─────────────
+            try:
+                orders = (
+                    self.db.table('orders')
+                    .select('id')
+                    .eq('username', uname)
+                    .execute()
+                    .data
+                ) or []
+                print(f"[DashboardService] {len(orders)} pedido(s) encontrado(s) para '{uname}'")
                 if orders:
                     order_ids = [o['id'] for o in orders]
                     self.db.table('order_items').delete().in_('order_id', order_ids).execute()
                     self.db.table('orders').delete().eq('username', uname).execute()
+                    print(f"[DashboardService] orders/order_items de '{uname}' removidos.")
             except Exception as e:
-                print(f"[DashboardService] Erro ao limpar orders/items para {uname}: {e}")
+                print(f"[DashboardService] ERRO ao limpar orders/items para '{uname}': {e}")
 
-            # 2. Limpeza de conversas e mensagens vinculadas
+            # ── Verificação de segurança — garante que orders foram limpos ────────
             try:
-                convs = self.db.table('conversations').select('id').eq('username', uname).execute().data
+                remaining = (
+                    self.db.table('orders')
+                    .select('id', count='exact')
+                    .eq('username', uname)
+                    .execute()
+                )
+                still_there = remaining.count or len(remaining.data or [])
+                if still_there > 0:
+                    raise RuntimeError(
+                        f"Ainda existem {still_there} pedido(s) em 'orders' para '{uname}'. "
+                        "Configure ON DELETE CASCADE na FK orders_username_fkey no Supabase, "
+                        "ou remova os pedidos manualmente antes de deletar o usuário."
+                    )
+            except RuntimeError:
+                raise  # erro crítico — propaga para o caller
+            except Exception as e:
+                print(f"[DashboardService] Aviso na verificação de orders para '{uname}': {e}")
+
+            # ── 2. Limpeza de conversas e mensagens vinculadas ────────────────────
+            try:
+                convs = (
+                    self.db.table('conversations')
+                    .select('id')
+                    .eq('username', uname)
+                    .execute()
+                    .data
+                ) or []
                 if convs:
                     conv_ids = [c['id'] for c in convs]
                     self.db.table('messages').delete().in_('session_id', conv_ids).execute()
                     self.db.table('conversations').delete().eq('username', uname).execute()
             except Exception as e:
-                print(f"[DashboardService] Erro ao limpar conversas/mensagens para {uname}: {e}")
+                print(f"[DashboardService] Erro ao limpar conversas/mensagens para '{uname}': {e}")
 
-            # 3. Tabelas que usam username como FK direta (Lista Expandida)
+            # ── 3. Tabelas com FK direta em username ──────────────────────────────
             tables = [
-                'messages', # Tenta deletar direto também, caso existam órfãs
+                'messages',              # órfãs diretas
                 'activity_submissions',
                 'user_exercise_attempts',
                 'user_errors',
@@ -490,27 +550,26 @@ class DashboardService:
                 'user_goals',
                 'user_stats',
                 'flashcards',
-                'user_feedback'
+                'user_feedback',
             ]
-            
+
             for table in tables:
                 try:
                     self.db.table(table).delete().eq('username', uname).execute()
                 except Exception as e:
-                    # Log simplificado para evitar flood se a tabela não existir
                     err_msg = str(e)
-                    if "PGRST205" not in err_msg: # Se não for "tabela não encontrada"
-                        print(f"[DashboardService] Erro ao limpar {table} para {uname}: {e}")
-            
-            # 4. Por fim, deleta o usuário
+                    if 'PGRST205' not in err_msg:  # ignora "tabela não existe"
+                        print(f"[DashboardService] Erro ao limpar {table} para '{uname}': {e}")
+
+            # ── 4. Deleta o usuário ───────────────────────────────────────────────
             try:
                 res = self.db.table('users').delete().eq('username', uname).execute()
-                print(f"[DashboardService] Resultado da exclusão de users para {uname}: {res.data}")
+                print(f"[DashboardService] Usuário '{uname}' excluído. Resposta: {res.data}")
                 return True
             except Exception as e:
-                print(f"[DashboardService] ERRO CRÍTICO ao deletar usuário {uname}: {e}")
+                print(f"[DashboardService] ERRO CRÍTICO ao deletar usuário '{uname}': {e}")
                 raise e
-            
+
         return await run_in_threadpool(_delete)
 
 

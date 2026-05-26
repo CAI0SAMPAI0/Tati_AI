@@ -117,9 +117,30 @@ async def delete_student(
     service: DashboardService = Depends(),
     user=Depends(require_staff)
 ) -> dict:
-    """Remove um aluno do sistema com limpeza de dependências."""
-    await service.delete_student(username)
-    return {'ok': True}
+    """Remove um aluno do sistema com limpeza de todas as dependências (FK-safe)."""
+    try:
+        await service.delete_student(username)
+        return {'ok': True}
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao deletar aluno: {e}")
+
+
+@router.delete('/buyers/{username}', status_code=200)
+async def delete_buyer(
+    username: str,
+    service: DashboardService = Depends(),
+    user=Depends(require_staff)
+) -> dict:
+    """Remove um buyer e todos os seus dados (orders, order_items, purchases) — FK-safe."""
+    try:
+        await service.delete_student(username)  # reutiliza a mesma lógica completa
+        return {'ok': True}
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao deletar buyer: {e}")
 
 
 # ── Análises por aluno ─────────────────────────────────────────────────────────

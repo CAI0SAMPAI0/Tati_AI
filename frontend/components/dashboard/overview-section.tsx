@@ -14,8 +14,15 @@ interface OverviewSectionProps {
 export function OverviewSection({ stats, students, difficulties, onSeeAllStudents }: OverviewSectionProps) {
   return (
     <div className="space-y-8">
-      {/* ── Stat Cards: 4 colunas, separadas por produto ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+      {/* ── Stat Cards ── */}
+      {/*
+        ✏️ CORREÇÃO PRINCIPAL:
+        - mobile:  2 colunas (grid-cols-2)
+        - md:      ainda 2 colunas — sidebar existe aqui e rouba espaço
+        - lg:      4 colunas (lg:grid-cols-4) — só quando tem espaço real
+        - gap menor no mobile, maior no desktop
+      */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
         {/* Tati AI */}
         <StatCard
           icon={<Users size={24} />}
@@ -49,6 +56,9 @@ export function OverviewSection({ stats, students, difficulties, onSeeAllStudent
       </div>
 
       {/* ── Divisor visual entre produtos ── */}
+      {/*
+        ✏️ empilha no mobile (grid-cols-1), lado a lado no md+
+      */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-primary/5 border border-primary/15">
           <Users size={15} className="text-primary shrink-0" />
@@ -65,6 +75,10 @@ export function OverviewSection({ stats, students, difficulties, onSeeAllStudent
       </div>
 
       {/* ── Tabelas ── */}
+      {/*
+        ✏️ empilha no mobile e md (col-1), lado a lado só no lg+
+        No range 768–1023px com sidebar, duas colunas de tabela ficam apertadas demais
+      */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Recent Students */}
         <div className="bg-surface border border-border rounded-2xl overflow-hidden">
