@@ -80,6 +80,46 @@ class ActivityService:
 
     async def get_module_details(self, module_id: str) -> Optional[Dict[str, Any]]:
         """Busca detalhes de um módulo e suas lições."""
+        if str(module_id).startswith('cefr_fc_'):
+            parts = module_id.split('_')
+            if len(parts) >= 4:
+                level = parts[2].upper()
+                def _fetch_cefr_fc():
+                    res = self.db.table('cefr_flashcards').select('*').eq('level', level).eq('is_published', True).execute()
+                    rows = res.data or []
+                    
+                    import re
+                    matched_rows = []
+                    matched_topic = ""
+                    for r in rows:
+                        t = r.get('topic') or 'General Vocabulary'
+                        t_slug = re.sub(r'[^a-zA-Z0-9]', '_', t.lower())
+                        if t_slug == "_".join(parts[3:]):
+                            matched_rows.append(r)
+                            matched_topic = t
+                            
+                    if not matched_rows:
+                        return None
+                        
+                    flashcards = []
+                    for row in matched_rows:
+                        flashcards.append({
+                            "front": row['front'],
+                            "back": row['back'],
+                            "explanation": row['explanation'] or "No explanation provided.",
+                            "image_url": row.get('image_url')
+                        })
+                        
+                    return {
+                        "id": module_id,
+                        "title": f"CEFR {level}: {matched_topic}",
+                        "description": f"Vocabulary deck about {matched_topic}.",
+                        "level": level,
+                        "flashcards": flashcards,
+                        "lessons": []
+                    }
+                return await run_in_threadpool(_fetch_cefr_fc)
+            return None
 
         def _fetch():
             try:

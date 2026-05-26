@@ -69,6 +69,10 @@ def register_all_routers(app: FastAPI) -> None:
     app.include_router(
         admin_premium_router, prefix='/admin/premium', tags=['admin']
     )
+    
+    # CEFR Admin Router
+    from app.modules.cefr.routes.admin import router as cefr_admin_router
+    app.include_router(cefr_admin_router, tags=['admin'])
 
     # ── AI ────────────────────────────────────────────────────
     from app.modules.chat.routes.chat import router as chat_router

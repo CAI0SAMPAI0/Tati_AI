@@ -244,7 +244,6 @@ export default function ProfilePage() {
             </div>
 
             <Button className="w-full h-12 text-sm font-bold gap-2 mt-4" onClick={handleSaveProfile} loading={isSaving}>
-              <CheckCircle2 size={18} />
               {'Save changes'}
             </Button>
           </section>
@@ -255,7 +254,7 @@ export default function ProfilePage() {
               <Lock size={20} className="text-primary" />
               {'Security'}
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-text-subtle uppercase ml-1">{'Current password'}</label>
                 <div className="relative">

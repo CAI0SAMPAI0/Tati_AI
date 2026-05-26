@@ -21,6 +21,49 @@ class QuizService:
 
     async def get_quiz(self, quiz_id: str) -> Optional[Dict[str, Any]]:
         """Busca um quiz e suas questões."""
+        if str(quiz_id).startswith('cefr_'):
+            parts = quiz_id.split('_')
+            if len(parts) >= 3:
+                level = parts[1].upper()
+                def _fetch_cefr():
+                    res = self.db.table('cefr_exercises').select('*').eq('level', level).eq('is_published', True).execute()
+                    rows = res.data or []
+                    
+                    import re
+                    matched_rows = []
+                    matched_topic = ""
+                    for r in rows:
+                        t = r.get('topic') or 'General Practice'
+                        t_slug = re.sub(r'[^a-zA-Z0-9]', '_', t.lower())
+                        if t_slug == "_".join(parts[2:]):
+                            matched_rows.append(r)
+                            matched_topic = t
+                            
+                    if not matched_rows:
+                        return None
+                        
+                    questions = []
+                    for idx, row in enumerate(matched_rows):
+                        questions.append({
+                            "id": str(row['id']),
+                            "quiz_id": quiz_id,
+                            "question": row['question'],
+                            "options": row['options'],
+                            "correct_index": row['correct_index'],
+                            "explanation": row['explanation'] or "No explanation provided.",
+                            "order": idx
+                        })
+                        
+                    return {
+                        "id": quiz_id,
+                        "title": f"CEFR {level}: {matched_topic}",
+                        "description": f"AI-generated quiz from your materials about {matched_topic}.",
+                        "module_id": "00000000-0000-0000-0000-000000000001",
+                        "module_title": "AI Exercises",
+                        "questions": questions
+                    }
+                return await run_in_threadpool(_fetch_cefr)
+            return None
 
         def _fetch():
             quiz = (

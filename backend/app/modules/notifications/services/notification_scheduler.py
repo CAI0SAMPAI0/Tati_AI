@@ -264,7 +264,7 @@ class NotificationScheduler:
         print("[Scheduler] Verificando inatividade...")
 
         def _fetch():
-            return self.db.table('users').select('username, name, last_active, weekly_plan').execute().data or []
+            return self.db.table('users').select('username, name, weekly_plan').execute().data or []
 
         users = await run_in_threadpool(_fetch)
         now = datetime.now(timezone.utc)

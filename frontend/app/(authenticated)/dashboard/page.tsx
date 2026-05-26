@@ -14,6 +14,7 @@ import { ModulesSection } from '@/components/dashboard/modules-section';
 import  SimulationsSection  from '@/components/dashboard/simulations-section';
 import { FlashcardsSection } from '@/components/dashboard/flashcards-section';
 import { PremiumSection } from '@/components/dashboard/premium-section';
+import { CefrSection } from '@/components/dashboard/cefr-section';
 import { StudentModal } from '@/components/dashboard/student-modal';
 import { apiGet } from '@/lib/api/client';
 
@@ -32,12 +33,12 @@ export default function DashboardPage() {
   // Get tab from URL or localStorage
   const getInitialTab = (): DashSection => {
     const tabParam = searchParams.get('tab') as DashSection;
-    if (tabParam && ['overview', 'students', 'reports', 'modules', 'flashcards', 'simulations', 'premium'].includes(tabParam)) {
+    if (tabParam && ['overview', 'students', 'reports', 'modules', 'flashcards', 'simulations', 'premium', 'cefr'].includes(tabParam)) {
       return tabParam;
     }
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('tati_last_dashboard_tab') as DashSection;
-      if (saved && ['overview', 'students', 'reports', 'modules', 'flashcards', 'simulations', 'premium'].includes(saved)) {
+      if (saved && ['overview', 'students', 'reports', 'modules', 'flashcards', 'simulations', 'premium', 'cefr'].includes(saved)) {
         return saved;
       }
     }
@@ -77,6 +78,7 @@ export default function DashboardPage() {
     modules: 'Modules',
     simulations: 'Simulations',
     flashcards: 'Flashcards',
+    cefr: 'CEFR Materials',
     submissions: 'Corrections'
   };
 
@@ -87,6 +89,7 @@ export default function DashboardPage() {
     modules: 'Management of modules and activities',
     simulations: 'Manage real-life conversation simulations',
     flashcards: 'Vocabulary deck management',
+    cefr: 'CEFR diagnostic and RAG materials',
     submissions: 'Student answers to review'
   };
 
@@ -156,6 +159,7 @@ export default function DashboardPage() {
                   modules: 'Modules',
                   flashcards: 'Flashcards',
                   simulations: 'Simulations',
+                  cefr: 'CEFR Materials',
                   premium: 'Premium Hub'
                 }[activeSection] || activeSection}
               </h1>
@@ -168,6 +172,7 @@ export default function DashboardPage() {
                   modules: 'Educational contents',
                   flashcards: 'Study decks',
                   simulations: 'Real-world scenarios',
+                  cefr: 'Diagnose and generate from PDFs',
                   premium: 'Premium materials & payments'
                 }[activeSection]}
               </p>
@@ -192,6 +197,7 @@ export default function DashboardPage() {
           {activeSection === 'modules' && <ModulesSection />}
           {activeSection === 'simulations' && <SimulationsSection />}
           {activeSection === 'flashcards' && <FlashcardsSection />}
+          {activeSection === 'cefr' && <CefrSection />}
           {activeSection === 'premium' && <PremiumSection />}
 
           {activeSection === 'students' && (

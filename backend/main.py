@@ -104,10 +104,16 @@ register_all_routers(app)
 
 @app.on_event('startup')
 async def startup_notifications() -> None:
-    """Inicia o scheduler de notificações e lembretes."""
+    """Inicia os schedulers da aplicação."""
     # pyright: ignore[reportMissingImports]
     from app.modules.notifications.services.notification_scheduler import notification_scheduler
+    from app.modules.cefr.services.cefr_scheduler import CEFRScheduler
 
+    # Configura o gerador semanal do CEFR usando o mesmo loop scheduler
+    cefr_scheduler = CEFRScheduler(notification_scheduler.scheduler)
+    cefr_scheduler.start()
+
+    # Inicia o scheduler principal (que roda todos os jobs registrados)
     notification_scheduler.start()
 
 

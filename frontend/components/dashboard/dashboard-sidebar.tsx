@@ -18,7 +18,7 @@ import {
 
 import { cn } from '@/lib/utils';
 
-export type DashSection = 'overview' | 'students' | 'reports' | 'modules' | 'flashcards' | 'simulations' | 'premium';
+export type DashSection = 'overview' | 'students' | 'reports' | 'modules' | 'flashcards' | 'simulations' | 'premium' | 'cefr';
 
 interface DashboardSidebarProps {
   activeSection: DashSection;
@@ -35,6 +35,7 @@ export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose 
     { id: 'modules', icon: <BookOpen size={20} />, label: 'Modules' },
     { id: 'flashcards', icon: <Layers size={20} />, label: 'Flashcards' },
     { id: 'simulations', icon: <Drama size={20} />, label: 'Simulations' },
+    { id: 'cefr', icon: <BookOpen size={20} />, label: 'CEFR Materials' },
     { id: 'premium', icon: <Zap size={20} />, label: 'Premium Hub' },
   ];
 

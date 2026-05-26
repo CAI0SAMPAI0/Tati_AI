@@ -116,7 +116,70 @@ async def get_personalized_module(current_user: dict = Depends(get_current_user)
             
             # Quizzes do usuário (limita aos últimos 15 para não poluir)
             quizzes = db.table('quizzes').select('*').eq('module_id', PERSONALIZED_MODULE_ID).eq('username', username).order('created_at', desc=True).limit(15).execute().data or []
-            module['quizzes'] = quizzes
+            
+            # 1. Carrega nível do usuário
+            user_res = db.table('users').select('level').eq('username', username).single().execute()
+            user_level = user_res.data.get('level', 'Intermediate') if (user_res and user_res.data) else 'Intermediate'
+            
+            # 2. Mapeamento para níveis CEFR
+            def map_user_level_to_cefr(ulvl: str) -> list[str]:
+                mapping = {
+                    'Beginner': ['A1'],
+                    'Pre-Intermediate': ['A2'],
+                    'Intermediate': ['B1', 'B2'],
+                    'Business English': ['C1'],
+                    'Advanced': ['C2']
+                }
+                return mapping.get(ulvl or 'Intermediate', ['B1', 'B2'])
+            
+            cefr_levels = map_user_level_to_cefr(user_level)
+            
+            # 3. Busca exercícios CEFR publicados
+            cefr_res = db.table('cefr_exercises').select('*').in_('level', cefr_levels).eq('is_published', True).execute()
+            cefr_rows = cefr_res.data or []
+            
+            # 4. Agrupa por tópico
+            from collections import defaultdict
+            import re
+            
+            grouped = defaultdict(list)
+            for row in cefr_rows:
+                topic = row.get('topic') or 'General Practice'
+                grouped[topic].append(row)
+            
+            # 5. Busca histórico de submissões para marcar como "done"
+            subs_res = db.table('activity_submissions').select('metadata').eq('username', username).eq('activity_type', 'quiz').execute()
+            completed_quiz_ids = set()
+            for s in (subs_res.data or []):
+                meta = s.get('metadata')
+                if meta and isinstance(meta, dict) and meta.get('quiz_id'):
+                    completed_quiz_ids.add(meta.get('quiz_id'))
+            
+            # 6. Cria quizzes virtuais
+            virtual_quizzes = []
+            for topic, items in grouped.items():
+                level_str = items[0]['level']
+                topic_slug = re.sub(r'[^a-zA-Z0-9]', '_', topic.lower())
+                quiz_id = f"cefr_{level_str}_{topic_slug}"
+                
+                is_done = quiz_id in completed_quiz_ids
+                
+                virtual_quizzes.append({
+                    "id": quiz_id,
+                    "title": f"CEFR {level_str}: {topic}",
+                    "description": f"Exercises about {topic}.",
+                    "module_id": PERSONALIZED_MODULE_ID,
+                    "username": username,
+                    "status": "done" if is_done else "new",
+                    "created_at": items[0].get('created_at') or now.isoformat()
+                })
+            
+            # 7. Mescla quizzes reais (personalizados por erros) e virtuais (CEFR)
+            all_quizzes = quizzes + virtual_quizzes
+            # Ordena por data de criação descrescente
+            all_quizzes.sort(key=lambda x: x.get('created_at') or '', reverse=True)
+            
+            module['quizzes'] = all_quizzes
             return module
         except Exception as e:
             print(f"[PersonalizedRouter] Erro no fetch: {e}")
