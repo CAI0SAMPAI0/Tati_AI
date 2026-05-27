@@ -5,8 +5,17 @@ import { AuthProvider } from './auth-provider';
 import { QueryProvider } from './query-provider';
 import { I18nProvider } from './i18n-provider';
 import { Toaster } from 'react-hot-toast';
-import { RegisterServiceWorker } from '@/components/pwa/register-sw';
-import { CapacitorHandler } from '@/components/pwa/capacitor-handler';
+import dynamic from 'next/dynamic';
+
+const RegisterServiceWorker = dynamic(
+  () => import('@/components/pwa/register-sw').then(m => ({ default: m.RegisterServiceWorker })),
+  { ssr: false }
+);
+
+const CapacitorHandler = dynamic(
+  () => import('@/components/pwa/capacitor-handler').then(m => ({ default: m.CapacitorHandler })),
+  { ssr: false }
+);
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
