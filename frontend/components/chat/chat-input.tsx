@@ -194,6 +194,7 @@ export function ChatInput({ onSend, onSendAudio, onSendFile, disabled, isStreami
           />
           
           <button
+            aria-label='Anexar arquivo'
             type="button"
             onClick={handleAttachClick}
             disabled={disabled || isStreaming || isRecording}
@@ -222,6 +223,7 @@ export function ChatInput({ onSend, onSendAudio, onSendFile, disabled, isStreami
 
           {isRecording ? (
             <button
+              aria-label='Parar gravação'
               type="button"
               onClick={stopRecording}
               className="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-glow-red"
@@ -231,6 +233,7 @@ export function ChatInput({ onSend, onSendAudio, onSendFile, disabled, isStreami
             </button>
           ) : (
             <button
+              aria-label='Gravar áudio'
               type="button"
               onClick={startRecording}
               disabled={disabled || isStreaming}
@@ -247,6 +250,7 @@ export function ChatInput({ onSend, onSendAudio, onSendFile, disabled, isStreami
           {!isRecording && (
             <button
               onClick={handleSend}
+              aria-label="Enviar mensagem"
               disabled={(!text.trim() && attachments.length === 0) || disabled || isStreaming}
               className={cn(
                 'p-2.5 rounded-lg bg-primary text-white transition-all active:scale-95 disabled:opacity-40 disabled:scale-100 disabled:pointer-events-none',

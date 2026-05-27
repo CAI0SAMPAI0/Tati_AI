@@ -55,9 +55,9 @@ export default function CompetitionsPage() {
         <main className="p-4 md:p-8 max-w-4xl w-full mx-auto space-y-8 animate-fade-in">
           <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-               <h2 className="text-2xl md:text-3xl font-display font-bold text-text mb-2">
+               <h1 className="text-2xl md:text-3xl font-display font-bold text-text mb-2">
                  Competitions
-               </h2>
+               </h1>
                <p className="text-text-muted text-sm">
                  See who the most engaged students are and climb the ranking!
                </p>

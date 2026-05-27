@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
 import type { Message } from '@/lib/api/types';
 import { MessageBubble } from './message-bubble';
@@ -34,7 +35,7 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit }:
       {showWelcome && (
         <div className="flex flex-col items-center justify-center py-12 text-center animate-fade-in">
           <div className="w-16 h-16 rounded-full border-[3px] border-primary/40 shadow-glow overflow-hidden mb-4">
-            <img src="/images/tati_logo.jpg" alt="Tati" className="w-full h-full object-cover" />
+            <Image src="/images/tati_logo.jpg" alt="Tati" width={28} height={28} className="w-full h-full object-cover" />
           </div>
           <h2 className="font-display text-xl font-bold mb-2">
             Hi! I'm Teacher Tati 👋
@@ -90,7 +91,7 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit }:
       {isStreaming && !streamingContent && (
         <div key="typing-indicator" className="flex gap-3 animate-fade-in">
           <div className="w-7 h-7 rounded-full border border-border bg-surface overflow-hidden shrink-0 mt-1 shadow-sm">
-             <img src="/images/tati_logo.jpg" alt="Tati" className="w-full h-full object-cover" />
+             <Image src="/images/tati_logo.jpg" alt="Tati" className="w-full h-full object-cover" width={28} height={28} />
           </div>
           <div className="bg-surface border border-border px-4 py-3 rounded-xl rounded-bl-sm flex gap-1.5 items-center shadow-sm">
             <span className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce [animation-delay:-0.3s]" />

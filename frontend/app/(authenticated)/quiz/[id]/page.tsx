@@ -1,16 +1,12 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
   ChevronLeft, 
-  CheckCircle2, 
-  XCircle, 
   ArrowRight, 
   RotateCcw, 
-  Flag,
   Target,
-  Clock,
   CircleCheck,
   CircleX,
   FileText
@@ -23,7 +19,10 @@ import { Spinner } from '@/components/ui/spinner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import ReactMarkdown from 'react-markdown';
+import dynamic from 'next/dynamic';
+
+
+const ReactMarkdown = dynamic(() => import('react-markdown'), { ssr: false });
 
 interface QuizQuestion {
   id: string;

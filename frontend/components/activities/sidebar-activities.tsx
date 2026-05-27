@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, User, Trophy, ChartBar, MessageSquare, X, TrendingUp, Zap } from 'lucide-react';
-import { LuGoal } from 'react-icons/lu';
+import { BookOpen, Trophy, ChartBar, MessageSquare, X, TrendingUp, Zap } from 'lucide-react';
+import { Target } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -29,7 +29,7 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
         { href: '/activities', icon: <BookOpen size={20} />, label: 'Activities' },
         { href: '/activities/hub', icon: <Zap size={20} />, label: 'Hub' },
         { href: '/progress', icon: <TrendingUp size={20} />, label: 'Progress' },
-        { href: '/goals', icon: <LuGoal size={20} />, label: 'Goals' },
+        { href: '/goals', icon: <Target size={20} />, label: 'Goals' },
         { href: '/achievements', icon: <Trophy size={20} />, label: 'Achievements' },
         { href: '/competitions', icon: <ChartBar size={20} />, label: 'Competitions' },
       ];
@@ -55,7 +55,7 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
           <span className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest">
             Main Menu
           </span>
-          <button onClick={onClose} className="p-1.5 rounded-md hover:bg-surface-hover text-text-muted md:hidden">
+          <button aria-label="Fechar menu" onClick={onClose} className="p-1.5 rounded-md hover:bg-surface-hover text-text-muted md:hidden">
             <X size={18} />
           </button>
         </div>

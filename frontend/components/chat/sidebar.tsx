@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -99,10 +100,7 @@ export function Sidebar({
         <div className="flex items-center justify-between p-4 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg overflow-hidden bg-primary/20 flex items-center justify-center text-primary">
-              <img
-                src="/images/tati_logo.jpg"
-                alt="Tati"
-                className="w-full h-full object-cover"
+              <Image src="/images/tati_logo.jpg" alt="Tati" width={28} height={28} className="w-full h-full object-cover"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none';
                   (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
@@ -115,6 +113,7 @@ export function Sidebar({
             </span>
           </div>
           <button
+            aria-label="Fechar menu"
             onClick={onClose}
             className="p-1.5 rounded-md hover:bg-surface-hover text-text-muted md:hidden"
           >
@@ -129,7 +128,7 @@ export function Sidebar({
         >
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-[hsl(270,60%,32%)] flex items-center justify-center text-[0.7rem] font-bold text-white shrink-0 overflow-hidden">
             {user?.avatar_url ? (
-              <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+              <Image src={user.avatar_url} alt="Avatar" width={32} height={32} className="w-full h-full object-cover" />
             ) : (
               (user?.name || user?.username || '?').charAt(0).toUpperCase()
             )}
@@ -205,6 +204,7 @@ export function Sidebar({
           )}
           <div className="flex-1" />
           <button
+            aria-label='Apagar todas as conversas'
             onClick={handleDeleteAll}
             className="p-2 rounded-lg border border-border text-text-muted hover:bg-danger/10 hover:text-danger hover:border-danger/50 transition-all"
             title="Delete all"
@@ -212,6 +212,7 @@ export function Sidebar({
             <Trash2 size={18} />
           </button>
           <button
+            aria-label='Sair da conta'
             onClick={logout}
             className="p-2 rounded-lg border border-border text-text-muted hover:bg-danger/10 hover:text-danger hover:border-danger/50 transition-all"
             title="Sign out"

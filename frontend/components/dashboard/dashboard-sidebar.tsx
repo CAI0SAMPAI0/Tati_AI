@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   PieChart,
@@ -7,7 +8,6 @@ import {
   LineChart,
   BookOpen,
   Layers,
-  FileSignature,
   Drama,
   MessageSquare,
   Settings,
@@ -68,9 +68,11 @@ export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose 
         <div className="p-6 shrink-0 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg overflow-hidden bg-primary/20 flex items-center justify-center text-primary shrink-0 border border-primary/10">
-              <img
+              <Image
                 src="/images/tati_logo.jpg"
                 alt="Tati AI"
+                width={32}
+                height={32}
                 className="w-full h-full object-cover"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;

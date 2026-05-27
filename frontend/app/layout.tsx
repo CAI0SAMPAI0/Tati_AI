@@ -1,7 +1,13 @@
 import { Sora, DM_Sans } from 'next/font/google';
 import './globals.css';
 import { AppProviders } from '@/providers/app-providers';
-import DeployBanner from '@/components/DeployBanner';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Teacher Tati - AI English Learning',
+  description: 'Practice English with an AI teacher 24/7.',
+  manifest: '/manifest.json',
+};
 
 const sora = Sora({
   subsets: ['latin'],
@@ -38,7 +44,6 @@ export default function RootLayout({
       <body>
         <AppProviders>
           {children}
-          <DeployBanner />
         </AppProviders>
       </body>
     </html>

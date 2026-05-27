@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { Menu, Trophy, Flame, CircleAlert } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -8,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
-import { cn } from '@/lib/utils';
 import { NotificationsDropdown } from './notifications-dropdown';
 
 interface MainHeaderProps {
@@ -24,7 +24,7 @@ interface StreakData {
 
 export function MainHeader({ onToggleMenu }: MainHeaderProps) {
   const { user } = useAuth();
-  
+
   // Use TanStack Query to fetch streak and trophy data
   const { data: streakData } = useQuery<StreakData>({
     queryKey: ['streak-data'],
@@ -58,7 +58,7 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
             </span>
           </Button>
           {!isHubOnly && (
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-text-subtle">
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-text-subtle" aria-label="Informações">
               <CircleAlert size={18} />
             </Button>
           )}
@@ -69,12 +69,15 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
             <>
               <div className="flex items-center gap-1.5 text-orange-500 font-bold text-sm" title="Streak">
                 <Flame size={18} fill="currentColor" />
-                <span>{streakData?.current_streak ?? user?.streak ?? 0}</span>
+                <span className="min-w-[1ch] inline-block">
+                  {streakData?.current_streak ?? user?.streak ?? 0}
+                </span>
+
               </div>
 
-              <div className="flex items-center gap-1.5 text-yellow-500 font-bold text-sm" title="Achievements">        
+              <div className="flex items-center gap-1.5 text-yellow-500 font-bold text-sm" title="Achievements">
                 <Trophy size={18} fill="currentColor" />
-                <span className="text-text-muted font-medium">
+                <span className="text-text-muted font-medium min-w-[4ch] inline-block">
                   {streakData?.trophies_earned ?? 0}/50
                 </span>
               </div>
@@ -85,15 +88,14 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
 
           <Link
             href="/profile"
-            className="flex items-center gap-2 pl-2 border-l border-border hover:opacity-80 transition-opacity" 
+            className="flex items-center gap-2 pl-2 border-l border-border hover:opacity-80 transition-opacity"
           >
             <span className="hidden md:block text-xs font-semibold text-text truncate max-w-[100px]">
               {user?.name || user?.username}
             </span>
             <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-[0.7rem] font-bold text-primary overflow-hidden">
               {user?.avatar_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                <Image src={user.avatar_url} alt="Avatar" width={32} height={32} className="w-full h-full object-cover" />
               ) : (
                 (user?.name || user?.username || '?').charAt(0).toUpperCase()
               )}

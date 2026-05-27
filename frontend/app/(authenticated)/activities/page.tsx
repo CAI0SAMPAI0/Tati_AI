@@ -219,9 +219,9 @@ export default function ActivitiesPage() {
         <main className="p-4 md:p-8 max-w-7xl w-full mx-auto animate-fade-in">
           <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
-              <h2 className="text-2xl md:text-3xl font-display font-bold text-text mb-2">
+              <h1 className="text-2xl md:text-3xl font-display font-bold text-text mb-2">
                 {'My Activities'}
-              </h2>
+              </h1>
               <p className="text-text-muted text-sm md:text-base max-w-2xl">
                 {'Practice vocabulary, grammar and pronunciation. Earn points in the ranking!'}
               </p>

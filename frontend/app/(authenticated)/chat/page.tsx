@@ -6,7 +6,6 @@ import { Sidebar } from '@/components/chat/sidebar';
 import { ChatTopbar } from '@/components/chat/topbar';
 import { MessageList } from '@/components/chat/message-list';
 import { ChatInput } from '@/components/chat/chat-input';
-import { WeeklyPlanHeader } from '@/components/chat/weekly-plan-header';
 import { fetchWeeklyPlan } from '@/lib/api/weekly-plan';
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { apiGet, apiPost, apiPatch } from '@/lib/api/client';
@@ -16,8 +15,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
-import ReactMarkdown from 'react-markdown';
+import dynamic from 'next/dynamic';
 import remarkGfm from 'remark-gfm';
+
+const ReactMarkdown = dynamic(() => import('react-markdown'), { ssr: false });
 
 export default function ChatPage() {
   const router = useRouter();

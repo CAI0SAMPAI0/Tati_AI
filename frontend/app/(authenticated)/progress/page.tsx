@@ -2,14 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
+import dynamic from 'next/dynamic';
 import { MessageSquare, BookOpen, CalendarDays, Type, Flame, Lightbulb, Download } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
@@ -77,6 +70,14 @@ const LEVEL_COLORS: Record<string, string> = {
   C1: 'from-violet-500 to-indigo-400',
   C2: 'from-primary to-violet-400',
 };
+
+const BarChart = dynamic(() => import('recharts').then(m => ({ default: m.BarChart })), { ssr: false });
+const Bar = dynamic(() => import('recharts').then(m => ({ default: m.Bar })), { ssr: false });
+const XAxis = dynamic(() => import('recharts').then(m => ({ default: m.XAxis })), { ssr: false });
+const YAxis = dynamic(() => import('recharts').then(m => ({ default: m.YAxis })), { ssr: false });
+const Tooltip = dynamic(() => import('recharts').then(m => ({ default: m.Tooltip })), { ssr: false });
+const ResponsiveContainer = dynamic(() => import('recharts').then(m => ({ default: m.ResponsiveContainer })), { ssr: false });
+
 
 // ─── Skeleton helpers ─────────────────────────────────────────────────────────
 
@@ -187,9 +188,9 @@ export default function ProgressPage() {
           {/* ── Header ── */}
           <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
-              <h2 className="text-2xl md:text-3xl font-display font-bold text-text mb-2">
+              <h1 className="text-2xl md:text-3xl font-display font-bold text-text mb-2">
                 My Progress
-              </h2>
+              </h1>
               <p className="text-text-muted text-sm">
                 Track your learning evolution
               </p>

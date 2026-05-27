@@ -25,9 +25,11 @@ import {
   Flame,
   X
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
+import dynamic from 'next/dynamic';
 
+const MotionDiv = dynamic(() => import('framer-motion').then(m => ({ default: m.motion.div })), { ssr: false });
+const AnimatePresence = dynamic(() => import('framer-motion').then(m => ({ default: m.AnimatePresence })), { ssr: false });
 interface Goal {
   id: string;
   type: string;
@@ -230,7 +232,7 @@ export default function GoalsPage() {
               <AnimatePresence mode="popLayout">
                 {goals.length > 0 ? (
                   goals.map((goal) => (
-                    <motion.div
+                    <MotionDiv
                       key={goal.id}
                       layout
                       initial={{ opacity: 0, y: 10 }}
@@ -259,7 +261,7 @@ export default function GoalsPage() {
 
                         <div className="space-y-2">
                           <div className="h-2 bg-bg-secondary rounded-full overflow-hidden">
-                            <motion.div 
+                            <MotionDiv 
                               initial={{ width: 0 }}
                               animate={{ width: `${Math.min(100, (goal.current / goal.target) * 100)}%` }}
                               className={`h-full rounded-full transition-all duration-1000 ${goal.achieved ? 'bg-success' : 'bg-primary shadow-[0_0_8px_rgba(var(--primary-rgb),0.5)]'}`}
@@ -298,7 +300,7 @@ export default function GoalsPage() {
                           <Trash2 size={18} />
                         </Button>
                       </div>
-                    </motion.div>
+                    </MotionDiv>
                   ))
                 ) : (
                   <div className="text-center py-16 bg-surface/50 border border-dashed border-border rounded-3xl space-y-4">
@@ -321,14 +323,14 @@ export default function GoalsPage() {
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div 
+            <MotionDiv 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsModalOpen(false)}
               className="absolute inset-0 bg-bg/80 backdrop-blur-sm"
             />
-            <motion.div 
+            <MotionDiv 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -386,7 +388,7 @@ export default function GoalsPage() {
                   {'New Goal'}
                 </Button>
               </div>
-            </motion.div>
+            </MotionDiv>
           </div>
         )}
       </AnimatePresence>

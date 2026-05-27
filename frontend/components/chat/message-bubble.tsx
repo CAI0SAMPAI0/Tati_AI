@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { formatTime } from '@/lib/utils';
 import type { Message } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
@@ -48,7 +49,7 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
       {!isUser && (
         <div className="w-7 h-7 rounded-full border border-border overflow-hidden shrink-0 mt-1 shadow-sm bg-surface">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/tati_logo.jpg" alt="Tati" className="w-full h-full object-cover" />
+          <Image src="/images/tati_logo.jpg" alt="Tati" width={28} height={28} className="w-full h-full object-cover" />
         </div>
       )}
 

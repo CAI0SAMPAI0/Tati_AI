@@ -242,16 +242,3 @@
     background: var(--primary-hover);
   }
 }
-
-/* Fix for long words and responsiveness */
-.break-words {
-  overflow-wrap: break-word;
-  word-break: break-word;
-}
-
-@media (max-width: 640px) {
-  .prose-container p {
-    font-size: 0.875rem;
-  }
-}
-

@@ -93,9 +93,9 @@ export default function AchievementsPage() {
 
         <main className="p-4 md:p-8 max-w-7xl w-full mx-auto space-y-8 animate-fade-in">
           <header>
-            <h2 className="text-2xl md:text-3xl font-display font-bold text-text mb-2">
+            <h1 className="text-2xl md:text-3xl font-display font-bold text-text mb-2">
               {'My Achievements'}
-            </h2>
+            </h1>
             <p className="text-text-muted text-sm">
               {'Milestones achieved in your learning journey.'}
             </p>
