@@ -103,5 +103,55 @@ mobile_app/capacitor/www/
 
 .worktrees/
 
+backend/test_list_files.py
 
 tatichatbot-491215-033b31817edf.json
+
+data/
+data/chroma_db/
+*.db
+*.sqlite
+ 
+# Arquivos de autenticação Google (SENSÍVEL)
+token.json
+*.json
+ 
+# Arquivos temporários gerados pela API
+temp/
+backend/assets/reports/
+/tmp/tati_files/
+ 
+# Chaves de serviço (NUNCA versionar)
+*service_account*.json
+tatichatbot-*.json
+credentials*.json
+ 
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+ 
+# Ambientes virtuais
+env/
+venv/
+.venv/
+.env
+*.env
+ 
+# IDEs
+.vscode/
+.idea/
+*.swp
+ 
+# Logs
+*.log
+pip-log.txt
+ 
+# OS
+.DS_Store
+Thumbs.db

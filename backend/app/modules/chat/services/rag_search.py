@@ -1,3 +1,10 @@
+"""
+rag_search.py — Busca no ChromaDB com inicialização 100% lazy.
+ 
+O modelo HuggingFace e o ChromaDB só são carregados na primeira
+chamada real a obter_contexto_rag(), nunca durante o import.
+"""
+ 
 from __future__ import annotations
 import os
 from dataclasses import dataclass
@@ -8,18 +15,31 @@ load_dotenv()
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _CHROMA_PATH = os.path.join(_BASE_DIR, 'data', 'chroma_db')
 
-# Lazy initialization — carrega apenas na primeira chamada real
+# Lazy — nenhuma variável inicializada aqui
 _embeddings = None
 _vectorstore = None
+_chroma_available: bool | None = None 
 
 
 def _get_vectorstore():
-    """Inicializa ChromaDB e embeddings apenas quando necessário (lazy)."""
-    global _embeddings, _vectorstore
-    if _vectorstore is None:
+    """Inicializa ChromaDB e embeddings apenas quando necessário."""
+    global _embeddings, _vectorstore, _chroma_available
+ 
+    if _chroma_available is False:
+        return None
+ 
+    if _vectorstore is not None:
+        return _vectorstore
+ 
+    # Verifica se o diretório do Chroma existe antes de tentar carregar
+    if not os.path.isdir(_CHROMA_PATH):
+        _chroma_available = False
+        return None
+ 
+    try:
         from langchain_chroma import Chroma
         from langchain_huggingface import HuggingFaceEndpointEmbeddings
-
+ 
         _embeddings = HuggingFaceEndpointEmbeddings(
             model='sentence-transformers/all-MiniLM-L6-v2',
             huggingfacehub_api_token=os.getenv('HUGGING_FACE_KEY', ''),
@@ -27,7 +47,12 @@ def _get_vectorstore():
         _vectorstore = Chroma(
             persist_directory=_CHROMA_PATH, embedding_function=_embeddings
         )
-    return _vectorstore
+        _chroma_available = True
+        return _vectorstore
+    except Exception as exc:
+        print(f'[RAG] Falha ao inicializar vectorstore: {exc}')
+        _chroma_available = False
+        return None
 
 
 @dataclass
@@ -40,6 +65,11 @@ def obter_contexto_rag(pergunta: str) -> RAGResult:
     """Busca no ChromaDB e retorna contexto + fontes formatados."""
     try:
         vs = _get_vectorstore()
+        if vs is None:
+            return RAGResult(
+                contexto='A biblioteca de conhecimento não está disponível no momento.',
+                fontes='',
+            )
         docs = vs.as_retriever(search_kwargs={'k': 3}).invoke(pergunta)
         if not docs:
             return RAGResult(
@@ -59,5 +89,4 @@ def obter_contexto_rag(pergunta: str) -> RAGResult:
         return RAGResult(contexto=contexto, fontes='\n'.join(fontes_set))
 
     except Exception as exc:
-        #print(f'⚠️ Erro silencioso no RAG: {exc}')
         return RAGResult(contexto='', fontes='')
