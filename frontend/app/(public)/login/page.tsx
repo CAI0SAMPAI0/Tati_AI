@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Script from 'next/script';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
@@ -77,15 +78,16 @@ export default function LoginPage() {
       }
     };
 
-    // Load the GIS script
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    script.onload = () => initGoogle();
-    document.head.appendChild(script);
+    // We rely on next/script for loading GIS.
+    // Ensure it initializes if already loaded.
+    if ((window as any).google?.accounts?.id) {
+      initGoogle();
+    } else {
+      // It will initialize once the script loads and window.onload is called,
+      // but we also have an interval just in case.
+      initGoogle();
+    }
 
-    return () => { script.remove(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -195,8 +197,9 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-bg relative overflow-hidden py-4 px-4">
-      {/* Noise overlay */}
-      <div className="fixed inset-0 opacity-[0.04] pointer-events-none -z-10" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")" }} />
+      {/* Script from Next.js to load Google Identity Services */}
+      <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
+
       {/* Ambient glow */}
       <div className="fixed -top-[20%] -left-[10%] w-[65%] h-[65%] pointer-events-none -z-10" style={{ background: 'radial-gradient(ellipse, hsla(258, 80%, 50%, 0.14) 0%, transparent 70%)' }} />
 

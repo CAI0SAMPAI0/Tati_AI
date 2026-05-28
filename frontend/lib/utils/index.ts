@@ -101,3 +101,41 @@ export function canAccessDashboard(
   }
   return isStaff(user);
 }
+
+export function parseAIResponse(content: string): { reply: string; correction?: string | null; drill?: string | null; report?: string | null } {
+  if (!content || typeof content !== 'string') return { reply: content || '' };
+  
+  if (!content.trim().startsWith('{')) {
+    return { reply: content };
+  }
+
+  try {
+    const data = JSON.parse(content);
+    if (data && typeof data === 'object' && ('reply' in data)) {
+      return {
+        reply: data.reply || '',
+        correction: data.correction,
+        drill: data.drill,
+        report: data.report
+      };
+    }
+  } catch (e) {
+    // If JSON is incomplete (streaming), extract "reply"
+    const match = content.match(/"reply"\s*:\s*"([^]*)/);
+    if (match) {
+       let partial = match[1];
+       if (partial.includes('", "correction":')) {
+           partial = partial.split('", "correction":')[0];
+       } else if (partial.includes('", "drill":')) {
+           partial = partial.split('", "drill":')[0];
+       } else {
+           // Basic cleanup for end of stream
+           partial = partial.replace(/(?<!\\)"\s*}?\s*$/, '');
+           partial = partial.replace(/(?<!\\)",\s*$/, '');
+       }
+       return { reply: partial.replace(/\\"/g, '"').replace(/\\n/g, '\n') };
+    }
+  }
+
+  return { reply: content };
+}

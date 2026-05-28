@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { formatTime } from '@/lib/utils';
 import type { Message } from '@/lib/api/types';
-import { cn } from '@/lib/utils';
+import { cn, parseAIResponse } from '@/lib/utils';
 import { ClickableText } from './clickable-text';
 import { AudioPlayer } from './audio-player';
 import { useState } from 'react';
@@ -101,10 +101,31 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
               {isUser ? (
                 <p className="whitespace-pre-wrap">{message.content}</p>
               ) : (
-                <ClickableText 
-                  content={message.content} 
-                  onWordClick={onWordClick || (() => {})} 
-                />
+                <div className="flex flex-col gap-3">
+                  <ClickableText 
+                    content={parseAIResponse(message.content).reply} 
+                    onWordClick={onWordClick || (() => {})} 
+                  />
+                  {/* Optionally display correction or drill here if you want */}
+                  {parseAIResponse(message.content).correction && (
+                    <div className="mt-2 p-3 bg-primary/10 border border-primary/20 rounded-xl text-sm">
+                      <p className="font-bold text-primary mb-1 text-xs uppercase tracking-wider">Correction</p>
+                      <ClickableText 
+                        content={parseAIResponse(message.content).correction!} 
+                        onWordClick={onWordClick || (() => {})} 
+                      />
+                    </div>
+                  )}
+                  {parseAIResponse(message.content).drill && (
+                    <div className="mt-1 p-3 bg-surface border border-border rounded-xl text-sm">
+                      <p className="font-bold text-text mb-1 text-xs uppercase tracking-wider">Practice</p>
+                      <ClickableText 
+                        content={parseAIResponse(message.content).drill!} 
+                        onWordClick={onWordClick || (() => {})} 
+                      />
+                    </div>
+                  )}
+                </div>
               )}
               
               {isUser && onEdit && !isStreaming && (

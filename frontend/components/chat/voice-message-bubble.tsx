@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import type { Message } from '@/lib/api/types';
+import { cn, parseAIResponse } from '@/lib/utils';
 import { ClickableText } from './clickable-text';
 
 interface VoiceMessageBubbleProps {
@@ -73,7 +73,7 @@ export function VoiceMessageBubble({ message, onWordClick }: VoiceMessageBubbleP
              message.content
           ) : (
             <ClickableText 
-              content={message.content} 
+              content={parseAIResponse(message.content).reply} 
               onWordClick={onWordClick || (() => {})} 
             />
           )}
