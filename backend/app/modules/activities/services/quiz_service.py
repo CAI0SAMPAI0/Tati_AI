@@ -57,7 +57,7 @@ class QuizService:
                     return {
                         "id": quiz_id,
                         "title": f"CEFR {level}: {matched_topic}",
-                        "description": f"AI-generated quiz from your materials about {matched_topic}.",
+                        "description": f"AI-generated quiz from your materials about {matched_topic}. Explanations always in English to help you learn!",
                         "module_id": "00000000-0000-0000-0000-000000000001",
                         "module_title": "AI Exercises",
                         "questions": questions
