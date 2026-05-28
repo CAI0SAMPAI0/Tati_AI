@@ -128,3 +128,58 @@ class CEFRGeneratorService:
         except Exception as e:
             print(f"[CEFRGenerator] Erro ao gerar exercícios: {e}")
             return None
+
+    @staticmethod
+    async def generate_simulations(level: str, topic: str, count: int = 2) -> Optional[List[Dict[str, Any]]]:
+        """
+        Gera simulações/cenários de roleplay baseados no material.
+        """
+        level_label = CEFRGeneratorService.CEFR_LABELS.get(level.upper(), level)
+        
+        context_docs = EmbeddingsService.search_similar_documents(query=topic, level=level, top_k=5)
+        
+        if not context_docs:
+            context_text = "Nenhum material de referência específico encontrado."
+        else:
+            context_text = "\n\n".join([f"Trecho:\n{d.get('content', '')}" for d in context_docs])
+            
+        prompt = f"""
+        Você é um professor de inglês nativo criando cenários de roleplay (simulações) para alunos do nível {level} do CEFR ({level_label}).
+        
+        Baseado no seguinte material sobre o tópico '{topic}':
+        
+        {context_text}
+        
+        Gere {count} cenários práticos de simulação focados em situações da vida real.
+        
+        REGRAS RÍGIDAS:
+        1. O cenário (scenario) descreve a situação de forma clara EM INGLÊS.
+        2. Os papéis (roles) definem quem é o aluno (Student) e quem é a IA (AI).
+        3. O objetivo (goal) diz o que o aluno precisa alcançar ao final da simulação.
+        4. O conteúdo DEVE estar adequado ao nível {level} de inglês.
+        5. Retorne APENAS um JSON válido.
+        
+        Formato de saída (JSON):
+        {{
+            "simulations": [
+                {{
+                    "scenario": "descrição da situação (Inglês)",
+                    "roles": {{"student": "papel do aluno", "ai": "papel da IA"}},
+                    "goal": "objetivo da simulação (Inglês)"
+                }}
+            ]
+        }}
+        """
+        
+        try:
+            data = await groq_chat_json(
+                messages=[{'role': 'user', 'content': prompt}],
+                max_tokens=2000,
+                temperature=0.3,
+            )
+            
+            return data.get('simulations', [])
+        except Exception as e:
+            print(f"[CEFRGenerator] Erro ao gerar simulações: {e}")
+            return None
+

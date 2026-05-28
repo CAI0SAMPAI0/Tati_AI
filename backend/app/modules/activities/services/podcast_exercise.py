@@ -174,6 +174,7 @@ class PodcastExerciseService:
                     normalized.append(
                         {
                             'type': 'voice',
+                            'question': str(ex.get('question', '')).strip(),
                             'phrase': phrase,
                             'translation_hint': str(
                                 ex.get('translation_hint', '')

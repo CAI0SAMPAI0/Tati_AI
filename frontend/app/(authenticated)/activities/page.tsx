@@ -191,15 +191,23 @@ export default function ActivitiesPage() {
 
   const simulations = useMemo(() => {
     if (!simulationsRaw) return [];
-    if (!searchQuery) return simulationsRaw;
-    return simulationsRaw.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [simulationsRaw, searchQuery]);
+    let filtered = simulationsRaw;
+    if (simulationProgress?.completed) {
+      filtered = filtered.filter(s => !simulationProgress.completed.includes(s.id));
+    }
+    if (!searchQuery) return filtered;
+    return filtered.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [simulationsRaw, searchQuery, simulationProgress]);
 
   const podcasts = useMemo(() => {
     if (!podcastsRaw) return [];
-    if (!searchQuery) return podcastsRaw;
-    return podcastsRaw.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [podcastsRaw, searchQuery]);
+    let filtered = podcastsRaw;
+    if (podcastProgress?.completed) {
+      filtered = filtered.filter(p => !podcastProgress.completed.includes(p.id));
+    }
+    if (!searchQuery) return filtered;
+    return filtered.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [podcastsRaw, searchQuery, podcastProgress]);
 
   const tabs: Array<{ id: TabType; icon: React.ReactNode; label: string; count?: number }> = [
     { id: 'quiz', icon: <HelpCircle size={18} />, label: 'Quizzes', count: quizzes.length },
@@ -352,9 +360,8 @@ export default function ActivitiesPage() {
                         description={p.description || 'Get ready to listen and practice.'}
                         imageUrl={p.thumbnail}
                         type="podcast"
-                        status={podcastProgress?.completed?.includes(p.id) ? 'done' : 'pending'}
                         onClick={() => router.push(`/podcasts/${p.id}`)}
-                        actionLabel={podcastProgress?.completed?.includes(p.id) ? 'Redo' : 'Play'}
+                        actionLabel="Play"
                       />
                     )) : (
                       <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
@@ -370,9 +377,8 @@ export default function ActivitiesPage() {
                       <ActivityCard
                         key={f.id}
                         title={f.title}
-                        description={f.description || 'Your vocabulary flashcards will be generated here soon.'}
+                        description={f.description || 'Your vocabulary flashcards.'}
                         type="flashcard"
-                        status="pending"
                         onClick={() => router.push(`/flashcards/${f.id}`)}
                         meta={[{ icon: <FileBox size={14} />, label: `${f.card_count} cards` }]}
                       />

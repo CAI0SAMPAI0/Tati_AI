@@ -24,6 +24,7 @@ interface StreakData {
 
 export function MainHeader({ onToggleMenu }: MainHeaderProps) {
   const { user } = useAuth();
+  const avatarUrl = user?.avatar_url || (user as any)?.profile?.avatar_url || null;
 
   // Use TanStack Query to fetch streak and trophy data
   const { data: streakData } = useQuery<StreakData>({
@@ -94,8 +95,8 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
               {user?.name || user?.username}
             </span>
             <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-[0.7rem] font-bold text-primary overflow-hidden">
-              {user?.avatar_url ? (
-                <Image src={user.avatar_url} alt="Avatar" width={32} height={32} className="w-full h-full object-cover" />
+              {avatarUrl ? (
+                <Image src={avatarUrl} alt="Avatar" width={32} height={32} className="w-full h-full object-cover" />
               ) : (
                 (user?.name || user?.username || '?').charAt(0).toUpperCase()
               )}

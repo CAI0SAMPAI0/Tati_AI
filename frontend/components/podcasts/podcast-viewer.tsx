@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useRouter } from 'next/navigation';
 
@@ -29,12 +29,15 @@ export function PodcastViewer({ podcast }: PodcastViewerProps) {
   const [practicePhrase, setPracticePhrase] = useState<string | null>(null);
   const [exerciseIndex, setExerciseIndex] = useState(0);
   const [isCompleting, setIsCompleting] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
 
+  const queryClient = useQueryClient();
   const handleComplete = async () => {
     setIsCompleting(true);
     try {
       await apiPost(`/activities/podcasts/${podcast.id}/complete`, {});
-      router.push('/activities');
+      await queryClient.invalidateQueries({ queryKey: ['activities-podcasts-progress'] });
+      setIsCompleted(true);
     } catch (e) {
       console.error(e);
     } finally {
@@ -173,67 +176,23 @@ export function PodcastViewer({ podcast }: PodcastViewerProps) {
             onClose={() => setPracticePhrase(null)}
           />
         ) : (
-          <div className="p-7 bg-surface border border-border rounded-2xl space-y-5 min-h-[360px]">
+          <div className="p-7 bg-surface border border-border rounded-2xl space-y-5">
             <h4 className="text-sm font-bold text-text flex items-center gap-2">
-              <Sparkles size={16} className="text-primary" />
-              {'Podcast Practice'}
+              <CheckCircle size={16} className="text-primary" />
+              {'Finished watching?'}
             </h4>
-            {exercises.length ? (
-              <div className="space-y-4">
-                <div className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest">
-                  Exercise {exerciseIndex + 1} of {exercises.length}
-                </div>
-                <div className="rounded-xl border border-border bg-bg-secondary/40 p-4 min-h-[170px]">
-                  {currentExercise?.type === 'voice' ? (
-                    <div className="space-y-2">
-                      <p className="text-xs font-bold text-primary uppercase tracking-wider">Pronunciation</p>
-                      <p className="text-sm font-semibold text-text">{String(currentExercise?.question || 'Listen and answer with your voice.')}</p>
-                      <p className="text-sm text-text">{String(currentExercise?.phrase || '')}</p>
-                      <button className="text-xs font-bold text-primary underline" onClick={() => setPracticePhrase(String(currentExercise?.phrase || ''))}>
-                        Practice this sentence
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <p className="text-sm font-semibold text-text">{String(currentExercise?.question || '')}</p>
-                      {currentExercise?.translation_hint && <p className="text-xs text-text-muted">{String(currentExercise.translation_hint)}</p>}
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center justify-between gap-2 mt-4 pt-4 border-t border-border">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setExerciseIndex((i) => Math.max(0, i - 1))}
-                    disabled={exerciseIndex === 0}
-                  >
-                    Back
-                  </Button>
-                  {exerciseIndex >= exercises.length - 1 ? (
-                    <Button
-                      size="sm"
-                      onClick={handleComplete}
-                      disabled={isCompleting}
-                      className="bg-success text-white hover:bg-success/90 border-transparent"
-                    >
-                      {isCompleting ? <Sparkles size={16} className="mr-2 animate-pulse" /> : <CheckCircle size={16} className="mr-2" />}
-                      Mark as Done
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      onClick={() => setExerciseIndex((i) => Math.min(exercises.length - 1, i + 1))}
-                    >
-                      Next
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-text-muted">
-                {'Watch or listen to the content above and answer Teacher Tati questions.'}
-              </p>
-            )}
+            <p className="text-xs text-text-muted">
+              Watch or listen to the content and follow along with the transcript. When you are done, mark this activity as completed to update your progress.
+            </p>
+            <Button
+              size="sm"
+              onClick={handleComplete}
+              disabled={isCompleting || isCompleted}
+              className="w-full bg-success text-white hover:bg-success/90 border-transparent mt-4"
+            >
+              {isCompleting ? <Sparkles size={16} className="mr-2 animate-pulse" /> : <CheckCircle size={16} className="mr-2" />}
+              {isCompleted ? 'Completed!' : 'Mark as Done'}
+            </Button>
           </div>
         )}
       </div>

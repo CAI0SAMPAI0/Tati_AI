@@ -12,7 +12,7 @@ class UserRepository:
     async def find_by_identifier(
         db: Client,
         identifier: str,
-        fields: str = 'username, name, email, password, role, level, focus',
+        fields: str = 'username, name, email, password, role, level, focus, avatar_url, profile',
     ) -> Optional[Dict[str, Any]]:
         def _fetch():
             ident = identifier.strip().lower()
@@ -50,7 +50,7 @@ class UserRepository:
 
     @staticmethod
     async def find_by_email(
-        db: Client, email: str, fields: str = 'username, name, email, role, level, focus'
+        db: Client, email: str, fields: str = 'username, name, email, role, level, focus, avatar_url, profile'
     ) -> Optional[Dict[str, Any]]:
         def _fetch():
             rows = (

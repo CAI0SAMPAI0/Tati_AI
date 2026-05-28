@@ -386,7 +386,7 @@ async def _fetch_youtube_duration_seconds(item: Dict[str, Any]) -> int:
     if not watch_url:
         return 0
     try:
-        async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=6.0, follow_redirects=True, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}) as client:
             resp = await client.get(watch_url)
         if resp.status_code != 200:
             return 0
@@ -562,7 +562,7 @@ async def evaluate_pronunciation(
     except Exception:
         raise BusinessLogicError(detail="Invalid audio format (base64 expected)")
 
-    result = await pronunciation_matcher.evaluate(audio_bytes, req.reference_text)
+    result = await pronunciation_matcher.evaluate(audio_bytes, req.reference_text, user.get('level', 'Beginner'))
     
     # Salvar tentativa no perfil do usuário
     username = user.get('username')

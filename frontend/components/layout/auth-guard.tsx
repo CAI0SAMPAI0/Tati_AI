@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Spinner } from '@/components/ui/spinner';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { token, isLoaded } = useAuth();
+  const { token, isLoaded, isBootstrappingProfile } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -15,7 +15,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [isLoaded, token, router]);
 
-  if (!isLoaded) {
+  if (!isLoaded || isBootstrappingProfile) {
     return (
       <div className="min-h-screen bg-bg flex items-center justify-center">
         <Spinner size="lg" />

@@ -371,6 +371,13 @@ export function FlashcardsSection() {
                >
                   <Trash2 size={16} />
                </button>
+               <a
+                  href={`/flashcards/${d.id}`}
+                  className="flex items-center justify-center p-2 rounded-lg bg-primary text-white hover:bg-primary/90 transition-all border border-transparent"
+                  title="Start flashcard session"
+               >
+                  <Eye size={16} />
+               </a>
             </div>
           </div>
         )) : (

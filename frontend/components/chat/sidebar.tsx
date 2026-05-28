@@ -40,6 +40,7 @@ export function Sidebar({
   onClose,
 }: SidebarProps) {
   const { user, logout } = useAuth();
+  const avatarUrl = user?.avatar_url || (user as any)?.profile?.avatar_url || null;
   
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -127,8 +128,8 @@ export function Sidebar({
           className="mx-3 mb-3 p-2.5 bg-surface border border-border rounded-lg flex items-center gap-3 hover:bg-primary/10 hover:border-primary/30 transition-all group"
         >
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-[hsl(270,60%,32%)] flex items-center justify-center text-[0.7rem] font-bold text-white shrink-0 overflow-hidden">
-            {user?.avatar_url ? (
-              <Image src={user.avatar_url} alt="Avatar" width={32} height={32} className="w-full h-full object-cover" />
+            {avatarUrl ? (
+              <Image src={avatarUrl} alt="Avatar" width={32} height={32} className="w-full h-full object-cover" />
             ) : (
               (user?.name || user?.username || '?').charAt(0).toUpperCase()
             )}

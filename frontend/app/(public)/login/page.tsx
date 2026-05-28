@@ -97,7 +97,7 @@ export default function LoginPage() {
     try {
       const res = await loginWithGoogle(response.credential);
       if (!res.ok) { setError('Error authenticating with Google.'); return; }
-      saveSession(res.data.access_token, res.data.user);
+      await saveSession(res.data.access_token, res.data.user);
       const user = res.data.user as any;
       if (isHubAccess || user.is_hub_only) {
         window.location.href = process.env.NEXT_PUBLIC_HUB_SITE_URL || 'http://localhost:3001/materiais';
@@ -123,7 +123,7 @@ export default function LoginPage() {
     try {
       const res = await loginWithCredentials(loginId, loginPw);
       if (!res.ok) { setError((res.data as any).detail || 'Invalid credentials.'); return; }
-      saveSession(res.data.access_token, res.data.user);
+      await saveSession(res.data.access_token, res.data.user);
 
       const user = res.data.user as any;
       if (isHubAccess || user.is_hub_only) {

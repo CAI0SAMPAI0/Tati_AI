@@ -28,6 +28,8 @@ class UserService:
         cache_key = f'profile:{username}'
         cached = await cache_get(cache_key)
         if cached:
+            if not cached.get('avatar_url') and isinstance(cached.get('profile'), dict):
+                cached['avatar_url'] = cached['profile'].get('avatar_url')
             return cached
 
         def _fetch():

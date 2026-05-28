@@ -41,7 +41,7 @@ _redoc_url = '/redoc' if settings.debug else None
 app = FastAPI(
     title='Teacher Tati AI',
     description='API para o aplicativo de ensino de inglês Teacher Tati',
-    version='2.0.2',
+    version='2.0.3',
     docs_url=_docs_url,
     redoc_url=_redoc_url
 )

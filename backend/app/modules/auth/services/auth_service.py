@@ -44,10 +44,15 @@ class AuthService:
             except Exception as e:
                 print(f'[Auth] Erro ao ativar subscription para {username}: {e}')
 
+        sanitized_user = {k: v for k, v in user.items() if k != 'password'}
+        profile = sanitized_user.get('profile')
+        if not sanitized_user.get('avatar_url') and isinstance(profile, dict):
+            sanitized_user['avatar_url'] = profile.get('avatar_url')
+
         return {
             'access_token': token,
             'token_type': 'bearer',
-            'user': {k: v for k, v in user.items() if k != 'password'},
+            'user': sanitized_user,
         }
 
     @staticmethod

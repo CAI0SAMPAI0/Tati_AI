@@ -93,20 +93,19 @@ async def generate_flashcards(level: str, topic: str, count: int = 5):
             raise HTTPException(status_code=500, detail="Não foi possível gerar os flashcards.")
             
         client = get_client()
-        saved_cards = []
-        for card in flashcards:
-            data = {
-                "level": level,
-                "front": card.get("front"),
-                "back": card.get("back"),
-                "explanation": card.get("explanation"),
-                "topic": topic
-            }
-            res = client.table("cefr_flashcards").insert(data).execute()
-            if res.data:
-                saved_cards.extend(res.data)
+        
+        # Saves as a single Flashcard Deck (Module)
+        deck_data = {
+            "title": f"CEFR {level}: {topic}",
+            "description": f"AI generated flashcards from CEFR material for level {level} on the topic '{topic}'.",
+            "level": level.lower(),
+            "flashcards": flashcards,
+            "is_published": True
+        }
+        
+        res = client.table("modules").insert(deck_data).execute()
                 
-        return {"success": True, "generated": len(saved_cards), "data": saved_cards}
+        return {"success": True, "generated": len(flashcards), "data": res.data}
         
     except Exception as e:
         print(f"[AdminRoute] Erro ao gerar flashcards: {e}")
@@ -124,25 +123,57 @@ async def generate_exercises(level: str, topic: str, count: int = 3):
             raise HTTPException(status_code=500, detail="Não foi possível gerar os exercícios.")
             
         client = get_client()
-        saved_exercises = []
-        for ex in exercises:
-            data = {
-                "level": level,
-                "type": "multiple_choice",
-                "question": ex.get("question"),
-                "options": ex.get("options"),
-                "correct_index": ex.get("correct_index"),
-                "explanation": ex.get("explanation"),
-                "topic": topic
-            }
-            res = client.table("cefr_exercises").insert(data).execute()
-            if res.data:
-                saved_exercises.extend(res.data)
+        # Saves as a Quiz Module
+        quiz_data = {
+            "title": f"CEFR Quiz {level}: {topic}",
+            "description": f"AI generated quiz from CEFR material.",
+            "level": level.lower(),
+            "type": "quiz",
+            "questions": exercises,
+            "is_published": True
+        }
+        res = client.table("modules").insert(quiz_data).execute()
                  
-        return {"success": True, "generated": len(saved_exercises), "data": saved_exercises}
+        return {"success": True, "generated": len(exercises), "data": res.data}
          
     except Exception as e:
         print(f"[AdminRoute] Erro ao gerar exercícios: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/generate-simulations")
+async def generate_simulations(level: str, topic: str, count: int = 2):
+    """
+    Gera simulações a partir do material indexado usando RAG.
+    """
+    try:
+        simulations = await CEFRGeneratorService.generate_simulations(level=level, topic=topic, count=count)
+        
+        if not simulations:
+            raise HTTPException(status_code=500, detail="Não foi possível gerar as simulações.")
+            
+        client = get_client()
+        saved_simulations = []
+        for i, sim in enumerate(simulations):
+            roles = sim.get("roles", {})
+            student_role = roles.get("student", "")
+            ai_role = roles.get("ai", "")
+            sys_prompt = f"You are {ai_role}. The user is {student_role}. Goal: {sim.get('goal')}. Scenario: {sim.get('scenario')}"
+            
+            data = {
+                "name": f"CEFR {level}: {topic} #{i+1}",
+                "description": sim.get("scenario"),
+                "difficulty": level.lower(),
+                "system_prompt": sys_prompt,
+                "is_active": True
+            }
+            res = client.table("simulations").insert(data).execute()
+            if res.data:
+                saved_simulations.extend(res.data)
+                 
+        return {"success": True, "generated": len(saved_simulations), "data": saved_simulations}
+         
+    except Exception as e:
+        print(f"[AdminRoute] Erro ao gerar simulações: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/trigger-scheduler")
@@ -181,28 +212,38 @@ class CEFRFlashcardUpdate(BaseModel):
     topic: Optional[str] = None
     is_published: Optional[bool] = None
 
-@router.get("/pending")
-async def get_pending_content():
+class CEFRSimulationUpdate(BaseModel):
+    level: Optional[str] = None
+    topic: Optional[str] = None
+    scenario: Optional[str] = None
+    roles: Optional[Any] = None
+    goal: Optional[str] = None
+    is_published: Optional[bool] = None
+
+@router.get("/all")
+async def get_all_content():
     """
-    Retorna todo o conteúdo pendente de revisão (is_published = False).
+    Retorna todo o conteúdo gerado (flashcards, exercises, simulations).
     """
     client = get_client()
     try:
-        # Busca flashcards pendentes
-        fc_res = client.table("cefr_flashcards").select("*").eq("is_published", False).execute()
+        fc_res = client.table("cefr_flashcards").select("*").execute()
         flashcards = fc_res.data or []
         
-        # Busca exercícios pendentes
-        ex_res = client.table("cefr_exercises").select("*").eq("is_published", False).execute()
+        ex_res = client.table("cefr_exercises").select("*").execute()
         exercises = ex_res.data or []
+        
+        sim_res = client.table("cefr_simulations").select("*").execute()
+        simulations = sim_res.data or []
         
         return {
             "success": True,
             "flashcards": flashcards,
-            "exercises": exercises
+            "exercises": exercises,
+            "simulations": simulations
         }
     except Exception as e:
-        print(f"[AdminRoute] Erro ao buscar pendentes: {e}")
+        print(f"[AdminRoute] Erro ao buscar conteúdo: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/exercises/{exercise_id}")
@@ -264,4 +305,35 @@ async def delete_cefr_flashcard(flashcard_id: str):
     except Exception as e:
         print(f"[AdminRoute] Erro ao excluir flashcard: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/simulations/{simulation_id}")
+async def update_cefr_simulation(simulation_id: str, body: CEFRSimulationUpdate):
+    """
+    Edita ou publica uma simulação CEFR.
+    """
+    client = get_client()
+    update_data = {k: v for k, v in body.model_dump().items() if v is not None}
+    
+    try:
+        res = client.table("cefr_simulations").update(update_data).eq("id", simulation_id).execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Simulação não encontrada")
+        return {"success": True, "data": res.data[0]}
+    except Exception as e:
+        print(f"[AdminRoute] Erro ao atualizar simulação: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/simulations/{simulation_id}")
+async def delete_cefr_simulation(simulation_id: str):
+    """
+    Exclui uma simulação CEFR (rejeitada).
+    """
+    client = get_client()
+    try:
+        res = client.table("cefr_simulations").delete().eq("id", simulation_id).execute()
+        return {"success": True, "message": "Simulação excluída com sucesso."}
+    except Exception as e:
+        print(f"[AdminRoute] Erro ao excluir simulação: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
