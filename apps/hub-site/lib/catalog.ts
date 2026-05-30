@@ -26,11 +26,12 @@ export type CatalogMaterial = {
 /**
  * Resolve o preço correto com base no role do usuário.
  * - 'buyer'   → price_buyers
- * - qualquer outro (student, staff, sem login) → price_students
+ * - sem role (visitante não logado) → price_buyers
+ * - 'student' ou outro role válido → price_students
  * Fallback para `price` legado se as colunas novas forem null/undefined.
  */
 export function resolvePrice(item: CatalogMaterial, role?: string | null): number {
-  if (role === 'buyer') {
+  if (!role || role === 'buyer') {
     return item.price_buyers ?? item.price ?? 0;
   }
   return item.price_students ?? item.price ?? 0;
