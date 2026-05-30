@@ -690,7 +690,14 @@ async def hub_checkout(body: HubCheckoutRequest, user: dict = Depends(get_curren
         raise ContentNotFoundError("Conteúdo não encontrado.")
 
     item = content.data
-    value = float(item['price'])
+    user_role = user.get('role', '')
+    if user_role == 'buyer':
+        value = float(item.get('price_buyers') or item.get('price') or 0)
+    else:
+        value = float(item.get('price_students') or item.get('price') or 0)
+
+    if value <= 0:
+        raise HTTPException(status_code=400, detail="Este material não possui preço configurado.")
 
     from app.modules.payments.routes.asaas import _get_validated_user
     from app.modules.payments.services.asaas import (

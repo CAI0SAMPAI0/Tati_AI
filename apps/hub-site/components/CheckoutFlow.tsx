@@ -5,7 +5,6 @@ import { createPortal } from 'react-dom';
 import { ShoppingCart, CheckCircle, Lock, X, Loader2, XCircle, RefreshCw, Clock } from 'lucide-react';
 import { resolveApiUrl } from '@/lib/catalog';
 import { useHubAuth } from '@/components/auth-provider';
-import { useRouter } from 'next/navigation';
 import { loginWithCredentials, getStoredSession } from '@tati/hub-core';
 
 interface CheckoutFlowProps {
@@ -19,7 +18,6 @@ interface CheckoutFlowProps {
 
 export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProps) {
   const { user, token, saveSession } = useHubAuth();
-  const router = useRouter();
 
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState<'form' | 'payment' | 'confirmed' | 'cancelled'>('form');
@@ -147,9 +145,16 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
     setProcessing(true);
 
     try {
+      const localToken = typeof window !== 'undefined' ? window.localStorage.getItem('token') : null;
+      const authToken = token || localToken;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (authToken) {
+        headers.Authorization = `Bearer ${authToken}`;
+      }
+
       const res = await fetch(`${resolveApiUrl()}/catalog/checkout`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           content_id: item.id,
           name,
@@ -325,7 +330,9 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
         type="button"
         onClick={() => {
           handleClose();
-          router.push('/materiais');
+          if (typeof window !== 'undefined') {
+            window.location.href = '/materiais';
+          }
         }}
         className="btn-primary mt-8 w-full py-3"
       >

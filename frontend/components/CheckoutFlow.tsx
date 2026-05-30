@@ -144,9 +144,16 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
     setProcessing(true);
 
     try {
+      const localToken = typeof window !== 'undefined' ? window.localStorage.getItem('token') : null;
+      const authToken = token || localToken;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (authToken) {
+        headers.Authorization = `Bearer ${authToken}`;
+      }
+
       const res = await fetch(`${resolveApiUrl()}/catalog/checkout`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           content_id: item.id,
           name,

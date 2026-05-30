@@ -44,8 +44,9 @@ export default function ProductCard({ item, showOwned, onAccessGranted }: Produc
   const styles = categoryStyles(category);
   const Icon = categoryIcons[category];
 
-  // Usuários do hub-site sempre têm role='buyer' — mas usamos o campo real se disponível
-  const role = (user as any)?.role ?? 'buyer';
+  // Resolve o preço com base no role real do usuário.
+  // Se não houver role, o resolvePrice usará price_students por padrão.
+  const role = (user as any)?.role;
   const price = resolvePrice(item, role);
   const priceLabel = formatPrice(price);
 

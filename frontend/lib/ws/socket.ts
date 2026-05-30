@@ -24,7 +24,7 @@ export class TatiWebSocket {
     if (!token) return;
 
     const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-    const baseUrl = 'ws://127.0.0.1:8001';
+    const baseUrl = 'ws://127.0.0.1:8000'; // Default for local development
     const path = '/chat/ws';
     const wsUrl = baseUrl + path;
 

@@ -7,6 +7,8 @@ from app.core.database import get_client
 from app.core.security import hash_password
 from app.core.dependencies.auth import get_current_user
 from datetime import datetime, timezone, date, timedelta
+from app.core.dependencies.auth import get_current_user, get_current_user_optional
+from typing import Optional
 
 router = APIRouter()
 
@@ -37,7 +39,11 @@ async def list_my_orders(
 
 
 @router.post("/checkout")
-async def public_checkout(body: CheckoutRequest, service: PremiumService = Depends()):
+async def public_checkout(
+    body: CheckoutRequest,
+    service: PremiumService = Depends(),
+    current_user: Optional[dict] = Depends(get_current_user_optional),
+):
     """
     Fluxo de checkout para visitantes:
     1. Busca ou Cria usuário com role 'buyer'
@@ -100,17 +106,22 @@ async def public_checkout(body: CheckoutRequest, service: PremiumService = Depen
     customer_id = customer['id']
 
     # Visitantes do hub-site são sempre compradores (buyers)
-    buyer_price = float(item.get('price_buyers') or item.get('price') or 0)
-    if buyer_price <= 0:
+    user_role = current_user.get('role', 'buyer') if current_user else 'buyer'
+    if user_role == 'buyer':
+        resolved_price = float(item.get('price_buyers') or item.get('price') or 0)
+    else:
+        resolved_price = float(item.get('price_students') or item.get('price') or 0)
+
+    if resolved_price <= 0:
         raise HTTPException(status_code=400, detail="Este material não possui preço configurado para compra.")
 
     due_date = (date.today() + timedelta(days=3)).isoformat()
-    print(f"[Checkout] billingType={body.billingType} customer_id={customer_id} value={buyer_price}")
+    print(f"[Checkout] billingType={body.billingType} customer_id={customer_id} value={resolved_price}")
     try:
         payment = await create_payment(
             customer_id=customer_id,
             billing_type=body.billingType,
-            value=buyer_price,
+            value=resolved_price,
             due_date=due_date,
             description=f"Material: {item['title']}",
             external_reference=f"HUB:{item['id']}:{username}"
@@ -134,7 +145,7 @@ async def public_checkout(body: CheckoutRequest, service: PremiumService = Depen
 
     order_res = db.table('orders').insert({
         'username': username,
-        'total_amount': buyer_price,
+        'total_amount': resolved_price,
         'status': 'pending',
         'asaas_id': payment_id,
         'payment_method': body.billingType
@@ -145,7 +156,7 @@ async def public_checkout(body: CheckoutRequest, service: PremiumService = Depen
     db.table('order_items').insert({
         'order_id': order_id,
         'content_id': item['id'],
-        'price': buyer_price
+        'price': resolved_price
     }).execute()
 
     pix_data = {}
