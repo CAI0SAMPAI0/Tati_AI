@@ -81,6 +81,7 @@ class AuthService:
 
         username = body.username.strip().lower()
         email = body.email.strip().lower()
+        is_hub_only = getattr(body, 'is_hub_only', False)
 
         exists = await UserRepository.check_exists_by_username_or_email(db, username, email)
         if exists:
@@ -93,7 +94,7 @@ class AuthService:
             'name': body.name.strip(),
             'email': email,
             'password': hash_password(body.password),
-            'role': 'student',
+            'role': 'buyer' if is_hub_only else 'student',
             'level': body.level,
             'focus': 'General Conversation',
             'created_at': datetime.now(timezone.utc).isoformat(),
@@ -102,7 +103,7 @@ class AuthService:
         return {'ok': True, 'message': 'Conta criada com sucesso'}
 
     @staticmethod
-    async def google_login(db: Client, credential: str) -> Dict[str, Any]:
+    async def google_login(db: Client, credential: str, is_hub_only: bool = False) -> Dict[str, Any]:
         if not settings.google_client_id:
             raise HTTPException(status_code=503, detail='Google OAuth not configured')
 
@@ -137,7 +138,7 @@ class AuthService:
             'name': name,
             'email': email,
             'password': 'google_authenticated',
-            'role': 'student',
+            'role': 'buyer' if is_hub_only else 'student',
             'level': 'Beginner',
             'focus': 'General Conversation',
             'created_at': datetime.now(timezone.utc).isoformat(),

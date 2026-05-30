@@ -23,13 +23,14 @@ export class ApiClientError<T = unknown> extends Error {
   }
 }
 
+const DEFAULT_LOCAL_API_BASE = 'http://localhost:8001';
 const DEFAULT_REMOTE_API_BASE = 'https://tatiai-production.up.railway.app';
 
 export function resolveApiBase(): string {
   return (
     process.env.NEXT_PUBLIC_API_URL ??
     process.env.NEXT_PUBLIC_API_BASE_URL ??
-    DEFAULT_REMOTE_API_BASE
+    (process.env.NODE_ENV === 'development' ? DEFAULT_LOCAL_API_BASE : DEFAULT_REMOTE_API_BASE)
   );
 }
 

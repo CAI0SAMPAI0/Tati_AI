@@ -19,8 +19,13 @@ export async function loginWithCredentials(
 
 export async function loginWithGoogle(
   credential: string,
+  isHubOnly: boolean = false,
 ): Promise<{ ok: boolean; status: number; data: AuthLoginResponse }> {
-  return apiPost<AuthLoginResponse>(HUB_ENDPOINTS.AUTH_GOOGLE, { credential }, { auth: false });
+  return apiPost<AuthLoginResponse>(
+    HUB_ENDPOINTS.AUTH_GOOGLE,
+    { credential, is_hub_only: isHubOnly },
+    { auth: false },
+  );
 }
 
 export async function registerUser(

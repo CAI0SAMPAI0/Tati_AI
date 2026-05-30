@@ -121,7 +121,7 @@ export function LoginForm() {
     setLoading(true);
 
     try {
-      const result = await loginWithGoogle(response.credential);
+      const result = await loginWithGoogle(response.credential, true);
       handleAuthSuccess(result.data.access_token, result.data.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Nao foi possivel autenticar com Google.');
@@ -174,6 +174,7 @@ export function LoginForm() {
         username: registerUsername,
         password: registerPassword,
         level: registerLevel,
+        is_hub_only: true,
       });
 
       setSuccess('Conta criada. Agora você já pode entrar no hub.');

@@ -41,12 +41,14 @@ class RegisterBody(BaseModel):
     username: str
     password: str
     level: str = 'Beginner'
+    is_hub_only: bool = False
 
 
 class GoogleBody(BaseModel):
     """Google OAuth credential token."""
 
     credential: str
+    is_hub_only: bool = False
 
 
 class ForgotPasswordBody(BaseModel):
@@ -130,7 +132,7 @@ async def register(body: RegisterBody, db: Client = Depends(get_db)) -> dict:
 @router.post('/google')
 async def google_login(body: GoogleBody, db: Client = Depends(get_db)) -> dict:
     """Authenticates via Google OAuth2. Creates account if needed."""
-    return await AuthService.google_login(db, body.credential)
+    return await AuthService.google_login(db, body.credential, body.is_hub_only)
 
 
 # ── Forgot password ──────────────────────────────────────────────────────────
