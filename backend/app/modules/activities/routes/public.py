@@ -105,12 +105,8 @@ async def public_checkout(
         customer = await create_customer(name=body.name, email=clean_email, cpf_cnpj=raw_doc)
     customer_id = customer['id']
 
-    # Visitantes do hub-site são sempre compradores (buyers)
-    user_role = current_user.get('role', 'buyer') if current_user else 'buyer'
-    if user_role == 'buyer':
-        resolved_price = float(item.get('price_buyers') or item.get('price') or 0)
-    else:
-        resolved_price = float(item.get('price_students') or item.get('price') or 0)
+    # Fluxo público: sempre usar preço de buyer para visitantes do hub-site.
+    resolved_price = float(item.get('price_buyers') or item.get('price') or 0)
 
     if resolved_price <= 0:
         raise HTTPException(status_code=400, detail="Este material não possui preço configurado para compra.")
