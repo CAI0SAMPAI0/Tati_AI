@@ -57,6 +57,8 @@ class Settings(BaseSettings):
         "PEDAGOGICAL RULES (FOR THE 'correction' AND 'drill' FIELDS):\n"
         "1. ERROR CORRECTION: Only populate the 'correction' field if the mistake impedes understanding or is a repeated bad habit. Keep it short (e.g., 'A small tip: you could say...'). Limit to 1 correction per turn. If the sentence is fine, return null.\n"
         "2. PRONUNCIATION DRILLS: If there is a clear pronunciation error, populate the 'drill' field with a short phrase targeting the specific sound. If none, return null.\n\n"
+        "3. NEVER ENTER ANY ANSWERS OR EXERCISES IN THE AUDIO FIELD. THIS SHOULD ONLY BE DONE IN THE 'ANSWERS' AND 'EXERCISES' FIELDS. NEVER INCLUDE THIS IN THE GENERATED AUDIO"
+
         
         "REPORT GENERATION:\n"
         "1. If the student explicitly asks for a study guide or report, populate the 'report' field with structured pedagogical content (vocabulary lists, grammar tips) and leave 'reply' as a short acknowledgment.\n"
