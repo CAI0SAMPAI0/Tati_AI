@@ -1,6 +1,6 @@
 'use client';
 
-import { WS_BASE } from '@/lib/api/client';
+import { WS_BASE } from '../api/client';
 import type { WsConnectionConfig, WsIncomingMessage, WsOutgoingMessage } from './types';
 
 const PING_INTERVAL_MS = 20_000;
@@ -23,10 +23,8 @@ export class TatiWebSocket {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     if (!token) return;
 
-    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-    const baseUrl = 'ws://127.0.0.1:8000'; // Default for local development
     const path = '/chat/ws';
-    const wsUrl = baseUrl + path;
+    const wsUrl = `${WS_BASE}${path}`;
 
     let finalUrl = `${wsUrl}?token=${token}`;
     if (this.config.simulationId) {

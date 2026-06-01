@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import json
 import re
 import io
 import docx
@@ -474,6 +475,22 @@ class ChatService:
             return f'[Erro ao ler arquivo: {e}]'
 
     def _clean_tts_text(self, text: str) -> str:
-        text = text.replace('*', '').replace('#', '').replace('_', '')
-        text = re.sub(r'\[DRILL:.*?\]', '', text)
-        return text.strip() or 'Please, repeat.'
+        """Extrai apenas o campo 'reply' do JSON da IA para o TTS.
+        O campo 'drill' e 'correction' são apenas para exibição, nunca para áudio."""
+        # Tenta parsear o JSON da resposta da IA
+        try:
+            # Remove possíveis blocos de código markdown ao redor do JSON
+            clean = text.strip()
+            if clean.startswith('```'):
+                clean = re.sub(r'^```[\w]*\n?', '', clean)
+                clean = re.sub(r'\n?```$', '', clean.strip())
+            data = json.loads(clean)
+            # Usa apenas o campo 'reply' para o áudio — drill e correction ficam silenciosos
+            reply = data.get('reply') or ''
+            reply = reply.replace('*', '').replace('#', '').replace('_', '')
+            return reply.strip() or 'Please, repeat.'
+        except Exception:
+            # Fallback: remove markdown e tags de drill
+            fallback = text.replace('*', '').replace('#', '').replace('_', '')
+            fallback = re.sub(r'\[DRILL:.*?\]', '', fallback)
+            return fallback.strip() or 'Please, repeat.'
