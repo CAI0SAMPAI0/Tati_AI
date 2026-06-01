@@ -1,12 +1,5 @@
-"""
-services/pronunciation_matcher.py
-Serviço para avaliar a precisão fonética da pronúncia do aluno.
-"""
-
-import json
-import re
 from typing import Dict, Any
-from app.modules.chat.services.llm import transcribe_audio, groq_chat
+from app.modules.chat.services.llm import transcribe_audio
 
 class PronunciationMatcher:
     def __init__(self):

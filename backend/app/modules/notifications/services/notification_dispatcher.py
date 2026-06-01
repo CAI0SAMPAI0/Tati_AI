@@ -1,7 +1,10 @@
 import resend
-from app.core.config import settings
 from app.core.database import get_client
 from app.modules.notifications.services.push_notifications import send_push_to_user
+from app.shared.services.email import EmailSender
+
+
+email_sender = EmailSender()
 
 
 async def dispatch_universal_notification(
@@ -33,33 +36,31 @@ async def dispatch_universal_notification(
     push_res = send_push_to_user(username, title, body, url)
     print(f'[Dispatcher] Push enviado para {username}: {push_res}')
 
-    # 3. ENVIAR EMAIL (Resend)
-    if user_email and settings.resend_api_key:
+    # 3. ENVIAR EMAIL
+    if user_email:
         try:
-            resend.api_key = settings.resend_api_key
-            resend.Emails.send(
-                {
-                    'from': 'Teacher Tati <tatiai@resend.dev>',
-                    'to': user_email,
-                    'subject': title,
-                    'html': f"""
-                <div style="font-family: sans-serif; max-width: 600px; color: #333;">
-                    <h2 style="color: #6366f1;">{title}</h2>
-                    <p>Hello, <strong>{student_name}</strong>!</p>
-                    <p>{body}</p>
-                    <div style="margin-top: 20px;">
-                        <a href="https://tati-ai.vercel.app{url}" 
-                           style="background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-                           Check it out in the App
-                        </a>
-                    </div>
-                    <p style="margin-top: 30px; font-size: 12px; color: #999;">
-                        Keep practicing every day to reach fluency! <br>
-                        Teacher Tati Team
-                    </p>
+            html = f"""
+            <div style="font-family: sans-serif; max-width: 600px; color: #333;">
+                <h2 style="color: #6366f1;">{title}</h2>
+                <p>Hello, <strong>{student_name}</strong>!</p>
+                <p>{body}</p>
+                <div style="margin-top: 20px;">
+                    <a href="https://tati-ai.vercel.app{url}" 
+                       style="background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                       Check it out in the App
+                    </a>
                 </div>
-                """,
-                }
+                <p style="margin-top: 30px; font-size: 12px; color: #999;">
+                    Keep practicing every day to reach fluency! <br>
+                    Teacher Tati Team
+                </p>
+            </div>
+            """
+            email_sender.send_email(
+                fromemail="Teacher Tati <tatiai@resend.dev>",
+                to_email=user_email,
+                subject=title,
+                html=html
             )
             print(f'[Dispatcher] Email enviado para {user_email}')
         except Exception as e:

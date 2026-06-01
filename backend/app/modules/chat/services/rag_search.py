@@ -1,10 +1,3 @@
-"""
-rag_search.py — Busca no ChromaDB com inicialização 100% lazy.
- 
-O modelo HuggingFace e o ChromaDB só são carregados na primeira
-chamada real a obter_contexto_rag(), nunca durante o import.
-"""
- 
 from __future__ import annotations
 import os
 from dataclasses import dataclass

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
+from app.core.exceptions import ContentNotFoundError
 from fastapi import (
     APIRouter,
     Depends,
@@ -233,7 +233,6 @@ async def chat_ws(
             # Tenta pegar o conv_id do query se existir, ou espera a primeira mensagem
             from app.shared.services.history import load_history
             # Como não temos conv_id ainda (talvez), espera a primeira mensagem do user 
-            pass
         except Exception: pass
 
     try:

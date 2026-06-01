@@ -6,9 +6,8 @@ from app.core.dependencies.db import get_db
 from fastapi import Depends
 from supabase import Client
 
-import json
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta, timezone
+from typing import Dict, Any
+from datetime import datetime, timezone
 from app.modules.chat.services.llm import groq_chat
 from fastapi.concurrency import run_in_threadpool
 

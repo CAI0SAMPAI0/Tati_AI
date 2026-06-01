@@ -5,7 +5,7 @@ Router para submissões de atividades e correções.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from typing import Any, Dict, Optional
 

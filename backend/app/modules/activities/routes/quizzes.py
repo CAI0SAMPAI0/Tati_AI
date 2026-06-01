@@ -3,8 +3,8 @@ Router de Quizzes e Desafios.
 Refatorado para usar QuizService e padrão async.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
-from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
+from fastapi import APIRouter, Depends
+from app.core.exceptions import ContentNotFoundError
 from pydantic import BaseModel
 from typing import List
 

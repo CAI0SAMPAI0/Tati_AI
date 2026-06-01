@@ -1,16 +1,8 @@
-"""
-services/semantic_judge.py
-IA-as-a-Judge para verificar se objetivos pedagógicos foram atingidos na conversa.
-"""
 from app.core.dependencies.db import get_db
 from fastapi import Depends
-from supabase import Client
-
 import json
-import re
 from datetime import datetime
-from typing import List, Dict, Any
-from app.modules.chat.services.llm import groq_chat
+from typing import Any
 from fastapi.concurrency import run_in_threadpool
 
 class SemanticJudgeService:

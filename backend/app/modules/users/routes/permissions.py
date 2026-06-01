@@ -6,8 +6,8 @@ e cálculos de dia útil para cobrança.
 
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
-from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
+from fastapi import APIRouter, Depends
+from app.core.exceptions import ContentNotFoundError
 from pydantic import BaseModel
 
 from app.core.config import settings

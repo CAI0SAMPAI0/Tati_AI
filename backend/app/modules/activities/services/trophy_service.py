@@ -1,13 +1,7 @@
-"""
-services/trophy_service.py
-Serviço para gerenciamento de troféus e conquistas.
-"""
-
 from typing import List, Dict, Any
 from fastapi.concurrency import run_in_threadpool
 from app.shared.services.upstash import cache_get, cache_set
 from fastapi import Depends
-from supabase import Client
 from app.core.dependencies.db import get_db
 
 

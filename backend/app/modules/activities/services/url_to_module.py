@@ -1,18 +1,8 @@
-"""
-services/url_to_module.py
-Serviço para gerar módulos pedagógicos a partir de URLs externas (notícias, blogs, artigos).
-"""
 from app.core.dependencies.db import get_db
 from fastapi import Depends
-from supabase import Client
-
-import json
-import re
-from typing import Dict, Any, List
+from typing import Dict, Any
 import httpx
 from bs4 import BeautifulSoup
-from app.modules.chat.services.llm import groq_chat
-from fastapi.concurrency import run_in_threadpool
 from app.modules.activities.services.activity_service import ActivityService
 
 class UrlToModuleService:

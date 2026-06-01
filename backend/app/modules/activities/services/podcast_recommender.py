@@ -4,14 +4,12 @@ Serviço para rankeamento, filtragem e recomendação de podcasts.
 """
 
 import re
-import json
 from typing import List, Dict, Any, Optional, Tuple
 from collections import Counter
 from datetime import datetime, timezone
 from fastapi.concurrency import run_in_threadpool
 
 from app.core.database import get_client
-from app.modules.chat.services.llm import stream_llm
 
 
 class PodcastRecommender:

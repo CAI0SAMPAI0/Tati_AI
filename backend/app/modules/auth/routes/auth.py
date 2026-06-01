@@ -1,11 +1,3 @@
-"""
-routers/auth.py
-Autenticação: login, registro, Google OAuth, recuperação e troca de senha.
-
-Endpoints de gestão de alunos (stats, students) foram movidos para
-``routers/admin/dashboard.py`` para separação de domínios.
-"""
-
 from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status

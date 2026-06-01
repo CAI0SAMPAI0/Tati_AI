@@ -3,7 +3,6 @@ from pydantic import BaseModel
 from app.core.dependencies.auth import get_current_user
 from app.core.database import get_client
 from app.core.utils.level_utils import matches_level
-from typing import Optional
 from datetime import datetime, timedelta, timezone
 
 router = APIRouter()

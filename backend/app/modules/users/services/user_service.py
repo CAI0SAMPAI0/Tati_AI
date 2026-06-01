@@ -211,7 +211,6 @@ class UserService:
             compressed = buf.getvalue()
         except ImportError:
             compressed = contents
-            content_type = 'image/jpeg'
         except Exception:
             compressed = contents
 

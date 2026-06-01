@@ -4,8 +4,7 @@ IMPORTANT: Static routes must come BEFORE dynamic /{module_id} to avoid shadowin
 """
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
-from fastapi.concurrency import run_in_threadpool
+from app.core.exceptions import ContentNotFoundError
 from typing import Optional
 
 from app.core.dependencies.auth import get_current_user

@@ -313,15 +313,27 @@ class EmailSender:
 </div>
 """
         return self._send(to_email, subject, html)
+    
+
+    def send_offensive_notification(self, user_email: str, user_name: str, offensive_message: str) -> bool:
+        subject = "Notificação de Ofensiva"
+        html = f"""
+        <div style="font-family:Arial,sans-serif;max-width:600px;">
+            <h2 style="color:#6366f1;">Notificação de Ofensiva</h2>
+            <p>Olá, {user_name}!</p>
+            <p>Nós detectamos uma ofensiva em sua conta.</p>
+            <p>Mensagem ofensiva: {offensive_message}</p>
+            <p>Por favor, revise sua conduta e evite comportamentos ofensivos no futuro.</p>
+        </div>
+        """
+        return self._send(user_email, subject, html)
 
 
-# Backwards-compatible 'resend' shim expected by tests.
 class _ResendShim:
     class Emails:
         @staticmethod
         def send(payload: dict) -> dict:
             # Minimal stub; tests will patch this method.
             return {"id": "stub"}
-
 
 resend = _ResendShim

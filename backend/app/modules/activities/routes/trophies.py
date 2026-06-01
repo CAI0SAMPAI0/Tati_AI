@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from app.core.dependencies.auth import get_current_user, require_staff
 from app.modules.activities.services.trophy_service import TrophyService
 
+
 router = APIRouter()
 
 

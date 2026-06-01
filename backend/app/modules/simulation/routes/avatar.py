@@ -5,8 +5,8 @@ from __future__ import annotations
 import base64
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
-from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
+from fastapi import APIRouter
+from app.core.exceptions import ContentNotFoundError
 from fastapi.responses import JSONResponse
 
 router = APIRouter()

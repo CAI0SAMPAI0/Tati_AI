@@ -4,7 +4,6 @@ Serviço para gerenciamento de módulos, conteúdos e flashcards.
 """
 from app.core.dependencies.db import get_db
 from fastapi import Depends
-from supabase import Client
 
 from typing import List, Dict, Any
 import uuid

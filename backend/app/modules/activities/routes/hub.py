@@ -348,7 +348,6 @@ async def get_content_access(
 
     return {"url": source, "type": "direct"}
 
-import asyncio
 from starlette.concurrency import run_in_threadpool
 
 # Cache global em memória para imagens brutas (evita baixar do Supabase toda hora)

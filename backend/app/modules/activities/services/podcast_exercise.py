@@ -3,11 +3,9 @@ services/podcast_exercise.py
 Serviço para geração e avaliação de exercícios de podcasts.
 """
 
-import json
 import re
 from typing import Dict, Any, Set
 from fastapi.concurrency import run_in_threadpool
-from app.modules.chat.services.llm import stream_llm
 
 
 class PodcastExerciseService:

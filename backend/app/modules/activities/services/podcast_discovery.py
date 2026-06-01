@@ -1,11 +1,8 @@
-import json
-import re
 from datetime import datetime, timezone
 from fastapi.concurrency import run_in_threadpool
 
 from app.core.config import settings
 from app.core.database import get_client
-from app.modules.chat.services.llm import groq_chat
 import asyncio
 
 # ============================================================
@@ -206,7 +203,7 @@ async def discover_personalized_podcasts(user_id: str, username: str, user_level
         existing_podcasts = await run_in_threadpool(
             lambda: db.table('podcasts').select('id').eq('user_id', username).execute().data or []
         )
-        existing_ids = {str(r.get('id')) for r in existing_podcasts if r.get('id')}
+        {str(r.get('id')) for r in existing_podcasts if r.get('id')}
         valid_count = 0
 
         for i, is_ok in enumerate(verifications):

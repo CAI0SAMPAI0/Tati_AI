@@ -1,11 +1,3 @@
-"""
-services/subscription_manager.py
-Lógica compartilhada para ativação e expiração de assinaturas.
-
-Evita imports circulares entre ``app.modules.auth.routes.auth`` e ``app.modules.payments.routes.asaas``
-centralizando a lógica de subscription aqui.
-"""
-
 from __future__ import annotations
 
 from datetime import date

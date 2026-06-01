@@ -6,7 +6,6 @@ Serviço para gerenciamento de progresso, rankings e planos semanais.
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
 from fastapi.concurrency import run_in_threadpool
-from supabase import Client
 from fastapi import Depends
 from app.core.dependencies.db import get_db
 from app.shared.services.upstash import cache_get, cache_set, cache_delete

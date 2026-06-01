@@ -15,7 +15,6 @@ from PIL import Image, ImageDraw, ImageFont
 import io
 
 import subprocess
-import tempfile
 from app.core.config import settings
 from app.core.database import get_client
 

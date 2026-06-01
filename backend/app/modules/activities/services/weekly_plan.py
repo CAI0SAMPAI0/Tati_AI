@@ -1,20 +1,7 @@
-"""
-Plano de estudos semanal com detecção de progresso real do aluno.
-
-Fluxo:
-  1. get_or_generate_weekly_plan  → retorna plano atual (cache 7 dias)
-  2. check_plan_progress          → analisa histórico e marca tópicos praticados
-  3. generate_transition_exercises → RAG + LLM geram exercícios de transição (5-10 q)
-  4. get_or_generate_weekly_plan  → chamada seguinte já gera novo plano (cache expirado)
-"""
-
 from __future__ import annotations
-
 import json
 import random
 from datetime import date, timedelta
-
-from app.modules.chat.services.llm import groq_chat
 from app.core.database import get_client
 from app.shared.services.upstash import cache_get, cache_set, cache_delete
 

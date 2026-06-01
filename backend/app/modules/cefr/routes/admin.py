@@ -1,9 +1,8 @@
-import os
 import re
 import unicodedata
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException
 from pydantic import BaseModel
-from typing import Dict, Any
+from typing import Any
 
 from app.core.database import get_client
 from app.modules.cefr.services.cefr_service import CEFRService
@@ -270,7 +269,7 @@ async def delete_cefr_exercise(exercise_id: str):
     """
     client = get_client()
     try:
-        res = client.table("cefr_exercises").delete().eq("id", exercise_id).execute()
+        client.table("cefr_exercises").delete().eq("id", exercise_id).execute()
         return {"success": True, "message": "Exercício excluído com sucesso."}
     except Exception as e:
         print(f"[AdminRoute] Erro ao excluir exercício: {e}")
@@ -300,7 +299,7 @@ async def delete_cefr_flashcard(flashcard_id: str):
     """
     client = get_client()
     try:
-        res = client.table("cefr_flashcards").delete().eq("id", flashcard_id).execute()
+        client.table("cefr_flashcards").delete().eq("id", flashcard_id).execute()
         return {"success": True, "message": "Flashcard excluído com sucesso."}
     except Exception as e:
         print(f"[AdminRoute] Erro ao excluir flashcard: {e}")
@@ -330,7 +329,7 @@ async def delete_cefr_simulation(simulation_id: str):
     """
     client = get_client()
     try:
-        res = client.table("cefr_simulations").delete().eq("id", simulation_id).execute()
+        client.table("cefr_simulations").delete().eq("id", simulation_id).execute()
         return {"success": True, "message": "Simulação excluída com sucesso."}
     except Exception as e:
         print(f"[AdminRoute] Erro ao excluir simulação: {e}")

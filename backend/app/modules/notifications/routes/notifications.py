@@ -3,8 +3,8 @@ Router para Gerenciamento de Notificações.
 Refatorado para usar NotificationService.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
-from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
+from fastapi import APIRouter, Depends
+from app.core.exceptions import ContentNotFoundError
 
 from app.core.dependencies.auth import get_current_user
 from app.modules.notifications.services.notification_service import NotificationService
@@ -26,7 +26,7 @@ async def list_notifications(
 @router.post('/read-all')
 async def mark_all_read(user=Depends(get_current_user), service: NotificationService = Depends()):
     """Marca todas as notificações do usuário logado como lidas."""
-    success = await service.mark_all_as_read(user['username'])
+    await service.mark_all_as_read(user['username'])
     return {'status': 'success'}
 
 @router.post('/{notification_id}/read')

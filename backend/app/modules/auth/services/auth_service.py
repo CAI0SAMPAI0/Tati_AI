@@ -1,8 +1,3 @@
-"""
-services/auth_service.py
-Regras de negócio para autenticação.
-"""
-
 from datetime import datetime, timezone
 from typing import Dict, Any
 from fastapi import HTTPException

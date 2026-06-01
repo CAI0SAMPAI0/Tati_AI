@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import io
 from typing import AsyncIterator
 
 from app.core.config import settings

@@ -3,9 +3,8 @@ routers/activities/vocabulary.py
 Router para gerenciamento de vocabulário pessoal e SRS.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
-from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
-from typing import List, Dict, Any
+from fastapi import APIRouter, Depends
+from app.core.exceptions import BusinessLogicError
 from app.core.dependencies.auth import get_current_user
 from app.modules.activities.services.vocabulary_srs import vocabulary_srs_service
 

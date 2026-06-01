@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
+from app.core.exceptions import BusinessLogicError
 from fastapi.concurrency import run_in_threadpool
 from app.core.dependencies.auth import get_current_user
 from app.modules.chat.services.llm import generate_image

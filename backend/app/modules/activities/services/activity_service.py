@@ -8,7 +8,6 @@ from fastapi.concurrency import run_in_threadpool
 from app.shared.services.upstash import cache_get, cache_set, cache_delete
 from app.core.utils.level_utils import matches_level
 from fastapi import Depends
-from supabase import Client
 from app.core.dependencies.db import get_db
 
 
@@ -576,8 +575,6 @@ class ActivityService:
     async def generate_flashcards(self, theme: str, level: str, module_id: Optional[str] = None) -> Dict[str, Any]:
         """Gera um deck de flashcards via IA em Inglês."""
         from app.modules.chat.services.llm import groq_chat
-        import json
-        import re
 
         prompt = (
             f'Create a high-quality English vocabulary flashcard deck about "{theme}". '

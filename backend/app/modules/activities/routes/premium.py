@@ -4,7 +4,7 @@ Router para o Hub de Conteúdos Premium (Visão do Aluno).
 """
 
 from fastapi import APIRouter, Depends, HTTPException
-from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
+from app.core.exceptions import ContentNotFoundError, BusinessLogicError, UserNotFoundError
 from typing import List, Dict, Any
 from datetime import date, timedelta
 
@@ -17,7 +17,6 @@ from app.modules.payments.services.asaas import (
     get_pix_qr_code,
 )
 from app.core.database import get_client
-from app.shared.services.document_validator import validate_document_auto
 
 router = APIRouter()
 

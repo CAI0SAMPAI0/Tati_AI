@@ -8,8 +8,7 @@ import uuid
 import os
 from fastapi import UploadFile, HTTPException
 from fastapi import Depends
-from supabase import Client
-from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
+from app.core.exceptions import PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError
 from app.core.dependencies.db import get_db
 from fastapi.concurrency import run_in_threadpool
 from app.shared.services.secure_document_service import (

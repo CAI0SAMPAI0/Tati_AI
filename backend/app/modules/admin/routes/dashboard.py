@@ -4,7 +4,7 @@ Router do painel administrativo.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
-from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
+from app.core.exceptions import ContentNotFoundError, BusinessLogicError
 from pydantic import BaseModel
 from typing import Optional
 

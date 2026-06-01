@@ -1,15 +1,9 @@
-"""routers/payments/asaas.py
-Endpoints de pagamento via Asaas: subscribe, cancel, webhook, planos.
-
-Referência da API Asaas: https://docs.asaas.com/docs
-"""
-
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
+from app.core.exceptions import PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
 from pydantic import BaseModel
 
 from app.core.config import settings

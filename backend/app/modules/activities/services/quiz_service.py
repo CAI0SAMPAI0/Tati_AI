@@ -5,9 +5,7 @@ Serviço para gerenciamento de quizzes e geração dinâmica de questões.
 
 from typing import List, Dict, Any, Optional
 from fastapi.concurrency import run_in_threadpool
-from app.modules.chat.services.llm import groq_chat
 from fastapi import Depends
-from supabase import Client
 from app.core.dependencies.db import get_db
 
 

@@ -1,7 +1,5 @@
-import json
 from typing import Dict, Any, List, Optional
 from app.modules.chat.services.llm import groq_chat_json
-from app.core.database import get_client
 from .embeddings import EmbeddingsService
 
 class CEFRGeneratorService:

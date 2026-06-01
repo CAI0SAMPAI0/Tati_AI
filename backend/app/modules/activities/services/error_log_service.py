@@ -3,15 +3,12 @@ Captura, organiza e prioriza erros gramaticais e de vocabulário detectados no c
 com foco em geração de exercícios baseada em padrões reais de erro.
 """
 
-import json
 import re
 from collections import defaultdict
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 
 from fastapi.concurrency import run_in_threadpool
 
-from app.modules.chat.services.llm import groq_chat
-from supabase import Client
 from fastapi import Depends
 from app.core.dependencies.db import get_db
 
@@ -259,7 +256,7 @@ Return ONLY a JSON object:
             )
             grouped[pattern_key].append(row)
 
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timezone
         now = datetime.now(timezone.utc)
 
         targets = []

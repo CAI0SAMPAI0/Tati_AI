@@ -1,8 +1,3 @@
-"""
-services/chat_service.py
-Serviço para gerenciamento de chat, streaming de LLM e tarefas de background.
-"""
-
 import asyncio
 import base64
 import re
@@ -17,13 +12,12 @@ from fastapi.concurrency import run_in_threadpool
 
 from app.core.config import settings
 from app.modules.chat.services.llm import stream_llm, text_to_speech, transcribe_audio
-from app.shared.services.history import save_message, load_history, load_llm_history, auto_title
+from app.shared.services.history import save_message, load_llm_history, auto_title
 from app.modules.chat.services.prompt_builder import UserProfile, build_effective_prompt
 from app.modules.chat.services.rag_search import obter_contexto_rag, RAGResult
 from app.modules.activities.services.pronunciation_matcher import match_pronunciation
 from app.core.dependencies.db import get_db
 from fastapi import Depends
-from supabase import Client
 
 
 class ChatService:

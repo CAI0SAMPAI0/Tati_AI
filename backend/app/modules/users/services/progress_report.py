@@ -6,14 +6,13 @@ Gera relatórios de evolução pedagógica em PDF para os alunos.
 
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Any, List
+from typing import Any
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from fastapi.concurrency import run_in_threadpool
 from fastapi import Depends
-from supabase import Client
 from app.core.dependencies.db import get_db
 
 

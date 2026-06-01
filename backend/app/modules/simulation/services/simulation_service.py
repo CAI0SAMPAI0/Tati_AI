@@ -7,7 +7,6 @@ import base64
 from typing import List, Dict, Any, Optional
 from fastapi.concurrency import run_in_threadpool
 from fastapi import Depends
-from supabase import Client
 from app.core.dependencies.db import get_db
 
 from app.modules.simulation.services.simulation import get_all_scenarios, get_scenario, evaluate_simulation

@@ -2,7 +2,7 @@
 Serviço de Ranking de Alunos.
 """
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from app.core.database import get_client
 
 # REGRAS DE PONTUAÇÃO EXATAS

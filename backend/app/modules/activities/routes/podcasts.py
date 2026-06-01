@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Header
-from app.core.exceptions import AuthenticationRequiredError, PremiumAccessDeniedError, ContentNotFoundError, BusinessLogicError, UserNotFoundError
+from app.core.exceptions import ContentNotFoundError, BusinessLogicError
 from pydantic import BaseModel, Field
 
 from app.core.dependencies.auth import get_current_user
