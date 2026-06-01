@@ -1,5 +1,6 @@
-import logging
 from __future__ import annotations
+
+import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
