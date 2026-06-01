@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 from typing import Dict, Any
 from fastapi import HTTPException
@@ -20,7 +21,8 @@ from app.core.exceptions import UserNotFoundError, BusinessLogicError, Authentic
 
 class AuthService:
     @staticmethod
-    async def build_token_response(user: Dict[str, Any]) -> Dict[str, Any]:
+    async def build_token_response(
+            user: Dict[str, Any]) -> Dict[str, Any]:
         token_payload = {
             'sub': user['username'],
             'role': user.get('role', 'student'),
@@ -37,11 +39,15 @@ class AuthService:
                 # Pode bloquear, então jogamos na threadpool
                 await run_in_threadpool(activate_special_user, username, 'full')
             except Exception as e:
-                print(f'[Auth] Erro ao ativar subscription para {username}: {e}')
+                logging.info(
+                    f'[Auth] Erro ao ativar subscription para {username}: {e}')
 
-        sanitized_user = {k: v for k, v in user.items() if k != 'password'}
+        sanitized_user = {
+            k: v for k,
+            v in user.items() if k != 'password'}
         profile = sanitized_user.get('profile')
-        if not sanitized_user.get('avatar_url') and isinstance(profile, dict):
+        if not sanitized_user.get(
+                'avatar_url') and isinstance(profile, dict):
             sanitized_user['avatar_url'] = profile.get('avatar_url')
 
         return {
@@ -51,10 +57,12 @@ class AuthService:
         }
 
     @staticmethod
-    async def authenticate_user(db: Client, username: str, password: str) -> Dict[str, Any]:
+    async def authenticate_user(
+            db: Client, username: str, password: str) -> Dict[str, Any]:
         user = await UserRepository.find_by_identifier(db, username)
         if not user:
-            raise AuthenticationRequiredError(detail='Usuário ou senha incorretos')
+            raise AuthenticationRequiredError(
+                detail='Usuário ou senha incorretos')
 
         password_ok = verify_password(password, user['password'])
         temp_ok = user.get('temp_password') and verify_password(
@@ -62,7 +70,8 @@ class AuthService:
         )
 
         if not password_ok and not temp_ok:
-            raise AuthenticationRequiredError(detail='Usuário ou senha incorretos')
+            raise AuthenticationRequiredError(
+                detail='Usuário ou senha incorretos')
 
         if temp_ok:
             await UserRepository.update_user(db, user['username'], {'temp_password': None})
@@ -72,7 +81,8 @@ class AuthService:
     @staticmethod
     async def register_student(db: Client, body: Any) -> Dict[str, Any]:
         if len(body.password) < 6:
-            raise BusinessLogicError('Senha deve ter pelo menos 6 caracteres')
+            raise BusinessLogicError(
+                'Senha deve ter pelo menos 6 caracteres')
 
         username = body.username.strip().lower()
         email = body.email.strip().lower()
@@ -81,8 +91,8 @@ class AuthService:
         exists = await UserRepository.check_exists_by_username_or_email(db, username, email)
         if exists:
             raise HTTPException(
-                status_code=409, detail='Username ou e-mail já cadastrado'
-            )
+                status_code=409,
+                detail='Username ou e-mail já cadastrado')
 
         new_user = {
             'username': username,
@@ -98,9 +108,13 @@ class AuthService:
         return {'ok': True, 'message': 'Conta criada com sucesso'}
 
     @staticmethod
-    async def google_login(db: Client, credential: str, is_hub_only: bool = False) -> Dict[str, Any]:
+    async def google_login(db: Client,
+                           credential: str,
+                           is_hub_only: bool = False) -> Dict[str,
+                                                              Any]:
         if not settings.google_client_id:
-            raise HTTPException(status_code=503, detail='Google OAuth not configured')
+            raise HTTPException(
+                status_code=503, detail='Google OAuth not configured')
 
         try:
             info = await run_in_threadpool(
@@ -111,7 +125,8 @@ class AuthService:
                 clock_skew_in_seconds=60,
             )
         except Exception as exc:
-            raise AuthenticationRequiredError(detail=f'Token Google inválido: {exc}')
+            raise AuthenticationRequiredError(
+                detail=f'Token Google inválido: {exc}')
 
         email = info.get('email', '').lower()
         name = info.get('name', email.split('@')[0])
@@ -146,7 +161,8 @@ class AuthService:
         )
 
     @staticmethod
-    async def process_forgot_password(db: Client, identifier: str) -> Dict[str, Any]:
+    async def process_forgot_password(
+            db: Client, identifier: str) -> Dict[str, Any]:
         user = await UserRepository.find_by_identifier(
             db, identifier, 'username, name, email, password'
         )
@@ -164,7 +180,8 @@ class AuthService:
 
         temp_password = generate_temp_password()
         await UserRepository.update_user(
-            db, user['username'], {'temp_password': hash_password(temp_password)}
+            db, user['username'], {
+                'temp_password': hash_password(temp_password)}
         )
 
         email_sender = EmailSender()
@@ -184,8 +201,8 @@ class AuthService:
             }
         if not email_sent:
             raise HTTPException(
-                status_code=500, detail='Erro ao enviar e-mail. Tente novamente.'
-            )
+                status_code=500,
+                detail='Erro ao enviar e-mail. Tente novamente.')
 
         return {
             'ok': True,
@@ -204,15 +221,19 @@ class AuthService:
 
         stored = user['password']
         if stored == 'google_authenticated':
-            raise BusinessLogicError(detail='Conta Google não usa senha local')
+            raise BusinessLogicError(
+                detail='Conta Google não usa senha local')
 
         if not verify_password(body.current_password, stored):
-            raise AuthenticationRequiredError(detail='Senha atual incorreta')
+            raise AuthenticationRequiredError(
+                detail='Senha atual incorreta')
 
         if len(body.new_password) < 6:
-            raise BusinessLogicError('Nova senha deve ter pelo menos 6 caracteres')
+            raise BusinessLogicError(
+                'Nova senha deve ter pelo menos 6 caracteres')
 
         await UserRepository.update_user(
-            db, current_user['username'], {'password': hash_password(body.new_password)}
+            db, current_user['username'], {
+                'password': hash_password(body.new_password)}
         )
         return {'ok': True}

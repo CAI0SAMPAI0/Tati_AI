@@ -1,3 +1,4 @@
+import logging
 import resend
 from app.core.database import get_client
 from app.modules.notifications.services.push_notifications import send_push_to_user
@@ -30,11 +31,12 @@ async def dispatch_universal_notification(
             user_email = res.data[0].get('email')
             student_name = res.data[0].get('name') or username
     except Exception as e:
-        print(f'[Dispatcher] Erro ao buscar email: {e}')
+        logging.info(f'[Dispatcher] Erro ao buscar email: {e}')
 
     # 2. ENVIAR PUSH (Dispositivo)
     push_res = send_push_to_user(username, title, body, url)
-    print(f'[Dispatcher] Push enviado para {username}: {push_res}')
+    logging.info(
+        f'[Dispatcher] Push enviado para {username}: {push_res}')
 
     # 3. ENVIAR EMAIL
     if user_email:
@@ -45,7 +47,7 @@ async def dispatch_universal_notification(
                 <p>Hello, <strong>{student_name}</strong>!</p>
                 <p>{body}</p>
                 <div style="margin-top: 20px;">
-                    <a href="https://tati-ai.vercel.app{url}" 
+                    <a href="https://tati-ai.vercel.app{url}"
                        style="background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
                        Check it out in the App
                     </a>
@@ -62,8 +64,10 @@ async def dispatch_universal_notification(
                 subject=title,
                 html=html
             )
-            print(f'[Dispatcher] Email enviado para {user_email}')
+            logging.info(
+                f'[Dispatcher] Email enviado para {user_email}')
         except Exception as e:
-            print(f'[Dispatcher] Erro no email: {e}')
+            logging.info(f'[Dispatcher] Erro no email: {e}')
     else:
-        print('[Dispatcher] Email não enviado (Email null ou Resend sem API Key)')
+        logging.info(
+            '[Dispatcher] Email não enviado (Email null ou Resend sem API Key)')

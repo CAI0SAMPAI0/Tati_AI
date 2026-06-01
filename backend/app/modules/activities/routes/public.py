@@ -1,3 +1,4 @@
+import logging
 from fastapi import Depends, APIRouter, HTTPException
 from typing import List
 from pydantic import BaseModel, EmailStr
@@ -55,16 +56,24 @@ async def public_checkout(
     raw_doc = "".join(filter(str.isdigit, body.cpf))
 
     temp_pass = None
-    existing = db.table('users').select('username').eq('email', clean_email).execute().data
+    existing = db.table('users').select('username').eq(
+        'email', clean_email).execute().data
     if existing:
         username = existing[0]['username']
-        db.table('users').update({'cpf': raw_doc, 'cpf_cnpj': raw_doc}).eq('username', username).execute()
+        db.table('users').update({'cpf': raw_doc, 'cpf_cnpj': raw_doc}).eq(
+            'username', username).execute()
     else:
         import random
         base_user = clean_email.split('@')[0]
-        username = f"hub_{base_user}_{datetime.now().strftime('%H%M%S')}"
-        clean_prefix = "".join(filter(str.isalnum, base_user))[:3].lower()
-        random_suffix = "".join([str(random.randint(0, 9)) for _ in range(4)])
+        username = f"hub_{base_user}_{
+            datetime.now().strftime('%H%M%S')}"
+        clean_prefix = "".join(
+            filter(
+                str.isalnum,
+                base_user))[
+            :3].lower()
+        random_suffix = "".join(
+            [str(random.randint(0, 9)) for _ in range(4)])
         temp_pass = f"{clean_prefix}{random_suffix}"
 
         db.table('users').insert({
@@ -87,11 +96,13 @@ async def public_checkout(
                 password=temp_pass
             )
         except Exception as e:
-            print(f"Erro ao enviar e-mail de boas-vindas: {e}")
+            logging.info(f"Erro ao enviar e-mail de boas-vindas: {e}")
 
     item = await service.get_public_item(body.content_id)
     if not item:
-        raise HTTPException(status_code=404, detail="Material não encontrado")
+        raise HTTPException(
+            status_code=404,
+            detail="Material não encontrado")
 
     from app.modules.payments.services.asaas import (
         create_customer,
@@ -105,14 +116,20 @@ async def public_checkout(
         customer = await create_customer(name=body.name, email=clean_email, cpf_cnpj=raw_doc)
     customer_id = customer['id']
 
-    # Fluxo público: sempre usar preço de buyer para visitantes do hub-site.
-    resolved_price = float(item.get('price_buyers') or item.get('price') or 0)
+    # Fluxo público: sempre usar preço de buyer para visitantes do
+    # hub-site.
+    resolved_price = float(
+        item.get('price_buyers') or item.get('price') or 0)
 
     if resolved_price <= 0:
-        raise HTTPException(status_code=400, detail="Este material não possui preço configurado para compra.")
+        raise HTTPException(
+            status_code=400,
+            detail="Este material não possui preço configurado para compra.")
 
     due_date = (date.today() + timedelta(days=3)).isoformat()
-    print(f"[Checkout] billingType={body.billingType} customer_id={customer_id} value={resolved_price}")
+    logging.info(
+        f"[Checkout] billingType={
+            body.billingType} customer_id={customer_id} value={resolved_price}")
     try:
         payment = await create_payment(
             customer_id=customer_id,
@@ -135,7 +152,9 @@ async def public_checkout(
                 status_code=503,
                 detail="Serviço de pagamento temporariamente indisponível. Tente novamente em instantes."
             )
-        raise HTTPException(status_code=502, detail=f"Erro ao processar pagamento: {err_str}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Erro ao processar pagamento: {err_str}")
 
     payment_id = payment.get('id')
 
@@ -169,16 +188,19 @@ async def public_checkout(
         'invoiceUrl': payment.get('invoiceUrl') or payment.get('paymentUrl'),
         'pix': pix_data if body.billingType == 'PIX' else None,
         'username': username,
-        'password': temp_pass
-    }
+        'password': temp_pass}
 
 
 @router.get("/{item_id}", response_model=PremiumContentPublic)
-async def get_catalog_item(item_id: str, service: PremiumService = Depends()):
+async def get_catalog_item(
+        item_id: str,
+        service: PremiumService = Depends()):
     """Retorna detalhes de um item específico do catálogo."""
     item = await service.get_public_item(item_id)
     if not item:
-        raise HTTPException(status_code=404, detail="Material não encontrado")
+        raise HTTPException(
+            status_code=404,
+            detail="Material não encontrado")
     return item
 
 
@@ -191,23 +213,31 @@ async def cancel_checkout(payment_id: str):
     db = get_client()
 
     # Verifica se o pedido existe e está pendente
-    order = db.table('orders').select('id, status').eq('asaas_id', payment_id).execute().data
+    order = db.table('orders').select('id, status').eq(
+        'asaas_id', payment_id).execute().data
     if not order:
-        raise HTTPException(status_code=404, detail="Pedido não encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail="Pedido não encontrado.")
 
     if order[0]['status'] not in ('pending',):
-        raise HTTPException(status_code=409, detail=f"Pedido não pode ser cancelado (status: {order[0]['status']}).")
+        raise HTTPException(
+            status_code=409,
+            detail=f"Pedido não pode ser cancelado (status: {
+                order[0]['status']}).")
 
     # Cancela no Asaas
     try:
         from app.modules.payments.services.asaas import cancel_payment
         await cancel_payment(payment_id)
     except Exception as e:
-        print(f"[CancelCheckout] Aviso: erro ao cancelar no Asaas: {e}")
+        logging.info(
+            f"[CancelCheckout] Aviso: erro ao cancelar no Asaas: {e}")
 
     # Atualiza status no banco
-    db.table('orders').update({'status': 'cancelled'}).eq('asaas_id', payment_id).execute()
-    db.table('premium_purchases').update({'status': 'cancelled'}).eq('asaas_payment_id', payment_id).execute()
+    db.table('orders').update({'status': 'cancelled'}).eq(
+        'asaas_id', payment_id).execute()
+    db.table('premium_purchases').update({'status': 'cancelled'}).eq(
+        'asaas_payment_id', payment_id).execute()
 
     return {'ok': True, 'message': 'Pedido cancelado com sucesso.'}
-

@@ -1,3 +1,4 @@
+import logging
 from __future__ import annotations
 
 import json
@@ -51,7 +52,7 @@ def save_push_subscription(
         ).execute()
         return True
     except Exception as exc:
-        print(f'[Push] Falha ao salvar subscription: {exc}')
+        logging.info(f'[Push] Falha ao salvar subscription: {exc}')
         return False
 
 
@@ -69,7 +70,7 @@ def disable_push_subscription(username: str, endpoint: str) -> None:
             query = query.eq('username', username)
         query.execute()
     except Exception as exc:
-        print(f'[Push] Falha ao desativar subscription: {exc}')
+        logging.info(f'[Push] Falha ao desativar subscription: {exc}')
 
 
 def _user_subscriptions(username: str) -> list[dict[str, Any]]:
@@ -87,7 +88,7 @@ def _user_subscriptions(username: str) -> list[dict[str, Any]]:
         )
         return rows or []
     except Exception as exc:
-        print(f'[Push] Falha ao carregar subscriptions: {exc}')
+        logging.info(f'[Push] Falha ao carregar subscriptions: {exc}')
         return []
 
 
@@ -119,9 +120,11 @@ def send_push_to_user(
             sent += 1
         except WebPushException as exc:
             failed += 1
-            status_code = getattr(getattr(exc, 'response', None), 'status_code', None)
+            status_code = getattr(
+                getattr(exc, 'response', None), 'status_code', None)
             if status_code in {404, 410}:
-                disable_push_subscription(username=username, endpoint=endpoint)
+                disable_push_subscription(
+                    username=username, endpoint=endpoint)
         except Exception:
             failed += 1
 

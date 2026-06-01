@@ -1,3 +1,4 @@
+import logging
 from __future__ import annotations
 
 import asyncio
@@ -52,7 +53,8 @@ class Podcast(BaseModel):
     source_type: str = 'youtube'
     media_type: str = 'video'
     external_url: Optional[str] = None
-    transcript_segments: List[TranscriptSegment] = Field(default_factory=list)
+    transcript_segments: List[TranscriptSegment] = Field(
+        default_factory=list)
     has_full_transcript: bool = False
     translation_language: str = 'en-US'
     recommendation_reason: Optional[str] = None
@@ -90,7 +92,7 @@ async def _http_fetch_ok(url: str) -> bool:
             resp = await client.get(url)
             return resp.status_code == 200
     except Exception as e:
-        print(f'[podcast] Fetch OK failed for {url}: {e}')
+        logging.info(f'[podcast] Fetch OK failed for {url}: {e}')
         return False
 
 
@@ -124,12 +126,17 @@ def _extract_json_blob(raw_text: str) -> str:
     """Extrai JSON de blocos de texto (Markdown)."""
     clean_text = raw_text.strip()
     if '```json' in clean_text:
-        return clean_text.split('```json', 1)[1].split('```', 1)[0].strip()
+        return clean_text.split(
+            '```json',
+            1)[1].split(
+            '```',
+            1)[0].strip()
     if '```' in clean_text:
         return clean_text.split('```', 1)[1].split('```', 1)[0].strip()
-    first_brace, last_brace = clean_text.find('{'), clean_text.rfind('}')
+    first_brace, last_brace = clean_text.find(
+        '{'), clean_text.rfind('}')
     return (
-        clean_text[first_brace : last_brace + 1]
+        clean_text[first_brace: last_brace + 1]
         if (first_brace >= 0 and last_brace > first_brace)
         else clean_text
     )
@@ -145,6 +152,7 @@ def _extract_youtube_watch_url(item: Dict[str, Any]) -> Optional[str]:
         video_id = embed.split('/embed/')[1].split('?')[0].split('/')[0]
         return f'https://www.youtube.com/watch?v={video_id}'
     return None
+
 
 def _format_seconds_to_mmss(total_seconds: int) -> str:
     """Formata segundos para MM:SS."""
@@ -189,14 +197,21 @@ def _normalize_transcript_segments(payload: list) -> list:
         start = str(row.get('start', '')).strip()
         source_text = str(row.get('source_text', '')).strip()
         if start and source_text:
-            out.append({'start': start, 'source_text': source_text, 'translated_text': row.get('translated_text', '')})
+            out.append({'start': start, 'source_text': source_text,
+                       'translated_text': row.get('translated_text', '')})
     return out
 
 
-def _normalize_exercises_payload(payload: dict, podcast_title: str) -> dict:
+def _normalize_exercises_payload(
+        payload: dict,
+        podcast_title: str) -> dict:
     exercises = []
     try:
-        if isinstance(payload, dict) and isinstance(payload.get('exercises'), list):
+        if isinstance(
+                payload,
+                dict) and isinstance(
+                payload.get('exercises'),
+                list):
             for ex in payload['exercises']:
                 if not isinstance(ex, dict):
                     continue
@@ -207,7 +222,8 @@ def _normalize_exercises_payload(payload: dict, podcast_title: str) -> dict:
     # fallback: generate 3 simple placeholder exercises
     if not exercises:
         exercises = [
-            {'type': 'choice', 'question': f'What is mentioned in {podcast_title}?', 'options': ['A', 'B', 'C', 'D'], 'correct_index': 0},
+            {'type': 'choice', 'question': f'What is mentioned in {podcast_title}?',
+                'options': ['A', 'B', 'C', 'D'], 'correct_index': 0},
             {'type': 'voice', 'phrase': f'Practice saying a line from {podcast_title}'},
             {'type': 'writing', 'question': f'Summarize {podcast_title} in one sentence.'},
         ]
@@ -216,12 +232,18 @@ def _normalize_exercises_payload(payload: dict, podcast_title: str) -> dict:
 
 
 def _normalize_evaluation_payload(payload: dict) -> dict:
-    score = int(payload.get('score', 0)) if isinstance(payload, dict) else 0
+    score = int(
+        payload.get(
+            'score',
+            0)) if isinstance(
+        payload,
+        dict) else 0
     if score < 0:
         score = 0
     if score > 100:
         score = 100
-    feedback = (payload.get('feedback') or '').strip() if isinstance(payload, dict) else ''
+    feedback = (payload.get('feedback') or '').strip(
+    ) if isinstance(payload, dict) else ''
     if not feedback:
         feedback = 'Thanks for your feedback.'
     return {'score': score, 'feedback': feedback}
@@ -232,7 +254,8 @@ def _podcast_text_terms(podcast: dict) -> list:
     for k in ('title', 'description', 'category'):
         v = podcast.get(k)
         if v:
-            terms.extend([t.strip().lower() for t in str(v).split() if t])
+            terms.extend([t.strip().lower()
+                         for t in str(v).split() if t])
     for t in podcast.get('theme_tags', []) or []:
         terms.append(str(t).lower())
     return list(dict.fromkeys(terms))
@@ -244,20 +267,36 @@ def _tokenize_interest_keywords(messages: list[str]) -> list[str]:
         for w in re.findall(r"[a-zA-Z]+", m.lower()):
             kws.append(w)
     # simple stopword removal
-    stop = {'the', 'and', 'to', 'for', 'we', 'i', 'a', 'in', 'of', 'can', 'be', 'is'}
+    stop = {'the', 'and', 'to', 'for', 'we',
+            'i', 'a', 'in', 'of', 'can', 'be', 'is'}
     kws = [k for k in kws if k not in stop]
     return list(dict.fromkeys(kws))
 
 
-def _compose_recommendation_reason(podcast: dict, terms: list, user_level: str, ui_lang: str) -> str:
+def _compose_recommendation_reason(
+        podcast: dict,
+        terms: list,
+        user_level: str,
+        ui_lang: str) -> str:
     if ui_lang and ui_lang.startswith('pt'):
-        return f"Recomendado para seu nível ({user_level}) e por temas como {', '.join(terms[:3])}."
-    return f"Recommended for your level ({user_level}) and topics like {', '.join(terms[:3])}."
+        return f"Recomendado para seu nível ({user_level}) e por temas como {
+            ', '.join(
+                terms[
+                    :3])}."
+    return f"Recommended for your level ({user_level}) and topics like {
+        ', '.join(
+            terms[
+                :3])}."
 
 
-def _load_cached_recommendations(profile: dict, user_level: str, ui_lang: str) -> Optional[list]:
+def _load_cached_recommendations(
+        profile: dict,
+        user_level: str,
+        ui_lang: str) -> Optional[list]:
     try:
-        entry = (profile or {}).get(PodcastRecommender.AUTO_RECO_PROFILE_KEY)
+        entry = (
+            profile or {}).get(
+            PodcastRecommender.AUTO_RECO_PROFILE_KEY)
         if not entry:
             return None
         gen = entry.get('generated_at')
@@ -285,15 +324,15 @@ def _visible_levels_for_user(user_level: str) -> list:
     key = ul.lower()
     if key in mapping:
         center = mapping[key]
-    elif ul.upper() in ['A1','A2','B1','B2','C1','C2']:
+    elif ul.upper() in ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']:
         center = ul.upper()
     else:
         center = 'A2'
 
-    order = ['A1','A2','B1','B2','C1','C2']
+    order = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
     idx = order.index(center) if center in order else 1
-    left = idx-1
-    right = idx+1
+    left = idx - 1
+    right = idx + 1
     res = []
     if left >= 0:
         res.append(order[left])
@@ -314,17 +353,22 @@ def _normalize_user_level(label: str) -> str:
     }
     if l in map_labels:
         return map_labels[l]
-    if l.upper() in ['A1','A2','B1','B2','C1','C2']:
+    if l.upper() in ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']:
         return l.upper()
     return 'A2'
 
 
-def _rank_personalized_recommendations(catalog: list, user_level: str, interest_keywords: list, ui_lang: str) -> list:
+def _rank_personalized_recommendations(
+        catalog: list,
+        user_level: str,
+        interest_keywords: list,
+        ui_lang: str) -> list:
     scored = []
     for item in catalog:
         score = 0.0
         # level match
-        if str(item.get('level','')).upper() == str(user_level).upper():
+        if str(item.get('level', '')).upper() == str(
+                user_level).upper():
             score += 2.0
         # interest keywords
         text_terms = set(_podcast_text_terms(item))
@@ -332,15 +376,24 @@ def _rank_personalized_recommendations(catalog: list, user_level: str, interest_
             if k.lower() in text_terms:
                 score += 1.5
         item['recommendation_score'] = score
-        item['recommendation_reason'] = _compose_recommendation_reason(item, interest_keywords, user_level, ui_lang)
+        item['recommendation_reason'] = _compose_recommendation_reason(
+            item, interest_keywords, user_level, ui_lang)
         scored.append(item)
-    return sorted(scored, key=lambda x: x.get('recommendation_score',0), reverse=True)
+    return sorted(
+        scored,
+        key=lambda x: x.get(
+            'recommendation_score',
+            0),
+        reverse=True)
 
 
-def _filter_unavailable_video_items(catalog: list, availability_checker=None) -> list:
+def _filter_unavailable_video_items(
+        catalog: list,
+        availability_checker=None) -> list:
     out = []
     for item in catalog:
-        if item.get('media_type') == 'video' and item.get('source_type') == 'youtube':
+        if item.get('media_type') == 'video' and item.get(
+                'source_type') == 'youtube':
             if availability_checker:
                 try:
                     if availability_checker(item):
@@ -365,14 +418,17 @@ def _focus_terms_for_profile(profile_label: str) -> list:
     return [pl]
 
 
-def _apply_level_playback_constraints(catalog: list, product_level_label: str) -> list:
+def _apply_level_playback_constraints(
+        catalog: list,
+        product_level_label: str) -> list:
     visible = _visible_levels_for_user(product_level_label)
     out = []
     for item in catalog:
-        lvl = str(item.get('level','')).upper()
+        lvl = str(item.get('level', '')).upper()
         if lvl not in visible:
             continue
-        duration = _duration_to_seconds(str(item.get('duration') or '0')) or 0
+        duration = _duration_to_seconds(
+            str(item.get('duration') or '0')) or 0
         easy = bool(item.get('easy_words', False))
         # keep only short items (<=5 minutes) and easy words
         if duration <= 5 * 60 and easy:
@@ -396,15 +452,16 @@ async def _fetch_youtube_duration_seconds(item: Dict[str, Any]) -> int:
         return 0
 
 
-def _sanitize_podcast_entry(raw_entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _sanitize_podcast_entry(
+        raw_entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     embed_url = str(raw_entry.get('embed_url', '')).strip()
     try:
-        if urlparse(embed_url).netloc.lower() not in ALLOWED_EMBED_HOSTS:
+        if urlparse(embed_url).netloc.lower(
+        ) not in ALLOWED_EMBED_HOSTS:
             return None
     except Exception:
         return None
     return {**raw_entry, 'embed_url': embed_url}
-
 
 
 @router.get('/progress')
@@ -427,7 +484,8 @@ async def get_podcast_progress(
                 .data
                 or []
             )
-            return [r.get('podcast_id') for r in rows if r.get('podcast_id')]
+            return [r.get('podcast_id')
+                    for r in rows if r.get('podcast_id')]
         except Exception:
             return []
 
@@ -455,7 +513,8 @@ async def get_podcast_recommendations(
     catalog = []
     try:
         rows = (
-            db.table('podcasts').select('*').eq('user_id', username).execute().data
+            db.table('podcasts').select(
+                '*').eq('user_id', username).execute().data
             or []
         )
         for row in rows:
@@ -463,21 +522,21 @@ async def get_podcast_recommendations(
             if sanitized:
                 catalog.append(sanitized)
     except Exception as exc:
-        print(f'[podcast] DB load failed: {exc}')
+        logging.info(f'[podcast] DB load failed: {exc}')
 
     # 2. Sem filtragem por nível para podcasts do usuário
     visible_catalog = catalog
 
-
     # 3. Disponibilidade
-    tasks = [availability_service.is_media_available(item) for item in visible_catalog]
+    tasks = [availability_service.is_media_available(
+        item) for item in visible_catalog]
     results = await asyncio.gather(*tasks)
-    visible_catalog = [item for item, ok in zip(visible_catalog, results) if ok]
+    visible_catalog = [item for item, ok in zip(
+        visible_catalog, results) if ok]
 
     # 4. Rankeamento
     recommendations = recommender.rank_recommendations(
-        visible_catalog, user_level, [], ui_lang, display_level=user_level_raw
-    )
+        visible_catalog, user_level, [], ui_lang, display_level=user_level_raw)
 
     return recommendations[:50]
 
@@ -486,7 +545,8 @@ async def get_podcast_recommendations(
 async def get_podcast_details(podcast_id: str):
     """Retorna detalhes de um podcast específico."""
     db = get_client()
-    rows = db.table('podcasts').select('*').eq('id', podcast_id).limit(1).execute().data
+    rows = db.table('podcasts').select(
+        '*').eq('id', podcast_id).limit(1).execute().data
     if not rows:
         raise ContentNotFoundError(detail='Podcast not found')
     item = rows[0]
@@ -496,18 +556,21 @@ async def get_podcast_details(podcast_id: str):
         if str(item.get('duration') or '') != exact_duration:
             item['duration'] = exact_duration
             try:
-                db.table('podcasts').update({'duration': exact_duration}).eq('id', podcast_id).execute()
+                db.table('podcasts').update({'duration': exact_duration}).eq(
+                    'id', podcast_id).execute()
             except Exception:
                 pass
     return item
 
 
 @router.get('/{podcast_id}/exercises')
-async def generate_podcast_exercises(podcast_id: str, lang: str = 'en-US'):
+async def generate_podcast_exercises(
+        podcast_id: str, lang: str = 'en-US'):
     """Alias para compatibilidade (GET com query param)."""
     exercise_service = PodcastExerciseService()
     db = get_client()
-    rows = db.table('podcasts').select('*').eq('id', podcast_id).limit(1).execute().data
+    rows = db.table('podcasts').select(
+        '*').eq('id', podcast_id).limit(1).execute().data
     if not rows:
         raise ContentNotFoundError(detail='Podcast not found')
     return await exercise_service.generate_exercises(rows[0], lang)
@@ -542,7 +605,7 @@ async def evaluate_podcast_exercise(
                 lambda: get_client().table('podcast_answers').insert(answer_row).execute()
             )
         except Exception as exc:
-            print(f'[Podcast] Erro ao salvar resposta: {exc}')
+            logging.info(f'[Podcast] Erro ao salvar resposta: {exc}')
 
     return result
 
@@ -560,20 +623,24 @@ async def evaluate_pronunciation(
     try:
         audio_bytes = base64.b64decode(req.audio)
     except Exception:
-        raise BusinessLogicError(detail="Invalid audio format (base64 expected)")
+        raise BusinessLogicError(
+            detail="Invalid audio format (base64 expected)")
 
     result = await pronunciation_matcher.evaluate(audio_bytes, req.reference_text, user.get('level', 'Beginner'))
-    
+
     # Salvar tentativa no perfil do usuário
     username = user.get('username')
     if username:
         def _save_attempt():
             db = get_client()
             # Busca histórico atual
-            user_data = db.table('users').select('pronunciation_challenges').eq('username', username).single().execute().data
-            history = user_data.get('pronunciation_challenges') if user_data else []
-            if not isinstance(history, list): history = []
-            
+            user_data = db.table('users').select('pronunciation_challenges').eq(
+                'username', username).single().execute().data
+            history = user_data.get(
+                'pronunciation_challenges') if user_data else []
+            if not isinstance(history, list):
+                history = []
+
             # Adiciona nova tentativa
             new_attempt = {
                 'podcast_id': req.podcast_id,
@@ -583,20 +650,20 @@ async def evaluate_pronunciation(
                 'timestamp': datetime.now(timezone.utc).isoformat()
             }
             history.append(new_attempt)
-            
+
             # Limita histórico aos últimos 100 para performance
             history = history[-100:]
-            
-            db.table('users').update({'pronunciation_challenges': history}).eq('username', username).execute()
+
+            db.table('users').update({'pronunciation_challenges': history}).eq(
+                'username', username).execute()
 
         try:
             await run_in_threadpool(_save_attempt)
         except Exception as e:
-            print(f"[Podcast] Erro ao salvar tentativa de pronúncia: {e}")
+            logging.info(
+                f"[Podcast] Erro ao salvar tentativa de pronúncia: {e}")
 
     return result
-
-
 
 
 @router.post('/{podcast_id}/complete')
@@ -617,22 +684,24 @@ async def mark_podcast_complete(
                 {
                     'username': username,
                     'podcast_id': podcast_id,
-                    'completed_at': datetime.now(timezone.utc).isoformat(),
+                    'completed_at': datetime.now(
+                        timezone.utc).isoformat(),
                 },
                 on_conflict='username,podcast_id',
             ).execute()
         except Exception as exc:
-            print(f'[Podcast] Erro ao salvar conclusão: {exc}')
+            logging.info(f'[Podcast] Erro ao salvar conclusão: {exc}')
 
     await run_in_threadpool(_save)
-    
+
     # 🏆 Gamification
     try:
         from app.modules.activities.services.gamification_service import GamificationService
         gs = GamificationService()
         # Podcast completion is like a simulation/video lesson
-        asyncio.create_task(gs.award_xp(username, gs.XP_REWARDS.get('simulation_complete', 50), 'Podcast completed'))
-    except:
+        asyncio.create_task(gs.award_xp(username, gs.XP_REWARDS.get(
+            'simulation_complete', 50), 'Podcast completed'))
+    except BaseException:
         pass
 
     return {'success': True, 'podcast_id': podcast_id}

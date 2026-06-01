@@ -1,5 +1,6 @@
 import flet as ft
 
+
 class AppColors:
     PRIMARY = "#6366F1"  # Indigo
     SECONDARY = "#EC4899"  # Pink
@@ -10,6 +11,7 @@ class AppColors:
     TEXT_SECONDARY = "#94A3B8"
     ERROR = "#EF4444"
 
+
 class AppStyles:
     HEADER_TEXT = ft.TextStyle(
         size=32,
@@ -17,7 +19,7 @@ class AppStyles:
         color=AppColors.TEXT_PRIMARY,
         font_family="Outfit"
     )
-    
+
     SUBHEADER_TEXT = ft.TextStyle(
         size=18,
         weight=ft.FontWeight.W_500,

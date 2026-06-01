@@ -42,25 +42,20 @@ class ModuleService:
 
             def _insert_mod():
                 mod_res = (
-                    self.db.table('modules')
-                    .insert(
+                    self.db.table('modules') .insert(
                         {
                             'title': payload.title,
                             'description': payload.description,
-                            'level': payload.levels[0]
-                            if payload.levels
-                            else 'Beginner',
+                            'level': payload.levels[0] if payload.levels else 'Beginner',
                             'levels': payload.levels,
                             'order': payload.order,
                             'is_published': False,
-                            'flashcards': [f.model_dump() for f in payload.flashcards]
-                            if payload.flashcards
-                            else [],
-                            'ai_prompt': payload.ai_prompt if hasattr(payload, 'ai_prompt') else None,
-                        }
-                    )
-                    .execute()
-                )
+                            'flashcards': [
+                                f.model_dump() for f in payload.flashcards] if payload.flashcards else [],
+                            'ai_prompt': payload.ai_prompt if hasattr(
+                                payload,
+                                'ai_prompt') else None,
+                        }) .execute())
                 return mod_res.data[0]['id']
 
             mod_id = await run_in_threadpool(_insert_mod)
@@ -109,8 +104,11 @@ class ModuleService:
                 'levels': payload.levels,
                 'level': payload.levels[0] if payload.levels else 'Beginner',
                 'order': payload.order,
-                'flashcards': [f.model_dump() for f in payload.flashcards],
-                'ai_prompt': payload.ai_prompt if hasattr(payload, 'ai_prompt') else None,
+                'flashcards': [
+                    f.model_dump() for f in payload.flashcards],
+                'ai_prompt': payload.ai_prompt if hasattr(
+                    payload,
+                    'ai_prompt') else None,
             }
             if payload.is_published is not None:
                 update_data['is_published'] = payload.is_published
@@ -155,13 +153,16 @@ class ModuleService:
             await cache_delete('modules:list:all')
             return True
         except Exception as e:
-            raise HTTPException(500, f'Erro ao atualizar módulo: {str(e)}')
+            raise HTTPException(
+                500, f'Erro ao atualizar módulo: {
+                    str(e)}')
 
     async def delete_module(self, module_id: str) -> bool:
         """Deleta um módulo."""
 
         def _delete():
-            self.db.table('modules').delete().eq('id', module_id).execute()
+            self.db.table('modules').delete().eq(
+                'id', module_id).execute()
 
         await run_in_threadpool(_delete)
         await cache_delete('modules:list:all')
@@ -170,7 +171,10 @@ class ModuleService:
     async def upload_content_file(self, file: UploadFile) -> str:
         """Faz upload de arquivo para o storage."""
         BUCKET = 'module-contents'
-        filename = f'{uuid.uuid4()}{os.path.splitext(file.filename)[1].lower()}'
+        filename = f'{
+            uuid.uuid4()}{
+            os.path.splitext(
+                file.filename)[1].lower()}'
         file_content = await file.read()
 
         def _upload():
@@ -179,11 +183,13 @@ class ModuleService:
                 file=file_content,
                 file_options={'content-type': file.content_type},
             )
-            return self.db.storage.from_(BUCKET).get_public_url(filename)
+            return self.db.storage.from_(
+                BUCKET).get_public_url(filename)
 
         return await run_in_threadpool(_upload)
 
-    async def list_for_student(self, user: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def list_for_student(
+            self, user: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Lista módulos para o aluno com progresso."""
         username = user['username']
         user_level = user.get('level') or 'Beginner'
@@ -259,7 +265,8 @@ class ModuleService:
                     q['attempts'] = attempts_map.get(q['id'], 0)
                     if m.get('id') == PERSONALIZED_MODULE_ID:
                         default_status = 'pending' if q['attempts'] == 0 else 'done'
-                        q['status'] = status_map.get(str(q['id']), default_status)
+                        q['status'] = status_map.get(
+                            str(q['id']), default_status)
                 m['has_quiz'] = len(quizzes) > 0
                 m['has_flashcards'] = (
                     isinstance(m.get('flashcards'), list)

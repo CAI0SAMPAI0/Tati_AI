@@ -28,15 +28,18 @@ async def get_current_challenge():
 
 @router.post('/challenges/submit')
 async def submit_pronunciation(
-    body: PronunciationSubmission, current_user: dict = Depends(get_current_user)
-):
+        body: PronunciationSubmission,
+        current_user: dict = Depends(get_current_user)):
     """Envia tentativa de pronúncia."""
     return submit_attempt(
-        current_user['username'], body.challenge_id, body.score, body.audio_b64
-    )
+        current_user['username'],
+        body.challenge_id,
+        body.score,
+        body.audio_b64)
 
 
 @router.get('/challenges/attempts')
-async def get_my_attempts(current_user: dict = Depends(get_current_user)):
+async def get_my_attempts(
+        current_user: dict = Depends(get_current_user)):
     """Retorna tentativas do usuário."""
     return {'attempts': get_user_attempts(current_user['username'])}

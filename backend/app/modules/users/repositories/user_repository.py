@@ -7,12 +7,16 @@ from typing import Dict, Any, Optional
 from fastapi.concurrency import run_in_threadpool
 from supabase import Client
 
+
 class UserRepository:
     @staticmethod
     def _strip_avatar_fields(fields: str) -> str:
-        cleaned = [part.strip() for part in fields.split(',') if part.strip()]
-        cleaned = [part for part in cleaned if part not in {'avatar_url', 'profile.avatar_url'}]
-        # Mantemos profile para compatibilidade legada de avatar em profile.avatar_url.
+        cleaned = [part.strip()
+                   for part in fields.split(',') if part.strip()]
+        cleaned = [part for part in cleaned if part not in {
+            'avatar_url', 'profile.avatar_url'}]
+        # Mantemos profile para compatibilidade legada de avatar em
+        # profile.avatar_url.
         return ', '.join(cleaned)
 
     @staticmethod
@@ -34,7 +38,8 @@ class UserRepository:
                         .data
                     )
                 except Exception:
-                    fallback_fields = UserRepository._strip_avatar_fields(fields)
+                    fallback_fields = UserRepository._strip_avatar_fields(
+                        fields)
                     rows = (
                         db.table('users')
                         .select(fallback_fields)
@@ -81,7 +86,8 @@ class UserRepository:
                     .data
                 )
             except Exception:
-                fallback_fields = UserRepository._strip_avatar_fields(fields)
+                fallback_fields = UserRepository._strip_avatar_fields(
+                    fields)
                 rows = (
                     db.table('users')
                     .select(fallback_fields)
@@ -95,7 +101,8 @@ class UserRepository:
         return await run_in_threadpool(_fetch)
 
     @staticmethod
-    async def check_exists_by_username_or_email(db: Client, username: str, email: str) -> bool:
+    async def check_exists_by_username_or_email(
+            db: Client, username: str, email: str) -> bool:
         def _fetch():
             rows = (
                 db.table('users')
@@ -109,15 +116,18 @@ class UserRepository:
         return await run_in_threadpool(_fetch)
 
     @staticmethod
-    async def insert_user(db: Client, user_data: Dict[str, Any]) -> None:
+    async def insert_user(
+            db: Client, user_data: Dict[str, Any]) -> None:
         def _insert():
             db.table('users').insert(user_data).execute()
 
         await run_in_threadpool(_insert)
 
     @staticmethod
-    async def update_user(db: Client, username: str, update_data: Dict[str, Any]) -> None:
+    async def update_user(db: Client, username: str,
+                          update_data: Dict[str, Any]) -> None:
         def _update():
-            db.table('users').update(update_data).eq('username', username).execute()
+            db.table('users').update(update_data).eq(
+                'username', username).execute()
 
         await run_in_threadpool(_update)

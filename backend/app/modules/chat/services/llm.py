@@ -1,3 +1,4 @@
+import logging
 from __future__ import annotations
 
 import base64
@@ -45,17 +46,16 @@ async def transcribe_audio(
         try:
             client = AsyncGroq(api_key=key)
             # Whisper prompt: verbatim transcription, support mixed PT/EN
-            # Expanded common English verbs to improve contextual accuracy
+            # Expanded common English verbs to improve contextual
+            # accuracy
             default_prompt = (
                 'Transcreva exatamente o que foi dito, palavra por palavra. Ignore ruídos de fundo, cliques ou respiração. '
                 'Se não houver fala clara, não transcreva nada. '
                 'Context: English learning practice. Phonetic accuracy is critical. '
                 "Pay close attention to common verbs: 'buy', 'eat', 'order', 'want', 'need', 'go', 'work', 'study', 'think', 'believe', 'understand', 'explain', 'practice', 'improve', 'learn'. "
-                "Distinguish between 'can' and 'can't', 'do' and 'does', 'did' and 'done'."
-            )
+                "Distinguish between 'can' and 'can't', 'do' and 'does', 'did' and 'done'.")
             effective_prompt = (
-                f'{default_prompt} {prompt}' if prompt else default_prompt
-            )
+                f'{default_prompt} {prompt}' if prompt else default_prompt)
 
             resp = await client.audio.transcriptions.create(
                 file=(filename, audio_bytes),
@@ -76,11 +76,11 @@ async def transcribe_audio(
 async def text_to_speech(text: str) -> str:
     """Converte texto em áudio base64 chamando o gerador com clonagem e fallbacks."""
     from app.modules.chat.services.audio_generator import generate_teacher_audio
-    
+
     audio_b64 = await generate_teacher_audio(text)
     if audio_b64:
         return audio_b64
-        
+
     # Caso crítico absoluto em que tudo falhe, retorna string vazia
     return ""
 
@@ -125,7 +125,8 @@ async def _stream_groq(
             return
         except Exception as exc:
             last_error = exc
-            print(f'[Groq stream] key {idx + 1}/{len(keys)} falhou: {str(exc)[:100]}')
+            logging.info(
+                f'[Groq stream] key {idx + 1}/{len(keys)} falhou: {str(exc)[:100]}')
             if _should_try_next_key(exc):
                 continue
             break
@@ -159,12 +160,14 @@ async def groq_chat(
             return resp.choices[0].message.content
         except Exception as exc:
             last_error = exc
-            print(f'[Groq chat] key {idx + 1}/{len(keys)} falhou: {str(exc)[:100]}')
+            logging.info(
+                f'[Groq chat] key {idx + 1}/{len(keys)} falhou: {str(exc)[:100]}')
             if _should_try_next_key(exc):
                 continue
             break
 
-    raise GroqKeyError(f'Todas as chaves Groq falharam. Ãšltimo: {last_error}')
+    raise GroqKeyError(
+        f'Todas as chaves Groq falharam. Ãšltimo: {last_error}')
 
 
 async def groq_chat_json(
@@ -180,30 +183,35 @@ async def groq_chat_json(
     """
     import json
     import re
-    
-    # Injetamos uma instrução forte no final da última mensagem para forçar saída JSON pura
+
+    # Injetamos uma instrução forte no final da última mensagem para
+    # forçar saída JSON pura
     if messages and messages[-1]['role'] == 'user':
         messages[-1]['content'] += "\n\nCRITICAL: You must respond ONLY with a valid JSON object. Do not include markdown blocks like ```json. Return the raw JSON directly."
-    
+
     try:
         raw_response = await groq_chat(messages, max_tokens, temperature, model)
-        
-        # Estratégia de limpeza: Tentar encontrar blocos markdown se a IA ignorar o aviso
+
+        # Estratégia de limpeza: Tentar encontrar blocos markdown se a
+        # IA ignorar o aviso
         clean_json = raw_response.strip()
-        match = re.search(r'```(?:json)?\s*(.*?)\s*```', clean_json, re.DOTALL)
+        match = re.search(
+            r'```(?:json)?\s*(.*?)\s*```',
+            clean_json,
+            re.DOTALL)
         if match:
             clean_json = match.group(1)
         else:
-            # Fallback robusto: Tenta extrair qualquer coisa entre as chaves principais
+            # Fallback robusto: Tenta extrair qualquer coisa entre as
+            # chaves principais
             match = re.search(r'\{.*\}', clean_json, re.DOTALL)
             if match:
                 clean_json = match.group(0)
-                
+
         return json.loads(clean_json)
     except Exception as e:
-        print(f"[LLM JSON] Falha severa ao extrair JSON: {e}")
+        logging.info(f"[LLM JSON] Falha severa ao extrair JSON: {e}")
         return {}
-
 
 
 async def generate_visemes(audio_b64: str) -> list:
@@ -231,7 +239,7 @@ async def generate_visemes(audio_b64: str) -> list:
         with open(temp_json) as f:
             return json.load(f).get('mouthCues', [])
     except Exception as exc:
-        print(f'[Visemes] Rhubarb falhou: {exc}')
+        logging.info(f'[Visemes] Rhubarb falhou: {exc}')
         return []
     finally:
         for path in (temp_audio, temp_json):
@@ -270,39 +278,45 @@ async def generate_image(prompt: str) -> str:
                     url = data["data"][0]["url"]
                     return url
                 else:
-                    print(f"[LLM] DALL-E 3 falhou ({resp.status_code}): {resp.text}")
+                    logging.info(
+                        f"[LLM] DALL-E 3 falhou ({resp.status_code}): {resp.text}")
         except Exception as e:
-            print(f"[LLM] Erro excepcional no DALL-E: {e}")
+            logging.info(f"[LLM] Erro excepcional no DALL-E: {e}")
 
     # 2. Fallback para busca na internet (Tavily)
     return await search_image_on_internet(prompt)
+
 
 async def search_image_on_internet(query: str) -> str:
     """Busca uma imagem relevante na internet usando a API do Tavily, com ajuda do Groq para otimizar a busca."""
     import httpx
     try:
-        # Usa Groq para gerar uma busca melhor em inglês (curta e descritiva para imagens)
+        # Usa Groq para gerar uma busca melhor em inglês (curta e
+        # descritiva para imagens)
         optimized_query = query
         try:
-            print(f"[LLM] Requesting Groq to optimize query for: {query}")
+            logging.info(
+                f"[LLM] Requesting Groq to optimize query for: {query}")
             optimized_query = await groq_chat([
                 {"role": "system", "content": "Generate a short, 3-4 word English search query to find a clear educational image for the following term. Output ONLY the query string, no quotes or explanations."},
                 {"role": "user", "content": query}
             ], model='llama-3.1-8b-instant', max_tokens=100)
             optimized_query = optimized_query.strip().strip('"').strip("'")
-            print(f"[LLM] Optimized image search query: {optimized_query}")
+            logging.info(
+                f"[LLM] Optimized image search query: {optimized_query}")
         except Exception as groq_err:
-            print(f"[LLM] Groq optimization failed: {groq_err}")
+            logging.info(f"[LLM] Groq optimization failed: {groq_err}")
 
         keys = settings.tavily_keys
         if not keys:
-            print("[LLM] Tavily API keys não configuradas.")
+            logging.info("[LLM] Tavily API keys não configuradas.")
             return ""
 
         async with httpx.AsyncClient(timeout=15.0) as client:
             for key in keys:
                 try:
-                    print(f"[LLM] Trying Tavily search with query: {optimized_query}")
+                    logging.info(
+                        f"[LLM] Trying Tavily search with query: {optimized_query}")
                     response = await client.post(
                         "https://api.tavily.com/search",
                         json={
@@ -312,24 +326,31 @@ async def search_image_on_internet(query: str) -> str:
                             "search_depth": "basic"
                         }
                     )
-                    
+
                     if response.status_code == 200:
                         data = response.json()
                         images = data.get('images', [])
-                        print(f"[LLM] Tavily found {len(images)} images")
+                        logging.info(
+                            f"[LLM] Tavily found {len(images)} images")
                         if images:
-                            # Algumas vezes Tavily retorna objetos na lista de imagens
+                            # Algumas vezes Tavily retorna objetos na
+                            # lista de imagens
                             img = images[0]
                             if isinstance(img, dict) and 'url' in img:
                                 return img['url']
                             return str(img)
                     else:
-                        print(f"[LLM] Tavily API error ({response.status_code}): {response.text}")
+                        logging.info(
+                            f"[LLM] Tavily API error ({
+                                response.status_code}): {
+                                response.text}")
                 except Exception as inner_e:
-                    print(f"[LLM] Erro com chave Tavily: {inner_e}")
+                    logging.info(
+                        f"[LLM] Erro com chave Tavily: {inner_e}")
                     continue
-        
+
         return ""
     except Exception as e:
-        print(f"[LLM] Erro crítico ao buscar imagem na internet: {e}")
+        logging.info(
+            f"[LLM] Erro crítico ao buscar imagem na internet: {e}")
         return ""

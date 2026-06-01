@@ -8,8 +8,16 @@ from app.core.database import get_client
 
 # Configuração de níveis (CEFR - Common European Framework)
 LEVELS = {
-    'A1': {'min': 0, 'max': 500, 'label': 'Beginner', 'label_pt': 'Iniciante'},
-    'A2': {'min': 500, 'max': 1200, 'label': 'Elementary', 'label_pt': 'Elementar'},
+    'A1': {
+        'min': 0,
+        'max': 500,
+        'label': 'Beginner',
+        'label_pt': 'Iniciante'},
+    'A2': {
+        'min': 500,
+        'max': 1200,
+        'label': 'Elementary',
+        'label_pt': 'Elementar'},
     'B1': {
         'min': 1200,
         'max': 2500,
@@ -22,8 +30,16 @@ LEVELS = {
         'label': 'Upper Intermediate',
         'label_pt': 'Intermediário Superior',
     },
-    'C1': {'min': 4000, 'max': 6000, 'label': 'Advanced', 'label_pt': 'Avançado'},
-    'C2': {'min': 6000, 'max': 999999, 'label': 'Mastery', 'label_pt': 'Domínio Total'},
+    'C1': {
+        'min': 4000,
+        'max': 6000,
+        'label': 'Advanced',
+        'label_pt': 'Avançado'},
+    'C2': {
+        'min': 6000,
+        'max': 999999,
+        'label': 'Mastery',
+        'label_pt': 'Domínio Total'},
 }
 
 # Recompensas de XP
@@ -75,7 +91,8 @@ def award_xp(username: str, amount: int, reason: str = '') -> dict:
 
     # Adiciona XP
     xp_data['xp'] = xp_data.get('xp', 0) + amount
-    xp_data['total_xp_earned'] = xp_data.get('total_xp_earned', 0) + amount
+    xp_data['total_xp_earned'] = xp_data.get(
+        'total_xp_earned', 0) + amount
 
     # Verifica se subiu de nível
     old_level = xp_data.get('level', 'A1')
@@ -92,17 +109,20 @@ def award_xp(username: str, amount: int, reason: str = '') -> dict:
     level_config = LEVELS.get(new_level, LEVELS['A1'])
     xp_in_level = xp_data['xp'] - level_config['min']
     xp_needed = level_config['max'] - level_config['min']
-    xp_data['level_progress'] = min(100, int((xp_in_level / xp_needed) * 100))
+    xp_data['level_progress'] = min(
+        100, int((xp_in_level / xp_needed) * 100))
     xp_data['xp_to_next'] = level_config['max'] - xp_data['xp']
 
     # Adiciona milestone se for primeira vez
-    if amount >= 100 and 'big_earner' not in xp_data.get('milestones', []):
+    if amount >= 100 and 'big_earner' not in xp_data.get(
+            'milestones', []):
         if 'milestones' not in xp_data:
             xp_data['milestones'] = []
         xp_data['milestones'].append('big_earner')
 
     # Salva
-    db.table('users').update({'xp_data': xp_data}).eq('username', username).execute()
+    db.table('users').update({'xp_data': xp_data}).eq(
+        'username', username).execute()
 
     return xp_data
 
@@ -156,7 +176,8 @@ def get_user_rank(username: str) -> dict:
         xp_data = get_xp_data(username)
 
         # Conta quantos usuários têm mais XP
-        users = db.table('users').select('username, xp_data').execute().data
+        users = db.table('users').select(
+            'username, xp_data').execute().data
 
         rank = 1
         for user in users:

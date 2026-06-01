@@ -1,3 +1,4 @@
+import logging
 from __future__ import annotations
 import os
 from dataclasses import dataclass
@@ -11,39 +12,39 @@ _CHROMA_PATH = os.path.join(_BASE_DIR, 'data', 'chroma_db')
 # Lazy — nenhuma variável inicializada aqui
 _embeddings = None
 _vectorstore = None
-_chroma_available: bool | None = None 
+_chroma_available: bool | None = None
 
 
 def _get_vectorstore():
     """Inicializa ChromaDB e embeddings apenas quando necessário."""
     global _embeddings, _vectorstore, _chroma_available
- 
+
     if _chroma_available is False:
         return None
- 
+
     if _vectorstore is not None:
         return _vectorstore
- 
+
     # Verifica se o diretório do Chroma existe antes de tentar carregar
     if not os.path.isdir(_CHROMA_PATH):
         _chroma_available = False
         return None
- 
+
     try:
         from langchain_chroma import Chroma
         from langchain_huggingface import HuggingFaceEndpointEmbeddings
- 
+
         _embeddings = HuggingFaceEndpointEmbeddings(
             model='sentence-transformers/all-MiniLM-L6-v2',
             huggingfacehub_api_token=os.getenv('HUGGING_FACE_KEY', ''),
         )
         _vectorstore = Chroma(
-            persist_directory=_CHROMA_PATH, embedding_function=_embeddings
-        )
+            persist_directory=_CHROMA_PATH,
+            embedding_function=_embeddings)
         _chroma_available = True
         return _vectorstore
     except Exception as exc:
-        print(f'[RAG] Falha ao inicializar vectorstore: {exc}')
+        logging.info(f'[RAG] Falha ao inicializar vectorstore: {exc}')
         _chroma_available = False
         return None
 
@@ -75,11 +76,18 @@ def obter_contexto_rag(pergunta: str) -> RAGResult:
             for i, doc in enumerate(docs)
         )
         fontes_set = {
-            f'📄 {doc.metadata.get("title", doc.metadata.get("source", "Desconhecido"))} '
-            f'(Pág: {doc.metadata.get("page", "N/A")})'
-            for doc in docs
-        }
-        return RAGResult(contexto=contexto, fontes='\n'.join(fontes_set))
+            f'📄 {
+                doc.metadata.get(
+                    "title",
+                    doc.metadata.get(
+                        "source",
+                        "Desconhecido"))} ' f'(Pág: {
+                    doc.metadata.get(
+                        "page",
+                        "N/A")})' for doc in docs}
+        return RAGResult(
+            contexto=contexto,
+            fontes='\n'.join(fontes_set))
 
     except Exception as exc:
         return RAGResult(contexto='', fontes='')

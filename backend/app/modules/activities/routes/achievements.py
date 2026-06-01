@@ -3,6 +3,7 @@ from app.core.dependencies.auth import get_current_user
 
 router = APIRouter()
 
+
 @router.get('/my')
 async def get_my_achievements(user=Depends(get_current_user)):
     """Retorna achievements do usuário."""

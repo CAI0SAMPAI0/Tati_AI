@@ -11,8 +11,8 @@ router = APIRouter()
 @router.get('/')
 @router.get('/all')
 async def my_trophies(
-    current_user: dict = Depends(get_current_user), service: TrophyService = Depends()
-):
+        current_user: dict = Depends(get_current_user),
+        service: TrophyService = Depends()):
     """Troféus do aluno logado."""
     return await service.get_user_trophies(current_user['username'])
 

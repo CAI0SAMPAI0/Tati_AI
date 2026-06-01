@@ -1,3 +1,4 @@
+import logging
 import json
 import os
 import argparse
@@ -29,14 +30,17 @@ def main():
     elif args.env:
         env = read_env_file(args.env)
         # common names
-        url = env.get('FRONTEND_URL') or env.get('VERCEL_URL') or env.get('NEXT_PUBLIC_URL') or env.get('FRONTEND_PROD_URL')
+        url = env.get('FRONTEND_URL') or env.get('VERCEL_URL') or env.get(
+            'NEXT_PUBLIC_URL') or env.get('FRONTEND_PROD_URL')
 
     if not url:
         url = 'http://localhost:3000'
 
-    cfg_path = os.path.join(os.path.dirname(__file__), 'capacitor.config.json')
+    cfg_path = os.path.join(
+        os.path.dirname(__file__),
+        'capacitor.config.json')
     if not os.path.exists(cfg_path):
-        print('capacitor.config.json not found at', cfg_path)
+        logging.info('capacitor.config.json not found at', cfg_path)
         return
 
     with open(cfg_path, 'r', encoding='utf-8') as f:
@@ -51,7 +55,7 @@ def main():
     with open(cfg_path, 'w', encoding='utf-8') as f:
         json.dump(cfg, f, indent=2, ensure_ascii=False)
 
-    print('Updated capacitor.config.json server.url ->', url)
+    logging.info('Updated capacitor.config.json server.url ->', url)
 
 
 if __name__ == '__main__':

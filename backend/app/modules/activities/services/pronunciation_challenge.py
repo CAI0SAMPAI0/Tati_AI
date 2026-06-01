@@ -21,7 +21,8 @@ WORD_BANK = {
     ],
     'intermediate': [
         {'word': 'thorough', 'phonetic': '/ˈθʌrə/', 'translation': 'minucioso'},
-        {'word': 'strengths', 'phonetic': '/streŋkθs/', 'translation': 'pontos fortes'},
+        {'word': 'strengths', 'phonetic': '/streŋkθs/',
+            'translation': 'pontos fortes'},
         {'word': 'rural', 'phonetic': '/ˈrʊrəl/', 'translation': 'rural'},
         {'word': 'squirrel', 'phonetic': '/ˈskwɜːrəl/', 'translation': 'esquilo'},
         {'word': 'colonel', 'phonetic': '/ˈkɜːrnəl/', 'translation': 'coronel'},
@@ -35,7 +36,8 @@ WORD_BANK = {
     ],
     'advanced': [
         {'word': 'sixth', 'phonetic': '/sɪksθ/', 'translation': 'sexto'},
-        {'word': 'twelfth', 'phonetic': '/twelfθ/', 'translation': 'décimo segundo'},
+        {'word': 'twelfth', 'phonetic': '/twelfθ/',
+            'translation': 'décimo segundo'},
         {'word': 'hypothesis', 'phonetic': '/haɪˈpɒθəsɪs/', 'translation': 'hipótese'},
         {'word': 'phenomenon', 'phonetic': '/fɪˈnɒmɪnən/', 'translation': 'fenômeno'},
         {
@@ -43,8 +45,10 @@ WORD_BANK = {
             'phonetic': '/ˌɒntrəprəˈnɜːr/',
             'translation': 'empreendedor',
         },
-        {'word': 'conscience', 'phonetic': '/ˈkɒnʃəns/', 'translation': 'consciência'},
-        {'word': 'hierarchy', 'phonetic': '/ˈhaɪərɑːrki/', 'translation': 'hierarquia'},
+        {'word': 'conscience', 'phonetic': '/ˈkɒnʃəns/',
+            'translation': 'consciência'},
+        {'word': 'hierarchy', 'phonetic': '/ˈhaɪərɑːrki/',
+            'translation': 'hierarquia'},
         {'word': 'chaos', 'phonetic': '/ˈkeɪɒs/', 'translation': 'caos'},
     ],
 }
@@ -58,7 +62,8 @@ def get_current_week_challenge() -> dict:
 
     # Seleciona palavras baseado na semana
     all_words = (
-        WORD_BANK['beginner'] + WORD_BANK['intermediate'] + WORD_BANK['advanced']
+        WORD_BANK['beginner'] + WORD_BANK['intermediate'] +
+        WORD_BANK['advanced']
     )
     start_idx = week_hash % len(all_words)
 
@@ -90,7 +95,9 @@ def submit_attempt(
             .data
         )
 
-        attempts = row.get('pronunciation_challenges', []) if row else []
+        attempts = row.get(
+            'pronunciation_challenges',
+            []) if row else []
     except Exception:
         attempts = []
 

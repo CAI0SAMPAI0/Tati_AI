@@ -1,3 +1,4 @@
+import logging
 import cloudinary
 import cloudinary.uploader
 from app.core.config import settings
@@ -19,7 +20,7 @@ def upload_profile_image(file_bytes: bytes, username: str) -> str:
     """
     try:
         if not settings.cloudinary_cloud_name:
-            print('[Cloudinary] Configuração ausente!')
+            logging.info('[Cloudinary] Configuração ausente!')
             return ''
 
         result = cloudinary.uploader.upload(
@@ -33,7 +34,7 @@ def upload_profile_image(file_bytes: bytes, username: str) -> str:
         )
         return result.get('secure_url', '')
     except Exception as e:
-        print(f'[Cloudinary] Erro no upload: {e}')
+        logging.info(f'[Cloudinary] Erro no upload: {e}')
         return ''
 
 
@@ -45,7 +46,7 @@ def upload_audio_to_cloudinary(
     """
     try:
         if not settings.cloudinary_cloud_name:
-            print('[Cloudinary] Configuração ausente!')
+            logging.info('[Cloudinary] Configuração ausente!')
             return ''
 
         result = cloudinary.uploader.upload(
@@ -57,17 +58,19 @@ def upload_audio_to_cloudinary(
         )
         return result.get('secure_url', '')
     except Exception as e:
-        print(f'[Cloudinary] Erro no upload de áudio: {e}')
+        logging.info(f'[Cloudinary] Erro no upload de áudio: {e}')
         return ''
 
 
-def upload_image_from_url(url: str, folder: str = 'tati_ai/flashcards') -> str:
+def upload_image_from_url(
+        url: str,
+        folder: str = 'tati_ai/flashcards') -> str:
     """
     Faz upload de uma imagem a partir de uma URL para o Cloudinary.
     """
     try:
         if not settings.cloudinary_cloud_name:
-            print('[Cloudinary] Configuração ausente!')
+            logging.info('[Cloudinary] Configuração ausente!')
             return url  # Fallback para a URL original
 
         result = cloudinary.uploader.upload(
@@ -77,17 +80,20 @@ def upload_image_from_url(url: str, folder: str = 'tati_ai/flashcards') -> str:
         )
         return result.get('secure_url', '')
     except Exception as e:
-        print(f'[Cloudinary] Erro no upload por URL: {e}')
+        logging.info(f'[Cloudinary] Erro no upload por URL: {e}')
         return url
 
 
-def upload_image_file(file_bytes: bytes, filename: str, folder: str = 'tati_ai/flashcards') -> str:
+def upload_image_file(
+        file_bytes: bytes,
+        filename: str,
+        folder: str = 'tati_ai/flashcards') -> str:
     """
     Faz upload de uma imagem (bytes) para o Cloudinary.
     """
     try:
         if not settings.cloudinary_cloud_name:
-            print('[Cloudinary] Configuração ausente!')
+            logging.info('[Cloudinary] Configuração ausente!')
             return ''
 
         result = cloudinary.uploader.upload(
@@ -98,5 +104,5 @@ def upload_image_file(file_bytes: bytes, filename: str, folder: str = 'tati_ai/f
         )
         return result.get('secure_url', '')
     except Exception as e:
-        print(f'[Cloudinary] Erro no upload de arquivo: {e}')
+        logging.info(f'[Cloudinary] Erro no upload de arquivo: {e}')
         return ''

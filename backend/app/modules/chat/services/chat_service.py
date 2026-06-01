@@ -1,3 +1,4 @@
+import logging
 import asyncio
 import base64
 import json
@@ -37,7 +38,9 @@ class ChatService:
             except Exception as e:
                 err_str = str(e).lower()
                 if ('disconnected' in err_str or 'connection' in err_str or 'protocol' in err_str) and attempt < retries - 1:
-                    print(f'[ChatService] DB connection issue, retrying ({attempt+1}/{retries})...')
+                    logging.info(
+                        f'[ChatService] DB connection issue, retrying ({
+                            attempt + 1}/{retries})...')
                     await asyncio.sleep(0.5 * (attempt + 1))
                     continue
                 raise e
@@ -56,9 +59,10 @@ class ChatService:
         try:
             rows = await self._execute_db(_fetch)
         except Exception as e:
-            print(f'[ChatService] Error fetching user profile: {e}')
+            logging.info(
+                f'[ChatService] Error fetching user profile: {e}')
             rows = []
-        
+
         data = rows[0] if rows else {}
         return UserProfile(
             username=username,
@@ -89,16 +93,22 @@ class ChatService:
         try:
             user_rows = await self._execute_db(_fetch_user)
         except Exception as e:
-            print(f'[ChatService] Error checking access: {e}')
-            return {'allowed': True, 'reason': None, 'free_messages_remaining': None}
-        
+            logging.info(f'[ChatService] Error checking access: {e}')
+            return {
+                'allowed': True,
+                'reason': None,
+                'free_messages_remaining': None}
+
         user = user_rows[0] if user_rows else {}
 
         is_admin = user.get('role') in settings.staff_roles
         is_exempt = user.get('is_exempt', False)
 
         if is_admin or is_exempt or user.get('is_premium_active'):
-            return {'allowed': True, 'reason': None, 'free_messages_remaining': None}
+            return {
+                'allowed': True,
+                'reason': None,
+                'free_messages_remaining': None}
 
         if today < PAID_START:
             user_created = date.fromisoformat(user['created_at'][:10])
@@ -119,7 +129,8 @@ class ChatService:
                 'free_messages_remaining': 0,
             }
 
-        return {'allowed': True, 'reason': None, 'free_messages_remaining': remaining}
+        return {'allowed': True, 'reason': None,
+                'free_messages_remaining': remaining}
 
     async def process_chat_message(
         self,
@@ -131,15 +142,18 @@ class ChatService:
     ) -> Optional[str]:
         content = msg.get('content', '').strip()
         conv_id = msg.get('conversation_id')
-        
+
         # 0. Segurança: Valida se a conversa pertence ao usuário
         if conv_id:
             def _check_conv():
-                return self.db.table('conversations').select('username').eq('id', conv_id).execute().data
-            
+                return self.db.table('conversations').select(
+                    'username').eq('id', conv_id).execute().data
+
             conv_rows = await self._execute_db(_check_conv)
             if conv_rows and conv_rows[0]['username'] != username:
-                print(f"[ChatSecurity] Alerta: Usuário {username} tentou acessar conversa {conv_id} de {conv_rows[0]['username']}")
+                logging.info(
+                    f"[ChatSecurity] Alerta: Usuário {username} tentou acessar conversa {conv_id} de {
+                        conv_rows[0]['username']}")
                 await websocket.send_json({'type': 'error', 'message': 'Acesso negado à conversa.'})
                 return pending_drill_target
 
@@ -148,10 +162,10 @@ class ChatService:
 
         # 1. Transcrição ou Extração de Arquivo
         if msg_type == 'audio':
-            #print(f'[ChatService] Transcrevendo áudio para {username}...')
+            # logging.info(f'[ChatService] Transcrevendo áudio para {username}...')
             audio_bytes = base64.b64decode(msg.get('audio', ''))
             content = await transcribe_audio(audio_bytes, filename='input.webm')
-            #print(f'[ChatService] Transcrição concluída: "{content[:50]}..."')
+            # logging.info(f'[ChatService] Transcrição concluída: "{content[:50]}..."')
             await websocket.send_json({'type': 'transcription', 'text': content})
         elif msg_type == 'file':
             filename = msg.get('filename', 'file.txt')
@@ -196,7 +210,8 @@ class ChatService:
         if not history:
             await auto_title(conv_id, username, content[:50])
 
-        user_audio_b64 = msg.get('audio') if msg_type == 'audio' else None
+        user_audio_b64 = msg.get(
+            'audio') if msg_type == 'audio' else None
         await save_message(conv_id, username, 'user', content, audio_b64=user_audio_b64)
         history.append({'role': 'user', 'content': content})
 
@@ -205,12 +220,13 @@ class ChatService:
         asyncio.create_task(record_study_day(username))
 
         # 5. LLM Response - OTIMIZAÇÃO: Busca RAG, Perfil e Sentimento em PARALELO
-        # Só buscamos RAG se a mensagem for relevante (mais de 10 caracteres)
+        # Só buscamos RAG se a mensagem for relevante (mais de 10
+        # caracteres)
         use_rag = len(content) > 10
-        
+
         # Define tarefas para execução paralela
         tasks = [self.get_user_profile(username)]
-        
+
         if use_rag:
             tasks.append(run_in_threadpool(obter_contexto_rag, content))
         else:
@@ -219,13 +235,19 @@ class ChatService:
 
         # Podcasts reais (busca rápida)
         def _fetch_pods():
-            return (self.db.table('podcasts').select('title, category').eq('user_id', username).order('created_at', desc=True).limit(5).execute().data)
+            return (
+                self.db.table('podcasts').select('title, category').eq(
+                    'user_id',
+                    username).order(
+                    'created_at',
+                    desc=True).limit(5).execute().data)
         tasks.append(self._execute_db(_fetch_pods))
 
         # Busca prompt de simulação em paralelo se houver
         if simulation_id:
             def _fetch_sim():
-                return self.db.table('simulations').select('system_prompt').eq('id', simulation_id).limit(1).execute().data
+                return self.db.table('simulations').select('system_prompt').eq(
+                    'id', simulation_id).limit(1).execute().data
             tasks.append(self._execute_db(_fetch_sim))
         else:
             async def _dummy_sim(): return []
@@ -236,12 +258,15 @@ class ChatService:
             from app.modules.chat.services.llm import groq_chat
             prompt = f"Analyze student message and return ONLY ONE word representing their sentiment: FRUSTRATED, EXCITED, CONFUSED, NEUTRAL, or TIRED.\n\nMessage: {text}"
             try:
-                # Usa groq_chat diretamente (já é async) e especifica modelo ultra-rápido
+                # Usa groq_chat diretamente (já é async) e especifica
+                # modelo ultra-rápido
                 res = await groq_chat([{"role": "user", "content": prompt}], max_tokens=10, temperature=0.1, model='llama-3.1-8b-instant')
                 return res.strip().upper()
-            except: return "NEUTRAL"
-        
-        # Truncate content to avoid 413 Payload Too Large when large files are attached
+            except BaseException:
+                return "NEUTRAL"
+
+        # Truncate content to avoid 413 Payload Too Large when large
+        # files are attached
         tasks.append(_detect_sentiment_task(content[:1000]))
 
         # Executa todas as tarefas de preparação em paralelo
@@ -252,26 +277,27 @@ class ChatService:
         sim_rows = results[3]
         sentiment = results[4]
 
-        sim_prompt = sim_rows[0].get('system_prompt') if sim_rows else None
+        sim_prompt = sim_rows[0].get(
+            'system_prompt') if sim_rows else None
 
         sentiment_map = {
             "FRUSTRATED": "Student feels FRUSTRATED. Be extremely patient, empathetic, and encouraging. Use simple words.",
             "EXCITED": "Student is EXCITED! Be very enthusiastic and celebrate their energy.",
             "CONFUSED": "Student is CONFUSED. Explain concepts slowly and clearly. Ask if they need an example.",
             "TIRED": "Student seems TIRED. Keep the conversation light, easy, and supportive.",
-            "NEUTRAL": ""
-        }
+            "NEUTRAL": ""}
         sentiment_instruction = sentiment_map.get(sentiment, "")
 
         effective_prompt = build_effective_prompt(
             profile, rag_result.contexto, real_podcasts=real_podcasts
         )
-        
+
         if sentiment_instruction:
             effective_prompt = f"{sentiment_instruction}\n\n{effective_prompt}"
 
         if sim_prompt:
-            # REFORÇO CRÍTICO: Simulação deve ser o foco absoluto e manter nome Tati
+            # REFORÇO CRÍTICO: Simulação deve ser o foco absoluto e
+            # manter nome Tati
             effective_prompt = (
                 f"ACT AS THE CHARACTER IN THIS SCENARIO:\n{sim_prompt}\n\n"
                 f"STRICT RULES:\n"
@@ -285,18 +311,18 @@ class ChatService:
 
         if is_voice_mode:
             effective_prompt += '\n\nCRITICAL: Voice mode. Keep responses very short (max 2 sentences).'
-            
+
         effective_prompt += '\n\nCRITICAL: If the user explicitly asks you to generate a PDF or a document, your VERY FIRST characters MUST be EXACTLY the tag "[GENERATE_PDF: filename.pdf]" where filename is related to the topic. DO NOT output any greetings or conversational text before this tag. Everything after this tag will be formatted into a downloadable PDF file. The content of the PDF MUST be entirely in English.'
 
         await websocket.send_json({'type': 'stream_start', 'conversation_id': conv_id})
         full_response = ''
         # Limite de tokens para velocidade
         max_tokens = 1000 if is_voice_mode else 1500
-        
+
         is_pdf_generation = False
         pdf_filename = f"tati_doc_{conv_id}.pdf"
         buffer = ''
-        
+
         async for token in stream_llm(effective_prompt, history, max_tokens=max_tokens):
             if not is_pdf_generation and len(buffer) < 80:
                 buffer += token
@@ -304,15 +330,16 @@ class ChatService:
                     is_pdf_generation = True
                     start_idx = buffer.find('[GENERATE_PDF')
                     end_idx = buffer.find(']', start_idx)
-                    tag_content = buffer[start_idx:end_idx+1]
-                    
+                    tag_content = buffer[start_idx:end_idx + 1]
+
                     if ':' in tag_content:
-                        pdf_filename = tag_content.split(':', 1)[1].strip(' ]')
+                        pdf_filename = tag_content.split(':', 1)[
+                            1].strip(' ]')
                         if not pdf_filename.endswith('.pdf'):
                             pdf_filename += '.pdf'
-                            
+
                     # Get everything after the tag
-                    full_response = buffer[end_idx+1:].lstrip()
+                    full_response = buffer[end_idx + 1:].lstrip()
                 elif len(buffer) >= 80 and '[GENERATE_PDF' not in buffer:
                     # Flush buffer as normal text
                     full_response += buffer
@@ -323,7 +350,7 @@ class ChatService:
                 else:
                     full_response += token
                     await websocket.send_json({'type': 'stream_token', 'content': token})
-        
+
         # Se terminou e buffer era menor que 80 e não era PDF
         if not is_pdf_generation and len(buffer) < 80 and buffer:
             if '[GENERATE_PDF' not in buffer:
@@ -333,25 +360,31 @@ class ChatService:
         if is_pdf_generation:
             try:
                 from app.shared.services.pdf_generator import generate_report_pdf
-                pdf_path = generate_report_pdf(full_response.strip(), filename=pdf_filename)
+                pdf_path = generate_report_pdf(
+                    full_response.strip(), filename=pdf_filename)
                 with open(pdf_path, 'rb') as f:
                     pdf_b64 = base64.b64encode(f.read()).decode('utf-8')
                 await websocket.send_json({
-                    'type': 'pdf_generated', 
-                    'pdf_b64': pdf_b64, 
+                    'type': 'pdf_generated',
+                    'pdf_b64': pdf_b64,
                     'filename': pdf_filename,
                     'text': '📄 Document created successfully!'
                 })
             except Exception as e:
-                print(f"Error generating PDF: {e}")
+                logging.info(f"Error generating PDF: {e}")
                 await websocket.send_json({'type': 'stream_token', 'content': '\n[Error generating PDF]'})
 
         await websocket.send_json({'type': 'stream_end'})
 
         # 6. Finaliza em Background para não travar o socket
         asyncio.create_task(
-            self._post_response_tasks(username, content, full_response, websocket, conv_id, is_pdf_generation)
-        )
+            self._post_response_tasks(
+                username,
+                content,
+                full_response,
+                websocket,
+                conv_id,
+                is_pdf_generation))
 
         return pending_drill_target
 
@@ -370,17 +403,26 @@ class ChatService:
             from app.modules.users.services.streaks import record_study_day
             await record_study_day(username)
         except Exception as e:
-            print(f'[Chat Background] Erro: {e}')
+            logging.info(f'[Chat Background] Erro: {e}')
 
     async def _post_response_tasks(
-        self, username: str, user_content: str, full_response: str, websocket: WebSocket, conv_id: str, is_pdf_generation: bool = False
-    ):
+            self,
+            username: str,
+            user_content: str,
+            full_response: str,
+            websocket: WebSocket,
+            conv_id: str,
+            is_pdf_generation: bool = False):
         """Tarefas após o streaming terminar."""
         try:
             # 0. XP (Gamification) - Recompensa por mensagem enviada
             from app.modules.activities.services.gamification_service import GamificationService
             gs = GamificationService()
-            asyncio.create_task(gs.award_xp(username, gs.XP_REWARDS['message_sent'], 'Chat activity'))
+            asyncio.create_task(
+                gs.award_xp(
+                    username,
+                    gs.XP_REWARDS['message_sent'],
+                    'Chat activity'))
 
             # 1. TTS e Salvar (PRIORIDADE)
             audio_b64 = None
@@ -388,22 +430,24 @@ class ChatService:
             if not is_pdf_generation:
                 tts_text = self._clean_tts_text(full_response)
                 audio_b64 = await text_to_speech(tts_text)
-                
+
             await save_message(
                 conv_id, username, 'assistant', full_response, audio_b64=audio_b64
             )
 
-            # Envia áudio imediatamente se for modo voz (opcional, já vai via WS se for o caso)
+            # Envia áudio imediatamente se for modo voz (opcional, já
+            # vai via WS se for o caso)
             if audio_b64 and not is_pdf_generation:
                 await websocket.send_json({'type': 'audio_response', 'audio': audio_b64, 'content': full_response})
 
-            # 1. Podcast Discovery (Atraso de 2s para não impactar a resposta imediata)
+            # 1. Podcast Discovery (Atraso de 2s para não impactar a
+            # resposta imediata)
             async def _delayed_discovery():
                 await asyncio.sleep(2)
                 from app.modules.activities.services.podcast_discovery import discover_personalized_podcasts
                 profile = await self.get_user_profile(username)
                 await discover_personalized_podcasts(username, username, profile.level)
-            
+
             asyncio.create_task(_delayed_discovery())
 
             # 2. Trophies
@@ -414,36 +458,50 @@ class ChatService:
             # 3. AutoExercise, Error Logging e Weekly Plan Tracking
             from app.modules.activities.services.error_log_service import error_log_service
             from app.modules.chat.services.semantic_judge import semantic_judge
-            
+
             # Executa tarefas de background de forma assíncrona
             # AGORA PASSANDO O CONTEÚDO DO USUÁRIO CORRETAMENTE
-            asyncio.create_task(error_log_service.extract_and_log_errors(username, user_content, full_response))
-            asyncio.create_task(semantic_judge.check_topics_completion(username, f"User: {user_content}\nTati: {full_response}"))
+            asyncio.create_task(
+                error_log_service.extract_and_log_errors(
+                    username, user_content, full_response))
+            asyncio.create_task(semantic_judge.check_topics_completion(
+                username, f"User: {user_content}\nTati: {full_response}"))
 
         except Exception as e:
-            print(f'[Chat Post-Response] Erro: {e}')
+            logging.info(f'[Chat Post-Response] Erro: {e}')
 
+    async def extract_text_from_file(
+            self, filename: str, content_b64: str) -> str:
+        ext = filename.lower().rsplit(
+            '.', 1)[-1] if '.' in filename else ''
 
-    async def extract_text_from_file(self, filename: str, content_b64: str) -> str:
-        ext = filename.lower().rsplit('.', 1)[-1] if '.' in filename else ''
-        
         # Apenas permite extração de texto de arquivos suportados
-        text_exts = {'txt', 'md', 'csv', 'json', 'py', 'js', 'html', 'css'}
-        
+        text_exts = {
+            'txt',
+            'md',
+            'csv',
+            'json',
+            'py',
+            'js',
+            'html',
+            'css'}
+
         image_exts = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'}
         if ext in image_exts:
             return f'[Imagem anexada: {filename}. A Teacher Tati ainda não possui visão computacional, mas sabe que você enviou esta imagem.]'
-            
+
         try:
             file_bytes = base64.b64decode(content_b64)
             if ext == 'pdf':
                 reader = pypdf.PdfReader(io.BytesIO(file_bytes))
                 return '\n'.join(
-                    p.extract_text() for p in reader.pages if p.extract_text()
-                ).replace('\x00', '')
+                    p.extract_text() for p in reader.pages if p.extract_text()).replace(
+                    '\x00', '')
             if ext == 'docx':
                 doc = docx.Document(io.BytesIO(file_bytes))
-                return '\n'.join(p.text for p in doc.paragraphs).replace('\x00', '')
+                return '\n'.join(
+                    p.text for p in doc.paragraphs).replace(
+                    '\x00', '')
             if ext == 'pptx':
                 from pptx import Presentation
                 prs = Presentation(io.BytesIO(file_bytes))
@@ -455,21 +513,25 @@ class ChatService:
                 return '\n'.join(text_runs).replace('\x00', '')
             if ext == 'xlsx':
                 import openpyxl
-                wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
+                wb = openpyxl.load_workbook(
+                    io.BytesIO(file_bytes), data_only=True)
                 lines = []
                 for sheet in wb.worksheets:
                     for row in sheet.iter_rows(values_only=True):
-                        row_text = ' | '.join([str(cell) for cell in row if cell is not None])
+                        row_text = ' | '.join(
+                            [str(cell) for cell in row if cell is not None])
                         if row_text:
                             lines.append(row_text)
                 return '\n'.join(lines).replace('\x00', '')
-                
+
             if ext in text_exts:
-                text_content = file_bytes.decode('utf-8', errors='ignore').replace('\x00', '')
+                text_content = file_bytes.decode(
+                    'utf-8', errors='ignore').replace('\x00', '')
                 if len(text_content) > 50000:
-                    return text_content[:50000] + '\n\n[Texto truncado (muito grande)]'
+                    return text_content[:50000] + \
+                        '\n\n[Texto truncado (muito grande)]'
                 return text_content
-                
+
             return f'[Arquivo anexado: {filename}. O conteúdo deste formato não pode ser lido diretamente pelo chat no momento.]'
         except Exception as e:
             return f'[Erro ao ler arquivo: {e}]'
@@ -479,18 +541,32 @@ class ChatService:
         O campo 'drill' e 'correction' são apenas para exibição, nunca para áudio."""
         # Tenta parsear o JSON da resposta da IA
         try:
-            # Remove possíveis blocos de código markdown ao redor do JSON
+            # Remove possíveis blocos de código markdown ao redor do
+            # JSON
             clean = text.strip()
             if clean.startswith('```'):
                 clean = re.sub(r'^```[\w]*\n?', '', clean)
                 clean = re.sub(r'\n?```$', '', clean.strip())
             data = json.loads(clean)
-            # Usa apenas o campo 'reply' para o áudio — drill e correction ficam silenciosos
+            # Usa apenas o campo 'reply' para o áudio — drill e
+            # correction ficam silenciosos
             reply = data.get('reply') or ''
-            reply = reply.replace('*', '').replace('#', '').replace('_', '')
+            reply = reply.replace(
+                '*',
+                '').replace(
+                '#',
+                '').replace(
+                '_',
+                '')
             return reply.strip() or 'Please, repeat.'
         except Exception:
             # Fallback: remove markdown e tags de drill
-            fallback = text.replace('*', '').replace('#', '').replace('_', '')
+            fallback = text.replace(
+                '*',
+                '').replace(
+                '#',
+                '').replace(
+                '_',
+                '')
             fallback = re.sub(r'\[DRILL:.*?\]', '', fallback)
             return fallback.strip() or 'Please, repeat.'

@@ -1,3 +1,4 @@
+import logging
 """
 Middleware de Rate Limiting para FastAPI.
 Usa Upstash Redis para controlar limites de requisições.
@@ -19,8 +20,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     """
 
     def __init__(
-        self, app, default_max_requests: int = 1000, default_window: int = 3600
-    ):
+            self,
+            app,
+            default_max_requests: int = 1000,
+            default_window: int = 3600):
         super().__init__(app)
         self.default_max_requests = default_max_requests
         self.default_window = default_window
@@ -58,14 +61,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         identifier = self._get_identifier(request)
         route_config = self._get_route_config(request.url.path)
 
-        # Verifica rate limit SOMENTE se Redis está disponível e habilitado
+        # Verifica rate limit SOMENTE se Redis está disponível e
+        # habilitado
         svc = upstash_mod.upstash_service
-        use_redis = svc and svc.enabled and getattr(svc, '_redis', None) is not None
+        use_redis = svc and svc.enabled and getattr(
+            svc, '_redis', None) is not None
         result = {'allowed': True}
 
         if use_redis:
             try:
-                limit_key = svc.rate_limit_key(identifier, request.url.path)
+                limit_key = svc.rate_limit_key(
+                    identifier, request.url.path)
                 result = await svc.rate_limit_check(
                     limit_key,
                     max_requests=route_config['max_requests'],
@@ -85,24 +91,26 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                             'X-RateLimit-Remaining': '0',
                             'X-RateLimit-Reset': str(reset_at),
                             'Access-Control-Allow-Origin': request.headers.get(
-                                'Origin', '*'
-                            ),
+                                'Origin',
+                                '*'),
                             'Access-Control-Allow-Credentials': 'true',
                         },
                     )
             except Exception as e:
-                print(f'[RateLimiter] Erro no Redis: {e}')
+                logging.info(f'[RateLimiter] Erro no Redis: {e}')
                 svc._enabled = False
                 svc._redis = None
 
         # Prossegue com a requisição (FORA do try do Redis)
         response = await call_next(request)
-        
+
         # Adiciona headers se o Redis foi usado com sucesso
         if use_redis and result.get('allowed'):
-            response.headers['X-RateLimit-Remaining'] = str(result.get('remaining', -1))
-            response.headers['X-RateLimit-Reset'] = str(result.get('reset_at', 0))
-            
+            response.headers['X-RateLimit-Remaining'] = str(
+                result.get('remaining', -1))
+            response.headers['X-RateLimit-Reset'] = str(
+                result.get('reset_at', 0))
+
         return response
 
     def _get_identifier(self, request: Request) -> str:

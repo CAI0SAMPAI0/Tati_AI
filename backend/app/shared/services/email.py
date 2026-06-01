@@ -1,3 +1,4 @@
+import logging
 from __future__ import annotations
 
 import os
@@ -11,30 +12,44 @@ from app.core.config import settings
 
 class EmailSender:
     def __init__(self) -> None:
-        self.smtp_host = getattr(settings, "smtp_host", "smtp.gmail.com")
+        self.smtp_host = getattr(
+            settings, "smtp_host", "smtp.gmail.com")
         self.smtp_port = int(getattr(settings, "smtp_port", 465))
         self.smtp_user = getattr(settings, "smtp_user", "")
         self.smtp_password = getattr(settings, "smtp_password", "")
         self._FROM = f"Teacher Tati <{self.smtp_user}>"
         # Ready if SMTP is configured OR a resend API key is present
-        self._ready = bool((self.smtp_host and self.smtp_user and self.smtp_password) or getattr(settings, "resend_api_key", ""))
+        self._ready = bool(
+            (self.smtp_host and self.smtp_user and self.smtp_password) or getattr(
+                settings, "resend_api_key", ""))
 
-    def _send(self, to_email: str, subject: str, html: str, attachments: list | None = None) -> bool:
+    def _send(self, to_email: str, subject: str, html: str,
+              attachments: list | None = None) -> bool:
         if not self._ready:
-            print(f"[EmailSender] SMTP/resend not configured. Email to {to_email}: {subject}")
+            logging.info(
+                f"[EmailSender] SMTP/resend not configured. Email to {to_email}: {subject}")
             return False
 
-        # Prefer external resend service (used in tests). If available, call it first.
+        # Prefer external resend service (used in tests). If available,
+        # call it first.
         try:
-            if "resend" in globals() and hasattr(resend, "Emails") and hasattr(resend.Emails, "send"):
-                # Prepare payload expected by tests: include 'from', filter attachments into dicts
-                payload = {"to": to_email, "subject": subject, "html": html, "from": "Teacher Tati <tatiai@resend.dev>"}
+            if "resend" in globals() and hasattr(
+                    resend, "Emails") and hasattr(
+                    resend.Emails, "send"):
+                # Prepare payload expected by tests: include 'from',
+                # filter attachments into dicts
+                payload = {
+                    "to": to_email,
+                    "subject": subject,
+                    "html": html,
+                    "from": "Teacher Tati <tatiai@resend.dev>"}
                 if attachments:
                     prepared = []
                     for p in attachments:
                         try:
                             if os.path.exists(p):
-                                prepared.append({"filename": os.path.basename(p), "path": p})
+                                prepared.append(
+                                    {"filename": os.path.basename(p), "path": p})
                         except Exception:
                             continue
                     if prepared:
@@ -42,7 +57,7 @@ class EmailSender:
                 resp = resend.Emails.send(payload)
                 return bool(resp)
         except Exception as exc:
-            print(f"[EmailSender] resend service failed: {exc}")
+            logging.info(f"[EmailSender] resend service failed: {exc}")
 
         msg = MIMEMultipart()
         msg["From"] = self._FROM
@@ -54,8 +69,10 @@ class EmailSender:
             for file_path in attachments:
                 if os.path.exists(file_path):
                     with open(file_path, "rb") as f:
-                        part = MIMEApplication(f.read(), Name=os.path.basename(file_path))
-                        part["Content-Disposition"] = f'attachment; filename="{os.path.basename(file_path)}"'
+                        part = MIMEApplication(
+                            f.read(), Name=os.path.basename(file_path))
+                        part["Content-Disposition"] = f'attachment; filename="{
+                            os.path.basename(file_path)}"'
                         msg.attach(part)
 
         try:
@@ -77,11 +94,16 @@ class EmailSender:
                 server.send_message(msg)
             return True
         except Exception as exc:
-            print(f"[EmailSender] Error sending email: {exc}")
+            logging.info(f"[EmailSender] Error sending email: {exc}")
             return False
 
     # Public convenience methods
-    def send_report_email(self, to_email: str, name: str, pdf_path: str, lang: str = "en-US") -> bool:
+    def send_report_email(
+            self,
+            to_email: str,
+            name: str,
+            pdf_path: str,
+            lang: str = "en-US") -> bool:
         t = {
             "subject": "📊 Your Weekly Progress Report - Teacher Tati AI",
             "title": "Your Evolution Report is Here!",
@@ -97,15 +119,33 @@ class EmailSender:
 <p style="font-size:12px;color:#999;">{t['footer']}</p>
 </div>
 """
-        return self._send(to_email, t["subject"], html, attachments=[pdf_path])
+        return self._send(
+            to_email,
+            t["subject"],
+            html,
+            attachments=[pdf_path])
 
-    def send_email(self, fromemail: str, to_email: str, subject: str, html: str) -> bool:
+    def send_email(
+            self,
+            fromemail: str,
+            to_email: str,
+            subject: str,
+            html: str) -> bool:
         return self._send(to_email, subject, html)
 
-    def _send_smtp_email(self, fromemail: str, to_email: str, subject: str, html: str) -> bool:
+    def _send_smtp_email(
+            self,
+            fromemail: str,
+            to_email: str,
+            subject: str,
+            html: str) -> bool:
         return self._send(to_email, subject, html)
 
-    def send_reset_email(self, to_email: str, name: str, temp_password: str) -> bool:
+    def send_reset_email(
+            self,
+            to_email: str,
+            name: str,
+            temp_password: str) -> bool:
         subject = "Teacher Tati — Your temporary password"
         html = self._build_email_html(name, temp_password)
         return self._send(to_email, subject, html)
@@ -127,7 +167,10 @@ class EmailSender:
 </div>
 """
 
-    def send_submission_notification(self, student_name: str, activity_title: str) -> bool:
+    def send_submission_notification(
+            self,
+            student_name: str,
+            activity_title: str) -> bool:
         subject = f"New submission: {activity_title}"
         html = f"""
 <div style="font-family:Arial,sans-serif;max-width:600px;">
@@ -140,8 +183,11 @@ class EmailSender:
         return self._send(admin_email, subject, html)
 
     def send_feedback_notification(
-        self, student_name: str, student_email: str, category: str, message: str
-    ) -> bool:
+            self,
+            student_name: str,
+            student_email: str,
+            category: str,
+            message: str) -> bool:
         category_labels = {
             "bug": "🐛 Bug",
             "feature": "💡 Feature Request",
@@ -163,8 +209,12 @@ class EmailSender:
         return self._send(admin_email, subject, html)
 
     def send_correction_notification(
-        self, student_name: str, student_email: str, activity_title: str, score: int, feedback: str
-    ) -> bool:
+            self,
+            student_name: str,
+            student_email: str,
+            activity_title: str,
+            score: int,
+            feedback: str) -> bool:
         subject = f"Activity Graded: {activity_title}"
         if score >= 90:
             score_message = "Excellent work! 🎉"
@@ -193,7 +243,12 @@ class EmailSender:
 """
         return self._send(student_email, subject, html)
 
-    def send_streak_email(self, to_email: str, name: str, streak_days: int, mode: str = "reminder") -> bool:
+    def send_streak_email(
+            self,
+            to_email: str,
+            name: str,
+            streak_days: int,
+            mode: str = "reminder") -> bool:
         if mode == "broken":
             subject = "⚠️ Your streak was broken — Teacher Tati"
             body_html = f"""
@@ -220,7 +275,12 @@ class EmailSender:
 """
         return self._send(to_email, subject, html)
 
-    def send_trophy_email(self, to_email: str, name: str, trophy_name: str, trophy_icon: str = "🏆") -> bool:
+    def send_trophy_email(
+            self,
+            to_email: str,
+            name: str,
+            trophy_name: str,
+            trophy_icon: str = "🏆") -> bool:
         subject = f"🏆 New trophy unlocked: {trophy_name} — Teacher Tati"
         html = f"""
 <div style="font-family:Arial,sans-serif;max-width:600px;text-align:center;">
@@ -235,7 +295,12 @@ class EmailSender:
 """
         return self._send(to_email, subject, html)
 
-    def send_new_activity_email(self, to_email: str, name: str, activity_title: str, activity_url: str = "https://tati-ai.vercel.app/activities") -> bool:
+    def send_new_activity_email(
+            self,
+            to_email: str,
+            name: str,
+            activity_title: str,
+            activity_url: str = "https://tati-ai.vercel.app/activities") -> bool:
         subject = f"📚 New activity available: {activity_title} — Teacher Tati"
         html = f"""
 <div style="font-family:Arial,sans-serif;max-width:600px;">
@@ -249,34 +314,44 @@ class EmailSender:
 """
         return self._send(to_email, subject, html)
 
-    def send_welcome_hub_email(self, to_email: str, name: str, username: str, password: str) -> bool:
+    def send_welcome_hub_email(
+            self,
+            to_email: str,
+            name: str,
+            username: str,
+            password: str) -> bool:
         subject = "Boas-vindas ao Tati AI Hub! 🚀 Suas credenciais de acesso"
         html = f"""
 <div style="font-family:Arial,sans-serif;max-width:600px;background:#0a0a0c;padding:30px;border-radius:24px;color:#ffffff;border:1px solid #222;">
     <h2 style="color:#7c3aed;margin-top:0;">Seja bem-vindo(a) ao Hub, {name}! 🎉</h2>
     <p style="color:#a1a1aa;line-height:1.6;">Sua conta foi criada automaticamente para que você possa acessar seus materiais. Use as credenciais abaixo para entrar:</p>
-    
+
     <div style="background:#111114;border:1px solid #333;border-radius:16px;padding:25px;margin:25px 0;text-align:center;">
         <p style="margin:0 0 10px 0;color:#71717a;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Seu Usuário</p>
         <p style="margin:0 0 20px 0;font-size:18px;font-weight:bold;color:#ffffff;">{username}</p>
-        
+
         <p style="margin:0 0 10px 0;color:#71717a;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Sua Senha Temporária</p>
         <p style="margin:0 0 0 0;font-size:24px;font-weight:bold;color:#7c3aed;">{password}</p>
     </div>
-    
+
     <p style="color:#f87171;font-size:14px;font-weight:bold;">⚠️ IMPORTANTE: Por segurança, recomendamos que você altere sua senha imediatamente após o primeiro login nas configurações do seu perfil.</p>
-    
+
     <div style="text-align:center;margin-top:30px;">
         <a href="http://localhost:3001/login" style="display:inline-block;background:#7c3aed;color:#ffffff;padding:14px 28px;border-radius:14px;text-decoration:none;font-weight:bold;box-shadow:0 10px 20px rgba(124,58,237,0.3);">Acessar o Hub agora →</a>
     </div>
-    
+
     <hr style="border:0;border-top:1px solid #222;margin:30px 0;">
     <p style="font-size:12px;color:#52525b;text-align:center;">Equipe Teacher Tati AI</p>
 </div>
 """
         return self._send(to_email, subject, html)
 
-    def send_purchase_confirmation(self, to_email: str, name: str, item_title: str, download_url: str) -> bool:
+    def send_purchase_confirmation(
+            self,
+            to_email: str,
+            name: str,
+            item_title: str,
+            download_url: str) -> bool:
         subject = f"✅ Compra confirmada: {item_title} — Teacher Tati"
         html = f"""
 <div style="font-family:Arial,sans-serif;max-width:600px;background:#f8fafc;padding:20px;border-radius:16px;color:#334155;">
@@ -295,7 +370,12 @@ class EmailSender:
 """
         return self._send(to_email, subject, html)
 
-    def send_payment_refused(self, to_email: str, name: str, payment_method: str, reason: str = "Não foi possível processar seu pagamento.") -> bool:
+    def send_payment_refused(
+            self,
+            to_email: str,
+            name: str,
+            payment_method: str,
+            reason: str = "Não foi possível processar seu pagamento.") -> bool:
         subject = "❌ Pagamento não aprovado — Teacher Tati"
         html = f"""
 <div style="font-family:Arial,sans-serif;max-width:600px;background:#fef2f2;padding:20px;border-radius:16px;color:#334155;">
@@ -313,9 +393,12 @@ class EmailSender:
 </div>
 """
         return self._send(to_email, subject, html)
-    
 
-    def send_offensive_notification(self, user_email: str, user_name: str, offensive_message: str) -> bool:
+    def send_offensive_notification(
+            self,
+            user_email: str,
+            user_name: str,
+            offensive_message: str) -> bool:
         subject = "Notificação de Ofensiva"
         html = f"""
         <div style="font-family:Arial,sans-serif;max-width:600px;">
@@ -335,5 +418,6 @@ class _ResendShim:
         def send(payload: dict) -> dict:
             # Minimal stub; tests will patch this method.
             return {"id": "stub"}
+
 
 resend = _ResendShim

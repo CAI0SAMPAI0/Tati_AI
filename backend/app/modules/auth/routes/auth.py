@@ -1,3 +1,4 @@
+import logging
 from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
@@ -18,11 +19,11 @@ async def _warm_up_tavily(username: str, level: str) -> None:
         from app.modules.activities.services.podcast_discovery import discover_personalized_podcasts
         await discover_personalized_podcasts(username, username, level)
     except Exception as exc:
-        print(f'[Auth] Erro no pré-carregamento Tavily para {username}: {exc}')
+        logging.info(
+            f'[Auth] Erro no pré-carregamento Tavily para {username}: {exc}')
 
 
-
-# ── Models ────────────────────────────────────────────────────────────────────
+# ── Models ────────────────────────────────────────────────────────────
 
 
 class RegisterBody(BaseModel):
@@ -56,7 +57,7 @@ class ChangePasswordBody(BaseModel):
     new_password: str
 
 
-# ── Login ─────────────────────────────────────────────────────────────────────
+# ── Login ─────────────────────────────────────────────────────────────
 
 
 @router.post('/login')
@@ -88,7 +89,8 @@ async def login(
     if not username or not password:
         try:
             json_data = await request.json()
-            username = json_data.get('username') or json_data.get('identifier')
+            username = json_data.get(
+                'username') or json_data.get('identifier')
             password = json_data.get('password')
         except Exception:
             pass
@@ -102,41 +104,50 @@ async def login(
     result = await AuthService.authenticate_user(db, username, password)
 
     # Warm-up Tavily em background sem bloquear o login
-    user_level = result.get('level', 'Beginner') if isinstance(result, dict) else 'Beginner'
-    background_tasks.add_task(_warm_up_tavily, str(username), str(user_level))
+    user_level = result.get('level', 'Beginner') if isinstance(
+        result, dict) else 'Beginner'
+    background_tasks.add_task(
+        _warm_up_tavily,
+        str(username),
+        str(user_level))
 
     return result
 
 
-
-# ── Register ──────────────────────────────────────────────────────────────────
+# ── Register ──────────────────────────────────────────────────────────
 
 
 @router.post('/register', status_code=status.HTTP_201_CREATED)
-async def register(body: RegisterBody, db: Client = Depends(get_db)) -> dict:
+async def register(
+        body: RegisterBody,
+        db: Client = Depends(get_db)) -> dict:
     """Cria nova conta de estudante."""
     return await AuthService.register_student(db, body)
 
 
-# ── Google OAuth ──────────────────────────────────────────────────────────────
+# ── Google OAuth ──────────────────────────────────────────────────────
 
 
 @router.post('/google')
-async def google_login(body: GoogleBody, db: Client = Depends(get_db)) -> dict:
+async def google_login(
+        body: GoogleBody,
+        db: Client = Depends(get_db)) -> dict:
     """Authenticates via Google OAuth2. Creates account if needed."""
     return await AuthService.google_login(db, body.credential, body.is_hub_only)
 
 
-# ── Forgot password ──────────────────────────────────────────────────────────
+# ── Forgot password ───────────────────────────────────────────────────
 
 
 @router.post('/forgot-password')
-async def forgot_password(body: ForgotPasswordBody, db: Client = Depends(get_db)) -> dict:
+async def forgot_password(
+        body: ForgotPasswordBody,
+        db: Client = Depends(get_db)) -> dict:
     """Envia senha temporária por e-mail."""
     return await AuthService.process_forgot_password(db, body.identifier)
 
 
-# ── Change password (autenticado) ─────────────────────────────────────────────
+# ── Change password (autenticado) ─────────────────────────────────────
 
 
 @router.put('/password')

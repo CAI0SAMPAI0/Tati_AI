@@ -11,7 +11,8 @@ from fastapi.responses import JSONResponse
 
 router = APIRouter()
 
-_AVATAR_DIR = Path(__file__).parent.parent.parent.parent.parent / 'assets' / 'avatar'
+_AVATAR_DIR = Path(
+    __file__).parent.parent.parent.parent.parent / 'assets' / 'avatar'
 
 _FRAME_FILES: dict[str, str] = {
     'normal': 'avatar_tati_normal.png',
@@ -47,9 +48,8 @@ def _load_frame_b64(filename: str) -> str | None:
 
 @router.get('/frames')
 async def get_avatar_frames():
-    frames = {
-        key: (_load_frame_b64(fname) or '') for key, fname in _FRAME_FILES.items()
-    }
+    frames = {key: (_load_frame_b64(fname) or '')
+              for key, fname in _FRAME_FILES.items()}
     frames['has_frames'] = bool(frames.get('normal'))
     return JSONResponse(content=frames)
 
@@ -60,7 +60,8 @@ async def get_single_frame(frame_name: str):
         raise ContentNotFoundError(detail='Frame não encontrado')
     data = _load_frame_b64(_FRAME_FILES[frame_name])
     if not data:
-        raise ContentNotFoundError(detail=f'Arquivo {_FRAME_FILES[frame_name]} não encontrado')
+        raise ContentNotFoundError(
+            detail=f'Arquivo {_FRAME_FILES[frame_name]} não encontrado')
     return {'frame': data, 'has_frame': True}
 
 

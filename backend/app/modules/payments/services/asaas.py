@@ -1,7 +1,8 @@
+import logging
 import httpx
 from app.core.config import settings
 
-# ── Configurações ─────────────────────────────────────────────────────────────
+# ── Configurações ─────────────────────────────────────────────────────
 
 ASAAS_BASE_URL_PROD = 'https://www.asaas.com/api/v3'
 ASAAS_BASE_URL_SANDBOX = 'https://sandbox.asaas.com/api/v3'
@@ -22,14 +23,15 @@ def get_headers():
     }
 
 
-# ── Clientes ──────────────────────────────────────────────────────────────────
+# ── Clientes ──────────────────────────────────────────────────────────
 
 
 async def create_customer(
     name: str, email: str, cpf_cnpj: str = None, phone: str = None
 ) -> dict:
     url = f'{get_base_url()}/customers'
-    payload = {'name': name, 'email': email, 'cpfCnpj': cpf_cnpj, 'mobilePhone': phone}
+    payload = {'name': name, 'email': email,
+               'cpfCnpj': cpf_cnpj, 'mobilePhone': phone}
     payload = {k: v for k, v in payload.items() if v is not None}
     async with httpx.AsyncClient() as client:
         try:
@@ -39,7 +41,9 @@ async def create_customer(
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as exc:
-            print(f'[Asaas] Erro ao criar cliente: {exc.response.text}')
+            logging.info(
+                f'[Asaas] Erro ao criar cliente: {
+                    exc.response.text}')
             raise Exception(f'Erro Asaas: {exc.response.text}')
 
 
@@ -53,8 +57,12 @@ async def update_customer(customer_id: str, payload: dict) -> dict:
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as exc:
-            print(f'[Asaas] Erro ao atualizar cliente: {exc.response.text}')
-            raise Exception(f'Erro Asaas ao atualizar: {exc.response.text}')
+            logging.info(
+                f'[Asaas] Erro ao atualizar cliente: {
+                    exc.response.text}')
+            raise Exception(
+                f'Erro Asaas ao atualizar: {
+                    exc.response.text}')
 
 
 async def get_customer_by_email(email: str) -> dict | None:
@@ -68,11 +76,11 @@ async def get_customer_by_email(email: str) -> dict | None:
             data = resp.json()
             return data['data'][0] if data.get('data') else None
         except Exception as exc:
-            print(f'[Asaas] Erro ao buscar cliente: {exc}')
+            logging.info(f'[Asaas] Erro ao buscar cliente: {exc}')
             return None
 
 
-# ── Assinaturas ───────────────────────────────────────────────────────────────
+# ── Assinaturas ───────────────────────────────────────────────────────
 
 
 async def create_subscription(
@@ -102,7 +110,9 @@ async def create_subscription(
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as exc:
-            print(f'[Asaas] Erro ao criar assinatura: {exc.response.text}')
+            logging.info(
+                f'[Asaas] Erro ao criar assinatura: {
+                    exc.response.text}')
             raise Exception(f'Erro Asaas: {exc.response.text}')
 
 
@@ -114,11 +124,13 @@ async def cancel_subscription(subscription_id: str) -> bool:
             resp.raise_for_status()
             return True
         except Exception as exc:
-            print(f'[Asaas] Erro ao cancelar assinatura: {exc}')
+            logging.info(f'[Asaas] Erro ao cancelar assinatura: {exc}')
             return False
 
 
-async def update_subscription_due_day(subscription_id: str, next_due_date: str) -> dict:
+async def update_subscription_due_day(
+        subscription_id: str,
+        next_due_date: str) -> dict:
     url = f'{get_base_url()}/subscriptions/{subscription_id}'
     async with httpx.AsyncClient() as client:
         try:
@@ -131,7 +143,9 @@ async def update_subscription_due_day(subscription_id: str, next_due_date: str) 
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as exc:
-            print(f'[Asaas] Erro ao atualizar vencimento: {exc.response.text}')
+            logging.info(
+                f'[Asaas] Erro ao atualizar vencimento: {
+                    exc.response.text}')
             raise Exception(f'Erro Asaas: {exc.response.text}')
 
 
@@ -148,11 +162,12 @@ async def get_subscription_payments(subscription_id: str) -> list:
             resp.raise_for_status()
             return resp.json().get('data', [])
         except Exception as exc:
-            print(f'[Asaas] Erro ao buscar pagamentos da assinatura: {exc}')
+            logging.info(
+                f'[Asaas] Erro ao buscar pagamentos da assinatura: {exc}')
             return []
 
 
-# ── Pagamentos Avulsos ─────────────────────────────────────────────────────────
+# ── Pagamentos Avulsos ────────────────────────────────────────────────
 
 
 async def create_payment(
@@ -182,8 +197,10 @@ async def create_payment(
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPStatusError as exc:
-            print(f'[Asaas] Erro ao criar pagamento: {exc.response.text}')
+            logging.info(
+                f'[Asaas] Erro ao criar pagamento: {exc.response.text}')
             raise Exception(f'Erro Asaas: {exc.response.text}')
+
 
 async def get_payment(payment_id: str) -> dict | None:
     """Busca um pagamento avulso pelo ID."""
@@ -194,11 +211,12 @@ async def get_payment(payment_id: str) -> dict | None:
             resp.raise_for_status()
             return resp.json()
         except Exception as exc:
-            print(f'[Asaas] Erro ao buscar pagamento {payment_id}: {exc}')
+            logging.info(
+                f'[Asaas] Erro ao buscar pagamento {payment_id}: {exc}')
             return None
 
 
-# ── PIX ───────────────────────────────────────────────────────────────────────
+# ── PIX ───────────────────────────────────────────────────────────────
 
 
 async def get_pix_qr_code(payment_id: str) -> dict:
@@ -210,11 +228,12 @@ async def get_pix_qr_code(payment_id: str) -> dict:
             return resp.json()
         except Exception as exc:
             # Apenas loga o erro, não quebra o fluxo
-            print(f'[Asaas] Aviso: QR Code indisponível para {payment_id}: {exc}')
+            logging.info(
+                f'[Asaas] Aviso: QR Code indisponível para {payment_id}: {exc}')
             return {"encodedImage": None, "payload": None}
-        
 
-# ── Status do Pagamento ───────────────────────────────────────────────────────
+
+# ── Status do Pagamento ───────────────────────────────────────────────
 
 
 async def get_payment_status(payment_id: str) -> dict | None:
@@ -225,7 +244,8 @@ async def get_payment_status(payment_id: str) -> dict | None:
 
     return {
         'id': payment.get('id'),
-        'status': payment.get('status'),  # PENDING, CONFIRMED, OVERDUE, REFUNDED, etc.
+        # PENDING, CONFIRMED, OVERDUE, REFUNDED, etc.
+        'status': payment.get('status'),
         'billingType': payment.get('billingType'),
         'value': payment.get('value'),
         'dueDate': payment.get('dueDate'),
@@ -244,5 +264,6 @@ async def cancel_payment(payment_id: str) -> bool:
             resp.raise_for_status()
             return True
         except Exception as exc:
-            print(f'[Asaas] Erro ao cancelar pagamento {payment_id}: {exc}')
+            logging.info(
+                f'[Asaas] Erro ao cancelar pagamento {payment_id}: {exc}')
             return False

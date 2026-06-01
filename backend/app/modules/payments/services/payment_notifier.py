@@ -1,5 +1,7 @@
+import logging
 from typing import Dict, List
 from fastapi import WebSocket
+
 
 class PaymentConnectionManager:
     def __init__(self):
@@ -19,7 +21,12 @@ class PaymentConnectionManager:
             if not self.active_connections[username]:
                 del self.active_connections[username]
 
-    async def notify_payment_status(self, username: str, status: str, payment_id: str, extra_data: dict = None):
+    async def notify_payment_status(
+            self,
+            username: str,
+            status: str,
+            payment_id: str,
+            extra_data: dict = None):
         if username in self.active_connections:
             message = {
                 "type": "payment_status",
@@ -31,6 +38,8 @@ class PaymentConnectionManager:
                 try:
                     await connection.send_json(message)
                 except Exception as e:
-                    print(f"Error sending payment notification to {username}: {e}")
+                    logging.info(
+                        f"Error sending payment notification to {username}: {e}")
+
 
 payment_notifier = PaymentConnectionManager()

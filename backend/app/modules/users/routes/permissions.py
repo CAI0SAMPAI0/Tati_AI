@@ -21,7 +21,8 @@ router = APIRouter()
 PAID_START = date(2026, 6, 30)
 FREE_MSG_LIMIT = 5
 
-# Feriados nacionais fixos (mês, dia) — adicione os móveis via banco se quiser
+# Feriados nacionais fixos (mês, dia) — adicione os móveis via banco se
+# quiser
 FERIADOS_FIXOS = {
     (1, 1),  # Ano Novo
     (4, 21),  # Tiradentes
@@ -120,7 +121,9 @@ async def get_access_info(
     username = user.get('username')
     can_access_dashboard = _can_access_dashboard(user)
     is_admin = can_access_dashboard
-    is_exempt = user.get('is_exempt', False) or username in SPECIAL_USERS
+    is_exempt = user.get(
+        'is_exempt',
+        False) or username in SPECIAL_USERS
     user.get('plan_type')
 
     # Admin ou Usuário Especial → sempre liberado com data infinita
@@ -191,10 +194,13 @@ async def change_due_date(
         raise BusinessLogicError(detail='Dia deve ser entre 1 e 28.')
     sub = _get_active_subscription(user['username'], db)
     if not sub:
-        raise ContentNotFoundError(detail='Nenhuma assinatura ativa encontrada.')
+        raise ContentNotFoundError(
+            detail='Nenhuma assinatura ativa encontrada.')
 
     # Calcula nova data de vencimento a partir de hoje
-    new_due = calc_due_date(date.today(), preferred_day=body.preferred_day)
+    new_due = calc_due_date(
+        date.today(),
+        preferred_day=body.preferred_day)
 
     db.table('subscriptions').update(
         {
@@ -213,7 +219,8 @@ async def change_due_date(
     return {
         'ok': True,
         'new_due_date': new_due.isoformat(),
-        'message': f'Vencimento alterado para dia {body.preferred_day} (próximo: {new_due}).',
+        'message': f'Vencimento alterado para dia {
+            body.preferred_day} (próximo: {new_due}).',
     }
 
 

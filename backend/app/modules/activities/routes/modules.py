@@ -13,14 +13,14 @@ from app.modules.activities.services.activity_service import ActivityService
 router = APIRouter()
 
 
-# ── Módulos & Lições ──────────────────────────────────────────────────────────
+# ── Módulos & Lições ──────────────────────────────────────────────────
 
 
-# ── Static routes first (before /{module_id}) ─────────────────────────────────
+# ── Static routes first (before /{module_id}) ─────────────────────────
 
 @router.get('/')
 async def list_modules(
-    level: Optional[str] = None, 
+    level: Optional[str] = None,
     user: dict = Depends(get_current_user),
     service: ActivityService = Depends()
 ):
@@ -38,13 +38,12 @@ async def get_weekly_goal(
     return await service.get_weekly_tasks(user['username'])
 
 
-# ── Admin Static Routes (Order matters) ───────────────────────────────────
-
-
+# ── Admin Static Routes (Order matters) ───────────────────────────────
 
 
 @router.post('/admin/generate-quiz')
-async def admin_generate_quiz(data: dict, service: ActivityService = Depends()):
+async def admin_generate_quiz(data: dict,
+                              service: ActivityService = Depends()):
     """Gera um quiz via IA."""
     from app.modules.activities.services.quiz_service import QuizService
 
@@ -57,7 +56,9 @@ async def admin_generate_quiz(data: dict, service: ActivityService = Depends()):
 
 
 @router.post('/admin/generate-flashcards')
-async def admin_generate_flashcards(data: dict, service: ActivityService = Depends()):
+async def admin_generate_flashcards(
+        data: dict,
+        service: ActivityService = Depends()):
     """Gera flashcards via IA."""
     return await service.generate_flashcards(
         data.get('theme'),
@@ -84,12 +85,13 @@ async def admin_list_modules(service: ActivityService = Depends()):
 
 
 @router.post('/admin')
-async def admin_create_module(data: dict, service: ActivityService = Depends()):
+async def admin_create_module(data: dict,
+                              service: ActivityService = Depends()):
     """Cria um novo módulo."""
     return await service.save_module(data)
 
 
-# ── Dynamic routes (/{module_id} must come LAST) ──────────────────────────────
+# ── Dynamic routes (/{module_id} must come LAST) ──────────────────────
 
 @router.put('/admin/{module_id}')
 async def admin_update_module(
@@ -100,13 +102,17 @@ async def admin_update_module(
 
 
 @router.delete('/admin/{module_id}')
-async def admin_delete_module(module_id: str, service: ActivityService = Depends()):
+async def admin_delete_module(
+        module_id: str,
+        service: ActivityService = Depends()):
     """Exclui um módulo."""
     return await service.delete_module(module_id)
 
 
 @router.get('/{module_id}')
-async def get_module(module_id: str, service: ActivityService = Depends()):
+async def get_module(
+        module_id: str,
+        service: ActivityService = Depends()):
     """Detalhes de um módulo específico."""
     module = await service.get_module_details(module_id)
     if not module:
@@ -115,7 +121,9 @@ async def get_module(module_id: str, service: ActivityService = Depends()):
 
 
 @router.get('/{module_id}/lessons')
-async def list_lessons(module_id: str, service: ActivityService = Depends()):
+async def list_lessons(
+        module_id: str,
+        service: ActivityService = Depends()):
     """Lista lições de um módulo."""
     module = await service.get_module_details(module_id)
     if not module:

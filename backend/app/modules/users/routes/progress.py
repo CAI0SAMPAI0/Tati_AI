@@ -108,15 +108,16 @@ async def download_progress_report(
     import os
 
     pdf_path = await progress_report_service.generate_student_report(user['username'], lang=lang)
-    
+
     if not os.path.exists(pdf_path):
-        raise HTTPException(status_code=500, detail="Erro ao gerar arquivo PDF")
+        raise HTTPException(
+            status_code=500, detail="Erro ao gerar arquivo PDF")
 
     return FileResponse(
         path=pdf_path,
-        filename=f"TatiAI_Report_{datetime.now().strftime('%Y-%m-%d')}.pdf",
-        media_type='application/pdf'
-    )
+        filename=f"TatiAI_Report_{
+            datetime.now().strftime('%Y-%m-%d')}.pdf",
+        media_type='application/pdf')
 
 
 def _calculate_rankings(db, start_date, end_date=None):
@@ -139,7 +140,12 @@ def _calculate_rankings(db, start_date, end_date=None):
         query_messages = query_messages.lte('created_at', iso_end)
 
     # Lista de usuários excluídos (staff/admin)
-    excluded_users = {'programador', 'professor', 'admin', 'caio', 'tati'}
+    excluded_users = {
+        'programador',
+        'professor',
+        'admin',
+        'caio',
+        'tati'}
 
     sessions_data = query_sessions.execute().data or []
     points_map = {'quiz': 7, 'flashcard': 3, 'simulation': 10}
@@ -178,7 +184,7 @@ def _calculate_rankings(db, start_date, end_date=None):
             }
         user_scores[u]['score'] += 8
         user_scores[u]['messages'] += 1
-        
+
     if user_scores:
         usernames = list(user_scores.keys())
         try:
@@ -191,7 +197,8 @@ def _calculate_rankings(db, start_date, end_date=None):
                 or []
             )
         except Exception:
-            # Compatibilidade com bancos que ainda não têm coluna top-level avatar_url
+            # Compatibilidade com bancos que ainda não têm coluna
+            # top-level avatar_url
             users_info = (
                 db.table('users')
                 .select('username, name, level, profile')
@@ -204,8 +211,11 @@ def _calculate_rankings(db, start_date, end_date=None):
             uname = row.get('username')
             if uname in user_scores:
                 user_scores[uname]['name'] = row.get('name') or uname
-                user_scores[uname]['level'] = row.get('level') or 'Beginner'
-                user_scores[uname]['avatar_url'] = row.get('avatar_url') or (row.get('profile') or {}).get('avatar_url')
-                
-    rankings = sorted(user_scores.values(), key=lambda x: (-x['score'], -x['messages']))
+                user_scores[uname]['level'] = row.get(
+                    'level') or 'Beginner'
+                user_scores[uname]['avatar_url'] = row.get('avatar_url') or (
+                    row.get('profile') or {}).get('avatar_url')
+
+    rankings = sorted(user_scores.values(),
+                      key=lambda x: (-x['score'], -x['messages']))
     return rankings

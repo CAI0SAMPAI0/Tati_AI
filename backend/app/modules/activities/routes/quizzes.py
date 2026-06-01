@@ -52,22 +52,23 @@ def ensure_explanation_language(
 
     if dl.startswith('en') and has_pt:
         return (
-            f"The correct answer is '{options[correct_index]}' because it best completes the sentence '{question}'."
-        )
+            f"The correct answer is '{
+                options[correct_index]}' because it best completes the sentence '{question}'.")
     if dl.startswith('pt') and has_en:
         return (
-            f"A alternativa correta é '{options[correct_index]}' porque ela completa melhor a frase '{question}'."
-        )
+            f"A alternativa correta é '{
+                options[correct_index]}' porque ela completa melhor a frase '{question}'.")
 
-    # Already in desired language or unable to detect: if desired != detected, prefer templated rewrite
+    # Already in desired language or unable to detect: if desired !=
+    # detected, prefer templated rewrite
     if dl.startswith('en') and not has_en:
         return (
-            f"The correct answer is '{options[correct_index]}' because it best completes the sentence '{question}'."
-        )
+            f"The correct answer is '{
+                options[correct_index]}' because it best completes the sentence '{question}'.")
     if dl.startswith('pt') and not has_pt:
         return (
-            f"A alternativa correta é '{options[correct_index]}' porque ela completa melhor a frase '{question}'."
-        )
+            f"A alternativa correta é '{
+                options[correct_index]}' porque ela completa melhor a frase '{question}'.")
 
     return explanation
 
@@ -104,7 +105,8 @@ async def submit_quiz(
 
 @router.post('/generate-dynamic')
 async def generate_dynamic(
-    topic: str, level: str = 'Intermediate', service: QuizService = Depends()
-):
+        topic: str,
+        level: str = 'Intermediate',
+        service: QuizService = Depends()):
     """Gera um quiz dinâmico via IA."""
     return await service.generate_dynamic_quiz(topic, level)

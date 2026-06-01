@@ -30,7 +30,8 @@ async def send_feedback(
     current_user: dict = Depends(get_current_user),
 ) -> dict:
     """Envia feedback/bug report do usuário para o administrador."""
-    student_name = current_user.get('name') or current_user.get('username')
+    student_name = current_user.get(
+        'name') or current_user.get('username')
     student_email = current_user.get('email', '')
 
     full_message = body.message
@@ -48,5 +49,9 @@ async def send_feedback(
     )
 
     if success:
-        return {'success': True, 'message': 'Feedback enviado com sucesso!'}
-    return {'success': False, 'message': 'Erro ao enviar feedback. Tente novamente.'}
+        return {
+            'success': True,
+            'message': 'Feedback enviado com sucesso!'}
+    return {
+        'success': False,
+        'message': 'Erro ao enviar feedback. Tente novamente.'}

@@ -24,10 +24,13 @@ async def list_notifications(
 
 
 @router.post('/read-all')
-async def mark_all_read(user=Depends(get_current_user), service: NotificationService = Depends()):
+async def mark_all_read(
+        user=Depends(get_current_user),
+        service: NotificationService = Depends()):
     """Marca todas as notificações do usuário logado como lidas."""
     await service.mark_all_as_read(user['username'])
     return {'status': 'success'}
+
 
 @router.post('/{notification_id}/read')
 async def mark_read(

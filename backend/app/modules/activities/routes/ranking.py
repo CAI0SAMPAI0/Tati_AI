@@ -12,7 +12,8 @@ router = APIRouter()
 
 @router.get('/')
 async def get_ranking(
-    category: str = 'global', limit: int = 20, service: ActivityService = Depends()
-):
+        category: str = 'global',
+        limit: int = 20,
+        service: ActivityService = Depends()):
     """Retorna o ranking de usuários."""
     return await service.get_ranking(category, limit)

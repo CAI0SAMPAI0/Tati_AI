@@ -1,3 +1,4 @@
+import logging
 """
 services/quiz_service.py
 Serviço para gerenciamento de quizzes e geração dinâmica de questões.
@@ -23,10 +24,12 @@ class QuizService:
             parts = quiz_id.split('_')
             if len(parts) >= 3:
                 level = parts[1].upper()
+
                 def _fetch_cefr():
-                    res = self.db.table('cefr_exercises').select('*').eq('level', level).eq('is_published', True).execute()
+                    res = self.db.table('cefr_exercises').select(
+                        '*').eq('level', level).eq('is_published', True).execute()
                     rows = res.data or []
-                    
+
                     import re
                     matched_rows = []
                     matched_topic = ""
@@ -36,10 +39,10 @@ class QuizService:
                         if t_slug == "_".join(parts[2:]):
                             matched_rows.append(r)
                             matched_topic = t
-                            
+
                     if not matched_rows:
                         return None
-                        
+
                     questions = []
                     for idx, row in enumerate(matched_rows):
                         questions.append({
@@ -51,15 +54,14 @@ class QuizService:
                             "explanation": row['explanation'] or "No explanation provided.",
                             "order": idx
                         })
-                        
+
                     return {
                         "id": quiz_id,
                         "title": f"CEFR {level}: {matched_topic}",
                         "description": f"AI-generated quiz from your materials about {matched_topic}. Explanations always in English to help you learn!",
                         "module_id": "00000000-0000-0000-0000-000000000001",
                         "module_title": "AI Exercises",
-                        "questions": questions
-                    }
+                        "questions": questions}
                 return await run_in_threadpool(_fetch_cefr)
             return None
 
@@ -83,7 +85,8 @@ class QuizService:
                 quiz['image_url'] = mod.get('image_url')
                 quiz['youtube_url'] = mod.get('youtube_url')
                 quiz['spotify_url'] = mod.get('spotify_url')
-                quiz['file_url'] = mod.get('file_url')                # remove to avoid confusing frontend
+                # remove to avoid confusing frontend
+                quiz['file_url'] = mod.get('file_url')
                 del quiz['modules']
             questions = (
                 self.db.table('quiz_questions')
@@ -112,11 +115,13 @@ class QuizService:
         total = len(questions)
 
         # Mapeamento de respostas corretas
-        correct_map = {str(q['id']): q['correct_index'] for q in questions}
+        correct_map = {str(q['id']): q['correct_index']
+                       for q in questions}
 
         for ans in answers:
             q_id = str(ans.get('question_id'))
-            if q_id in correct_map and ans.get('selected_index') == correct_map[q_id]:
+            if q_id in correct_map and ans.get(
+                    'selected_index') == correct_map[q_id]:
                 correct_count += 1
 
         score = int((correct_count / total) * 100) if total > 0 else 0
@@ -149,12 +154,20 @@ class QuizService:
             import asyncio
             from app.modules.activities.services.gamification_service import GamificationService
             gs = GamificationService()
-            # XP reward: proportional to score (e.g., 100% -> 50 XP, 70% -> 35 XP)
+            # XP reward: proportional to score (e.g., 100% -> 50 XP, 70%
+            # -> 35 XP)
             xp_reward = int(score * 0.5)
             if xp_reward > 0:
-                asyncio.create_task(gs.award_xp(username, xp_reward, f"Quiz: {quiz.get('title', 'Practice')}"))
+                asyncio.create_task(
+                    gs.award_xp(
+                        username,
+                        xp_reward,
+                        f"Quiz: {
+                            quiz.get(
+                                'title',
+                                'Practice')}"))
         except Exception as e:
-            print(f'[QuizService] Error awarding XP: {e}')
+            logging.info(f'[QuizService] Error awarding XP: {e}')
 
         return {
             'score': score,
@@ -163,11 +176,17 @@ class QuizService:
             'passed': score >= 70,
         }
 
-    async def generate_module_quiz(self, title: str, level: str, context: str, num_questions: int = 5) -> Dict[str, Any]:
+    async def generate_module_quiz(self,
+                                   title: str,
+                                   level: str,
+                                   context: str,
+                                   num_questions: int = 5) -> Dict[str,
+                                                                   Any]:
         """Gera um quiz completo para um módulo."""
         return await self.generate_dynamic_quiz(f"{title} ({context})", level, num_questions=num_questions)
 
-    async def generate_dynamic_quiz(self, topic: str, level: str, num_questions: int = 5) -> Dict[str, Any]:
+    async def generate_dynamic_quiz(
+            self, topic: str, level: str, num_questions: int = 5) -> Dict[str, Any]:
         """Gera um quiz dinâmico usando LLM baseado em um tópico."""
         from app.modules.chat.services.llm import groq_chat_json
         prompt = (
@@ -189,5 +208,5 @@ class QuizService:
                 data['quiz_title'] = data['title']
             return data
         except Exception as e:
-            print(f'[QuizService] Erro ao gerar quiz: {e}')
+            logging.info(f'[QuizService] Erro ao gerar quiz: {e}')
             return {}

@@ -3,7 +3,13 @@ from typing import Optional, List
 from uuid import UUID
 
 VALID_CATEGORIES = (
-    'grammar', 'speaking', 'travel', 'business', 'vocabulary', 'writing', 'other',
+    'grammar',
+    'speaking',
+    'travel',
+    'business',
+    'vocabulary',
+    'writing',
+    'other',
 )
 
 
@@ -12,8 +18,10 @@ class PremiumContentPublic(BaseModel):
     title: str
     description: Optional[str] = None
     price: float
-    price_students: Optional[float] = None   # preço para alunos da Tati AI
-    price_buyers: Optional[float] = None     # preço para clientes do Hub
+    # preço para alunos da Tati AI
+    price_students: Optional[float] = None
+    # preço para clientes do Hub
+    price_buyers: Optional[float] = None
     thumbnail_url: Optional[str] = None
     preview_url: Optional[str] = None
     category: Optional[str] = 'other'

@@ -21,7 +21,8 @@ def get_goals(username: str) -> dict:
             .data
         )
 
-        goals_data = row.get('study_goals', {'goals': []}) if row else {'goals': []}
+        goals_data = row.get('study_goals', {'goals': []}) if row else {
+            'goals': []}
     except Exception:
         goals_data = {'goals': []}
 
@@ -34,7 +35,8 @@ def create_goal(username: str, goal_data: dict) -> dict:
 
     goal = {
         'id': f'goal_{int(datetime.now(timezone.utc).timestamp())}',
-        'type': goal_data.get('type'),  # daily_minutes, daily_messages, weekly_words
+        # daily_minutes, daily_messages, weekly_words
+        'type': goal_data.get('type'),
         'target': goal_data.get('target'),
         'current': 0,
         'period': goal_data.get('period', 'daily'),  # daily, weekly
@@ -53,7 +55,10 @@ def create_goal(username: str, goal_data: dict) -> dict:
     return goal
 
 
-def update_goal_progress(username: str, goal_id: str, increment: int = 1) -> dict:
+def update_goal_progress(
+        username: str,
+        goal_id: str,
+        increment: int = 1) -> dict:
     """Atualiza o progresso de uma meta."""
     db = get_client()
     goals_data = get_goals(username)
@@ -63,10 +68,13 @@ def update_goal_progress(username: str, goal_id: str, increment: int = 1) -> dic
             goal['current'] = goal.get('current', 0) + increment
 
             # Verifica se atingiu a meta
-            if goal['current'] >= goal['target'] and not goal.get('achieved'):
+            if goal['current'] >= goal['target'] and not goal.get(
+                    'achieved'):
                 goal['achieved'] = True
-                goal['achieved_at'] = datetime.now(timezone.utc).isoformat()
-                goal['achieved_count'] = goal.get('achieved_count', 0) + 1
+                goal['achieved_at'] = datetime.now(
+                    timezone.utc).isoformat()
+                goal['achieved_count'] = goal.get(
+                    'achieved_count', 0) + 1
 
             break
 
@@ -82,7 +90,8 @@ def delete_goal(username: str, goal_id: str) -> dict:
     db = get_client()
     goals_data = get_goals(username)
 
-    goals_data['goals'] = [g for g in goals_data['goals'] if g['id'] != goal_id]
+    goals_data['goals'] = [
+        g for g in goals_data['goals'] if g['id'] != goal_id]
 
     db.table('users').update({'study_goals': goals_data}).eq(
         'username', username

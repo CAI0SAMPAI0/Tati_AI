@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 
+
 class FlashcardCreate(BaseModel):
     level: str
     front: str
@@ -11,10 +12,12 @@ class FlashcardCreate(BaseModel):
     topic: Optional[str] = None
     source_file: Optional[str] = None
 
+
 class FlashcardResponse(FlashcardCreate):
     id: str
     is_published: bool
     created_at: datetime
+
 
 class ExerciseCreate(BaseModel):
     level: str
@@ -25,6 +28,7 @@ class ExerciseCreate(BaseModel):
     explanation: Optional[str] = None
     topic: Optional[str] = None
     source_file: Optional[str] = None
+
 
 class ExerciseResponse(ExerciseCreate):
     id: str

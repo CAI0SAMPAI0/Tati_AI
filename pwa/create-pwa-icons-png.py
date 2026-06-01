@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -28,13 +29,15 @@ def create_icon(size: int) -> Image.Image:
     text_x = (size - text_width) // 2
     text_y = (size - text_height) // 2 + size // 8
 
-    draw.text((text_x, text_y), text, fill=(255, 255, 255, 255), font=font)
+    draw.text(
+        (text_x, text_y), text, fill=(
+            255, 255, 255, 255), font=font)
     return img
 
 
 for size in (192, 512):
     output = ICONS_DIR / f"icon-{size}x{size}.png"
     create_icon(size).save(output)
-    print(f"Created: {output}")
+    logging.info(f"Created: {output}")
 
-print("PWA icons generated successfully")
+logging.info("PWA icons generated successfully")

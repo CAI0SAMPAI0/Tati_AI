@@ -19,9 +19,8 @@ class XPRecord(BaseModel):
 
 @router.get('/')
 @router.get('')
-async def get_xp(
-    user=Depends(get_current_user), service: GamificationService = Depends()
-):
+async def get_xp(user=Depends(get_current_user),
+                 service: GamificationService = Depends()):
     """Retorna o XP atual do usuário."""
     return await service.get_user_xp(user['username'])
 

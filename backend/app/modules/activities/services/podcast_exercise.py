@@ -1,3 +1,4 @@
+import logging
 """
 services/podcast_exercise.py
 Serviço para geração e avaliação de exercícios de podcasts.
@@ -11,7 +12,8 @@ from fastapi.concurrency import run_in_threadpool
 class PodcastExerciseService:
     @staticmethod
     def _pick_lang(pt_text: str, en_text: str, ui_lang: str) -> str:
-        return en_text if str(ui_lang).lower().startswith('en') else pt_text
+        return en_text if str(ui_lang).lower(
+        ).startswith('en') else pt_text
 
     async def generate_exercises(
         self, podcast: Dict[str, Any], ui_lang: str
@@ -24,25 +26,32 @@ class PodcastExerciseService:
         for segment in podcast.get('transcript_segments', []):
             if not segment.get('source_text'):
                 continue
-            segments.append(
-                f'- {segment.get("start", "--:--")} | EN: {segment.get("source_text", "")} | PT: {segment.get("translated_text", "")}'
-            )
-        print(f'[exercise] transcript segments count: {len(segments)}')
+            segments.append(f'- {segment.get("start",
+                                             "--:--")} | EN: {segment.get("source_text",
+                                                                          "")} | PT: {segment.get("translated_text",
+                                                                                                  "")}')
+        logging.info(
+            f'[exercise] transcript segments count: {
+                len(segments)}')
         transcript_context = '\n'.join(segments)
-        print(f'[exercise] transcript_context preview: {transcript_context[:300]}')
+        logging.info(
+            f'[exercise] transcript_context preview: {transcript_context[:300]}')
         if not transcript_context.strip():
-            transcript_context = f"Topic/Description: {podcast.get('description', '')}"
-            print(f"[exercise] WARNING: sem transcrição, usando description como fallback")
-            
+            transcript_context = f"Topic/Description: {
+                podcast.get(
+                    'description', '')}"
+            logging.info(
+                f"[exercise] WARNING: sem transcrição, usando description como fallback")
+
         level = str(podcast.get('level') or 'Beginner')
         level_lower = level.lower()
-        is_beginner = any(token in level_lower for token in ['a1', 'a2', 'beginner', 'pre-intermediate'])
+        is_beginner = any(token in level_lower for token in [
+                          'a1', 'a2', 'beginner', 'pre-intermediate'])
         difficulty_rule = (
             "Use short, simple English (CEFR A1-A2). Prefer common words, short sentences and direct questions."
             if is_beginner
             else "Use clear English aligned to the student's level. Avoid unnecessary complexity."
         )
-        
 
         system_prompt = (
             f"You are Teacher TATI, a professional English teacher. Your goal is to create engaging and specific exercises for the podcast '{podcast.get('title')}'.\n\n"
@@ -72,15 +81,18 @@ class PodcastExerciseService:
                 payload, podcast.get('title', ''), ui_lang, None
             )
         except Exception as exc:
-            print(f'Error generating/parsing LLM response for exercises: {exc}')
-            return self.get_fallback_exercises(podcast.get('title', ''), ui_lang)
+            logging.info(
+                f'Error generating/parsing LLM response for exercises: {exc}')
+            return self.get_fallback_exercises(
+                podcast.get('title', ''), ui_lang)
 
     async def _try_fetch_transcript(self, podcast: Dict[str, Any]):
         embed_url = podcast.get('embed_url', '')
         video_id = None
 
         if '/embed/' in embed_url:
-            video_id = embed_url.split('/embed/')[-1].split('?')[0].split('/')[0]
+            video_id = embed_url.split(
+                '/embed/')[-1].split('?')[0].split('/')[0]
 
         if not video_id:
             ext = podcast.get('external_url', '')
@@ -90,7 +102,9 @@ class PodcastExerciseService:
                 video_id = ext.split('youtu.be/')[-1].split('?')[0]
 
         if not video_id or len(video_id) != 11:
-            print(f'[transcript] video_id inválido: {video_id!r}')
+            logging.info(
+                f'[transcript] video_id inválido: {
+                    video_id!r}')
             return  # ← para aqui se inválido
 
         # daqui pra baixo, video_id é garantidamente válido
@@ -98,19 +112,25 @@ class PodcastExerciseService:
             try:
                 from youtube_transcript_api import YouTubeTranscriptApi
                 # Tenta buscar transcrições em inglês ou português
-                transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-                # Prioridade: Inglês manual -> Inglês auto -> Português manual -> Português auto
+                transcript_list = YouTubeTranscriptApi.list_transcripts(
+                    video_id)
+                # Prioridade: Inglês manual -> Inglês auto -> Português
+                # manual -> Português auto
                 try:
-                    transcript = transcript_list.find_transcript(['en', 'en-US', 'en-GB'])
-                except:
+                    transcript = transcript_list.find_transcript(
+                        ['en', 'en-US', 'en-GB'])
+                except BaseException:
                     try:
-                        transcript = transcript_list.find_generated_transcript(['en', 'en-US'])
-                    except:
+                        transcript = transcript_list.find_generated_transcript(
+                            ['en', 'en-US'])
+                    except BaseException:
                         try:
-                            transcript = transcript_list.find_transcript(['pt', 'pt-BR'])
-                        except:
-                            transcript = transcript_list.find_generated_transcript(['pt', 'pt-BR'])
-                
+                            transcript = transcript_list.find_transcript(
+                                ['pt', 'pt-BR'])
+                        except BaseException:
+                            transcript = transcript_list.find_generated_transcript(
+                                ['pt', 'pt-BR'])
+
                 raw = transcript.fetch()
 
                 return [
@@ -122,7 +142,8 @@ class PodcastExerciseService:
                     for s in raw
                 ]
             except Exception as e:
-                print(f'Transcript fetch failed for {video_id}: {e}')
+                logging.info(
+                    f'Transcript fetch failed for {video_id}: {e}')
                 return []
 
         segments = await run_in_threadpool(_fetch)
@@ -134,18 +155,20 @@ class PodcastExerciseService:
                 from app.core.database import get_client
                 await run_in_threadpool(
                     lambda: get_client()
-                        .table('podcasts')
-                        .update({'transcript_segments': segments})
-                        .eq('id', podcast['id'])
-                        .execute()
+                    .table('podcasts')
+                    .update({'transcript_segments': segments})
+                    .eq('id', podcast['id'])
+                    .execute()
                 )
             except Exception as e:
-                print(f'[transcript] falha ao persistir: {e}')
+                logging.info(f'[transcript] falha ao persistir: {e}')
 
     def _normalize_exercises_payload(
         self, payload: Any, title: str, ui_lang: str, terms: Set[str] = None
     ) -> Dict[str, Any]:
-        if not isinstance(payload, dict) or not payload.get('exercises'):
+        if not isinstance(
+                payload,
+                dict) or not payload.get('exercises'):
             return self.get_fallback_exercises(title, ui_lang)
 
         normalized = []
@@ -172,18 +195,22 @@ class PodcastExerciseService:
                     normalized.append(
                         {
                             'type': 'voice',
-                            'question': str(ex.get('question', '')).strip(),
+                            'question': str(
+                                ex.get(
+                                    'question',
+                                    '')).strip(),
                             'phrase': phrase,
                             'translation_hint': str(
-                                ex.get('translation_hint', '')
-                            ).strip(),
+                                ex.get(
+                                    'translation_hint',
+                                    '')).strip(),
                             'tts_text': phrase,
-                        }
-                    )
+                        })
                 continue
 
         if terms:
-            normalized = [ex for ex in normalized if self._is_relevant(ex, terms)]
+            normalized = [
+                ex for ex in normalized if self._is_relevant(ex, terms)]
 
         if len(normalized) < 3:
             return self.get_fallback_exercises(title, ui_lang)
@@ -201,30 +228,25 @@ class PodcastExerciseService:
         ex_terms = set(re.findall(r'[a-z]{4,}', text))
         return bool(ex_terms.intersection(terms))
 
-    def get_fallback_exercises(self, title: str, ui_lang: str) -> Dict[str, Any]:
-        return {
-            'exercises': [
-                {
-                    'type': 'voice',
-                    'question': f"Listen and answer with your voice: What is the main idea of '{title}'?",
-                    'phrase': 'The main idea is to improve English communication skills.',
-                    'translation_hint': 'Speak in one short sentence.',
-                },
-                {
-                    'type': 'voice',
-                    'question': 'Listen and answer with your voice: What new word or phrase did you hear?',
-                    'phrase': 'I heard a useful phrase about daily conversation.',
-                    'translation_hint': 'Use simple words.',
-                },
-                {
-                    'type': 'voice',
-                    'question': 'Listen and answer with your voice: What did you learn from this video?',
-                    'phrase': 'I learned something new today.',
-                    'translation_hint': 'Learned...',
-                    'translation_hint': 'Say it slowly and clearly.',
-                },
-            ]
-        }
+    def get_fallback_exercises(
+            self, title: str, ui_lang: str) -> Dict[str, Any]:
+        return {'exercises': [{'type': 'voice',
+                               'question': f"Listen and answer with your voice: What is the main idea of '{title}'?",
+                               'phrase': 'The main idea is to improve English communication skills.',
+                               'translation_hint': 'Speak in one short sentence.',
+                               },
+                              {'type': 'voice',
+                               'question': 'Listen and answer with your voice: What new word or phrase did you hear?',
+                               'phrase': 'I heard a useful phrase about daily conversation.',
+                               'translation_hint': 'Use simple words.',
+                               },
+                              {'type': 'voice',
+                               'question': 'Listen and answer with your voice: What did you learn from this video?',
+                               'phrase': 'I learned something new today.',
+                               'translation_hint': 'Learned...',
+                               'translation_hint': 'Say it slowly and clearly.',
+                               },
+                              ]}
 
     async def evaluate_exercise(
         self, req: Any, user_level: str, ui_lang: str
@@ -263,8 +285,13 @@ class PodcastExerciseService:
         self, payload: Any, ui_lang: str
     ) -> Dict[str, Any]:
         raw_score = payload.get('score')
-        score = min(max(int(raw_score), 0), 100) if raw_score is not None else 0
-        feedback = str(payload.get('feedback', '')).strip() or self._pick_lang(
-            'Boa resposta!', 'Good answer!', ui_lang
-        )
+        score = min(max(int(raw_score), 0),
+                    100) if raw_score is not None else 0
+        feedback = str(
+            payload.get(
+                'feedback',
+                '')).strip() or self._pick_lang(
+            'Boa resposta!',
+            'Good answer!',
+            ui_lang)
         return {'score': score, 'feedback': feedback}

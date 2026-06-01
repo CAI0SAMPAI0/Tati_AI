@@ -18,7 +18,8 @@ from app.core.security import decode_token
 from app.core.database import get_client
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl='auth/login')
-oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl='auth/login', auto_error=False)
+oauth2_scheme_optional = OAuth2PasswordBearer(
+    tokenUrl='auth/login', auto_error=False)
 
 # Colunas necessárias para autenticação — evita SELECT * que puxa
 # campos pesados como ``vocabulary`` (JSON potencialmente enorme).

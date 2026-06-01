@@ -1,3 +1,4 @@
+import logging
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
@@ -72,8 +73,7 @@ def _render_notification_copy(
         )
     elif message == 'notif.trophy_earned.message':
         localized_message = (
-            (f'Você ganhou o troféu: {trophy_name}') if is_pt else f'You earned the trophy: {trophy_name}'
-        )
+            (f'Você ganhou o troféu: {trophy_name}') if is_pt else f'You earned the trophy: {trophy_name}')
     else:
         localized_message = message
 
@@ -94,7 +94,9 @@ def _normalize_user_lang(lang: str | None) -> str:
     return 'pt-BR'
 
 
-def should_notify_streak_milestone(previous_days: int, current_days: int) -> bool:
+def should_notify_streak_milestone(
+        previous_days: int,
+        current_days: int) -> bool:
     """Retorna True quando o usuário alcança um marco de sequência.
 
     Marcos observados: 7 e 30 dias (testes unitários esperam 7 e 30).
@@ -123,7 +125,8 @@ def create_notification(
     db = get_client()
     safe_payload = _safe_payload(payload)
 
-    rendered_title, rendered_body = _render_notification_copy(title, message, safe_payload)
+    rendered_title, rendered_body = _render_notification_copy(
+        title, message, safe_payload)
 
     try:
         db.table('notifications').insert(
@@ -146,19 +149,24 @@ def create_notification(
                 }
             ).execute()
         except Exception as exc:
-            print(f'[Notif] Error creating notification: {exc}')
+            logging.info(f'[Notif] Error creating notification: {exc}')
             return
 
     if send_push:
         try:
-            send_push_to_user(username, title=rendered_title, body=rendered_body, url=push_url)
+            send_push_to_user(username, title=rendered_title,
+                              body=rendered_body, url=push_url)
         except Exception as exc:
-            print(f'[Notif] Falha no push: {exc}')
+            logging.info(f'[Notif] Falha no push: {exc}')
 
 
-def _has_notification_today(username: str, notif_category: str, now_utc: datetime) -> bool:
+def _has_notification_today(
+        username: str,
+        notif_category: str,
+        now_utc: datetime) -> bool:
     db = get_client()
-    start_day = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_day = now_utc.replace(
+        hour=0, minute=0, second=0, microsecond=0)
     try:
         rows = (
             db.table('notifications')
@@ -175,10 +183,13 @@ def _has_notification_today(username: str, notif_category: str, now_utc: datetim
         return False
 
 
-def should_notify_streak_milestone(previous_streak: int, new_streak: int) -> bool:
-    return int(new_streak or 0) in STREAK_MILESTONES and int(new_streak or 0) > int(
-        previous_streak or 0
-    )
+def should_notify_streak_milestone(
+        previous_streak: int,
+        new_streak: int) -> bool:
+    return int(
+        new_streak or 0) in STREAK_MILESTONES and int(
+        new_streak or 0) > int(
+        previous_streak or 0)
 
 
 def notify_streak_milestone(username: str, streak_days: int) -> None:
@@ -217,7 +228,10 @@ def notify_streak_broken(username: str, streak_days: int) -> None:
     )
 
 
-def notify_trophy_earned(username: str, trophy_name: str, trophy_icon: str = '🏆') -> None:
+def notify_trophy_earned(
+        username: str,
+        trophy_name: str,
+        trophy_icon: str = '🏆') -> None:
     create_notification(
         username=username,
         category='trophy',
@@ -245,7 +259,7 @@ def notify_trophy_earned(username: str, trophy_name: str, trophy_icon: str = '�
                 from app.shared.services.email import EmailSender
                 EmailSender().send_trophy_email(email, name, trophy_name, trophy_icon)
     except Exception as exc:
-        print(f'[Notif] Erro ao enviar e-mail de troféu: {exc}')
+        logging.info(f'[Notif] Erro ao enviar e-mail de troféu: {exc}')
 
 
 def notify_correction(
@@ -295,10 +309,10 @@ def notify_new_activity(
         if student_email:
             from app.shared.services.email import EmailSender
             EmailSender().send_new_activity_email(
-                student_email, student_name, activity_title, activity_url
-            )
+                student_email, student_name, activity_title, activity_url)
     except Exception as exc:
-        print(f'[Notif] Erro ao enviar e-mail de nova atividade: {exc}')
+        logging.info(
+            f'[Notif] Erro ao enviar e-mail de nova atividade: {exc}')
 
 
 def notify_all_students(
@@ -313,17 +327,20 @@ def notify_all_students(
     Evita duplicados baseados na mensagem e categoria.
     """
     from app.core.database import get_client
-    
+
     db = get_client()
     try:
-        res = db.table('users').select('username, name, email').execute()
+        res = db.table('users').select(
+            'username, name, email').execute()
         users = res.data or []
-        
+
         for u in users:
             username = u.get('username')
-            if not username: continue
-            
-            # Verificação de duplicados (mesma categoria e mensagem nas últimas 24h)
+            if not username:
+                continue
+
+            # Verificação de duplicados (mesma categoria e mensagem nas
+            # últimas 24h)
             try:
                 check = db.table('notifications')\
                     .select('id')\
@@ -334,7 +351,7 @@ def notify_all_students(
                     .execute()
                 if check.data:
                     continue
-            except:
+            except BaseException:
                 pass
 
             create_notification(
@@ -345,18 +362,17 @@ def notify_all_students(
                 send_push=True,
                 push_url=url
             )
-            
+
             if send_email and u.get('email'):
                 try:
                     from app.shared.services.email import EmailSender
-                    EmailSender().send_new_activity_email(
-                        u['email'], u.get('name', username), message, f'https://tati-ai.vercel.app{url}'
-                    )
-                except:
+                    EmailSender().send_new_activity_email(u['email'], u.get(
+                        'name', username), message, f'https://tati-ai.vercel.app{url}')
+                except BaseException:
                     pass
-                    
+
     except Exception as e:
-        print(f'[Notif] Erro ao notificar todos: {e}')
+        logging.info(f'[Notif] Erro ao notificar todos: {e}')
 
 
 def notify_welcome(username: str, name: str) -> None:
@@ -377,9 +393,11 @@ def dispatch_streak_engagement_notifications(
 
     db = get_client()
     try:
-        users = db.table('users').select('username, streak_data').execute().data or []
+        users = db.table('users').select(
+            'username, streak_data').execute().data or []
     except Exception as exc:
-        print(f'[Notif] Falha ao carregar usuários para job: {exc}')
+        logging.info(
+            f'[Notif] Falha ao carregar usuários para job: {exc}')
         return summary
 
     for row in users:
@@ -390,7 +408,8 @@ def dispatch_streak_engagement_notifications(
         if not isinstance(streak_data, dict):
             continue
 
-        last_study_date = str(streak_data.get('last_study_date') or '').strip()
+        last_study_date = str(streak_data.get(
+            'last_study_date') or '').strip()
         current_streak = int(streak_data.get('current_streak') or 0)
         if not last_study_date or current_streak <= 0:
             continue
@@ -404,13 +423,15 @@ def dispatch_streak_engagement_notifications(
         summary['processed'] += 1
 
         if days_since == 1 and mode in {'all', 'reminder'}:
-            if not _has_notification_today(username, 'streak_reminder', ref):
+            if not _has_notification_today(
+                    username, 'streak_reminder', ref):
                 notify_streak_reminder(username, current_streak)
                 summary['reminder'] += 1
             continue
 
         if days_since == 2 and mode in {'all', 'broken'}:
-            if not _has_notification_today(username, 'streak_broken', ref):
+            if not _has_notification_today(
+                    username, 'streak_broken', ref):
                 notify_streak_broken(username, current_streak)
                 summary['broken'] += 1
             continue

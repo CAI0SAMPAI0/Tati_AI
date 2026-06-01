@@ -1,3 +1,4 @@
+import logging
 """
 Serviço de geolocalização e cálculo de dias úteis baseado na localização do usuário.
 Usa timezone e feriados locais para determinar dias úteis.
@@ -8,7 +9,7 @@ from typing import Optional
 import httpx
 
 
-# ── Feriados fixos por país ───────────────────────────────────────────────────
+# ── Feriados fixos por país ───────────────────────────────────────────
 
 HOLIDAYS_FIXED = {
     # Brasil (mês, dia)
@@ -44,7 +45,7 @@ HOLIDAYS_FIXED = {
     },
 }
 
-# ── Feriados móveis (calculados por ano) ──────────────────────────────────────
+# ── Feriados móveis (calculados por ano) ──────────────────────────────
 
 
 def _easter_sunday(year: int) -> date:
@@ -125,7 +126,7 @@ def get_moving_holidays(year: int, country: str) -> list[date]:
     return holidays
 
 
-# ── Detecção de país via IP ───────────────────────────────────────────────────
+# ── Detecção de país via IP ───────────────────────────────────────────
 
 
 async def detect_country_from_ip(ip_address: str) -> Optional[str]:
@@ -142,12 +143,12 @@ async def detect_country_from_ip(ip_address: str) -> Optional[str]:
             if data.get('status') == 'success':
                 return data.get('countryCode')  # 'BR', 'US', 'GB', etc.
     except Exception as e:
-        print(f'[GeoIP] Erro ao detectar país: {e}')
+        logging.info(f'[GeoIP] Erro ao detectar país: {e}')
 
     return None
 
 
-# ── Verificação de dia útil ───────────────────────────────────────────────────
+# ── Verificação de dia útil ───────────────────────────────────────────
 
 
 def is_business_day_local(d: date, country: str = 'BR') -> bool:
@@ -222,7 +223,7 @@ def calc_due_date_local(
     return due
 
 
-# ── Informações de fuso horário ──────────────────────────────────────────────
+# ── Informações de fuso horário ───────────────────────────────────────
 
 
 async def get_timezone_from_ip(ip_address: str) -> Optional[str]:
@@ -236,12 +237,12 @@ async def get_timezone_from_ip(ip_address: str) -> Optional[str]:
             if data.get('status') == 'success':
                 return data.get('timezone')  # 'America/Sao_Paulo', etc.
     except Exception as e:
-        print(f'[Timezone] Erro: {e}')
+        logging.info(f'[Timezone] Erro: {e}')
 
     return None
 
 
-# ── Endpoint helper ───────────────────────────────────────────────────────────
+# ── Endpoint helper ───────────────────────────────────────────────────
 
 
 async def get_user_location_info(client_ip: str) -> dict:

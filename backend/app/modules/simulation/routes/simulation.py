@@ -35,13 +35,14 @@ class SimEvaluateRequest(BaseModel):
 
 @router.get('/simulation/scenarios')
 async def list_scenarios(
-    level: str | None = None, 
+    level: str | None = None,
     user: dict = Depends(get_current_user),
     service: SimulationService = Depends()
 ) -> list:
     """Lista todos os cenários disponíveis, opcionalmente filtrados por nível."""
     effective_level = level or user.get('level')
     return await service.list_scenarios(effective_level)
+
 
 @router.get('/simulation/scenarios/{scenario_id}')
 async def get_scenario_details(
@@ -83,7 +84,8 @@ async def send_simulation_message(
 ) -> dict:
     """Envia mensagem para simulação e recebe resposta da IA."""
     return await service.process_message(
-        current_user['username'], body.content, body.scenario, body.conversation_id, current_user.get('level', 'Beginner')
+        current_user['username'], body.content, body.scenario, body.conversation_id, current_user.get(
+            'level', 'Beginner')
     )
 
 
@@ -97,7 +99,7 @@ async def evaluate(
     return await service.evaluate(body.messages, current_user['username'])
 
 
-# ── Progresso de simulações ────────────────────────────────────────────────────
+# ── Progresso de simulações ───────────────────────────────────────────
 
 
 @router.get('/simulation/progress')
@@ -123,7 +125,8 @@ async def get_simulation_progress(
                     .data
                     or []
                 )
-                return [r.get('scenario_id') for r in rows if r.get('scenario_id')]
+                return [r.get('scenario_id')
+                        for r in rows if r.get('scenario_id')]
             except Exception:
                 continue
         return []

@@ -40,7 +40,8 @@ class ProgressService:
         def _fetch():
             now = datetime.now(timezone.utc)
             week_ago = now - timedelta(days=7)
-            month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            month_start = now.replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0)
             last_month_end = month_start - timedelta(days=1)
             last_month_start = last_month_end.replace(
                 day=1, hour=0, minute=0, second=0, microsecond=0
@@ -62,7 +63,8 @@ class ProgressService:
                 created = s.get('created_at')
                 if not created:
                     continue
-                dt = datetime.fromisoformat(created.replace('Z', '+00:00'))
+                dt = datetime.fromisoformat(
+                    created.replace('Z', '+00:00'))
                 if dt >= week_ago:
                     this_week += val
                 if dt >= month_start:
@@ -111,7 +113,8 @@ class ProgressService:
             streak_obj = stats.get('streak_data') or {}
             streak_obj.get('current_streak', 0)
 
-            all_trophies = self.db.table('trophies').select('*').execute().data or []
+            all_trophies = self.db.table(
+                'trophies').select('*').execute().data or []
             medals = []
             for t in all_trophies:
                 unlocked = t['id'] in earned_ids
@@ -156,7 +159,8 @@ class ProgressService:
 
         def _fetch():
             now = datetime.now(timezone.utc)
-            month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            month_start = now.replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0)
             rankings = _calculate_rankings(self.db, month_start)
             for i, entry in enumerate(rankings):
                 if entry['username'] == username:
@@ -165,7 +169,10 @@ class ProgressService:
                         'name': entry.get('name', user_name),
                         'score': entry.get('score', 0),
                     }
-            return {'position': len(rankings) + 1, 'name': user_name, 'score': 0}
+            return {
+                'position': len(rankings) + 1,
+                'name': user_name,
+                'score': 0}
 
         res = await run_in_threadpool(_fetch)
         await cache_set(cache_key, res, ttl=300)
@@ -181,7 +188,8 @@ class ProgressService:
 
         def _fetch():
             now = datetime.now(timezone.utc)
-            month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            month_start = now.replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0)
             rankings = _calculate_rankings(self.db, month_start)
             return rankings[:15]
 
@@ -194,12 +202,14 @@ class ProgressService:
 
         def _fetch():
             now = datetime.now(timezone.utc)
-            month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            month_start = now.replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0)
             last_month_end = month_start - timedelta(days=1)
             last_month_start = last_month_end.replace(
                 day=1, hour=0, minute=0, second=0, microsecond=0
             )
-            rankings = _calculate_rankings(self.db, last_month_start, last_month_end)
+            rankings = _calculate_rankings(
+                self.db, last_month_start, last_month_end)
             return {
                 'month': f'{last_month_start.month:02d}/{last_month_start.year}',
                 'winners': [
@@ -222,13 +232,15 @@ class ProgressService:
 
         return await get_or_generate_weekly_plan(username, level, focus)
 
-    async def check_plan_progress(self, username: str) -> Dict[str, Any]:
+    async def check_plan_progress(
+            self, username: str) -> Dict[str, Any]:
         from app.modules.activities.services.weekly_plan import check_plan_progress
 
         progress = await check_plan_progress(username=username)
         return {'progress': progress}
 
-    async def start_plan_transition(self, username: str) -> Dict[str, Any]:
+    async def start_plan_transition(
+            self, username: str) -> Dict[str, Any]:
         from app.modules.activities.services.weekly_plan import (
             check_plan_progress,
             generate_transition_exercises,

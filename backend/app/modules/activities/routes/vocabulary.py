@@ -10,27 +10,35 @@ from app.modules.activities.services.vocabulary_srs import vocabulary_srs_servic
 
 router = APIRouter()
 
+
 @router.get('/due')
 async def get_due_vocabulary(user: dict = Depends(get_current_user)):
     """Retorna palavras que precisam de revisão hoje."""
     return await vocabulary_srs_service.get_due_words(user['username'])
 
+
 @router.post('/review/{entry_id}')
-async def record_vocabulary_review(entry_id: str, quality_score: int, user: dict = Depends(get_current_user)):
+async def record_vocabulary_review(
+        entry_id: str,
+        quality_score: int,
+        user: dict = Depends(get_current_user)):
     """Registra uma revisão de palavra e calcula próximo intervalo."""
     if not (0 <= quality_score <= 5):
         raise BusinessLogicError(detail="Score must be between 0 and 5")
-    
+
     await vocabulary_srs_service.record_review(entry_id, quality_score, user['username'])
     return {"ok": True}
 
+
 @router.post('/add')
-async def add_word_manually(data: dict, user: dict = Depends(get_current_user)):
+async def add_word_manually(
+        data: dict,
+        user: dict = Depends(get_current_user)):
     """Adiciona manualmente uma palavra ao SRS."""
     word = data.get('word')
     if not word:
         raise BusinessLogicError(detail="Word is required")
-        
+
     await vocabulary_srs_service.add_to_srs(
         user['username'],
         word,

@@ -15,7 +15,7 @@ from app.modules.activities.services.activity_service import ActivityService
 router = APIRouter()
 
 
-# ── Models ─────────────────────────────────────────────────────────────────────
+# ── Models ────────────────────────────────────────────────────────────
 
 
 class SubmissionBody(BaseModel):
@@ -34,7 +34,7 @@ class CorrectionBody(BaseModel):
     score: int
 
 
-# ── Aluno ──────────────────────────────────────────────────────────────────────
+# ── Aluno ─────────────────────────────────────────────────────────────
 
 
 @router.post('/')
@@ -62,7 +62,7 @@ async def list_my_submissions(
     return await service.get_user_submissions(user['username'])
 
 
-# ── Admin ──────────────────────────────────────────────────────────────────────
+# ── Admin ─────────────────────────────────────────────────────────────
 
 
 @router.get('/admin/submissions')

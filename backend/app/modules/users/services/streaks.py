@@ -1,3 +1,4 @@
+import logging
 """
 Serviço de Streaks (dias consecutivos de estudo).
 Gerencia o acompanhamento de dias consecutivos que o aluno praticou.
@@ -24,7 +25,8 @@ def _calculate_current_streak(streak_data: dict, today: date) -> int:
         return 0
 
     # Ordena datas decrescente (garante que a mais recente é a primeira)
-    sorted_dates = sorted([date.fromisoformat(d) for d in study_dates], reverse=True)
+    sorted_dates = sorted([date.fromisoformat(d)
+                          for d in study_dates], reverse=True)
 
     last_study_date = sorted_dates[0]
     days_since_last = (today - last_study_date).days
@@ -49,7 +51,9 @@ async def _execute_db(func, retries=3):
         except Exception as e:
             err_str = str(e).lower()
             if ('disconnected' in err_str or 'connection' in err_str or 'protocol' in err_str) and attempt < retries - 1:
-                print(f'[Streak DB] Connection issue, retrying ({attempt+1}/{retries})...')
+                logging.info(
+                    f'[Streak DB] Connection issue, retrying ({
+                        attempt + 1}/{retries})...')
                 await asyncio.sleep(0.5 * (attempt + 1))
                 continue
             raise e
@@ -87,7 +91,8 @@ async def get_streak(username: str) -> dict:
             return streak_data
         return _empty_streak()
     except Exception as e:
-        print(f'[Streak] Erro ao buscar streak para {username}: {e}')
+        logging.info(
+            f'[Streak] Erro ao buscar streak para {username}: {e}')
         return _empty_streak()
 
 
@@ -142,7 +147,8 @@ async def record_study_day(username: str) -> dict:
 
         # 3. Verifica meta de 3 mensagens
         if msg_count < 3:
-            db.table('users').update({'streak_data': streak_data}).eq('username', username).execute()
+            db.table('users').update({'streak_data': streak_data}).eq(
+                'username', username).execute()
             return streak_data
 
         # 4. Atingiu a meta!
@@ -156,13 +162,15 @@ async def record_study_day(username: str) -> dict:
         else:
             streak_data['current_streak'] = 1
 
-        if streak_data['current_streak'] > streak_data.get('longest_streak', 0):
+        if streak_data['current_streak'] > streak_data.get(
+                'longest_streak', 0):
             streak_data['longest_streak'] = streak_data['current_streak']
 
         if today_str not in study_dates:
             study_dates.insert(0, today_str)
             streak_data['study_dates'] = study_dates[:90]
-            streak_data['total_study_days'] = streak_data.get('total_study_days', 0) + 1
+            streak_data['total_study_days'] = streak_data.get(
+                'total_study_days', 0) + 1
 
         streak_data['last_study_date'] = today_str
 
@@ -180,20 +188,24 @@ async def record_study_day(username: str) -> dict:
             # Background tasks (Trophies/Notifs)
             try:
                 from app.modules.activities.services.trophy_service import check_streak_trophies
-                check_streak_trophies(username, streak_data.get('longest_streak', 0))
-            except Exception: pass
+                check_streak_trophies(
+                    username, streak_data.get('longest_streak', 0))
+            except Exception:
+                pass
 
             try:
                 from app.modules.notifications.services.notifications import notify_streak_milestone, should_notify_streak_milestone
                 new_streak = int(streak_data.get('current_streak') or 0)
-                if should_notify_streak_milestone(previous_streak, new_streak):
+                if should_notify_streak_milestone(
+                        previous_streak, new_streak):
                     notify_streak_milestone(username, new_streak)
-            except Exception: pass
-            
+            except Exception:
+                pass
+
             return streak_data
         return result
     except Exception as e:
-        print(f'[Streak] Erro ao gravar: {e}')
+        logging.info(f'[Streak] Erro ao gravar: {e}')
         return _empty_streak()
 
 
@@ -206,9 +218,13 @@ async def get_streak_milestones(username: str) -> list[dict]:
         {'days': 3, 'badge': '⭐', 'label': '3 Day Streak', 'achieved': longest >= 3},
         {'days': 7, 'badge': '🔥', 'label': 'Week Warrior', 'achieved': longest >= 7},
         {'days': 14, 'badge': '💪', 'label': '2 Week Streak', 'achieved': longest >= 14},
-        {'days': 30, 'badge': '🌟', 'label': 'Monthly Master', 'achieved': longest >= 30},
-        {'days': 60, 'badge': '🚀', 'label': '2 Month Streak', 'achieved': longest >= 60},
-        {'days': 100, 'badge': '💎', 'label': 'Diamond Learner', 'achieved': longest >= 100},
-        {'days': 365, 'badge': '👑', 'label': 'Year Champion', 'achieved': longest >= 365},
+        {'days': 30, 'badge': '🌟', 'label': 'Monthly Master',
+            'achieved': longest >= 30},
+        {'days': 60, 'badge': '🚀', 'label': '2 Month Streak',
+            'achieved': longest >= 60},
+        {'days': 100, 'badge': '💎', 'label': 'Diamond Learner',
+            'achieved': longest >= 100},
+        {'days': 365, 'badge': '👑', 'label': 'Year Champion',
+            'achieved': longest >= 365},
     ]
     return milestones

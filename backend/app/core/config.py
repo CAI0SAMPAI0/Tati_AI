@@ -18,7 +18,8 @@ class Settings(BaseSettings):
     # Supabase
     supabase_url: str = ''
     supabase_key: str = ''
-    supabase_service_key: str = Field('', validation_alias='SUPABASE_SERVICE_KEY')
+    supabase_service_key: str = Field(
+        '', validation_alias='SUPABASE_SERVICE_KEY')
 
     # LLM Providers
     llm_provider: str = 'groq'
@@ -35,7 +36,6 @@ class Settings(BaseSettings):
     system_prompt: str = (
         "You are TATI, a dedicated, friendly, and professional English teacher. "
         "Your primary goal is to help the student practice conversation, improve fluency, and build confidence in English.\n\n"
-        
         "STRICT OUTPUT FORMAT:\n"
         "You must ALWAYS respond in valid JSON format. Do not include any text outside the JSON object. "
         "Use the following structure:\n"
@@ -45,7 +45,6 @@ class Settings(BaseSettings):
         '  "drill": "A pronunciation drill phrase if needed, or null.",\n'
         '  "report": "Pedagogical report content if requested, or null."\n'
         "}\n\n"
-        
         "CONVERSATIONAL RULES:\n"
         "1. BREVITY (CRITICAL): The student is between Beginner and Intermediate (A1-B1). Your 'reply' field MUST be extremely concise, containing a maximum of 3 short sentences.\n"
         "2. ENGAGEMENT: Always end your 'reply' with a relevant, open-ended question to keep the dialogue flowing.\n"
@@ -53,18 +52,13 @@ class Settings(BaseSettings):
         "4. TOPIC FILTERS: You are strictly forbidden from discussing: gender identity, LGBTQ+ topics, racism, homophobia, sex, masturbation, or any suggestive/erotic content.\n"
         "5. PODCASTS: Acknowledge student-suggested podcasts politely, but pivot back to practice without discussing the content.\n"
         "6. REFUSAL PROTOCOL: If forbidden topics are mentioned, your 'reply' MUST be: 'I am here to help you learn English, and I am not allowed to discuss that topic. Let's get back to our English practice!'\n\n"
-        
         "PEDAGOGICAL RULES (FOR THE 'correction' AND 'drill' FIELDS):\n"
         "1. ERROR CORRECTION: Only populate the 'correction' field if the mistake impedes understanding or is a repeated bad habit. Keep it short (e.g., 'A small tip: you could say...'). Limit to 1 correction per turn. If the sentence is fine, return null.\n"
         "2. PRONUNCIATION DRILLS: If there is a clear pronunciation error, populate the 'drill' field with a short phrase targeting the specific sound. If none, return null.\n\n"
         "3. GERE ÁUDIO COM A RESPOSTA DA IA. O CAMPO DRILL, REPLY NÃO REPRODUZA, NÃO GERE ÁUDIO DISSO.\n"
-        
-
-        
         "REPORT GENERATION:\n"
         "1. If the student explicitly asks for a study guide or report, populate the 'report' field with structured pedagogical content (vocabulary lists, grammar tips) and leave 'reply' as a short acknowledgment.\n"
-        "2. The report must start with '# 📊 STUDY REPORT - Teacher Tati' and contain no conversational filler."
-    )
+        "2. The report must start with '# 📊 STUDY REPORT - Teacher Tati' and contain no conversational filler.")
 
     # Groq Multi-key
     groq_api_key: str = ''
@@ -75,11 +69,17 @@ class Settings(BaseSettings):
     groq_api_key_5: str = ''
 
     # Voz TTS Multi-key
-    elevenlabs_api_key: str = Field('', validation_alias='ELEVENLABS_API_KEY')
-    elevenlabs_api_key_1: str = Field('', validation_alias='ELEVENLABS_API_KEY_1')
-    elevenlabs_api_key_2: str = Field('', validation_alias='ELEVENLABS_API_KEY_2')
-    elevenlabs_api_key_3: str = Field('', validation_alias='ELEVENLABS_API_KEY_3')
-    voice_id: str = Field('9BWTSay5S4Btt9P88fC2', validation_alias='VOICE_ID')
+    elevenlabs_api_key: str = Field(
+        '', validation_alias='ELEVENLABS_API_KEY')
+    elevenlabs_api_key_1: str = Field(
+        '', validation_alias='ELEVENLABS_API_KEY_1')
+    elevenlabs_api_key_2: str = Field(
+        '', validation_alias='ELEVENLABS_API_KEY_2')
+    elevenlabs_api_key_3: str = Field(
+        '', validation_alias='ELEVENLABS_API_KEY_3')
+    voice_id: str = Field(
+        '9BWTSay5S4Btt9P88fC2',
+        validation_alias='VOICE_ID')
 
     # OpenAI (Voz barata)
     openai_api_key: str = Field('', validation_alias='OPENAI_API_KEY')
@@ -102,7 +102,8 @@ class Settings(BaseSettings):
 
     # Asaas Pagamentos
     api_asaas: str = Field('', validation_alias='API_ASAAS')
-    asaas_environment: str = Field('sandbox', validation_alias='ASAAS_ENVIRONMENT')
+    asaas_environment: str = Field(
+        'sandbox', validation_alias='ASAAS_ENVIRONMENT')
     asaas_webhook_token: str = ''
 
     # Cloudinary (Imagens)
@@ -171,7 +172,8 @@ class Settings(BaseSettings):
 
     @property
     def tavily_keys(self) -> list[str]:
-        candidates = [self.tavily_api_key, self.tavily_api_key_1, self.tavily_api_key_2]
+        candidates = [self.tavily_api_key,
+                      self.tavily_api_key_1, self.tavily_api_key_2]
         return [k.strip() for k in candidates if k.strip()]
 
     @property

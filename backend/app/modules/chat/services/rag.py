@@ -1,3 +1,4 @@
+import logging
 import os
 from dotenv import load_dotenv
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -22,7 +23,8 @@ def autenticar_google():
     creds = None
 
     if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', scopes)
+        creds = Credentials.from_authorized_user_file(
+            'token.json', scopes)
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -38,7 +40,8 @@ def autenticar_google():
                     'redirect_uris': ['http://localhost'],
                 }
             }
-            flow = InstalledAppFlow.from_client_config(creds_data, scopes)
+            flow = InstalledAppFlow.from_client_config(
+                creds_data, scopes)
             creds = flow.run_local_server(port=0)
 
         with open('token.json', 'w') as token:
@@ -48,13 +51,13 @@ def autenticar_google():
 
 
 def sincronizar_drive():
-    print('🔑 Iniciando autenticação...')
+    logging.info('🔑 Iniciando autenticação...')
     autenticar_google()
 
-    folder_id = (
-        os.getenv('GOOGLE_DRIVE_FOLDER_ID') or '11AjlpMFhuvkGJsXPQnNxRNN5wySn8W8R'
-    )
-    print(f'☁️ Conectando à pasta do Google Drive: {folder_id}...')
+    folder_id = (os.getenv('GOOGLE_DRIVE_FOLDER_ID')
+                 or '11AjlpMFhuvkGJsXPQnNxRNN5wySn8W8R')
+    logging.info(
+        f'☁️ Conectando à pasta do Google Drive: {folder_id}...')
     try:
         # Puxa SOMENTE PDFs da pasta específica
         loader = GoogleDriveLoader(
@@ -62,13 +65,16 @@ def sincronizar_drive():
         )
         documentos = loader.load()
         if not documentos:
-            print('⚠️ Nenhum PDF encontrado nessa pasta do Drive.')
+            logging.info(
+                '⚠️ Nenhum PDF encontrado nessa pasta do Drive.')
             return []
 
-        print(f'✅ Sucesso! Lidas {len(documentos)} páginas/documentos do Drive.')
+        logging.info(
+            f'✅ Sucesso! Lidas {
+                len(documentos)} páginas/documentos do Drive.')
         return documentos
     except Exception as e:
-        print(f'❌ Erro no LangChain: {e}')
+        logging.info(f'❌ Erro no LangChain: {e}')
         return []
 
 
@@ -76,20 +82,23 @@ def salvar_no_banco(documentos):
     if not documentos:
         return
 
-    print('✂️ Cortando os textos em pedaços menores...')
+    logging.info('✂️ Cortando os textos em pedaços menores...')
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000, chunk_overlap=200, length_function=len
     )
     pedacos = text_splitter.split_documents(documentos)
-    print(f'✅ O texto foi dividido em {len(pedacos)} pedaços.')
+    logging.info(f'✅ O texto foi dividido em {len(pedacos)} pedaços.')
 
-    print(f'🧠 Criando o banco de dados em: {CHROMA_PATH}...')
-    embeddings_model = HuggingFaceEmbeddings(model_name='all-MiniLM-L6-v2')
+    logging.info(f'🧠 Criando o banco de dados em: {CHROMA_PATH}...')
+    embeddings_model = HuggingFaceEmbeddings(
+        model_name='all-MiniLM-L6-v2')
 
     Chroma.from_documents(
-        documents=pedacos, embedding=embeddings_model, persist_directory=CHROMA_PATH
-    )
-    print('🎉 BANCO DE DADOS CRIADO COM SUCESSO! A Tati já pode ler os PDFs da nuvem.')
+        documents=pedacos,
+        embedding=embeddings_model,
+        persist_directory=CHROMA_PATH)
+    logging.info(
+        '🎉 BANCO DE DADOS CRIADO COM SUCESSO! A Tati já pode ler os PDFs da nuvem.')
 
 
 if __name__ == '__main__':

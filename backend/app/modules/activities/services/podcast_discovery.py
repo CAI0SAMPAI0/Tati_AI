@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 from fastapi.concurrency import run_in_threadpool
 
@@ -10,13 +11,34 @@ import asyncio
 # Para todos os níveis: vídeos de até 10 minutos
 # ============================================================
 MIN_DURATION_SECONDS = 2 * 60   # 2 minutos (evita clips curtos demais)
-MAX_DURATION_SECONDS = 10 * 60  # 10 minutos (limite máximo para todos os níveis)
+# 10 minutos (limite máximo para todos os níveis)
+MAX_DURATION_SECONDS = 10 * 60
 
 BANNED_TOKENS = [
-    'full course', '6 hour', '8 hour', '10 hour', 'live stream', 'livestream',
-    '60 minutes', '60 mins', '45 minutes', '45 mins', '30 minutes', '30 mins',
-    '25 minutes', '25 mins', '20 minutes', '20 mins', '15 minutes', '15 mins',
-    '1 hour', '2 hours', '3 hours', '1 hr', '2 hr', '3 hr',
+    'full course',
+    '6 hour',
+    '8 hour',
+    '10 hour',
+    'live stream',
+    'livestream',
+    '60 minutes',
+    '60 mins',
+    '45 minutes',
+    '45 mins',
+    '30 minutes',
+    '30 mins',
+    '25 minutes',
+    '25 mins',
+    '20 minutes',
+    '20 mins',
+    '15 minutes',
+    '15 mins',
+    '1 hour',
+    '2 hours',
+    '3 hours',
+    '1 hr',
+    '2 hr',
+    '3 hr',
 ]
 
 
@@ -28,7 +50,8 @@ def _duration_to_seconds(dur_str: str) -> int:
         if len(parts) == 2:
             return int(parts[0]) * 60 + int(parts[1])
         elif len(parts) == 3:
-            return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+            return int(parts[0]) * 3600 + \
+                int(parts[1]) * 60 + int(parts[2])
     except Exception:
         return 0
     return 0
@@ -47,7 +70,8 @@ def _has_banned_token(title: str, description: str = '') -> bool:
     return any(token in text for token in BANNED_TOKENS)
 
 
-async def discover_personalized_podcasts(user_id: str, username: str, user_level: str):
+async def discover_personalized_podcasts(
+        user_id: str, username: str, user_level: str):
     """
     IA que analisa conversas, busca no Tavily e salva vídeos personalizados.
     Regra: todos os níveis recebem vídeos de até 10 minutos.
@@ -61,24 +85,41 @@ async def discover_personalized_podcasts(user_id: str, username: str, user_level
     try:
         from datetime import timedelta
         now = datetime.now(timezone.utc)
-        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-        start_of_week = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        start_of_day = now.replace(
+            hour=0, minute=0, second=0, microsecond=0).isoformat()
+        start_of_week = (
+            now -
+            timedelta(
+                days=now.weekday())).replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0).isoformat()
 
         def _count_recent(since_iso):
-            return db.table('podcasts').select('id', count='exact').eq('user_id', username).gte('created_at', since_iso).execute()
-
+            return db.table('podcasts').select(
+                'id',
+                count='exact').eq(
+                'user_id',
+                username).gte(
+                'created_at',
+                since_iso).execute()
 
         daily_res = await run_in_threadpool(_count_recent, start_of_day)
-        if (daily_res.count or 0) >= getattr(settings, 'video_limit_per_day', 3):
-            print(f'[Discovery] Limite diário atingido para {username}')
+        if (daily_res.count or 0) >= getattr(
+                settings, 'video_limit_per_day', 3):
+            logging.info(
+                f'[Discovery] Limite diário atingido para {username}')
             return
 
         weekly_res = await run_in_threadpool(_count_recent, start_of_week)
-        if (weekly_res.count or 0) >= getattr(settings, 'video_limit_per_week', 5):
-            print(f'[Discovery] Limite semanal atingido para {username}')
+        if (weekly_res.count or 0) >= getattr(
+                settings, 'video_limit_per_week', 5):
+            logging.info(
+                f'[Discovery] Limite semanal atingido para {username}')
             return
     except Exception as e:
-        print(f'[Discovery] Erro ao verificar limites: {e}')
+        logging.info(f'[Discovery] Erro ao verificar limites: {e}')
 
     # 1. PEGAR INTERESSES RECENTES
     try:
@@ -97,7 +138,7 @@ async def discover_personalized_podcasts(user_id: str, username: str, user_level
         msg_data = await run_in_threadpool(_fetch_msgs)
         recent_text = ' '.join([m['content'] for m in msg_data])
     except Exception as e:
-        print(f'[Discovery] Erro ao buscar mensagens: {e}')
+        logging.info(f'[Discovery] Erro ao buscar mensagens: {e}')
         return
 
     if not recent_text:
@@ -132,7 +173,8 @@ async def discover_personalized_podcasts(user_id: str, username: str, user_level
             max_results=10,  # Busca mais para compensar o filtro mais restrito
         )
         results = result.get('results', [])
-        return [r for r in results if 'youtube.com/watch' in r.get('url', '')]
+        return [
+            r for r in results if 'youtube.com/watch' in r.get('url', '')]
 
     for key in keys:
         try:
@@ -142,7 +184,7 @@ async def discover_personalized_podcasts(user_id: str, username: str, user_level
                 success_tavily = True
                 break
         except Exception as e:
-            print(f'[Discovery] Tavily Key falhou: {e}')
+            logging.info(f'[Discovery] Tavily Key falhou: {e}')
             continue
 
     if not success_tavily:
@@ -178,30 +220,42 @@ async def discover_personalized_podcasts(user_id: str, username: str, user_level
             if not all(k in p for k in ('id', 'title', 'embed_url')):
                 continue
 
-            # Filtra pelo título/duração antes mesmo de verificar disponibilidade
-            if _has_banned_token(p.get('title', ''), p.get('description', '')):
-                print(f"[Discovery] Vídeo bloqueado por título: {p.get('title')}")
+            # Filtra pelo título/duração antes mesmo de verificar
+            # disponibilidade
+            if _has_banned_token(
+                p.get(
+                    'title', ''), p.get(
+                    'description', '')):
+                logging.info(
+                    f"[Discovery] Vídeo bloqueado por título: {
+                        p.get('title')}")
                 continue
 
             if not _is_duration_valid(p.get('duration', '')):
-                print(f"[Discovery] Vídeo bloqueado por duração: {p.get('title')} ({p.get('duration')})")
+                logging.info(
+                    f"[Discovery] Vídeo bloqueado por duração: {
+                        p.get('title')} ({
+                        p.get('duration')})")
                 continue
 
             video_id = p['embed_url'].split('/')[-1].split('?')[0]
             watch_url = f'https://www.youtube.com/watch?v={video_id}'
-            oembed_url = f'https://www.youtube.com/oembed?url={quote_plus(watch_url)}&format=json'
+            oembed_url = f'https://www.youtube.com/oembed?url={
+                quote_plus(watch_url)}&format=json'
 
             tasks_verify.append(_http_fetch_ok(oembed_url))
             video_data_list.append((p, video_id))
 
         if not tasks_verify:
-            print('[Discovery] Nenhum vídeo válido após filtragem inicial')
+            logging.info(
+                '[Discovery] Nenhum vídeo válido após filtragem inicial')
             return
 
         verifications = await asyncio.gather(*tasks_verify)
 
         existing_podcasts = await run_in_threadpool(
-            lambda: db.table('podcasts').select('id').eq('user_id', username).execute().data or []
+            lambda: db.table('podcasts').select('id').eq(
+                'user_id', username).execute().data or []
         )
         {str(r.get('id')) for r in existing_podcasts if r.get('id')}
         valid_count = 0
@@ -214,7 +268,8 @@ async def discover_personalized_podcasts(user_id: str, username: str, user_level
 
             p['user_id'] = username
             p['level'] = user_level
-            p['description'] = p.get('description') or 'Short English lesson recommended by Tati AI'
+            p['description'] = p.get(
+                'description') or 'Short English lesson recommended by Tati AI'
             p['thumbnail'] = f'https://img.youtube.com/vi/{video_id}/hqdefault.jpg'
             p['source_name'] = 'YouTube (Tavily Discovery)'
             p['created_at'] = datetime.now(timezone.utc).isoformat()
@@ -230,7 +285,8 @@ async def discover_personalized_podcasts(user_id: str, username: str, user_level
         if valid_count > 0:
             from app.modules.activities.routes.podcasts import invalidate_podcast_recommendations_cache
             await run_in_threadpool(invalidate_podcast_recommendations_cache, username)
-            print(f'[Discovery] {valid_count} vídeos (≤10min) salvos para {username}')
+            logging.info(
+                f'[Discovery] {valid_count} vídeos (≤10min) salvos para {username}')
 
     except Exception as e:
-        print(f'[Discovery] Erro no processamento: {e}')
+        logging.info(f'[Discovery] Erro no processamento: {e}')

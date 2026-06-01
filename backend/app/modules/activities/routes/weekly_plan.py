@@ -19,6 +19,7 @@ from app.core.database import get_client
 
 router = APIRouter()
 
+
 def _completed_exercise_ids(db, username: str) -> set[str]:
     """IDs concluídos via user_exercise_attempts (quizzes e ai_exercises) e activity_submissions."""
     try:
@@ -31,38 +32,50 @@ def _completed_exercise_ids(db, username: str) -> set[str]:
             .execute()
             .data
         )
-        completed = {str(r["exercise_id"]) for r in rows if r.get("exercise_id")}
-        
+        completed = {str(r["exercise_id"])
+                     for r in rows if r.get("exercise_id")}
+
         # Check submissions (Novo)
-        rows_sub = db.table("activity_submissions").select("metadata").eq("username", username).eq("activity_type", "quiz").execute().data or []
+        rows_sub = db.table("activity_submissions").select("metadata").eq(
+            "username", username).eq("activity_type", "quiz").execute().data or []
         for r in rows_sub:
             meta = r.get("metadata") or {}
             qid = meta.get("quiz_id")
-            if qid: completed.add(str(qid))
-            
+            if qid:
+                completed.add(str(qid))
+
         return completed
     except Exception:
         return set()
 
+
 def _completed_podcasts_ids(db, username: str) -> set[str]:
     try:
-        rows = db.table("podcast_completions").select("podcast_id").eq("username", username).execute().data or []
-        return {str(r["podcast_id"]) for r in rows if r.get("podcast_id")}
+        rows = db.table("podcast_completions").select(
+            "podcast_id").eq("username", username).execute().data or []
+        return {str(r["podcast_id"])
+                for r in rows if r.get("podcast_id")}
     except Exception:
         return set()
+
 
 def _completed_simulation_ids(db, username: str) -> set[str]:
     try:
         # Check both simulation_progress table and submissions
-        rows = db.table("simulation_progress").select("scenario_id").eq("username", username).execute().data or []
-        prog = {str(r["scenario_id"]) for r in rows if r.get("scenario_id")}
-        
+        rows = db.table("simulation_progress").select(
+            "scenario_id").eq("username", username).execute().data or []
+        prog = {str(r["scenario_id"])
+                for r in rows if r.get("scenario_id")}
+
         # Fallback to submissions
-        rows_sub = db.table("activity_submissions").select("metadata").eq("username", username).eq("activity_type", "simulation").execute().data or []
+        rows_sub = db.table("activity_submissions").select("metadata").eq(
+            "username", username).eq(
+            "activity_type", "simulation").execute().data or []
         for r in rows_sub:
             meta = r.get("metadata") or {}
             sid = meta.get("simulation_id") or meta.get("item_id")
-            if sid: prog.add(str(sid))
+            if sid:
+                prog.add(str(sid))
         return prog
     except Exception:
         return set()
@@ -72,7 +85,10 @@ def _completed_simulation_ids(db, username: str) -> set[str]:
 # Builders de topics por categoria
 # ─────────────────────────────────────────────
 
-def _build_quiz_topics(db, username: str, completed_ids: set[str]) -> list[dict]:
+def _build_quiz_topics(
+        db,
+        username: str,
+        completed_ids: set[str]) -> list[dict]:
     try:
         rows = (
             db.table("quizzes")
@@ -100,7 +116,10 @@ def _build_quiz_topics(db, username: str, completed_ids: set[str]) -> list[dict]
         return []
 
 
-def _build_ai_exercise_topics(db, username: str, completed_ids: set[str]) -> list[dict]:
+def _build_ai_exercise_topics(
+        db,
+        username: str,
+        completed_ids: set[str]) -> list[dict]:
     try:
         rows = (
             db.table("quizzes")
@@ -128,7 +147,10 @@ def _build_ai_exercise_topics(db, username: str, completed_ids: set[str]) -> lis
         return []
 
 
-def _build_simulation_topics(db, username: str, completed_ids: set[str]) -> list[dict]:
+def _build_simulation_topics(
+        db,
+        username: str,
+        completed_ids: set[str]) -> list[dict]:
     try:
         # Simulations are global or user-owned? Usually global catalog.
         rows = (
@@ -155,7 +177,10 @@ def _build_simulation_topics(db, username: str, completed_ids: set[str]) -> list
         return []
 
 
-def _build_podcast_topics(db, username: str, completed_ids: set[str]) -> list[dict]:
+def _build_podcast_topics(
+        db,
+        username: str,
+        completed_ids: set[str]) -> list[dict]:
     try:
         # Podcasts of THIS user
         rows = (
@@ -190,7 +215,8 @@ def _build_podcast_topics(db, username: str, completed_ids: set[str]) -> list[di
 # ─────────────────────────────────────────────
 
 @router.get("/users/progress/weekly-plan")
-async def get_weekly_plan(current_user: dict = Depends(get_current_user)):
+async def get_weekly_plan(
+        current_user: dict = Depends(get_current_user)):
     """
     Retorna o Weekly Goal do usuário com todos os pendentes e concluídos.
     """
@@ -204,16 +230,25 @@ async def get_weekly_plan(current_user: dict = Depends(get_current_user)):
 
     # Monta topics por categoria
     topics: list[dict] = []
-    
+
     # 1. Quizzes e AI Exercises
     topics.extend(_build_quiz_topics(db, username, completed_exercises))
-    topics.extend(_build_ai_exercise_topics(db, username, completed_exercises))
-    
+    topics.extend(
+        _build_ai_exercise_topics(
+            db,
+            username,
+            completed_exercises))
+
     # 2. Simulations
-    topics.extend(_build_simulation_topics(db, username, completed_simulations))
-    
+    topics.extend(_build_simulation_topics(
+        db, username, completed_simulations))
+
     # 3. Podcasts
-    topics.extend(_build_podcast_topics(db, username, completed_podcasts))
+    topics.extend(
+        _build_podcast_topics(
+            db,
+            username,
+            completed_podcasts))
 
     # Ordenação: pendentes primeiro
     topics.sort(key=lambda x: 0 if x["status"] == "pending" else 1)

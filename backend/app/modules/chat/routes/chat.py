@@ -1,3 +1,4 @@
+import logging
 from __future__ import annotations
 
 import json
@@ -29,7 +30,7 @@ from app.core.config import settings
 router = APIRouter()
 
 
-# ── Models ────────────────────────────────────────────────────────────────────
+# ── Models ────────────────────────────────────────────────────────────
 class RenameConversationBody(BaseModel):
     title: str
 
@@ -48,7 +49,7 @@ class CreateConversationBody(BaseModel):
     simulation_id: str | None = None
 
 
-# ── REST endpoints ────────────────────────────────────────────────────────────
+# ── REST endpoints ────────────────────────────────────────────────────
 
 
 @router.post('/conversations', status_code=status.HTTP_201_CREATED)
@@ -66,13 +67,13 @@ async def new_conversation(
 
 
 @router.get('/conversations')
-async def get_conversations(current_user: dict = Depends(get_current_user)):
+async def get_conversations(
+        current_user: dict = Depends(get_current_user)):
     return await list_conversations(current_user['username'])
 
 
-@router.delete(
-    '/conversations/{conversation_id}', status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete('/conversations/{conversation_id}',
+               status_code=status.HTTP_204_NO_CONTENT)
 async def remove_conversation(
     conversation_id: str, current_user: dict = Depends(get_current_user)
 ):
@@ -101,7 +102,8 @@ async def get_history(
     from app.core.database import get_client
     db = get_client()
     # Verifica se a conversa pertence ao usuário
-    conv = db.table('conversations').select('username').eq('id', conversation_id).execute()
+    conv = db.table('conversations').select(
+        'username').eq('id', conversation_id).execute()
     if not conv.data or conv.data[0]['username'] != current_user['username']:
         raise ContentNotFoundError(detail='Conversa não encontrada')
 
@@ -123,7 +125,8 @@ async def edit_message(
     body: EditMessageBody,
     current_user: dict = Depends(get_current_user),
 ):
-    # message_id pode ser int ou str dependendo do banco, tentamos converter
+    # message_id pode ser int ou str dependendo do banco, tentamos
+    # converter
     try:
         m_id = int(message_id)
     except ValueError:
@@ -144,11 +147,13 @@ async def get_summary(
     from app.core.database import get_client
     db = get_client()
     # Verifica se a conversa pertence ao usuário
-    conv = db.table('conversations').select('username').eq('id', conversation_id).execute()
+    conv = db.table('conversations').select(
+        'username').eq('id', conversation_id).execute()
     if not conv.data or conv.data[0]['username'] != current_user['username']:
         raise ContentNotFoundError(detail='Conversa não encontrada')
 
-    # Restaurado lógica de resumo simplificada para manter compatibilidade
+    # Restaurado lógica de resumo simplificada para manter
+    # compatibilidade
     history = await load_history(conversation_id)
     if not history or len(history) < 2:
         raise HTTPException(400, 'Poucas mensagens')
@@ -170,19 +175,21 @@ async def get_summary(
         res = await groq_chat([{'role': 'user', 'content': prompt}])
         return {'summary': res}
     except Exception as e:
-        print(f"Error in summary: {e}")
+        logging.info(f"Error in summary: {e}")
         raise HTTPException(500, 'Erro ao gerar resumo')
 
 
 @router.post('/tts')
-async def tts_word(body: TTSRequest, current_user: dict = Depends(get_current_user)):
+async def tts_word(
+        body: TTSRequest,
+        current_user: dict = Depends(get_current_user)):
     audio_b64 = await text_to_speech(body.text)
     if not audio_b64:
         raise HTTPException(status_code=503, detail='TTS indisponível')
     return {'audio': audio_b64}
 
 
-# ── WebSocket ─────────────────────────────────────────────────────────────────
+# ── WebSocket ─────────────────────────────────────────────────────────
 
 
 @router.websocket('/ws')
@@ -192,70 +199,75 @@ async def chat_ws(
     simulation_id: str | None = Query(None),
     service: ChatService = Depends(),
 ):
-    '''print(f'--- [WS DEBUG START] ---')
-    print(f'[WS] Query Token: {token[:10] if token else "None"}')
-    print(f'[WS] Headers: {dict(websocket.headers)}')'''
-    
+    '''logging.info(f'--- [WS DEBUG START] ---')
+    logging.info(f'[WS] Query Token: {token[:10] if token else "None"}')
+    logging.info(f'[WS] Headers: {dict(websocket.headers)}')'''
+
     from app.core.security import decode_token
 
     # Restaurar suporte a Sec-WebSocket-Protocol (comum em SPAs)
     ws_token = token
     subprotocol = None
-    header_protocols = websocket.headers.get('sec-websocket-protocol', '')
-    #print(f'[WS] Sec-WebSocket-Protocol Header: {header_protocols}')
-    
+    header_protocols = websocket.headers.get(
+        'sec-websocket-protocol', '')
+    # logging.info(f'[WS] Sec-WebSocket-Protocol Header: {header_protocols}')
+
     if header_protocols:
         protocols = [p.strip() for p in header_protocols.split(',')]
         for p in protocols:
             if p != 'access_token' and not ws_token:
                 ws_token = p
                 subprotocol = 'access_token'
-                print(f'[WS] Extracted token from subprotocol: {ws_token[:10]}...')
+                logging.info(
+                    f'[WS] Extracted token from subprotocol: {ws_token[:10]}...')
 
-    # print(f'[WS] Final ws_token: {ws_token[:10] if ws_token else "None"}')
+    # logging.info(f'[WS] Final ws_token: {ws_token[:10] if ws_token else "None"}')
     payload = decode_token(ws_token) if ws_token else None
-    # print(f'[WS] Payload: {payload}')
+    # logging.info(f'[WS] Payload: {payload}')
 
     if not payload:
-        print(f'[WS] Rejeitando: Payload nulo')
+        logging.info(f'[WS] Rejeitando: Payload nulo')
         await websocket.close(code=4001, reason='Token inválido')
         return
 
-    #print(f'[WS] Aceitando conexÃ£o com subprotocol: {subprotocol}')
+    # logging.info(f'[WS] Aceitando conexÃ£o com subprotocol: {subprotocol}')
     await websocket.accept(subprotocol=subprotocol)
-    #print(f'[WS] ConexÃ£o aceita para: {payload.get("sub")}')
+    # logging.info(f'[WS] ConexÃ£o aceita para: {payload.get("sub")}')
     username = payload['sub']
     pending_drill_target = None
 
     # Se for simulação e não tiver mensagens, envia saudação inicial
     if simulation_id:
         try:
-            # Tenta pegar o conv_id do query se existir, ou espera a primeira mensagem
+            # Tenta pegar o conv_id do query se existir, ou espera a
+            # primeira mensagem
             from app.shared.services.history import load_history
-            # Como não temos conv_id ainda (talvez), espera a primeira mensagem do user 
-        except Exception: pass
+            # Como não temos conv_id ainda (talvez), espera a primeira
+            # mensagem do user
+        except Exception:
+            pass
 
     try:
         while True:
             raw = await websocket.receive_text()
-            # print(f'[WS] Mensagem recebida: {raw[:50]}...')
+            # logging.info(f'[WS] Mensagem recebida: {raw[:50]}...')
             try:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
-                print(f'[WS] Erro de JSON: {raw}')
+                logging.info(f'[WS] Erro de JSON: {raw}')
                 continue
 
             if msg.get('type') == 'ping':
                 await websocket.send_json({'type': 'pong'})
                 continue
 
-            #print(f'[WS] Processando: {msg.get("type")}')
+            # logging.info(f'[WS] Processando: {msg.get("type")}')
             try:
                 pending_drill_target = await service.process_chat_message(
                     websocket, msg, username, pending_drill_target, simulation_id=simulation_id
                 )
             except Exception as e:
-                print(f'[WS] Erro ao processar mensagem: {e}')
+                logging.info(f'[WS] Erro ao processar mensagem: {e}')
                 import traceback
                 traceback.print_exc()
                 try:
@@ -263,13 +275,14 @@ async def chat_ws(
                         'type': 'error',
                         'message': 'Desculpe, tive um problema de conexão. Por favor, tente novamente.'
                     })
-                except: pass
-            #print(f'[WS] Processamento finalizado')
+                except BaseException:
+                    pass
+            # logging.info(f'[WS] Processamento finalizado')
 
     except WebSocketDisconnect:
-        # print(f'[WS] Cliente desconectado')
+        # logging.info(f'[WS] Cliente desconectado')
         pass
     except Exception as exc:
-        #print(f'[WS] Erro CRÍTICO: {exc}')
+        # logging.info(f'[WS] Erro CRÍTICO: {exc}')
         import traceback
         traceback.print_exc()

@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, Body
 from pydantic import BaseModel
 from app.core.dependencies.auth import get_current_user
@@ -7,17 +8,19 @@ from datetime import datetime, timedelta, timezone
 
 router = APIRouter()
 
+
 class FlashcardProgressPayload(BaseModel):
     deck_id: str
     card_front: str
     status: str  # 'correct' | 'wrong' | 'unknown'
+
 
 @router.get('/my')
 async def get_my_flashcards(user=Depends(get_current_user)):
     """Retorna flashcards do usuário filtrados por nível."""
     db = get_client()
     user_level = user.get('level')
-    
+
     try:
         res = (
             db.table('modules')
@@ -29,18 +32,23 @@ async def get_my_flashcards(user=Depends(get_current_user)):
             .execute()
         )
         data = res.data or []
-        
+
         filtered = []
         for d in data:
-            if matches_level(user_level, d.get('level'), d.get('levels')):
+            if matches_level(
+                    user_level,
+                    d.get('level'),
+                    d.get('levels')):
                 fc = d.get('flashcards')
                 d['card_count'] = len(fc) if isinstance(fc, list) else 0
                 filtered.append(d)
-                
-        filtered.sort(key=lambda x: x.get('created_at') or '', reverse=True)
+
+        filtered.sort(
+            key=lambda x: x.get('created_at') or '',
+            reverse=True)
         return filtered
     except Exception as e:
-        print(f"[FlashcardsRouter] Erro: {e}")
+        logging.info(f"[FlashcardsRouter] Erro: {e}")
         return []
 
 
@@ -52,15 +60,17 @@ async def save_flashcard_progress(
     """Salva o resultado de um card (correto, errado, não sei)."""
     db = get_client()
     username = user.get('username')
-    
+
     # Calculate next review date using simple spaced repetition
     now = datetime.now(timezone.utc)
     if payload.status == 'correct':
         next_review = None  # Correct: no forced review needed
     elif payload.status == 'wrong':
-        next_review = (now + timedelta(days=2)).isoformat()  # Review in 2 days
+        next_review = (now + timedelta(days=2)
+                       ).isoformat()  # Review in 2 days
     else:  # unknown
-        next_review = (now + timedelta(days=1)).isoformat()  # Review tomorrow
+        next_review = (now + timedelta(days=1)
+                       ).isoformat()  # Review tomorrow
 
     try:
         # Upsert: update if exists, insert if not
@@ -72,7 +82,7 @@ async def save_flashcard_progress(
             .eq('card_front', payload.card_front)
             .execute()
         )
-        
+
         record = {
             'username': username,
             'deck_id': payload.deck_id,
@@ -81,15 +91,16 @@ async def save_flashcard_progress(
             'next_review_date': next_review,
             'reviewed_at': now.isoformat(),
         }
-        
+
         if existing.data:
-            db.table('user_flashcard_progress').update(record).eq('id', existing.data[0]['id']).execute()
+            db.table('user_flashcard_progress').update(
+                record).eq('id', existing.data[0]['id']).execute()
         else:
             db.table('user_flashcard_progress').insert(record).execute()
-            
+
         return {'ok': True}
     except Exception as e:
-        print(f"[FlashcardsProgress] Erro: {e}")
+        logging.info(f"[FlashcardsProgress] Erro: {e}")
         return {'ok': False, 'error': str(e)}
 
 
@@ -102,7 +113,7 @@ async def get_friday_review(user=Depends(get_current_user)):
     """
     db = get_client()
     username = user.get('username')
-    
+
     try:
         # Get cards marked 'wrong' or 'unknown'
         res = (
@@ -113,41 +124,47 @@ async def get_friday_review(user=Depends(get_current_user)):
             .execute()
         )
         progress_rows = res.data or []
-        
+
         if not progress_rows:
             return {'has_review': False, 'cards': [], 'total': 0}
-        
-        # For each failed card, try to get full card data from the deck module
+
+        # For each failed card, try to get full card data from the deck
+        # module
         review_cards = []
         deck_cache: dict = {}
-        
+
         for row in progress_rows:
             deck_id = row.get('deck_id')
             card_front = row.get('card_front')
-            
+
             if deck_id not in deck_cache:
-                deck_res = db.table('modules').select('flashcards, title').eq('id', deck_id).execute()
+                deck_res = db.table('modules').select(
+                    'flashcards, title').eq('id', deck_id).execute()
                 deck_cache[deck_id] = deck_res.data[0] if deck_res.data else None
-                
+
             deck_data = deck_cache.get(deck_id)
             if not deck_data or not deck_data.get('flashcards'):
                 continue
-                
+
             # Find the specific card
-            matching = [c for c in deck_data['flashcards'] if c.get('front') == card_front]
+            matching = [c for c in deck_data['flashcards']
+                        if c.get('front') == card_front]
             if matching:
                 card = matching[0]
                 card['_deck_title'] = deck_data.get('title', '')
                 card['_status'] = row.get('status')
                 card['_deck_id'] = deck_id
                 review_cards.append(card)
-        
+
         return {
             'has_review': len(review_cards) > 0,
             'total': len(review_cards),
             'cards': review_cards
         }
     except Exception as e:
-        print(f"[FridayReview] Erro: {e}")
-        return {'has_review': False, 'cards': [], 'total': 0, 'error': str(e)}
-
+        logging.info(f"[FridayReview] Erro: {e}")
+        return {
+            'has_review': False,
+            'cards': [],
+            'total': 0,
+            'error': str(e)}

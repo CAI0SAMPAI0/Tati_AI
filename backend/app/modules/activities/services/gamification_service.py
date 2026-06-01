@@ -1,3 +1,4 @@
+import logging
 """
 Serviço central de gamificação: XP, Níveis, Streaks e Metas.
 """
@@ -45,7 +46,9 @@ class GamificationService:
             except Exception as e:
                 err_str = str(e).lower()
                 if ('disconnected' in err_str or 'connection' in err_str or 'protocol' in err_str) and attempt < retries - 1:
-                    print(f'[Gamification DB] Connection issue, retrying ({attempt+1}/{retries})...')
+                    logging.info(
+                        f'[Gamification DB] Connection issue, retrying ({
+                            attempt + 1}/{retries})...')
                     await asyncio.sleep(0.5 * (attempt + 1))
                     continue
                 raise e
@@ -65,7 +68,11 @@ class GamificationService:
 
         data = await self._execute_db(_fetch)
         if not data:
-            return {'xp': 0, 'level': 'A1', 'level_progress': 0, 'xp_to_next': 500}
+            return {
+                'xp': 0,
+                'level': 'A1',
+                'level_progress': 0,
+                'xp_to_next': 500}
         return data
 
     async def award_xp(
@@ -118,7 +125,7 @@ class GamificationService:
                 .execute()
             )
             data = res.data.get('streak_data') or {}
-            
+
             earned = (
                 self.db.table('user_trophies')
                 .select('id')
@@ -137,7 +144,8 @@ class GamificationService:
                 .data
                 or []
             )
-            data['total_questions'] = sum(p.get('total_q', 0) for p in prog)
+            data['total_questions'] = sum(
+                p.get('total_q', 0) for p in prog)
 
             sessions = (
                 self.db.table('study_sessions')
@@ -147,7 +155,8 @@ class GamificationService:
                 .data
                 or []
             )
-            data['hours_saved'] = sum(s.get('duration_minutes', 0) for s in sessions) / 60.0
+            data['hours_saved'] = sum(s.get('duration_minutes', 0)
+                                      for s in sessions) / 60.0
 
             return data
 
@@ -156,7 +165,7 @@ class GamificationService:
             data['current_streak'] = 0
         if not data.get('longest_streak'):
             data['longest_streak'] = 0
-        
+
         return data
 
     async def update_streak(self, username: str) -> Dict[str, Any]:
@@ -192,8 +201,7 @@ class GamificationService:
 
         def _update():
             self.db.table('users').update({'streak_data': updated_streak}).eq(
-                'username', username
-            ).execute()
+                'username', username).execute()
 
         await self._execute_db(_update)
         return updated_streak

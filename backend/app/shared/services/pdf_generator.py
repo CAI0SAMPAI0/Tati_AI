@@ -10,7 +10,7 @@ from reportlab.lib.units import mm
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
 
-# ── Cores da Teacher Tati ─────────────────────────────────────────────────────
+# ── Cores da Teacher Tati ─────────────────────────────────────────────
 PRIMARY = colors.HexColor('#7828C8')  # roxo
 PRIMARY_L = colors.HexColor('#9D50E0')
 DARK = colors.HexColor('#1a1a2e')
@@ -18,11 +18,13 @@ MUTED = colors.HexColor('#6b7280')
 WHITE = colors.white
 BG_LIGHT = colors.HexColor('#f5f0ff')
 
-# ── Caminhos ──────────────────────────────────────────────────────────────────
+# ── Caminhos ──────────────────────────────────────────────────────────
 _BASE_DIR = Path(__file__).parent.parent
 _LOGO_CANDIDATES = [
-    Path(__file__).parent.parent.parent.parent / 'assets' / 'images' / 'tati_logo.jpg',
-    Path(__file__).parent.parent.parent.parent.parent / 'frontend' / 'public' / 'images' / 'tati_logo.jpg',
+    Path(__file__).parent.parent.parent.parent /
+    'assets' / 'images' / 'tati_logo.jpg',
+    Path(__file__).parent.parent.parent.parent.parent /
+    'frontend' / 'public' / 'images' / 'tati_logo.jpg',
 ]
 _LOGO_PATH = next((p for p in _LOGO_CANDIDATES if p.exists()), None)
 
@@ -121,7 +123,8 @@ def _clean(text: str) -> str:
 
     # Remove apenas caracteres que REALMENTE quebram o ReportLab (fora do Latin-1 básico)
     # Mas preserva acentuação (á, é, í, ó, ú, ç, etc)
-    # Emojis e caracteres asiáticos/árabes ainda serão removidos para evitar erros de fonte.
+    # Emojis e caracteres asiáticos/árabes ainda serão removidos para
+    # evitar erros de fonte.
     return text.strip()
 
 
@@ -130,7 +133,7 @@ def _header_footer(canvas, doc):
     canvas.saveState()
     w, h = A4
 
-    # ── Header ────────────────────────────────────────────────────────────────
+    # ── Header ────────────────────────────────────────────────────────
     # Logo (se existir)
     if _LOGO_PATH:
         logo_h = 14 * mm
@@ -151,8 +154,9 @@ def _header_footer(canvas, doc):
     canvas.setFont('Helvetica-Bold', 13)
     canvas.setFillColor(PRIMARY)
     canvas.drawString(
-        title_x, h - doc.topMargin + 8 * mm, 'STUDY REPORT - Teacher Tati'
-    )
+        title_x,
+        h - doc.topMargin + 8 * mm,
+        'STUDY REPORT - Teacher Tati')
 
     # Linha separadora do header
     canvas.setStrokeColor(PRIMARY)
@@ -164,7 +168,7 @@ def _header_footer(canvas, doc):
         h - doc.topMargin + 2 * mm,
     )
 
-    # ── Footer ────────────────────────────────────────────────────────────────
+    # ── Footer ────────────────────────────────────────────────────────
     canvas.setStrokeColor(MUTED)
     canvas.setLineWidth(0.5)
     canvas.line(
@@ -186,7 +190,9 @@ def _header_footer(canvas, doc):
     canvas.restoreState()
 
 
-def generate_report_pdf(content_markdown: str, filename: str = 'report.pdf') -> str:
+def generate_report_pdf(
+        content_markdown: str,
+        filename: str = 'report.pdf') -> str:
     """
     Gera um PDF formatado a partir de Markdown.
     Suporta: # H1, ## H2, ### H3, listas - * +, sub-listas com tab+, numeradas.
@@ -212,13 +218,14 @@ def generate_report_pdf(content_markdown: str, filename: str = 'report.pdf') -> 
         line = raw.rstrip()
         i += 1
 
-        # ── Títulos ───────────────────────────────────────────────────────────
+        # ── Títulos ───────────────────────────────────────────────────
         if line.startswith('# '):
             text = _clean(line[2:])
             story.append(Spacer(1, 4 * mm))
             story.append(Paragraph(text, styles['h1']))
             story.append(
-                HRFlowable(width='100%', thickness=1, color=PRIMARY_L, spaceAfter=3)
+                HRFlowable(width='100%', thickness=1,
+                           color=PRIMARY_L, spaceAfter=3)
             )
             continue
 
@@ -234,34 +241,44 @@ def generate_report_pdf(content_markdown: str, filename: str = 'report.pdf') -> 
             story.append(Paragraph(text, styles['h3']))
             continue
 
-        # ── Linha em branco ───────────────────────────────────────────────────
+        # ── Linha em branco ───────────────────────────────────────────
         if line.strip() == '':
             story.append(Spacer(1, 2 * mm))
             continue
 
-        # ── Sub-lista com tab: "\t+ texto" ou "  + texto" ─────────────────────
+        # ── Sub-lista com tab: "\t+ texto" ou "  + texto" ─────────────
         if re.match(r'^[\t ]{1,}\+\s', line):
             text = _clean(re.sub(r'^[\t ]+\+\s*', '', line))
-            story.append(Paragraph(f'&#8227; {text}', styles['subbullet']))
+            story.append(
+                Paragraph(
+                    f'&#8227; {text}',
+                    styles['subbullet']))
             continue
 
-        # ── Lista com - * + ───────────────────────────────────────────────────
+        # ── Lista com - * + ───────────────────────────────────────────
         if re.match(r'^[-*+]\s', line):
             text = _clean(line[2:])
             story.append(Paragraph(f'&#8226; {text}', styles['bullet']))
             continue
 
-        # ── Lista numerada ────────────────────────────────────────────────────
+        # ── Lista numerada ────────────────────────────────────────────
         m = re.match(r'^(\d+)\.\s(.*)', line)
         if m:
             text = _clean(m.group(2))
-            story.append(Paragraph(f'<b>{m.group(1)}.</b> {text}', styles['numbered']))
+            story.append(
+                Paragraph(
+                    f'<b>{
+                        m.group(1)}.</b> {text}',
+                    styles['numbered']))
             continue
 
-        # ── Texto normal ──────────────────────────────────────────────────────
+        # ── Texto normal ──────────────────────────────────────────────
         text = _clean(line)
         if text:
             story.append(Paragraph(text, styles['body']))
 
-    doc.build(story, onFirstPage=_header_footer, onLaterPages=_header_footer)
+    doc.build(
+        story,
+        onFirstPage=_header_footer,
+        onLaterPages=_header_footer)
     return output_path

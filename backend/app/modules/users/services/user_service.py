@@ -1,3 +1,4 @@
+import logging
 """
 services/user_service.py
 Serviço para gerenciamento de perfil, vocabulário e dados do usuário.
@@ -28,8 +29,10 @@ class UserService:
         cache_key = f'profile:{username}'
         cached = await cache_get(cache_key)
         if cached:
-            if not cached.get('avatar_url') and isinstance(cached.get('profile'), dict):
-                cached['avatar_url'] = cached['profile'].get('avatar_url')
+            if not cached.get('avatar_url') and isinstance(
+                    cached.get('profile'), dict):
+                cached['avatar_url'] = cached['profile'].get(
+                    'avatar_url')
             return cached
 
         def _fetch():
@@ -59,9 +62,8 @@ class UserService:
             if not rows:
                 return None
             row = rows[0]
-            avatar = row.get('avatar_url') or (row.get('profile') or {}).get(
-                'avatar_url'
-            )
+            avatar = row.get('avatar_url') or (
+                row.get('profile') or {}).get('avatar_url')
             row['avatar_url'] = avatar
             return row
 
@@ -160,7 +162,8 @@ class UserService:
             if any(w.get('term') == word_data['term'] for w in words):
                 return {'ok': False, 'message': 'Already exists'}
 
-            word_data['added_at'] = datetime.now(timezone.utc).isoformat()
+            word_data['added_at'] = datetime.now(
+                timezone.utc).isoformat()
             words.append(word_data)
             self.db.table('users').update({'vocabulary': words}).eq(
                 'username', username
@@ -171,7 +174,8 @@ class UserService:
         await cache_delete(f'vocabulary:{username}')
         return res
 
-    async def delete_vocabulary_word(self, username: str, term: str) -> Dict[str, Any]:
+    async def delete_vocabulary_word(
+            self, username: str, term: str) -> Dict[str, Any]:
         def _delete():
             row = (
                 self.db.table('users')
@@ -218,12 +222,14 @@ class UserService:
         url = f'data:image/jpeg;base64,{b64}'
 
         def _update_db():
-            # Tenta atualizar tanto a coluna profile quanto a coluna top-level avatar_url
-            rows = self.db.table('users').select('profile').eq('username', username).execute().data
+            # Tenta atualizar tanto a coluna profile quanto a coluna
+            # top-level avatar_url
+            rows = self.db.table('users').select('profile').eq(
+                'username', username).execute().data
             profile = (rows[0].get('profile') or {}) if rows else {}
             profile['avatar_url'] = url
-            
-            # Tenta atualizar ambos. Se a coluna avatar_url não existir, o Supabase pode dar erro, 
+
+            # Tenta atualizar ambos. Se a coluna avatar_url não existir, o Supabase pode dar erro,
             # então fazemos de forma segura ou pegamos a exceção.
             try:
                 self.db.table('users').update({
@@ -241,5 +247,5 @@ class UserService:
             await cache_delete(f'profile:{username}')
             return url
         except Exception as e:
-            print(f'[UserService] Error uploading avatar: {e}')
+            logging.info(f'[UserService] Error uploading avatar: {e}')
             raise HTTPException(500, f'Erro no upload: {str(e)}')

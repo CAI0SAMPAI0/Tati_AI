@@ -1,3 +1,4 @@
+import logging
 """
 Configuração do Sentry para monitoramento de erros.
 """
@@ -15,10 +16,12 @@ def init_sentry():
 
     sentry_dsn = os.getenv('SENTRY_DSN')
     sentry_environment = os.getenv('SENTRY_ENVIRONMENT', 'production')
-    sentry_traces_sample_rate = float(os.getenv('SENTRY_TRACES_SAMPLE_RATE', '0.2'))
+    sentry_traces_sample_rate = float(
+        os.getenv('SENTRY_TRACES_SAMPLE_RATE', '0.2'))
 
     if not sentry_dsn:
-        print('[Sentry] SENTRY_DSN não configurado - monitoramento desativado')
+        logging.info(
+            '[Sentry] SENTRY_DSN não configurado - monitoramento desativado')
         return
 
     sentry_sdk.init(
@@ -41,4 +44,5 @@ def init_sentry():
         },
     )
 
-    print(f'[Sentry] ✅ Inicializado - ambiente: {sentry_environment}')
+    logging.info(
+        f'[Sentry] ✅ Inicializado - ambiente: {sentry_environment}')

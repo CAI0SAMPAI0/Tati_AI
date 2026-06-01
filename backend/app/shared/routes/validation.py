@@ -17,7 +17,7 @@ from datetime import date
 router = APIRouter()
 
 
-# ── Models ────────────────────────────────────────────────────────────────────
+# ── Models ────────────────────────────────────────────────────────────
 
 
 class DocumentValidationRequest(BaseModel):
@@ -33,10 +33,11 @@ class DocumentValidationResponse(BaseModel):
     message: str
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
+# ── Endpoints ─────────────────────────────────────────────────────────
 
 
-@router.post('/validate-document', response_model=DocumentValidationResponse)
+@router.post('/validate-document',
+             response_model=DocumentValidationResponse)
 async def validate_document(body: DocumentValidationRequest):
     """
     Valida um documento de identificação.
@@ -48,7 +49,8 @@ async def validate_document(body: DocumentValidationRequest):
         # Validação específica por país
         from app.shared.services.document_validator import validate_international_document
 
-        result = validate_international_document(body.document, body.country_code)
+        result = validate_international_document(
+            body.document, body.country_code)
         return DocumentValidationResponse(**result)
 
     # Detecção automática
@@ -80,8 +82,13 @@ async def get_location_info(request: Request):
             'country': 'BR',
             'timezone': 'America/Sao_Paulo',
             'today': today.isoformat(),
-            'is_business_day': is_business_day_local(today, 'BR'),
-            'next_business_day': calc_due_date_local(today, 5, 'BR').isoformat(),
+            'is_business_day': is_business_day_local(
+                today,
+                'BR'),
+            'next_business_day': calc_due_date_local(
+                today,
+                5,
+                'BR').isoformat(),
             'note': 'Localhost - usando Brasil como padrão',
         }
 

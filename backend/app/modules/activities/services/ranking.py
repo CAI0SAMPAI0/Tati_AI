@@ -1,3 +1,4 @@
+import logging
 """
 Serviço de Ranking de Alunos.
 """
@@ -14,7 +15,10 @@ ACTION_POINTS = {
 }
 
 
-def _empty_stats(username: str, user_map: dict, level_map: dict) -> dict:
+def _empty_stats(
+        username: str,
+        user_map: dict,
+        level_map: dict) -> dict:
     return {
         'username': username,
         'name': user_map.get(username) or username,
@@ -31,17 +35,27 @@ def _empty_stats(username: str, user_map: dict, level_map: dict) -> dict:
 def get_ranking_data(username: str) -> dict:
     db = get_client()
     now = datetime.now(timezone.utc)
-    start_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    start_month = now.replace(
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0)
 
     try:
         from app.core.config import settings
 
         staff_usernames = set(settings.staff_roles)
         access = (
-            db.table('student_access').select('username, role').execute().data or []
+            db.table('student_access').select(
+                'username, role').execute().data or []
         )
         for a in access:
-            if a.get('role') in ('professor', 'professora', 'programador', 'admin'):
+            if a.get('role') in (
+                'professor',
+                'professora',
+                'programador',
+                    'admin'):
                 staff_usernames.add(a['username'])
 
         # Busca dados de sessões e mensagens
@@ -75,7 +89,11 @@ def get_ranking_data(username: str) -> dict:
             atype = a.get('activity_type')
             if atype in ACTION_POINTS:
                 stats[u]['score'] += ACTION_POINTS[atype]
-                if atype in ['quiz', 'flashcard', 'message', 'simulation']:
+                if atype in [
+                    'quiz',
+                    'flashcard',
+                    'message',
+                        'simulation']:
                     stats[u][f'{atype}s'] += 1
 
         for m in messages:
@@ -102,19 +120,23 @@ def get_ranking_data(username: str) -> dict:
                 uname = u_info.get('username')
                 if uname in stats:
                     stats[uname]['name'] = u_info.get('name') or uname
-                    stats[uname]['level'] = u_info.get('level') or 'Beginner'
-                    stats[uname]['avatar_url'] = u_info.get('avatar_url') or (u_info.get('profile') or {}).get('avatar_url')
-        ranking = sorted(stats.values(), key=lambda x: x['score'], reverse=True)
+                    stats[uname]['level'] = u_info.get(
+                        'level') or 'Beginner'
+                    stats[uname]['avatar_url'] = u_info.get('avatar_url') or (
+                        u_info.get('profile') or {}).get('avatar_url')
+        ranking = sorted(
+            stats.values(), key=lambda x: x['score'], reverse=True)
 
         return {
             'top15': ranking[:15],
             'my_position': next(
-                (i + 1 for i, x in enumerate(ranking) if x['username'] == username), 0
+                (i + 1 for i, x in enumerate(ranking)
+                 if x['username'] == username), 0
             ),
             'winners': [],
         }
     except Exception as e:
-        print(f'[Ranking] Erro: {e}')
+        logging.info(f'[Ranking] Erro: {e}')
         return {'top15': [], 'my_position': 0, 'winners': []}
 
 
@@ -122,42 +144,65 @@ def get_ranking_by_level(username: str) -> dict:
     """Retorna o ranking agrupado por níveis de proficiência."""
     db = get_client()
     now = datetime.now(timezone.utc)
-    start_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    start_month = now.replace(
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0)
 
     try:
         from app.core.config import settings
-        # 1. Busca todos os usuários e seus níveis (excluindo staff por role real)
+        # 1. Busca todos os usuários e seus níveis (excluindo staff por
+        # role real)
         try:
-            all_users = db.table('users').select('username, name, level, avatar_url, profile').execute().data or []
+            all_users = db.table('users').select(
+                'username, name, level, avatar_url, profile').execute().data or []
         except Exception:
-            all_users = db.table('users').select('username, name, level, profile').execute().data or []
+            all_users = db.table('users').select(
+                'username, name, level, profile').execute().data or []
         staff_usernames = set(settings.staff_roles)
-        access = db.table('student_access').select('username, role').execute().data or []
+        access = db.table('student_access').select(
+            'username, role').execute().data or []
         for a in access:
-            if a.get('role') in ('professor', 'professora', 'programador', 'admin'):
+            if a.get('role') in (
+                'professor',
+                'professora',
+                'programador',
+                    'admin'):
                 staff_usernames.add(a.get('username'))
-        all_users = [u for u in all_users if (u.get('username') and u.get('username') not in staff_usernames)]
-        
-        user_level_map = {u['username']: u.get('level', 'Beginner') for u in all_users}
-        user_name_map = {u['username']: u.get('name') or u['username'] for u in all_users}
+        all_users = [
+            u for u in all_users if (
+                u.get('username') and u.get('username') not in staff_usernames)]
+
+        user_level_map = {u['username']: u.get(
+            'level', 'Beginner') for u in all_users}
+        user_name_map = {u['username']: u.get(
+            'name') or u['username'] for u in all_users}
 
         # 2. Busca ações do mês
-        actions = db.table('study_sessions').select('username, activity_type').gte('created_at', start_month.isoformat()).execute().data or []
-        messages = db.table('messages').select('username').eq('role', 'user').gte('created_at', start_month.isoformat()).execute().data or []
+        actions = db.table('study_sessions').select('username, activity_type').gte(
+            'created_at', start_month.isoformat()).execute().data or []
+        messages = db.table('messages').select('username').eq('role', 'user').gte(
+            'created_at', start_month.isoformat()).execute().data or []
 
         stats = {}
         for u_name in user_level_map.keys():
             # Passa o mapa de nomes para a função auxiliar
-            stats[u_name] = _empty_stats(u_name, user_name_map, user_level_map)
+            stats[u_name] = _empty_stats(
+                u_name, user_name_map, user_level_map)
             stats[u_name]['level'] = user_level_map[u_name]
-            user_row = next((u for u in all_users if u.get('username') == u_name), None)
+            user_row = next(
+                (u for u in all_users if u.get('username') == u_name), None)
             if user_row:
-                stats[u_name]['avatar_url'] = user_row.get('avatar_url') or (user_row.get('profile') or {}).get('avatar_url')
+                stats[u_name]['avatar_url'] = user_row.get('avatar_url') or (
+                    user_row.get('profile') or {}).get('avatar_url')
         for a in actions:
             u = a.get('username')
             if u in stats:
-                stats[u]['score'] += ACTION_POINTS.get(a.get('activity_type'), 0)
-        
+                stats[u]['score'] += ACTION_POINTS.get(
+                    a.get('activity_type'), 0)
+
         for m in messages:
             u = m.get('username')
             if u in stats:
@@ -173,7 +218,7 @@ def get_ranking_by_level(username: str) -> dict:
         }
 
         result = {cat: [] for cat in categories.keys()}
-        
+
         for user_stat in stats.values():
             lvl = str(user_stat.get('level', 'Beginner'))
             assigned = False
@@ -187,11 +232,20 @@ def get_ranking_by_level(username: str) -> dict:
 
         # Ordena cada categoria e limita ao TOP 10
         for cat in result:
-            result[cat] = sorted(result[cat], key=lambda x: x['score'], reverse=True)[:10]
+            result[cat] = sorted(
+                result[cat],
+                key=lambda x: x['score'],
+                reverse=True)[
+                :10]
 
         return result
     except Exception as e:
         import traceback
         traceback.print_exc()
-        print(f'[Ranking] Erro by level: {e}')
-        return {'Beginner': [], 'Pre-Intermediate': [], 'Intermediate': [], 'Advanced': [], 'Business': []}
+        logging.info(f'[Ranking] Erro by level: {e}')
+        return {
+            'Beginner': [],
+            'Pre-Intermediate': [],
+            'Intermediate': [],
+            'Advanced': [],
+            'Business': []}

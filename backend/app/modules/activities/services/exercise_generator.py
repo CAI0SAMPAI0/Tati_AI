@@ -1,3 +1,4 @@
+import logging
 from __future__ import annotations
 from typing import Dict, Any, List, Optional
 from app.core.dependencies.db import get_db
@@ -29,27 +30,30 @@ class ExerciseGeneratorService:
     ) -> Optional[str]:
         """
         Gera exercícios baseados em padrões específicos de erro detectados.
-        
+
         Args:
             username: Identificação do aluno
             training_targets: Lista de dicionários com padrões de erro (vindo do ErrorLogService)
             exercise_type: Tipo de exercício (quiz, story, fill_in, dialogue)
         """
         if not training_targets:
-            print(f'[ExerciseGen] Nenhum target de treino fornecido para {username}')
+            logging.info(
+                f'[ExerciseGen] Nenhum target de treino fornecido para {username}')
             return None
 
-        # Seleciona os top 3 padrões mais críticos para focar o exercício
+        # Seleciona os top 3 padrões mais críticos para focar o
+        # exercício
         primary_targets = training_targets[:3]
-        
+
         # Monta contexto estruturado dos erros
         error_context = self._build_error_context(primary_targets)
-        
+
         # Busca nível do aluno para adequar dificuldade
         user_level = 'Intermediate'
         try:
             def _get_lvl():
-                return self.db.table('users').select('level').eq('username', username).single().execute()
+                return self.db.table('users').select('level').eq(
+                    'username', username).single().execute()
             user_res = await run_in_threadpool(_get_lvl)
             if user_res.data:
                 user_level = user_res.data.get('level', 'Intermediate')
@@ -63,12 +67,14 @@ class ExerciseGeneratorService:
             targets=primary_targets,
             user_level=user_level
         )
-        
+
         if not exercise_data:
-            # Atualiza tentativa como falhada para não re-tentar imediatamente
+            # Atualiza tentativa como falhada para não re-tentar
+            # imediatamente
             try:
                 if attempt_id:
-                    self.db.table('user_exercise_attempts').update({'status': 'failed'}).eq('id', attempt_id).execute()
+                    self.db.table('user_exercise_attempts').update(
+                        {'status': 'failed'}).eq('id', attempt_id).execute()
             except Exception:
                 pass
             return None
@@ -85,18 +91,20 @@ class ExerciseGeneratorService:
         # Atualiza tentativa para referenciar o quiz gerado
         try:
             if attempt_id and quiz_id:
-                self.db.table('user_exercise_attempts').update({'exercise_id': quiz_id, 'status': 'pending'}).eq('id', attempt_id).execute()
+                self.db.table('user_exercise_attempts').update(
+                    {'exercise_id': quiz_id, 'status': 'pending'}).eq('id', attempt_id).execute()
         except Exception:
             pass
-        
+
         return quiz_id
 
-    def _build_error_context(self, targets: List[Dict[str, Any]]) -> str:
+    def _build_error_context(
+            self, targets: List[Dict[str, Any]]) -> str:
         """
         Constrói um contexto rico baseado nos padrões de erro estruturados.
         """
         context_parts = []
-        
+
         for target in targets:
             pattern_key = target.get('pattern_key', 'unknown')
             category = target.get('category', 'grammar')
@@ -104,7 +112,7 @@ class ExerciseGeneratorService:
             correct = target.get('correct_text', '')
             explanation = target.get('explanation', '')
             frequency = target.get('frequency', 1)
-            
+
             context_parts.append(f"""
 Padrão detectado: {pattern_key}
 Categoria: {category}
@@ -125,8 +133,9 @@ Frequência: {frequency} ocorrências
         """
         Chama o LLM para gerar o exercício baseado nos padrões específicos.
         """
-        
-        # Prompts específicos por tipo, mas agora com contexto estruturado
+
+        # Prompts específicos por tipo, mas agora com contexto
+        # estruturado
         type_instructions = {
             'quiz': (
                 "STRICT CONSTRAINTS:\n"
@@ -143,8 +152,8 @@ Frequência: {frequency} ocorrências
             ),
             'story': (
                 'Write a SHORT story (5-8 sentences) that naturally incorporates the grammar structures '
-                'the student is struggling with, specifically: ' + 
-                ', '.join([t.get('correct_text', '') for t in targets[:2]]) + 
+                'the student is struggling with, specifically: ' +
+                ', '.join([t.get('correct_text', '') for t in targets[:2]]) +
                 '. Then create 3 comprehension questions.\n'
                 "STRICT RULE: DO NOT use labels like 'A)', 'B)' etc. in the options.\n"
                 'Return JSON: {"title": "Story Practice", "description": "...", "story": "...", '
@@ -176,7 +185,11 @@ Frequência: {frequency} ocorrências
         }
 
         # Use centralized prompt builder (ensures consistent rules)
-        prompt = build_exercise_prompt(error_context, exercise_type, targets, user_level=user_level)
+        prompt = build_exercise_prompt(
+            error_context,
+            exercise_type,
+            targets,
+            user_level=user_level)
 
         try:
             data = await groq_chat_json(
@@ -187,9 +200,11 @@ Frequência: {frequency} ocorrências
 
             # Validação básica
             if not data or 'exercises' not in data or not data['exercises']:
-                raise ValueError('Nenhum exercício gerado ou JSON inválido retornado')
+                raise ValueError(
+                    'Nenhum exercício gerado ou JSON inválido retornado')
 
-            # Sanitização das opções: remover rótulos A)/B)/1. etc e garantir presença da resposta correta
+            # Sanitização das opções: remover rótulos A)/B)/1. etc e
+            # garantir presença da resposta correta
             import re
             pattern_keys = [t.get('pattern_key') for t in targets]
 
@@ -205,7 +220,8 @@ Frequência: {frequency} ocorrências
                     if not isinstance(o, str):
                         o = str(o or '')
                     # remove leading labels como 'A)' 'B.' '1.'
-                    o_clean = re.sub(r"^\s*(?:[A-Za-z]\)|[A-Za-z]\.|[0-9]+[\.)])\s*", '', o).strip()
+                    o_clean = re.sub(
+                        r"^\s*(?:[A-Za-z]\)|[A-Za-z]\.|[0-9]+[\.)])\s*", '', o).strip()
                     if o_clean:
                         clean_opts.append(o_clean)
 
@@ -221,7 +237,8 @@ Frequência: {frequency} ocorrências
                 # Garante que a opção correta esteja presente
                 correct_index = ex.get('correct_index')
                 # tenta obter texto correto a partir do target
-                target_key = ex.get('target_pattern') or (pattern_keys[0] if pattern_keys else None)
+                target_key = ex.get('target_pattern') or (
+                    pattern_keys[0] if pattern_keys else None)
                 correct_text = None
                 for t in targets:
                     if t.get('pattern_key') == target_key:
@@ -233,11 +250,14 @@ Frequência: {frequency} ocorrências
                     if answer and answer in dedup_opts:
                         correct_index = dedup_opts.index(answer)
 
-                # Se ainda não temos índice correto, tentar localizar por texto correto
-                if (correct_index is None or not (0 <= int(correct_index) < len(dedup_opts))) and correct_text:
+                # Se ainda não temos índice correto, tentar localizar
+                # por texto correto
+                if (correct_index is None or not (
+                        0 <= int(correct_index) < len(dedup_opts))) and correct_text:
                     try:
                         if correct_text in dedup_opts:
-                            correct_index = dedup_opts.index(correct_text)
+                            correct_index = dedup_opts.index(
+                                correct_text)
                         else:
                             # Insere como primeira opção
                             dedup_opts.insert(0, correct_text)
@@ -259,7 +279,7 @@ Frequência: {frequency} ocorrências
             return data
 
         except Exception as e:
-            print(f'[ExerciseGen] Erro ao gerar conteúdo: {e}')
+            logging.info(f'[ExerciseGen] Erro ao gerar conteúdo: {e}')
             return None
 
     async def _persist_exercise(
@@ -275,16 +295,26 @@ Frequência: {frequency} ocorrências
         """
         def _save():
             # Prevenção de duplicidade por título (janela de 1 hora)
-            target_title = title or exercise_data.get('title', f'{exercise_type.title()} Practice')
+            target_title = title or exercise_data.get(
+                'title', f'{exercise_type.title()} Practice')
             try:
                 from datetime import datetime, timedelta, timezone
-                one_hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
-                dup = self.db.table('quizzes').select('id').eq('username', username).eq('title', target_title).gte('created_at', one_hour_ago).execute()
+                one_hour_ago = (datetime.now(timezone.utc) -
+                                timedelta(hours=1)).isoformat()
+                dup = self.db.table('quizzes').select('id').eq(
+                    'username',
+                    username).eq(
+                    'title',
+                    target_title).gte(
+                    'created_at',
+                    one_hour_ago).execute()
                 if dup.data:
-                    print(f"[ExerciseGen] Quiz '{target_title}' já existe para {username}. Abortando inserção.")
+                    logging.info(
+                        f"[ExerciseGen] Quiz '{target_title}' já existe para {username}. Abortando inserção.")
                     return dup.data[0]['id']
             except Exception as e:
-                print(f"[ExerciseGen] Erro no check de duplicidade: {e}")
+                logging.info(
+                    f"[ExerciseGen] Erro no check de duplicidade: {e}")
 
             # Garante módulo personalizado
             try:
@@ -303,7 +333,7 @@ Frequência: {frequency} ocorrências
                         'is_published': True,
                     }).execute()
             except Exception as e:
-                print(f'[ExerciseGen] Aviso módulo: {e}')
+                logging.info(f'[ExerciseGen] Aviso módulo: {e}')
 
             # Cria o quiz
             quiz_res = self.db.table('quizzes').insert({
@@ -311,7 +341,8 @@ Frequência: {frequency} ocorrências
                 'username': username,
                 'title': title or exercise_data.get('title', f'{exercise_type.title()} Practice'),
                 'description': exercise_data.get('description', 'Based on your recent error patterns.'),
-                'generated_from_patterns': [t.get('pattern_key') for t in targets],  # Metadado útil
+                # Metadado útil
+                'generated_from_patterns': [t.get('pattern_key') for t in targets],
             }).execute()
 
             if not quiz_res.data:
@@ -324,9 +355,10 @@ Frequência: {frequency} ocorrências
                 options = q.get('options', [])
                 if not options:
                     continue
-                
+
                 correct_index = self._extract_correct_index(q, options)
-                pattern_key = q.get('target_pattern', targets[0].get('pattern_key') if targets else 'general')
+                pattern_key = q.get('target_pattern', targets[0].get(
+                    'pattern_key') if targets else 'general')
 
                 self.db.table('quiz_questions').insert({
                     'quiz_id': quiz_id,
@@ -349,9 +381,11 @@ Frequência: {frequency} ocorrências
                     'target_patterns': [t.get('pattern_key') for t in targets],
                 }).execute()
             except Exception as e:
-                print(f'[ExerciseGen] Aviso ao registrar tentativa: {e}')
+                logging.info(
+                    f'[ExerciseGen] Aviso ao registrar tentativa: {e}')
 
-            # Vincula explicitamente aos padrões na tabela de relacionamento
+            # Vincula explicitamente aos padrões na tabela de
+            # relacionamento
             for target in targets:
                 try:
                     self.db.table('exercise_pattern_links').insert({
@@ -362,40 +396,45 @@ Frequência: {frequency} ocorrências
                         'score_at_generation': target.get('score', 0),
                     }).execute()
                 except Exception as e:
-                    print(f'[ExerciseGen] Erro ao vincular padrão: {e}')
+                    logging.info(
+                        f'[ExerciseGen] Erro ao vincular padrão: {e}')
 
             return quiz_id
 
         try:
             quiz_id = await run_in_threadpool(_save)
-            
+
             # Invalida cache
             try:
                 from app.shared.services.upstash import cache_delete
                 await cache_delete(f'modules:list:{username}')
             except Exception:
                 pass
-                
-            print(f'[ExerciseGen] Exercício gerado com sucesso: {quiz_id} para {username}')
+
+            logging.info(
+                f'[ExerciseGen] Exercício gerado com sucesso: {quiz_id} para {username}')
             return quiz_id
-            
+
         except Exception as e:
-            print(f'[ExerciseGen] Erro ao persistir: {e}')
+            logging.info(f'[ExerciseGen] Erro ao persistir: {e}')
             return None
 
-    def _extract_correct_index(self, question_data: Dict, options: List[str]) -> int:
+    def _extract_correct_index(
+            self,
+            question_data: Dict,
+            options: List[str]) -> int:
         """
         Extrai o índice correto de várias possibilidades.
         """
         correct_index = question_data.get('correct_index')
-        
+
         if correct_index is None:
             answer = question_data.get('answer')
             if answer in options:
                 correct_index = options.index(answer)
             else:
                 correct_index = 0
-        
+
         try:
             return int(correct_index)
         except (ValueError, TypeError):
@@ -417,11 +456,13 @@ async def generate_exercises_from_history(
     Mantida para compatibilidade, mas delega para a nova arquitetura.
     Se possível, use diretamente o ExerciseGeneratorService com training_targets.
     """
-    print(f'[ExerciseGen] WARN: Usando função legada. Considere migrar para training_targets.')
-    
-    # Fallback: cria um target genérico se não tiver acesso aos patterns reais
+    logging.info(
+        f'[ExerciseGen] WARN: Usando função legada. Considere migrar para training_targets.')
+
+    # Fallback: cria um target genérico se não tiver acesso aos patterns
+    # reais
     from app.modules.activities.services.error_log_service import error_log_service
-    
+
     try:
         # Tenta buscar targets reais do usuário
         targets = await error_log_service._get_training_targets(username)
@@ -429,7 +470,7 @@ async def generate_exercises_from_history(
             username, targets, exercise_type
         )
     except Exception as e:
-        print(f'[ExerciseGen] Erro no fallback: {e}')
+        logging.info(f'[ExerciseGen] Erro no fallback: {e}')
         return None
 
 

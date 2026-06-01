@@ -17,7 +17,8 @@ router = APIRouter()
 
 
 @router.get('/users/progress/daily-summary')
-async def get_daily_summary(current_user: dict = Depends(get_current_user)):
+async def get_daily_summary(
+        current_user: dict = Depends(get_current_user)):
     """
     Resumo leve de progresso diário/semanal para o badge flutuante.
     Cache curto (2 min) para parecer quase real-time sem sobrecarregar o banco.
@@ -34,7 +35,7 @@ async def get_daily_summary(current_user: dict = Depends(get_current_user)):
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_ago = now - timedelta(days=7)
 
-    # ── Mensagens da semana ───────────────────────────────────────────────────
+    # ── Mensagens da semana ───────────────────────────────────────────
     try:
         msgs = (
             db.table('messages')
@@ -49,7 +50,7 @@ async def get_daily_summary(current_user: dict = Depends(get_current_user)):
     except Exception:
         messages_week = 0
 
-    # ── Palavras novas hoje ───────────────────────────────────────────────────
+    # ── Palavras novas hoje ───────────────────────────────────────────
     # Tenta tabela de vocabulário primeiro
     words_today = 0
     try:
@@ -62,9 +63,11 @@ async def get_daily_summary(current_user: dict = Depends(get_current_user)):
             .data
         )
         if vocab:
-            words_today = len({row['word'].lower() for row in vocab if row.get('word')})
+            words_today = len({row['word'].lower()
+                              for row in vocab if row.get('word')})
     except Exception:
-        # Fallback: conta palavras únicas das mensagens de hoje do assistente
+        # Fallback: conta palavras únicas das mensagens de hoje do
+        # assistente
         try:
             bot_msgs = (
                 db.table('messages')

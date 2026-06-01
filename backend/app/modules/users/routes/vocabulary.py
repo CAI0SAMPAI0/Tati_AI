@@ -34,15 +34,17 @@ async def get_vocabulary(
 
 @router.post('/add')
 async def add_word(
-    body: VocabWord, user=Depends(get_current_user), service: UserService = Depends()
-):
+        body: VocabWord,
+        user=Depends(get_current_user),
+        service: UserService = Depends()):
     """Adiciona uma palavra ao vocabulário."""
     return await service.add_vocabulary_word(user['username'], body.model_dump())
 
 
 @router.delete('/{term}')
 async def delete_word(
-    term: str, user=Depends(get_current_user), service: UserService = Depends()
-):
+        term: str,
+        user=Depends(get_current_user),
+        service: UserService = Depends()):
     """Remove uma palavra do vocabulário."""
     return await service.delete_vocabulary_word(user['username'], term)

@@ -41,20 +41,35 @@ def register_all_routers(app: FastAPI) -> None:
     from app.modules.users.routes.daily_summary import router as daily_summary_router
     from app.modules.activities.routes.weekly_plan import router as weekly_plan_router
 
-    app.include_router(profile_router, prefix='/profile', tags=['users'])
+    app.include_router(
+        profile_router,
+        prefix='/profile',
+        tags=['users'])
     app.include_router(
         permissions_router,
         prefix='/users/permissions',
         tags=['users'],
     )
-    app.include_router(streaks_router, prefix='/users/streaks', tags=['users'])
-    app.include_router(streaks_router, prefix='/users/streak', tags=['users'])
-    app.include_router(progress_router, prefix='/users/progress', tags=['users'])
+    app.include_router(
+        streaks_router,
+        prefix='/users/streaks',
+        tags=['users'])
+    app.include_router(
+        streaks_router,
+        prefix='/users/streak',
+        tags=['users'])
+    app.include_router(
+        progress_router, prefix='/users/progress', tags=['users'])
     from app.modules.activities.routes.vocabulary import router as vocabulary_router
-    app.include_router(vocabulary_router, prefix='/users/vocabulary', tags=['users'])
-    app.include_router(goals_router, prefix='/users/goals', tags=['users'])
+    app.include_router(vocabulary_router,
+                       prefix='/users/vocabulary', tags=['users'])
+    app.include_router(
+        goals_router,
+        prefix='/users/goals',
+        tags=['users'])
     app.include_router(xp_router, prefix='/users/xp', tags=['users'])
-    app.include_router(onboarding_router, prefix='/users/onboarding', tags=['users'])
+    app.include_router(onboarding_router,
+                       prefix='/users/onboarding', tags=['users'])
 
     # Esses dois app.routers_init já definem caminhos absolutos internamente.
     # Portanto, não usar prefix aqui para evitar duplicação de path.
@@ -65,11 +80,14 @@ def register_all_routers(app: FastAPI) -> None:
     from app.modules.admin.routes.dashboard import router as dashboard_router
     from app.modules.admin.routes.premium import router as admin_premium_router
 
-    app.include_router(dashboard_router, prefix='/dashboard', tags=['admin'])
+    app.include_router(
+        dashboard_router,
+        prefix='/dashboard',
+        tags=['admin'])
     app.include_router(
         admin_premium_router, prefix='/admin/premium', tags=['admin']
     )
-    
+
     # CEFR Admin Router
     from app.modules.cefr.routes.admin import router as cefr_admin_router
     app.include_router(cefr_admin_router, tags=['admin'])
@@ -114,8 +132,7 @@ def register_all_routers(app: FastAPI) -> None:
         prefix='/activities/modules',
         tags=['activities'],
     )
-    
-    
+
     app.include_router(
         quizzes_router,
         prefix='/activities/quizzes',
@@ -176,7 +193,8 @@ def register_all_routers(app: FastAPI) -> None:
         tags=['activities'],
     )
 
-    # Alias para /activities/weekly-goal (DEVE VIR POR ÚLTIMO para não sombrear /hub)
+    # Alias para /activities/weekly-goal (DEVE VIR POR ÚLTIMO para não
+    # sombrear /hub)
     app.include_router(
         modules_router,
         prefix='/activities',
@@ -186,7 +204,10 @@ def register_all_routers(app: FastAPI) -> None:
     # ── Payments ──────────────────────────────────────────────
     from app.modules.payments.routes.asaas import router as payments_router
 
-    app.include_router(payments_router, prefix='/payments', tags=['payments'])
+    app.include_router(
+        payments_router,
+        prefix='/payments',
+        tags=['payments'])
 
     # ── Notifications ─────────────────────────────────────────
     from app.modules.notifications.routes.notifications import router as notifications_router
@@ -209,9 +230,15 @@ def register_all_routers(app: FastAPI) -> None:
     # ── Bootstrap (Performance) ───────────────────────────────
     from app.modules.users.routes.bootstrap import router as bootstrap_router
 
-    app.include_router(bootstrap_router, prefix='/users', tags=['users'])
+    app.include_router(
+        bootstrap_router,
+        prefix='/users',
+        tags=['users'])
 
     # ── Public ──────────────────────────────────────────────
     from app.modules.activities.routes.public import router as public_router
 
-    app.include_router(public_router, prefix='/catalog', tags=['public'])
+    app.include_router(
+        public_router,
+        prefix='/catalog',
+        tags=['public'])

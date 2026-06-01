@@ -22,17 +22,23 @@ class SimulationService:
         else:
             self.db = db
 
-    async def list_scenarios(self, level: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def list_scenarios(
+            self, level: Optional[str] = None) -> List[Dict[str, Any]]:
         return await run_in_threadpool(get_all_scenarios, level)
 
-    async def get_scenario_details(self, scenario_id: str) -> Optional[Dict[str, Any]]:
+    async def get_scenario_details(
+            self, scenario_id: str) -> Optional[Dict[str, Any]]:
         return await run_in_threadpool(get_scenario, scenario_id)
 
-    async def start_session(self, username: str, scenario_id: str, user_level: str = 'Beginner') -> Dict[str, Any]:
+    async def start_session(self,
+                            username: str,
+                            scenario_id: str,
+                            user_level: str = 'Beginner') -> Dict[str,
+                                                                  Any]:
         """Inicializa uma nova sessão de simulação e retorna o ID da conversa com a primeira mensagem da IA."""
         import uuid
         conv_id = f"sim_{uuid.uuid4().hex[:8]}"
-        
+
         scenario = await self.get_scenario_details(scenario_id)
         if not scenario:
             return {"error": "Scenario not found"}
@@ -46,22 +52,22 @@ class SimulationService:
                     'conversation_id': conv_id,
                     'status': 'started'
                 }).execute()
-            except:
+            except BaseException:
                 pass
-        
+
         await run_in_threadpool(_log)
 
         # Gerar primeira mensagem da IA
         system_prompt = scenario.get('system_prompt', '')
-        
+
         # REFORÇO DE PERSONA TATI
         tati_instruction = (
             "CRITICAL: YOUR NAME IS TATI (or Tatiana). "
-            "Introduce yourself as Tati. Stay in character but keep your identity as Tati. "
-        )
-        if 'TATI' not in system_prompt.upper() and 'TATIANA' not in system_prompt.upper():
+            "Introduce yourself as Tati. Stay in character but keep your identity as Tati. ")
+        if 'TATI' not in system_prompt.upper(
+        ) and 'TATIANA' not in system_prompt.upper():
             system_prompt = f"{tati_instruction}\n{system_prompt}"
-            
+
         level_rule = (
             f"STUDENT LEVEL: {user_level}. "
             "Adapt your vocabulary and sentence length to this level. "
@@ -97,13 +103,13 @@ class SimulationService:
             }
         }
 
-    async def transcribe_audio(self, audio_b64: str, user_info: Dict[str, Any]) -> str:
+    async def transcribe_audio(
+            self, audio_b64: str, user_info: Dict[str, Any]) -> str:
         username = user_info['username']
         user_name = user_info.get('name', username)
         user_focus = user_info.get('focus', '')
         stt_prompt = (
-            f'User name: {user_name}. Focus: {user_focus}. Simulation practice.'
-        )
+            f'User name: {user_name}. Focus: {user_focus}. Simulation practice.')
 
         audio_bytes = base64.b64decode(audio_b64)
         return await transcribe_audio(
@@ -147,11 +153,11 @@ class SimulationService:
         # REFORÇO DE PERSONA TATI
         tati_instruction = (
             "CRITICAL: YOUR NAME IS TATI (or Tatiana). "
-            "Introduce yourself as Tati. Stay in character but keep your identity as Tati. "
-        )
-        if 'TATI' not in system_prompt.upper() and 'TATIANA' not in system_prompt.upper():
+            "Introduce yourself as Tati. Stay in character but keep your identity as Tati. ")
+        if 'TATI' not in system_prompt.upper(
+        ) and 'TATIANA' not in system_prompt.upper():
             system_prompt = f"{tati_instruction}\n{system_prompt}"
-            
+
         level_rule = (
             f"STUDENT LEVEL: {user_level}. "
             "Adapt your vocabulary and sentence length to this level. "
@@ -178,8 +184,10 @@ class SimulationService:
         try:
             from app.modules.activities.services.error_log_service import error_log_service
             import asyncio
-            asyncio.create_task(error_log_service.extract_and_log_errors(username, content, reply_text))
-        except:
+            asyncio.create_task(
+                error_log_service.extract_and_log_errors(
+                    username, content, reply_text))
+        except BaseException:
             pass
 
         return {

@@ -6,7 +6,7 @@ from typing import Optional
 from app.core.database import get_client
 
 
-# ── Constantes ────────────────────────────────────────────────────────────────
+# ── Constantes ────────────────────────────────────────────────────────
 
 SPECIAL_USERS: set[str] = {
     'tati',
@@ -20,7 +20,7 @@ SPECIAL_USERS: set[str] = {
 }
 
 
-# ── Funções públicas ─────────────────────────────────────────────────────────
+# ── Funções públicas ──────────────────────────────────────────────────
 
 
 def activate_subscription(
@@ -45,7 +45,8 @@ def activate_subscription(
             .execute()
             .data
         )
-        preferred_day = (user_row[0].get('preferred_due_day') or 5) if user_row else 5
+        preferred_day = (user_row[0].get(
+            'preferred_due_day') or 5) if user_row else 5
 
     expires_at = calc_due_date(today, preferred_day)
 

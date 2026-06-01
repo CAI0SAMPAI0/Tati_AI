@@ -1,3 +1,4 @@
+import logging
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
@@ -37,7 +38,7 @@ router = APIRouter()
 def _pay_log(message: str) -> None:
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc).isoformat()
-    print(f"[Payments][{now}] {message}")
+    logging.info(f"[Payments][{now}] {message}")
 
 
 def _is_webhook_event_already_processed(event_key: str) -> bool:
@@ -57,7 +58,9 @@ def _is_webhook_event_already_processed(event_key: str) -> bool:
         return False
 
 
-def _mark_webhook_event_processed(event_key: str, payload: dict) -> None:
+def _mark_webhook_event_processed(
+        event_key: str,
+        payload: dict) -> None:
     db = get_client()
     try:
         db.table('payment_webhook_events').insert(
@@ -75,7 +78,7 @@ async def payment_ws(
 ):
     """WebSocket para acompanhar o status do pagamento em tempo real."""
     from app.core.security import decode_token
-    
+
     payload = decode_token(token) if token else None
     if not payload:
         await websocket.close(code=4001, reason='Token inválido')
@@ -83,7 +86,7 @@ async def payment_ws(
 
     username = payload['sub']
     await payment_notifier.connect(websocket, username)
-    
+
     try:
         while True:
             # Mantém a conexão aberta e responde a pings
@@ -96,7 +99,7 @@ async def payment_ws(
         payment_notifier.disconnect(websocket, username)
 
 
-# ── Models ────────────────────────────────────────────────────────────────────
+# ── Models ────────────────────────────────────────────────────────────
 
 
 class SubscribeRequest(BaseModel):
@@ -108,7 +111,7 @@ class ChangeDueDateRequest(BaseModel):
     preferred_day: int  # 1–28
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────
 
 
 async def _find_customer_by_document(doc: str) -> dict | None:
@@ -160,7 +163,8 @@ def _get_validated_user(username: str) -> dict:
         raise UserNotFoundError(detail='Usuário não encontrado.')
 
     if not user_db.get('email'):
-        raise BusinessLogicError(detail='Usuário não possui e-mail cadastrado.')
+        raise BusinessLogicError(
+            detail='Usuário não possui e-mail cadastrado.')
 
     # if user_db.get('username') in SPECIAL_USERS:
     #     raise HTTPException(
@@ -176,21 +180,24 @@ def _get_validated_user(username: str) -> dict:
     )
 
     if not raw_doc:
-        raise BusinessLogicError(detail='CPF/CNPJ é obrigatório. Por favor, preencha no seu perfil.',)
+        raise BusinessLogicError(
+            detail='CPF/CNPJ é obrigatório. Por favor, preencha no seu perfil.',)
 
     validation = validate_document_auto(raw_doc)
     if not validation['valid']:
-        raise BusinessLogicError(detail=f'Documento inválido: {validation["message"]}')
+        raise BusinessLogicError(
+            detail=f'Documento inválido: {validation["message"]}')
 
     user_db['_raw_doc'] = raw_doc
     return user_db
 
 
 # Funções de subscription agora estão em services/subscription_manager.py
-# Importadas no topo: activate_subscription, expire_by_subscription_id, activate_special_user
+# Importadas no topo: activate_subscription, expire_by_subscription_id,
+# activate_special_user
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
+# ── Endpoints ─────────────────────────────────────────────────────────
 
 
 @router.post('/subscribe')
@@ -208,7 +215,8 @@ async def subscribe(
     username = current_user['username']
     if username not in SPECIAL_USERS:
         if date.today() < PAID_START:
-            raise PremiumAccessDeniedError(detail='Planos e pagamentos só estarão disponíveis a partir de 30/06/2026.',)
+            raise PremiumAccessDeniedError(
+                detail='Planos e pagamentos só estarão disponíveis a partir de 30/06/2026.',)
 
     # 1. Busca o plano no banco — o valor vem daqui, nunca do frontend
     plan = (
@@ -220,7 +228,8 @@ async def subscribe(
         .data
     )
     if not plan:
-        raise ContentNotFoundError(detail='Plano não encontrado ou indisponível.')
+        raise ContentNotFoundError(
+            detail='Plano não encontrado ou indisponível.')
     plan = plan[0]
     value = float(plan['price'])
 
@@ -228,7 +237,10 @@ async def subscribe(
     user_db = _get_validated_user(current_user['username'])
     username = user_db['username']
     raw_doc = user_db['_raw_doc']
-    phone = ''.join(filter(str.isdigit, str(user_db.get('phone') or '')))
+    phone = ''.join(
+        filter(
+            str.isdigit, str(
+                user_db.get('phone') or '')))
     phone = phone if len(phone) >= 10 else None
 
     # 3. Busca ou cria customer no Asaas
@@ -266,7 +278,8 @@ async def subscribe(
 
     # 4. Calcula data do primeiro vencimento
     preferred_day = user_db.get('preferred_due_day') or 5
-    next_due_date = calc_due_date(date.today(), preferred_day).isoformat()
+    next_due_date = calc_due_date(
+        date.today(), preferred_day).isoformat()
 
     # 5. Cria assinatura recorrente no Asaas
     try:
@@ -305,9 +318,8 @@ async def subscribe(
             first_payment_id = first_payment.get('id')
             invoice_url = first_payment.get('invoiceUrl') or invoice_url
     except Exception as e:
-        print(
-            f'[Subscribe] Aviso: não foi possível buscar payment da subscription: {e}'
-        )
+        logging.info(
+            f'[Subscribe] Aviso: não foi possível buscar payment da subscription: {e}')
 
     # 7. Salva no banco como 'pending' — webhook vai ativar
     db.table('subscriptions').insert(
@@ -331,7 +343,8 @@ async def subscribe(
             pix_qr_code = pix_data.get('encodedImage')
             pix_copy_paste = pix_data.get('payload')
         except Exception as e:
-            print(f'[Subscribe] Aviso: erro ao buscar QR Code PIX: {e}')
+            logging.info(
+                f'[Subscribe] Aviso: erro ao buscar QR Code PIX: {e}')
 
     # 9. Retorna dados para o frontend
     return {
@@ -362,7 +375,8 @@ async def cancel(current_user: dict = Depends(get_current_user)):
     )
 
     if not sub:
-        raise ContentNotFoundError(detail='Nenhuma assinatura ativa encontrada.')
+        raise ContentNotFoundError(
+            detail='Nenhuma assinatura ativa encontrada.')
 
     asaas_id = sub[0].get('asaas_subscription_id')
 
@@ -407,7 +421,8 @@ async def change_due_date(
     )
 
     if not sub:
-        raise ContentNotFoundError(detail='Nenhuma assinatura ativa encontrada.')
+        raise ContentNotFoundError(
+            detail='Nenhuma assinatura ativa encontrada.')
 
     new_due = calc_due_date(date.today(), body.preferred_day)
     asaas_id = sub[0].get('asaas_subscription_id')
@@ -435,7 +450,8 @@ async def change_due_date(
     return {
         'ok': True,
         'new_due_date': new_due.isoformat(),
-        'message': f'Vencimento alterado para dia {body.preferred_day} (próximo: {new_due}).',
+        'message': f'Vencimento alterado para dia {
+            body.preferred_day} (próximo: {new_due}).',
     }
 
 
@@ -459,7 +475,8 @@ async def get_status(current_user: dict = Depends(get_current_user)):
     from app.modules.users.routes.permissions import SPECIAL_USERS
 
     username = current_user.get('username')
-    is_special = username in SPECIAL_USERS or current_user.get('is_exempt')
+    is_special = username in SPECIAL_USERS or current_user.get(
+        'is_exempt')
 
     if is_special:
         return {
@@ -503,6 +520,7 @@ async def get_status(current_user: dict = Depends(get_current_user)):
         'preferred_due_day': s.get('preferred_due_day', 5),
         'payment_id': s.get('payment_id')
     }
+
 
 @router.get('/payment-status/{payment_id}')
 async def get_payment_status_endpoint(
@@ -553,12 +571,15 @@ async def cancel_payment_endpoint(
         raise ContentNotFoundError(detail='Pagamento não encontrado.')
 
     if sub[0].get('status') != 'pending':
-        raise BusinessLogicError(detail='Só é possível cancelar pagamentos pendentes.')
+        raise BusinessLogicError(
+            detail='Só é possível cancelar pagamentos pendentes.')
 
     # Cancela no Asaas
     success = await cancel_payment(payment_id)
     if not success:
-        raise HTTPException(status_code=500, detail='Erro ao cancelar pagamento no Asaas.')
+        raise HTTPException(
+            status_code=500,
+            detail='Erro ao cancelar pagamento no Asaas.')
 
     # Atualiza no banco
     db.table('subscriptions').update({'status': 'cancelled'}).eq(
@@ -577,21 +598,26 @@ async def asaas_webhook(request: Request):
     try:
         # Valida token do webhook (obrigatório)
         token = request.headers.get('asaas-access-token', '')
-        
+
         if not settings.asaas_webhook_token:
-            _pay_log("CRITICAL: asaas_webhook_token not configured in settings")
-            raise HTTPException(status_code=500, detail="Webhook security token not configured")
+            _pay_log(
+                "CRITICAL: asaas_webhook_token not configured in settings")
+            raise HTTPException(
+                status_code=500,
+                detail="Webhook security token not configured")
 
         if token != settings.asaas_webhook_token:
             _pay_log(f"webhook_invalid_token token={token}")
-            raise HTTPException(status_code=401, detail="Invalid webhook token")
+            raise HTTPException(
+                status_code=401, detail="Invalid webhook token")
 
         body = await request.json()
         event = body.get('event', '')
         payment = body.get('payment', {})
 
         payment_id = payment.get('id', '')
-        subscription_id = payment.get('subscription', '')  # ID da assinatura no Asaas
+        # ID da assinatura no Asaas
+        subscription_id = payment.get('subscription', '')
         ext_ref = payment.get('externalReference', '')
         event_key = f"{event}:{payment_id}:{subscription_id}:{ext_ref}"
 
@@ -599,10 +625,11 @@ async def asaas_webhook(request: Request):
             _pay_log(f"webhook_duplicate_ignored event_key={event_key}")
             return {'ok': True, 'duplicate': True}
         _mark_webhook_event_processed(event_key, body)
-        
-        # ── Processamento de Conteúdo Premium (Novo Hub e Antigo) ─────────────
+
+        # ── Processamento de Conteúdo Premium (Novo Hub e Antigo) ─────
         if ext_ref.startswith('PREMIUM:') or ext_ref.startswith('HUB:'):
-            _pay_log(f"webhook_premium_event event={event} ext_ref={ext_ref} payment_id={payment_id}")
+            _pay_log(
+                f"webhook_premium_event event={event} ext_ref={ext_ref} payment_id={payment_id}")
             is_new_hub = ext_ref.startswith('HUB:')
             parts = ext_ref.split(':')
 
@@ -620,7 +647,9 @@ async def asaas_webhook(request: Request):
                             'status': 'confirmed',
                             'asaas_payment_id': payment_id
                         }, on_conflict='username,content_id').execute()
-                        _pay_log(f'premium_purchases_upsert ok username={username} content_id={content_id} result={upsert_res.data}')
+                        _pay_log(
+                            f'premium_purchases_upsert ok username={username} content_id={content_id} result={
+                                upsert_res.data}')
                     except Exception as e:
                         _pay_log(f'premium_purchases_upsert ERROR: {e}')
                         # Fallback: insert simples sem upsert
@@ -631,11 +660,15 @@ async def asaas_webhook(request: Request):
                                 'status': 'confirmed',
                                 'asaas_payment_id': payment_id
                             }).execute()
-                            _pay_log(f'premium_purchases_insert_fallback ok username={username}')
+                            _pay_log(
+                                f'premium_purchases_insert_fallback ok username={username}')
                         except Exception as e2:
-                            _pay_log(f'premium_purchases_insert_fallback ERROR: {e2}')
+                            _pay_log(
+                                f'premium_purchases_insert_fallback ERROR: {e2}')
 
-                    # 2. Atualiza orders (tabela do novo hub) — busca por asaas_id OU por username+content via order_items
+                    # 2. Atualiza orders (tabela do novo hub) — busca
+                    # por asaas_id OU por username+content via
+                    # order_items
                     if is_new_hub:
                         try:
                             # Atualização direta por asaas_id
@@ -643,89 +676,110 @@ async def asaas_webhook(request: Request):
                                 'status': 'confirmed',
                                 'confirmed_at': datetime.now(timezone.utc).isoformat()
                             }).eq('asaas_id', payment_id).execute()
-                            _pay_log(f'orders_update ok asaas_id={payment_id} rows_updated={len(upd_res.data or [])}')
+                            _pay_log(
+                                f'orders_update ok asaas_id={payment_id} rows_updated={len(upd_res.data or [])}')
 
-                            # Se não encontrou por asaas_id, tenta via order_items
+                            # Se não encontrou por asaas_id, tenta via
+                            # order_items
                             if not upd_res.data:
-                                _pay_log(f'orders_update no rows by asaas_id — trying via order_items username={username} content_id={content_id}')
+                                _pay_log(
+                                    f'orders_update no rows by asaas_id — trying via order_items username={username} content_id={content_id}')
                                 oi_rows = db.table('order_items')\
                                     .select('order_id, orders!inner(id, username, status)')\
                                     .eq('content_id', content_id)\
                                     .execute().data or []
                                 for oi in oi_rows:
                                     o = oi.get('orders', {})
-                                    if o.get('username') == username and o.get('status') == 'pending':
+                                    if o.get('username') == username and o.get(
+                                            'status') == 'pending':
                                         db.table('orders').update({
                                             'status': 'confirmed',
                                             'asaas_id': payment_id,
                                             'confirmed_at': datetime.now(timezone.utc).isoformat()
                                         }).eq('id', o['id']).execute()
-                                        _pay_log(f'orders_update_via_order_items ok order_id={o["id"]}')
+                                        _pay_log(
+                                            f'orders_update_via_order_items ok order_id={
+                                                o["id"]}')
                                         break
                         except Exception as e:
                             _pay_log(f'orders_update ERROR: {e}')
 
-                    _pay_log(f'premium_purchase_confirmed username={username} content_id={content_id} payment_id={payment_id}')
+                    _pay_log(
+                        f'premium_purchase_confirmed username={username} content_id={content_id} payment_id={payment_id}')
 
                     # 3. Envia e-mail de confirmação
                     try:
-                        user_data = db.table('users').select('email, name').eq('username', username).single().execute().data
-                        content_data = db.table('premium_content').select('title').eq('id', content_id).single().execute().data
+                        user_data = db.table('users').select('email, name').eq(
+                            'username', username).single().execute().data
+                        content_data = db.table('premium_content').select(
+                            'title').eq('id', content_id).single().execute().data
 
                         if user_data and content_data:
                             from app.shared.services.email import EmailSender
                             sender = EmailSender()
-                            hub_url = f"{getattr(settings, 'frontend_url', 'https://tati-ai.vercel.app')}/materiais"
+                            hub_url = f"{
+                                getattr(
+                                    settings,
+                                    'frontend_url',
+                                    'https://tati-ai.vercel.app')}/materiais"
                             sender.send_purchase_confirmation(
                                 to_email=user_data['email'],
                                 name=user_data.get('name') or username,
                                 item_title=content_data['title'],
                                 download_url=hub_url
                             )
-                            _pay_log(f'premium_confirmation_email_sent username={username} email={user_data["email"]}')
+                            _pay_log(
+                                f'premium_confirmation_email_sent username={username} email={
+                                    user_data["email"]}')
 
                             await payment_notifier.notify_payment_status(
                                 username,
                                 "confirmed",
                                 payment_id,
-                                {"content_id": content_id, "title": content_data['title']}
+                                {"content_id": content_id,
+                                    "title": content_data['title']}
                             )
                     except Exception as e:
                         _pay_log(f'premium_email_send ERROR: {e}')
 
                 elif event in ('PAYMENT_REFUNDED', 'CHARGEBACK_REQUESTED', 'PAYMENT_DELETED'):
                     try:
-                        db.table('premium_purchases').update({
-                            'status': 'revoked'
-                        }).eq('username', username).eq('content_id', content_id).execute()
+                        db.table('premium_purchases').update({'status': 'revoked'}).eq(
+                            'username', username).eq('content_id', content_id).execute()
 
                         if is_new_hub:
-                            db.table('orders').update({'status': 'revoked'}).eq('asaas_id', payment_id).execute()
+                            db.table('orders').update({'status': 'revoked'}).eq(
+                                'asaas_id', payment_id).execute()
 
-                        _pay_log(f'premium_purchase_revoked username={username} content_id={content_id} payment_id={payment_id}')
+                        _pay_log(
+                            f'premium_purchase_revoked username={username} content_id={content_id} payment_id={payment_id}')
                     except Exception as e:
                         _pay_log(f'premium_revoke ERROR: {e}')
 
             return {'ok': True}
 
-        # ── Processamento de Assinaturas ─────────────────────────────────
-        parts = ext_ref.split('|') if '|' in ext_ref else [ext_ref, 'basic']
+        # ── Processamento de Assinaturas ──────────────────────────────
+        parts = ext_ref.split('|') if '|' in ext_ref else [
+            ext_ref, 'basic']
         username = parts[0]
         plan_type = parts[1] if len(parts) > 1 else 'basic'
 
-        _pay_log(f'webhook_subscription_event event={event} username={username} plan={plan_type} subscription={subscription_id} payment_id={payment_id}')
+        _pay_log(
+            f'webhook_subscription_event event={event} username={username} plan={plan_type} subscription={subscription_id} payment_id={payment_id}')
 
         if event in ('PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED'):
             # Pagamento confirmado — ativa a assinatura
-            activate_subscription(username, plan_type, subscription_id, payment_id)
-            _pay_log(f'subscription_activated username={username} plan={plan_type} subscription={subscription_id}')
+            activate_subscription(username, plan_type,
+                                  subscription_id, payment_id)
+            _pay_log(
+                f'subscription_activated username={username} plan={plan_type} subscription={subscription_id}')
 
         elif event == 'PAYMENT_OVERDUE':
             # Venceu — entra em grace period, ainda não cancela
             get_client().table('subscriptions').update({'status': 'grace'}).eq(
-                'asaas_subscription_id', subscription_id
-            ).execute()
-            _pay_log(f'subscription_grace_period username={username} subscription={subscription_id}')
+                'asaas_subscription_id', subscription_id).execute()
+            _pay_log(
+                f'subscription_grace_period username={username} subscription={subscription_id}')
 
         elif event in (
             'PAYMENT_DELETED',
@@ -737,35 +791,42 @@ async def asaas_webhook(request: Request):
             expire_by_subscription_id(subscription_id)
             # Envia e-mail de pagamento recusado
             db = get_client()
-            user_data = db.table('users').select('email, name').eq('username', username).single().execute().data
+            user_data = db.table('users').select('email, name').eq(
+                'username', username).single().execute().data
             if user_data:
                 from app.shared.services.email import EmailSender
                 sender = EmailSender()
-                billing_type = payment.get('billingType', 'desconhecida')
+                billing_type = payment.get(
+                    'billingType', 'desconhecida')
                 reason_map = {
                     'PAYMENT_REFUNDED': 'Pagamento estornado.',
                     'CHARGEBACK_REQUESTED': 'Chargeback solicitado.',
                     'PAYMENT_DELETED': 'Pagamento cancelado.',
                     'SUBSCRIPTION_DELETED': 'Assinatura cancelada.',
                 }
-                reason = reason_map.get(event, 'Pagamento não aprovado.')
+                reason = reason_map.get(
+                    event, 'Pagamento não aprovado.')
                 sender.send_payment_refused(
                     to_email=user_data['email'],
                     name=user_data.get('name') or username,
-                    payment_method=billing_type.replace('_', ' ').title(),
-                    reason=reason
-                )
-                _pay_log(f'payment_refused_email_sent username={username} email={user_data["email"]} event={event}')
-                
+                    payment_method=billing_type.replace(
+                        '_',
+                        ' ').title(),
+                    reason=reason)
+                _pay_log(
+                    f'payment_refused_email_sent username={username} email={
+                        user_data["email"]} event={event}')
+
                 # Notify WebSocket
                 await payment_notifier.notify_payment_status(
-                    username, 
-                    "refused", 
-                    payment_id, 
+                    username,
+                    "refused",
+                    payment_id,
                     {"reason": reason, "event": event}
                 )
-                
-            _pay_log(f'subscription_expired username={username} subscription={subscription_id} event={event}')
+
+            _pay_log(
+                f'subscription_expired username={username} subscription={subscription_id} event={event}')
 
         elif event in ('PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED'):
             # Only relevant if not caught by subscriptions logic above
@@ -776,4 +837,5 @@ async def asaas_webhook(request: Request):
 
     except Exception as exc:
         _pay_log(f'webhook_error error={exc}')
-        return {'ok': False, 'error': str(exc)}  # sempre 200 para o Asaas não retentar
+        # sempre 200 para o Asaas não retentar
+        return {'ok': False, 'error': str(exc)}

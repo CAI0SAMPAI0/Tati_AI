@@ -7,7 +7,7 @@ import re
 from typing import Optional
 
 
-# ── Helpers de validação ──────────────────────────────────────────────────────
+# ── Helpers de validação ──────────────────────────────────────────────
 
 
 def _multiply_and_sum(digits: list[int], weights: list[int]) -> int:
@@ -22,7 +22,7 @@ def _calculate_digit(digits: list[int], weights: list[int]) -> int:
     return 0 if remainder < 2 else 11 - remainder
 
 
-# ── Validação de CPF ──────────────────────────────────────────────────────────
+# ── Validação de CPF ──────────────────────────────────────────────────
 
 
 def validate_cpf(cpf: str) -> bool:
@@ -51,13 +51,14 @@ def validate_cpf(cpf: str) -> bool:
 
     # Verifica segundo dígito verificador
     digits.append(digit1)
-    weights2 = list(range(11, 1, -1))  # [11, 10, 9, 8, 7, 6, 5, 4, 3, 2]
+    # [11, 10, 9, 8, 7, 6, 5, 4, 3, 2]
+    weights2 = list(range(11, 1, -1))
     digit2 = _calculate_digit(digits, weights2)
 
     return int(cpf[10]) == digit2
 
 
-# ── Validação de CNPJ ─────────────────────────────────────────────────────────
+# ── Validação de CNPJ ─────────────────────────────────────────────────
 
 
 def validate_cnpj(cnpj: str) -> bool:
@@ -92,7 +93,7 @@ def validate_cnpj(cnpj: str) -> bool:
     return int(cnpj[13]) == digit2
 
 
-# ── Identificação do tipo de documento ────────────────────────────────────────
+# ── Identificação do tipo de documento ────────────────────────────────
 
 
 def identify_document(doc: str) -> Optional[str]:
@@ -110,7 +111,7 @@ def identify_document(doc: str) -> Optional[str]:
     return None
 
 
-# ── Validação de documentos internacionais ────────────────────────────────────
+# ── Validação de documentos internacionais ────────────────────────────
 
 
 def validate_us_ssn(ssn: str) -> bool:
@@ -187,7 +188,8 @@ def validate_canadian_sin(sin: str) -> bool:
     return total % 10 == 0
 
 
-def validate_international_document(doc: str, country_code: str = 'BR') -> dict:
+def validate_international_document(
+        doc: str, country_code: str = 'BR') -> dict:
     """
     Valida documento de identificação baseado no código do país.
 
@@ -215,7 +217,8 @@ def validate_international_document(doc: str, country_code: str = 'BR') -> dict:
         ],
     }
 
-    country_validators = validators.get(country_code.upper(), validators['BR'])
+    country_validators = validators.get(
+        country_code.upper(), validators['BR'])
 
     for doc_type, validate_func, format_func in country_validators:
         if validate_func(doc):
@@ -230,11 +233,12 @@ def validate_international_document(doc: str, country_code: str = 'BR') -> dict:
         'valid': False,
         'type': None,
         'formatted': doc,
-        'message': f'Documento inválido para o país {country_code.upper()}',
+        'message': f'Documento inválido para o país {
+            country_code.upper()}',
     }
 
 
-# ── Funções de formatação ─────────────────────────────────────────────────────
+# ── Funções de formatação ─────────────────────────────────────────────
 
 
 def format_cpf(cpf: str) -> str:
@@ -269,7 +273,7 @@ def format_ca_sin(sin: str) -> str:
     return f'{sin[:3]} {sin[3:6]} {sin[6:]}'
 
 
-# ── Validação unificada (auto-detect) ─────────────────────────────────────────
+# ── Validação unificada (auto-detect) ─────────────────────────────────
 
 
 def validate_document_auto(doc: str) -> dict:

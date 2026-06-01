@@ -19,6 +19,7 @@ async def admin_list_premium(
     """Lista todos os conteúdos premium para o admin."""
     return await service.list_all_admin()
 
+
 @router.post('/')
 async def admin_create_premium(
     data: dict,
@@ -27,6 +28,7 @@ async def admin_create_premium(
 ) -> Dict[str, Any]:
     """Cria um novo conteúdo premium."""
     return await service.create_content(data)
+
 
 @router.put('/{content_id}')
 async def admin_update_premium(
@@ -38,6 +40,7 @@ async def admin_update_premium(
     """Atualiza um conteúdo premium existente."""
     return await service.update_content(content_id, data)
 
+
 @router.delete('/{content_id}')
 async def admin_delete_premium(
     content_id: str,
@@ -48,6 +51,7 @@ async def admin_delete_premium(
     success = await service.delete_content(content_id)
     return {"success": success}
 
+
 @router.delete('/purchases/{username}')
 async def admin_reset_user_purchases(
     username: str,
@@ -56,10 +60,13 @@ async def admin_reset_user_purchases(
     """Remove compras e pedidos do hub para um usuário (testes)."""
     from app.core.database import get_client
     db = get_client()
-    db.table('premium_purchases').delete().eq('username', username).execute()
-    orders = db.table('orders').select('id').eq('username', username).execute().data or []
+    db.table('premium_purchases').delete().eq(
+        'username', username).execute()
+    orders = db.table('orders').select('id').eq(
+        'username', username).execute().data or []
     for order in orders:
-        db.table('order_items').delete().eq('order_id', order['id']).execute()
+        db.table('order_items').delete().eq(
+            'order_id', order['id']).execute()
     db.table('orders').delete().eq('username', username).execute()
     return {'ok': True, 'username': username}
 

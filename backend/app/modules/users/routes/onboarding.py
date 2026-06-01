@@ -12,8 +12,10 @@ from app.shared.services.upstash import cache_get, cache_set, cache_delete
 
 router = APIRouter()
 
+
 class OnboardingUpdate(BaseModel):
     has_seen_onboarding: bool = True
+
 
 @router.get('/')
 async def get_onboarding_status(user=Depends(get_current_user)):
@@ -27,26 +29,32 @@ async def get_onboarding_status(user=Depends(get_current_user)):
 
     def _fetch():
         db = get_client()
-        return db.table('user_onboarding').select('has_seen_onboarding').eq('username', username).limit(1).execute().data
-    
+        return db.table('user_onboarding').select('has_seen_onboarding').eq(
+            'username', username).limit(1).execute().data
+
     rows = await run_in_threadpool(_fetch)
-    has_seen = rows[0].get('has_seen_onboarding', False) if rows else False
+    has_seen = rows[0].get(
+        'has_seen_onboarding',
+        False) if rows else False
     result = {'has_seen_onboarding': bool(has_seen)}
     await cache_set(cache_key, result, ttl=3600)
     return result
 
+
 @router.post('/')
-async def mark_onboarding_done(body: OnboardingUpdate, user=Depends(get_current_user)):
+async def mark_onboarding_done(
+        body: OnboardingUpdate,
+        user=Depends(get_current_user)):
     """Marca o onboarding como concluído."""
     username = user['username']
-    
+
     def _update():
         db = get_client()
         db.table('user_onboarding').upsert({
             'username': username,
             'has_seen_onboarding': body.has_seen_onboarding
         }).execute()
-    
+
     await run_in_threadpool(_update)
     await cache_delete(f'onboarding:{username}')
     return {'ok': True, 'has_seen_onboarding': body.has_seen_onboarding}

@@ -17,7 +17,8 @@ router = APIRouter()
 
 
 @router.get('/bootstrap')
-async def get_bootstrap(current_user: dict = Depends(get_current_user)) -> dict:
+async def get_bootstrap(
+        current_user: dict = Depends(get_current_user)) -> dict:
     """Retorna dados iniciais agregados para o frontend.
 
     Combina: access, streak, notifications count e XP.
@@ -29,8 +30,10 @@ async def get_bootstrap(current_user: dict = Depends(get_current_user)) -> dict:
     username = current_user['username']
     cache_key = f'bootstrap:{username}'
 
-    # Gatilho de descoberta em background (opcional, se não houver cache recente)
-    asyncio.create_task(discover_personalized_podcasts(username, username, current_user.get('level', 'Intermediate')))
+    # Gatilho de descoberta em background (opcional, se não houver cache
+    # recente)
+    asyncio.create_task(discover_personalized_podcasts(
+        username, username, current_user.get('level', 'Intermediate')))
 
     cached = await cache_get(cache_key)
     if cached:

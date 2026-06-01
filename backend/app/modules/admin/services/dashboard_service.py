@@ -1,3 +1,4 @@
+import logging
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
@@ -9,6 +10,7 @@ from fastapi import Depends
 
 
 EXCLUDED_USERS = ['programador', 'professor', 'admin', 'caio', 'tati']
+
 
 def parse_dt(value: Any) -> datetime:
     """Helper global para parsing de datas ISO."""
@@ -24,6 +26,7 @@ def parse_dt(value: Any) -> datetime:
     except Exception:
         return datetime.min.replace(tzinfo=timezone.utc)
 
+
 class DashboardService:
     """Serviço de dados para o painel administrativo."""
 
@@ -34,7 +37,7 @@ class DashboardService:
         else:
             self.db = db
 
-    # ── Estatísticas rápidas ─────────────────────────────────────────────────
+    # ── Estatísticas rápidas ──────────────────────────────────────────
 
     async def get_quick_stats(self) -> Dict[str, Any]:
         """Estatísticas rápidas para o overview do dashboard."""
@@ -57,10 +60,13 @@ class DashboardService:
                     .eq('role', 'buyer')
                     .execute()
                 )
-                total_students = res_users.count if res_users.count is not None else len(res_users.data)
-                total_buyers = res_buyers.count if res_buyers.count is not None else len(res_buyers.data)
+                total_students = res_users.count if res_users.count is not None else len(
+                    res_users.data)
+                total_buyers = res_buyers.count if res_buyers.count is not None else len(
+                    res_buyers.data)
             except Exception as e:
-                print(f"[DashboardService] Erro ao contar usuários: {e}")
+                logging.info(
+                    f"[DashboardService] Erro ao contar usuários: {e}")
                 total_students = 0
                 total_buyers = 0
 
@@ -85,7 +91,8 @@ class DashboardService:
                     )
                     messages_today = res_msgs.count if res_msgs.count is not None else 0
                 except Exception as e:
-                    print(f"[DashboardService] Erro ao contar mensagens: {e}")
+                    logging.info(
+                        f"[DashboardService] Erro ao contar mensagens: {e}")
                     messages_today = 0
 
             # Usuários que enviaram ao menos 1 mensagem hoje
@@ -99,7 +106,8 @@ class DashboardService:
                     .data
                     or []
                 )
-                active_today = len({r.get('username') for r in active_rows if r.get('username')})
+                active_today = len({r.get('username')
+                                   for r in active_rows if r.get('username')})
             except Exception:
                 active_today = 0
 
@@ -113,7 +121,8 @@ class DashboardService:
         try:
             return await run_in_threadpool(_fetch)
         except Exception as e:
-            print(f"[DashboardService] Erro crítico em get_quick_stats: {e}")
+            logging.info(
+                f"[DashboardService] Erro crítico em get_quick_stats: {e}")
             return {
                 'total_students': 0,
                 'total_messages': 0,
@@ -121,7 +130,7 @@ class DashboardService:
                 'error': str(e)
             }
 
-    # ── Lista de alunos ──────────────────────────────────────────────────────
+    # ── Lista de alunos ───────────────────────────────────────────────
 
     async def get_students_list(self) -> List[Dict[str, Any]]:
         """Lista alunos com metadados completos."""
@@ -143,14 +152,18 @@ class DashboardService:
                     or []
                 )
             except Exception as e:
-                print(f"[DashboardService] Erro ao buscar usuários (tentando colunas mínimas): {e}")
+                logging.info(
+                    f"[DashboardService] Erro ao buscar usuários (tentando colunas mínimas): {e}")
                 try:
-                    users = self.db.table('users').select('username, name, email').limit(500).execute().data or []
+                    users = self.db.table('users').select(
+                        'username, name, email').limit(500).execute().data or []
                 except Exception as e2:
-                    print(f"[DashboardService] Falha total ao buscar usuários: {e2}")
+                    logging.info(
+                        f"[DashboardService] Falha total ao buscar usuários: {e2}")
                     return []
 
-            # Busca todas as mensagens recentes para identificar atividade recente
+            # Busca todas as mensagens recentes para identificar
+            # atividade recente
             try:
                 msg_rows = (
                     self.db.table('messages')
@@ -163,7 +176,8 @@ class DashboardService:
                     or []
                 )
             except Exception as e:
-                print(f"[DashboardService] Erro ao buscar mensagens recentes: {e}")
+                logging.info(
+                    f"[DashboardService] Erro ao buscar mensagens recentes: {e}")
                 msg_rows = []
 
             # Agrupa última atividade por usuário
@@ -171,24 +185,29 @@ class DashboardService:
             for r in msg_rows:
                 uname = r.get('username')
                 if uname and uname not in last_activity:
-                    # Usa created_at (que tem hora) e faz fallback para date
-                    last_activity[uname] = r.get('created_at') or r.get('date', '')
+                    # Usa created_at (que tem hora) e faz fallback para
+                    # date
+                    last_activity[uname] = r.get(
+                        'created_at') or r.get('date', '')
 
             # Processa a lista final
             processed_users = []
             from app.core.config import settings
             staff_roles = getattr(settings, 'staff_roles', [])
-            
+
             for u in users:
                 username = u.get('username')
-                if not username: continue
-                
-                # Prioriza data da última mensagem, senão data de criação
-                last_active_str = last_activity.get(username) or u.get('created_at', '')
-                
+                if not username:
+                    continue
+
+                # Prioriza data da última mensagem, senão data de
+                # criação
+                last_active_str = last_activity.get(
+                    username) or u.get('created_at', '')
+
                 u['is_staff'] = u.get('role') in staff_roles
                 u['last_active'] = last_active_str
-                
+
                 processed_users.append(u)
 
             # Ordena por atividade mais recente
@@ -198,31 +217,35 @@ class DashboardService:
                     reverse=True
                 )
             except Exception as sort_err:
-                print(f"[DashboardService] Erro ao ordenar alunos: {sort_err}")
+                logging.info(
+                    f"[DashboardService] Erro ao ordenar alunos: {sort_err}")
 
             return processed_users
 
         try:
             return await run_in_threadpool(_fetch)
         except Exception as e:
-            print(f"[DashboardService] Erro em get_students_list: {e}")
+            logging.info(
+                f"[DashboardService] Erro em get_students_list: {e}")
             return []
 
-    # ── Relatórios ──────────────────────────────────────────────────────────
+    # ── Relatórios ────────────────────────────────────────────────────
 
     async def get_reports_overview(self) -> Dict[str, Any]:
         """Visão geral de performance da turma — retorna dados para os gráficos do frontend."""
 
         def _fetch():
             try:
-                # ── Atividade semanal (mensagens por dia nos últimos 7 dias) ──────
+                # ── Atividade semanal (mensagens por dia nos últimos 7
                 weekly_activity = [0] * 7
                 today = date.today()
                 # Segunda-feira = índice 0, Domingo = índice 6
                 week_start = today - timedelta(days=today.weekday())
 
                 try:
-                    since_iso = datetime.combine(week_start, datetime.min.time()).replace(tzinfo=timezone.utc).isoformat()
+                    since_iso = datetime.combine(
+                        week_start, datetime.min.time()).replace(
+                        tzinfo=timezone.utc).isoformat()
                     msg_rows = (
                         self.db.table('messages')
                         .select('date, created_at')
@@ -242,9 +265,10 @@ class DashboardService:
                         except Exception:
                             pass
                 except Exception as e:
-                    print(f'[DashboardService] Erro ao buscar atividade semanal: {e}')
+                    logging.info(
+                        f'[DashboardService] Erro ao buscar atividade semanal: {e}')
 
-                # ── Distribuição de níveis ─────────────────────────────────────────
+                # ── Distribuição de níveis ────────────────────────────
                 level_distribution: Dict[str, int] = {}
                 try:
                     user_rows = (
@@ -258,23 +282,25 @@ class DashboardService:
                     )
                     for r in user_rows:
                         lvl = r.get('level') or 'Unknown'
-                        level_distribution[lvl] = level_distribution.get(lvl, 0) + 1
+                        level_distribution[lvl] = level_distribution.get(
+                            lvl, 0) + 1
                 except Exception as e:
-                    print(f'[DashboardService] Erro ao buscar níveis: {e}')
+                    logging.info(
+                        f'[DashboardService] Erro ao buscar níveis: {e}')
 
                 return {
                     'weekly_activity': weekly_activity,
                     'level_distribution': level_distribution,
                 }
             except Exception as e:
-                print(f'[DashboardService] Erro crítico em get_reports_overview: {e}')
+                logging.info(
+                    f'[DashboardService] Erro crítico em get_reports_overview: {e}')
                 return {
                     'weekly_activity': [0, 0, 0, 0, 0, 0, 0],
                     'level_distribution': {},
                 }
 
         return await run_in_threadpool(_fetch)
-
 
     async def get_difficulties_stats(self) -> Dict[str, Any]:
         """Retorna distribuição de dificuldades/níveis dos alunos e alertas baseados em IA."""
@@ -302,18 +328,23 @@ class DashboardService:
 
         def _fetch_recent_active():
             try:
-                # Busca as últimas 1000 mensagens para abranger mais alunos
-                res = self.db.table('messages').select('username, content').eq('role', 'user').not_.in_('username', EXCLUDED_USERS).order('created_at', desc=True).limit(1000).execute().data or []
+                # Busca as últimas 1000 mensagens para abranger mais
+                # alunos
+                res = self.db.table('messages').select('username, content').eq(
+                    'role', 'user').not_.in_(
+                    'username', EXCLUDED_USERS).order(
+                    'created_at', desc=True).limit(1000).execute().data or []
                 user_msgs = {}
                 for r in res:
                     u = r.get('username')
                     if u:
-                        # Mantemos apenas as 10 mais recentes de cada um para análise
+                        # Mantemos apenas as 10 mais recentes de cada um
+                        # para análise
                         if u not in user_msgs:
                             user_msgs[u] = []
                         if len(user_msgs[u]) < 10:
                             user_msgs[u].append(r.get('content', ''))
-                
+
                 return list(user_msgs.items())
             except Exception:
                 return []
@@ -322,11 +353,12 @@ class DashboardService:
         top_users = await run_in_threadpool(_fetch_recent_active)
 
         alerts = []
-        sem = asyncio.Semaphore(5) # Limita chamadas paralelas para não travar o rate limit
+        # Limita chamadas paralelas para não travar o rate limit
+        sem = asyncio.Semaphore(5)
 
         async def analyze_user(username, msgs):
             async with sem:
-                context = " | ".join(msgs[:10]) 
+                context = " | ".join(msgs[:10])
                 prompt = (
                     f"Analyze these messages from an English learner and identify their main language difficulty or struggle in 2-4 words "
                     f"(e.g. 'Past Tense', 'Vocabulary', 'Prepositions', 'Basic Phrasing'). "
@@ -335,10 +367,10 @@ class DashboardService:
                 )
                 try:
                     difficulty = await groq_chat([{"role": "user", "content": prompt}], temperature=0.1)
-                    
+
                     if len(difficulty) > 40:
                         difficulty = "General Grammar"
-                        
+
                     alerts.append({
                         'username': username,
                         'current_difficulty': difficulty.strip().replace('"', '')
@@ -358,15 +390,16 @@ class DashboardService:
             'alerts': alerts,
         }
 
-
     async def get_all_simulations(self) -> List[Dict[str, Any]]:
         """Lista todas as simulações cadastradas."""
         def _fetch():
             try:
-                res = self.db.table('simulations').select('*').order('created_at', desc=True).execute()
+                res = self.db.table('simulations').select(
+                    '*').order('created_at', desc=True).execute()
                 return res.data or []
             except Exception as e:
-                print(f"[DashboardService] Erro em get_all_simulations: {e}")
+                logging.info(
+                    f"[DashboardService] Erro em get_all_simulations: {e}")
                 return []
         return await run_in_threadpool(_fetch)
 
@@ -374,15 +407,24 @@ class DashboardService:
         """Estatísticas específicas de um aluno."""
         def _fetch():
             try:
-                user_res = self.db.table('users').select('xp, level, focus').eq('username', username).limit(1).execute()
+                user_res = self.db.table('users').select('xp, level, focus').eq(
+                    'username', username).limit(1).execute()
                 user_data = user_res.data[0] if user_res.data else {}
-                
-                msg_res = self.db.table('messages').select('id', count='exact').eq('username', username).eq('role', 'user').execute()
+
+                msg_res = self.db.table('messages').select(
+                    'id',
+                    count='exact').eq(
+                    'username',
+                    username).eq(
+                    'role',
+                    'user').execute()
                 total_messages = msg_res.count or 0
-                
-                err_res = self.db.table('user_errors').select('id', count='exact').eq('username', username).execute()
+
+                err_res = self.db.table('user_errors').select(
+                    'id', count='exact').eq(
+                    'username', username).execute()
                 total_errors = err_res.count or 0
-                
+
                 return {
                     'xp': user_data.get('xp', 0),
                     'level': user_data.get('level', 'Beginner'),
@@ -391,46 +433,65 @@ class DashboardService:
                     'total_errors': total_errors
                 }
             except Exception as e:
-                print(f"[DashboardService] Erro em get_user_stats: {e}")
+                logging.info(
+                    f"[DashboardService] Erro em get_user_stats: {e}")
                 return {}
         return await run_in_threadpool(_fetch)
 
-    async def update_student(self, username: str, level: Optional[str] = None, custom_prompt: Optional[str] = None) -> dict:
+    async def update_student(
+            self,
+            username: str,
+            level: Optional[str] = None,
+            custom_prompt: Optional[str] = None) -> dict:
         """Atualiza nível e/ou prompt de um aluno."""
         payload = {}
-        if level: payload['level'] = level
-        if custom_prompt: payload['custom_prompt'] = custom_prompt
-        if not payload: return {'ok': True}
+        if level:
+            payload['level'] = level
+        if custom_prompt:
+            payload['custom_prompt'] = custom_prompt
+        if not payload:
+            return {'ok': True}
+
         def _exec():
-            return self.db.table('users').update(payload).eq('username', username).execute()
+            return self.db.table('users').update(
+                payload).eq('username', username).execute()
         await run_in_threadpool(_exec)
         return {'ok': True}
 
-    async def get_grammar_errors(self, username: str, lang: str = 'en-US') -> dict:
+    async def get_grammar_errors(
+            self,
+            username: str,
+            lang: str = 'en-US') -> dict:
         """Analisa erros gramaticais de um aluno."""
         def _fetch():
             try:
-                res = self.db.table('user_errors').select('*').eq('username', username).order('created_at', desc=True).limit(50).execute()
+                res = self.db.table('user_errors').select(
+                    '*').eq('username', username).order('created_at', desc=True).limit(50).execute()
                 return {'errors': res.data or []}
             except Exception:
                 return {'errors': []}
         return await run_in_threadpool(_fetch)
 
-    async def get_recommendations(self, username: str, lang: str = 'en-US') -> dict:
+    async def get_recommendations(
+            self,
+            username: str,
+            lang: str = 'en-US') -> dict:
         """Retorna recomendações pedagógicas."""
         # Simplificado por enquanto
         return {
             'recommendations': [
                 'Pratique mais conversação sobre temas do seu dia a dia.',
                 'Assista a vídeos curtos sobre gramática básica.',
-                'Tente usar novas palavras do seu vocabulário nas conversas.'
-            ]
-        }
+                'Tente usar novas palavras do seu vocabulário nas conversas.']}
 
-    async def generate_simulation(self, topic: str, level: str, instructions: str) -> dict:
+    async def generate_simulation(
+            self,
+            topic: str,
+            level: str,
+            instructions: str) -> dict:
         """Gera um cenário de simulação via IA."""
         from app.modules.chat.services.llm import groq_chat_json
-        
+
         prompt = (
             f"Create a professional English practice scenario about: {topic}.\n"
             f"Target Student Level: {level}. Extra Instructions: {instructions}.\n"
@@ -441,8 +502,10 @@ class DashboardService:
             if data:
                 # Garante que is_active seja True para RLS
                 data['is_active'] = True
-                res = self.db.table('simulations').insert(data).execute()
-                return res.data[0] if res.data else {'error': 'Falha ao salvar no banco'}
+                res = self.db.table(
+                    'simulations').insert(data).execute()
+                return res.data[0] if res.data else {
+                    'error': 'Falha ao salvar no banco'}
             return {'error': 'IA retornou formato inválido'}
         except Exception as e:
             return {'error': str(e)}
@@ -452,7 +515,8 @@ class DashboardService:
         def _delete():
             # ── 0. Resolve o username EXATO como está no banco (não forçar lowercase) ─
             # O bug original: .lower() fazia o match falhar se o DB tinha capitalização
-            # diferente, resultando em orders não removidos e FK bloqueando a deleção.
+            # diferente, resultando em orders não removidos e FK
+            # bloqueando a deleção.
             try:
                 user_row = (
                     self.db.table('users')
@@ -472,14 +536,17 @@ class DashboardService:
                         .execute()
                         .data
                     )
-                uname = user_row[0]['username'] if user_row else username.strip()
+                uname = user_row[0]['username'] if user_row else username.strip(
+                )
             except Exception as e:
-                print(f"[DashboardService] Aviso ao resolver username exato: {e}")
+                logging.info(
+                    f"[DashboardService] Aviso ao resolver username exato: {e}")
                 uname = username.strip()
 
-            print(f"[DashboardService] Iniciando exclusão total do usuário: '{uname}'")
+            logging.info(
+                f"[DashboardService] Iniciando exclusão total do usuário: '{uname}'")
 
-            # ── 1. Limpeza de pedidos e itens (orders — FK crítica!) ─────────────
+            # ── 1. Limpeza de pedidos e itens (orders — FK crítica!) ──
             try:
                 orders = (
                     self.db.table('orders')
@@ -488,16 +555,22 @@ class DashboardService:
                     .execute()
                     .data
                 ) or []
-                print(f"[DashboardService] {len(orders)} pedido(s) encontrado(s) para '{uname}'")
+                logging.info(
+                    f"[DashboardService] {
+                        len(orders)} pedido(s) encontrado(s) para '{uname}'")
                 if orders:
                     order_ids = [o['id'] for o in orders]
-                    self.db.table('order_items').delete().in_('order_id', order_ids).execute()
-                    self.db.table('orders').delete().eq('username', uname).execute()
-                    print(f"[DashboardService] orders/order_items de '{uname}' removidos.")
+                    self.db.table('order_items').delete().in_(
+                        'order_id', order_ids).execute()
+                    self.db.table('orders').delete().eq(
+                        'username', uname).execute()
+                    logging.info(
+                        f"[DashboardService] orders/order_items de '{uname}' removidos.")
             except Exception as e:
-                print(f"[DashboardService] ERRO ao limpar orders/items para '{uname}': {e}")
+                logging.info(
+                    f"[DashboardService] ERRO ao limpar orders/items para '{uname}': {e}")
 
-            # ── Verificação de segurança — garante que orders foram limpos ────────
+            # ── Verificação de segurança — garante que orders foram lim
             try:
                 remaining = (
                     self.db.table('orders')
@@ -505,7 +578,8 @@ class DashboardService:
                     .eq('username', uname)
                     .execute()
                 )
-                still_there = remaining.count or len(remaining.data or [])
+                still_there = remaining.count or len(
+                    remaining.data or [])
                 if still_there > 0:
                     raise RuntimeError(
                         f"Ainda existem {still_there} pedido(s) em 'orders' para '{uname}'. "
@@ -515,9 +589,10 @@ class DashboardService:
             except RuntimeError:
                 raise  # erro crítico — propaga para o caller
             except Exception as e:
-                print(f"[DashboardService] Aviso na verificação de orders para '{uname}': {e}")
+                logging.info(
+                    f"[DashboardService] Aviso na verificação de orders para '{uname}': {e}")
 
-            # ── 2. Limpeza de conversas e mensagens vinculadas ────────────────────
+            # ── 2. Limpeza de conversas e mensagens vinculadas ────────
             try:
                 convs = (
                     self.db.table('conversations')
@@ -528,12 +603,15 @@ class DashboardService:
                 ) or []
                 if convs:
                     conv_ids = [c['id'] for c in convs]
-                    self.db.table('messages').delete().in_('session_id', conv_ids).execute()
-                    self.db.table('conversations').delete().eq('username', uname).execute()
+                    self.db.table('messages').delete().in_(
+                        'session_id', conv_ids).execute()
+                    self.db.table('conversations').delete().eq(
+                        'username', uname).execute()
             except Exception as e:
-                print(f"[DashboardService] Erro ao limpar conversas/mensagens para '{uname}': {e}")
+                logging.info(
+                    f"[DashboardService] Erro ao limpar conversas/mensagens para '{uname}': {e}")
 
-            # ── 3. Tabelas com FK direta em username ──────────────────────────────
+            # ── 3. Tabelas com FK direta em username ──────────────────
             tables = [
                 'messages',              # órfãs diretas
                 'activity_submissions',
@@ -555,27 +633,32 @@ class DashboardService:
 
             for table in tables:
                 try:
-                    self.db.table(table).delete().eq('username', uname).execute()
+                    self.db.table(table).delete().eq(
+                        'username', uname).execute()
                 except Exception as e:
                     err_msg = str(e)
                     if 'PGRST205' not in err_msg:  # ignora "tabela não existe"
-                        print(f"[DashboardService] Erro ao limpar {table} para '{uname}': {e}")
+                        logging.info(
+                            f"[DashboardService] Erro ao limpar {table} para '{uname}': {e}")
 
-            # ── 4. Deleta o usuário ───────────────────────────────────────────────
+            # ── 4. Deleta o usuário ───────────────────────────────────
             try:
-                res = self.db.table('users').delete().eq('username', uname).execute()
-                print(f"[DashboardService] Usuário '{uname}' excluído. Resposta: {res.data}")
+                res = self.db.table('users').delete().eq(
+                    'username', uname).execute()
+                logging.info(
+                    f"[DashboardService] Usuário '{uname}' excluído. Resposta: {
+                        res.data}")
                 return True
             except Exception as e:
-                print(f"[DashboardService] ERRO CRÍTICO ao deletar usuário '{uname}': {e}")
+                logging.info(
+                    f"[DashboardService] ERRO CRÍTICO ao deletar usuário '{uname}': {e}")
                 raise e
 
         return await run_in_threadpool(_delete)
 
-
     async def get_buyers_list(self) -> List[Dict[str, Any]]:
         """Lista usuários com role=buyer com total gasto via orders/order_items."""
- 
+
         def _fetch() -> List[Dict[str, Any]]:
             try:
                 users = (
@@ -588,11 +671,13 @@ class DashboardService:
                     or []
                 )
             except Exception as e:
-                print(f"[DashboardService] Erro ao buscar buyers: {e}")
+                logging.info(
+                    f"[DashboardService] Erro ao buscar buyers: {e}")
                 return []
- 
+
             # Busca orders confirmadas com seus itens
-            # Fazemos dois fetches separados para evitar joins complexos via PostgREST
+            # Fazemos dois fetches separados para evitar joins complexos
+            # via PostgREST
             try:
                 orders_rows = (
                     self.db.table('orders')
@@ -603,9 +688,10 @@ class DashboardService:
                     or []
                 )
             except Exception as e:
-                print(f"[DashboardService] Erro ao buscar orders: {e}")
+                logging.info(
+                    f"[DashboardService] Erro ao buscar orders: {e}")
                 orders_rows = []
- 
+
             # Agrupa orders por username
             orders_by_user: Dict[str, List[dict]] = {}
             for o in orders_rows:
@@ -614,33 +700,35 @@ class DashboardService:
                     if uname not in orders_by_user:
                         orders_by_user[uname] = []
                     orders_by_user[uname].append(o)
- 
+
             processed = []
             for u in users:
                 username = u.get('username')
                 if not username:
                     continue
- 
+
                 user_orders = orders_by_user.get(username, [])
- 
+
                 total_spent = sum(
                     float(o.get('total_amount') or 0)
                     for o in user_orders
                 )
                 total_purchases = len(user_orders)
- 
+
                 # Data da última compra confirmada
                 last_purchase_at = ''
                 if user_orders:
-                    dates = [o.get('confirmed_at') or o.get('created_at') or '' for o in user_orders]
+                    dates = [o.get('confirmed_at') or o.get(
+                        'created_at') or '' for o in user_orders]
                     last_purchase_at = max(dates, default='')
- 
+
                 u['total_purchases'] = total_purchases
                 u['total_spent'] = round(total_spent, 2)
                 u['last_purchase_at'] = last_purchase_at
-                u['last_active'] = last_purchase_at or u.get('created_at', '')
+                u['last_active'] = last_purchase_at or u.get(
+                    'created_at', '')
                 processed.append(u)
- 
+
             try:
                 processed.sort(
                     key=lambda x: parse_dt(x.get('last_active')),
@@ -648,12 +736,12 @@ class DashboardService:
                 )
             except Exception:
                 pass
- 
+
             return processed
- 
+
         try:
             return await run_in_threadpool(_fetch)
         except Exception as e:
-            print(f"[DashboardService] Erro em get_buyers_list: {e}")
+            logging.info(
+                f"[DashboardService] Erro em get_buyers_list: {e}")
             return []
- 

@@ -107,17 +107,21 @@ class PodcastRecommender:
     def _extract_json_blob(raw_text: str) -> str:
         clean_text = raw_text.strip()
         if '```json' in clean_text:
-            return clean_text.split('```json', 1)[1].split('```', 1)[0].strip()
-        first_brace, last_brace = clean_text.find('{'), clean_text.rfind('}')
+            return clean_text.split(
+                '```json', 1)[1].split(
+                '```', 1)[0].strip()
+        first_brace, last_brace = clean_text.find(
+            '{'), clean_text.rfind('}')
         return (
-            clean_text[first_brace : last_brace + 1]
+            clean_text[first_brace: last_brace + 1]
             if (first_brace >= 0 and last_brace > first_brace)
             else clean_text
         )
 
     @staticmethod
     def _pick_lang(pt_text: str, en_text: str, ui_lang: str) -> str:
-        return en_text if str(ui_lang).lower().startswith('en') else pt_text
+        return en_text if str(ui_lang).lower(
+        ).startswith('en') else pt_text
 
     @staticmethod
     def _compose_recommendation_reason(
@@ -148,9 +152,8 @@ class PodcastRecommender:
         normalized_key = raw_level.lower().replace('_', ' ').replace('-', ' ')
         normalized_key = ' '.join(normalized_key.split())
         return cls.LEVEL_ALIASES.get(
-            normalized_key,
-            cls.LEVEL_ALIASES.get(raw_level.lower(), cls.DEFAULT_CEFR_LEVEL),
-        )
+            normalized_key, cls.LEVEL_ALIASES.get(
+                raw_level.lower(), cls.DEFAULT_CEFR_LEVEL), )
 
     @classmethod
     async def get_recent_messages(cls, username: str) -> List[str]:
@@ -169,9 +172,8 @@ class PodcastRecommender:
             )
 
         rows = await run_in_threadpool(_fetch)
-        return [
-            str(row.get('content', '')).strip() for row in rows if row.get('content')
-        ]
+        return [str(row.get('content', '')).strip()
+                for row in rows if row.get('content')]
 
     async def extract_interest_keywords(
         self, messages: List[str]
@@ -189,12 +191,14 @@ class PodcastRecommender:
             from app.modules.chat.services.llm import groq_chat_json
             payload = await groq_chat_json([{"role": "user", "content": prompt}])
             interests = payload.get('interests', []) if payload else []
-            return [str(i).strip().lower() for i in interests if i][:5], 'llm'
+            return [str(i).strip().lower()
+                    for i in interests if i][:5], 'llm'
         except Exception:
             pass
         return self._tokenize_interest_keywords(messages), 'heuristic'
 
-    def _tokenize_interest_keywords(self, messages: List[str]) -> List[str]:
+    def _tokenize_interest_keywords(
+            self, messages: List[str]) -> List[str]:
         words = []
         for msg in messages:
             words.extend(re.findall(r'[a-zA-Z]{4,}', msg.lower()))
@@ -217,8 +221,7 @@ class PodcastRecommender:
             enriched = dict(podcast)
             enriched['recommendation_score'] = score
             enriched['recommendation_reason'] = self._compose_recommendation_reason(
-                podcast, [], level_label, ui_lang
-            )
+                podcast, [], level_label, ui_lang)
             ranked.append(enriched)
         return ranked
 
@@ -248,7 +251,6 @@ class PodcastRecommender:
 
         def _update():
             get_client().table('users').update({'profile': updated_profile}).eq(
-                'username', username
-            ).execute()
+                'username', username).execute()
 
         await run_in_threadpool(_update)

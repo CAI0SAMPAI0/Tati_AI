@@ -1,3 +1,4 @@
+import logging
 from typing import List, Dict, Any
 from fastapi.concurrency import run_in_threadpool
 from app.shared.services.upstash import cache_get, cache_set
@@ -13,7 +14,8 @@ class TrophyService:
         else:
             self.db = db
 
-    async def get_user_trophies(self, username: str) -> List[Dict[str, Any]]:
+    async def get_user_trophies(
+            self, username: str) -> List[Dict[str, Any]]:
         cache_key = f'trophies:{username}'
         cached = await cache_get(cache_key)
         if cached:
@@ -45,7 +47,8 @@ class TrophyService:
         await cache_set(cache_key, trophies, ttl=300)
         return trophies
 
-    async def list_achievements(self, username: str) -> List[Dict[str, Any]]:
+    async def list_achievements(
+            self, username: str) -> List[Dict[str, Any]]:
         """Retorna todos os troféus do sistema com o status de desbloqueio do usuário."""
         # Mapeamento completo para garantir inglês na interface
         TRANSLATIONS = {
@@ -57,7 +60,7 @@ class TrophyService:
             'Mestre dos Quizzes': 'Quiz Master',
             'Mestre Supremo': 'Supreme Master',
             'Perfeccionista': 'Perfectionist',
-            
+
             # Streaks
             'Primeiro Dia': 'First Day',
             'Ofensiva de 3 Dias': '3-Day Streak',
@@ -68,7 +71,7 @@ class TrophyService:
             'Ofensiva de 100 Dias': '100-Day Streak',
             'Ofensiva de 365 Dias': '365-Day Streak',
             'Sempre Alerta': 'Always Alert',
-            
+
             # Milestones & Messages
             'Primeira Mensagem': 'First Message',
             '100 Mensagens': '100 Messages',
@@ -80,34 +83,34 @@ class TrophyService:
             'Madrugador': 'Early Bird',
             'Coruja': 'Night Owl',
             'Final de Semana': 'Weekend Warrior',
-            
+
             # Social
             'Popular': 'Popular',
             'Comunicador': 'Communicator',
             'Falante': 'Talkative',
             'Social': 'Social',
             'Conversador': 'Chatty Student',
-            
+
             # Credits & Tycoon
             'Primeiro Crédito': 'First Credit',
             'Economizador': 'Saver',
             'Colecionador': 'Collector',
             'Rico': 'Wealthy',
             'Magnata': 'Tycoon',
-            
+
             # Time
             'Primeira Hora': 'First Hour',
             'Mestre do Tempo': 'Time Master',
             'Tempo Supremo': 'Supreme Time',
             'Viajante do Tempo': 'Time Traveler',
-            
+
             # Vocabulary
             'Vocabulário 10': 'Vocabulary 10',
             'Vocabulário 50': 'Vocabulary 50',
             'Vocabulário 100': 'Vocabulary 100',
             'Poliglota': 'Polyglot',
             'Dicionário Vivo': 'Living Dictionary',
-            
+
             # Goals & Ranking
             'Primeira Meta': 'First Goal',
             'Focado': 'Focused',
@@ -131,12 +134,14 @@ class TrophyService:
 
         def _fetch():
             # 1. Busca todos os troféus cadastrados
-            all_trophies = self.db.table('trophies').select('*').execute().data or []
-            
+            all_trophies = self.db.table(
+                'trophies').select('*').execute().data or []
+
             # 2. Busca troféus conquistados pelo usuário
-            earned = self.db.table('user_trophies').select('trophy_id').eq('username', username).execute().data or []
+            earned = self.db.table('user_trophies').select(
+                'trophy_id').eq('username', username).execute().data or []
             earned_ids = {t['trophy_id'] for t in earned}
-            
+
             # 3. Formata para o frontend
             result = []
             for t in all_trophies:
@@ -151,10 +156,11 @@ class TrophyService:
                     'unlocked': t['id'] in earned_ids
                 })
             return result
-            
+
         return await run_in_threadpool(_fetch)
 
-    async def check_and_award_trophies(self, username: str) -> List[Dict[str, Any]]:
+    async def check_and_award_trophies(
+            self, username: str) -> List[Dict[str, Any]]:
         def _check():
             progress = (
                 self.db.table('user_progress')
@@ -175,7 +181,8 @@ class TrophyService:
             )
             existing_ids = {t['trophy_id'] for t in existing}
             all_trophies = (
-                self.db.table('trophies').select('id, name, icon').execute().data or []
+                self.db.table('trophies').select(
+                    'id, name, icon').execute().data or []
             )
             trophy_map = {t['name']: t for t in all_trophies}
 
@@ -198,20 +205,25 @@ class TrophyService:
                     ).execute()
                     from app.modules.notifications.services.notifications import notify_trophy_earned
 
-                    notify_trophy_earned(username, t_info['name'], t_info['icon'])
-                    earned.append({'title': t_info['name'], 'icon': t_info['icon']})
+                    notify_trophy_earned(
+                        username, t_info['name'], t_info['icon'])
+                    earned.append(
+                        {'title': t_info['name'], 'icon': t_info['icon']})
             return earned
 
         return await run_in_threadpool(_check)
 
-    async def award_specialist_badge(self, username: str, topic_title: str):
+    async def award_specialist_badge(
+            self, username: str, topic_title: str):
         """Atribui uma badge de especialista baseada em um tópico específico concluído."""
         def _award():
             # 1. Cria ou recupera a definição do troféu de especialista
             badge_name = f'Specialist: {topic_title}'
-            
-            # Verifica se já existe a definição na tabela global de troféus
-            t_res = self.db.table('trophies').select('id, icon').eq('name', badge_name).execute().data
+
+            # Verifica se já existe a definição na tabela global de
+            # troféus
+            t_res = self.db.table('trophies').select(
+                'id, icon').eq('name', badge_name).execute().data
             if t_res:
                 trophy_id = t_res[0]['id']
                 icon = t_res[0]['icon']
@@ -223,18 +235,23 @@ class TrophyService:
                     'icon': '🎓',
                     'category': 'specialist'
                 }
-                insert_res = self.db.table('trophies').insert(new_t).execute().data
-                if not insert_res: return
+                insert_res = self.db.table(
+                    'trophies').insert(new_t).execute().data
+                if not insert_res:
+                    return
                 trophy_id = insert_res[0]['id']
                 icon = '🎓'
 
             # 2. Atribui ao usuário se não tiver
-            existing = self.db.table('user_trophies').select('id').eq('username', username).eq('trophy_id', trophy_id).execute().data
+            existing = self.db.table('user_trophies').select('id').eq(
+                'username', username).eq('trophy_id', trophy_id).execute().data
             if not existing:
-                self.db.table('user_trophies').insert({'username': username, 'trophy_id': trophy_id}).execute()
+                self.db.table('user_trophies').insert(
+                    {'username': username, 'trophy_id': trophy_id}).execute()
                 from app.modules.notifications.services.notifications import notify_trophy_earned
                 notify_trophy_earned(username, badge_name, icon)
-                print(f'[Trophy] Awarded Specialist Badge: {topic_title} to {username}')
+                logging.info(
+                    f'[Trophy] Awarded Specialist Badge: {topic_title} to {username}')
 
         await run_in_threadpool(_award)
 
@@ -245,7 +262,8 @@ def check_chat_trophies(username: str):
 
     db = get_client()
     # Lógica simplificada para checagem rápida
-    # Poderia chamar TrophyService().check_and_award_trophies mas aqui é síncrono para run_in_threadpool
+    # Poderia chamar TrophyService().check_and_award_trophies mas aqui é
+    # síncrono para run_in_threadpool
     progress = (
         db.table('messages')
         .select('id', count='exact')
@@ -278,8 +296,10 @@ def check_chat_trophies(username: str):
                 ).execute()
                 from app.modules.notifications.services.notifications import notify_trophy_earned
 
-                notify_trophy_earned(username, t[0]['name'], t[0]['icon'])
-                print(f'[Trophy] Awarded Chatty Student to {username}')
+                notify_trophy_earned(
+                    username, t[0]['name'], t[0]['icon'])
+                logging.info(
+                    f'[Trophy] Awarded Chatty Student to {username}')
 
 
 def check_streak_trophies(username: str, longest_streak: int):
@@ -322,5 +342,7 @@ def check_streak_trophies(username: str, longest_streak: int):
                     ).execute()
                     from app.modules.notifications.services.notifications import notify_trophy_earned
 
-                    notify_trophy_earned(username, t[0]['name'], t[0]['icon'])
-                    print(f'[Trophy] Awarded {trophy_name} to {username}')
+                    notify_trophy_earned(
+                        username, t[0]['name'], t[0]['icon'])
+                    logging.info(
+                        f'[Trophy] Awarded {trophy_name} to {username}')

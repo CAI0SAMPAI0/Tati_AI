@@ -58,7 +58,8 @@ class MediaAvailabilityService:
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
             return dt >= (
-                datetime.now(timezone.utc) - timedelta(hours=self._cache_ttl_hours)
+                datetime.now(timezone.utc) -
+                timedelta(hours=self._cache_ttl_hours)
             )
         except Exception:
             return False
@@ -78,10 +79,12 @@ class MediaAvailabilityService:
         ok = False
 
         if source_type == 'youtube':
-            # Nota: _extract_youtube_watch_url é síncrona e rápida (apenas parse de string)
+            # Nota: _extract_youtube_watch_url é síncrona e rápida
+            # (apenas parse de string)
             watch_url = self._extract_youtube_watch_url_logic(item)
             if watch_url:
-                oembed_url = f'https://www.youtube.com/oembed?url={quote_plus(watch_url)}&format=json'
+                oembed_url = f'https://www.youtube.com/oembed?url={
+                    quote_plus(watch_url)}&format=json'
                 ok = await self.check_url(oembed_url)
         elif source_type == 'spotify':
             embed_url = str(item.get('embed_url', '')).strip()
@@ -96,7 +99,8 @@ class MediaAvailabilityService:
         }
         return ok
 
-    def _extract_youtube_watch_url_logic(self, item: Dict[str, Any]) -> Optional[str]:
+    def _extract_youtube_watch_url_logic(
+            self, item: Dict[str, Any]) -> Optional[str]:
         """Lógica extraída de podcasts.py para evitar importação circular complexa."""
         from urllib.parse import urlparse, parse_qs
 
@@ -110,7 +114,8 @@ class MediaAvailabilityService:
                 if video_id:
                     return f'https://www.youtube.com/watch?v={video_id}'
             elif 'youtu.be' in host:
-                video_id = parsed_external.path.strip('/').split('/', 1)[0].strip()
+                video_id = parsed_external.path.strip(
+                    '/').split('/', 1)[0].strip()
                 if video_id:
                     return f'https://www.youtube.com/watch?v={video_id}'
 
@@ -124,8 +129,13 @@ class MediaAvailabilityService:
         if '/embed/' not in parsed.path:
             return None
         video_id = (
-            parsed.path.split('/embed/', 1)[1].split('/', 1)[0].split('?', 1)[0].strip()
-        )
+            parsed.path.split(
+                '/embed/',
+                1)[1].split(
+                '/',
+                1)[0].split(
+                '?',
+                1)[0].strip())
         if not video_id:
             return None
         return f'https://www.youtube.com/watch?v={video_id}'

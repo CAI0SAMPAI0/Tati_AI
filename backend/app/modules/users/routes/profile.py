@@ -28,7 +28,9 @@ class ProfileUpdate(BaseModel):
 
 
 @router.get('')
-async def get_profile(user=Depends(get_current_user), service: UserService = Depends()):
+async def get_profile(
+        user=Depends(get_current_user),
+        service: UserService = Depends()):
     return await service.get_profile(user['username'])
 
 

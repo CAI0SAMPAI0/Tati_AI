@@ -9,12 +9,22 @@ from jose import jwt
 from app.core.config import settings
 
 # jwt
-def create_access_token(data: dict, expires_minutes: int | None = None) -> str:
+
+
+def create_access_token(
+        data: dict,
+        expires_minutes: int | None = None) -> str:
     expires = expires_minutes or settings.access_token_expire_minutes
-    payload = {**data, 'exp': datetime.now(timezone.utc) + timedelta(minutes=expires)}
+    payload = {
+        **data,
+        'exp': datetime.now(
+            timezone.utc) +
+        timedelta(
+            minutes=expires)}
     return jwt.encode(
-        payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
-    )
+        payload,
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm)
 
 
 def decode_token(token: str) -> dict | None:
@@ -22,8 +32,8 @@ def decode_token(token: str) -> dict | None:
 
     try:
         return jwt.decode(
-            token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
-        )
+            token, settings.jwt_secret_key, algorithms=[
+                settings.jwt_algorithm])
     except JWTError:
         return None
 
@@ -50,4 +60,5 @@ _SAFE_ALPHABET = ''.join(
 
 
 def generate_temp_password(length: int = 12) -> str:
-    return ''.join(secrets.choice(_SAFE_ALPHABET) for _ in range(length))
+    return ''.join(secrets.choice(_SAFE_ALPHABET)
+                   for _ in range(length))

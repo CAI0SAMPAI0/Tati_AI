@@ -41,8 +41,7 @@ class SubmissionService:
                         'username': username,
                         'activity_type': payload.activity_type or 'exercise',
                         'duration_minutes': 3,
-                    }
-                ).execute()
+                    }).execute()
             except Exception:
                 pass
 
@@ -50,7 +49,8 @@ class SubmissionService:
 
         return await run_in_threadpool(_insert)
 
-    async def get_my_submissions(self, username: str) -> List[Dict[str, Any]]:
+    async def get_my_submissions(
+            self, username: str) -> List[Dict[str, Any]]:
         """Busca submissões do aluno."""
 
         def _fetch():
@@ -100,7 +100,8 @@ class SubmissionService:
         await run_in_threadpool(_update)
         return True
 
-    async def get_submission_by_id(self, sub_id: str) -> Optional[Dict[str, Any]]:
+    async def get_submission_by_id(
+            self, sub_id: str) -> Optional[Dict[str, Any]]:
         """Busca submissão por ID."""
 
         def _fetch():
