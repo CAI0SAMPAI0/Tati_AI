@@ -27,7 +27,7 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
       setIsEditing(false);
       return;
     }
-    
+
     setIsSaving(true);
     try {
       await onEdit(message.id, editContent);
@@ -102,32 +102,13 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
                 <p className="whitespace-pre-wrap">{message.content}</p>
               ) : (
                 <div className="flex flex-col gap-3">
-                  <ClickableText 
-                    content={parseAIResponse(message.content).reply} 
-                    onWordClick={onWordClick || (() => {})} 
+                  <ClickableText
+                    content={parseAIResponse(message.content).reply}
+                    onWordClick={onWordClick || (() => { })}
                   />
-                  {/* Optionally display correction or drill here if you want */}
-                  {parseAIResponse(message.content).correction && (
-                    <div className="mt-2 p-3 bg-primary/10 border border-primary/20 rounded-xl text-sm">
-                      <p className="font-bold text-primary mb-1 text-xs uppercase tracking-wider">Correction</p>
-                      <ClickableText 
-                        content={parseAIResponse(message.content).correction!} 
-                        onWordClick={onWordClick || (() => {})} 
-                      />
-                    </div>
-                  )}
-                  {parseAIResponse(message.content).drill && (
-                    <div className="mt-1 p-3 bg-surface border border-border rounded-xl text-sm">
-                      <p className="font-bold text-text mb-1 text-xs uppercase tracking-wider">Practice</p>
-                      <ClickableText 
-                        content={parseAIResponse(message.content).drill!} 
-                        onWordClick={onWordClick || (() => {})} 
-                      />
-                    </div>
-                  )}
                 </div>
               )}
-              
+
               {isUser && onEdit && !isStreaming && (
                 <button
                   onClick={() => setIsEditing(true)}
@@ -149,7 +130,7 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
               className="flex items-center gap-3 bg-surface border border-border hover:border-primary/50 hover:bg-primary/5 rounded-xl p-3 text-text transition-all group/pdf"
             >
               <div className="w-10 h-10 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2"/><path d="M8 17h2"/><path d="M14 13h2"/><path d="M14 17h2"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /><path d="M8 13h2" /><path d="M8 17h2" /><path d="M14 13h2" /><path d="M14 17h2" /></svg>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold truncate group-hover/pdf:text-primary transition-colors">
