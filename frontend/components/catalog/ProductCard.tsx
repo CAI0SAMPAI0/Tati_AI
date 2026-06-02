@@ -118,7 +118,7 @@ export default function ProductCard({ item, showOwned, onAccessGranted }: Produc
             href={`/activities/hub/${item.id}/ler`}
             className="rounded-hub bg-success/10 px-3 py-1.5 text-xs font-bold text-success transition hover:bg-success/20"
           >
-            Ler agora
+            Read now
           </Link>
         ) : (
           <div className="flex-shrink-0">

@@ -73,7 +73,7 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit }:
         />
       ))}
 
-      {isStreaming && (
+      {isStreaming && streamingContent && (
         <MessageBubble
           message={{
             id: 'streaming',
@@ -87,7 +87,6 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit }:
         />
       )}
 
-      {/* Typing indicator (only shown if isStreaming is true but streamingContent is empty) */}
       {isStreaming && !streamingContent && (
         <div key="typing-indicator" className="flex gap-3 animate-fade-in">
           <div className="w-7 h-7 rounded-full border border-border bg-surface overflow-hidden shrink-0 mt-1 shadow-sm">
