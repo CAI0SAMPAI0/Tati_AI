@@ -1,5 +1,5 @@
-const CACHE_NAME = 'tati-ai-v2.1.0';
-const API_CACHE_NAME = 'tati-ai-api-v2.1.0';
+const CACHE_NAME = 'tati-ai-v2.1.1';
+const API_CACHE_NAME = 'tati-ai-api-v2.1.1';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -83,6 +83,28 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // 1. REQUISIÇÕES DE NAVEGAÇÃO (PÁGINAS HTML): Network-First
+  // Evita que páginas como index.html, dashboard.html e login fiquem presas em cache antigo
+  if (event.request.mode === 'navigate' || event.request.url.endsWith('.html') || event.request.url === self.location.origin + '/') {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (response && response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          return caches.match(event.request).then(cached => cached || caches.match('/'));
+        })
+    );
+    return;
+  }
+
+  // 2. OUTROS RECURSOS ESTÁTICOS (css, js, imagens, fontes): Cache-First
   event.respondWith(
     caches.match(event.request)
       .then(response => {
@@ -98,6 +120,12 @@ self.addEventListener('fetch', event => {
             return response;
           }
 
+          // Evita cachear respostas HTML dinâmicas
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('text/html')) {
+            return response;
+          }
+
           // Cache successful responses
           if (response.status === 200) {
             const responseToCache = response.clone();
@@ -108,12 +136,6 @@ self.addEventListener('fetch', event => {
           }
           return response;
         });
-      })
-      .catch(() => {
-        // Se falhar both cache e network, retorna página offline
-        if (event.request.mode === 'navigate') {
-          return caches.match('/');
-        }
       })
   );
 });

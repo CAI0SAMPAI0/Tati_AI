@@ -7,6 +7,15 @@ export function RegisterServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     if (process.env.NODE_ENV !== 'production') return;
 
+    // Escuta mudanças de controle para recarregar a página automaticamente
+    // Isso garante que o usuário obtenha a versão mais recente sem precisar fechar e reabrir o app
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+
     navigator.serviceWorker.register('/sw.js').catch(() => {
       // Falha silenciosa para não impactar o fluxo principal.
     });
@@ -14,3 +23,4 @@ export function RegisterServiceWorker() {
 
   return null;
 }
+
