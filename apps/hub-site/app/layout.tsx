@@ -23,8 +23,28 @@ export const metadata: Metadata = {
   title: "Tati Hub | Taty's English Class",
   description:
     'Catálogo de materiais premium da Teacher Tati — e-books, exercícios e guias de estudo.',
+  keywords: ['Tati Hub', 'Taty\'s English Class',
+    'English Class', 'Materias', 'Exercícios',
+    'Guias', 'Livros', 'Planos de estudo', 'Gramática',
+    'Vocabulário', 'Inglês Online', 'Cursos de Inglês'],
   icons: {
     icon: '/images/tati_logo.jpg',
+  },
+  openGraph: {
+    title: "Tati Hub | Taty's English Class",
+    description: 'Catálogo de materiais premium da Teacher Tati',
+    type: 'website',
+    url: 'https://tati-hub.vercel.app',
+    images: '/images/tati_logo.jpg',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: "Tati Hub | Taty's English Class",
+    description: 'Catálogo de materiais premium da Teacher Tati',
+    images: '/images/tati_logo.jpg',
+  },
+  alternates: {
+    canonical: 'https://tati-hub.vercel.app',
   },
 };
 

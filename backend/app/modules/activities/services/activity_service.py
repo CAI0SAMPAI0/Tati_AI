@@ -299,22 +299,29 @@ class ActivityService:
                 # Fallback se a expansão falhar
                 data = self.db.table('modules').select(
                     '*').order('created_at', desc=True).execute().data or []
-                # Busca quiz e lições separadamente para cada módulo
-                # (menos eficiente mas funcional)
-                for module in data:
-                    module_id = module.get('id')
+                if data:
+                    module_ids = [str(m.get('id')) for m in data if m.get('id')]
+                    
                     try:
-                        quizzes = self.db.table('quizzes').select(
-                            '*').eq('module_id', module_id).execute().data or []
-                        module['quizzes'] = quizzes
-                    except BaseException:
-                        module['quizzes'] = []
+                        all_quizzes = self.db.table('quizzes').select('*').in_('module_id', module_ids).execute().data or []
+                        quizzes_by_module = {}
+                        for q in all_quizzes:
+                            quizzes_by_module.setdefault(str(q['module_id']), []).append(q)
+                    except Exception:
+                        quizzes_by_module = {}
+
                     try:
-                        lessons = self.db.table('lessons').select(
-                            '*').eq('module_id', module_id).execute().data or []
-                        module['lessons'] = lessons
-                    except BaseException:
-                        module['lessons'] = []
+                        all_lessons = self.db.table('lessons').select('*').in_('module_id', module_ids).execute().data or []
+                        lessons_by_module = {}
+                        for l in all_lessons:
+                            lessons_by_module.setdefault(str(l['module_id']), []).append(l)
+                    except Exception:
+                        lessons_by_module = {}
+
+                    for module in data:
+                        mid = str(module.get('id'))
+                        module['quizzes'] = quizzes_by_module.get(mid, [])
+                        module['lessons'] = lessons_by_module.get(mid, [])
 
             # Filtra fora apenas os módulos que são PURAMENTE decks de flashcards
             # Ou seja: tem flashcards E NÃO tem quiz E NÃO tem lições

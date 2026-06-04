@@ -54,10 +54,10 @@ export default function DashboardPage() {
     setActiveSection(section);
     localStorage.setItem('tati_last_dashboard_tab', section);
     
-    // Update URL without full page reload
+    // Update URL without full page reload and without triggering Next.js server fetch
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', section);
-    router.push(`/dashboard?${params.toString()}`, { scroll: false });
+    window.history.pushState(null, '', `/dashboard?${params.toString()}`);
   };
 
   // Sync tab if URL changes (e.g., browser back/forward)

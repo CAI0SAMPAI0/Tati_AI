@@ -1,24 +1,23 @@
 from __future__ import annotations
-from app.routers_init import register_all_routers
-from app.core.utils.rate_limiter import setup_rate_limiting
 import sys
 import logging
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Força o carregamento do .env da raiz do projeto ANTES de qualquer outro import
+env_path = Path(__file__).parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
+
+from app.routers_init import register_all_routers
+from app.core.utils.rate_limiter import setup_rate_limiting
 from app.core.utils.sentry_config import init_sentry
 from app.core.config import settings
 
-from pathlib import Path
-
-from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
-
-
-# Força o carregamento do .env da raiz do projeto
-env_path = Path(__file__).parent.parent / '.env'
-load_dotenv(dotenv_path=env_path)
 
 # Sentry — Inicialização crítica para captura de exceções
 
@@ -46,7 +45,7 @@ print = logging.info
 app = FastAPI(
     title='Teacher Tati AI',
     description='API para o aplicativo de ensino de inglês Teacher Tati',
-    version='2.1.0',
+    version='2.1.1',
     docs_url=_docs_url,
     redoc_url=_redoc_url)
 
@@ -123,38 +122,7 @@ async def startup_event() -> None:
         except Exception as exc:
             logging.info(f'[Startup] Warmup do banco falhou: {exc}')
 
-    await _warmup()
-
-    # 2. Inicia schedulers em background (não bloqueia a API)
-    async def _start_schedulers():
-        await asyncio.sleep(3)
-        try:
-            from app.modules.notifications.services.notification_scheduler import (
-                notification_scheduler, )
-            from app.modules.cefr.services.cefr_scheduler import CEFRScheduler
-
-            cefr_scheduler = CEFRScheduler(
-                notification_scheduler.scheduler)
-            cefr_scheduler.start()
-
-            # 3. Registra o keepalive periódico no mesmo scheduler
-            #    Roda a cada 4 minutos para manter a conexão TCP viva
-            from app.core.database import keep_alive_ping
-
-            notification_scheduler.scheduler.add_job(
-                keep_alive_ping,
-                'interval',
-                minutes=4,
-                id='db_keepalive',
-                replace_existing=True,
-            )
-
-            notification_scheduler.start()
-            logging.info('[Startup] Schedulers e keepalive iniciados.')
-        except Exception as exc:
-            logging.info(f'[Startup] Erro ao iniciar schedulers: {exc}')
-
-    asyncio.create_task(_start_schedulers())
+    await _warmup() 
 
 
 #  Entrypoint
@@ -203,7 +171,7 @@ async def health():
     return {
         'status': 'ok',
         "service": "Teacher Tati API",
-        "version": "2.0.2"
+        "version": "2.1.1"
     }
 
 if __name__ == '__main__':

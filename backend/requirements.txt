@@ -44,3 +44,5 @@ pydantic[email]
 tavily-python
 tavily
 PyMuPDF
+celery
+redis

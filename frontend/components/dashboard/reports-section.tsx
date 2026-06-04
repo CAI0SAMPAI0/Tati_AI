@@ -8,16 +8,10 @@ import { cn } from '@/lib/utils/index';
 
 const COLORS = ['#7c3aed', '#a855f7', '#c084fc', '#34d399', '#f59e0b'];
 
-const BarChart = dynamic(() => import('recharts').then(m => ({ default: m.BarChart })), { ssr: false });
-const Bar = dynamic(() => import('recharts').then(m => ({ default: m.Bar })), { ssr: false });
-const XAxis = dynamic(() => import('recharts').then(m => ({ default: m.XAxis })), { ssr: false });
-const YAxis = dynamic(() => import('recharts').then(m => ({ default: m.YAxis })), { ssr: false });
-const CartesianGrid = dynamic(() => import('recharts').then(m => ({ default: m.CartesianGrid })), { ssr: false });
-const Tooltip = dynamic(() => import('recharts').then(m => ({ default: m.Tooltip })), { ssr: false });
-const ResponsiveContainer = dynamic(() => import('recharts').then(m => ({ default: m.ResponsiveContainer })), { ssr: false });
-const PieChart = dynamic(() => import('recharts').then(m => ({ default: m.PieChart })), { ssr: false });
-const Pie = dynamic(() => import('recharts').then(m => ({ default: m.Pie })), { ssr: false });
-const Cell = dynamic(() => import('recharts').then(m => ({ default: m.Cell })), { ssr: false });
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+  PieChart, Pie, Cell 
+} from 'recharts';
 
 interface ReportsPayload {
   weekly_activity?: number[];

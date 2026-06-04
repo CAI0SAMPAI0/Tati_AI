@@ -14,17 +14,7 @@ from app.modules.auth.services.auth_service import AuthService
 router = APIRouter()
 
 
-async def _warm_up_tavily(username: str, level: str) -> None:
-    """Pré-carrega podcasts personalizados via Tavily em background após login."""
-    try:
-        from app.modules.activities.services.podcast_discovery import discover_personalized_podcasts
-        await discover_personalized_podcasts(username, username, level)
-    except Exception as exc:
-        logging.info(
-            f'[Auth] Erro no pré-carregamento Tavily para {username}: {exc}')
-
-
-# ── Models ────────────────────────────────────────────────────────────
+#  Models 
 
 
 class RegisterBody(BaseModel):
@@ -58,15 +48,13 @@ class ChangePasswordBody(BaseModel):
     new_password: str
 
 
-# ── Login ─────────────────────────────────────────────────────────────
+#  Login ─
 
 
 @router.post('/login')
 @router.post('/login_form')
 async def login(
     request: Request,
-    background_tasks: BackgroundTasks,
-    form: OAuth2PasswordRequestForm = Depends(lambda: None),
     db: Client = Depends(get_db),
 ) -> dict:
     """Autentica via form-data (OAuth2) ou JSON.
@@ -102,20 +90,10 @@ async def login(
             detail='Credenciais não fornecidas ou formato inválido.',
         )
 
-    result = await AuthService.authenticate_user(db, username, password)
-
-    # Warm-up Tavily em background sem bloquear o login
-    user_level = result.get('level', 'Beginner') if isinstance(
-        result, dict) else 'Beginner'
-    background_tasks.add_task(
-        _warm_up_tavily,
-        str(username),
-        str(user_level))
-
-    return result
+    return await AuthService.authenticate_user(db, username, password)
 
 
-# ── Register ──────────────────────────────────────────────────────────
+#  Register 
 
 
 @router.post('/register', status_code=status.HTTP_201_CREATED)
@@ -126,7 +104,7 @@ async def register(
     return await AuthService.register_student(db, body)
 
 
-# ── Google OAuth ──────────────────────────────────────────────────────
+#  Google OAuth 
 
 
 @router.post('/google')
@@ -137,7 +115,7 @@ async def google_login(
     return await AuthService.google_login(db, body.credential, body.is_hub_only)
 
 
-# ── Forgot password ───────────────────────────────────────────────────
+#  Forgot password ─
 
 
 @router.post('/forgot-password')
@@ -148,7 +126,7 @@ async def forgot_password(
     return await AuthService.process_forgot_password(db, body.identifier)
 
 
-# ── Change password (autenticado) ─────────────────────────────────────
+#  Change password (autenticado) ─
 
 
 @router.put('/password')

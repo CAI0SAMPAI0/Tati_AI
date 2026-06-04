@@ -118,105 +118,101 @@ async def get_personalized_module(
         logging.info(
             f"[PersonalizedRouter] Erro na lógica de frequência: {e}")
 
-    # 3. Retorna o módulo e seus quizzes
-    def _fetch():
-        try:
-            res_mod = db.table('modules').select(
-                '*').eq('id', PERSONALIZED_MODULE_ID).execute()
-            module = res_mod.data[0] if res_mod.data else None
-
-            if not module:
-                return {
-                    'id': PERSONALIZED_MODULE_ID,
-                    'title': 'Personalized Practice',
-                    'description': 'AI-generated exercises based on your history.',
-                    'quizzes': []}
-
-            # Quizzes do usuário (limita aos últimos 15 para não poluir)
-            quizzes = db.table('quizzes').select('*').eq(
+    # 3. Retorna o módulo e seus quizzes (Otimizado com asyncio.gather conforme Sprint 2)
+    try:
+        # Agrupa as consultas independentes para execução paralela
+        tasks = [
+            run_in_threadpool(lambda: db.table('modules').select(
+                '*').eq('id', PERSONALIZED_MODULE_ID).execute()),
+            run_in_threadpool(lambda: db.table('quizzes').select('*').eq(
                 'module_id', PERSONALIZED_MODULE_ID).eq(
                 'username', username).order(
-                'created_at', desc=True).limit(15).execute().data or []
+                'created_at', desc=True).limit(15).execute()),
+            run_in_threadpool(lambda: db.table('users').select('level').eq(
+                'username', username).single().execute()),
+            run_in_threadpool(lambda: db.table('activity_submissions').select('metadata').eq(
+                'username', username).eq('activity_type', 'quiz').execute())
+        ]
 
-            # 1. Carrega nível do usuário
-            user_res = db.table('users').select('level').eq(
-                'username', username).single().execute()
-            user_level = user_res.data.get('level', 'Intermediate') if (
-                user_res and user_res.data) else 'Intermediate'
+        res_mod, res_quiz, res_user, res_subs = await asyncio.gather(*tasks)
 
-            # 2. Mapeamento para níveis CEFR
-            def map_user_level_to_cefr(ulvl: str) -> list[str]:
-                mapping = {
-                    'Beginner': ['A1'],
-                    'Pre-Intermediate': ['A2'],
-                    'Intermediate': ['B1', 'B2'],
-                    'Business English': ['C1'],
-                    'Advanced': ['C2']
-                }
-                return mapping.get(ulvl or 'Intermediate', ['B1', 'B2'])
+        module = res_mod.data[0] if res_mod.data else None
+        if not module:
+            module = {
+                'id': PERSONALIZED_MODULE_ID,
+                'title': 'Personalized Practice',
+                'description': 'AI-generated exercises based on your history.',
+                'quizzes': []}
 
-            cefr_levels = map_user_level_to_cefr(user_level)
+        quizzes = res_quiz.data or []
+        user_level = res_user.data.get('level', 'Intermediate') if (
+            res_user and res_user.data) else 'Intermediate'
 
-            # 3. Busca exercícios CEFR publicados
-            cefr_res = db.table('cefr_exercises').select(
-                '*').in_('level', cefr_levels).eq('is_published', True).execute()
-            cefr_rows = cefr_res.data or []
+        # Mapeamento para níveis CEFR
+        def map_user_level_to_cefr(ulvl: str) -> list[str]:
+            mapping = {
+                'Beginner': ['A1'],
+                'Pre-Intermediate': ['A2'],
+                'Intermediate': ['B1', 'B2'],
+                'Business English': ['C1'],
+                'Advanced': ['C2']
+            }
+            return mapping.get(ulvl or 'Intermediate', ['B1', 'B2'])
 
-            # 4. Agrupa por tópico
-            from collections import defaultdict
-            import re
+        cefr_levels = map_user_level_to_cefr(user_level)
 
-            grouped = defaultdict(list)
-            for row in cefr_rows:
-                topic = row.get('topic') or 'General Practice'
-                grouped[topic].append(row)
+        # Busca exercícios CEFR publicados (depende do nível, então roda após o gather inicial)
+        cefr_res = await run_in_threadpool(lambda: db.table('cefr_exercises').select(
+            '*').in_('level', cefr_levels).eq('is_published', True).execute())
+        cefr_rows = cefr_res.data or []
 
-            # 5. Busca histórico de submissões para marcar como "done"
-            subs_res = db.table('activity_submissions').select('metadata').eq(
-                'username', username).eq('activity_type', 'quiz').execute()
-            completed_quiz_ids = set()
-            for s in (subs_res.data or []):
-                meta = s.get('metadata')
-                if meta and isinstance(
-                        meta, dict) and meta.get('quiz_id'):
-                    completed_quiz_ids.add(meta.get('quiz_id'))
+        # 4. Agrupa por tópico
+        from collections import defaultdict
+        import re
 
-            # 6. Cria quizzes virtuais
-            virtual_quizzes = []
-            for topic, items in grouped.items():
-                level_str = items[0]['level']
-                topic_slug = re.sub(r'[^a-zA-Z0-9]', '_', topic.lower())
-                quiz_id = f"cefr_{level_str}_{topic_slug}"
+        grouped = defaultdict(list)
+        for row in cefr_rows:
+            topic = row.get('topic') or 'General Practice'
+            grouped[topic].append(row)
 
-                is_done = quiz_id in completed_quiz_ids
+        # 5. Processa histórico de submissões
+        completed_quiz_ids = set()
+        for s in (res_subs.data or []):
+            meta = s.get('metadata')
+            if meta and isinstance(
+                    meta, dict) and meta.get('quiz_id'):
+                completed_quiz_ids.add(meta.get('quiz_id'))
 
-                virtual_quizzes.append({
-                    "id": quiz_id,
-                    "title": f"CEFR {level_str}: {topic}",
-                    "description": f"Exercises about {topic}.",
-                    "module_id": PERSONALIZED_MODULE_ID,
-                    "username": username,
-                    "status": "done" if is_done else "new",
-                    "created_at": items[0].get('created_at') or now.isoformat()
-                })
+        # 6. Cria quizzes virtuais
+        virtual_quizzes = []
+        for topic, items in grouped.items():
+            level_str = items[0]['level']
+            topic_slug = re.sub(r'[^a-zA-Z0-9]', '_', topic.lower())
+            quiz_id = f"cefr_{level_str}_{topic_slug}"
 
-            # 7. Mescla quizzes reais (personalizados por erros) e
-            # virtuais (CEFR)
-            all_quizzes = quizzes + virtual_quizzes
-            # Ordena por data de criação descrescente
-            all_quizzes.sort(key=lambda x: x.get(
-                'created_at') or '', reverse=True)
+            is_done = quiz_id in completed_quiz_ids
 
-            module['quizzes'] = all_quizzes
-            return module
-        except Exception as e:
-            logging.info(f"[PersonalizedRouter] Erro no fetch: {e}")
-            return None
+            virtual_quizzes.append({
+                "id": quiz_id,
+                "title": f"CEFR {level_str}: {topic}",
+                "description": f"Exercises about {topic}.",
+                "module_id": PERSONALIZED_MODULE_ID,
+                "username": username,
+                "status": "done" if is_done else "new",
+                "created_at": items[0].get('created_at') or now.isoformat()
+            })
 
-    result = await run_in_threadpool(_fetch)
-    if not result:
+        # 7. Mescla quizzes reais (personalizados por erros) e virtuais (CEFR)
+        all_quizzes = quizzes + virtual_quizzes
+        # Ordena por data de criação descrescente
+        all_quizzes.sort(key=lambda x: x.get(
+            'created_at') or '', reverse=True)
+
+        module['quizzes'] = all_quizzes
+        return module
+
+    except Exception as e:
+        logging.info(f"[PersonalizedRouter] Erro no fetch otimizado: {e}")
         raise HTTPException(
             status_code=500,
             detail="Erro ao carregar atividades personalizadas")
-
-    return result

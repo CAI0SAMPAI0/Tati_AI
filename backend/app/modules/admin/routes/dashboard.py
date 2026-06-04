@@ -217,7 +217,7 @@ async def list_simulations(
 
 
 @router.get('/simulations/{simulation_id}')
-async def get_simulation(
+def get_simulation(
         simulation_id: str,
         db: Client = Depends(get_db),
         user=Depends(require_staff)):
@@ -275,7 +275,11 @@ async def create_simulation(
         filtered_data['difficulty'] = str(
             data.get('level') or data.get('difficulty') or 'all').lower()
 
-    res = db.table('simulations').insert(filtered_data).execute()
+    from fastapi.concurrency import run_in_threadpool
+    def _save():
+        return db.table('simulations').insert(filtered_data).execute()
+        
+    res = await run_in_threadpool(_save)
 
     # Desabilitado: Notificação global de nova simulação
     """
@@ -296,7 +300,7 @@ async def create_simulation(
 
 
 @router.put('/simulations/{simulation_id}')
-async def update_simulation(
+def update_simulation(
         simulation_id: str,
         data: dict,
         db: Client = Depends(get_db),
@@ -325,7 +329,7 @@ async def update_simulation(
 
 
 @router.delete('/simulations/{simulation_id}')
-async def delete_simulation(
+def delete_simulation(
         simulation_id: str,
         db: Client = Depends(get_db),
         user=Depends(require_staff)):
@@ -335,7 +339,7 @@ async def delete_simulation(
 
 
 @router.get('/modules')
-async def list_all_modules(
+def list_all_modules(
         db: Client = Depends(get_db),
         user=Depends(require_staff)):
     """Lista todos os módulos (quizzes e conteúdos), ignorando flashcards."""
@@ -348,7 +352,7 @@ async def list_all_modules(
 
 
 @router.put('/modules/{module_id}')
-async def update_module_admin(
+def update_module_admin(
         module_id: str,
         data: dict,
         db: Client = Depends(get_db),
@@ -372,7 +376,7 @@ async def delete_module_admin(
 
 
 @router.get('/flashcards')
-async def get_dashboard_flashcards(
+def get_dashboard_flashcards(
         db: Client = Depends(get_db),
         user=Depends(require_staff)) -> list:
     """Lista flashcards globais ou de admin."""
@@ -394,7 +398,7 @@ async def get_dashboard_flashcards(
 
 
 @router.post('/flashcards')
-async def create_flashcard_deck(
+def create_flashcard_deck(
         data: dict,
         service: DashboardService = Depends(),
         db: Client = Depends(get_db),
@@ -413,7 +417,7 @@ async def create_flashcard_deck(
 
 
 @router.put('/flashcards/{deck_id}')
-async def update_flashcard_deck(
+def update_flashcard_deck(
         deck_id: str,
         data: dict,
         db: Client = Depends(get_db),

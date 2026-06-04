@@ -113,7 +113,7 @@ class ChangeDueDateRequest(BaseModel):
 
 
 @router.get('/access')
-async def get_access_info(
+def get_access_info(
     user: dict = Depends(get_current_user),
     db: Client = Depends(get_db)
 ):
@@ -185,7 +185,7 @@ async def get_access_info(
 
 
 @router.post('/change-due-date')
-async def change_due_date(
+def change_due_date(
     body: ChangeDueDateRequest,
     user: dict = Depends(get_current_user),
     db: Client = Depends(get_db),
@@ -225,7 +225,7 @@ async def change_due_date(
 
 
 @router.get('/subscription')
-async def get_subscription(
+def get_subscription(
     user: dict = Depends(get_current_user),
     db: Client = Depends(get_db),
 ):

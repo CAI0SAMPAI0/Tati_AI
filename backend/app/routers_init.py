@@ -242,3 +242,11 @@ def register_all_routers(app: FastAPI) -> None:
         public_router,
         prefix='/catalog',
         tags=['public'])
+
+    # --- Tasks (Celery Polling) ---
+    from app.routers.tasks import router as tasks_router
+
+    app.include_router(
+        tasks_router,
+        prefix='/tasks',
+        tags=['tasks'])

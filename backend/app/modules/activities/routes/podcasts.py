@@ -20,6 +20,25 @@ from app.modules.activities.services.podcast_recommender import PodcastRecommend
 
 router = APIRouter()
 
+@router.get('/warmup')
+async def warmup_podcasts(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Endpoint isolado para pré-carregar podcasts personalizados via Tavily.
+    Dessa forma, o login fica mais rápido e o carregamento pesado ocorre 
+    em background após a entrada no dashboard.
+    """
+    username = current_user['username']
+    level = current_user.get('level', 'Beginner')
+
+    from app.modules.activities.services.podcast_discovery import discover_personalized_podcasts
+    # Dispara em background
+    asyncio.create_task(discover_personalized_podcasts(
+        username, username, level))
+
+    return {"ok": True, "message": "Warmup initiated"}
+
 # Expose the profiler key constant for tests and external modules
 AUTO_RECO_PROFILE_KEY = PodcastRecommender.AUTO_RECO_PROFILE_KEY
 

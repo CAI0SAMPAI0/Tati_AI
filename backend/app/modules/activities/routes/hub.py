@@ -143,40 +143,13 @@ async def list_premium_content(
     contents = contents_res.data or []
 
     # 2. Busca compras do usuário
-    purchases_data = []
+    purchased_ids = set()
     if username:
         purchases_res = db.table('premium_purchases').select(
-            'id, content_id, asaas_payment_id, status').eq('username', username).execute()
-        purchases_data = purchases_res.data or []
-
-    # 2.1 Verifica em tempo real os pagamentos pendentes no Asaas
-    purchased_ids = set()
-    from app.modules.payments.services.asaas import get_payment
-    import asyncio
-
-    tasks = []
-    for p in purchases_data:
-        if p['status'] == 'confirmed':
-            purchased_ids.add(p['content_id'])
-        elif p['status'] == 'pending' and p.get('asaas_payment_id'):
-            # Adiciona tarefa para verificar o status no Asaas
-            async def _check_payment(purch=p):
-                try:
-                    payment_data = await get_payment(purch['asaas_payment_id'])
-                    if payment_data and payment_data.get(
-                            'status') in ['RECEIVED', 'CONFIRMED']:
-                        # Atualiza no banco
-                        db.table('premium_purchases').update(
-                            {'status': 'confirmed'}).eq('id', purch['id']).execute()
-                        purchased_ids.add(purch['content_id'])
-                except Exception as e:
-                    logging.info(
-                        f"[Hub] Erro ao verificar pagamento {
-                            purch['asaas_payment_id']}: {e}")
-            tasks.append(_check_payment())
-
-    if tasks:
-        await asyncio.gather(*tasks)
+            'content_id, status').eq('username', username).execute()
+        for p in (purchases_res.data or []):
+            if p['status'] == 'confirmed':
+                purchased_ids.add(p['content_id'])
 
     # 3. Formata resposta
     result = []

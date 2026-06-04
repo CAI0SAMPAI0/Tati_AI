@@ -116,10 +116,25 @@ async def public_checkout(
         customer = await create_customer(name=body.name, email=clean_email, cpf_cnpj=raw_doc)
     customer_id = customer['id']
 
-    # Fluxo público: sempre usar preço de buyer para visitantes do
-    # hub-site.
-    resolved_price = float(
-        item.get('price_buyers') or item.get('price') or 0)
+    # Determina o role do usuário para decidir o preço.
+    # Primeiro verifica o token (se estiver logado no hub). 
+    # Se não, verifica se o e-mail já existe no banco.
+    user_role = 'buyer'
+    if current_user and current_user.get('role'):
+        user_role = current_user.get('role')
+    elif existing:
+        # Precisamos buscar a role do usuário existente
+        existing_full = db.table('users').select('role').eq('username', username).execute().data
+        if existing_full and existing_full[0].get('role'):
+            user_role = existing_full[0].get('role')
+
+    # Alunos, professores e admins ganham o preço de estudante
+    if user_role != 'buyer':
+        resolved_price = float(
+            item.get('price_students') or item.get('price') or 0)
+    else:
+        resolved_price = float(
+            item.get('price_buyers') or item.get('price') or 0)
 
     if resolved_price <= 0:
         raise HTTPException(
