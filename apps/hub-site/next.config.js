@@ -1,7 +1,7 @@
 /* @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  transpilePackages: ['@tati/hub-core'],
+  transpilePackages: ['@tati/hub-core', 'lucide-react'],
   images: {
     remotePatterns: [
       {

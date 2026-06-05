@@ -6,40 +6,14 @@ Sistema de gamificação para motivar alunos.
 from datetime import datetime, timezone
 from app.core.database import get_client
 
-# Configuração de níveis (CEFR - Common European Framework)
+# Configuração de níveis XP (CEFR - Common European Framework)
 LEVELS = {
-    'A1': {
-        'min': 0,
-        'max': 500,
-        'label': 'Beginner',
-        'label_pt': 'Iniciante'},
-    'A2': {
-        'min': 500,
-        'max': 1200,
-        'label': 'Elementary',
-        'label_pt': 'Elementar'},
-    'B1': {
-        'min': 1200,
-        'max': 2500,
-        'label': 'Intermediate',
-        'label_pt': 'Intermediário',
-    },
-    'B2': {
-        'min': 2500,
-        'max': 4000,
-        'label': 'Upper Intermediate',
-        'label_pt': 'Intermediário Superior',
-    },
-    'C1': {
-        'min': 4000,
-        'max': 6000,
-        'label': 'Advanced',
-        'label_pt': 'Avançado'},
-    'C2': {
-        'min': 6000,
-        'max': 999999,
-        'label': 'Mastery',
-        'label_pt': 'Domínio Total'},
+    'A1': {'min': 0, 'max': 500},
+    'A2': {'min': 500, 'max': 1200},
+    'B1': {'min': 1200, 'max': 2500},
+    'B2': {'min': 2500, 'max': 4000},
+    'C1': {'min': 4000, 'max': 6000},
+    'C2': {'min': 6000, 'max': 999999},
 }
 
 # Recompensas de XP

@@ -106,7 +106,7 @@ async def submit_quiz(
 @router.post('/generate-dynamic')
 async def generate_dynamic(
         topic: str,
-        level: str = 'Intermediate',
+        level: str = 'B1',
         service: QuizService = Depends()):
     """Gera um quiz dinâmico via IA."""
     return await service.generate_dynamic_quiz(topic, level)

@@ -17,6 +17,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 
 import { cn, isStaff, canAccessDashboard } from '@/lib/utils';
+import { levelLabel } from '@/lib/constants/levels';
 import { ConversationList } from './conversation-list';
 import { WeeklyPlan } from './weekly-plan';
 import { apiGet, apiDelete } from '@/lib/api/client';
@@ -140,7 +141,7 @@ export function Sidebar({
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-[0.68rem] text-text-muted truncate">
-                {user?.level || 'Student'}
+                {user?.level ? levelLabel(user.level) : 'Student'}
               </span>
               {isPremium && (
                 <span className="px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[0.6rem] font-bold border border-primary/30">

@@ -63,6 +63,7 @@ export const ENDPOINTS = {
   ACTIVITIES_MODULES: '/activities/modules',
   ACTIVITIES_QUIZZES: '/activities/quizzes',
   ACTIVITIES_RANKING: '/activities/ranking',
+  ACTIVITIES_PODCASTS_WARMUP: '/activities/podcasts/warmup',
   ACTIVITIES_PODCASTS_RECOMMENDATIONS: '/activities/podcasts/recommendations',
   ACTIVITIES_PODCAST_DETAIL: (id: string) => `/activities/podcasts/${id}`,
   ACTIVITIES_PODCASTS_EXERCISES: (id: string) => `/activities/podcasts/${id}/exercises`,

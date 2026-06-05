@@ -1,10 +1,12 @@
+import type { CEFRLevel } from './levels';
+
 export interface User {
   id: string;
   username: string;
   email: string;
   name: string;
   role: string;
-  level: string;
+  level: CEFRLevel | string;
   plan_type: string | null;
   avatar_url?: string | null;
   cpf?: string | null;
@@ -26,7 +28,7 @@ export interface RegisterPayload {
   email: string;
   username: string;
   password: string;
-  level: string;
+  level: CEFRLevel | string;
   is_hub_only?: boolean;
 }
 

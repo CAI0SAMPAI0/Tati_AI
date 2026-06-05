@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { loginWithCredentials, loginWithGoogle, registerUser, requestPasswordReset } from '@/lib/api/auth';
+import { LEVEL_OPTIONS } from '@/lib/constants/levels';
 
 type Tab = 'login' | 'register' | 'forgot';
 
@@ -32,7 +33,7 @@ export default function LoginPage() {
   const [regEmail, setRegEmail] = useState('');
   const [regUsername, setRegUsername] = useState('');
   const [regPassword, setRegPassword] = useState('');
-  const [regLevel, setRegLevel] = useState('Beginner');
+  const [regLevel, setRegLevel] = useState('A1');
 
   // Forgot state
   const [forgotId, setForgotId] = useState('');
@@ -187,13 +188,7 @@ export default function LoginPage() {
     }
   };
 
-  const levelOptions = [
-    { value: 'Beginner', label: 'Beginner' },
-    { value: 'Pre-Intermediate', label: 'Pre-Intermediate' },
-    { value: 'Intermediate', label: 'Intermediate' },
-    { value: 'Business English', label: 'Business English' },
-    { value: 'Advanced', label: 'Advanced' },
-  ];
+  const levelOptions = LEVEL_OPTIONS;
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-bg relative overflow-hidden py-4 px-4">

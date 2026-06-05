@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '@/lib/api/client';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils/index';
+import { levelLabel, normalizeLevel } from '@/lib/constants/levels';
 
 const COLORS = ['#7c3aed', '#a855f7', '#c084fc', '#34d399', '#f59e0b'];
 
@@ -41,11 +42,12 @@ export function ReportsSection() {
 
   const levelDist = Object.entries(reportData?.level_distribution || {}).map(([name, value]) => ({
     name,
+    label: levelLabel(name),
     value,
     percentage: totalStudents > 0 ? Math.round((value / totalStudents) * 100) : 0
   })).filter(i => (i.value as number) > 0);
 
-  const filteredStudents = students?.filter(s => s.level === selectedLevel) || [];
+  const filteredStudents = students?.filter(s => normalizeLevel(s.level) === selectedLevel) || [];
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -120,7 +122,7 @@ export function ReportsSection() {
                >
                   <div className="flex items-center gap-2 mb-1">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
-                    <span className="text-[0.65rem] font-bold text-text-muted uppercase truncate">{lv.name}</span>
+                    <span className="text-[0.65rem] font-bold text-text-muted uppercase truncate">{lv.label}</span>
                   </div>
                   <div className="flex items-baseline gap-1">
                     <span className="text-sm font-bold text-text">{lv.value}</span>

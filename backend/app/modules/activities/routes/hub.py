@@ -248,8 +248,6 @@ async def get_content_access(
                 f"access_check_orders username={username} content_id={content_id} order_items={
                     order_items.data}")
 
-            from app.modules.payments.services.asaas import get_payment_status as asaas_get_payment_status
-
             for oi in (order_items.data or []):
                 order = oi.get('orders', {})
                 if order.get('username') != username:
@@ -258,47 +256,6 @@ async def get_content_access(
                 if order.get('status') == 'confirmed':
                     has_access = True
                     break
-
-                # Se está pendente, verifica diretamente no Asaas
-                if order.get('status') == 'pending' and order.get(
-                        'asaas_id'):
-                    try:
-                        asaas_data = await asaas_get_payment_status(order['asaas_id'])
-                        asaas_status = asaas_data.get(
-                            'status', '') if asaas_data else ''
-                        _hub_log(
-                            f"asaas_direct_check order_id={
-                                order['id']} asaas_id={
-                                order['asaas_id']} asaas_status={asaas_status}")
-
-                        if asaas_status in ('RECEIVED', 'CONFIRMED'):
-                            has_access = True
-                            # Sincroniza tudo no banco
-                            db.table('orders').update({
-                                'status': 'confirmed',
-                                'confirmed_at': datetime.now(timezone.utc).isoformat()
-                            }).eq('id', order['id']).execute()
-
-                            try:
-                                db.table('premium_purchases').upsert({
-                                    'username': username,
-                                    'content_id': content_id,
-                                    'status': 'confirmed',
-                                    'asaas_payment_id': order['asaas_id'],
-                                }, on_conflict='username,content_id').execute()
-                            except Exception:
-                                db.table('premium_purchases').insert({
-                                    'username': username,
-                                    'content_id': content_id,
-                                    'status': 'confirmed',
-                                    'asaas_payment_id': order['asaas_id'],
-                                }).execute()
-
-                            _hub_log(
-                                f"access_granted_via_asaas_direct username={username} content_id={content_id}")
-                            break
-                    except Exception as e:
-                        _hub_log(f"asaas_direct_check ERROR: {e}")
 
         if not has_access:
             raise PremiumAccessDeniedError()
@@ -725,7 +682,7 @@ def _get_or_create_guest_user(name: str, email: str, cpf: str) -> str:
             'password': hash_password(temp_password),
             'temp_password': hash_password(temp_password),
             'role': 'student',
-            'level': 'Beginner',
+            'level': 'A1',
             'focus': 'General Conversation',
             'cpf': raw_doc,
             'cpf_cnpj': raw_doc,
@@ -948,6 +905,18 @@ async def hub_payment_status(
 
     if not purchase:
         raise ContentNotFoundError("Pagamento não encontrado.")
+
+    # Já confirmado no Supabase — evita round-trip ao Asaas
+    if purchase[0].get('status') == 'confirmed':
+        return {
+            'paymentId': payment_id,
+            'status': 'confirmed',
+            'billingType': None,
+            'invoiceUrl': None,
+            'pixQrCode': None,
+            'pixCopyPaste': None,
+            'raw': None,
+        }
 
     payment_data = await _sync_premium_purchase_payment(payment_id, user['username'])
     if not payment_data:

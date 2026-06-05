@@ -16,9 +16,24 @@ import { X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import dynamic from 'next/dynamic';
-import remarkGfm from 'remark-gfm';
 
-const ReactMarkdown = dynamic(() => import('react-markdown'), { ssr: false });
+// Both react-markdown AND remark-gfm are pure ESM — they must be
+// imported together inside dynamic() so Webpack never bundles them
+// synchronously (which would crash with "Cannot read properties of
+// undefined (reading 'call')").
+const ReactMarkdown = dynamic(
+  () =>
+    Promise.all([
+      import('react-markdown').then((m) => m.default),
+      import('remark-gfm').then((m) => m.default),
+    ]).then(([Markdown, remarkGfm]) => {
+      const MarkdownWithGfm = ({ children }: { children: string }) => (
+        <Markdown remarkPlugins={[remarkGfm]}>{children}</Markdown>
+      );
+      return { default: MarkdownWithGfm };
+    }),
+  { ssr: false },
+);
 
 export default function ChatPage() {
   const router = useRouter();
@@ -295,7 +310,7 @@ export default function ChatPage() {
                   </div>
                 ) : (
                   <div className="prose dark:prose-invert prose-headings:text-text prose-headings:font-black prose-p:text-text/90 prose-strong:text-primary prose-ul:list-disc prose-li:text-text/80 max-w-none text-sm leading-relaxed text-text">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    <ReactMarkdown>
                       {summary || 'No summary available at the moment.'}
                     </ReactMarkdown>
                   </div>

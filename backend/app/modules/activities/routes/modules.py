@@ -8,6 +8,7 @@ from app.core.exceptions import ContentNotFoundError
 from typing import Optional
 
 from app.core.dependencies.auth import get_current_user
+from app.core.enums import normalize_level
 from app.modules.activities.services.activity_service import ActivityService
 
 router = APIRouter()
@@ -50,7 +51,7 @@ async def admin_generate_quiz(data: dict,
     qs = QuizService()
     return await qs.generate_dynamic_quiz(
         data.get('content_titles') or data.get('title', 'English Practice'),
-        data.get('level', 'Intermediate'),
+        normalize_level(data.get('level'), default='B1'),
         num_questions=data.get('num_questions', 5)
     )
 
@@ -62,7 +63,7 @@ async def admin_generate_flashcards(
     """Gera flashcards via IA."""
     return await service.generate_flashcards(
         data.get('theme'),
-        data.get('level', 'Intermediate'),
+        normalize_level(data.get('level'), default='B1'),
         module_id=data.get('module_id')
     )
 

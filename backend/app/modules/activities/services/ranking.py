@@ -5,6 +5,7 @@ Serviço de Ranking de Alunos.
 
 from datetime import datetime, timezone
 from app.core.database import get_client
+from app.core.enums import normalize_level, CEFR_ORDER
 
 # REGRAS DE PONTUAÇÃO EXATAS
 ACTION_POINTS = {
@@ -22,7 +23,7 @@ def _empty_stats(
     return {
         'username': username,
         'name': user_map.get(username) or username,
-        'level': (level_map or {}.get(username)) or 'Beginner',
+        'level': normalize_level((level_map or {}).get(username)),
         'avatar_url': None,
         'score': 0,
         'messages': 0,
@@ -120,8 +121,7 @@ def get_ranking_data(username: str) -> dict:
                 uname = u_info.get('username')
                 if uname in stats:
                     stats[uname]['name'] = u_info.get('name') or uname
-                    stats[uname]['level'] = u_info.get(
-                        'level') or 'Beginner'
+                    stats[uname]['level'] = normalize_level(u_info.get('level'))
                     stats[uname]['avatar_url'] = u_info.get('avatar_url') or (
                         u_info.get('profile') or {}).get('avatar_url')
         ranking = sorted(
@@ -175,8 +175,7 @@ def get_ranking_by_level(username: str) -> dict:
             u for u in all_users if (
                 u.get('username') and u.get('username') not in staff_usernames)]
 
-        user_level_map = {u['username']: u.get(
-            'level', 'Beginner') for u in all_users}
+        user_level_map = {u['username']: normalize_level(u.get('level')) for u in all_users}
         user_name_map = {u['username']: u.get(
             'name') or u['username'] for u in all_users}
 
@@ -208,27 +207,13 @@ def get_ranking_by_level(username: str) -> dict:
             if u in stats:
                 stats[u]['score'] += ACTION_POINTS['message']
 
-        # 3. Agrupa por categoria exata do projeto
-        categories = {
-            'Beginner': ['A1', 'Beginner', 'Elementary'],
-            'Pre-Intermediate': ['A2', 'Pre-Intermediate'],
-            'Intermediate': ['B1', 'B2', 'Intermediate', 'Upper Intermediate'],
-            'Advanced': ['C1', 'Advanced', 'Mastery'],
-            'Business': ['C2', 'Business', 'Business English', 'Professional']
-        }
-
-        result = {cat: [] for cat in categories.keys()}
+        # 3. Agrupa por código CEFR padronizado (A1–C2)
+        result: dict[str, list] = {code: [] for code in CEFR_ORDER}
 
         for user_stat in stats.values():
-            lvl = str(user_stat.get('level', 'Beginner'))
-            assigned = False
-            for cat, levels in categories.items():
-                if any(l.lower() in lvl.lower() for l in levels):
-                    result[cat].append(user_stat)
-                    assigned = True
-                    break
-            if not assigned:
-                result['Beginner'].append(user_stat)
+            lvl = normalize_level(str(user_stat.get('level', 'A1')))
+            user_stat['level'] = lvl  # garante que exibe CEFR no payload
+            result.setdefault(lvl, []).append(user_stat)
 
         # Ordena cada categoria e limita ao TOP 10
         for cat in result:
@@ -243,9 +228,4 @@ def get_ranking_by_level(username: str) -> dict:
         import traceback
         traceback.print_exc()
         logging.info(f'[Ranking] Erro by level: {e}')
-        return {
-            'Beginner': [],
-            'Pre-Intermediate': [],
-            'Intermediate': [],
-            'Advanced': [],
-            'Business': []}
+        return {code: [] for code in CEFR_ORDER}

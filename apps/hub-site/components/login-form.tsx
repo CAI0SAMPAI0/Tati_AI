@@ -9,6 +9,7 @@ import {
   loginWithCredentials,
   loginWithGoogle,
   registerUser,
+  LEVEL_OPTIONS,
 } from '@tati/hub-core';
 import { useHubAuth } from '@/components/auth-provider';
 
@@ -33,7 +34,7 @@ export function LoginForm() {
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerUsername, setRegisterUsername] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
-  const [registerLevel, setRegisterLevel] = useState('Beginner');
+  const [registerLevel, setRegisterLevel] = useState('A1');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -403,6 +404,24 @@ export function LoginForm() {
                     placeholder="seuusuario"
                     className="w-full rounded-xl border border-line bg-bgSecondary px-4 py-3 text-sm text-ink outline-none transition focus:border-violet-500/50"
                   />
+                </label>
+
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium text-muted">
+                    Nível de inglês
+                  </span>
+
+                  <select
+                    value={registerLevel}
+                    onChange={(e) => setRegisterLevel(e.target.value)}
+                    className="w-full rounded-xl border border-line bg-bgSecondary px-4 py-3 text-sm text-ink outline-none transition focus:border-violet-500/50"
+                  >
+                    {LEVEL_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
                 <label className="flex flex-col gap-1.5">

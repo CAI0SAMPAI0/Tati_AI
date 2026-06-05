@@ -49,6 +49,13 @@ function isAbsoluteUrl(value: string): boolean {
 
 function resolvePath(path: string): string {
   if (isAbsoluteUrl(path)) return path;
+  
+  // Se estiver rodando no servidor (SSR) dentro do Docker, usa o DNS interno
+  if (typeof window === 'undefined' && process.env.INTERNAL_API_URL) {
+    const base = process.env.INTERNAL_API_URL;
+    return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+  }
+
   return `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`;
 }
 

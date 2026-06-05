@@ -1,0 +1,21 @@
+# ─── Dockerfile.dev (hub-site) ─────────────────────────────────────────────────
+# Contexto: Root do projeto
+# ────────────────────────────────────────────────────────────────────────────────
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copia arquivos de configuração do workspace
+COPY package*.json ./
+COPY apps/hub-site/package*.json ./apps/hub-site/
+COPY packages/hub-core/package*.json ./packages/hub-core/
+
+# Instala todas as dependências do monorepo (mais eficiente)
+RUN npm install --prefer-offline
+
+# O código é montado via volume, mas precisamos garantir que o WORKDIR é o app correto
+WORKDIR /app/apps/hub-site
+
+EXPOSE 3001
+
+CMD ["npm", "run", "dev"]

@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { DialogModal } from '@/components/ui/dialog-modal';
 import toast from 'react-hot-toast';
 import { ENDPOINTS } from '@/lib/api/endpoints';
+import { LEVEL_OPTIONS, LEVEL_FILTER_OPTIONS, normalizeLevel, levelLabel } from '@/lib/constants/levels';
 
 interface FlashcardDeck {
   id: string;
@@ -80,7 +81,10 @@ export function FlashcardsSection() {
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const filteredDecks = (decks as FlashcardDeck[]).filter((d: FlashcardDeck) => filterLevel === 'all' || d.level === filterLevel);
+  const filteredDecks = (decks as FlashcardDeck[]).filter((d: FlashcardDeck) => {
+    if (filterLevel === 'all') return true;
+    return normalizeLevel(d.level) === normalizeLevel(filterLevel);
+  });
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Delete this deck?')) return;
@@ -323,12 +327,9 @@ export function FlashcardsSection() {
               value={filterLevel}
               onChange={(e) => setFilterLevel(e.target.value)}
             >
-              <option value="all">All Levels</option>
-              <option value="beginner">Beginner</option>
-              <option value="pre-intermediate">Pre-Intermediate</option>
-              <option value="intermediate">Intermediate</option>
-              <option value="business english">Business English</option>
-              <option value="advanced">Advanced</option>
+              {LEVEL_FILTER_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
          </div>
          <Button className="gap-2" onClick={() => openModal()}>
@@ -349,7 +350,7 @@ export function FlashcardsSection() {
                   {d.card_count || 0} cards
                 </span>
                 <span className="text-[0.55rem] font-black uppercase text-text-subtle tracking-tighter">
-                  {d.level === 'all' || d.level === 'todos' ? 'All Levels' : (d.level || 'Intermediate')}
+                  {d.level === 'all' || d.level === 'todos' ? 'All Levels' : levelLabel(d.level)}
                 </span>
               </div>
             </div>
@@ -409,11 +410,9 @@ export function FlashcardsSection() {
                   onChange={(e) => setFormData(prev => ({ ...prev, level: e.target.value }))}
                 >
                   <option value="all">All Levels</option>
-                  <option value="beginner">Beginner</option>
-                  <option value="pre-intermediate">Pre-Intermediate</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="business english">Business English</option>
-                  <option value="advanced">Advanced</option>
+                  {LEVEL_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
                 </select>
               </div>
 

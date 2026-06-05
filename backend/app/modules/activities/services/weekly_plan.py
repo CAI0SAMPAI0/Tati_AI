@@ -298,6 +298,7 @@ Student's recent messages (use to personalize difficulty and style):
 Task: {type_prompt}
 
 IMPORTANT:
+- ALL content (questions, options, explanations) MUST be entirely in English
 - Base exercises on the reference material when possible
 - Match difficulty to the student's apparent level from their messages
 - Make questions clearly about the weekly topics

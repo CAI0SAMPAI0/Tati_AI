@@ -29,12 +29,21 @@ export const metadata: Metadata = {
 
 async function getMateriais(): Promise<CatalogMaterial[]> {
   const apiUrl = resolveApiUrl();
-  const res = await fetch(`${apiUrl}/catalog`, {
-    next: { revalidate: 60 },
-  });
+  console.log('[Hub SSR] Fetching from:', `${apiUrl}/catalog`);
+  try {
+    const res = await fetch(`${apiUrl}/catalog`, {
+      next: { revalidate: 60 },
+    });
 
-  if (!res.ok) return [];
-  return res.json();
+    if (!res.ok) {
+      console.error('[Hub SSR] Fetch failed:', res.status, res.statusText);
+      return [];
+    }
+    return res.json();
+  } catch (err) {
+    console.error('[Hub SSR] Fetch error:', err);
+    throw err;
+  }
 }
 
 export default async function CatalogoPage() {

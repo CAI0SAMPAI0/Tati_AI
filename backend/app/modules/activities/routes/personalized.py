@@ -145,21 +145,12 @@ async def get_personalized_module(
                 'quizzes': []}
 
         quizzes = res_quiz.data or []
-        user_level = res_user.data.get('level', 'Intermediate') if (
-            res_user and res_user.data) else 'Intermediate'
+        user_level = res_user.data.get('level', 'B1') if (
+            res_user and res_user.data) else 'B1'
 
-        # Mapeamento para níveis CEFR
-        def map_user_level_to_cefr(ulvl: str) -> list[str]:
-            mapping = {
-                'Beginner': ['A1'],
-                'Pre-Intermediate': ['A2'],
-                'Intermediate': ['B1', 'B2'],
-                'Business English': ['C1'],
-                'Advanced': ['C2']
-            }
-            return mapping.get(ulvl or 'Intermediate', ['B1', 'B2'])
-
-        cefr_levels = map_user_level_to_cefr(user_level)
+        # Usa normalize_level + janela CEFR para buscar conteúdo adjacente
+        from app.core.enums import normalize_level, cefr_window
+        cefr_levels = cefr_window(normalize_level(user_level), radius=1)
 
         # Busca exercícios CEFR publicados (depende do nível, então roda após o gather inicial)
         cefr_res = await run_in_threadpool(lambda: db.table('cefr_exercises').select(

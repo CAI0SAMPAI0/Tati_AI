@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Dict, Any
@@ -15,8 +16,10 @@ from app.core.security import (
 )
 from app.shared.services.email import EmailSender
 from app.modules.users.repositories.user_repository import UserRepository
+from app.core.enums import normalize_level
 from supabase import Client
 from app.core.exceptions import UserNotFoundError, BusinessLogicError, AuthenticationRequiredError
+
 
 
 class AuthService:
@@ -26,7 +29,7 @@ class AuthService:
         token_payload = {
             'sub': user['username'],
             'role': user.get('role', 'student'),
-            'level': user.get('level', 'Beginner'),
+            'level': normalize_level(user.get('level')),
         }
         token = create_access_token(token_payload)
 
@@ -35,12 +38,14 @@ class AuthService:
 
         username = user['username']
         if username in SPECIAL_USERS:
-            try:
-                # Pode bloquear, então jogamos na threadpool
-                await run_in_threadpool(activate_special_user, username, 'full')
-            except Exception as e:
-                logging.info(
-                    f'[Auth] Erro ao ativar subscription para {username}: {e}')
+            async def _activate_special() -> None:
+                try:
+                    await run_in_threadpool(activate_special_user, username, 'full')
+                except Exception as e:
+                    logging.info(
+                        f'[Auth] Erro ao ativar subscription para {username}: {e}')
+
+            asyncio.create_task(_activate_special())
 
         sanitized_user = {
             k: v for k,
@@ -100,7 +105,7 @@ class AuthService:
             'email': email,
             'password': hash_password(body.password),
             'role': 'buyer' if is_hub_only else 'student',
-            'level': body.level,
+            'level': normalize_level(body.level),
             'focus': 'General Conversation',
             'created_at': datetime.now(timezone.utc).isoformat(),
         }
@@ -149,7 +154,7 @@ class AuthService:
             'email': email,
             'password': 'google_authenticated',
             'role': 'buyer' if is_hub_only else 'student',
-            'level': 'Beginner',
+            'level': 'A1',
             'focus': 'General Conversation',
             'created_at': datetime.now(timezone.utc).isoformat(),
         }

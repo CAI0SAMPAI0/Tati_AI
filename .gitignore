@@ -155,3 +155,7 @@ pip-log.txt
 # OS
 .DS_Store
 Thumbs.db
+
+design_system/*
+.env.docker.example
+comandos.txt

@@ -21,6 +21,7 @@ import { DialogModal } from '@/components/ui/dialog-modal';
 import { Spinner } from '@/components/ui/spinner';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
+import { LEVEL_OPTIONS, LEVEL_FILTER_OPTIONS, normalizeLevel, levelLabel } from '@/lib/constants/levels';
 
 interface SimulationRow {
   id: string;
@@ -73,11 +74,10 @@ export default function SimulationsSection() {
 
   const filteredSimulations = simulations.filter((s: any) => {
     if (filterLevel === 'all') return true;
-    const simDiff = (s.difficulty || '').toLowerCase();
-    const targetDiff = filterLevel.toLowerCase();
+    const simDiff = normalizeLevel(s.difficulty);
+    const targetDiff = normalizeLevel(filterLevel);
     
-    // Mostra se o nível for o selecionado OU se for para todos ('all'/'todos')
-    return simDiff === targetDiff || simDiff === 'all' || simDiff === 'todos';
+    return simDiff === targetDiff || s.difficulty === 'all' || s.difficulty === 'todos';
   });
 
   const handleDelete = async (id: string) => {
@@ -98,7 +98,7 @@ export default function SimulationsSection() {
       setFormData({
         name: sim.name || '',
         description: sim.description || '',
-        difficulty: (sim.difficulty || 'beginner').toLowerCase(),
+        difficulty: sim.difficulty === 'all' || sim.difficulty === 'todos' ? 'all' : normalizeLevel(sim.difficulty),
         system_prompt: sim.system_prompt || '',
         emoji: sim.emoji || '🎭',
       });
@@ -236,12 +236,9 @@ export default function SimulationsSection() {
             value={filterLevel}
             onChange={(e) => setFilterLevel(e.target.value)}
           >
-            <option value="all">All Levels</option>
-            <option value="Beginner">Beginner</option>
-            <option value="Pre-Intermediate">Pre-Intermediate</option>
-            <option value="Intermediate">Intermediate</option>
-            <option value="Business English">Business English</option>
-            <option value="Advanced">Advanced</option>
+            {LEVEL_FILTER_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
         </div>
         <Button className="gap-2" onClick={() => openModal()}>
@@ -259,7 +256,7 @@ export default function SimulationsSection() {
                 {s.difficulty === 'all' || s.difficulty === 'todos' ? 'A' : (s.difficulty?.[0] || 'B')}
               </div>
               <span className="text-[0.6rem] font-bold px-2 py-0.5 rounded-full bg-surface-hover border border-border uppercase tracking-widest text-text-subtle">
-                {s.difficulty === 'all' || s.difficulty === 'todos' ? 'All Levels' : (s.difficulty || 'Beginner')}
+                {s.difficulty === 'all' || s.difficulty === 'todos' ? 'All Levels' : levelLabel(s.difficulty)}
               </span>
             </div>
 
@@ -329,12 +326,10 @@ export default function SimulationsSection() {
               value={formData.difficulty}
               onChange={(e) => setFormData(prev => ({ ...prev, difficulty: e.target.value }))}
             >
-              <option value="all">All Levels </option>
-              <option value="beginner">Beginner</option>
-              <option value="pre-intermediate">Pre-Intermediate</option>
-              <option value="intermediate">Intermediate</option>
-              <option value="business english">Business English</option>
-              <option value="advanced">Advanced</option>
+              <option value="all">All Levels</option>
+              {LEVEL_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
           </div>
           <Input

@@ -43,10 +43,9 @@ class PodcastExerciseService:
             logging.info(
                 f"[exercise] WARNING: sem transcrição, usando description como fallback")
 
-        level = str(podcast.get('level') or 'Beginner')
-        level_lower = level.lower()
-        is_beginner = any(token in level_lower for token in [
-                          'a1', 'a2', 'beginner', 'pre-intermediate'])
+        from app.core.enums import normalize_level
+        level = normalize_level(podcast.get('level'))
+        is_beginner = level in ('A1', 'A2')
         difficulty_rule = (
             "Use short, simple English (CEFR A1-A2). Prefer common words, short sentences and direct questions."
             if is_beginner
@@ -67,7 +66,7 @@ class PodcastExerciseService:
             "RESPONSE FORMAT (STRICT JSON ONLY):\n"
             "{\n"
             '  "exercises": [\n'
-            '    {"type": "voice", "question": "Context about the phrase...", "phrase": "exact phrase from transcript", "translation_hint": "Brazilian Portuguese translation hint"}\n'
+            '    {"type": "voice", "question": "Context about the phrase...", "phrase": "exact phrase from transcript", "translation_hint": "Short English hint about meaning"}\n'
             '  ]\n'
             "}\n"
             "CRITICAL: Do not include any text outside the JSON. Use the transcript content religiously."
@@ -260,6 +259,7 @@ class PodcastExerciseService:
                 "Compare word by word. Score 0-100 based on accuracy.\n"
                 "In feedback: point out specific words they missed or mispronounced, and praise what was right.\n"
                 "Be encouraging but honest. If score < 70, give the correct phrase again.\n"
+                "Feedback MUST be in English only.\n"
                 'Return JSON: { "score": 80, "feedback": "..." }'
             )
         else:
@@ -270,6 +270,7 @@ class PodcastExerciseService:
                 f"Student answer: \"{req.user_answer}\"\n"
                 f"Student level: {user_level}\n"
                 "Score 0-100 strictly based on correctness. Do NOT default to 85.\n"
+                "Feedback MUST be in English only.\n"
                 'Return JSON: { "score": 70, "feedback": "..." }'
             )
 

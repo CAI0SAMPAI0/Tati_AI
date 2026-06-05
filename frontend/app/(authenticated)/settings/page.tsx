@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   Moon,
   Sun,
+  Monitor,
   Save,
   RotateCcw,
   Smartphone,
@@ -23,7 +24,7 @@ import toast from 'react-hot-toast';
 import { useTour } from '@/hooks/useTour';
 
 export default function SettingsPage() {
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const router = useRouter();
   const { restartTour } = useTour();
   const [mounted, setMounted] = useState(false);
@@ -78,20 +79,26 @@ export default function SettingsPage() {
                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
                     <p className="text-sm font-bold text-text mb-0.5">Theme</p>
-                    <p className="text-xs text-text-muted">Choose between light and dark mode</p>
+                    <p className="text-xs text-text-muted">Light, dark or match your device</p>
                   </div>
-                  <div className="flex p-1 bg-bg border border-border rounded-xl">
+                  <div className="flex flex-wrap p-1 bg-bg border border-border rounded-xl gap-1">
+                    <button
+                      onClick={() => setTheme('light')}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all ${theme === 'light' ? 'bg-primary text-white shadow-glow' : 'text-text-muted hover:text-text'}`}
+                    >
+                      <Sun size={14} /> {'Light'}
+                    </button>
                     <button
                       onClick={() => setTheme('dark')}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${theme === 'dark' || resolvedTheme === 'dark' ? 'bg-primary text-white shadow-glow' : 'text-text-muted hover:text-text'}`}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all ${theme === 'dark' ? 'bg-primary text-white shadow-glow' : 'text-text-muted hover:text-text'}`}
                     >
                       <Moon size={14} /> {'Dark'}
                     </button>
                     <button
-                      onClick={() => setTheme('light')}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${theme === 'light' || resolvedTheme === 'light' ? 'bg-primary text-white shadow-glow' : 'text-text-muted hover:text-text'}`}
+                      onClick={() => setTheme('system')}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all ${theme === 'system' ? 'bg-primary text-white shadow-glow' : 'text-text-muted hover:text-text'}`}
                     >
-                      <Sun size={14} /> {'Light'}
+                      <Monitor size={14} /> {'System'}
                     </button>
                   </div>
                </div>

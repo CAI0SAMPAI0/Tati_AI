@@ -1,0 +1,95 @@
+# ─── docker-compose.dev.yml ────────────────────────────────────────────────────
+# Ambiente de DESENVOLVIMENTO local — com hot-reload em todos os serviços.
+#
+# Uso rápido:
+#   docker compose -f docker-compose.dev.yml up --build
+#
+# Serviços individuais:
+#   docker compose -f docker-compose.dev.yml up backend
+#   docker compose -f docker-compose.dev.yml up frontend
+#   docker compose -f docker-compose.dev.yml up hub
+# ────────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ─── Backend (FastAPI + uvicorn --reload) ──────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8001:8001"
+    volumes:
+      # Monta o código-fonte diretamente — qualquer mudança reinicia o uvicorn
+      - ./backend:/app
+    env_file:
+      - .env          # variáveis de produção/segredos reais
+    environment:
+      PORT: "8001"
+      PYTHONUNBUFFERED: "1"
+      WEB_CONCURRENCY: "1"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ─── Frontend Tati AI (Next.js dev server com hot-reload) ──────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      # Hot-reload: o código local é montado no container
+      - ./frontend:/app/frontend
+      - ./packages/hub-core:/app/packages/hub-core
+      # Preserva node_modules do container (não substitui pelo da máquina host)
+      - frontend_node_modules:/app/frontend/node_modules
+      - frontend_next:/app/frontend/.next
+    environment:
+      # Aponta para o backend dentro da rede Docker
+      NEXT_PUBLIC_API_BASE_URL: "http://localhost:8001"
+      NEXT_PUBLIC_WS_BASE_URL: "ws://localhost:8001"
+      NEXT_PUBLIC_AUTH_REFRESH_PATH: "/auth/refresh"
+      INTERNAL_API_URL: "http://backend:8001"
+      NEXT_PUBLIC_INTERNAL_API_URL: "http://backend:8001"
+      WATCHPACK_POLLING: "true"    # necessário no Windows/WSL2 para file-watch
+      CHOKIDAR_USEPOLLING: "true"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── Hub Site (apps/hub-site, Next.js dev server com hot-reload) ───────────
+  hub:
+    build:
+      context: .
+      dockerfile: apps/hub-site/Dockerfile.dev
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./apps/hub-site:/app/apps/hub-site
+      - ./packages/hub-core:/app/packages/hub-core
+      - hub_node_modules:/app/apps/hub-site/node_modules
+      - hub_next:/app/apps/hub-site/.next
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: "http://localhost:8001"
+      INTERNAL_API_URL: "http://backend:8001"
+      NEXT_PUBLIC_INTERNAL_API_URL: "http://backend:8001"
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+# ─── Volumes nomeados (evitam conflito com node_modules do host) ────────────
+volumes:
+  frontend_node_modules:
+  frontend_next:
+  hub_node_modules:
+  hub_next:

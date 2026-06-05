@@ -1,7 +1,7 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
+import { TatiLogo } from '@/components/ui/tati-logo';
 import {
   PieChart,
   Users,
@@ -13,7 +13,6 @@ import {
   Settings,
   X,
   Zap,
-  GraduationCap
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -67,23 +66,8 @@ export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose 
       >
         <div className="p-6 shrink-0 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg overflow-hidden bg-primary/20 flex items-center justify-center text-primary shrink-0 border border-primary/10">
-              <Image
-                src="/images/tati_logo.jpg"
-                alt="Tati AI"
-                width={32}
-                height={32}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  const fallback = target.nextElementSibling as HTMLElement;
-                  if (fallback) fallback.style.display = 'flex';
-                }}
-              />
-              <div style={{ display: 'none' }} className="w-full h-full items-center justify-center bg-primary text-white">
-                <GraduationCap size={16} />
-              </div>
+            <div className="w-8 h-8 rounded-lg overflow-hidden bg-primary/20 flex items-center justify-center shrink-0 border border-primary/10">
+              <TatiLogo size={32} className="w-full h-full rounded-lg" />
             </div>
             <div className="min-w-0">
               <div className="font-display text-[0.9rem] font-bold tracking-tight text-text truncate">Teacher Tati</div>

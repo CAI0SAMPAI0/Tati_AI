@@ -19,6 +19,7 @@ import {
 import { type Podcast } from '@/lib/api/types/podcast';
 import { cn } from '@/lib/utils';
 import { apiGet, apiPost } from '@/lib/api/client';
+import { normalizeLevel, levelLabel } from '@/lib/constants/levels';
 
 interface PodcastViewerProps {
   podcast: Podcast;
@@ -66,10 +67,10 @@ export function PodcastViewer({ podcast }: PodcastViewerProps) {
   }, [podcast.embed_url]);
 
   const levelColor = useMemo(() => {
-    const l = podcast.level?.toLowerCase();
-    if (l.includes('a1') || l.includes('beginner')) return 'bg-success/10 text-success border-success/20';
-    if (l.includes('b1') || l.includes('intermediate')) return 'bg-primary/10 text-primary border-primary/20';
-    if (l.includes('c1') || l.includes('advanced')) return 'bg-danger/10 text-danger border-danger/20';
+    const code = normalizeLevel(podcast.level);
+    if (code === 'A1' || code === 'A2') return 'bg-success/10 text-success border-success/20';
+    if (code === 'B1' || code === 'B2') return 'bg-primary/10 text-primary border-primary/20';
+    if (code === 'C1' || code === 'C2') return 'bg-danger/10 text-danger border-danger/20';
     return 'bg-bg-secondary text-text-muted border-border';
   }, [podcast.level]);
 
@@ -114,7 +115,7 @@ export function PodcastViewer({ podcast }: PodcastViewerProps) {
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
             <span className={cn("text-[0.65rem] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border", levelColor)}>
-              {podcast.level}
+              {levelLabel(podcast.level)}
             </span>
             <span className="flex items-center gap-1.5 text-[0.65rem] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-bg-secondary border border-border text-text-muted">
               {podcast.media_type === 'audio' ? <Waves size={14} /> : <CirclePlay size={14} />}

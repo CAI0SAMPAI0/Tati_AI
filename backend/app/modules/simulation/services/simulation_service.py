@@ -12,6 +12,7 @@ from app.core.dependencies.db import get_db
 from app.modules.simulation.services.simulation import get_all_scenarios, get_scenario, evaluate_simulation
 from app.modules.chat.services.llm import groq_chat, transcribe_audio, text_to_speech
 from app.shared.services.history import save_message
+from app.core.enums import normalize_level
 
 
 class SimulationService:
@@ -33,13 +34,14 @@ class SimulationService:
     async def start_session(self,
                             username: str,
                             scenario_id: str,
-                            user_level: str = 'Beginner') -> Dict[str,
+                            user_level: str = 'A1') -> Dict[str,
                                                                   Any]:
         """Inicializa uma nova sessão de simulação e retorna o ID da conversa com a primeira mensagem da IA."""
         import uuid
         conv_id = f"sim_{uuid.uuid4().hex[:8]}"
 
         scenario = await self.get_scenario_details(scenario_id)
+        user_level = normalize_level(user_level)
         if not scenario:
             return {"error": "Scenario not found"}
 
@@ -122,9 +124,10 @@ class SimulationService:
         content: str,
         scenario_id: str,
         conversation_id: Optional[str] = None,
-        user_level: str = 'Beginner',
+        user_level: str = 'A1',
     ) -> Dict[str, Any]:
         conv_id = conversation_id or f'sim_{username}_{scenario_id}'
+        user_level = normalize_level(user_level)
 
         # Salva e registra atividade
         await save_message(conv_id, username, 'user', content)

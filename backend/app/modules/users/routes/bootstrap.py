@@ -25,15 +25,8 @@ async def get_bootstrap(
     O frontend pode chamar este endpoint uma vez ao invés de
     fazer 4-6 chamadas separadas.
     """
-    import asyncio
-    from app.modules.activities.services.podcast_discovery import discover_personalized_podcasts
     username = current_user['username']
     cache_key = f'bootstrap:{username}'
-
-    # Gatilho de descoberta em background (opcional, se não houver cache
-    # recente)
-    asyncio.create_task(discover_personalized_podcasts(
-        username, username, current_user.get('level', 'Intermediate')))
 
     cached = await cache_get(cache_key)
     if cached:

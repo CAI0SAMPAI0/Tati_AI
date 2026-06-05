@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import logging
-
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
 from app.core.dependencies.auth import get_current_user
@@ -24,7 +21,7 @@ class RegisterBody(BaseModel):
     email: str
     username: str
     password: str
-    level: str = 'Beginner'
+    level: str = 'A1'
     is_hub_only: bool = False
 
 
@@ -59,9 +56,8 @@ async def login(
 ) -> dict:
     """Autentica via form-data (OAuth2) ou JSON.
 
-    Após autenticação bem-sucedida, dispara em background o pré-carregamento
-    de podcasts personalizados via Tavily para que a próxima visita
-    às atividades já tenha conteúdo preparado.
+    Retorno imediato: validação bcrypt + JWT. Pré-carregamento de podcasts
+    deve ser disparado pelo cliente via GET /activities/podcasts/warmup.
     """
     username = None
     password = None

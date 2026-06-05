@@ -1,0 +1,20 @@
+# ─── Dockerfile.dev (Frontend) ─────────────────────────────────────────────────
+# Contexto: Root do projeto
+# ────────────────────────────────────────────────────────────────────────────────
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copia arquivos de configuração do workspace
+COPY package*.json ./
+COPY frontend/package*.json ./frontend/
+COPY packages/hub-core/package*.json ./packages/hub-core/
+
+# Instala todas as dependências
+RUN npm install --prefer-offline
+
+WORKDIR /app/frontend
+
+EXPOSE 3000
+
+CMD ["npm", "run", "dev"]

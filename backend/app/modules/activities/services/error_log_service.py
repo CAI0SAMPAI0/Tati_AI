@@ -50,7 +50,7 @@ Return ONLY a JSON object:
       "incorrect": "exactly as written by student",
       "correct": "the correct form",
       "category": "grammar|vocabulary|preposition|verb_tense|spelling",
-      "explanation": "Short explanation in Portuguese",
+      "explanation": "Short explanation in English",
       "severity": 1,
       "confidence": 0.9,
       "should_practice": true

@@ -1,6 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from app.core.config import settings
+from app.core.enums import normalize_level
+
 
 """
 Constrói o prompt (system prompt) para a LLM, combinando instruções base, perfil do aluno, contexto RAG e custom prompt.
@@ -17,8 +19,8 @@ class UserProfile:
 
 
 _LEVEL_RULES = {
-    'Beginner': (
-        'ADAPTATION RULES for BEGINNER:\n'
+    'A1': (
+        'ADAPTATION RULES for A1 (Beginner):\n'
         '- Use EXTREMELY simple words and VERY short sentences.\n'
         '- General response length: 15-20 words.\n'
         '- If the student asks for a story or history, you can expand up to 40 words using very simple language.\n'
@@ -26,28 +28,39 @@ _LEVEL_RULES = {
         '- NO complex explanations and NO grammar lessons.\n'
         '- NEVER provide inline feedback markers. Just keep the conversation going.\n'
         "- If you don't understand, ask a very simple follow-up question."),
-    'Pre-Intermediate': (
-        'ADAPTATION RULES for PRE-INTERMEDIATE:\n'
+    'A2': (
+        'ADAPTATION RULES for A2 (Pre-Intermediate):\n'
         '- Use simple language but slightly more elaborated than beginner.\n'
         '- General response length: 30-40 words.\n'
         '- If the student asks for detailed information or history, expand up to 80 words.\n'
         '- Keep answers concise and clear.\n'
         '- No detailed feedback during chat.\n'
         '- Introduce basic phrasal verbs.'),
-    'Intermediate': (
-        'ADAPTATION RULES for INTERMEDIATE:\n'
+    'B1': (
+        'ADAPTATION RULES for B1 (Intermediate):\n'
         '- Speak naturally, use standard vocabulary.\n'
         '- General response length: 60-80 words.\n'
         '- If the student asks for history, stories, or detailed explanations, expand up to 150 words.\n'
         '- Balanced responses, natural conversation flow.\n'
         '- Keep conversational replies clean.\n'
         '- Introduce useful phrasal verbs and common idioms.'),
-    'Advanced': (
-        'ADAPTATION RULES for ADVANCED / BUSINESS:\n'
+    'B2': (
+        'ADAPTATION RULES for B2 (Upper-Intermediate):\n'
+        '- Speak naturally and fluently.\n'
+        '- General response length: 80-100 words.\n'
+        '- Encourage student to use more complex sentence structures.\n'
+        '- Introduce advanced idioms and phrasal verbs.'),
+    'C1': (
+        'ADAPTATION RULES for C1 (Advanced):\n'
         '- Talk like a native speaker.\n'
         '- Use sophisticated idioms and complex vocabulary.\n'
         '- Full native-level responses with nuance and detail.\n'
         '- No specific word limit; provide complete and rich information as requested.'),
+    'C2': (
+        'ADAPTATION RULES for C2 (Mastery / Proficiency):\n'
+        '- Talk like a highly articulate native speaker.\n'
+        '- Use sophisticated grammar, advanced vocabulary, and precise nuances.\n'
+        '- Engage in complex, high-level abstract discussions.'),
 }
 
 _RAG_RULES = (
@@ -70,12 +83,12 @@ _PODCAST_LOGIC_TEMPLATE = (
 
 
 def build_profile_instruction(profile: UserProfile) -> str:
-    level_rule = _LEVEL_RULES.get(
-        profile.level, _LEVEL_RULES['Intermediate'])
+    lvl = normalize_level(profile.level)
+    level_rule = _LEVEL_RULES.get(lvl, _LEVEL_RULES['B1'])
     return (
         f'\n\n--- STUDENT PROFILE ---\n'
         f'Student Real Name: {profile.name}\n'
-        f'English Level: {profile.level}\n'
+        f'English Level: {lvl}\n'
         f'Main Focus: {profile.focus}\n\n'
         f'{level_rule}\n'
         f'- Always address the student by their Real Name ({profile.name}) occasionally to make it personal.\n'
@@ -128,12 +141,13 @@ def build_exercise_prompt(
         error_context: str,
         exercise_type: str = 'quiz',
         targets: list[dict] | None = None,
-        user_level: str = 'Intermediate') -> str:
+        user_level: str = 'B1') -> str:
     """
     Constrói um prompt focado para geração de exercícios a partir de um contexto de erros.
     Garante instruções estritas: usar somente os padrões fornecidos, não usar rótulos A/B/C/D
     e retornar apenas JSON válido.
     """
+    user_level = normalize_level(user_level)
     if not targets:
         targets = []
 
@@ -165,11 +179,11 @@ STRICT CONSTRAINTS:
 7. DO NOT use labels like 'A)', 'B)', 'C)', 'D)' in the options. Return ONLY the plain text of the options.
 8. Return ONLY valid JSON.
 9. If the student made a mistake like "I are", the question MUST be about that specific subject-verb agreement.
-10. THE EXPLANATION MUST BE IN PORTUGUESE and explain WHY the incorrect form was wrong based on the specific pattern.
+10. THE EXPLANATION MUST BE IN ENGLISH and explain WHY the incorrect form was wrong based on the specific pattern.
 11. DO NOT include the correct answer in the question text.
 12. ADJUST THE DIFFICULTY to match a {user_level} student. Use appropriate vocabulary and sentence complexity.
-13. If the student is Beginner, keep sentences very short. If Advanced, use more natural and complex contexts.
-14. THE TITLE AND DESCRIPTION MUST BE IN ENGLISH. Only the "explanation" field should be in Portuguese.
+13. If the student is at A1/A2, keep sentences very short. If at C1/C2, use more natural and complex contexts.
+14. ALL FIELDS (title, description, questions, options AND explanations) MUST BE ENTIRELY IN ENGLISH. Never use Portuguese.
 
 Return example shape:
 {

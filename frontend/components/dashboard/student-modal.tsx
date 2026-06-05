@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { apiPut, apiPost, apiDelete, apiGet } from '@/lib/api/client';
 import toast from 'react-hot-toast';
 import { cn, formatTime, formatDateTime } from '@/lib/utils/index';
+import { CEFR_LEVELS, normalizeLevel, levelLabel } from '@/lib/constants/levels';
 
 interface StudentModalProps {
   isOpen: boolean;
@@ -182,20 +183,20 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                 </div>
                 <div className="p-3 bg-surface border border-border rounded-xl">
                   <span className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider">{'Level'}</span>
-                  <p className="text-lg font-bold text-primary">{localStudent.level || '—'}</p>
+                  <p className="text-lg font-bold text-primary">{localStudent.level ? levelLabel(localStudent.level) : '—'}</p>
                 </div>
               </div>
 
               <div className="space-y-3">
                 <label className="text-xs font-bold text-text-muted uppercase tracking-widest">{'Level'}</label>
                 <div className="grid grid-cols-3 gap-2">
-                  {['Beginner', 'Pre-Intermediate', 'Intermediate', 'Advanced', 'Business'].map((lvl) => (
+                  {CEFR_LEVELS.map((lvl) => (
                     <button
                       key={lvl}
                       onClick={() => handleUpdateLevel(lvl)}
                       className={cn(
                         "px-2 py-2 rounded-lg text-[0.65rem] font-bold border transition-all",
-                        localStudent.level === lvl ? "bg-primary border-primary text-white" : "border-border hover:border-primary/40 text-text-subtle"
+                        normalizeLevel(localStudent.level) === lvl ? "bg-primary border-primary text-white" : "border-border hover:border-primary/40 text-text-subtle"
                       )}
                     >
                       {lvl}

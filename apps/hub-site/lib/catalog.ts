@@ -49,6 +49,11 @@ export const FILTER_OPTIONS = [
 export type FilterId = (typeof FILTER_OPTIONS)[number]['id'];
 
 export function resolveApiUrl(): string {
+  // Em SSR no Docker, precisamos usar o nome do serviço 'backend'
+  if (typeof window === 'undefined') {
+    return process.env.INTERNAL_API_URL || 'http://backend:8001';
+  }
+  
   return (
     process.env.NEXT_PUBLIC_API_URL ??
     process.env.NEXT_PUBLIC_API_BASE_URL ??

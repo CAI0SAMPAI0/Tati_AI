@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from fastapi.concurrency import run_in_threadpool
 
 from app.core.database import get_client
+from app.core.enums import normalize_level
 
 
 class PodcastRecommender:
@@ -18,27 +19,7 @@ class PodcastRecommender:
     DEFAULT_CEFR_LEVEL = 'A1'
     BEGINNER_LEVEL_CODES = {'A1', 'A2'}
 
-    LEVEL_ALIASES = {
-        'a1': 'A1',
-        'a2': 'A2',
-        'b1': 'B1',
-        'b2': 'B2',
-        'c1': 'C1',
-        'c2': 'C2',
-        'beginner': 'A1',
-        'iniciante': 'A1',
-        'pre-intermediate': 'A2',
-        'pre intermediate': 'A2',
-        'pre_intermediate': 'A2',
-        'pre intermediario': 'A2',
-        'pre-intermediario': 'A2',
-        'intermediate': 'B1',
-        'intermediario': 'B1',
-        'business english': 'B2',
-        'ingles para negocios': 'B2',
-        'advanced': 'C1',
-        'avancado': 'C1',
-    }
+    LEVEL_ALIASES = {}  # Mantido por compatibilidade – lógica delegada a core.enums.normalize_level
 
     FOCUS_TERM_MAP = {
         'general conversation': ['conversation', 'speaking', 'listening', 'lifestyle'],
@@ -146,14 +127,9 @@ class PodcastRecommender:
 
     @classmethod
     def _normalize_user_level(cls, user_level: str) -> str:
-        raw_level = str(user_level or '').strip()
-        if not raw_level:
-            return cls.DEFAULT_CEFR_LEVEL
-        normalized_key = raw_level.lower().replace('_', ' ').replace('-', ' ')
-        normalized_key = ' '.join(normalized_key.split())
-        return cls.LEVEL_ALIASES.get(
-            normalized_key, cls.LEVEL_ALIASES.get(
-                raw_level.lower(), cls.DEFAULT_CEFR_LEVEL), )
+        """Delega para core.enums.normalize_level (fonte única de verdade)."""
+        return normalize_level(user_level, default=cls.DEFAULT_CEFR_LEVEL)
+
 
     @classmethod
     async def get_recent_messages(cls, username: str) -> List[str]:

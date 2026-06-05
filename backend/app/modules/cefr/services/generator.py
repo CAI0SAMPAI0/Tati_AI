@@ -1,18 +1,12 @@
 import logging
 from typing import Dict, Any, List, Optional
 from app.modules.chat.services.llm import groq_chat_json
+from app.core.enums import CEFR_LABELS as _CEFR_LABEL_MAP, normalize_level
 from .embeddings import EmbeddingsService
 
 
 class CEFRGeneratorService:
-    CEFR_LABELS = {
-        "A1": "Beginner",
-        "A2": "Pre-Intermediate",
-        "B1": "Intermediate",
-        "B2": "Intermediate",
-        "C1": "Business English",
-        "C2": "Advanced"
-    }
+    CEFR_LABELS = _CEFR_LABEL_MAP
 
     @staticmethod
     async def generate_flashcards(
@@ -20,8 +14,8 @@ class CEFRGeneratorService:
         """
         Gera flashcards baseados no material do nível CEFR usando o LLM.
         """
-        level_label = CEFRGeneratorService.CEFR_LABELS.get(
-            level.upper(), level)
+        level = normalize_level(level)
+        level_label = CEFRGeneratorService.CEFR_LABELS.get(level, level)
 
         # Busca contexto relevante no pgvector
         context_docs = EmbeddingsService.search_similar_documents(
@@ -84,8 +78,8 @@ class CEFRGeneratorService:
         """
         Gera exercícios de múltipla escolha baseados no material.
         """
-        level_label = CEFRGeneratorService.CEFR_LABELS.get(
-            level.upper(), level)
+        level = normalize_level(level)
+        level_label = CEFRGeneratorService.CEFR_LABELS.get(level, level)
 
         context_docs = EmbeddingsService.search_similar_documents(
             query=topic, level=level, top_k=5)
@@ -146,8 +140,8 @@ class CEFRGeneratorService:
         """
         Gera simulações/cenários de roleplay baseados no material.
         """
-        level_label = CEFRGeneratorService.CEFR_LABELS.get(
-            level.upper(), level)
+        level = normalize_level(level)
+        level_label = CEFRGeneratorService.CEFR_LABELS.get(level, level)
 
         context_docs = EmbeddingsService.search_similar_documents(
             query=topic, level=level, top_k=5)

@@ -13,6 +13,7 @@ from app.core.dependencies.db import get_db
 from app.shared.services.upstash import cache_get, cache_set, cache_delete
 from app.shared.services.document_validator import validate_document_auto
 from app.core.exceptions import UserNotFoundError, InvalidDocumentError
+from app.core.enums import normalize_level
 from supabase import Client
 from fastapi import Depends
 
@@ -111,7 +112,7 @@ class UserService:
                     profile[field] = body[field]
 
             if 'level' in top_level and top_level['level']:
-                top_level['level'] = top_level['level'].lower()
+                top_level['level'] = normalize_level(top_level['level'])
 
             update_data = {**top_level, 'profile': profile}
             self.db.table('users').update(update_data).eq(

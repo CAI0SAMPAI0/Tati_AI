@@ -1,10 +1,12 @@
+import { CEFRLevel } from '../constants/levels';
+
 export interface User {
   id: string;
   username: string;
   email: string;
   name: string;
   role: string;
-  level: string;
+  level: CEFRLevel;
   plan_type: string | null;
   avatar_url?: string | null;
   cpf?: string | null;
@@ -56,7 +58,7 @@ export interface UserProfile {
   email: string;
   name: string;
   role: string;
-  level: string;
+  level: CEFRLevel;
   plan_type: string | null;
   avatar_url?: string | null;
   bio?: string;

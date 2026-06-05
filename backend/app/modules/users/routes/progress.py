@@ -6,6 +6,7 @@ Refatorado para usar ProgressService e padrão async.
 from fastapi import APIRouter, Depends, HTTPException
 from app.core.dependencies.auth import get_current_user
 from app.modules.users.services.progress_service import ProgressService
+from app.core.enums import normalize_level
 
 router = APIRouter()
 
@@ -211,8 +212,7 @@ def _calculate_rankings(db, start_date, end_date=None):
             uname = row.get('username')
             if uname in user_scores:
                 user_scores[uname]['name'] = row.get('name') or uname
-                user_scores[uname]['level'] = row.get(
-                    'level') or 'Beginner'
+                user_scores[uname]['level'] = normalize_level(row.get('level'))
                 user_scores[uname]['avatar_url'] = row.get('avatar_url') or (
                     row.get('profile') or {}).get('avatar_url')
 

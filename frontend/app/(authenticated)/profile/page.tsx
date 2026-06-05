@@ -31,6 +31,7 @@ import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { LEVEL_OPTIONS, normalizeLevel } from '@/lib/constants/levels';
 
 export default function ProfilePage() {
   const { user, logout, updateProfile } = useAuth();
@@ -43,7 +44,7 @@ export default function ProfilePage() {
     nickname: user?.nickname || '',
     email: user?.email || '',
     occupation: user?.occupation || '',
-    level: user?.level || 'Beginner',
+    level: normalizeLevel(user?.level),
     focus: user?.focus || 'General Conversation',
   });
 
@@ -59,7 +60,7 @@ export default function ProfilePage() {
         nickname: user.nickname || '',
         email: user.email || '',
         occupation: user.occupation || '',
-        level: user.level || 'Beginner',
+        level: normalizeLevel(user.level),
         focus: user.focus || 'General Conversation',
       });
     }
@@ -216,14 +217,8 @@ export default function ProfilePage() {
                   <label className="text-xs font-bold text-text-subtle uppercase ml-1">{'English level'}</label>
                   <Select
                     value={formData.level}
-                    onChange={(e) => setFormData({ ...formData, level: e.target.value })}
-                    options={[
-                      { value: 'Beginner', label: 'Beginner' },
-                      { value: 'Pre-Intermediate', label: 'Pre-Intermediate' },
-                      { value: 'Intermediate', label: 'Intermediate' },
-                      { value: 'Business English', label: 'Business English' },
-                      { value: 'Advanced', label: 'Advanced' },
-                    ]}
+                    onChange={(e) => setFormData({ ...formData, level: normalizeLevel(e.target.value) })}
+                    options={LEVEL_OPTIONS}
                   />
                 </div>
                 <div className="space-y-2">

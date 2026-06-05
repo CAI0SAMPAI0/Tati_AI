@@ -12,6 +12,12 @@ import {
 import type { User } from '@/lib/api/types';
 import { ApiClientError, apiGet, registerUnauthorizedHandler } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
+
+function triggerPodcastWarmup() {
+  apiGet<{ ok: boolean }>(ENDPOINTS.ACTIVITIES_PODCASTS_WARMUP).catch(() => {
+    // Fire-and-forget: não bloqueia login nem navegação
+  });
+}
 import { clearStoredSession, getStoredSession, saveStoredSession } from '@/lib/api/auth';
 
 function normalizeUserAvatar(source: User): User {
@@ -83,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setToken(newToken);
       setIsBootstrappingProfile(false);
+      triggerPodcastWarmup();
     }
   }, []);
 
@@ -130,6 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .finally(() => {
         setIsLoaded(true);
+        triggerPodcastWarmup();
       });
   }, []);
 

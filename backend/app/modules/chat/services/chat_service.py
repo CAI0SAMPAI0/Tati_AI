@@ -15,6 +15,7 @@ from fastapi.concurrency import run_in_threadpool
 from app.core.config import settings
 from app.modules.chat.services.llm import stream_llm, text_to_speech, transcribe_audio
 from app.shared.services.history import save_message, load_llm_history, auto_title
+from app.core.enums import normalize_level
 from app.modules.chat.services.prompt_builder import UserProfile, build_effective_prompt
 from app.modules.chat.services.rag_search import obter_contexto_rag, RAGResult
 from app.modules.activities.services.pronunciation_matcher import match_pronunciation
@@ -67,7 +68,7 @@ class ChatService:
         return UserProfile(
             username=username,
             name=data.get('name') or username,
-            level=data.get('level') or 'Intermediate',
+            level=normalize_level(data.get('level'), default='B1'),
             focus=data.get('focus') or 'General Conversation',
             custom_prompt=(data.get('custom_prompt') or '').strip(),
         )

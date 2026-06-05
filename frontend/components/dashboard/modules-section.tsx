@@ -28,6 +28,7 @@ import { apiGet, apiPut, apiDelete, apiPost, apiUpload } from '@/lib/api/client'
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { LEVEL_OPTIONS } from '@/lib/constants/levels';
 import { DialogModal } from '@/components/ui/dialog-modal';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
@@ -613,11 +614,9 @@ export function ModulesSection() {
                 onChange={(e) => setFormData(prev => ({ ...prev, level: e.target.value }))}
               >
                 <option value="all">All Levels</option>
-                <option value="beginner">Beginner</option>
-                <option value="pre-intermediate">Pre-Intermediate</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="business english">Business English</option>
-                <option value="advanced">Advanced</option>
+                {LEVEL_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
               </select>
             </div>
 

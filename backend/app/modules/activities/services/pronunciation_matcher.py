@@ -1,6 +1,7 @@
 import logging
 from typing import Dict, Any
 from app.modules.chat.services.llm import transcribe_audio
+from app.core.enums import normalize_level
 
 
 class PronunciationMatcher:
@@ -10,11 +11,12 @@ class PronunciationMatcher:
     async def evaluate(self,
                        audio_bytes: bytes,
                        reference_text: str,
-                       user_level: str = "Beginner") -> Dict[str,
+                       user_level: str = "A1") -> Dict[str,
                                                              Any]:
         """
         Avalia o áudio do aluno comparando-o com o texto de referência.
         """
+        user_level = normalize_level(user_level)
         # 1. Transcrever com Whisper via Groq (otimizado para captura
         # fonética no llm.py)
         transcription = await transcribe_audio(audio_bytes, prompt=f"Reference text: {reference_text}")

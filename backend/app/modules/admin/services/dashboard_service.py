@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Optional
 from fastapi.concurrency import run_in_threadpool
 from app.core.dependencies.db import get_db
 from fastapi import Depends
+from app.core.enums import normalize_level
+
 
 
 EXCLUDED_USERS = ['programador', 'professor', 'admin', 'caio', 'tati']
@@ -282,7 +284,7 @@ class DashboardService:
                         or []
                     )
                     for r in user_rows:
-                        lvl = r.get('level') or 'Unknown'
+                        lvl = normalize_level(r.get('level'))
                         level_distribution[lvl] = level_distribution.get(
                             lvl, 0) + 1
                 except Exception as e:
@@ -321,7 +323,7 @@ class DashboardService:
                 )
                 level_dist: Dict[str, int] = {}
                 for r in user_rows:
-                    lvl = r.get('level') or 'Unknown'
+                    lvl = normalize_level(r.get('level'))
                     level_dist[lvl] = level_dist.get(lvl, 0) + 1
                 return level_dist
             except Exception:
@@ -428,7 +430,7 @@ class DashboardService:
 
                 return {
                     'xp': user_data.get('xp', 0),
-                    'level': user_data.get('level', 'Beginner'),
+                    'level': normalize_level(user_data.get('level')),
                     'focus': user_data.get('focus', 'General English'),
                     'total_messages': total_messages,
                     'total_errors': total_errors

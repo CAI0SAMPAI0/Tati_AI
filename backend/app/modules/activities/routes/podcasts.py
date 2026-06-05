@@ -17,6 +17,7 @@ from app.core.database import get_client
 from app.shared.services.media_availability import MediaAvailabilityService
 from app.modules.activities.services.podcast_exercise import PodcastExerciseService
 from app.modules.activities.services.podcast_recommender import PodcastRecommender
+from app.core.enums import normalize_level, cefr_window
 
 router = APIRouter()
 
@@ -30,7 +31,7 @@ async def warmup_podcasts(
     em background após a entrada no dashboard.
     """
     username = current_user['username']
-    level = current_user.get('level', 'Beginner')
+    level = normalize_level(current_user.get('level'))
 
     from app.modules.activities.services.podcast_discovery import discover_personalized_podcasts
     # Dispara em background
@@ -333,49 +334,13 @@ def _load_cached_recommendations(
 
 
 def _visible_levels_for_user(user_level: str) -> list:
-    # map product labels to CEFR windows
-    mapping = {
-        'beginner': 'A1',
-        'pre-intermediate': 'A2',
-        'intermediate': 'B1',
-        'advanced': 'C1',
-    }
-    ul = str(user_level or '').strip()
-    key = ul.lower()
-    if key in mapping:
-        center = mapping[key]
-    elif ul.upper() in ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']:
-        center = ul.upper()
-    else:
-        center = 'A2'
-
-    order = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
-    idx = order.index(center) if center in order else 1
-    left = idx - 1
-    right = idx + 1
-    res = []
-    if left >= 0:
-        res.append(order[left])
-    res.append(order[idx])
-    if right < len(order):
-        res.append(order[right])
-    return res
+    """Retorna janela CEFR ±1 ao redor do nível do usuário."""
+    return cefr_window(normalize_level(user_level), radius=1)
 
 
 def _normalize_user_level(label: str) -> str:
-    l = str(label or '').strip().lower()
-    map_labels = {
-        'beginner': 'A1',
-        'pre-intermediate': 'A2',
-        'intermediate': 'B1',
-        'business english': 'B2',
-        'advanced': 'C1',
-    }
-    if l in map_labels:
-        return map_labels[l]
-    if l.upper() in ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']:
-        return l.upper()
-    return 'A2'
+    """Delega para core.enums.normalize_level."""
+    return normalize_level(label)
 
 
 def _rank_personalized_recommendations(
@@ -605,7 +570,8 @@ async def evaluate_podcast_exercise(
 
     exercise_service = PodcastExerciseService()
     username = user.get('username', '')
-    result = await exercise_service.evaluate_exercise(req, user.get('level', 'A1'), 'pt-BR')
+    result = await exercise_service.evaluate_exercise(
+        req, normalize_level(user.get('level')), 'en-US')
 
     # Salvar resposta no banco (gracioso — não bloqueia em caso de erro)
     if username and result:
@@ -646,7 +612,7 @@ async def evaluate_pronunciation(
         raise BusinessLogicError(
             detail="Invalid audio format (base64 expected)")
 
-    result = await pronunciation_matcher.evaluate(audio_bytes, req.reference_text, user.get('level', 'Beginner'))
+    result = await pronunciation_matcher.evaluate(audio_bytes, req.reference_text, normalize_level(user.get('level')))
 
     # Salvar tentativa no perfil do usuário
     username = user.get('username')

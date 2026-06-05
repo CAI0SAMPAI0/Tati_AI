@@ -4,6 +4,8 @@ Serviço para gerenciamento de módulos, conteúdos e flashcards.
 """
 from app.core.dependencies.db import get_db
 from fastapi import Depends
+from app.core.enums import normalize_level
+
 
 from typing import List, Dict, Any
 import uuid
@@ -46,7 +48,7 @@ class ModuleService:
                         {
                             'title': payload.title,
                             'description': payload.description,
-                            'level': payload.levels[0] if payload.levels else 'Beginner',
+                            'level': normalize_level(payload.levels[0]) if payload.levels else 'A1',
                             'levels': payload.levels,
                             'order': payload.order,
                             'is_published': False,
@@ -102,7 +104,7 @@ class ModuleService:
                 'title': payload.title,
                 'description': payload.description,
                 'levels': payload.levels,
-                'level': payload.levels[0] if payload.levels else 'Beginner',
+                'level': normalize_level(payload.levels[0]) if payload.levels else 'A1',
                 'order': payload.order,
                 'flashcards': [
                     f.model_dump() for f in payload.flashcards],
@@ -192,7 +194,7 @@ class ModuleService:
             self, user: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Lista módulos para o aluno com progresso."""
         username = user['username']
-        user_level = user.get('level') or 'Beginner'
+        user_level = normalize_level(user.get('level'))
         cache_key = f'modules:list:{username}'
 
         cached = await cache_get(cache_key)
@@ -249,15 +251,15 @@ class ModuleService:
 
         filtered = []
         for m in modules_data:
-            lvls = m.get('levels') or []
-            sing = m.get('level')
+            lvls_raw = m.get('levels') or []
+            sing_raw = m.get('level')
             show = (
                 m.get('id') == PERSONALIZED_MODULE_ID
-                or (not lvls and not sing)
-                or any(x in lvls for x in ['all', 'todos'])
-                or sing in ['all', 'todos']
-                or user_level in lvls
-                or user_level == sing
+                or (not lvls_raw and not sing_raw)
+                or any(str(x).lower().strip() in ['all', 'todos', 'any', 'all levels'] for x in lvls_raw)
+                or str(sing_raw).lower().strip() in ['all', 'todos', 'any', 'all levels']
+                or any(normalize_level(x) == user_level for x in lvls_raw)
+                or normalize_level(sing_raw) == user_level
             )
             if show:
                 quizzes = m.get('quizzes', [])

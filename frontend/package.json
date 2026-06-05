@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
-    "dev": "next dev --port 3000",
+    "sync-assets": "node -e \"const fs=require('fs');const path=require('path');const src=path.join(__dirname,'../backend/assets/images/tati_logo.jpg');const dest=path.join(__dirname,'public/images/tati_logo.jpg');fs.mkdirSync(path.dirname(dest),{recursive:true});fs.copyFileSync(src,dest);\"",
+    "dev": "npm run sync-assets && next dev --port 3000",
     "dev:clean": "npm run clean && next dev --port 3000",
     "build": "next build",
     "start": "next start",

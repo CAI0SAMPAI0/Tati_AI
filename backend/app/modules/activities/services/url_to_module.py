@@ -4,6 +4,7 @@ from fastapi import Depends
 from typing import Dict, Any
 import httpx
 from bs4 import BeautifulSoup
+from app.core.enums import normalize_level
 from app.modules.activities.services.activity_service import ActivityService
 
 
@@ -19,7 +20,7 @@ class UrlToModuleService:
     async def generate_from_url(self,
                                 url: str,
                                 username: str,
-                                target_level: str = 'Intermediate') -> Dict[str,
+                                target_level: str = 'B1') -> Dict[str,
                                                                             Any]:
         """
         Lê uma URL, extrai o texto e gera um módulo de estudo completo.
@@ -57,6 +58,8 @@ class UrlToModuleService:
         3. A "Grammar Focus" section based on the text.
         4. 3 Multiple choice questions (quiz).
         5. 2 Vocabulary flashcards (term + definition).
+
+        CRITICAL: ALL content (title, reading, grammar focus, questions, options, explanations, flashcards) MUST be entirely in English.
 
         Return ONLY valid JSON:
         {{

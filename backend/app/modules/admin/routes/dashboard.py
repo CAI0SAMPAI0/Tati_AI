@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.core.exceptions import ContentNotFoundError, BusinessLogicError
 from pydantic import BaseModel
 from typing import Optional
+from app.core.enums import normalize_level
 
 from app.core.dependencies.auth import require_staff, get_current_user
 from app.core.dependencies.db import get_db
@@ -27,7 +28,7 @@ class UrlGenerationRequest(BaseModel):
     """Payload para gerar um módulo a partir de uma URL externa."""
 
     url: str
-    level: Optional[str] = 'Intermediate'
+    level: Optional[str] = 'B1'
 
 
 # ── Estatísticas e visão geral ────────────────────────────────────────
@@ -239,7 +240,7 @@ async def create_simulation(
     if data.get('is_ai_generated') or data.get('use_ai_generation'):
         return await service.generate_simulation(
             data.get('topic') or data.get('name', 'Nova Simulação'),
-            data.get('level') or data.get('difficulty', 'beginner'),
+            normalize_level(data.get('level') or data.get('difficulty')),
             data.get('instructions', '')
         )
 
@@ -258,7 +259,11 @@ async def create_simulation(
         v in data.items() if k in allowed_fields}
 
     if 'difficulty' in filtered_data and filtered_data['difficulty']:
-        filtered_data['difficulty'] = filtered_data['difficulty'].lower()
+        val = filtered_data['difficulty']
+        if val and str(val).lower().strip() in ['all', 'todos', 'any', 'all levels']:
+            filtered_data['difficulty'] = 'all'
+        else:
+            filtered_data['difficulty'] = normalize_level(val)
 
     # Garantir is_active=True para que o RLS não esconda o registro (Fix
     # 23506)
@@ -272,8 +277,11 @@ async def create_simulation(
                 'name', 'English Practice')}."
 
     if 'difficulty' in filtered_data:
-        filtered_data['difficulty'] = str(
-            data.get('level') or data.get('difficulty') or 'all').lower()
+        val = data.get('level') or data.get('difficulty')
+        if val and str(val).lower().strip() in ['all', 'todos', 'any', 'all levels']:
+            filtered_data['difficulty'] = 'all'
+        else:
+            filtered_data['difficulty'] = normalize_level(val)
 
     from fastapi.concurrency import run_in_threadpool
     def _save():
@@ -322,7 +330,11 @@ def update_simulation(
         v in data.items() if k in allowed_fields}
 
     if 'difficulty' in filtered_data and filtered_data['difficulty']:
-        filtered_data['difficulty'] = filtered_data['difficulty'].lower()
+        val = filtered_data['difficulty']
+        if val and str(val).lower().strip() in ['all', 'todos', 'any', 'all levels']:
+            filtered_data['difficulty'] = 'all'
+        else:
+            filtered_data['difficulty'] = normalize_level(val)
 
     return db.table('simulations').update(
         filtered_data).eq('id', simulation_id).execute()
@@ -404,10 +416,15 @@ def create_flashcard_deck(
         db: Client = Depends(get_db),
         user=Depends(require_staff)):
     """Cria um novo deck de flashcards."""
+    val = data.get('level')
+    if val and str(val).lower().strip() in ['all', 'todos', 'any', 'all levels']:
+        payload_level = 'all'
+    else:
+        payload_level = normalize_level(val) if val else 'all'
     payload = {
         'title': data.get('title'),
         'description': data.get('description'),
-        'level': str(data.get('level') or 'all').lower(),
+        'level': payload_level,
         'flashcards': data.get('flashcards', []),
         'is_published': True
     }
@@ -426,8 +443,7 @@ def update_flashcard_deck(
     payload = {
         'title': data.get('title'),
         'description': data.get('description'),
-        'level': str(
-            data.get('level')).lower() if data.get('level') else None,
+        'level': normalize_level(data.get('level')) if data.get('level') else None,
         'flashcards': data.get('flashcards')}
     # Filtra None
     payload = {k: v for k, v in payload.items() if v is not None}

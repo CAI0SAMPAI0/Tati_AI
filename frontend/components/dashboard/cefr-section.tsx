@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, BookOpen, PenTool, Clapperboard } from 'lucide-react';
 import { apiUpload, apiPost } from '@/lib/api/client';
+import { LEVEL_OPTIONS } from '@/lib/constants/levels';
 
 export function CefrSection() {
   const [level, setLevel] = useState('A1');
@@ -82,8 +83,8 @@ export function CefrSection() {
               onChange={e => setLevel(e.target.value)}
               className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:ring-2 focus:ring-primary/20 outline-none"
             >
-              {['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].map(l => (
-                <option key={l} value={l}>{l}</option>
+              {LEVEL_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
           </div>

@@ -62,7 +62,7 @@ async def start_simulation(
     service: SimulationService = Depends(),
 ) -> dict:
     """Inicia uma nova sessão de simulação."""
-    return await service.start_session(current_user['username'], body.scenario_id, current_user.get('level', 'Beginner'))
+    return await service.start_session(current_user['username'], body.scenario_id, current_user.get('level', 'A1'))
 
 
 @router.post('/simulation/transcribe')
@@ -85,7 +85,7 @@ async def send_simulation_message(
     """Envia mensagem para simulação e recebe resposta da IA."""
     return await service.process_message(
         current_user['username'], body.content, body.scenario, body.conversation_id, current_user.get(
-            'level', 'Beginner')
+            'level', 'A1')
     )
 
 

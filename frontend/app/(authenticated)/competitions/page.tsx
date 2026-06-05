@@ -18,6 +18,7 @@ import { apiGet } from '@/lib/api/client';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/spinner';
+import { CEFRLevel, CEFR_LEVELS, CEFR_LABEL_MAP } from '@/lib/constants/levels';
 
 interface RankingEntry {
   username: string;
@@ -31,7 +32,7 @@ export default function CompetitionsPage() {
   const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [rankingMode, setRankingMode] = useState<'global' | 'level'>('global');
-  const [selectedLevelCat, setSelectedLevelLevelCat] = useState<'Beginner' | 'Pre-Intermediate' | 'Intermediate' | 'Advanced' | 'Business'>('Beginner');
+  const [selectedLevelCat, setSelectedLevelLevelCat] = useState<CEFRLevel>('A1');
 
   const { data: globalRanking = [], isLoading: globalLoading } = useQuery<RankingEntry[]>({
     queryKey: ['competitions-global-ranking'],
@@ -87,7 +88,7 @@ export default function CompetitionsPage() {
 
           {rankingMode === 'level' && (
             <div className="flex flex-wrap justify-center gap-2 animate-in fade-in slide-in-from-top-2 duration-500">
-              {(['Beginner', 'Pre-Intermediate', 'Intermediate', 'Advanced', 'Business'] as const).map(cat => (
+              {CEFR_LEVELS.map(cat => (
                 <button
                   key={cat}
                   onClick={() => setSelectedLevelLevelCat(cat)}
@@ -98,7 +99,7 @@ export default function CompetitionsPage() {
                       : "bg-surface border-border text-text-muted hover:border-primary/30"
                   )}
                 >
-                  {cat}
+                  {CEFR_LABEL_MAP[cat] || cat}
                 </button>
               ))}
             </div>

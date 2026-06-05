@@ -7,6 +7,7 @@ from fastapi import Depends
 
 from fastapi.concurrency import run_in_threadpool
 
+from app.core.enums import normalize_level
 from app.modules.chat.services.llm import groq_chat_json
 from app.modules.chat.services.prompt_builder import build_exercise_prompt
 
@@ -50,14 +51,14 @@ class ExerciseGeneratorService:
         error_context = self._build_error_context(primary_targets)
 
         # Busca nível do aluno para adequar dificuldade
-        user_level = 'Intermediate'
+        user_level = 'B1'
         try:
             def _get_lvl():
                 return self.db.table('users').select('level').eq(
                     'username', username).single().execute()
             user_res = await run_in_threadpool(_get_lvl)
             if user_res.data:
-                user_level = user_res.data.get('level', 'Intermediate')
+                user_level = normalize_level(user_res.data.get('level'), default='B1')
         except Exception:
             pass
 
@@ -129,7 +130,7 @@ Frequência: {frequency} ocorrências
         error_context: str,
         exercise_type: str,
         targets: List[Dict[str, Any]],
-        user_level: str = 'Intermediate'
+        user_level: str = 'B1'
     ) -> Optional[Dict[str, Any]]:
         """
         Chama o LLM para gerar o exercício baseado nos padrões específicos.

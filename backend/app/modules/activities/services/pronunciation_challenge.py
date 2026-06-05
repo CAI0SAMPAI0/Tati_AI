@@ -9,7 +9,7 @@ import hashlib
 
 # Banco de palavras por dificuldade
 WORD_BANK = {
-    'beginner': [
+    'A1': [
         {'word': 'thought', 'phonetic': '/θɔːt/', 'translation': 'pensamento'},
         {'word': 'through', 'phonetic': '/θruː/', 'translation': 'através'},
         {'word': 'three', 'phonetic': '/θriː/', 'translation': 'três'},
@@ -19,7 +19,7 @@ WORD_BANK = {
         {'word': 'mother', 'phonetic': '/ˈmʌðər/', 'translation': 'mãe'},
         {'word': 'breathe', 'phonetic': '/briːð/', 'translation': 'respirar'},
     ],
-    'intermediate': [
+    'B1': [
         {'word': 'thorough', 'phonetic': '/ˈθʌrə/', 'translation': 'minucioso'},
         {'word': 'strengths', 'phonetic': '/streŋkθs/',
             'translation': 'pontos fortes'},
@@ -34,7 +34,7 @@ WORD_BANK = {
             'translation': 'estatísticas',
         },
     ],
-    'advanced': [
+    'C1': [
         {'word': 'sixth', 'phonetic': '/sɪksθ/', 'translation': 'sexto'},
         {'word': 'twelfth', 'phonetic': '/twelfθ/',
             'translation': 'décimo segundo'},
@@ -62,8 +62,8 @@ def get_current_week_challenge() -> dict:
 
     # Seleciona palavras baseado na semana
     all_words = (
-        WORD_BANK['beginner'] + WORD_BANK['intermediate'] +
-        WORD_BANK['advanced']
+        WORD_BANK['A1'] + WORD_BANK['B1'] +
+        WORD_BANK['C1']
     )
     start_idx = week_hash % len(all_words)
 
