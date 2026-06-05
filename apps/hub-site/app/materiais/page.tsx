@@ -42,7 +42,7 @@ async function getMateriais(): Promise<CatalogMaterial[]> {
     return res.json();
   } catch (err) {
     console.error('[Hub SSR] Fetch error:', err);
-    throw err;
+    return[];
   }
 }
 
