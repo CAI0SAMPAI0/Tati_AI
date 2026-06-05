@@ -74,7 +74,7 @@ const nextConfig = {
     'mdast-util-phrasing-content',
     'vfile-message',
   ],
-  
+
   // Compressão ativa
   compress: true,
 
@@ -89,7 +89,6 @@ const nextConfig = {
   },
 
   images: {
-    // Formatos modernos
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [
       {
@@ -121,14 +120,12 @@ const nextConfig = {
           { key: 'Cache-Control', value: 'no-store, max-age=0, must-revalidate' },
         ],
       },
-      // Cache agressivo para assets estáticos
       {
         source: '/_next/static/:path*',
         headers: [
           { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
         ],
       },
-      // Cache para imagens
       {
         source: '/images/:path*',
         headers: [
@@ -138,11 +135,6 @@ const nextConfig = {
     ];
   },
 
-  // Webpack override — segunda camada de proteção contra ESM puro em node_modules.
-  // Desabilita `fullySpecified` para arquivos .mjs, permitindo que o Webpack
-  // resolva módulos ESM sem exigir extensão completa nos imports internos.
-  // Isso resolve o crash "Cannot read properties of undefined (reading 'call')"
-  // mesmo quando algum pacote ESM não estiver listado em transpilePackages.
   webpack(config) {
     config.module.rules.push({
       test: /\.m?js$/,
