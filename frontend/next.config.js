@@ -2,7 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: [
-    '@tati/hub-core',
     'framer-motion',
     'lucide-react',
     'recharts',

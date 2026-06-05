@@ -1,6 +1,3 @@
-/**
- * Re-exporta níveis CEFR do hub-core (fonte única de verdade).
- */
 export {
   type CEFRLevel,
   CEFR_LEVELS,
@@ -9,4 +6,4 @@ export {
   CEFR_LABEL_MAP,
   normalizeLevel,
   levelLabel,
-} from '@tati/hub-core';
+} from '@/lib/hub-core';
