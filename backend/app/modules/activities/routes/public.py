@@ -6,10 +6,10 @@ from app.modules.activities.services.premium_service import PremiumService
 from app.modules.activities.schema.premium import PremiumContentPublic, HubOrderPublic
 from app.core.database import get_client
 from app.core.security import hash_password
-from app.core.dependencies.auth import get_current_user
-from datetime import datetime, timezone, date, timedelta
 from app.core.dependencies.auth import get_current_user, get_current_user_optional
 from typing import Optional
+from datetime import datetime, timezone, date, timedelta
+
 
 router = APIRouter()
 
@@ -188,6 +188,16 @@ async def public_checkout(
         'content_id': item['id'],
         'price': resolved_price
     }).execute()
+
+    try:
+        db.table('premium_purchases').upsert({
+            'username': username,
+            'content_id': item['id'],
+            'asaas_payment_id': payment_id,
+            'status': 'pending'
+        }, on_conflict='username,content_id').execute()
+    except Exception as exc:
+        logging.info(f'[PublicCheckout] Aviso: erro ao inserir premium_purchases: {exc}')
 
     pix_data = {}
     if body.billingType == 'PIX':

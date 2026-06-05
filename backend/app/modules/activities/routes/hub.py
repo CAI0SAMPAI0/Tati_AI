@@ -1,8 +1,4 @@
 import logging
-"""
-routers/activities/hub.py
-Gerencia o Hub de conteúdos premium (Kiwify style).
-"""
 
 from starlette.concurrency import run_in_threadpool
 from app.core.exceptions import AuthenticationRequiredError
