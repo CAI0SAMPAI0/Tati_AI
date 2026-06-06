@@ -20,7 +20,7 @@ const menuItems = [
 ];
 
 const secondaryItems = [
-  { name: 'Support', icon: HelpCircle, href: 'mailto:caio.matos@aedb.br' },
+  { name: 'Support', icon: HelpCircle, href: `https://mail.google.com/mail/?view=cm&fs=1&to=${process.env.NEXT_PUBLIC_SUPPORT_EMAIL}` },
 ];
 
 interface SidebarProps {
