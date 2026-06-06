@@ -6,6 +6,7 @@ import { ShoppingCart, CheckCircle, Lock, X, Loader2, XCircle, RefreshCw, Clock 
 import { resolveApiUrl } from '@/lib/catalog';
 import { useHubAuth } from '@/components/auth-provider';
 import { loginWithCredentials, getStoredSession } from '@tati/hub-core';
+import { usePaymentWebSocket } from '@/hooks/usePaymentWebSocket';
 
 interface CheckoutFlowProps {
   item: {
@@ -41,21 +42,21 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollCountRef = useRef(0);
-  const MAX_POLLS = 60; // 5 minutos checando a cada 5s
+  const MAX_POLLS = 60;
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // Indica se o checkout está na fase "aguardando pagamento"
+  const isAwaitingPayment = step === 'payment' && pollingStatus === 'polling';
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     if (user) {
       setName((prev) => prev || user.name || '');
       setEmail((prev) => prev || user.email || '');
-      setCpf((prev: string) => prev || (user as { cpf?: string; cpf_cnpj?: string }).cpf || (user as { cpf_cnpj?: string }).cpf_cnpj || '');
+      setCpf((prev: string) => prev || (user as any).cpf || (user as any).cpf_cnpj || '');
     }
   }, [user]);
 
-  // Limpeza do polling ao fechar a modal
   const stopPolling = useCallback(() => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
@@ -64,10 +65,40 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
     pollCountRef.current = 0;
   }, []);
 
+  // ── Confirmação unificada (WebSocket ou polling) ──────────────────
+  const handlePaymentConfirmed = useCallback(async (isProcessing = false) => {
+    stopPolling();
+    setContentIsProcessing(isProcessing);
+    setPollingStatus('confirmed');
+    setStep('confirmed');
+    onAccessGranted?.();
+  }, [stopPolling, onAccessGranted]);
+
+  // ── WebSocket: escuta confirmações em tempo real ──────────────────
+  // Só ativa enquanto o modal está aberto e aguardando pagamento
+    usePaymentWebSocket({
+      enabled: isAwaitingPayment,
+      onConfirmed: useCallback((data: { payment_id: string }) => {
+        // Só reage se for o pagamento deste item
+        if (
+          !checkoutResult?.paymentId ||
+          data.payment_id !== checkoutResult.paymentId
+        ) return;
+        handlePaymentConfirmed(false);
+      }, [checkoutResult?.paymentId, handlePaymentConfirmed]),
+      onRefused: useCallback((data: { payment_id: string }) => {
+        if (
+          !checkoutResult?.paymentId ||
+          data.payment_id !== checkoutResult.paymentId
+        ) return;
+        stopPolling();
+        setPollingStatus('error');
+      }, [checkoutResult?.paymentId, stopPolling]),
+    });
+
   const handleClose = useCallback(() => {
     stopPolling();
     setIsOpen(false);
-    // Reseta para próxima abertura
     setTimeout(() => {
       setStep('form');
       setCheckoutResult(null);
@@ -75,7 +106,7 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
     }, 300);
   }, [stopPolling]);
 
-  // Polling: verifica se o acesso foi liberado no backend
+  // ── Polling: fallback caso WebSocket não chegue ───────────────────
   const startPolling = useCallback((paymentId: string) => {
     setPollingStatus('polling');
     pollCountRef.current = 0;
@@ -100,44 +131,26 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
         });
 
         if (res.ok) {
-          // 200 = acesso liberado e conteúdo pronto
-          stopPolling();
-          setContentIsProcessing(false);
-          setPollingStatus('confirmed');
-          setStep('confirmed');
-          onAccessGranted?.();
+          handlePaymentConfirmed(false);
           return;
         }
 
         if (res.status === 409) {
-          // 409 = pagamento confirmado mas material ainda processando
-          stopPolling();
-          setContentIsProcessing(true);
-          setPollingStatus('confirmed');
-          setStep('confirmed');
-          onAccessGranted?.();
+          handlePaymentConfirmed(true);
           return;
         }
-
-        // 403 = ainda não pago, continua polling
-        // Outros erros: continua tentando
       } catch {
-        // Erro de rede, tenta de novo no próximo ciclo
+        // erro de rede, tenta de novo
       }
     }, 5000);
-  }, [item.id, token, stopPolling, onAccessGranted]);
-
+  }, [item.id, token, stopPolling, handlePaymentConfirmed]);
 
   const formatCPF = (val: string) => {
     const digits = val.replace(/\D/g, '');
     if (digits.length <= 11) {
-      return digits
-        .replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
-        .substring(0, 14);
+      return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4').substring(0, 14);
     }
-    return digits
-      .replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')
-      .substring(0, 18);
+    return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5').substring(0, 18);
   };
 
   const handleCheckout = async (e: React.FormEvent) => {
@@ -148,20 +161,12 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
       const localToken = typeof window !== 'undefined' ? window.localStorage.getItem('token') : null;
       const authToken = token || localToken;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (authToken) {
-        headers.Authorization = `Bearer ${authToken}`;
-      }
+      if (authToken) headers.Authorization = `Bearer ${authToken}`;
 
       const res = await fetch(`${resolveApiUrl()}/catalog/checkout`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          content_id: item.id,
-          name,
-          email,
-          cpf,
-          billingType,
-        }),
+        body: JSON.stringify({ content_id: item.id, name, email, cpf, billingType }),
       });
 
       if (!res.ok) {
@@ -172,7 +177,6 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
       const data = await res.json();
       setCheckoutResult(data);
 
-      // Se um novo usuário com senha temporária foi gerado, realiza o login automático imediatamente
       if (data.username && data.password) {
         try {
           const loginRes = await loginWithCredentials(data.username, data.password);
@@ -180,13 +184,13 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
             saveSession(loginRes.data.access_token, loginRes.data.user);
           }
         } catch (loginErr) {
-          console.error("Erro ao autenticar automaticamente o novo usuário:", loginErr);
+          console.error('Erro ao autenticar automaticamente:', loginErr);
         }
       }
 
       setStep('payment');
 
-      // Inicia o polling para detectar confirmação automática
+      // Inicia polling como fallback (WebSocket é o canal principal)
       if (data.paymentId) {
         startPolling(data.paymentId);
       }
@@ -205,13 +209,19 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch(`${resolveApiUrl()}/catalog/checkout/${checkoutResult.paymentId}/cancel`, {
-        method: 'POST',
-        headers,
-      });
+      const res = await fetch(
+        `${resolveApiUrl()}/catalog/checkout/${checkoutResult.paymentId}/cancel`,
+        { method: 'POST', headers },
+      );
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        // Pedido já confirmado: o pagamento foi aprovado, apenas fechamos o modal
+        if (res.status === 400 && err.detail?.includes('confirmado')) {
+          stopPolling();
+          setStep('confirmed');
+          return;
+        }
         throw new Error(err.detail || 'Erro ao cancelar pedido');
       }
 
@@ -224,7 +234,6 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
     }
   };
 
-  // ── Conteúdo do passo "aguardando pagamento" ───────────────────────────────
   const PaymentStep = () => (
     <div className="py-2 text-center">
       <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -247,7 +256,9 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
       </p>
 
       {pollingStatus === 'polling' && (
-        <p className="mt-1 text-xs text-subtle">A liberação é automática. Esta tela vai atualizar sozinha ✓</p>
+        <p className="mt-1 text-xs text-subtle">
+          A liberação é automática. Esta tela vai atualizar sozinha ✓
+        </p>
       )}
 
       {checkoutResult?.pix ? (
@@ -288,20 +299,20 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
         </p>
       )}
 
-      {/* Botão de cancelar */}
-      <button
-        type="button"
-        disabled={cancelling || pollingStatus === 'confirmed'}
-        onClick={handleCancel}
-        className="mt-6 flex w-full items-center justify-center gap-2 rounded-hub border border-line py-2.5 text-xs font-bold text-error transition hover:bg-error/5 disabled:opacity-40"
-      >
-        {cancelling ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
-        {cancelling ? 'Cancelando...' : 'Cancelar pedido'}
-      </button>
+      {pollingStatus !== 'confirmed' && (
+        <button
+          type="button"
+          disabled={cancelling}
+          onClick={handleCancel}
+          className="mt-6 flex w-full items-center justify-center gap-2 rounded-hub border border-line py-2.5 text-xs font-bold text-error transition hover:bg-error/5 disabled:opacity-40"
+        >
+          {cancelling ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
+          {cancelling ? 'Cancelando...' : 'Cancelar pedido'}
+        </button>
+      )}
     </div>
   );
 
-  // ── Passo: pagamento confirmado ────────────────────────────────────────────
   const ConfirmedStep = () => (
     <div className="py-4 text-center">
       <div className={`mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full ${
@@ -341,7 +352,6 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
     </div>
   );
 
-  // ── Passo: pedido cancelado ────────────────────────────────────────────────
   const CancelledStep = () => (
     <div className="py-4 text-center">
       <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-error/10 text-error">
@@ -457,15 +467,9 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
                 className="btn-primary flex w-full items-center justify-center gap-2 py-4"
               >
                 {processing ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    Processando...
-                  </>
+                  <><Loader2 size={16} className="animate-spin" /> Processando...</>
                 ) : (
-                  <>
-                    <Lock size={16} />
-                    Finalizar pedido
-                  </>
+                  <><Lock size={16} /> Finalizar pedido</>
                 )}
               </button>
             </form>

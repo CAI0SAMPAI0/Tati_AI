@@ -237,7 +237,7 @@ async def cancel_checkout(payment_id: str):
     """
     db = get_client()
 
-    # Verifica se o pedido existe e está pendente
+    # Verifica se o pedido existe
     order = db.table('orders').select('id, status').eq(
         'asaas_id', payment_id).execute().data
     if not order:
@@ -245,11 +245,23 @@ async def cancel_checkout(payment_id: str):
             status_code=404,
             detail="Pedido não encontrado.")
 
-    if order[0]['status'] not in ('pending',):
+    current_status = order[0]['status']
+
+    # Se já cancelado, retorna sucesso silencioso (idempotente)
+    if current_status == 'cancelled':
+        return {'ok': True, 'message': 'Pedido já estava cancelado.'}
+
+    # Se já confirmado (pagamento aprovado), informa sem lançar erro de conflito
+    if current_status == 'confirmed':
         raise HTTPException(
-            status_code=409,
-            detail=f"Pedido não pode ser cancelado (status: {
-                order[0]['status']}).")
+            status_code=400,
+            detail="Este pedido já foi confirmado e o acesso ao material foi liberado. Não é possível cancelá-lo.")
+
+    # Só cancela se estiver pendente
+    if current_status != 'pending':
+        raise HTTPException(
+            status_code=400,
+            detail=f"Pedido não pode ser cancelado (status: {current_status}).")
 
     # Cancela no Asaas
     try:
@@ -266,3 +278,4 @@ async def cancel_checkout(payment_id: str):
         'asaas_payment_id', payment_id).execute()
 
     return {'ok': True, 'message': 'Pedido cancelado com sucesso.'}
+
