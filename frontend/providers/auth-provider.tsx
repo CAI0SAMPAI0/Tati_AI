@@ -18,7 +18,12 @@ function triggerPodcastWarmup() {
     // Fire-and-forget: não bloqueia login nem navegação
   });
 }
-import { clearStoredSession, getStoredSession, saveStoredSession } from '@/lib/api/auth';
+import {
+  clearStoredSession,
+  getStoredSession,
+  saveStoredSession,
+  syncAuthTokenCookieFromStorage,
+} from '@/lib/api/auth';
 
 function normalizeUserAvatar(source: User): User {
   const profileAvatar = (source as User & { profile?: { avatar_url?: string } })?.profile?.avatar_url;
@@ -111,6 +116,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (hasHydrated.current) return;
     hasHydrated.current = true;
+    syncAuthTokenCookieFromStorage();
+
     const session = getStoredSession();
     if (!session) {
       setIsLoaded(true);

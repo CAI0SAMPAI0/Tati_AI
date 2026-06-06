@@ -297,8 +297,6 @@ def _access_response(
 
 def _can_access_dashboard(user: dict) -> bool:
     username = user.get('username')
-    if (username == 'caio.sampaio'):
-        return False
     role = user.get('role')
     return role in settings.staff_roles or username in SPECIAL_USERS
 

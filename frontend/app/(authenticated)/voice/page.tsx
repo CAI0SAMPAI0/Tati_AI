@@ -25,10 +25,16 @@ import { apiGet, apiPost } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import toast from 'react-hot-toast';
 import { useTheme } from 'next-themes';
-import ReactMarkdown from 'react-markdown';
 import { cn } from '@/lib/utils';
 
 function VoicePageContent() {
+  const [Markdown, setMarkdown] = useState<any>(null);
+  useEffect(() => {
+    import('react-markdown').then((mod) => {
+      setMarkdown(() => mod.default);
+    });
+  }, []);
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
@@ -451,7 +457,13 @@ function VoicePageContent() {
                   <button onClick={() => setIsSummaryOpen(false)} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl"><X /></button>
                </div>
                <div className="flex-1 overflow-y-auto p-6 sm:p-8 prose dark:prose-invert max-w-none text-sm sm:text-base">
-                  {loadingSummary ? <div className="py-10 sm:py-20 text-center animate-pulse">Generating summary...</div> : <ReactMarkdown>{summary || ''}</ReactMarkdown>}
+                  {loadingSummary ? (
+                    <div className="py-10 sm:py-20 text-center animate-pulse">Generating summary...</div>
+                  ) : Markdown ? (
+                    <Markdown>{summary || ''}</Markdown>
+                  ) : (
+                    <div className="py-10 text-center animate-pulse">Loading...</div>
+                  )}
                </div>
             </motion.div>
           </div>

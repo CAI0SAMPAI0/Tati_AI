@@ -152,16 +152,24 @@ export function OverviewSection({ stats, students, difficulties, onSeeAllStudent
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {difficulties?.alerts?.length > 0 ? difficulties.alerts.map((a: any) => (
-                  <tr key={a.username} className="hover:bg-bg-secondary/30 transition-colors">
-                    <td className="px-5 py-3 text-sm font-medium text-text">@{a.username}</td>
-                    <td className="px-5 py-3">
-                      <span className="text-xs font-medium text-warning">
-                        {a.current_difficulty}
-                      </span>
+                {!difficulties ? (
+                  <tr>
+                    <td colSpan={2} className="px-5 py-10 text-center text-sm text-text-muted">
+                      Loading alerts...
                     </td>
                   </tr>
-                )) : (
+                ) : difficulties?.alerts?.length > 0 ? (
+                  difficulties.alerts.map((a: any) => (
+                    <tr key={a.username} className="hover:bg-bg-secondary/30 transition-colors">
+                      <td className="px-5 py-3 text-sm font-medium text-text">@{a.username}</td>
+                      <td className="px-5 py-3">
+                        <span className="text-xs font-medium text-warning">
+                          {a.current_difficulty}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
                   <tr>
                     <td colSpan={2} className="px-5 py-10 text-center text-sm text-text-muted">
                       No students with registered difficulties.

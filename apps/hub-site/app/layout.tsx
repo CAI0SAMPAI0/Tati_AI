@@ -3,6 +3,7 @@ import { Sora, DM_Sans } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/components/auth-provider';
 import HubLayoutWrapper from '@/components/HubLayoutWrapper';
+import { QueryProvider } from '@/providers/query-provider';
 
 const sora = Sora({
   subsets: ['latin'],
@@ -56,9 +57,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-screen bg-bg font-body text-ink antialiased">
         <span className="grain-overlay" aria-hidden />
-        <AuthProvider>
-          <HubLayoutWrapper>{children}</HubLayoutWrapper>
-        </AuthProvider>
+        <QueryProvider>
+          <AuthProvider>
+            <HubLayoutWrapper>{children}</HubLayoutWrapper>
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   );

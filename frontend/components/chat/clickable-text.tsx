@@ -1,8 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import React, { useMemo, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
 interface ClickableTextProps {
@@ -13,6 +11,20 @@ interface ClickableTextProps {
 }
 
 export function ClickableText({ content, isMarkdown = true, onWordClick, className }: ClickableTextProps) {
+  const [Markdown, setMarkdown] = useState<any>(null);
+  const [gfm, setGfm] = useState<any>(null);
+
+  useEffect(() => {
+    if (!isMarkdown) return;
+    Promise.all([
+      import('react-markdown'),
+      import('remark-gfm')
+    ]).then(([mdModule, gfmModule]) => {
+      setMarkdown(() => mdModule.default);
+      setGfm(() => gfmModule.default);
+    });
+  }, [isMarkdown]);
+
   const handleClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target.classList.contains('clickable-word')) {
@@ -49,23 +61,27 @@ export function ClickableText({ content, isMarkdown = true, onWordClick, classNa
     );
   }
 
+  if (!Markdown || !gfm) {
+    return <div className={cn("prose-container", className)}>{content}</div>;
+  }
+
   return (
     <div className={cn("prose-container", className)} onClick={handleClick}>
-      <ReactMarkdown 
-        remarkPlugins={[remarkGfm]}
+      <Markdown 
+        remarkPlugins={[gfm]}
         components={{
-          p: ({ children }) => <p>{wrapChildren(children)}</p>,
-          li: ({ children }) => <li>{wrapChildren(children)}</li>,
-          h1: ({ children }) => <h1>{wrapChildren(children)}</h1>,
-          h2: ({ children }) => <h2>{wrapChildren(children)}</h2>,
-          h3: ({ children }) => <h3>{wrapChildren(children)}</h3>,
-          span: ({ children }) => <span>{wrapChildren(children)}</span>,
-          em: ({ children }) => <em>{wrapChildren(children)}</em>,
-          strong: ({ children }) => <strong>{wrapChildren(children)}</strong>,
+          p: ({ children }: any) => <p>{wrapChildren(children)}</p>,
+          li: ({ children }: any) => <li>{wrapChildren(children)}</li>,
+          h1: ({ children }: any) => <h1>{wrapChildren(children)}</h1>,
+          h2: ({ children }: any) => <h2>{wrapChildren(children)}</h2>,
+          h3: ({ children }: any) => <h3>{wrapChildren(children)}</h3>,
+          span: ({ children }: any) => <span>{wrapChildren(children)}</span>,
+          em: ({ children }: any) => <em>{wrapChildren(children)}</em>,
+          strong: ({ children }: any) => <strong>{wrapChildren(children)}</strong>,
         }}
       >
         {processedContent}
-      </ReactMarkdown>
+      </Markdown>
     </div>
   );
 }

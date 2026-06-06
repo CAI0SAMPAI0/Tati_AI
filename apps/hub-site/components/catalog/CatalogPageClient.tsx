@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { apiGet, HUB_ENDPOINTS } from '@tati/hub-core';
 import type { PremiumCatalogItem } from '@tati/hub-core';
@@ -15,17 +16,14 @@ import {
   searchMaterials,
 } from '@/lib/catalog';
 
-type CatalogPageClientProps = {
-  initialItems: CatalogMaterial[];
-};
-
 function mergeAccess(
-  base: CatalogMaterial[],
+  base: CatalogMaterial[] | null,
   authenticated: PremiumCatalogItem[] | null,
 ): CatalogMaterial[] {
-  if (!authenticated) return base;
+  const safeBase = base || [];
+  if (!authenticated) return safeBase;
   const accessMap = new Map(authenticated.map((item) => [item.id, item.has_access]));
-  return base.map((item) => ({
+  return safeBase.map((item) => ({
     ...item,
     has_access: accessMap.get(item.id) ?? item.has_access,
   }));
@@ -61,56 +59,33 @@ function Section({
   );
 }
 
-export default function CatalogPageClient({ initialItems }: CatalogPageClientProps) {
+export default function CatalogPageClient() {
   const { token } = useHubAuth();
-  const [items, setItems] = useState<CatalogMaterial[]>(initialItems);
-  const [clientLoaded, setClientLoaded] = useState(false);
   const [filter, setFilter] = useState<FilterId>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [accessOverrides, setAccessOverrides] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    setItems(initialItems);
-  }, [initialItems]);
+  const { data: catalog = [] } = useQuery<CatalogMaterial[]>({
+    queryKey: ['hub-catalog'],
+    queryFn: () => apiGet<CatalogMaterial[]>('/catalog'),
+  });
 
-  // Carrega catálogo público via cliente se o SSR veio vazio
-  useEffect(() => {
-    if (initialItems.length === 0 && !clientLoaded) {
-      apiGet<CatalogMaterial[]>('/catalog')
-        .then((catalog) => {
-          setItems(catalog);
-          setClientLoaded(true);
-        })
-        .catch((err) => {
-          console.error('Erro ao carregar catálogo no cliente', err);
-          setClientLoaded(true);
-        });
-    }
-  }, [initialItems, clientLoaded]);
+  const { data: authenticatedCatalog } = useQuery<PremiumCatalogItem[]>({
+    queryKey: ['hub-public-catalog'],
+    queryFn: () => apiGet<PremiumCatalogItem[]>(HUB_ENDPOINTS.HUB_PUBLIC),
+    enabled: Boolean(token),
+  });
 
-  const fetchAuthenticated = useCallback(() => {
-    if (!token) {
-      return;
-    }
-    apiGet<PremiumCatalogItem[]>(HUB_ENDPOINTS.HUB_PUBLIC)
-      .then((authenticated) => setItems((current) => mergeAccess(current, authenticated)))
-      .catch((err) => console.error('Erro ao buscar acessos', err));
-  }, [token]);
+  const items = useMemo(() => {
+    const merged = mergeAccess(catalog, authenticatedCatalog ?? null) || [];
+    return merged.map((item) =>
+      accessOverrides[item.id] ? { ...item, has_access: true } : item,
+    );
+  }, [catalog, authenticatedCatalog, accessOverrides]);
 
-  useEffect(() => {
-    if (token || clientLoaded) {
-      fetchAuthenticated();
-    }
-  }, [fetchAuthenticated, token, clientLoaded]);
-
-  const handleAccessGranted = useCallback(
-    (id: string) => {
-      setItems((prev) =>
-        prev.map((item) => (item.id === id ? { ...item, has_access: true } : item)),
-      );
-      setTimeout(fetchAuthenticated, 2000);
-    },
-    [fetchAuthenticated],
-  );
+  const handleAccessGranted = useCallback((id: string) => {
+    setAccessOverrides((prev) => ({ ...prev, [id]: true }));
+  }, []);
 
   const categoryFiltered = useMemo(() => filterMaterials(items, filter), [items, filter]);
 

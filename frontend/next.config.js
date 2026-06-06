@@ -6,7 +6,6 @@ const nextConfig = {
     'lucide-react',
     'recharts',
     'zustand',
-    '@tanstack/react-query',
     // react-markdown and its ESM-only dependencies must be transpiled
     // by Next.js/Webpack, otherwise the bundler crashes with
     // "Cannot read properties of undefined (reading 'call')"
@@ -84,7 +83,6 @@ const nextConfig = {
       'lucide-react',
       'framer-motion',
       'recharts',
-      '@tanstack/react-query',
     ],
   },
 
@@ -148,5 +146,6 @@ const nextConfig = {
 };
 
 module.exports = {
+  ...nextConfig,
   productionBrowserSourceMaps: true,
 }

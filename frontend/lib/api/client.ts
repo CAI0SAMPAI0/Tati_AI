@@ -119,6 +119,8 @@ async function tryRefreshToken(): Promise<boolean> {
     const payload = (await parseResponseBody<{ access_token?: string }>(response)) ?? {};
     if (!payload.access_token) return false;
     localStorage.setItem('token', payload.access_token);
+    const { setAuthTokenCookie } = await import('./auth-cookie');
+    setAuthTokenCookie(payload.access_token);
     return true;
   } catch {
     return false;

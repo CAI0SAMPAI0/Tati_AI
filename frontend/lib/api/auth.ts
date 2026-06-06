@@ -1,4 +1,5 @@
 import { apiPost, apiPostForm } from './client';
+import { clearAuthTokenCookie, setAuthTokenCookie, syncAuthTokenCookieFromStorage } from './auth-cookie';
 import type { AuthLoginResponse, User } from './types';
 
 export async function loginWithCredentials(
@@ -65,6 +66,7 @@ export function saveStoredSession(session: StoredSession): void {
   if (session.refreshToken) {
     localStorage.setItem(REFRESH_TOKEN_KEY, session.refreshToken);
   }
+  setAuthTokenCookie(session.token);
 }
 
 export function clearStoredSession(): void {
@@ -72,4 +74,7 @@ export function clearStoredSession(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
+  clearAuthTokenCookie();
 }
+
+export { syncAuthTokenCookieFromStorage };

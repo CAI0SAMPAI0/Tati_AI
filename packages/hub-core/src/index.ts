@@ -1,4 +1,5 @@
 export * from './auth';
+export * from './auth-cookie';
 export * from './catalog';
 export * from './client';
 export * from './endpoints';

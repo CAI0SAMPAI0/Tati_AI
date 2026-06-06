@@ -8,12 +8,12 @@ import { Toaster } from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 
 const RegisterServiceWorker = dynamic(
-  () => import('@/components/pwa/register-sw').then(m => ({ default: m.RegisterServiceWorker })),
+  () => import('@/components/pwa/register-sw').then(m => m.RegisterServiceWorker as any),
   { ssr: false }
 );
 
 const CapacitorHandler = dynamic(
-  () => import('@/components/pwa/capacitor-handler').then(m => ({ default: m.CapacitorHandler })),
+  () => import('@/components/pwa/capacitor-handler').then(m => m.CapacitorHandler as any),
   { ssr: false }
 );
 

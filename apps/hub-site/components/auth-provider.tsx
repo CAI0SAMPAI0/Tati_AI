@@ -15,6 +15,7 @@ import {
   clearStoredSession,
   getStoredSession,
   saveStoredSession,
+  syncAuthTokenCookieFromStorage,
 } from '@tati/hub-core';
 import type { User } from '@tati/hub-core';
 
@@ -62,6 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    syncAuthTokenCookieFromStorage();
+
     const current = getStoredSession();
     if (!current) {
       setIsLoaded(true);

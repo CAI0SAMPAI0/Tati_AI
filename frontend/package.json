@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
-    "sync-assets": "node -e \"const fs=require('fs');const path=require('path');const src=path.join(__dirname,'../backend/assets/images/tati_logo.jpg');const dest=path.join(__dirname,'public/images/tati_logo.jpg');fs.mkdirSync(path.dirname(dest),{recursive:true});fs.copyFileSync(src,dest);\"",
+    "sync-assets": "node -e \"const fs=require('fs');const path=require('path');const src=path.join(process.cwd(),'../backend/assets/images/tati_logo.jpg');const dest=path.join(process.cwd(),'public/images/tati_logo.jpg');if(fs.existsSync(src)){fs.mkdirSync(path.dirname(dest),{recursive:true});fs.copyFileSync(src,dest);}else{console.warn('tati_logo.jpg not found in backend, skipping sync');}\"",
     "dev": "npm run sync-assets && next dev --port 3000",
     "dev:clean": "npm run clean && next dev --port 3000",
     "build": "next build",
@@ -15,7 +15,7 @@
   "dependencies": {
     "@capacitor/app": "^8.1.0",
     "@capacitor/core": "^8.3.4",
-    "@tanstack/react-query": "^5.100.6",
+    "@tanstack/react-query": "^5.101.0",
     "framer-motion": "^11.11.17",
     "lucide-react": "^0.468.0",
     "next": "14.2.29",

@@ -1,3 +1,4 @@
+import { clearAuthTokenCookie, setAuthTokenCookie } from './auth-cookie';
 import type { User } from './types';
 
 const TOKEN_KEY = 'token';
@@ -33,6 +34,7 @@ export function saveStoredSession(session: StoredSession): void {
   if (session.refreshToken) {
     window.localStorage.setItem(REFRESH_TOKEN_KEY, session.refreshToken);
   }
+  setAuthTokenCookie(session.token);
 }
 
 export function clearStoredSession(): void {
@@ -40,6 +42,7 @@ export function clearStoredSession(): void {
   window.localStorage.removeItem(TOKEN_KEY);
   window.localStorage.removeItem(USER_KEY);
   window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+  clearAuthTokenCookie();
 }
 
 export function getAccessToken(): string | null {

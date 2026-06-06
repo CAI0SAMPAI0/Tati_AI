@@ -17,12 +17,13 @@ export type WeeklyPlan = {
  * Busca o plano semanal unificado.
  * O backend agora retorna todos os pendentes (podcasts, simulations, ai-exercises).
  */
-export async function fetchWeeklyPlan(): Promise<WeeklyPlan> {
-  try {
-    const data = await apiGet<any>('/users/progress/weekly-plan');
-    
-    // Garantir que topics venha como array
-    const topics: WeeklyTopic[] = (data.topics || []).map((t: any) => ({
+export function normalizeWeeklyPlanData(data: unknown): WeeklyPlan {
+  const payload = (data && typeof data === 'object' ? data : {}) as {
+    topics?: unknown[];
+    created_at?: string;
+  };
+
+  const topics: WeeklyTopic[] = (payload.topics || []).map((t: any) => ({
       id: String(t.id),
       title: String(t.title),
       description: t.description || '',
@@ -30,10 +31,16 @@ export async function fetchWeeklyPlan(): Promise<WeeklyPlan> {
       redirect_url: t.redirect_url
     }));
 
-    return {
-      created_at: data.created_at || new Date().toISOString(),
-      topics,
-    };
+  return {
+    created_at: payload.created_at || new Date().toISOString(),
+    topics,
+  };
+}
+
+export async function fetchWeeklyPlan(): Promise<WeeklyPlan> {
+  try {
+    const data = await apiGet<unknown>('/users/progress/weekly-plan');
+    return normalizeWeeklyPlanData(data);
   } catch (error) {
     console.error('[fetchWeeklyPlan] Failed:', error);
     return {

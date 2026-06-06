@@ -1,6 +1,7 @@
 from __future__ import annotations
 import logging
-from supabase import Client, create_client
+from supabase import Client, create_client, ClientOptions
+import httpx
 from app.core.config import settings
 
 
@@ -10,15 +11,16 @@ _client: Client | None = None
 
 def get_client() -> Client:
     """
-    Retorna o cliente Supabase singleton.
-    Cria na primeira chamada, reutiliza nas seguintes.
-    Thread-safe para leitura (FastAPI é single-threaded no event loop).
+    Retorna o cliente Supabase singleton com HTTP/2 desabilitado para evitar bugs de concorrência do httpx.
     """
     global _client
     if _client is None:
+        custom_client = httpx.Client(http2=False, timeout=30.0)
+        options = ClientOptions(httpx_client=custom_client)
         _client = create_client(
             settings.supabase_url,
             settings.supabase_service_key or settings.supabase_key,
+            options=options,
         )
     return _client
 

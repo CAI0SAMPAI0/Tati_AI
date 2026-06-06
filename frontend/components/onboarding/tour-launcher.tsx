@@ -3,10 +3,7 @@
 import { useTour } from '@/hooks/useTour';
 import dynamic from 'next/dynamic';
 
-const TourModal = dynamic(
-  () => import('./tour-modal').then(m => ({ default: m.TourModal })),
-  { ssr: false }
-);
+import { TourModal } from './tour-modal';
 
 export function TourLauncher() {
   const { isActive, currentStep, next, prev, skip, totalSteps, isLoading } = useTour();

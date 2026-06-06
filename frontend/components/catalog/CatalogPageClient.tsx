@@ -24,12 +24,13 @@ type CatalogPageClientProps = {
 };
 
 function mergeAccess(
-  base: CatalogMaterial[],
+  base: CatalogMaterial[] | null,
   authenticated: PremiumCatalogItem[] | null,
 ): CatalogMaterial[] {
-  if (!authenticated) return base;
+  const safeBase = base || [];
+  if (!authenticated) return safeBase;
   const accessMap = new Map(authenticated.map((item) => [item.id, item.has_access]));
-  return base.map((item) => ({
+  return safeBase.map((item) => ({
     ...item,
     has_access: accessMap.get(item.id) ?? item.has_access,
   }));
