@@ -43,7 +43,7 @@ export function formatPrice(value: number): string {
 }
 
 export const FILTER_OPTIONS = [
-  { id: 'all', label: 'Todos' },
+  { id: 'all', label: 'All' },
   { id: 'grammar', label: 'Grammar' },
   { id: 'speaking', label: 'Speaking' },
   { id: 'travel', label: 'Travel' },
