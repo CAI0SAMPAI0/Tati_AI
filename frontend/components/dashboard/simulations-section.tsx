@@ -123,30 +123,54 @@ export default function SimulationsSection() {
         use_ai_generation: true
       };
 
-      const res = await apiPost(ENDPOINTS.ADMIN_SIMULATIONS, payload);
+      const res = await apiPost<{ success: boolean; task_id?: string }>(ENDPOINTS.ADMIN_SIMULATIONS, payload);
 
-      if (res.ok && res.data) {
-        toast.success('AI improved the scenario!');
-
-        const updatedSim = res.data as SimulationRow;
-
-        setFormData({
-          name: updatedSim.name,
-          description: updatedSim.description || '',
-          difficulty: updatedSim.difficulty || 'all',
-          system_prompt: updatedSim.system_prompt || '',
-          emoji: updatedSim.emoji || '🎭',
-        });
-
-        await invalidateSimulations();
-        if (!editingSim) setEditingSim(updatedSim);
+      if (res.ok && res.data.success && res.data.task_id) {
+        const taskId = res.data.task_id;
+        toast.loading('AI is generating the scenario...', { id: taskId });
+        
+        // Poll status
+        const pollInterval = setInterval(async () => {
+          try {
+            const statusRes = await apiGet<{status: string; result?: any; error?: string}>(`/tasks/status/${taskId}`);
+            if (statusRes) {
+              if (statusRes.status === 'success') {
+                clearInterval(pollInterval);
+                setIsGenerating(false);
+                toast.success('Simulation generated successfully!', { id: taskId });
+                
+                const updatedSim = statusRes.result as SimulationRow;
+                if (updatedSim) {
+                  setFormData({
+                    name: updatedSim.name,
+                    description: updatedSim.description || '',
+                    difficulty: updatedSim.difficulty || 'all',
+                    system_prompt: updatedSim.system_prompt || '',
+                    emoji: updatedSim.emoji || '🎭',
+                  });
+                  if (!editingSim) setEditingSim(updatedSim);
+                }
+                
+                await invalidateSimulations();
+              } else if (statusRes.status === 'failed') {
+                clearInterval(pollInterval);
+                setIsGenerating(false);
+                toast.error(`Failed to generate: ${statusRes.error || 'Unknown error'}`, { id: taskId });
+              }
+            }
+          } catch (err: any) {
+            clearInterval(pollInterval);
+            setIsGenerating(false);
+            toast.error(`Error checking status: ${err.message}`, { id: taskId });
+          }
+        }, 2000);
       } else {
+        setIsGenerating(false);
         toast.error('Error generating with AI.');
       }
     } catch {
-      toast.error('Connection error with AI.');
-    } finally {
       setIsGenerating(false);
+      toast.error('Connection error with AI.');
     }
   };
 

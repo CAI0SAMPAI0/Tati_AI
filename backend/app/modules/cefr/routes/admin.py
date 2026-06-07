@@ -9,8 +9,7 @@ from typing import Any
 
 from app.core.database import get_client
 from app.modules.cefr.services.cefr_service import CEFRService
-# from app.modules.auth.dependencies import get_current_admin_user # Se
-# houver autenticação de admin
+from app.core.dependencies.auth import require_staff, Depends
 
 router = APIRouter(prefix="/cefr/admin", tags=["CEFR Admin"])
 
@@ -93,13 +92,19 @@ async def upload_cefr_material(
 
 
 @router.post("/generate-flashcards")
-async def generate_flashcards(level: str, topic: str, count: int = 5):
+async def generate_flashcards(
+    level: str, 
+    topic: str, 
+    count: int = 5,
+    title: Optional[str] = None,
+    user=Depends(require_staff)
+):
     """
     Gera flashcards a partir do material indexado usando RAG em background.
     """
     try:
         from app.modules.cefr.tasks import generate_cefr_flashcards_task
-        task = generate_cefr_flashcards_task.delay(level, topic, count)
+        task = generate_cefr_flashcards_task.delay(level, topic, count, username=user['username'], custom_title=title)
         return {
             "success": True,
             "task_id": task.id}
@@ -109,13 +114,19 @@ async def generate_flashcards(level: str, topic: str, count: int = 5):
 
 
 @router.post("/generate-exercises")
-async def generate_exercises(level: str, topic: str, count: int = 3):
+async def generate_exercises(
+    level: str, 
+    topic: str, 
+    count: int = 3,
+    title: Optional[str] = None,
+    user=Depends(require_staff)
+):
     """
     Gera exercícios a partir do material indexado usando RAG em background.
     """
     try:
         from app.modules.cefr.tasks import generate_cefr_exercises_task
-        task = generate_cefr_exercises_task.delay(level, topic, count)
+        task = generate_cefr_exercises_task.delay(level, topic, count, username=user['username'], custom_title=title)
         return {
             "success": True,
             "task_id": task.id}
@@ -125,13 +136,19 @@ async def generate_exercises(level: str, topic: str, count: int = 3):
 
 
 @router.post("/generate-simulations")
-async def generate_simulations(level: str, topic: str, count: int = 2):
+async def generate_simulations(
+    level: str, 
+    topic: str, 
+    count: int = 2,
+    title: Optional[str] = None,
+    user=Depends(require_staff)
+):
     """
     Gera simulações a partir do material indexado usando RAG em background.
     """
     try:
         from app.modules.cefr.tasks import generate_cefr_simulations_task
-        task = generate_cefr_simulations_task.delay(level, topic, count)
+        task = generate_cefr_simulations_task.delay(level, topic, count, username=user['username'], custom_title=title)
         return {
             "success": True,
             "task_id": task.id}

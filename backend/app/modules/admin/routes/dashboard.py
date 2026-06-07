@@ -48,6 +48,15 @@ async def generate_from_url_endpoint(
     )
     if not result.get('ok'):
         raise BusinessLogicError(detail=result.get('error'))
+
+    from app.modules.notifications.services.notifications import notify_ai_generation
+    notify_ai_generation(
+        username=user['username'],
+        title="✨ Módulo Gerado",
+        message="O módulo a partir da URL foi gerado com sucesso.",
+        url="/admin"
+    )
+
     return result
 
 
@@ -238,11 +247,19 @@ async def create_simulation(
         user=Depends(require_staff)):
     """Cria uma nova simulação (manual ou via IA se is_ai_generated)."""
     if data.get('is_ai_generated') or data.get('use_ai_generation'):
-        return await service.generate_simulation(
-            data.get('topic') or data.get('name', 'Nova Simulação'),
-            normalize_level(data.get('level') or data.get('difficulty')),
-            data.get('instructions', '')
+        from app.modules.activities.tasks import generate_simulation_task
+        
+        topic = data.get('topic') or data.get('name', 'Nova Simulação')
+        level = normalize_level(data.get('level') or data.get('difficulty'))
+        instructions = data.get('instructions', '')
+        
+        task = generate_simulation_task.delay(
+            topic=topic,
+            level=level,
+            instructions=instructions,
+            username=user['username']
         )
+        return {"success": True, "task_id": task.id}
 
     # Limpeza de dados para evitar erro de coluna inexistente
     allowed_fields = {

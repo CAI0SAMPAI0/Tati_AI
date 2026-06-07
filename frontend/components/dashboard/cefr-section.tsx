@@ -4,10 +4,15 @@ import { useState } from 'react';
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, BookOpen, PenTool, Clapperboard } from 'lucide-react';
 import { apiUpload, apiPost, apiGet } from '@/lib/api/client';
 import { LEVEL_OPTIONS } from '@/lib/constants/levels';
+import toast from 'react-hot-toast';
 
 export function CefrSection() {
   const [level, setLevel] = useState('A1');
   const [topic, setTopic] = useState('');
+  const [cefrTitle, setCefrTitle] = useState('');
+  const [cardCount, setCardCount] = useState(5);
+  const [exerciseCount, setExerciseCount] = useState(3);
+  const [simulationCount, setSimulationCount] = useState(2);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [generatingFlashcards, setGeneratingFlashcards] = useState(false);
@@ -54,14 +59,22 @@ export function CefrSection() {
     
     try {
       let endpoint = '';
-      if (type === 'flashcards') endpoint = `/cefr/admin/generate-flashcards?level=${level}&topic=${encodeURIComponent(topic)}&count=5`;
-      else if (type === 'exercises') endpoint = `/cefr/admin/generate-exercises?level=${level}&topic=${encodeURIComponent(topic)}&count=3`;
-      else if (type === 'simulations') endpoint = `/cefr/admin/generate-simulations?level=${level}&topic=${encodeURIComponent(topic)}&count=2`;
+      if (type === 'flashcards') {
+        endpoint = `/cefr/admin/generate-flashcards?level=${level}&topic=${encodeURIComponent(topic)}&count=${cardCount}`;
+        if (cefrTitle.trim()) endpoint += `&title=${encodeURIComponent(cefrTitle.trim())}`;
+      } else if (type === 'exercises') {
+        endpoint = `/cefr/admin/generate-exercises?level=${level}&topic=${encodeURIComponent(topic)}&count=${exerciseCount}`;
+        if (cefrTitle.trim()) endpoint += `&title=${encodeURIComponent(cefrTitle.trim())}`;
+      } else if (type === 'simulations') {
+        endpoint = `/cefr/admin/generate-simulations?level=${level}&topic=${encodeURIComponent(topic)}&count=${simulationCount}`;
+        if (cefrTitle.trim()) endpoint += `&title=${encodeURIComponent(cefrTitle.trim())}`;
+      }
         
       const res = await apiPost<{success: boolean; task_id?: string}>(endpoint, null);
       
       if (res.ok && res.data.success && res.data.task_id) {
         const taskId = res.data.task_id;
+        toast.loading(`Starting generation of ${type}...`, { id: taskId, duration: 4000 });
         
         // Poll status
         const pollInterval = setInterval(async () => {
@@ -73,13 +86,13 @@ export function CefrSection() {
                 if (type === 'flashcards') setGeneratingFlashcards(false);
                 else if (type === 'exercises') setGeneratingExercises(false);
                 else if (type === 'simulations') setGeneratingSimulations(false);
-                alert(`${type.charAt(0).toUpperCase() + type.slice(1)} generated and saved to the Dashboard successfully!`);
+                toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} generated successfully!`, { id: taskId });
               } else if (statusRes.status === 'failed') {
                 clearInterval(pollInterval);
                 if (type === 'flashcards') setGeneratingFlashcards(false);
                 else if (type === 'exercises') setGeneratingExercises(false);
                 else if (type === 'simulations') setGeneratingSimulations(false);
-                alert(`Failed to generate ${type}: ${statusRes.error || 'Unknown error'}`);
+                toast.error(`Failed to generate ${type}: ${statusRes.error || 'Unknown error'}`, { id: taskId });
               }
             }
           } catch (err: any) {
@@ -87,20 +100,20 @@ export function CefrSection() {
             if (type === 'flashcards') setGeneratingFlashcards(false);
             else if (type === 'exercises') setGeneratingExercises(false);
             else if (type === 'simulations') setGeneratingSimulations(false);
-            alert(`Error checking status for ${type}: ${err.message}`);
+            toast.error(`Error checking status for ${type}: ${err.message}`, { id: taskId });
           }
         }, 2000);
       } else {
         if (type === 'flashcards') setGeneratingFlashcards(false);
         else if (type === 'exercises') setGeneratingExercises(false);
         else if (type === 'simulations') setGeneratingSimulations(false);
-        alert('Failed to initiate content generation');
+        toast.error('Failed to initiate content generation');
       }
     } catch (err: any) {
       if (type === 'flashcards') setGeneratingFlashcards(false);
       else if (type === 'exercises') setGeneratingExercises(false);
       else if (type === 'simulations') setGeneratingSimulations(false);
-      alert(err.message || 'Error generating content');
+      toast.error(err.message || 'Error generating content');
     }
   };
 
@@ -179,45 +192,96 @@ export function CefrSection() {
           <BookOpen size={24} className="text-primary" />
           Generate Content from PDFs
         </h2>
-        <p className="text-xs text-text-muted mb-4">Content is automatically published and will be available in the Flashcards, Modules (Quizzes), and Simulations tabs.</p>
+        <p className="text-xs text-text-muted mb-6">Content is automatically published and will be available in the Flashcards, Modules (Quizzes), and Simulations tabs.</p>
         
-        <div className="flex flex-col md:flex-row gap-4 items-end">
-          <div className="flex-1 space-y-2 w-full">
-            <label className="text-sm font-bold text-text-subtle">Topic / Situation</label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-text-subtle">Título do Conteúdo (Opcional)</label>
             <input 
               type="text" 
-              placeholder="e.g. Shopping at the supermarket"
+              placeholder="Ex: No Supermercado (deixando vazio, usará o prompt)"
+              value={cefrTitle}
+              onChange={e => setCefrTitle(e.target.value)}
+              className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:ring-2 focus:ring-primary/20 outline-none"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-text-subtle">Topic / Situation (Prompt detalhado para a IA)</label>
+            <input 
+              type="text" 
+              placeholder="e.g. Shopping at the supermarket and talking to a cashier"
               value={topic}
               onChange={e => setTopic(e.target.value)}
               className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:ring-2 focus:ring-primary/20 outline-none"
             />
           </div>
-          
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-text-subtle">Quantidade de Flashcards</label>
+            <input 
+              type="number" 
+              min="1" 
+              max="50"
+              value={cardCount}
+              onChange={e => setCardCount(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:ring-2 focus:ring-primary/20 outline-none"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-text-subtle">Quantidade de Exercícios / Questões</label>
+            <input 
+              type="number" 
+              min="1" 
+              max="50"
+              value={exerciseCount}
+              onChange={e => setExerciseCount(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:ring-2 focus:ring-primary/20 outline-none"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-text-subtle">Quantidade de Simulações</label>
+            <input 
+              type="number" 
+              min="1" 
+              max="20"
+              value={simulationCount}
+              onChange={e => setSimulationCount(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:ring-2 focus:ring-primary/20 outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-4 pt-4 border-t border-border">
           <button 
             onClick={() => handleGenerate('flashcards')}
             disabled={!topic.trim() || generatingFlashcards}
-            className="px-6 py-3 bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20 rounded-xl font-bold text-sm disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+            className="flex-1 min-w-[200px] px-6 py-3.5 bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20 rounded-xl font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap transition-all"
           >
             {generatingFlashcards ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
-            Generate Flashcards
+            Generate Flashcards ({cardCount} cards)
           </button>
 
           <button 
             onClick={() => handleGenerate('exercises')}
             disabled={!topic.trim() || generatingExercises}
-            className="px-6 py-3 bg-orange-500/10 text-orange-500 hover:bg-orange-500/20 rounded-xl font-bold text-sm disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+            className="flex-1 min-w-[200px] px-6 py-3.5 bg-orange-500/10 text-orange-500 hover:bg-orange-500/20 rounded-xl font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap transition-all"
           >
             {generatingExercises ? <Loader2 size={16} className="animate-spin" /> : <PenTool size={16} />}
-            Generate Exercises
+            Generate Exercises ({exerciseCount} questions)
           </button>
           
           <button 
             onClick={() => handleGenerate('simulations')}
             disabled={!topic.trim() || generatingSimulations}
-            className="px-6 py-3 bg-pink-500/10 text-pink-500 hover:bg-pink-500/20 rounded-xl font-bold text-sm disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+            className="flex-1 min-w-[200px] px-6 py-3.5 bg-pink-500/10 text-pink-500 hover:bg-pink-500/20 rounded-xl font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap transition-all"
           >
             {generatingSimulations ? <Loader2 size={16} className="animate-spin" /> : <Clapperboard size={16} />}
-            Generate Simulations
+            Generate Simulations ({simulationCount} sims)
           </button>
         </div>
       </div>

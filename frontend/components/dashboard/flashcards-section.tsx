@@ -252,24 +252,47 @@ export function FlashcardsSection() {
     }
     setIsGenerating(true);
     try {
-      const res = await apiPost<{ ok: boolean }>(ENDPOINTS.ADMIN_MODULE_GENERATE_FLASHCARDS, {
+      const res = await apiPost<{ success: boolean; task_id?: string }>(ENDPOINTS.ADMIN_MODULE_GENERATE_FLASHCARDS, {
         theme: formData.ai_with_images ? `IMG:${formData.ai_theme}` : formData.ai_theme,
         instructions: '',
         level: formData.level,
         card_count: formData.card_count,
         module_id: editingDeck?.id
       });
-      if (res.ok) {
-        toast.success('Flashcards generated with AI successfully!');
-        await invalidateDecks();
-        setIsModalOpen(false);
+      if (res.ok && res.data.success && res.data.task_id) {
+        const taskId = res.data.task_id;
+        toast.loading('Generating flashcards with AI...', { id: taskId });
+        
+        // Poll status
+        const pollInterval = setInterval(async () => {
+          try {
+            const statusRes = await apiGet<{status: string; error?: string}>(`/tasks/status/${taskId}`);
+            if (statusRes) {
+              if (statusRes.status === 'success') {
+                clearInterval(pollInterval);
+                setIsGenerating(false);
+                toast.success('Flashcards generated successfully!', { id: taskId });
+                await invalidateDecks();
+                setIsModalOpen(false);
+              } else if (statusRes.status === 'failed') {
+                clearInterval(pollInterval);
+                setIsGenerating(false);
+                toast.error(`Failed to generate flashcards: ${statusRes.error || 'Unknown error'}`, { id: taskId });
+              }
+            }
+          } catch (err: any) {
+            clearInterval(pollInterval);
+            setIsGenerating(false);
+            toast.error(`Error checking status: ${err.message}`, { id: taskId });
+          }
+        }, 2000);
       } else {
+        setIsGenerating(false);
         toast.error('Error generating flashcards with AI.');
       }
     } catch {
-      toast.error('Error connecting with AI.');
-    } finally {
       setIsGenerating(false);
+      toast.error('Error connecting with AI.');
     }
   };
 

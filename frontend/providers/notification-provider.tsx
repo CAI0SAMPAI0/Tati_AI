@@ -65,7 +65,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         const newNotifs = list.filter(n => !n.is_read && !lastNotifIds.current.has(n.id));
         newNotifs.forEach(n => {
           // Toast AI generations or general notifications
-          if (n.category === 'new_activity' || n.category === 'correction') {
+          if (n.category === 'new_activity' || n.category === 'correction' || n.category === 'ai_generation') {
              toast.success(`${n.title}: ${n.body}`, { duration: 6000 });
           } else if (n.category !== 'reminder') {
              toast(`${n.title}: ${n.body}`, { icon: '🔔', duration: 5000 });

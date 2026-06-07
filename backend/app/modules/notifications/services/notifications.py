@@ -385,6 +385,17 @@ def notify_welcome(username: str, name: str) -> None:
     )
 
 
+def notify_ai_generation(username: str, title: str, message: str, url: str = '/admin') -> None:
+    create_notification(
+        username=username,
+        category='ai_generation',
+        title=title,
+        message=message,
+        send_push=False,
+        push_url=url,
+    )
+
+
 def dispatch_streak_engagement_notifications(
     mode: str = 'all', now_utc: Optional[datetime] = None
 ) -> Dict[str, int]:

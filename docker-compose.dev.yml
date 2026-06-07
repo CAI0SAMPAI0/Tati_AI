@@ -28,6 +28,9 @@ services:
       PORT: "8001"
       PYTHONUNBUFFERED: "1"
       WEB_CONCURRENCY: "1"
+      # Forçamos a usar o redis local do docker em dev
+      UPSTASH_REDIS_URL: "redis://redis"
+      UPSTASH_REDIS_TOKEN: ""
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
@@ -35,6 +38,39 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+
+  # ─── Redis (Para o Celery no ambiente local) ────────────────────────────────
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ─── Celery Worker (Processamento em Background) ───────────────────────────
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+    environment:
+      # Forçamos a usar o redis local do docker se estiver rodando via compose
+      UPSTASH_REDIS_URL: "redis://redis"
+      UPSTASH_REDIS_TOKEN: ""
+    command: ["celery", "-A", "app.core.celery_app", "worker", "--loglevel=info"]
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
 
   # ─── Frontend Tati AI (Next.js dev server com hot-reload) ──────────────────
   frontend:

@@ -1,6 +1,10 @@
 import os
 from celery import Celery
 from celery.schedules import crontab
+from dotenv import load_dotenv
+
+# Carrega as variáveis de ambiente do .env para rodar localmente com Upstash
+load_dotenv()
 
 # Recupera as credenciais do Upstash Redis configuradas no Railway
 UPSTASH_URL = os.getenv('UPSTASH_REDIS_URL')
@@ -21,7 +25,13 @@ else:
 celery_app = Celery(
     "teacher_tati_tasks",
     broker=redis_broker_url,
-    backend=redis_broker_url
+    backend=redis_broker_url,
+    include=[
+        "app.core.tasks",
+        "app.modules.notifications.tasks",
+        "app.modules.cefr.tasks",
+        "app.modules.activities.tasks",
+    ]
 )
 
 # Configuracoes de performance e otimizacao para o Upstash (Fila Leve)

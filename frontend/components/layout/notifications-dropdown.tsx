@@ -18,6 +18,7 @@ const NOTIF_ICONS: Record<string, string> = {
   report: '📊',
   retention: '🍎',
   trophy: '🏆',
+  ai_generation: '✨',
   general: '🔔',
 };
 

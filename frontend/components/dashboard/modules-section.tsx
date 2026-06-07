@@ -218,7 +218,7 @@ export function ModulesSection() {
     }
     setIsGenerating(true);
     try {
-      const res = await apiPost<GeneratedContent>(ENDPOINTS.ADMIN_MODULE_GENERATE_QUIZ, {
+      const res = await apiPost<{ success: boolean; task_id?: string }>(ENDPOINTS.ADMIN_MODULE_GENERATE_QUIZ, {
         title: formData.title || 'New Module',
         description: formData.description || formData.ai_prompt,
         level: formData.level,
@@ -227,28 +227,53 @@ export function ModulesSection() {
         preview_mode: true
       });
 
-      if (res.ok && res.data) {
-        // Normalize: backend may return 'title' instead of 'quiz_title'
-        const raw = res.data as any;
-        const normalized: GeneratedContent = {
-          quiz_title: raw.quiz_title || raw.title || formData.title,
-          questions: (raw.questions || []).map((q: any) => ({
-            question: q.question,
-            options: q.options || [],
-            correct_index: typeof q.correct_index === 'number' ? q.correct_index : 0,
-            explanation: q.explanation || '',
-          }))
-        };
-        setFormData(prev => ({ ...prev, generated_content: normalized }));
-        setIsReviewOpen(true);
-        toast.success('Content generated! Review below.');
+      if (res.ok && res.data.success && res.data.task_id) {
+        const taskId = res.data.task_id;
+        toast.loading('Generating quiz with AI...', { id: taskId });
+        
+        // Poll status
+        const pollInterval = setInterval(async () => {
+          try {
+            const statusRes = await apiGet<{status: string; result?: any; error?: string}>(`/tasks/status/${taskId}`);
+            if (statusRes) {
+              if (statusRes.status === 'success') {
+                clearInterval(pollInterval);
+                setIsGenerating(false);
+                toast.success('Quiz generated successfully!', { id: taskId });
+                
+                const raw = statusRes.result;
+                if (raw) {
+                  const normalized: GeneratedContent = {
+                    quiz_title: raw.quiz_title || raw.title || formData.title,
+                    questions: (raw.questions || []).map((q: any) => ({
+                      question: q.question,
+                      options: q.options || [],
+                      correct_index: typeof q.correct_index === 'number' ? q.correct_index : 0,
+                      explanation: q.explanation || '',
+                    }))
+                  };
+                  setFormData(prev => ({ ...prev, generated_content: normalized }));
+                  setIsReviewOpen(true);
+                }
+              } else if (statusRes.status === 'failed') {
+                clearInterval(pollInterval);
+                setIsGenerating(false);
+                toast.error(`Failed to generate: ${statusRes.error || 'Unknown error'}`, { id: taskId });
+              }
+            }
+          } catch (err: any) {
+            clearInterval(pollInterval);
+            setIsGenerating(false);
+            toast.error(`Error checking status: ${err.message}`, { id: taskId });
+          }
+        }, 2000);
       } else {
+        setIsGenerating(false);
         toast.error('Error generating with AI.');
       }
     } catch {
-      toast.error('Connection error with AI.');
-    } finally {
       setIsGenerating(false);
+      toast.error('Connection error with AI.');
     }
   };
 

@@ -78,12 +78,19 @@ def register_all_routers(app: FastAPI) -> None:
 
     # ── Admin ─────────────────────────────────────────────────
     from app.modules.admin.routes.dashboard import router as dashboard_router
+    from app.modules.admin.routes.tasks import router as tasks_router
     from app.modules.admin.routes.premium import router as admin_premium_router
 
     app.include_router(
         dashboard_router,
         prefix='/dashboard',
         tags=['admin'])
+    
+    app.include_router(
+        tasks_router,
+        tags=['admin'],
+    )
+    
     app.include_router(
         admin_premium_router, prefix='/admin/premium', tags=['admin']
     )
