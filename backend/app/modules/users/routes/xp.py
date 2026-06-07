@@ -1,8 +1,3 @@
-"""
-Router para Gerenciamento de XP.
-Refatorado para usar GamificationService.
-"""
-
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 

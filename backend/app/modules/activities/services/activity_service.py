@@ -229,49 +229,71 @@ class ActivityService:
     async def get_weekly_tasks(self, username: str) -> Dict[str, Any]:
         """Consolida atividades pendentes para o Weekly Goal."""
         def _fetch():
-            # 1. Busca IDs de quizzes concluídos via submissions
-            done_quizzes = self.db.table('activity_submissions').select('metadata').eq(
-                'username', username).eq('activity_type', 'quiz').execute().data or []
-            done_ids = {str(r['metadata'].get('quiz_id')) for r in done_quizzes if r.get(
-                'metadata') and r['metadata'].get('quiz_id')}
+            # Get user's level
+            user_row = self.db.table('users').select('level').eq('username', username).single().execute().data
+            user_level = user_row.get('level', 'A1') if user_row else 'A1'
+            from app.core.enums import normalize_level
+            from app.core.utils.level_utils import matches_level
+            user_level_norm = normalize_level(user_level)
 
-            # 2. Quizzes pendentes (não feitos)
-            # Quizzes não parecem ter filtro de username, mas de active.
+            # 1. Quizzes e AI Exercises concluídos
+            done_rows = self.db.table('activity_submissions').select('metadata, activity_type').eq(
+                'username', username).execute().data or []
+            
+            done_quiz_ids = set()
+            done_sim_ids = set()
+            for r in done_rows:
+                act_type = r.get('activity_type')
+                meta = r.get('metadata') or {}
+                if act_type == 'quiz':
+                    qid = meta.get('quiz_id') or meta.get('item_id')
+                    if qid:
+                        done_quiz_ids.add(str(qid))
+                elif act_type == 'simulation':
+                    sid = meta.get('simulation_id') or meta.get('item_id')
+                    if sid:
+                        done_sim_ids.add(str(sid))
+
+            # 2. Quizzes pendentes (não feitos) do nível do usuário
             all_quizzes = self.db.table('quizzes').select(
-                'id, title, description, module_id').eq('is_active', True).execute().data or []
-            pending_quizzes = [
-                q for q in all_quizzes if str(q['id']) not in done_ids]
+                'id, title, description, module_id, modules(level, levels)').eq('is_active', True).execute().data or []
+            
+            pending_quizzes = []
+            for q in all_quizzes:
+                if str(q['id']) in done_quiz_ids:
+                    continue
+                m_info = q.get('modules') or {}
+                m_level = m_info.get('level')
+                m_levels = m_info.get('levels')
+                if matches_level(user_level_norm, m_level, m_levels):
+                    pending_quizzes.append({
+                        'id': q['id'],
+                        'title': q['title'],
+                        'description': q.get('description'),
+                        'module_id': q.get('module_id')
+                    })
 
-            # 3. Exercícios IA (personalized_quiz) pendentes via
-            # attempts
+            # 3. Exercícios IA (personalized_quiz) pendentes
             attempts = self.db.table('user_exercise_attempts').select('exercise_id').eq(
                 'username', username).eq('status', 'pending').execute().data or []
 
-            # 4. Simulações pendentes (Tabela pode não existir ainda)
-            try:
-                sims = self.db.table('simulation_attempts').select('simulation_id').eq(
-                    'username', username).eq('status', 'not_started').execute().data or []
-            except Exception:
-                sims = []
-
-            logging.info(f"[WeeklyGoalDebug] User: {username}")
-            logging.info(
-                f"[WeeklyGoalDebug] Done Quizzes: {
-                    len(done_ids)}")
-            logging.info(
-                f"[WeeklyGoalDebug] Pending Quizzes: {
-                    len(pending_quizzes)}")
-            logging.info(
-                f"[WeeklyGoalDebug] Pending AI Exercises: {
-                    len(attempts)}")
-            logging.info(
-                f"[WeeklyGoalDebug] Pending Simulations: {
-                    len(sims)}")
+            # 4. Simulações pendentes do nível do usuário
+            all_simulations = self.db.table('simulations').select('id, name, description, difficulty').eq('is_active', True).execute().data or []
+            pending_simulations = []
+            for s in all_simulations:
+                if str(s['id']) in done_sim_ids:
+                    continue
+                if matches_level(user_level_norm, s.get('difficulty')):
+                    pending_simulations.append({
+                        'simulation_id': s['id'],
+                        'name': s['name'],
+                        'description': s.get('description')
+                    })
 
             return {
                 'quizzes': pending_quizzes,
                 'ai_exercises': attempts,
-                'simulations': sims
+                'simulations': pending_simulations
             }
         return await run_in_threadpool(_fetch)
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { apiGet } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 
@@ -11,8 +12,8 @@ import { useRouter } from 'next/navigation';
 import { Clock, Tag } from 'lucide-react';
 
 export function PodcastList() {
-  
   const router = useRouter();
+  const [visibleCount, setVisibleCount] = useState(10);
 
   const { data: podcasts, isLoading, error } = useQuery<Podcast[]>({
     queryKey: ['podcasts-recommendations'],
@@ -40,22 +41,37 @@ export function PodcastList() {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
-      {podcasts.map((p) => (
-        <ActivityCard
-          key={p.id}
-          title={p.title}
-          description={p.description || 'Get ready to listen and practice.'}
-          imageUrl={p.thumbnail}
-          type="podcast"
-          onClick={() => router.push(`/podcasts/${p.id}`)}
-          actionLabel={'▶ Play'}
-          meta={[
-            { icon: <Tag size={12} />, label: p.level },
-            { icon: <Clock size={12} />, label: p.duration || '--:--' }
-          ]}
-        />
-      ))}
+    <div className="space-y-6">
+      <div className="text-sm text-text-subtle font-semibold px-1">
+        Showing {Math.min(visibleCount, podcasts.length)} of {podcasts.length} podcasts
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+        {podcasts.slice(0, visibleCount).map((p) => (
+          <ActivityCard
+            key={p.id}
+            title={p.title}
+            description={p.description || 'Get ready to listen and practice.'}
+            imageUrl={p.thumbnail}
+            type="podcast"
+            onClick={() => router.push(`/podcasts/${p.id}`)}
+            actionLabel={'▶ Play'}
+            meta={[
+              { icon: <Tag size={12} />, label: p.level },
+              { icon: <Clock size={12} />, label: p.duration || '--:--' }
+            ]}
+          />
+        ))}
+      </div>
+      {visibleCount < podcasts.length && (
+        <div className="flex justify-center mt-8">
+          <button
+            onClick={() => setVisibleCount(prev => prev + 10)}
+            className="px-6 py-3 bg-surface hover:bg-surface-hover border border-border text-text font-bold rounded-xl transition-all shadow-sm"
+          >
+            Show More
+          </button>
+        </div>
+      )}
     </div>
   );
 }

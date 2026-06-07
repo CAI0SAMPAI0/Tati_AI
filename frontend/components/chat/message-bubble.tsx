@@ -7,7 +7,8 @@ import { cn, parseAIResponse } from '@/lib/utils';
 import { ClickableText } from './clickable-text';
 import { AudioPlayer } from './audio-player';
 import { useState } from 'react';
-import { Pencil, Check, X } from 'lucide-react';
+import { Pencil, Check, X, Copy } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface MessageBubbleProps {
   message: Message;
@@ -21,6 +22,15 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const [isSaving, setIsSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    const textToCopy = isUser ? message.content : parseAIResponse(message.content).reply;
+    navigator.clipboard.writeText(textToCopy);
+    setCopied(true);
+    toast.success('Copied to clipboard!');
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const handleSave = async () => {
     if (!onEdit || editContent.trim() === message.content) {
@@ -116,6 +126,19 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
                   title="Edit message"
                 >
                   <Pencil size={12} />
+                </button>
+              )}
+
+              {!isStreaming && (
+                <button
+                  onClick={handleCopy}
+                  className={cn(
+                    "absolute top-1/2 -translate-y-1/2 p-1.5 text-text-subtle hover:text-primary opacity-0 group-hover:opacity-100 transition-all bg-surface border border-border rounded-lg shadow-sm z-10",
+                    isUser ? (onEdit ? "-left-16" : "-left-8") : "-right-8"
+                  )}
+                  title="Copy message"
+                >
+                  {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
                 </button>
               )}
             </>

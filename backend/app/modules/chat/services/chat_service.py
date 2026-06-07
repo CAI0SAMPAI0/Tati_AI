@@ -488,11 +488,16 @@ class ChatService:
             'css'}
 
         image_exts = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'}
-        if ext in image_exts:
-            return f'[Imagem anexada: {filename}. A Teacher Tati ainda não possui visão computacional, mas sabe que você enviou esta imagem.]'
 
         try:
             file_bytes = base64.b64decode(content_b64)
+            if ext in image_exts:
+                from app.modules.chat.services.llm import preprocess_image_with_opencv, describe_image_with_gemini
+                # Preprocess with OpenCV
+                processed_bytes = preprocess_image_with_opencv(file_bytes)
+                # Describe with Gemini
+                description = await describe_image_with_gemini(processed_bytes)
+                return f"[Imagem anexada: {filename}]\nDescrição da imagem:\n{description}"
             if ext == 'pdf':
                 reader = pypdf.PdfReader(io.BytesIO(file_bytes))
                 return '\n'.join(

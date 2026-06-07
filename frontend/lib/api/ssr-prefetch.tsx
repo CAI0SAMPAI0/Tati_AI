@@ -35,7 +35,11 @@ export async function prefetchQueries(items: PrefetchItem[]): Promise<Dehydrated
           queryFn ??
           (async () => {
             const { serverFetch } = await import('./server-fetch');
-            return serverFetch(endpoint!);
+            const data = await serverFetch(endpoint!);
+            if (data === null) {
+              throw new Error(`SSR Prefetch failed for ${endpoint}`);
+            }
+            return data;
           }),
       }),
     ),

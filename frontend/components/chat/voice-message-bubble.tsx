@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Volume2 } from 'lucide-react';
+import { Play, Pause, Volume2, Copy, Check } from 'lucide-react';
 import type { Message } from '@/lib/api/types';
 import { cn, parseAIResponse } from '@/lib/utils';
+import toast from 'react-hot-toast';
 import { ClickableText } from './clickable-text';
 
 interface VoiceMessageBubbleProps {
@@ -15,6 +16,15 @@ export function VoiceMessageBubble({ message, onWordClick }: VoiceMessageBubbleP
   const isUser = message.role === 'user';
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    const textToCopy = isUser ? message.content : parseAIResponse(message.content).reply;
+    navigator.clipboard.writeText(textToCopy);
+    setCopied(true);
+    toast.success('Copied to clipboard!');
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   // Sincroniza o áudio se ele mudar (durante o stream ou após carregar)
   useEffect(() => {
@@ -62,7 +72,16 @@ export function VoiceMessageBubble({ message, onWordClick }: VoiceMessageBubbleP
           {isUser ? 'You' : 'Teacher Tati'}
         </span>
       </div>
-      <div className="flex items-end gap-2">
+      <div className="flex items-end gap-2 relative">
+        {isUser && (
+          <button
+            onClick={handleCopy}
+            className="p-2 rounded-full border border-border bg-surface text-text-subtle hover:text-primary transition-all duration-300 opacity-0 group-hover:opacity-100 shadow-md flex items-center justify-center shrink-0"
+            title="Copy message"
+          >
+            {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+          </button>
+        )}
         <div className={cn(
           "px-5 py-3.5 rounded-[22px] text-[0.9rem] md:text-sm font-medium leading-relaxed shadow-xl border transition-all duration-500",
           isUser 
@@ -79,19 +98,28 @@ export function VoiceMessageBubble({ message, onWordClick }: VoiceMessageBubbleP
           )}
         </div>
         {!isUser && (
-          <button 
-            onClick={toggleAudio}
-            disabled={!message.audio_b64}
-            className={cn(
-              "p-2.5 rounded-full transition-all duration-300 shadow-lg active:scale-90 shrink-0",
-              !message.audio_b64 && "opacity-30 cursor-not-allowed grayscale",
-              isPlaying 
-                ? "bg-primary text-white scale-110" 
-                : "bg-surface dark:bg-white/5 text-text-subtle hover:text-primary hover:scale-110 border border-border/40"
-            )}
-          >
-            {isPlaying ? <Pause size={14} fill="white" /> : <Play size={14} />}
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={toggleAudio}
+              disabled={!message.audio_b64}
+              className={cn(
+                "p-2.5 rounded-full transition-all duration-300 shadow-lg active:scale-90 shrink-0",
+                !message.audio_b64 && "opacity-30 cursor-not-allowed grayscale",
+                isPlaying 
+                  ? "bg-primary text-white scale-110" 
+                  : "bg-surface dark:bg-white/5 text-text-subtle hover:text-primary hover:scale-110 border border-border/40"
+              )}
+            >
+              {isPlaying ? <Pause size={14} fill="white" /> : <Play size={14} />}
+            </button>
+            <button
+              onClick={handleCopy}
+              className="p-2.5 rounded-full border border-border bg-surface text-text-subtle hover:text-primary transition-all duration-300 opacity-0 group-hover:opacity-100 shadow-lg flex items-center justify-center shrink-0"
+              title="Copy message"
+            >
+              {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+            </button>
+          </div>
         )}
       </div>
     </div>

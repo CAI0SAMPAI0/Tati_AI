@@ -10,7 +10,9 @@ UPSTASH_TOKEN = os.getenv('UPSTASH_REDIS_TOKEN')
 # Removendo o prefixo http/https caso venha no formato REST do Upstash
 if UPSTASH_URL:
     clean_url = UPSTASH_URL.replace("redis://", "").replace("https://", "").replace("http://", "")
-    redis_broker_url = f"redis://:{UPSTASH_TOKEN}@{clean_url}"
+    if ":" not in clean_url:
+        clean_url = f"{clean_url}:6379"
+    redis_broker_url = f"rediss://:{UPSTASH_TOKEN}@{clean_url}?ssl_cert_reqs=CERT_NONE"
 else:
     # Fallback para desenvolvimento local
     redis_broker_url = "redis://localhost:6379/0"

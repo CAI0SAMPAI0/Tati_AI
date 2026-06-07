@@ -8,7 +8,9 @@ import re
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, BackgroundTasks
+from fastapi.concurrency import run_in_threadpool
+
 from app.core.exceptions import ContentNotFoundError, BusinessLogicError
 from pydantic import BaseModel, Field
 
@@ -23,6 +25,7 @@ router = APIRouter()
 
 @router.get('/warmup')
 async def warmup_podcasts(
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -35,8 +38,7 @@ async def warmup_podcasts(
 
     from app.modules.activities.services.podcast_discovery import discover_personalized_podcasts
     # Dispara em background
-    asyncio.create_task(discover_personalized_podcasts(
-        username, username, level))
+    background_tasks.add_task(discover_personalized_podcasts, username, username, level)
 
     return {"ok": True, "message": "Warmup initiated"}
 
@@ -52,6 +54,7 @@ ALLOWED_EMBED_HOSTS = {
     'w.soundcloud.com',
     'embed.ted.com',
     'www.dailymotion.com',
+    'www.dw.com',
 }
 
 
@@ -462,15 +465,21 @@ async def get_podcast_progress(
         db = get_client()
         try:
             rows = (
-                db.table('podcast_completions')
-                .select('podcast_id')
+                db.table('activity_submissions')
+                .select('metadata')
                 .eq('username', username)
+                .eq('activity_type', 'podcast')
                 .execute()
                 .data
                 or []
             )
-            return [r.get('podcast_id')
-                    for r in rows if r.get('podcast_id')]
+            completed = []
+            for r in rows:
+                meta = r.get('metadata') or {}
+                pid = meta.get('podcast_id') or meta.get('item_id')
+                if pid:
+                    completed.append(str(pid))
+            return completed
         except Exception:
             return []
 
@@ -492,59 +501,73 @@ async def get_podcast_recommendations(
     user_level = recommender._normalize_user_level(user_level_raw)
     ui_lang = _normalize_ui_lang(lang or accept_language)
 
-    db = get_client()
+    def _fetch_db():
+        db = get_client()
+        return db.table('podcasts').select('id, title, description, level, thumbnail, embed_url, duration, category, source_name, source_type, media_type, external_url, has_full_transcript').eq('user_id', username).execute().data or []
+
+    try:
+        rows = await run_in_threadpool(_fetch_db)
+    except Exception as exc:
+        logging.info(f'[podcast] DB load failed: {exc}')
+        rows = []
 
     # 1. Carregar Catálogo
     catalog = []
-    try:
-        rows = (
-            db.table('podcasts').select(
-                '*').eq('user_id', username).execute().data
-            or []
-        )
-        for row in rows:
-            sanitized = _sanitize_podcast_entry(row)
-            if sanitized:
-                catalog.append(sanitized)
-    except Exception as exc:
-        logging.info(f'[podcast] DB load failed: {exc}')
+    for row in rows:
+        sanitized = _sanitize_podcast_entry(row)
+        if sanitized:
+            catalog.append(sanitized)
 
-    # 2. Sem filtragem por nível para podcasts do usuário
-    visible_catalog = catalog
+    # 2. Filtrar por nível CEFR do usuário (mantém podcasts 'all' levels)
+    def _levels_match(podcast_level: str, u_level: str) -> bool:
+        pl = (podcast_level or '').lower().strip()
+        ul = u_level.lower().strip()
+        return pl in ('', 'all', 'todos', ul)
 
-    # 3. Disponibilidade
-    tasks = [availability_service.is_media_available(
-        item) for item in visible_catalog]
-    results = await asyncio.gather(*tasks)
-    visible_catalog = [item for item, ok in zip(
-        visible_catalog, results) if ok]
+    visible_catalog = [item for item in catalog if _levels_match(item.get('level', ''), user_level)]
+    # fallback: se o filtro excluir tudo, mostra todos
+    if not visible_catalog:
+        visible_catalog = catalog
+
+    # 3. Disponibilidade (Desativado temporariamente por causar lentidão severa de ~1 min)
+    # tasks = [availability_service.is_media_available(item) for item in visible_catalog]
+    # results = await asyncio.gather(*tasks)
+    # visible_catalog = [item for item, ok in zip(visible_catalog, results) if ok]
 
     # 4. Rankeamento
     recommendations = recommender.rank_recommendations(
-        visible_catalog, user_level, [], ui_lang, display_level=user_level_raw)
+        visible_catalog, user_level, [], ui_lang, display_level=user_level_raw
+    )
 
     return recommendations[:50]
 
 
 @router.get('/{podcast_id}', response_model=Podcast)
-async def get_podcast_details(podcast_id: str):
+async def get_podcast_details(podcast_id: str, background_tasks: BackgroundTasks):
     """Retorna detalhes de um podcast específico."""
-    db = get_client()
-    rows = db.table('podcasts').select(
-        '*').eq('id', podcast_id).limit(1).execute().data
+    def _fetch_podcast():
+        db = get_client()
+        return db.table('podcasts').select('*').eq('id', podcast_id).limit(1).execute().data or []
+    
+    rows = await run_in_threadpool(_fetch_podcast)
     if not rows:
         raise ContentNotFoundError(detail='Podcast not found')
     item = rows[0]
-    exact_seconds = await _fetch_youtube_duration_seconds(item)
-    if exact_seconds > 0:
-        exact_duration = _format_seconds_to_mmss(exact_seconds)
-        if str(item.get('duration') or '') != exact_duration:
-            item['duration'] = exact_duration
-            try:
-                db.table('podcasts').update({'duration': exact_duration}).eq(
-                    'id', podcast_id).execute()
-            except Exception:
-                pass
+    async def _async_update_duration(podcast_item):
+        exact_seconds = await _fetch_youtube_duration_seconds(item)
+        if exact_seconds > 0:
+            exact_duration = _format_seconds_to_mmss(exact_seconds)
+            if str(item.get('duration') or '') != exact_duration:
+                def _update_db():
+                    get_client().table('podcasts').update({'duration': exact_duration}).eq('id', podcast_id).execute()
+                await run_in_threadpool(_update_db)
+                # item['duration'] = exact_duration
+                # try:
+                #     db.table('podcasts').update({'duration': exact_duration}).eq(
+                #         'id', podcast_id).execute()
+                # except Exception:
+                #     pass
+    background_tasks.add_task(_async_update_duration, item)
     return item
 
 
@@ -666,15 +689,19 @@ async def mark_podcast_complete(
     def _save() -> None:
         db = get_client()
         try:
-            db.table('podcast_completions').upsert(
-                {
-                    'username': username,
+            payload = {
+                'username': username,
+                'activity_type': 'podcast',
+                'module_id': None,
+                'score': 100,
+                'metadata': {
                     'podcast_id': podcast_id,
-                    'completed_at': datetime.now(
-                        timezone.utc).isoformat(),
+                    'item_id': podcast_id,
+                    'completed_at': datetime.now(timezone.utc).isoformat()
                 },
-                on_conflict='username,podcast_id',
-            ).execute()
+                'created_at': datetime.now(timezone.utc).isoformat()
+            }
+            db.table('activity_submissions').insert(payload).execute()
         except Exception as exc:
             logging.info(f'[Podcast] Erro ao salvar conclusão: {exc}')
 

@@ -19,8 +19,9 @@ import { cn } from '@/lib/utils';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 
 interface DashboardStats {
-  trophies_earned: number;
-  total_xp: number;
+  trophies_earned?: number;
+  total_xp?: number;
+  xp?: number;
 }
 
 interface StreakData {
@@ -74,7 +75,7 @@ export default function AchievementsClientPage() {
     return (categoryMap[filter] || []).some((token) => cat.includes(token));
   });
 
-  const trophyCount = stats?.trophies_earned || 0;
+  const trophyCount = medals ? medals.filter(m => m.unlocked).length : 0;
   const trophyProgress = (trophyCount / 50) * 100;
 
   return (
@@ -105,11 +106,13 @@ export default function AchievementsClientPage() {
                   </div>
                   <div>
                     <p className="text-[0.6rem] font-bold text-text-muted uppercase">Total XP</p>
-                    <p className="text-sm font-bold text-text">{stats?.total_xp || 0}</p>
+                    <p className="text-sm font-bold text-text">{stats?.total_xp || stats?.xp || 0}</p>
                   </div>
                 </div>
               </div>
             </div>
+
+            {/* Trophy Progress Card */}
             <div className="bg-surface border border-border rounded-3xl p-6 space-y-6 group hover:border-primary/30 transition-all">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold uppercase tracking-widest text-text-subtle">Trophy Progress</h3>

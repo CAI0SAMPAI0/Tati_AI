@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bell, BellOff, Check, CheckCheck } from 'lucide-react';
 import { apiGet, apiPost } from '@/lib/api/client';
-import { useI18n } from '@/hooks/useI18n';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import { cn } from '@/lib/utils';
 
@@ -45,7 +44,6 @@ function timeAgo(dateStr: string): string {
 }
 
 export function NotificationsDropdown() {
-  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
@@ -172,14 +170,14 @@ export function NotificationsDropdown() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <p className={cn('text-xs font-bold text-text truncate', !n.is_read && 'text-primary')}>
-                        {t(n.title)}
+                        {n.title}
                       </p>
                       {!n.is_read && (
                         <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
                       )}
                     </div>
                     <p className="text-[0.65rem] text-text-muted leading-relaxed mt-0.5 line-clamp-2">
-                      {t(n.body)}
+                      {n.body}
                     </p>
                     <p className="text-[0.6rem] text-text-subtle mt-1">{timeAgo(n.created_at)}</p>
                   </div>

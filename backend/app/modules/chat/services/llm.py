@@ -355,3 +355,79 @@ async def search_image_on_internet(query: str) -> str:
         logging.info(
             f"[LLM] Erro crítico ao buscar imagem na internet: {e}")
         return ""
+
+
+async def describe_image_with_gemini(image_bytes: bytes) -> str:
+    """Usa o Gemini 2.0 Flash para descrever uma imagem ou extrair seu texto (OCR)."""
+    from app.core.config import settings
+    import google.generativeai as genai
+    from PIL import Image
+    import io
+    
+    keys = [k for k in settings.gemini_keys() if k]
+    if not keys:
+        logging.info("[Gemini Vision] Nenhuma API Key do Gemini configurada.")
+        return "[Erro: Nenhuma API Key do Gemini configurada.]"
+
+    last_err = None
+    for key in keys:
+        try:
+            genai.configure(api_key=key)
+            model = genai.GenerativeModel('gemini-2.0-flash')
+            
+            image = Image.open(io.BytesIO(image_bytes))
+            
+            prompt = (
+                "You are an AI assistant. Analyze this image. "
+                "If it contains text, perform OCR and extract the exact text in its original language. "
+                "If it is an image/photo, describe what is in the image, any details, labels, or activities depicted. "
+                "Output ONLY the extracted text or description, no pleasantries or meta-explanations. English preferred for descriptions, unless text is in another language."
+            )
+            
+            def _generate():
+                response = model.generate_content([prompt, image])
+                return response.text
+                
+            text = await run_in_threadpool(_generate)
+            return text.strip()
+        except Exception as e:
+            logging.info(f"[Gemini Vision] Falha ao chamar Gemini com chave: {e}")
+            last_err = e
+            
+    return f"[Erro ao processar imagem via Gemini: {last_err}]"
+
+
+def preprocess_image_with_opencv(image_bytes: bytes) -> bytes:
+    """Usa OpenCV para decodificar, validar e redimensionar a imagem se necessário."""
+    import cv2
+    import numpy as np
+    
+    try:
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if img is None:
+            logging.info("[OpenCV Preprocess] Não foi possível decodificar a imagem com OpenCV.")
+            return image_bytes
+            
+        h, w = img.shape[:2]
+        max_dim = 1024
+        
+        if max(h, w) > max_dim:
+            if w > h:
+                new_w = max_dim
+                new_h = int(h * (max_dim / w))
+            else:
+                new_h = max_dim
+                new_w = int(w * (max_dim / h))
+                
+            img_resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+            logging.info(f"[OpenCV Preprocess] Imagem redimensionada de {w}x{h} para {new_w}x{new_h}")
+            
+            _, encoded_img = cv2.imencode('.jpg', img_resized)
+            return encoded_img.tobytes()
+            
+        return image_bytes
+    except Exception as e:
+        logging.info(f"[OpenCV Preprocess] Erro no preprocessamento OpenCV: {e}")
+        return image_bytes

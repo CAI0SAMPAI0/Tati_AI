@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, BookOpen, PenTool, Clapperboard } from 'lucide-react';
-import { apiUpload, apiPost } from '@/lib/api/client';
+import { apiUpload, apiPost, apiGet } from '@/lib/api/client';
 import { LEVEL_OPTIONS } from '@/lib/constants/levels';
 
 export function CefrSection() {
@@ -10,7 +10,9 @@ export function CefrSection() {
   const [topic, setTopic] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [generating, setGenerating] = useState(false);
+  const [generatingFlashcards, setGeneratingFlashcards] = useState(false);
+  const [generatingExercises, setGeneratingExercises] = useState(false);
+  const [generatingSimulations, setGeneratingSimulations] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<{success: boolean; message: string} | null>(null);
 
   const handleUpload = async () => {
@@ -45,7 +47,10 @@ export function CefrSection() {
 
   const handleGenerate = async (type: 'flashcards' | 'exercises' | 'simulations') => {
     if (!topic.trim()) return;
-    setGenerating(true);
+    
+    if (type === 'flashcards') setGeneratingFlashcards(true);
+    else if (type === 'exercises') setGeneratingExercises(true);
+    else if (type === 'simulations') setGeneratingSimulations(true);
     
     try {
       let endpoint = '';
@@ -53,17 +58,49 @@ export function CefrSection() {
       else if (type === 'exercises') endpoint = `/cefr/admin/generate-exercises?level=${level}&topic=${encodeURIComponent(topic)}&count=3`;
       else if (type === 'simulations') endpoint = `/cefr/admin/generate-simulations?level=${level}&topic=${encodeURIComponent(topic)}&count=2`;
         
-      const res = await apiPost<{success: boolean; data: any[]}>(endpoint, null);
+      const res = await apiPost<{success: boolean; task_id?: string}>(endpoint, null);
       
-      if (res.ok && res.data.success) {
-        alert(`${type.charAt(0).toUpperCase() + type.slice(1)} generated and saved to the Dashboard successfully! Check the ${type === 'exercises' ? 'Modules' : type.charAt(0).toUpperCase() + type.slice(1)} tab.`);
+      if (res.ok && res.data.success && res.data.task_id) {
+        const taskId = res.data.task_id;
+        
+        // Poll status
+        const pollInterval = setInterval(async () => {
+          try {
+            const statusRes = await apiGet<{status: string; error?: string}>(`/tasks/status/${taskId}`);
+            if (statusRes) {
+              if (statusRes.status === 'success') {
+                clearInterval(pollInterval);
+                if (type === 'flashcards') setGeneratingFlashcards(false);
+                else if (type === 'exercises') setGeneratingExercises(false);
+                else if (type === 'simulations') setGeneratingSimulations(false);
+                alert(`${type.charAt(0).toUpperCase() + type.slice(1)} generated and saved to the Dashboard successfully!`);
+              } else if (statusRes.status === 'failed') {
+                clearInterval(pollInterval);
+                if (type === 'flashcards') setGeneratingFlashcards(false);
+                else if (type === 'exercises') setGeneratingExercises(false);
+                else if (type === 'simulations') setGeneratingSimulations(false);
+                alert(`Failed to generate ${type}: ${statusRes.error || 'Unknown error'}`);
+              }
+            }
+          } catch (err: any) {
+            clearInterval(pollInterval);
+            if (type === 'flashcards') setGeneratingFlashcards(false);
+            else if (type === 'exercises') setGeneratingExercises(false);
+            else if (type === 'simulations') setGeneratingSimulations(false);
+            alert(`Error checking status for ${type}: ${err.message}`);
+          }
+        }, 2000);
       } else {
-        alert('Failed to generate content');
+        if (type === 'flashcards') setGeneratingFlashcards(false);
+        else if (type === 'exercises') setGeneratingExercises(false);
+        else if (type === 'simulations') setGeneratingSimulations(false);
+        alert('Failed to initiate content generation');
       }
     } catch (err: any) {
+      if (type === 'flashcards') setGeneratingFlashcards(false);
+      else if (type === 'exercises') setGeneratingExercises(false);
+      else if (type === 'simulations') setGeneratingSimulations(false);
       alert(err.message || 'Error generating content');
-    } finally {
-      setGenerating(false);
     }
   };
 
@@ -158,28 +195,28 @@ export function CefrSection() {
           
           <button 
             onClick={() => handleGenerate('flashcards')}
-            disabled={!topic.trim() || generating}
+            disabled={!topic.trim() || generatingFlashcards}
             className="px-6 py-3 bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20 rounded-xl font-bold text-sm disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
           >
-            {generating ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+            {generatingFlashcards ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
             Generate Flashcards
           </button>
 
           <button 
             onClick={() => handleGenerate('exercises')}
-            disabled={!topic.trim() || generating}
+            disabled={!topic.trim() || generatingExercises}
             className="px-6 py-3 bg-orange-500/10 text-orange-500 hover:bg-orange-500/20 rounded-xl font-bold text-sm disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
           >
-            {generating ? <Loader2 size={16} className="animate-spin" /> : <PenTool size={16} />}
+            {generatingExercises ? <Loader2 size={16} className="animate-spin" /> : <PenTool size={16} />}
             Generate Exercises
           </button>
           
           <button 
             onClick={() => handleGenerate('simulations')}
-            disabled={!topic.trim() || generating}
+            disabled={!topic.trim() || generatingSimulations}
             className="px-6 py-3 bg-pink-500/10 text-pink-500 hover:bg-pink-500/20 rounded-xl font-bold text-sm disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
           >
-            {generating ? <Loader2 size={16} className="animate-spin" /> : <Clapperboard size={16} />}
+            {generatingSimulations ? <Loader2 size={16} className="animate-spin" /> : <Clapperboard size={16} />}
             Generate Simulations
           </button>
         </div>

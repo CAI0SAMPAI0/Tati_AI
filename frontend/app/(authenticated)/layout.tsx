@@ -1,6 +1,4 @@
 import { AuthGuard } from '@/components/layout/auth-guard';
-import { prefetchCommonQueries } from '@/lib/api/page-prefetches';
-import { PrefetchHydration } from '@/lib/api/ssr-prefetch';
 import dynamic from 'next/dynamic';
 
 const TourLauncher = dynamic(
@@ -9,14 +7,10 @@ const TourLauncher = dynamic(
 );
 
 export default async function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
-  const state = await prefetchCommonQueries();
-
   return (
-    <PrefetchHydration state={state}>
-      <AuthGuard>
-        {children}
-        <TourLauncher />
-      </AuthGuard>
-    </PrefetchHydration>
+    <AuthGuard>
+      {children}
+      <TourLauncher />
+    </AuthGuard>
   );
 }

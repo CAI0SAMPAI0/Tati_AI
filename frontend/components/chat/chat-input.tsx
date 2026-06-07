@@ -160,6 +160,66 @@ export function ChatInput({ onSend, onSendAudio, onSendFile, disabled, isStreami
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = (reader.result as string).split(',')[1];
+        if (base64) {
+          setAttachments(prev => [...prev, { name: file.name, base64 }]);
+          toast.success(`File ${file.name} added!`);
+        }
+      };
+      reader.onerror = () => toast.error('Error reading dropped file');
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf('image') !== -1) {
+        const file = item.getAsFile();
+        if (!file) continue;
+        
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64 = (reader.result as string).split(',')[1];
+          if (base64) {
+            const filename = `pasted_image_${Date.now()}.png`;
+            setAttachments(prev => [...prev, { name: filename, base64 }]);
+            toast.success('Image pasted from clipboard!');
+          }
+        };
+        reader.onerror = () => toast.error('Error reading pasted image');
+        reader.readAsDataURL(file);
+        
+        e.preventDefault();
+        break;
+      }
+    }
+  };
+
   return (
     <div className="p-2 md:p-4 border-t border-border bg-bg shrink-0">
       <div className="max-w-4xl mx-auto relative">
@@ -182,10 +242,16 @@ export function ChatInput({ onSend, onSendAudio, onSendFile, disabled, isStreami
           </div>
         )}
 
-        <div className={cn(
-          "flex items-end gap-2 bg-surface border border-border p-2 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-all",
-          attachments.length > 0 ? "rounded-b-xl" : "rounded-xl"
-        )}>
+        <div 
+          className={cn(
+            "flex items-end gap-2 bg-surface border p-2 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-all",
+            attachments.length > 0 ? "rounded-b-xl" : "rounded-xl",
+            isDragging ? "border-dashed border-primary bg-primary/5" : "border-border"
+          )}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -215,6 +281,7 @@ export function ChatInput({ onSend, onSendAudio, onSendFile, disabled, isStreami
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               placeholder="Type your message..."
               className="flex-1 bg-transparent border-none outline-none text-[0.9375rem] text-text py-2 resize-none min-h-[40px] max-h-[140px] scrollbar-none"
               disabled={disabled || isStreaming}

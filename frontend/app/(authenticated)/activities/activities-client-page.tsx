@@ -78,6 +78,7 @@ export default function ActivitiesClientPage() {
   const [activeTab, setActiveTab] = useState<TabType>('quiz');
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [visiblePodcastsCount, setVisiblePodcastsCount] = useState(10);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -174,29 +175,23 @@ export default function ActivitiesClientPage() {
   const simulations = useMemo(() => {
     if (!simulationsRaw) return [];
     let filtered = simulationsRaw;
-    if (simulationProgress?.completed) {
-      filtered = filtered.filter((s) => !simulationProgress.completed.includes(s.id));
-    }
     if (!searchQuery) return filtered;
     return filtered.filter((s) => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [simulationsRaw, searchQuery, simulationProgress]);
+  }, [simulationsRaw, searchQuery]);
 
   const podcasts = useMemo(() => {
     if (!podcastsRaw) return [];
     let filtered = podcastsRaw;
-    if (podcastProgress?.completed) {
-      filtered = filtered.filter((p) => !podcastProgress.completed.includes(p.id));
-    }
     if (!searchQuery) return filtered;
     return filtered.filter((p) => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [podcastsRaw, searchQuery, podcastProgress]);
+  }, [podcastsRaw, searchQuery]);
 
   const tabs: Array<{ id: TabType; icon: React.ReactNode; label: string; count?: number }> = [
     { id: 'quiz', icon: <HelpCircle size={18} />, label: 'Quizzes', count: quizzes.length },
     { id: 'exercises', icon: <Sparkles size={18} />, label: 'AI Exercises', count: exercises.length },
     { id: 'flashcards', icon: <Layers size={18} />, label: 'Flashcards', count: flashcards.length },
     { id: 'simulations', icon: <Drama size={18} />, label: 'Simulations', count: simulations.length },
-    { id: 'podcasts', icon: <Podcast size={18} />, label: 'Podcasts', count: Math.min(podcasts.length, 15) },
+    { id: 'podcasts', icon: <Podcast size={18} />, label: 'Podcasts', count: podcasts.length },
   ];
 
   return (
@@ -349,22 +344,35 @@ export default function ActivitiesClientPage() {
             )}
 
             {activeTab === 'podcasts' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {podcasts.length > 0 ? (
-                  podcasts.slice(0, 15).map((p) => (
-                    <ActivityCard
-                      key={p.id}
-                      title={p.title}
-                      description={p.description || 'Get ready to listen and practice.'}
-                      imageUrl={p.thumbnail}
-                      type="podcast"
-                      onClick={() => router.push(`/podcasts/${p.id}`)}
-                      actionLabel="Play"
-                    />
-                  ))
-                ) : (
-                  <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
-                    No podcasts available.
+              <div className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {podcasts.length > 0 ? (
+                    podcasts.slice(0, visiblePodcastsCount).map((p) => (
+                      <ActivityCard
+                        key={p.id}
+                        title={p.title}
+                        description={p.description || 'Get ready to listen and practice.'}
+                        imageUrl={p.thumbnail}
+                        type="podcast"
+                        status={podcastProgress?.completed?.includes(p.id) ? 'done' : 'new'}
+                        onClick={() => router.push(`/podcasts/${p.id}`)}
+                        actionLabel="Play"
+                      />
+                    ))
+                  ) : (
+                    <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
+                      No podcasts available.
+                    </div>
+                  )}
+                </div>
+                {visiblePodcastsCount < podcasts.length && (
+                  <div className="flex justify-center mt-6">
+                    <button
+                      onClick={() => setVisiblePodcastsCount(prev => prev + 10)}
+                      className="px-6 py-3 bg-surface hover:bg-surface-hover border border-border text-text font-bold rounded-xl transition-all shadow-sm flex items-center gap-2"
+                    >
+                      Show More
+                    </button>
                   </div>
                 )}
               </div>

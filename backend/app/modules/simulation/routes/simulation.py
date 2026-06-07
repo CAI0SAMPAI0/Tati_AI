@@ -114,22 +114,25 @@ async def get_simulation_progress(
 
     def _fetch() -> list:
         db = get_client()
-        # Tenta tabela simulation_sessions
-        for table in ('simulation_sessions', 'simulations'):
-            try:
-                rows = (
-                    db.table(table)
-                    .select('scenario_id')
-                    .eq('username', username)
-                    .execute()
-                    .data
-                    or []
-                )
-                return [r.get('scenario_id')
-                        for r in rows if r.get('scenario_id')]
-            except Exception:
-                continue
-        return []
+        try:
+            rows = (
+                db.table('activity_submissions')
+                .select('metadata')
+                .eq('username', username)
+                .eq('activity_type', 'simulation')
+                .execute()
+                .data
+                or []
+            )
+            completed = []
+            for r in rows:
+                meta = r.get('metadata') or {}
+                sid = meta.get('simulation_id') or meta.get('item_id')
+                if sid:
+                    completed.append(str(sid))
+            return completed
+        except Exception:
+            return []
 
     completed = await run_in_threadpool(_fetch)
     return {'completed': completed}
@@ -149,21 +152,23 @@ async def mark_simulation_complete(
 
     def _save() -> None:
         db = get_client()
-        payload = {
-            'username': username,
-            'scenario_id': scenario_id,
-            'completed_at': datetime.now(timezone.utc).isoformat(),
-        }
-        # Tenta upsert nas tabelas possíveis
-        for table in ('simulation_sessions', 'simulations'):
-            try:
-                db.table(table).upsert(
-                    payload,
-                    on_conflict='username,scenario_id',
-                ).execute()
-                return
-            except Exception:
-                continue
+        try:
+            payload = {
+                'username': username,
+                'activity_type': 'simulation',
+                'module_id': None,
+                'score': 100,
+                'metadata': {
+                    'simulation_id': scenario_id,
+                    'item_id': scenario_id,
+                    'completed_at': datetime.now(timezone.utc).isoformat()
+                },
+                'created_at': datetime.now(timezone.utc).isoformat()
+            }
+            db.table('activity_submissions').insert(payload).execute()
+        except Exception as exc:
+            import logging
+            logging.info(f'[Simulation] Erro ao salvar conclusão: {exc}')
 
     await run_in_threadpool(_save)
     return {'success': True, 'scenario_id': scenario_id}

@@ -95,114 +95,48 @@ async def upload_cefr_material(
 @router.post("/generate-flashcards")
 async def generate_flashcards(level: str, topic: str, count: int = 5):
     """
-    Gera flashcards a partir do material indexado usando RAG.
+    Gera flashcards a partir do material indexado usando RAG em background.
     """
     try:
-        flashcards = await CEFRGeneratorService.generate_flashcards(level=level, topic=topic, count=count)
-
-        if not flashcards:
-            raise HTTPException(
-                status_code=500,
-                detail="Não foi possível gerar os flashcards.")
-
-        client = get_client()
-
-        # Saves as a single Flashcard Deck (Module)
-        deck_data = {
-            "title": f"CEFR {level}: {topic}",
-            "description": f"AI generated flashcards from CEFR material for level {level} on the topic '{topic}'.",
-            "level": level.lower(),
-            "flashcards": flashcards,
-            "is_published": True}
-
-        res = client.table("modules").insert(deck_data).execute()
-
+        from app.modules.cefr.tasks import generate_cefr_flashcards_task
+        task = generate_cefr_flashcards_task.delay(level, topic, count)
         return {
             "success": True,
-            "generated": len(flashcards),
-            "data": res.data}
-
+            "task_id": task.id}
     except Exception as e:
-        logging.info(f"[AdminRoute] Erro ao gerar flashcards: {e}")
+        logging.info(f"[AdminRoute] Erro ao disparar geração de flashcards: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/generate-exercises")
 async def generate_exercises(level: str, topic: str, count: int = 3):
     """
-    Gera exercícios a partir do material indexado usando RAG.
+    Gera exercícios a partir do material indexado usando RAG em background.
     """
     try:
-        exercises = await CEFRGeneratorService.generate_exercises(level=level, topic=topic, count=count)
-
-        if not exercises:
-            raise HTTPException(
-                status_code=500,
-                detail="Não foi possível gerar os exercícios.")
-
-        client = get_client()
-        # Saves as a Quiz Module
-        quiz_data = {
-            "title": f"CEFR Quiz {level}: {topic}",
-            "description": f"AI generated quiz from CEFR material.",
-            "level": level.lower(),
-            "type": "quiz",
-            "questions": exercises,
-            "is_published": True
-        }
-        res = client.table("modules").insert(quiz_data).execute()
-
+        from app.modules.cefr.tasks import generate_cefr_exercises_task
+        task = generate_cefr_exercises_task.delay(level, topic, count)
         return {
             "success": True,
-            "generated": len(exercises),
-            "data": res.data}
-
+            "task_id": task.id}
     except Exception as e:
-        logging.info(f"[AdminRoute] Erro ao gerar exercícios: {e}")
+        logging.info(f"[AdminRoute] Erro ao disparar geração de exercícios: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/generate-simulations")
 async def generate_simulations(level: str, topic: str, count: int = 2):
     """
-    Gera simulações a partir do material indexado usando RAG.
+    Gera simulações a partir do material indexado usando RAG em background.
     """
     try:
-        simulations = await CEFRGeneratorService.generate_simulations(level=level, topic=topic, count=count)
-
-        if not simulations:
-            raise HTTPException(
-                status_code=500,
-                detail="Não foi possível gerar as simulações.")
-
-        client = get_client()
-        saved_simulations = []
-        for i, sim in enumerate(simulations):
-            roles = sim.get("roles", {})
-            student_role = roles.get("student", "")
-            ai_role = roles.get("ai", "")
-            sys_prompt = f"You are {ai_role}. The user is {student_role}. Goal: {
-                sim.get('goal')}. Scenario: {
-                sim.get('scenario')}"
-
-            data = {
-                "name": f"CEFR {level}: {topic} #{i + 1}",
-                "description": sim.get("scenario"),
-                "difficulty": level.lower(),
-                "system_prompt": sys_prompt,
-                "is_active": True
-            }
-            res = client.table("simulations").insert(data).execute()
-            if res.data:
-                saved_simulations.extend(res.data)
-
+        from app.modules.cefr.tasks import generate_cefr_simulations_task
+        task = generate_cefr_simulations_task.delay(level, topic, count)
         return {
             "success": True,
-            "generated": len(saved_simulations),
-            "data": saved_simulations}
-
+            "task_id": task.id}
     except Exception as e:
-        logging.info(f"[AdminRoute] Erro ao gerar simulações: {e}")
+        logging.info(f"[AdminRoute] Erro ao disparar geração de simulações: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

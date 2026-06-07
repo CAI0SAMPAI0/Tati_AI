@@ -193,13 +193,7 @@ def register_all_routers(app: FastAPI) -> None:
         tags=['activities'],
     )
 
-    # Alias para /activities/weekly-goal (DEVE VIR POR ÚLTIMO para não
-    # sombrear /hub)
-    app.include_router(
-        modules_router,
-        prefix='/activities',
-        tags=['activities'],
-    )
+
 
     # ── Payments ──────────────────────────────────────────────
     from app.modules.payments.routes.asaas import router as payments_router

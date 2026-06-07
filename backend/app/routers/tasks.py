@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from app.core.celery_app import celery_app
 from app.core.dependencies.auth import get_current_user
 
-router = APIRouter(prefix="/tasks", tags=["Tasks"])
+router = APIRouter(tags=["Tasks"])
 
 @router.get("/status/{task_id}")
 async def get_task_status(task_id: str, current_user: dict = Depends(get_current_user)):

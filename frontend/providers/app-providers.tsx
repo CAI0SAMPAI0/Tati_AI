@@ -3,7 +3,6 @@
 import { ThemeProvider } from './theme-provider';
 import { AuthProvider } from './auth-provider';
 import { QueryProvider } from './query-provider';
-import { I18nProvider } from './i18n-provider';
 import { Toaster } from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 
@@ -22,9 +21,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     <ThemeProvider>
       <QueryProvider>
         <AuthProvider>
-          <I18nProvider>
-            {children}
-          </I18nProvider>
+          {children}
           <Toaster
             position="top-right"
             toastOptions={{

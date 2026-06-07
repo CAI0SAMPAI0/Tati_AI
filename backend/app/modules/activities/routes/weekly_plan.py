@@ -20,6 +20,16 @@ from app.core.database import get_client
 router = APIRouter()
 
 
+@router.get("/activities/weekly-goal")
+async def get_activities_weekly_goal(
+    user: dict = Depends(get_current_user)
+):
+    """Retorna as tarefas pendentes para o Weekly Goal do aluno (compatibilidade frontend)."""
+    from app.modules.activities.services.activity_service import ActivityService
+    service = ActivityService()
+    return await service.get_weekly_tasks(user['username'])
+
+
 def _completed_exercise_ids(db, username: str) -> set[str]:
     """IDs concluídos via user_exercise_attempts (quizzes e ai_exercises) e activity_submissions."""
     try:
@@ -51,23 +61,22 @@ def _completed_exercise_ids(db, username: str) -> set[str]:
 
 def _completed_podcasts_ids(db, username: str) -> set[str]:
     try:
-        rows = db.table("podcast_completions").select(
-            "podcast_id").eq("username", username).execute().data or []
-        return {str(r["podcast_id"])
-                for r in rows if r.get("podcast_id")}
+        completed = set()
+        rows_sub = db.table("activity_submissions").select("metadata").eq(
+            "username", username).eq("activity_type", "podcast").execute().data or []
+        for r in rows_sub:
+            meta = r.get("metadata") or {}
+            pid = meta.get("podcast_id") or meta.get("item_id")
+            if pid:
+                completed.add(str(pid))
+        return completed
     except Exception:
         return set()
 
 
 def _completed_simulation_ids(db, username: str) -> set[str]:
     try:
-        # Check both simulation_progress table and submissions
-        rows = db.table("simulation_progress").select(
-            "scenario_id").eq("username", username).execute().data or []
-        prog = {str(r["scenario_id"])
-                for r in rows if r.get("scenario_id")}
-
-        # Fallback to submissions
+        prog = set()
         rows_sub = db.table("activity_submissions").select("metadata").eq(
             "username", username).eq(
             "activity_type", "simulation").execute().data or []
@@ -150,18 +159,26 @@ def _build_ai_exercise_topics(
 def _build_simulation_topics(
         db,
         username: str,
-        completed_ids: set[str]) -> list[dict]:
+        completed_ids: set[str],
+        user_level: str) -> list[dict]:
     try:
+        from app.core.utils.level_utils import matches_level
+        from app.core.enums import normalize_level
+        user_level_norm = normalize_level(user_level)
+
         # Simulations are global or user-owned? Usually global catalog.
         rows = (
             db.table("simulations")
-            .select("id, name, description, emoji")
+            .select("id, name, description, emoji, difficulty")
             .eq("is_active", True)
             .execute()
             .data
         )
         topics = []
         for row in rows:
+            diff = row.get("difficulty")
+            if not matches_level(user_level_norm, diff):
+                continue
             emoji = row.get("emoji") or "🎯"
             name = row.get("name") or "Simulation"
             is_done = str(row["id"]) in completed_ids
@@ -180,8 +197,13 @@ def _build_simulation_topics(
 def _build_podcast_topics(
         db,
         username: str,
-        completed_ids: set[str]) -> list[dict]:
+        completed_ids: set[str],
+        user_level: str) -> list[dict]:
     try:
+        from app.core.utils.level_utils import matches_level
+        from app.core.enums import normalize_level
+        user_level_norm = normalize_level(user_level)
+
         # Podcasts of THIS user
         rows = (
             db.table("podcasts")
@@ -194,6 +216,8 @@ def _build_podcast_topics(
         for row in rows:
             duration = row.get("duration") or ""
             level = row.get("level") or ""
+            if not matches_level(user_level_norm, level):
+                continue
             is_done = str(row["id"]) in completed_ids
             topics.append({
                 "id": f"pod-{row['id']}",
@@ -241,14 +265,15 @@ async def get_weekly_plan(
 
     # 2. Simulations
     topics.extend(_build_simulation_topics(
-        db, username, completed_simulations))
+        db, username, completed_simulations, current_user.get('level', 'A1')))
 
     # 3. Podcasts
     topics.extend(
         _build_podcast_topics(
             db,
             username,
-            completed_podcasts))
+            completed_podcasts,
+            current_user.get('level', 'A1')))
 
     # Ordenação: pendentes primeiro
     topics.sort(key=lambda x: 0 if x["status"] == "pending" else 1)

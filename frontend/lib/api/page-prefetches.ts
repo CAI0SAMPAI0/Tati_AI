@@ -135,8 +135,17 @@ export async function prefetchRoute(
   route: string,
   ctx?: PrefetchContext,
 ): Promise<DehydratedState> {
-  const { createServerQueryClient } = await import('./ssr-prefetch');
+  const { createServerQueryClient, prefetchQueries } = await import('./ssr-prefetch');
   const { dehydrate } = await import('@tanstack/react-query');
+  
+  const items = ROUTE_PREFETCHES[route]?.(ctx) || [];
+  const token = await getServerAuthToken();
+  const toPrefetch = withCommonQueries(items, token);
+  
+  if (toPrefetch.length > 0) {
+    return prefetchQueries(toPrefetch);
+  }
+  
   const queryClient = createServerQueryClient();
   return dehydrate(queryClient);
 }

@@ -410,27 +410,40 @@ class DashboardService:
         """Estatísticas específicas de um aluno."""
         def _fetch():
             try:
-                user_res = self.db.table('users').select('xp, level, focus').eq(
+                user_res = self.db.table('users').select('xp_data, level, focus').eq(
                     'username', username).limit(1).execute()
                 user_data = user_res.data[0] if user_res.data else {}
+                xp_data = user_data.get('xp_data') or {}
+                
+                xp_val = xp_data.get('xp') or 0
+                level_str = normalize_level(xp_data.get('level') or user_data.get('level') or 'A1')
+                
+                LEVELS_CONFIG = {
+                    'A1': {'min': 0, 'max': 500},
+                    'A2': {'min': 500, 'max': 1200},
+                    'B1': {'min': 1200, 'max': 2500},
+                    'B2': {'min': 2500, 'max': 4000},
+                    'C1': {'min': 4000, 'max': 6000},
+                    'C2': {'min': 6000, 'max': 999999},
+                }
+                l_conf = LEVELS_CONFIG.get(level_str, LEVELS_CONFIG['A1'])
+                xp_in_level = max(0, xp_val - l_conf['min'])
+                xp_needed = l_conf['max'] - l_conf['min']
+                fallback_prog = min(100, int((xp_in_level / xp_needed) * 100)) if xp_needed > 0 else 0
 
                 msg_res = self.db.table('messages').select(
-                    'id',
-                    count='exact').eq(
-                    'username',
-                    username).eq(
-                    'role',
-                    'user').execute()
+                    'id', count='exact').eq('username', username).eq('role', 'user').execute()
                 total_messages = msg_res.count or 0
 
                 err_res = self.db.table('user_errors').select(
-                    'id', count='exact').eq(
-                    'username', username).execute()
+                    'id', count='exact').eq('username', username).execute()
                 total_errors = err_res.count or 0
 
                 return {
-                    'xp': user_data.get('xp', 0),
-                    'level': normalize_level(user_data.get('level')),
+                    'xp': xp_val,
+                    'total_xp': xp_data.get('total_xp_earned') or xp_val,
+                    'level': level_str,
+                    'level_progress': xp_data.get('level_progress') or fallback_prog,
                     'focus': user_data.get('focus', 'General English'),
                     'total_messages': total_messages,
                     'total_errors': total_errors

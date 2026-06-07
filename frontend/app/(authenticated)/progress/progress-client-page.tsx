@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import dynamic from 'next/dynamic';
 import { MessageSquare, BookOpen, CalendarDays, Type, Flame, Lightbulb, Download } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
@@ -15,7 +14,8 @@ import toast from 'react-hot-toast';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface XpData {
-  total_xp: number;
+  total_xp?: number;
+  xp?: number;
   current_streak: number;
   longest_streak: number;
   level_progress?: number;
@@ -119,53 +119,53 @@ export default function ProgressClientPage() {
 
   const stats = activeReport
     ? {
-        total_messages: activeReport.total_messages,
-        total_conversations: activeReport.total_conversations,
-        study_days: activeReport.study_days,
-        unique_words_used: activeReport.unique_words_used,
-      }
+      total_messages: activeReport.total_messages,
+      total_conversations: activeReport.total_conversations,
+      study_days: activeReport.study_days,
+      unique_words_used: activeReport.unique_words_used,
+    }
     : null;
 
   // Build chart data
   const chartData =
     period === 'weekly' && weeklyReport
       ? weeklyReport.messages_by_day.map((val, i) => ({
-          name: weeklyReport.days_of_week[i] ?? `D${i + 1}`,
-          messages: val,
-        }))
+        name: weeklyReport.days_of_week[i] ?? `D${i + 1}`,
+        messages: val,
+      }))
       : period === 'monthly' && monthlyReport
         ? monthlyReport.messages_by_week.map((val, i) => ({
-            name: `Wk ${i + 1}`,
-            messages: val,
-          }))
+          name: `Wk ${i + 1}`,
+          messages: val,
+        }))
         : [];
 
   const handleDownloadReport = async () => {
     setIsDownloading(true);
     try {
-        const token = localStorage.getItem('token');
-        const url = `${API_BASE}/users/progress/report/download`;
-        
-        const response = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (!response.ok) throw new Error('Download failed');
-        
-        const blob = await response.blob();
-        const downloadUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = `TatiAI_Report_${new Date().toISOString().split('T')[0]}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(downloadUrl);
-        toast.success('Report downloaded successfully!');
+      const token = localStorage.getItem('token');
+      const url = `${API_BASE}/users/progress/report/download`;
+
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!response.ok) throw new Error('Download failed');
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `TatiAI_Report_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(downloadUrl);
+      toast.success('Report downloaded successfully!');
     } catch (err) {
-        console.error(err);
-        toast.error('Error downloading report. Please try again.');
+      console.error(err);
+      toast.error('Error downloading report. Please try again.');
     } finally {
-        setIsDownloading(false);
+      setIsDownloading(false);
     }
   };
 
@@ -190,9 +190,9 @@ export default function ProgressClientPage() {
                 Track your learning evolution
               </p>
             </div>
-            
-            <Button 
-              onClick={handleDownloadReport} 
+
+            <Button
+              onClick={handleDownloadReport}
               disabled={isDownloading}
               className="gap-2 bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 rounded-2xl px-6 py-6 font-bold transition-all active:scale-[0.98]"
             >
@@ -223,7 +223,7 @@ export default function ProgressClientPage() {
                     {xpLoading ? (
                       <span className="inline-block w-16 h-4 bg-bg-secondary rounded animate-pulse" />
                     ) : (
-                      `Experience`
+                      xpData?.level || 'A1'
                     )}
                   </p>
                 </div>
@@ -235,7 +235,7 @@ export default function ProgressClientPage() {
                 ) : (
                   <>
                     <span className="text-xl font-black text-primary tabular-nums">
-                      {xpData?.total_xp?.toLocaleString('en-US') ?? 0}
+                      {(xpData?.total_xp || xpData?.xp || 0).toLocaleString('en-US')}
                     </span>
                     <span className="text-xs font-bold text-text-muted ml-1">
                       XP
@@ -259,7 +259,7 @@ export default function ProgressClientPage() {
               <div className="flex justify-between text-[0.6rem] font-bold text-text-subtle uppercase tracking-widest">
                 <span>Keep learning!</span>
                 <span>
-                  {xpLoading ? '—' : `${xpData?.total_xp?.toLocaleString('en-US') ?? 0} Total XP`}
+                  {xpLoading ? '—' : `${(xpData?.total_xp || xpData?.xp || 0).toLocaleString('en-US')} Total XP`}
                 </span>
               </div>
             </div>
