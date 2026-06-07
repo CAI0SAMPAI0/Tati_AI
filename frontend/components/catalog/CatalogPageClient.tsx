@@ -103,16 +103,16 @@ export default function CatalogPageClient({ initialItems }: CatalogPageClientPro
   }, [fetchAuthenticated]);
 
   // Primeiro filtra por categoria
-  const categoryFiltered = useMemo(() => filterMaterials(items, filter), [items, filter]);
+  const categoryFiltered = useMemo(() => filterMaterials(items || [], filter) || [], [items, filter]);
 
   // Depois aplica o termo de pesquisa
   const searchFiltered = useMemo(
-    () => searchMaterials(categoryFiltered, searchQuery),
+    () => searchMaterials(categoryFiltered, searchQuery) || [],
     [categoryFiltered, searchQuery],
   );
 
   const featured = useMemo(
-    () => (searchFiltered || []).filter((item) => item.is_featured && filter === 'all' && !searchQuery.trim()),
+    () => searchFiltered.filter((item) => item.is_featured && filter === 'all' && !searchQuery.trim()),
     [searchFiltered, filter, searchQuery],
   );
 
