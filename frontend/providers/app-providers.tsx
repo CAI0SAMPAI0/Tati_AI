@@ -3,6 +3,7 @@
 import { ThemeProvider } from './theme-provider';
 import { AuthProvider } from './auth-provider';
 import { QueryProvider } from './query-provider';
+import { NotificationProvider } from './notification-provider';
 import { Toaster } from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 
@@ -21,8 +22,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     <ThemeProvider>
       <QueryProvider>
         <AuthProvider>
-          {children}
-          <Toaster
+          <NotificationProvider>
+            {children}
+            <Toaster
             position="top-right"
             toastOptions={{
               style: {
@@ -37,8 +39,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
               error: { iconTheme: { primary: 'hsl(355 78% 60%)', secondary: 'white' } },
             }}
           />
-          <RegisterServiceWorker />
-          <CapacitorHandler />
+            <RegisterServiceWorker />
+            <CapacitorHandler />
+          </NotificationProvider>
         </AuthProvider>
       </QueryProvider>
     </ThemeProvider>

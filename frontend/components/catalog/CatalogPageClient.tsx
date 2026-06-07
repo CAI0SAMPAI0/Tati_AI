@@ -112,7 +112,7 @@ export default function CatalogPageClient({ initialItems }: CatalogPageClientPro
   );
 
   const featured = useMemo(
-    () => searchFiltered.filter((item) => item.is_featured && filter === 'all' && !searchQuery.trim()),
+    () => (searchFiltered || []).filter((item) => item.is_featured && filter === 'all' && !searchQuery.trim()),
     [searchFiltered, filter, searchQuery],
   );
 
