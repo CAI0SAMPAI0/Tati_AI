@@ -191,7 +191,7 @@ async def groq_chat_json(
     messages: list[dict],
     max_tokens: int = 1500,
     temperature: float = 0.4,
-    model: str = 'llama-3.3-70b-versatile',
+    model: str = 'llama-3.1-8b-instant',
 ) -> dict:
     """
     Chama o Groq, garante que a saída seja tratada como JSON,

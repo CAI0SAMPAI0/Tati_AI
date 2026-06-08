@@ -47,6 +47,11 @@ interface ModuleRow {
   spotify_url?: string;
   image_url?: string;
   file_url?: string;
+  quizzes?: Array<{
+    id: string;
+    title: string;
+    questions?: any[];
+  }>;
 }
 
 interface QuizQuestion {
@@ -447,17 +452,30 @@ export function ModulesSection() {
               <div className="bg-primary/10 w-10 h-10 rounded-xl flex items-center justify-center text-primary">
                 <BookOpen size={20} />
               </div>
-              <span className={cn("text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider",
-                m.is_published ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'
-              )}>
-                {m.is_published ? 'Published' : 'Drafts'}
-              </span>
+              <div className="flex gap-1.5">
+                {m.level && m.level !== 'all' && (
+                  <span className="text-[0.6rem] font-bold px-2 py-0.5 rounded-full border bg-bg-secondary text-text-subtle uppercase tracking-wider">
+                    {m.level}
+                  </span>
+                )}
+                <span className={cn("text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider",
+                  m.is_published ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'
+                )}>
+                  {m.is_published ? 'Published' : 'Drafts'}
+                </span>
+              </div>
             </div>
             <div>
               <h3 className="font-bold text-text truncate mb-1">{m.title}</h3>
-              <p className="text-xs text-text-muted line-clamp-2 leading-relaxed h-8">
+              <p className="text-xs text-text-muted line-clamp-2 leading-relaxed h-8 mb-2">
                 {m.description || 'No description provided.'}
               </p>
+              {m.quizzes && m.quizzes.length > 0 && (
+                <div className="flex items-center gap-1.5 text-[0.65rem] text-primary font-bold bg-primary/10 w-fit px-2 py-0.5 rounded-md border border-primary/20">
+                  <HelpCircle size={12} />
+                  <span>{m.quizzes[0].title || 'Quiz'}</span>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-3 gap-2 mt-auto pt-2">
               <button onClick={() => openModal(m)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle">

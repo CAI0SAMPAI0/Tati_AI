@@ -31,28 +31,29 @@ class CEFRGeneratorService:
                 [f"Trecho:\n{d.get('content', '')}" for d in context_docs])
 
         prompt = f"""
-        Você é um professor de idiomas experiente criando material para o nível {level} do CEFR ({level_label}).
+        You are an experienced English language teacher creating educational materials for CEFR level {level} ({level_label}).
 
-        Baseado no seguinte material de referência sobre o tópico '{topic}':
+        Based on the following reference material about the topic '{topic}':
 
         {context_text}
 
-        Sua tarefa: Gerar {count} flashcards educacionais práticos sobre o tópico '{topic}' adequados para o nível {level} ({level_label}).
+        Your task: Generate exactly {count} practical educational flashcards about the topic '{topic}' suitable for level {level} ({level_label}).
 
-        REGRAS RÍGIDAS:
-        1. A frente (front) deve conter uma palavra, frase ou situação prática EM INGLÊS.
-        2. O verso (back) deve conter a definição ou resposta EM INGLÊS.
-        3. A explicação (explanation) DEVE SER TOTALMENTE EM INGLÊS, explicando o uso, gramática ou contexto da expressão de forma simples.
-        4. O conteúdo DEVE estar adequado ao nível {level} de inglês.
-        5. Retorne APENAS o JSON válido sem markdown ou outro texto.
+        CRITICAL CONSTRAINTS:
+        1. All fields, texts, titles, descriptions, front, back, and explanation MUST be entirely in English.
+        2. NEVER use Portuguese anywhere in the response.
+        3. The front (front) must contain a word, phrase, or practical situation in English.
+        4. The back (back) must contain the definition or answer in English.
+        5. The explanation (explanation) must be entirely in English, explaining the usage, grammar, or context of the expression in a simple way for a {level} level student.
+        6. Return ONLY a valid JSON object matching the format below, without any markdown formatting or extra text.
 
-        Formato de saída esperado (JSON rígido):
+        Expected Output Format (Strict JSON):
         {{
             "flashcards": [
                 {{
-                    "front": "termo ou situação prática (Inglês)",
-                    "back": "definição ou resposta (Inglês)",
-                    "explanation": "explicação detalhada de uso (Inglês)"
+                    "front": "term or practical situation (English)",
+                    "back": "definition or answer (English)",
+                    "explanation": "detailed explanation of usage (English)"
                 }}
             ]
         }}
@@ -91,31 +92,32 @@ class CEFRGeneratorService:
                 [f"Trecho:\n{d.get('content', '')}" for d in context_docs])
 
         prompt = f"""
-        Você é um professor de inglês nativo criando exercícios práticos para alunos do nível {level} do CEFR ({level_label}).
+        You are a native English teacher creating practical exercises for students at CEFR level {level} ({level_label}).
 
-        Baseado no seguinte material sobre o tópico '{topic}':
+        Based on the following material about the topic '{topic}':
 
         {context_text}
 
-        Gere {count} questões de múltipla escolha focadas no USO PRÁTICO do idioma (vocabulário, gramática ou compreensão de situações reais).
-        NÃO faça perguntas teóricas sobre o texto (ex: "o que o aluno faz no mercado"). Faça perguntas como se o aluno estivesse NAQUELA SITUAÇÃO praticando o INGLÊS. (ex: "You want to buy some apples. What do you say to the cashier?").
+        Generate exactly {count} multiple-choice questions focused on the PRACTICAL USE of the language (vocabulary, grammar, or comprehension of real-life situations).
+        Do NOT ask theoretical questions about the text. Ask questions as if the student were in that situation practicing English (e.g. "You want to buy some apples. What do you say to the cashier?").
 
-        REGRAS RÍGIDAS:
-        1. A pergunta (question) DEVE SER TOTALMENTE EM INGLÊS e focar em uma situação, preenchimento de lacuna (fill-in-the-blank) ou resposta a um diálogo.
-        2. As opções (options) DEVEM SER TOTALMENTE EM INGLÊS. Forneça exatamente 4 opções.
-        3. A explicação (explanation) DEVE SER TOTALMENTE EM INGLÊS, justificando a resposta correta gramaticalmente ou pelo contexto.
-        4. O índice da resposta correta (correct_index) deve ser um inteiro de 0 a 3 correspondente à opção correta.
-        5. NÃO use prefixos como A), B), C) nas opções, apenas o texto da opção.
-        6. Retorne APENAS um JSON válido.
+        CRITICAL CONSTRAINTS:
+        1. All fields, questions, options, and explanations MUST be entirely in English. Never use Portuguese.
+        2. The question (question) must be entirely in English and focus on a situation, fill-in-the-blank, or conversation reply.
+        3. The options (options) must be entirely in English. Provide exactly 4 options.
+        4. The explanation (explanation) must be entirely in English, explaining why the correct option is right grammatically or contextually.
+        5. The correct_index must be an integer from 0 to 3 corresponding to the correct option.
+        6. Do NOT use prefixes like A), B), C) in the options, just the plain text of the option.
+        7. Return ONLY a valid JSON object matching the format below, without any markdown formatting or extra text.
 
-        Formato de saída (JSON):
+        Expected Output Format (Strict JSON):
         {{
             "exercises": [
                 {{
-                    "question": "texto da pergunta situacional (Inglês)",
-                    "options": ["opção 1 (Inglês)", "opção 2 (Inglês)", "opção 3 (Inglês)", "opção 4 (Inglês)"],
+                    "question": "situational question text (English)",
+                    "options": ["option 1 (English)", "option 2 (English)", "option 3 (English)", "option 4 (English)"],
                     "correct_index": 0,
-                    "explanation": "explicação detalhada (Inglês)"
+                    "explanation": "detailed explanation (English)"
                 }}
             ]
         }}
@@ -156,28 +158,28 @@ class CEFRGeneratorService:
                 [f"Trecho:\n{d.get('content', '')}" for d in context_docs])
 
         prompt = f"""
-        Você é um professor de inglês nativo criando cenários de roleplay (simulações) para alunos do nível {level} do CEFR ({level_label}).
+        You are a native English teacher creating roleplay scenarios (simulations) for students at CEFR level {level} ({level_label}).
 
-        Baseado no seguinte material sobre o tópico '{topic}':
+        Based on the following material about the topic '{topic}':
 
         {context_text}
 
-        Gere {count} cenários práticos de simulação focados em situações da vida real.
+        Generate exactly {count} practical simulation scenarios focused on real-life situations.
 
-        REGRAS RÍGIDAS:
-        1. O cenário (scenario) descreve a situação de forma clara EM INGLÊS.
-        2. Os papéis (roles) definem quem é o aluno (Student) e quem é a IA (AI).
-        3. O objetivo (goal) diz o que o aluno precisa alcançar ao final da simulação.
-        4. O conteúdo DEVE estar adequado ao nível {level} de inglês.
-        5. Retorne APENAS um JSON válido.
+        CRITICAL CONSTRAINTS:
+        1. All fields, scenario, roles, and goal MUST be entirely in English. Never use Portuguese.
+        2. The scenario (scenario) must describe the situation clearly in English.
+        3. The roles (roles) must define who the student is (Student) and who the AI is (AI) in English.
+        4. The goal (goal) must describe what the student needs to achieve by the end of the simulation in English.
+        5. Return ONLY a valid JSON object matching the format below, without any markdown formatting or extra text.
 
-        Formato de saída (JSON):
+        Expected Output Format (Strict JSON):
         {{
             "simulations": [
                 {{
-                    "scenario": "descrição da situação (Inglês)",
-                    "roles": {{"student": "papel do aluno", "ai": "papel da IA"}},
-                    "goal": "objetivo da simulação (Inglês)"
+                    "scenario": "description of the situation (English)",
+                    "roles": {{"student": "student role (English)", "ai": "AI role (English)"}},
+                    "goal": "simulation goal (English)"
                 }}
             ]
         }}

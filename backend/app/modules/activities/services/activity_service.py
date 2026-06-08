@@ -176,6 +176,32 @@ class ActivityService:
             except Exception:
                 lessons = []
             module['lessons'] = lessons
+
+            try:
+                quizzes = (
+                    self.db.table('quizzes')
+                    .select('*')
+                    .eq('module_id', module_id)
+                    .execute()
+                    .data
+                    or []
+                )
+                for q in quizzes:
+                    q_questions = (
+                        self.db.table('quiz_questions')
+                        .select('*')
+                        .eq('quiz_id', q['id'])
+                        .order('order', desc=False)
+                        .execute()
+                        .data
+                        or []
+                    )
+                    q['questions'] = q_questions
+            except Exception as e:
+                logging.info(f'[ActivityService] Erro ao buscar quizzes: {e}')
+                quizzes = []
+            module['quizzes'] = quizzes
+
             return module
 
         return await run_in_threadpool(_fetch)
@@ -731,8 +757,9 @@ class ActivityService:
         prompt = (
             f'Create a high-quality English vocabulary flashcard deck about "{theme}". '
             f'Level: {level}. Count: 10 cards. '
-            f'Format: JSON {{"title": "{theme} Vocabulary", "description": "...", "cards": [{{"front": "term", "back": "definition/example"}}]}}. '
-            f'Focus strictly on "{theme}". All text in English.'
+            f'Format: JSON {{"title": "{theme} Vocabulary", "description": "...", "cards": [{{"front": "term", "back": "definition/example", "explanation": "detailed explanation of use"}}]}}. '
+            f'Focus strictly on "{theme}". '
+            f'CRITICAL: All fields (title, description, front, back, explanation) MUST be entirely in English. Never use Portuguese.'
         )
         try:
             from app.modules.chat.services.llm import groq_chat_json
@@ -743,19 +770,20 @@ class ActivityService:
 
             cards = data.get('cards', [])
 
-            # Se solicitado geração automática de imagens (ou se quisermos oferecer isso)
-            # Para não ser muito lento, podemos gerar apenas se o
-            # usuário pedir explicitamente via flag
-            if data.get('generate_images') or theme.startswith('IMG:'):
-                from app.modules.chat.services.llm import generate_image
-                from app.shared.services.cloudinary_service import upload_image_from_url
-
-                for card in cards:
-                    img_prompt = f"{card['front']}: {card['back']}"
-                    img_url = await generate_image(img_prompt)
-                    if img_url:
-                        perm_url = await run_in_threadpool(upload_image_from_url, img_url)
-                        card['image_url'] = perm_url
+            # ALWAYS search for images on the internet for each flashcard
+            from app.modules.chat.services.llm import search_image_on_internet
+            import asyncio
+            async def _add_image(card):
+                term = card.get('front', '')
+                if term:
+                    try:
+                        img_url = await search_image_on_internet(term)
+                        if img_url:
+                            card['image_url'] = img_url
+                    except Exception as e:
+                        logging.info(f"[ActivityService] Error fetching image for '{term}': {e}")
+            
+            await asyncio.gather(*[_add_image(c) for c in cards])
 
             # Salva como um módulo de flashcards (ajustado para o schema
             # real)
@@ -765,10 +793,10 @@ class ActivityService:
                         'title',
                         theme.replace(
                             'IMG:',
-                            '')),
+                            '') + ' Vocabulary'),
                     'description': data.get(
                         'description',
-                        f'Flashcards sobre {theme}'),
+                        f'Flashcards about {theme}'),
                     'level': level,
                     'flashcards': cards,
                     'is_published': True}
