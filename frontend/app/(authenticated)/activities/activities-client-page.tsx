@@ -153,13 +153,28 @@ export default function ActivitiesClientPage() {
         }
       });
     });
+
+    if (masterModule && masterModule.quizzes) {
+      masterModule.quizzes.forEach((q: any) => {
+        if (q.id && q.id.startsWith('cefr_')) {
+          if (!searchQuery || q.title.toLowerCase().includes(searchQuery.toLowerCase())) {
+            list.push({
+              ...q,
+              module_title: 'CEFR Exercises',
+              user_status: { is_done: q.status === 'done', score: q.score },
+            });
+          }
+        }
+      });
+    }
+
     return list;
-  }, [modules, searchQuery]);
+  }, [modules, masterModule, searchQuery]);
 
   const exercises = useMemo(() => {
     if (!masterModule || !masterModule.quizzes) return [];
     return masterModule.quizzes.filter(
-      (q: any) => !searchQuery || q.title.toLowerCase().includes(searchQuery.toLowerCase()),
+      (q: any) => q.id && !q.id.startsWith('cefr_') && (!searchQuery || q.title.toLowerCase().includes(searchQuery.toLowerCase())),
     );
   }, [masterModule, searchQuery]);
 

@@ -8,12 +8,15 @@ import {
   Trash2,
   PenLine,
   Play,
+  Eye,
+  EyeOff,
   Sparkles,
   RotateCcw,
   Clapperboard
 } from 'lucide-react';
 
 import { apiGet, apiDelete, apiPost, apiPut } from '@/lib/api/client';
+import { cn } from '@/lib/utils';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -89,6 +92,16 @@ export default function SimulationsSection() {
       invalidateSimulations();
     } catch {
       toast.error('Error deleting.', { id: toastId });
+    }
+  };
+
+  const handleTogglePublish = async (id: string, current: boolean) => {
+    try {
+      await apiPut(`${ENDPOINTS.ADMIN_SIMULATIONS}/${id}`, { is_published: !current });
+      toast.success(current ? 'Simulation returned to drafts' : 'Simulation published!');
+      invalidateSimulations();
+    } catch {
+      toast.error('Error updating status.');
     }
   };
 
@@ -279,9 +292,17 @@ export default function SimulationsSection() {
               <div className="bg-primary/10 w-10 h-10 rounded-xl flex items-center justify-center text-primary font-black uppercase text-xs">
                 {s.difficulty === 'all' || s.difficulty === 'todos' ? 'A' : (s.difficulty?.[0] || 'B')}
               </div>
-              <span className="text-[0.6rem] font-bold px-2 py-0.5 rounded-full bg-surface-hover border border-border uppercase tracking-widest text-text-subtle">
-                {s.difficulty === 'all' || s.difficulty === 'todos' ? 'All Levels' : levelLabel(s.difficulty)}
-              </span>
+              <div className="flex flex-col items-end gap-1">
+                <span className={cn(
+                  "text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider",
+                  s.is_published ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'
+                )}>
+                  {s.is_published ? 'Published' : 'Draft'}
+                </span>
+                <span className="text-[0.6rem] font-bold px-2 py-0.5 rounded-full bg-surface-hover border border-border uppercase tracking-widest text-text-subtle">
+                  {s.difficulty === 'all' || s.difficulty === 'todos' ? 'All Levels' : levelLabel(s.difficulty)}
+                </span>
+              </div>
             </div>
 
             <div>
@@ -295,16 +316,24 @@ export default function SimulationsSection() {
               <button
                 onClick={() => handleStartSimulation(s)}
                 className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all text-xs font-bold border border-primary/20"
+                title="Start simulation"
               >
                 <Play size={14} /> Play
-
               </button>
-              <button onClick={() => openModal(s)} className="p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border">
+              <button onClick={() => openModal(s)} className="p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title="Edit">
                 <PenLine size={14} />
+              </button>
+              <button
+                onClick={() => handleTogglePublish(s.id, !!s.is_published)}
+                className="p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border"
+                title={s.is_published ? "Unpublish (Draft)" : "Publish"}
+              >
+                {s.is_published ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
               <button
                 onClick={() => handleDelete(s.id)}
                 className="p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle border border-border"
+                title="Delete"
               >
                 <Trash2 size={16} />
               </button>

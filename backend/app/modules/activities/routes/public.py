@@ -27,7 +27,20 @@ async def list_premium_content(
     service: PremiumService = Depends()
 ):
     """Lista todo o conteúdo premium disponível para compra (não requer login)."""
-    return await service.list_public_catalog()
+    from app.shared.services.upstash import cache_get, cache_set
+
+    cache_key = "catalog:public_list"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    result = await service.list_public_catalog()
+
+    # Cache por 5 minutos (300s) — revalidado em background pelo React Query
+    await cache_set(cache_key, result, ttl=300)
+
+    return result
+
 
 
 @router.get("/orders", response_model=List[HubOrderPublic])

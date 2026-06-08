@@ -247,8 +247,16 @@ class ChatService:
         # Busca prompt de simulação em paralelo se houver
         if simulation_id:
             def _fetch_sim():
-                return self.db.table('simulations').select('system_prompt').eq(
+                res = self.db.table('simulations').select('system_prompt').eq(
                     'id', simulation_id).limit(1).execute().data
+                if res:
+                    return res
+                # Se não encontrar, tenta na tabela 'cefr_simulations'
+                res_cefr = self.db.table('cefr_simulations').select('scenario').eq(
+                    'id', simulation_id).limit(1).execute().data
+                if res_cefr:
+                    return [{'system_prompt': res_cefr[0]['scenario']}]
+                return []
             tasks.append(self._execute_db(_fetch_sim))
         else:
             async def _dummy_sim(): return []

@@ -43,6 +43,36 @@ async def get_my_flashcards(user=Depends(get_current_user)):
                 d['card_count'] = len(fc) if isinstance(fc, list) else 0
                 filtered.append(d)
 
+        # Fetch and append published CEFR virtual flashcard decks
+        try:
+            cefr_res = db.table('cefr_flashcards').select('*').eq('is_published', True).execute()
+            cefr_data = cefr_res.data or []
+
+            from collections import defaultdict
+            import re
+
+            grouped_cf = defaultdict(list)
+            for row in cefr_data:
+                row_level = row.get('level', 'A1')
+                if matches_level(user_level, row_level):
+                    topic = row.get('topic') or 'General Vocabulary'
+                    grouped_cf[(row_level, topic)].append(row)
+
+            for (lvl, topic), cards in grouped_cf.items():
+                topic_slug = re.sub(r'[^a-zA-Z0-9]', '_', topic.lower())
+                deck_id = f"cefr_fc_{lvl.lower()}_{topic_slug}"
+                filtered.append({
+                    'id': deck_id,
+                    'title': f"CEFR {lvl}: {topic}",
+                    'description': f"Vocabulary deck about {topic}.",
+                    'card_count': len(cards),
+                    'level': lvl,
+                    'is_published': True,
+                    'created_at': cards[0].get('created_at') or datetime.now(timezone.utc).isoformat()
+                })
+        except Exception as cefr_err:
+            logging.info(f"[FlashcardsRouter] Erro ao buscar cefr_flashcards: {cefr_err}")
+
         filtered.sort(
             key=lambda x: x.get('created_at') or '',
             reverse=True)

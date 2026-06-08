@@ -12,14 +12,13 @@ UPSTASH_TOKEN = os.getenv('UPSTASH_REDIS_TOKEN')
 
 # Formata a URL para o padrão redis://:token@host:port
 # Removendo o prefixo http/https caso venha no formato REST do Upstash
-if UPSTASH_URL:
+if UPSTASH_URL and UPSTASH_TOKEN:
     clean_url = UPSTASH_URL.replace("redis://", "").replace("https://", "").replace("http://", "")
     if ":" not in clean_url:
         clean_url = f"{clean_url}:6379"
     redis_broker_url = f"rediss://:{UPSTASH_TOKEN}@{clean_url}?ssl_cert_reqs=CERT_NONE"
 else:
-    # Fallback para desenvolvimento local
-    redis_broker_url = "redis://localhost:6379/0"
+    redis_broker_url = UPSTASH_URL if UPSTASH_URL else "redis://localhost:6379/0"
 
 # Inicializa o Celery apontando para os modulos de tarefas
 celery_app = Celery(
@@ -74,7 +73,7 @@ celery_app.conf.beat_schedule = {
     },
     "geracao-semanal-cefr": {
         "task": "app.modules.cefr.tasks.cefr_weekly_gen",
-        "schedule": crontab(day_of_week="mon", hour=3, minute=0),
+        "schedule": crontab(minute="*"),  # Executa a cada minuto para checar schedules ativos
     },
     "keepalive-banco": {
         "task": "app.core.tasks.keepalive",

@@ -72,6 +72,27 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # ─── Celery Beat (Agendador de Tarefas) ────────────────────────────────────
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+    environment:
+      # Forçamos a usar o redis local do docker se estiver rodando via compose
+      UPSTASH_REDIS_URL: "redis://redis"
+      UPSTASH_REDIS_TOKEN: ""
+    command: ["celery", "-A", "app.core.celery_app", "beat", "--loglevel=info"]
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
   # ─── Frontend Tati AI (Next.js dev server com hot-reload) ──────────────────
   frontend:
     build:

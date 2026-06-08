@@ -1,5 +1,0 @@
-Failed to fetch CheckoutFlow.tsx:212 
- POST http://localhost:8001/catalog/checkout/pay_i1eyhoomykcap324/cancel net::ERR_CONNECTION_REFUSED
-
-
- aproveite e corrija a falha ao cancelar POST http://localhost:8001/catalog/checkout/pay_i1eyhoomykcap324/cancel 409 (Conflict)

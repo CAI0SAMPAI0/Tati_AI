@@ -10,7 +10,7 @@ class CEFRGeneratorService:
 
     @staticmethod
     async def generate_flashcards(
-            level: str, topic: str, count: int = 5) -> Optional[List[Dict[str, Any]]]:
+            level: str, topic: str, count: int = 5, reference_ids: List[str] = None) -> Optional[List[Dict[str, Any]]]:
         """
         Gera flashcards baseados no material do nível CEFR usando o LLM.
         """
@@ -19,7 +19,7 @@ class CEFRGeneratorService:
 
         # Busca contexto relevante no pgvector
         context_docs = EmbeddingsService.search_similar_documents(
-            query=topic, level=level, top_k=5)
+            query=topic, level=level, top_k=5, reference_ids=reference_ids)
 
         # Se não encontrou contexto, avisa
         if not context_docs:
@@ -74,7 +74,7 @@ class CEFRGeneratorService:
 
     @staticmethod
     async def generate_exercises(
-            level: str, topic: str, count: int = 3) -> Optional[List[Dict[str, Any]]]:
+            level: str, topic: str, count: int = 3, reference_ids: List[str] = None) -> Optional[List[Dict[str, Any]]]:
         """
         Gera exercícios de múltipla escolha baseados no material.
         """
@@ -82,7 +82,7 @@ class CEFRGeneratorService:
         level_label = CEFRGeneratorService.CEFR_LABELS.get(level, level)
 
         context_docs = EmbeddingsService.search_similar_documents(
-            query=topic, level=level, top_k=5)
+            query=topic, level=level, top_k=5, reference_ids=reference_ids)
 
         if not context_docs:
             context_text = "Nenhum material de referência específico encontrado."
@@ -136,15 +136,18 @@ class CEFRGeneratorService:
 
     @staticmethod
     async def generate_simulations(
-            level: str, topic: str, count: int = 2) -> Optional[List[Dict[str, Any]]]:
+            level: str, topic: str, count: int = 1, reference_ids: List[str] = None) -> Optional[List[Dict[str, Any]]]:
         """
         Gera simulações/cenários de roleplay baseados no material.
+        Sempre gera exatamente 1 simulação por requisição (regra de negócio).
         """
+        # Regra de negócio: sempre 1 simulação por requisição
+        count = 1
         level = normalize_level(level)
         level_label = CEFRGeneratorService.CEFR_LABELS.get(level, level)
 
         context_docs = EmbeddingsService.search_similar_documents(
-            query=topic, level=level, top_k=5)
+            query=topic, level=level, top_k=5, reference_ids=reference_ids)
 
         if not context_docs:
             context_text = "Nenhum material de referência específico encontrado."

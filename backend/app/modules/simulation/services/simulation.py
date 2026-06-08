@@ -79,6 +79,26 @@ def get_all_scenarios(level: Optional[str] = None) -> list[dict]:
 
         merged = list(scenarios_by_slug.values())
 
+        # Fetch published CEFR simulations
+        try:
+            cefr_res = db.table('cefr_simulations').select('*').eq('is_published', True).execute()
+            cefr_data = cefr_res.data or []
+            for cs in cefr_data:
+                slug = f"cefr_sim_{cs['id']}"
+                merged.append({
+                    'id': cs['id'],
+                    'name': f"CEFR {cs.get('level', 'A1')}: {cs.get('topic')}",
+                    'slug': slug,
+                    'description': cs.get('goal', 'Practice your English conversation skills.'),
+                    'difficulty': cs.get('level', 'A1'),
+                    'system_prompt': cs.get('scenario'),
+                    'greeting': f"Hello! Let's practice about: {cs.get('topic')}. {cs.get('scenario')[:100]}...",
+                    'icon': '🎭',
+                    'emoji': '🎭'
+                })
+        except Exception as cefr_err:
+            logging.info(f'[Simulation Service] Erro ao buscar cefr_simulations: {cefr_err}')
+
         # Filtra usando a lógica unificada
         filtered = [s for s in merged if matches_level(
             level, s.get('difficulty'))]
@@ -110,8 +130,25 @@ def get_scenario(scenario_id: str) -> Optional[dict]:
         if res.data:
             return res.data
     except Exception as e:
-        logging.info(
-            f'[Simulation Service] Erro ao buscar cenário {scenario_id}: {e}')
+        # Tenta buscar na tabela cefr_simulations
+        try:
+            cefr_res = db.table('cefr_simulations').select('*').eq('id', scenario_id).single().execute()
+            if cefr_res.data:
+                cs = cefr_res.data
+                return {
+                    'id': cs['id'],
+                    'name': f"CEFR {cs.get('level', 'A1')}: {cs.get('topic')}",
+                    'slug': f"cefr_sim_{cs['id']}",
+                    'description': cs.get('goal', 'Practice your English conversation skills.'),
+                    'difficulty': cs.get('level', 'A1'),
+                    'system_prompt': cs.get('scenario'),
+                    'greeting': f"Hello! Let's practice about: {cs.get('topic')}. {cs.get('scenario')[:100]}...",
+                    'icon': '🎭',
+                    'emoji': '🎭'
+                }
+        except Exception:
+            logging.info(
+                f'[Simulation Service] Erro ao buscar cenário {scenario_id} no db e cefr_db: {e}')
 
     # Fallback final por slug se o ID parecer um slug
     return next(

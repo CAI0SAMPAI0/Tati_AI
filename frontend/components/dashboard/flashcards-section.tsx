@@ -9,6 +9,8 @@ import {
   Trash2,
   PenLine,
   Eye,
+  EyeOff,
+  Play,
   FileBox,
   Sparkles,
   Image as ImageIcon,
@@ -24,6 +26,7 @@ import { DialogModal } from '@/components/ui/dialog-modal';
 import toast from 'react-hot-toast';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import { LEVEL_OPTIONS, LEVEL_FILTER_OPTIONS, normalizeLevel, levelLabel } from '@/lib/constants/levels';
+import { cn } from '@/lib/utils';
 
 interface FlashcardDeck {
   id: string;
@@ -31,6 +34,7 @@ interface FlashcardDeck {
   description?: string;
   card_count?: number;
   level?: string;
+  is_published?: boolean;
   flashcards?: Array<{ front: string; back: string; image_url?: string }>;
 }
 
@@ -99,6 +103,16 @@ export function FlashcardsSection() {
       }
     } catch {
       toast.error('Error deleting deck.', { id: toastId });
+    }
+  };
+
+  const handleTogglePublish = async (id: string, current: boolean) => {
+    try {
+      await apiPut(`/dashboard/flashcards/${id}`, { is_published: !current });
+      toast.success(current ? 'Deck returned to drafts' : 'Deck published!');
+      invalidateDecks();
+    } catch {
+      toast.error('Error updating status.');
     }
   };
 
@@ -372,6 +386,12 @@ export function FlashcardsSection() {
                 <span className="text-[0.65rem] font-bold px-2 py-0.5 rounded-full bg-primary/5 border border-primary/20 text-primary">
                   {d.card_count || 0} cards
                 </span>
+                <span className={cn(
+                  "text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider",
+                  d.is_published ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'
+                )}>
+                  {d.is_published ? 'Published' : 'Draft'}
+                </span>
                 <span className="text-[0.55rem] font-black uppercase text-text-subtle tracking-tighter">
                   {d.level === 'all' || d.level === 'todos' ? 'All Levels' : levelLabel(d.level)}
                 </span>
@@ -385,13 +405,17 @@ export function FlashcardsSection() {
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 mt-auto pt-2">
-               <button onClick={() => openModal(d)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border">
+            <div className="grid grid-cols-4 gap-2 mt-auto pt-2">
+               <button onClick={() => openModal(d)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title="Edit">
                   <PenLine size={16} />
+               </button>
+               <button onClick={() => handleTogglePublish(d.id, !!d.is_published)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title={d.is_published ? "Unpublish (Draft)" : "Publish"}>
+                  {d.is_published ? <EyeOff size={16} /> : <Eye size={16} />}
                </button>
                <button
                   onClick={() => handleDelete(d.id)}
                   className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle border border-border"
+                  title="Delete"
                >
                   <Trash2 size={16} />
                </button>
@@ -400,7 +424,7 @@ export function FlashcardsSection() {
                   className="flex items-center justify-center p-2 rounded-lg bg-primary text-white hover:bg-primary/90 transition-all border border-transparent"
                   title="Start flashcard session"
                >
-                  <Eye size={16} />
+                  <Play size={16} />
                </a>
             </div>
           </div>

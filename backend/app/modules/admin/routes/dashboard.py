@@ -223,7 +223,42 @@ async def list_simulations(
         service: DashboardService = Depends(),
         user=Depends(require_staff)) -> list:
     """Lista todas as simulações registradas."""
-    return await service.get_all_simulations()
+    normal_sims = await service.get_all_simulations()
+    
+    # Map is_published/is_active
+    for sim in normal_sims:
+        if 'is_published' not in sim:
+            sim['is_published'] = sim.get('is_active', True)
+
+    from app.core.database import get_client
+    import logging
+    db = get_client()
+    try:
+        cefr_res = db.table('cefr_simulations').select('*').order('created_at', desc=True).execute()
+        cefr_data = cefr_res.data or []
+        for sim in cefr_data:
+            roles = sim.get('roles') or {}
+            student_role = roles.get('student', '')
+            ai_role = roles.get('ai', '')
+            sys_prompt = f"You are {ai_role}. The user is {student_role}. Goal: {sim.get('goal')}. Scenario: {sim.get('scenario')}"
+            
+            normal_sims.append({
+                'id': f"cefr_sim_{sim['id']}",
+                'name': f"CEFR {sim['level'].upper()}: {sim['topic']}",
+                'description': sim.get('scenario') or '',
+                'difficulty': sim.get('level') or 'A1',
+                'system_prompt': sys_prompt,
+                'emoji': '🎭',
+                'is_active': sim.get('is_published', False),
+                'is_published': sim.get('is_published', False),
+                'is_cefr': True,
+                'created_at': sim.get('created_at') or ''
+            })
+    except Exception as e:
+        logging.error(f"[DashboardRouter] Erro ao buscar cefr_simulations para admin: {e}")
+
+    normal_sims.sort(key=lambda x: x.get('created_at') or '', reverse=True)
+    return normal_sims
 
 
 @router.get('/simulations/{simulation_id}')
@@ -331,6 +366,26 @@ def update_simulation(
         db: Client = Depends(get_db),
         user=Depends(require_staff)):
     """Atualiza uma simulação."""
+    if simulation_id.startswith('cefr_sim_'):
+        real_id = simulation_id.replace('cefr_sim_', '')
+        update_data = {}
+        if 'is_active' in data:
+            update_data['is_published'] = data['is_active']
+        if 'is_published' in data:
+            update_data['is_published'] = data['is_published']
+        if 'name' in data:
+            import re
+            name = data['name']
+            name = re.sub(r'^CEFR\s+[A-Z0-9]+:\s*', '', name)
+            update_data['topic'] = name
+        if 'description' in data:
+            update_data['scenario'] = data['description']
+        if 'difficulty' in data:
+            update_data['level'] = data['difficulty']
+        if 'system_prompt' in data:
+            update_data['scenario'] = data['system_prompt']
+            
+        return db.table('cefr_simulations').update(update_data).eq('id', real_id).execute()
 
     allowed_fields = {
         'name',
@@ -363,6 +418,10 @@ def delete_simulation(
         db: Client = Depends(get_db),
         user=Depends(require_staff)):
     """Exclui uma simulação."""
+    if simulation_id.startswith('cefr_sim_'):
+        real_id = simulation_id.replace('cefr_sim_', '')
+        return db.table('cefr_simulations').delete().eq('id', real_id).execute()
+
     return db.table('simulations').delete().eq(
         'id', simulation_id).execute()
 
@@ -410,8 +469,6 @@ def get_dashboard_flashcards(
         user=Depends(require_staff)) -> list:
     """Lista flashcards globais ou de admin."""
     try:
-        # Flashcards são armazenados na tabela modules com o campo
-        # flashcards preenchido
         from app.modules.activities.routes.personalized import PERSONALIZED_MODULE_ID
         res = db.table('modules').select('*').not_.is_(
             'flashcards', 'null').neq(
@@ -421,6 +478,52 @@ def get_dashboard_flashcards(
         for d in data:
             fc = d.get('flashcards')
             d['card_count'] = len(fc) if isinstance(fc, list) else 0
+            if 'is_published' not in d:
+                d['is_published'] = True
+
+        # Now fetch all cefr_flashcards
+        try:
+            cefr_res = db.table('cefr_flashcards').select('*').order('created_at', desc=True).execute()
+            cefr_data = cefr_res.data or []
+            
+            from collections import defaultdict
+            import re
+            
+            grouped_cf = defaultdict(list)
+            for row in cefr_data:
+                row_level = row.get('level', 'A1').upper()
+                topic = row.get('topic') or 'General Vocabulary'
+                grouped_cf[(row_level, topic)].append(row)
+                
+            for (lvl, topic), cards in grouped_cf.items():
+                topic_slug = re.sub(r'[^a-zA-Z0-9]', '_', topic.lower())
+                deck_id = f"cefr_fc_{lvl.lower()}_{topic_slug}"
+                
+                # Check if published
+                is_pub = all(c.get('is_published', False) for c in cards)
+                
+                data.append({
+                    'id': deck_id,
+                    'title': f"CEFR {lvl}: {topic}",
+                    'description': f"Vocabulary deck about {topic}.",
+                    'card_count': len(cards),
+                    'level': lvl,
+                    'is_published': is_pub,
+                    'flashcards': [{
+                        'front': c.get('front'),
+                        'back': c.get('back'),
+                        'explanation': c.get('explanation'),
+                        'image_url': c.get('image_url')
+                    } for c in cards],
+                    'is_cefr': True,
+                    'created_at': cards[0].get('created_at') or ''
+                })
+        except Exception as cefr_err:
+            import logging
+            logging.error(f"[DashboardRouter] Erro ao buscar cefr_flashcards para admin: {cefr_err}")
+
+        # Sort the merged list by created_at desc
+        data.sort(key=lambda x: x.get('created_at') or '', reverse=True)
         return data
     except Exception:
         return []
@@ -443,7 +546,7 @@ def create_flashcard_deck(
         'description': data.get('description'),
         'level': payload_level,
         'flashcards': data.get('flashcards', []),
-        'is_published': True
+        'is_published': data.get('is_published', True)
     }
     res = db.table('modules').insert(payload).execute()
 
@@ -457,12 +560,63 @@ def update_flashcard_deck(
         db: Client = Depends(get_db),
         user=Depends(require_staff)):
     """Atualiza um deck de flashcards."""
+    if deck_id.startswith('cefr_fc_'):
+        parts = deck_id.split('_')
+        if len(parts) >= 4:
+            level = parts[2].upper()
+            topic_slug = "_".join(parts[3:])
+            
+            res = db.table('cefr_flashcards').select('*').eq('level', level).execute()
+            rows = res.data or []
+            
+            import re
+            matched_rows = []
+            for r in rows:
+                t = r.get('topic') or 'General Vocabulary'
+                t_slug = re.sub(r'[^a-zA-Z0-9]', '_', t.lower())
+                if t_slug == topic_slug:
+                    matched_rows.append(r)
+            
+            if matched_rows:
+                matched_ids = [r['id'] for r in matched_rows]
+                update_data = {}
+                if 'is_published' in data:
+                    update_data['is_published'] = data['is_published']
+                if 'title' in data:
+                    title = data['title']
+                    title = re.sub(r'^CEFR\s+[A-Z0-9]+:\s*', '', title)
+                    update_data['topic'] = title
+                if 'level' in data:
+                    update_data['level'] = data['level']
+                
+                if update_data:
+                    db.table('cefr_flashcards').update(update_data).in_('id', matched_ids).execute()
+                
+                if 'flashcards' in data and data['flashcards'] is not None:
+                    db.table('cefr_flashcards').delete().in_('id', matched_ids).execute()
+                    new_topic = update_data.get('topic', matched_rows[0].get('topic'))
+                    new_level = update_data.get('level', level)
+                    for c in data['flashcards']:
+                        card_payload = {
+                            'level': new_level,
+                            'topic': new_topic,
+                            'front': c.get('front'),
+                            'back': c.get('back'),
+                            'explanation': c.get('explanation'),
+                            'image_url': c.get('image_url'),
+                            'is_published': data.get('is_published', matched_rows[0].get('is_published', False))
+                        }
+                        db.table('cefr_flashcards').insert(card_payload).execute()
+                        
+                return {"success": True}
+        return {"success": False, "error": "Invalid CEFR deck ID format"}
+
     payload = {
         'title': data.get('title'),
         'description': data.get('description'),
         'level': normalize_level(data.get('level')) if data.get('level') else None,
-        'flashcards': data.get('flashcards')}
-    # Filtra None
+        'flashcards': data.get('flashcards'),
+        'is_published': data.get('is_published')}
     payload = {k: v for k, v in payload.items() if v is not None}
 
     return db.table('modules').update(
@@ -473,8 +627,32 @@ def update_flashcard_deck(
 async def delete_flashcard_deck(
         deck_id: str,
         service: ActivityService = Depends(),
+        db: Client = Depends(get_db),
         user=Depends(require_staff)):
     """Exclui um deck de flashcards usando o ActivityService para tratar dependências."""
+    if deck_id.startswith('cefr_fc_'):
+        parts = deck_id.split('_')
+        if len(parts) >= 4:
+            level = parts[2].upper()
+            topic_slug = "_".join(parts[3:])
+            
+            res = db.table('cefr_flashcards').select('*').eq('level', level).execute()
+            rows = res.data or []
+            
+            import re
+            matched_rows = []
+            for r in rows:
+                t = r.get('topic') or 'General Vocabulary'
+                t_slug = re.sub(r'[^a-zA-Z0-9]', '_', t.lower())
+                if t_slug == topic_slug:
+                    matched_rows.append(r)
+            
+            if matched_rows:
+                matched_ids = [r['id'] for r in matched_rows]
+                db.table('cefr_flashcards').delete().in_('id', matched_ids).execute()
+            return {"success": True}
+        return {"success": False, "error": "Invalid CEFR deck ID format"}
+
     success = await service.delete_module(deck_id)
     if not success:
         raise BusinessLogicError(

@@ -130,15 +130,21 @@ async def admin_reprocess_content(
 async def list_premium_content(
         user: Optional[dict] = Depends(get_current_user_optional)):
     """Lista todos os conteúdos premium disponíveis e indica se o usuário já comprou."""
+    from app.shared.services.upstash import cache_get, cache_set
+
     db = get_client()
     username = user.get('username') if user else None
 
-    # 1. Busca conteúdos ativos
-    contents_res = db.table('premium_content').select(
-        '*').eq('is_active', True).execute()
-    contents = contents_res.data or []
+    # 1. Busca conteúdos ativos (com cache de 5 min para a query pesada)
+    cache_key = "hub:active_contents"
+    contents = await cache_get(cache_key)
+    if contents is None:
+        contents_res = db.table('premium_content').select(
+            '*').eq('is_active', True).execute()
+        contents = contents_res.data or []
+        await cache_set(cache_key, contents, ttl=300)
 
-    # 2. Busca compras do usuário
+    # 2. Busca compras do usuário (sempre live — não cachear dados de acesso)
     purchased_ids = set()
     if username:
         purchases_res = db.table('premium_purchases').select(

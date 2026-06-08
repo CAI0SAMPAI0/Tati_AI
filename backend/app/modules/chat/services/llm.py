@@ -135,13 +135,12 @@ async def _stream_groq(
     yield f'[Erro Groq: todas as {len(keys)} chave(s) falharam. Ãšltimo: {str(last_error)[:120]}]'
 
 
-async def groq_chat(
+async def _groq_chat_attempt(
     messages: list[dict],
-    max_tokens: int = 1500,
-    temperature: float = 0.4,
-    model: str = 'llama-3.3-70b-versatile',
+    max_tokens: int,
+    temperature: float,
+    model: str,
 ) -> str:
-    """Chamada simples ao Groq com fallback automático entre chaves."""
     from groq import AsyncGroq
 
     keys = settings.groq_keys
@@ -168,7 +167,24 @@ async def groq_chat(
             break
 
     raise GroqKeyError(
-        f'Todas as chaves Groq falharam. Ãšltimo: {last_error}')
+        f'Todas as chaves Groq falharam. Último: {last_error}')
+
+
+async def groq_chat(
+    messages: list[dict],
+    max_tokens: int = 1500,
+    temperature: float = 0.4,
+    model: str = 'llama-3.3-70b-versatile',
+) -> str:
+    """Chamada simples ao Groq com fallback automático entre chaves e modelos."""
+    try:
+        return await _groq_chat_attempt(messages, max_tokens, temperature, model)
+    except Exception as e:
+        if "rate_limit" in str(e).lower() and model == 'llama-3.3-70b-versatile':
+            fallback_model = 'llama-3.1-8b-instant'
+            logging.warning(f"[Groq chat] Rate limit hit for {model}. Falling back to {fallback_model}...")
+            return await _groq_chat_attempt(messages, max_tokens, temperature, fallback_model)
+        raise e
 
 
 async def groq_chat_json(

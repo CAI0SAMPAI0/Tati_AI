@@ -145,6 +145,12 @@ class PremiumService:
         data.setdefault('processing_status', 'pending')
         return data
 
+    async def _invalidate_catalog_cache(self):
+        """Invalida caches do catálogo após mutações em premium_content."""
+        from app.shared.services.upstash import cache_delete
+        await cache_delete("catalog:public_list")
+        await cache_delete("hub:active_contents")
+
     async def create_content(
             self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Cria conteúdo premium e dispara processamento seguro para arquivos PDF."""
@@ -156,6 +162,8 @@ class PremiumService:
             return res.data[0]
 
         content = await run_in_threadpool(_insert)
+
+        await self._invalidate_catalog_cache()
 
         source = content.get('content_source')
         content_type = content.get('type')
@@ -246,6 +254,8 @@ class PremiumService:
 
         content = await run_in_threadpool(_update)
 
+        await self._invalidate_catalog_cache()
+
         if source_changed and content.get('type') in ('file', 'pdf'):
             import asyncio
             asyncio.create_task(
@@ -271,7 +281,9 @@ class PremiumService:
             self.db.table('premium_content').delete().eq(
                 'id', content_id).execute()
             return True
-        return await run_in_threadpool(_delete)
+        result = await run_in_threadpool(_delete)
+        await self._invalidate_catalog_cache()
+        return result
 
     async def upload_file(self, file: UploadFile) -> str:
         """Faz upload de arquivo para o bucket premium e retorna o path."""
