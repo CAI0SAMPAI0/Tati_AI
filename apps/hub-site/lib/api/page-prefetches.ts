@@ -24,7 +24,11 @@ async function prefetchHubQueries(items: PrefetchItem[]): Promise<DehydratedStat
         queryFn:
           queryFn ??
           (async () => {
-            return serverFetch(endpoint!, auth);
+            const data = await serverFetch(endpoint!, auth);
+            if (data === null) {
+              throw new Error(`SSR Prefetch failed for ${endpoint}`);
+            }
+            return data;
           }),
       }),
     ),
