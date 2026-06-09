@@ -238,10 +238,17 @@ class PremiumService:
             raise BusinessLogicError(
                 detail='Preço deve ser maior que zero.')
 
+        def _get_old_source():
+            existing = self.db.table('premium_content').select('content_source').eq('id', content_id).execute().data
+            return existing[0].get('content_source') if existing else None
+
+        old_source = await run_in_threadpool(_get_old_source)
+
         source_changed = (
             'content_source' in payload
             and payload['content_source']
             and not str(payload['content_source']).startswith('http')
+            and payload['content_source'] != old_source
         )
 
         if source_changed:
