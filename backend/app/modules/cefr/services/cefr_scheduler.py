@@ -82,11 +82,13 @@ class CEFRScheduler:
                     logging.error(f"[CEFR Scheduler] Error parsing execution time {exec_time_val}: {parse_err}")
                     continue
 
-                if current_weekday in weekdays and current_hour == exec_hour and now.minute == exec_minute:
-                    logging.info(f"[CEFR Scheduler] Schedule {schedule['id']} matches current time. Running generation...")
+                # Comparação por dia da semana e hora (ignora o minuto exato para funcionar perfeitamente com crons horários)
+                if current_weekday in weekdays and current_hour == exec_hour:
+                    logging.info(f"[CEFR Scheduler] Schedule {schedule['id']} matches current weekday and hour. Running generation...")
                     limit = schedule.get("materials_per_execution", 5)
                     selected_types = schedule.get("selected_types") or ["flashcards", "exercises", "simulations"]
                     await self.run_generation_with_limit(limit, selected_types)
+
 
         except Exception as e:
             logging.error(f"[CEFR Scheduler] Error checking schedules: {e}")
