@@ -10,6 +10,9 @@ export type PrefetchContext = {
 
 async function weeklyPlanPrefetch(): Promise<unknown> {
   const data = await serverFetch('/users/progress/weekly-plan');
+  if (data === null) {
+    throw new Error('SSR Prefetch failed for /users/progress/weekly-plan');
+  }
   return normalizeWeeklyPlanData(data);
 }
 
@@ -100,14 +103,29 @@ const ROUTE_PREFETCHES: Record<string, (ctx?: PrefetchContext) => PrefetchItem[]
       endpoint: `${ENDPOINTS.ACTIVITIES_PODCASTS_RECOMMENDATIONS}?lang=en-US`,
     },
   ],
-  'hub-catalog': () => [{ queryKey: ['hub-catalog'], endpoint: '/catalog', queryFn: () => serverFetch('/catalog', false) }],
+  'hub-catalog': () => [
+    {
+      queryKey: ['hub-catalog'],
+      endpoint: '/catalog',
+      queryFn: async () => {
+        const data = await serverFetch('/catalog', false);
+        if (data === null) {
+          throw new Error('SSR Prefetch failed for /catalog');
+        }
+        return data;
+      },
+    },
+  ],
   'hub-orders': () => [{ queryKey: ['hub-orders'], endpoint: '/catalog/orders' }],
   'hub-my-materials': () => [
     {
       queryKey: ['hub-my-materials'],
       queryFn: async () => {
         const list = await serverFetch<Array<{ has_access?: boolean }>>('/activities/hub');
-        return (list ?? []).filter((item) => item.has_access);
+        if (list === null) {
+          throw new Error('SSR Prefetch failed for /activities/hub');
+        }
+        return list.filter((item) => item.has_access);
       },
     },
   ],

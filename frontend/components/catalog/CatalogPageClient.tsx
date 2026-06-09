@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '@/lib/api/client';
 import { useAuth } from '@/providers/auth-provider';
 import HeroBanner from '@/components/catalog/HeroBanner';
@@ -70,37 +71,31 @@ function Section({
 
 export default function CatalogPageClient({ initialItems }: CatalogPageClientProps) {
   const { user } = useAuth();
-  const [items, setItems] = useState<CatalogMaterial[]>(initialItems);
   const [filter, setFilter] = useState<FilterId>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [accessOverrides, setAccessOverrides] = useState<Record<string, boolean>>({});
 
-  // Sincroniza estado se initialItems mudar (vindo do react-query do parent)
-  useEffect(() => {
-    setItems(initialItems);
-  }, [initialItems]);
-
-  const fetchAuthenticated = useCallback(() => {
-    if (!user) {
-      return;
-    }
-    // Endpoint do frontend principal para pegar acessos
-    apiGet<PremiumCatalogItem[]>('/activities/hub')
-      .then((authenticated) => {
-        setItems((current) => mergeAccess(current, authenticated));
-      })
-      .catch((err) => console.error('Erro ao buscar acessos', err));
-  }, [user]);
-
-  useEffect(() => {
-    fetchAuthenticated();
-  }, [fetchAuthenticated]);
+  const { data: authenticatedCatalog, refetch: refetchAuthenticated } = useQuery<PremiumCatalogItem[]>({
+    queryKey: ['hub-my-accesses'],
+    queryFn: () => apiGet<PremiumCatalogItem[]>('/activities/hub'),
+    enabled: Boolean(user),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const handleAccessGranted = useCallback((id: string) => {
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, has_access: true } : item))
+    setAccessOverrides((prev) => ({ ...prev, [id]: true }));
+    setTimeout(() => {
+      refetchAuthenticated();
+    }, 2000);
+  }, [refetchAuthenticated]);
+
+  const items = useMemo(() => {
+    const base = initialItems || [];
+    const merged = mergeAccess(base, authenticatedCatalog ?? null);
+    return merged.map((item) =>
+      accessOverrides[item.id] ? { ...item, has_access: true } : item
     );
-    setTimeout(fetchAuthenticated, 2000);
-  }, [fetchAuthenticated]);
+  }, [initialItems, authenticatedCatalog, accessOverrides]);
 
   // Primeiro filtra por categoria
   const categoryFiltered = useMemo(() => filterMaterials(items || [], filter) || [], [items, filter]);
