@@ -3,6 +3,9 @@ import { prefetchHubCatalog } from '@/lib/api/page-prefetches';
 import { PrefetchHydration } from '@/lib/api/ssr-prefetch';
 import type { Metadata } from 'next';
 
+export const dynamic = 'force-dynamic';
+
+
 export const metadata: Metadata = {
   title: 'Catálogo | Tati Hub',
   description:

@@ -75,6 +75,12 @@ async def admin_reprocess_content(
         'secure_pages': None,
     }).eq('id', content_id).execute()
 
+    # Invalida os caches do catálogo imediatamente
+    from app.shared.services.upstash import cache_delete
+    await cache_delete("catalog:public_list")
+    await cache_delete("hub:active_contents")
+
+
     import asyncio
 
     async def _do_reprocess():

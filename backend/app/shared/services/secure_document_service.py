@@ -172,8 +172,17 @@ class SecureDocumentService:
         try:
             self.db.table('premium_content').update(
                 payload).eq('id', content_id).execute()
+            try:
+                from app.shared.services.upstash import upstash_service
+                if upstash_service._ensure_connected() and upstash_service._redis:
+                    upstash_service._redis.delete("catalog:public_list")
+                    upstash_service._redis.delete("hub:active_contents")
+                    logging.info(f"[Upstash] Caches do catálogo invalidados pós-status: {status}")
+            except Exception as cache_err:
+                logging.info(f"[Upstash] Erro ao invalidar cache pós-status: {cache_err}")
         except Exception as e:
             logging.info(f'[SecureDoc] Erro ao atualizar status: {e}')
+
 
     def upload_to_drive(
             self,
@@ -354,6 +363,15 @@ class SecureDocumentService:
 
         self.db.table('premium_content').update(
             update_payload).eq('id', content_id).execute()
+
+        try:
+            from app.shared.services.upstash import upstash_service
+            if upstash_service._ensure_connected() and upstash_service._redis:
+                upstash_service._redis.delete("catalog:public_list")
+                upstash_service._redis.delete("hub:active_contents")
+                logging.info("[Upstash] Caches do catálogo invalidados pós-processamento completo")
+        except Exception as cache_err:
+            logging.info(f"[Upstash] Erro ao invalidar cache pós-processamento completo: {cache_err}")
 
         return {
             'success': True,
