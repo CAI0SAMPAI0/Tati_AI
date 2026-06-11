@@ -263,7 +263,7 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
           rel="noopener noreferrer"
           className="btn-primary mt-6 inline-block w-full py-3 text-center"
         >
-          Ver boleto / fatura
+          {billingType === 'DEBIT_CARD' ? 'Pagar com Cartão de Débito' : 'Ver boleto / fatura'}
         </a>
       )}
 
@@ -427,11 +427,10 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
                 <label className="block text-[10px] font-black uppercase tracking-widest text-subtle">
                   Forma de pagamento
                 </label>
-                <div className="grid grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-2 gap-2.5">
                   {[
                     { id: 'PIX', label: 'PIX', icon: Zap, sub: 'Imediato' },
-                    { id: 'CREDIT_CARD', label: 'Cartão', icon: CreditCard, sub: 'Crédito' },
-                    { id: 'BOLETO', label: 'Boleto', icon: Landmark, sub: '1-2 dias' },
+                    { id: 'DEBIT_CARD', label: 'Cartão de Débito', icon: CreditCard, sub: 'Débito' },
                   ].map((m) => {
                     const Icon = m.icon;
                     const active = billingType === m.id;

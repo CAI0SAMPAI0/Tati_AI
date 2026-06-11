@@ -710,8 +710,9 @@ def _get_or_create_guest_user(name: str, email: str, cpf: str) -> str:
 @router.post("/checkout")
 async def hub_checkout(
         body: HubCheckoutRequest,
+        request: Request,
         user: dict = Depends(get_current_user)):
-    """Cria uma cobrança avulsa no Asaas para um item do Hub."""
+    """Cria uma cobrança no Mercado Pago para um item do Hub."""
     db = get_client()
     username = user['username']
 
@@ -735,13 +736,7 @@ async def hub_checkout(
             detail="Este material não possui preço configurado.")
 
     from app.modules.payments.routes.asaas import _get_validated_user
-    from app.modules.payments.services.asaas import (
-        create_customer,
-        create_payment,
-        get_customer_by_email,
-        get_pix_qr_code,
-        update_customer,
-    )
+    from app.modules.payments.services.mercadopago import MercadoPago
 
     if body.cpf:
         await _persist_user_document(username, body.cpf)
@@ -749,34 +744,152 @@ async def hub_checkout(
     user_db = _get_validated_user(username)
     raw_doc = user_db['_raw_doc']
 
-    customer = await get_customer_by_email(user_db['email'])
-    if customer:
-        customer_id = customer['id']
-        if not customer.get('cpfCnpj') and raw_doc:
-            await update_customer(customer_id, {'cpfCnpj': raw_doc})
-    else:
-        new_cust = await create_customer(
-            name=user_db.get('name') or username,
-            email=user_db['email'],
-            cpf_cnpj=raw_doc,
-        )
-        customer_id = new_cust['id']
+    mp = MercadoPago()
+    external_ref = f"HUB:{item['id']}:{username}"
 
-    due_date = (date.today() + timedelta(days=3)).isoformat()
+    # --- Reaproveitamento de cobrança pendente (limite 5 minutos) ---
     try:
-        payment = await create_payment(
-            customer_id=customer_id,
-            billing_type=body.billingType,
-            value=value,
-            due_date=due_date,
-            description=f"Compra Hub: {item['title']}",
-            external_reference=f"PREMIUM:{item['id']}:{username}",
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
-
-    payment_id = payment.get('id')
-    invoice_url = _resolve_checkout_url(payment)
+        existing_purchases = db.table('premium_purchases')\
+            .select('*')\
+            .eq('username', username)\
+            .eq('content_id', item['id'])\
+            .eq('status', 'pending')\
+            .execute().data
+            
+        if existing_purchases:
+            existing_payment_id = existing_purchases[0].get('asaas_payment_id')
+            if existing_payment_id:
+                is_mp = existing_payment_id.isdigit() or existing_payment_id.startswith('pref_') or '-' in existing_payment_id
+                if is_mp:
+                    from dateutil.parser import parse as parse_date
+                    
+                    # 1. Caso seja PIX
+                    if existing_payment_id.isdigit():
+                        try:
+                            payment_details = await mp.get_payment(existing_payment_id)
+                            status = payment_details.get('status')
+                            if status == 'pending':
+                                date_created = payment_details.get('date_created')
+                                created_at = parse_date(date_created)
+                                if created_at.tzinfo is None:
+                                    created_at = created_at.replace(tzinfo=timezone.utc)
+                                
+                                if (datetime.now(timezone.utc) - created_at).total_seconds() < 300:
+                                    if body.billingType == 'PIX':
+                                        invoice_url = payment_details.get('point_of_interaction', {}).get('transaction_data', {}).get('ticket_url')
+                                        pix_qr_code = payment_details.get('point_of_interaction', {}).get('transaction_data', {}).get('qr_code_base64')
+                                        pix_copy_paste = payment_details.get('point_of_interaction', {}).get('transaction_data', {}).get('qr_code')
+                                        
+                                        logging.info(f"[HubCheckout] Reaproveitando pagamento PIX pendente {existing_payment_id} para {username}")
+                                        return {
+                                            'paymentId': existing_payment_id,
+                                            'invoiceUrl': invoice_url,
+                                            'pixQrCode': pix_qr_code,
+                                            'pixCopyPaste': pix_copy_paste,
+                                            'pix': {'qrCode': pix_qr_code, 'copyPaste': pix_copy_paste} if pix_qr_code else None,
+                                            'value': value,
+                                            'title': item['title'],
+                                        }
+                                    else:
+                                        # Mudou o método de pagamento
+                                        try:
+                                            await mp._put(f'/v1/payments/{existing_payment_id}', {'status': 'cancelled'})
+                                            db.table('premium_purchases').update({'status': 'revoked'}).eq('asaas_payment_id', existing_payment_id).execute()
+                                            db.table('orders').update({'status': 'cancelled'}).eq('asaas_id', existing_payment_id).execute()
+                                            logging.info(f"[HubCheckout] Cancelado PIX antigo {existing_payment_id} devido a alteração do método")
+                                        except Exception as ec:
+                                            logging.info(f"[HubCheckout] Erro ao cancelar PIX antigo: {ec}")
+                        except Exception as ep:
+                            logging.info(f"[HubCheckout] Erro ao recuperar pagamento PIX do MP: {ep}")
+                            
+                    # 2. Caso seja Preferência (Cartão de Débito)
+                    elif existing_payment_id.startswith('pref_') or '-' in existing_payment_id:
+                        try:
+                            preference_details = await mp.get_preference(existing_payment_id)
+                            date_created = preference_details.get('date_created')
+                            created_at = parse_date(date_created)
+                            if created_at.tzinfo is None:
+                                created_at = created_at.replace(tzinfo=timezone.utc)
+                                  
+                            if (datetime.now(timezone.utc) - created_at).total_seconds() < 300:
+                                if body.billingType == 'DEBIT_CARD':
+                                    from app.core.config import settings
+                                    is_sandbox = settings.mp_access_token.startswith('TEST-')
+                                    invoice_url = preference_details.get('sandbox_init_point') if is_sandbox else preference_details.get('init_point')
+                                    
+                                    logging.info(f"[HubCheckout] Reaproveitando preferência de débito {existing_payment_id} para {username}")
+                                    return {
+                                        'paymentId': existing_payment_id,
+                                        'invoiceUrl': invoice_url,
+                                        'pixQrCode': None,
+                                        'pixCopyPaste': None,
+                                        'pix': None,
+                                        'value': value,
+                                        'title': item['title'],
+                                    }
+                                else:
+                                    # Mudou o método de pagamento
+                                    try:
+                                        db.table('premium_purchases').update({'status': 'revoked'}).eq('asaas_payment_id', existing_payment_id).execute()
+                                        db.table('orders').update({'status': 'cancelled'}).eq('asaas_id', existing_payment_id).execute()
+                                        logging.info(f"[HubCheckout] Cancelada preferência antiga {existing_payment_id} devido a alteração do método")
+                                    except Exception as ec:
+                                        logging.info(f"[HubCheckout] Erro ao revogar preferência no banco: {ec}")
+                        except Exception as ep:
+                            logging.info(f"[HubCheckout] Erro ao recuperar preferência do MP: {ep}")
+    except Exception as e:
+        logging.info(f"[HubCheckout] Erro no fluxo de reaproveitamento: {e}")
+    # -------------------------------------------------------------
+    
+    if body.billingType == 'PIX':
+        payer = {
+            'email': user_db['email'],
+            'identification': {
+                'type': 'CPF',
+                'number': raw_doc
+            }
+        }
+        name_parts = (user_db.get('name') or username).strip().split(' ', 1)
+        if len(name_parts) > 0:
+            payer['first_name'] = name_parts[0]
+        if len(name_parts) > 1:
+            payer['last_name'] = name_parts[1]
+            
+        try:
+            payment = await mp.pay_with_pix(
+                amount=value,
+                description=f"Compra Hub: {item['title']}",
+                payer=payer,
+                external_reference=external_ref
+            )
+            payment_id = str(payment.get('id'))
+            invoice_url = payment.get('point_of_interaction', {}).get('transaction_data', {}).get('ticket_url')
+            pix_qr_code = payment.get('point_of_interaction', {}).get('transaction_data', {}).get('qr_code_base64')
+            pix_copy_paste = payment.get('point_of_interaction', {}).get('transaction_data', {}).get('qr_code')
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Erro Mercado Pago: {exc}")
+            
+    elif body.billingType == 'DEBIT_CARD':
+        origin = request.headers.get('origin') or 'https://tati-ai.vercel.app'
+        try:
+            preference = await mp.create_preference_for_debit_card(
+                amount=value,
+                description=f"Compra Hub: {item['title']}",
+                payer_name=user_db.get('name') or username,
+                payer_email=user_db['email'],
+                payer_cpf=raw_doc,
+                external_reference=external_ref,
+                success_url=f"{origin}/materiais"
+            )
+            payment_id = preference.get('id')
+            is_sandbox = settings.mp_access_token.startswith('TEST-')
+            invoice_url = preference.get('sandbox_init_point') if is_sandbox else preference.get('init_point')
+            pix_qr_code = None
+            pix_copy_paste = None
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Erro Mercado Pago (Preference): {exc}")
+    else:
+        raise HTTPException(status_code=400, detail="Método de pagamento não suportado para o Hub. Use PIX ou DEBIT_CARD.")
 
     try:
         db.table('premium_purchases').upsert(
@@ -796,25 +909,19 @@ async def hub_checkout(
         else:
             raise
 
-    pix_qr_code = None
-    pix_copy_paste = None
-    if body.billingType == 'PIX' and payment_id:
-        pix_data = await get_pix_qr_code(payment_id)
-        pix_qr_code = pix_data.get('encodedImage')
-        pix_copy_paste = pix_data.get('payload')
-
     return {
         'paymentId': payment_id,
         'invoiceUrl': invoice_url,
         'pixQrCode': pix_qr_code,
         'pixCopyPaste': pix_copy_paste,
+        'pix': {'qrCode': pix_qr_code, 'copyPaste': pix_copy_paste} if pix_qr_code else None,
         'value': value,
         'title': item['title'],
     }
 
 
 @router.post("/checkout/guest")
-async def hub_checkout_guest(body: GuestCheckoutRequest):
+async def hub_checkout_guest(body: GuestCheckoutRequest, request: Request):
     """Checkout de visitante para compra no hub público."""
     db = get_client()
     raw_doc = _normalize_document(body.cpf)
@@ -834,38 +941,157 @@ async def hub_checkout_guest(body: GuestCheckoutRequest):
     item = content.data
     value = float(item['price'])
 
-    from app.modules.payments.services.asaas import (
-        create_customer,
-        create_payment,
-        get_customer_by_email,
-        get_pix_qr_code,
-        update_customer,
-    )
+    from app.modules.payments.services.mercadopago import MercadoPago
 
-    customer = await get_customer_by_email(body.email.strip().lower())
-    if customer:
-        customer_id = customer['id']
-        if not customer.get('cpfCnpj'):
-            await update_customer(customer_id, {'cpfCnpj': raw_doc})
+    mp = MercadoPago()
+    external_ref = f"HUB:{item['id']}:{username}"
+    clean_email = body.email.strip().lower()
+
+    # --- Reaproveitamento de cobrança pendente (limite 5 minutos) ---
+    try:
+        existing_purchases = db.table('premium_purchases')\
+            .select('*')\
+            .eq('username', username)\
+            .eq('content_id', item['id'])\
+            .eq('status', 'pending')\
+            .execute().data
+            
+        if existing_purchases:
+            existing_payment_id = existing_purchases[0].get('asaas_payment_id')
+            if existing_payment_id:
+                is_mp = existing_payment_id.isdigit() or existing_payment_id.startswith('pref_') or '-' in existing_payment_id
+                if is_mp:
+                    from dateutil.parser import parse as parse_date
+                    
+                    # 1. Caso seja PIX
+                    if existing_payment_id.isdigit():
+                        try:
+                            payment_details = await mp.get_payment(existing_payment_id)
+                            status = payment_details.get('status')
+                            if status == 'pending':
+                                date_created = payment_details.get('date_created')
+                                created_at = parse_date(date_created)
+                                if created_at.tzinfo is None:
+                                    created_at = created_at.replace(tzinfo=timezone.utc)
+                                
+                                if (datetime.now(timezone.utc) - created_at).total_seconds() < 300:
+                                    if body.billingType == 'PIX':
+                                        invoice_url = payment_details.get('point_of_interaction', {}).get('transaction_data', {}).get('ticket_url')
+                                        pix_qr_code = payment_details.get('point_of_interaction', {}).get('transaction_data', {}).get('qr_code_base64')
+                                        pix_copy_paste = payment_details.get('point_of_interaction', {}).get('transaction_data', {}).get('qr_code')
+                                        
+                                        logging.info(f"[HubCheckoutGuest] Reaproveitando pagamento PIX pendente {existing_payment_id} para {username}")
+                                        return {
+                                            'paymentId': existing_payment_id,
+                                            'invoiceUrl': invoice_url,
+                                            'pixQrCode': pix_qr_code,
+                                            'pixCopyPaste': pix_copy_paste,
+                                            'pix': {'qrCode': pix_qr_code, 'copyPaste': pix_copy_paste} if pix_qr_code else None,
+                                            'value': value,
+                                            'title': item['title'],
+                                            'username': username,
+                                        }
+                                    else:
+                                        # Mudou o método de pagamento
+                                        try:
+                                            await mp._put(f'/v1/payments/{existing_payment_id}', {'status': 'cancelled'})
+                                            db.table('premium_purchases').update({'status': 'revoked'}).eq('asaas_payment_id', existing_payment_id).execute()
+                                            db.table('orders').update({'status': 'cancelled'}).eq('asaas_id', existing_payment_id).execute()
+                                            logging.info(f"[HubCheckoutGuest] Cancelado PIX antigo {existing_payment_id} devido a alteração do método")
+                                        except Exception as ec:
+                                            logging.info(f"[HubCheckoutGuest] Erro ao cancelar PIX antigo: {ec}")
+                        except Exception as ep:
+                            logging.info(f"[HubCheckoutGuest] Erro ao recuperar pagamento PIX do MP: {ep}")
+                            
+                    # 2. Caso seja Preferência (Cartão de Débito)
+                    elif existing_payment_id.startswith('pref_') or '-' in existing_payment_id:
+                        try:
+                            preference_details = await mp.get_preference(existing_payment_id)
+                            date_created = preference_details.get('date_created')
+                            created_at = parse_date(date_created)
+                            if created_at.tzinfo is None:
+                                created_at = created_at.replace(tzinfo=timezone.utc)
+                                  
+                            if (datetime.now(timezone.utc) - created_at).total_seconds() < 300:
+                                if body.billingType == 'DEBIT_CARD':
+                                    from app.core.config import settings
+                                    is_sandbox = settings.mp_access_token.startswith('TEST-')
+                                    invoice_url = preference_details.get('sandbox_init_point') if is_sandbox else preference_details.get('init_point')
+                                    
+                                    logging.info(f"[HubCheckoutGuest] Reaproveitando preferência de débito {existing_payment_id} para {username}")
+                                    return {
+                                        'paymentId': existing_payment_id,
+                                        'invoiceUrl': invoice_url,
+                                        'pixQrCode': None,
+                                        'pixCopyPaste': None,
+                                        'pix': None,
+                                        'value': value,
+                                        'title': item['title'],
+                                        'username': username,
+                                    }
+                                else:
+                                    # Mudou o método de pagamento
+                                    try:
+                                        db.table('premium_purchases').update({'status': 'revoked'}).eq('asaas_payment_id', existing_payment_id).execute()
+                                        db.table('orders').update({'status': 'cancelled'}).eq('asaas_id', existing_payment_id).execute()
+                                        logging.info(f"[HubCheckoutGuest] Cancelada preferência antiga {existing_payment_id} devido a alteração do método")
+                                    except Exception as ec:
+                                        logging.info(f"[HubCheckoutGuest] Erro ao revogar preferência no banco: {ec}")
+                        except Exception as ep:
+                            logging.info(f"[HubCheckoutGuest] Erro ao recuperar preferência do MP: {ep}")
+    except Exception as e:
+        logging.info(f"[HubCheckoutGuest] Erro no fluxo de reaproveitamento: {e}")
+    # -------------------------------------------------------------
+    
+    if body.billingType == 'PIX':
+        payer = {
+            'email': clean_email,
+            'identification': {
+                'type': 'CPF',
+                'number': raw_doc
+            }
+        }
+        name_parts = body.name.strip().split(' ', 1)
+        if len(name_parts) > 0:
+            payer['first_name'] = name_parts[0]
+        if len(name_parts) > 1:
+            payer['last_name'] = name_parts[1]
+            
+        try:
+            payment = await mp.pay_with_pix(
+                amount=value,
+                description=f"Compra Hub: {item['title']}",
+                payer=payer,
+                external_reference=external_ref
+            )
+            payment_id = str(payment.get('id'))
+            invoice_url = payment.get('point_of_interaction', {}).get('transaction_data', {}).get('ticket_url')
+            pix_qr_code = payment.get('point_of_interaction', {}).get('transaction_data', {}).get('qr_code_base64')
+            pix_copy_paste = payment.get('point_of_interaction', {}).get('transaction_data', {}).get('qr_code')
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Erro Mercado Pago: {exc}")
+            
+    elif body.billingType == 'DEBIT_CARD':
+        origin = request.headers.get('origin') or 'https://tati-ai.vercel.app'
+        try:
+            preference = await mp.create_preference_for_debit_card(
+                amount=value,
+                description=f"Compra Hub: {item['title']}",
+                payer_name=body.name,
+                payer_email=clean_email,
+                payer_cpf=raw_doc,
+                external_reference=external_ref,
+                success_url=f"{origin}/materiais"
+            )
+            payment_id = preference.get('id')
+            is_sandbox = settings.mp_access_token.startswith('TEST-')
+            invoice_url = preference.get('sandbox_init_point') if is_sandbox else preference.get('init_point')
+            pix_qr_code = None
+            pix_copy_paste = None
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Erro Mercado Pago (Preference): {exc}")
     else:
-        new_cust = await create_customer(
-            name=body.name.strip(),
-            email=body.email.strip().lower(),
-            cpf_cnpj=raw_doc,
-        )
-        customer_id = new_cust['id']
-
-    due_date = (date.today() + timedelta(days=3)).isoformat()
-    payment = await create_payment(
-        customer_id=customer_id,
-        billing_type=body.billingType,
-        value=value,
-        due_date=due_date,
-        description=f"Compra Hub: {item['title']}",
-        external_reference=f"PREMIUM:{item['id']}:{username}",
-    )
-    payment_id = payment.get('id')
-    invoice_url = _resolve_checkout_url(payment)
+        raise HTTPException(status_code=400, detail="Método de pagamento não suportado para o Hub. Use PIX ou DEBIT_CARD.")
 
     db.table('premium_purchases').upsert(
         {
@@ -880,18 +1106,12 @@ async def hub_checkout_guest(body: GuestCheckoutRequest):
         f"guest_checkout_created username={username} content_id={
             item['id']} payment_id={payment_id}")
 
-    pix_qr_code = None
-    pix_copy_paste = None
-    if body.billingType == 'PIX' and payment_id:
-        pix_data = await get_pix_qr_code(payment_id)
-        pix_qr_code = pix_data.get('encodedImage')
-        pix_copy_paste = pix_data.get('payload')
-
     return {
         'paymentId': payment_id,
         'invoiceUrl': invoice_url,
         'pixQrCode': pix_qr_code,
         'pixCopyPaste': pix_copy_paste,
+        'pix': {'qrCode': pix_qr_code, 'copyPaste': pix_copy_paste} if pix_qr_code else None,
         'value': value,
         'title': item['title'],
         'username': username,
@@ -916,10 +1136,13 @@ async def hub_payment_status(
     )
 
     if not purchase:
-        raise ContentNotFoundError("Pagamento não encontrado.")
+        # Tenta buscar por asaas_id na tabela orders caso tenha mudado na webhook
+        order = db.table('orders').select('username').eq('asaas_id', payment_id).execute().data
+        if not order or order[0]['username'] != user['username']:
+            raise ContentNotFoundError("Pagamento não encontrado.")
 
-    # Já confirmado no Supabase — evita round-trip ao Asaas
-    if purchase[0].get('status') == 'confirmed':
+    # Já confirmado no Supabase — evita round-trip
+    if purchase and purchase[0].get('status') == 'confirmed':
         return {
             'paymentId': payment_id,
             'status': 'confirmed',
@@ -929,6 +1152,45 @@ async def hub_payment_status(
             'pixCopyPaste': None,
             'raw': None,
         }
+
+    # Verifica se é Mercado Pago
+    is_mp = payment_id.isdigit() or '-' in payment_id or payment_id.startswith('pref_')
+    if is_mp:
+        from app.modules.payments.services.mercadopago import MercadoPago
+        mp = MercadoPago()
+        
+        if '-' in payment_id or payment_id.startswith('pref_'):
+            return {
+                'paymentId': payment_id,
+                'status': 'pending',
+                'billingType': 'DEBIT_CARD',
+                'invoiceUrl': None,
+                'pixQrCode': None,
+                'pixCopyPaste': None,
+                'raw': None
+            }
+        else:
+            try:
+                payment_details = await mp.get_payment(payment_id)
+                status = payment_details.get('status')
+                billing_type = 'PIX' if payment_details.get('payment_method_id') == 'pix' else 'DEBIT_CARD'
+                
+                if status == 'approved':
+                    db.table('premium_purchases').update({'status': 'confirmed'}).eq(
+                        'username', user['username']).eq('asaas_payment_id', payment_id).execute()
+                    
+                return {
+                    'paymentId': payment_id,
+                    'status': 'confirmed' if status == 'approved' else 'pending',
+                    'billingType': billing_type,
+                    'invoiceUrl': payment_details.get('transaction_details', {}).get('ticket_url'),
+                    'pixQrCode': payment_details.get('point_of_interaction', {}).get('transaction_data', {}).get('qr_code_base64'),
+                    'pixCopyPaste': payment_details.get('point_of_interaction', {}).get('transaction_data', {}).get('qr_code'),
+                    'raw': payment_details
+                }
+            except Exception as e:
+                logging.error(f"Error fetching MP payment status: {e}")
+                raise ContentNotFoundError("Pagamento não encontrado no Mercado Pago.")
 
     payment_data = await _sync_premium_purchase_payment(payment_id, user['username'])
     if not payment_data:

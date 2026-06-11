@@ -1,20 +1,3 @@
-"""
-routers — Registro centralizado de todos os app.routers_init da aplicação.
-
-Organização por domínio:
-    auth        → Login, registro, OAuth, recuperação de senha
-    admin       → Dashboard, gestão de alunos, simulações (staff-only)
-    users       → Perfil, permissões, streaks, progresso, vocabulário, metas, XP
-    activities  → Módulos, quizzes, podcasts, troféus, submissions, ranking
-    ai          → Chat (WebSocket), avatar
-    payments    → Asaas (assinatura, webhook, planos)
-    simulation  → Cenários de roleplay
-    notifications → Push, listagem, leitura
-    validation  → Documentos, geolocalização
-    feedback    → Bug reports e sugestões dos alunos
-    challenges  → Challenge semanal de pronúncia
-"""
-
 from fastapi import FastAPI
 
 
@@ -205,9 +188,15 @@ def register_all_routers(app: FastAPI) -> None:
     # ── Payments ──────────────────────────────────────────────
     from app.modules.payments.routes.asaas import router as payments_router
     from app.modules.payments.routes.asaas import asaas_webhook
+    from app.modules.payments.routes.mercadopago import router as mp_payments_router
 
     app.include_router(
         payments_router,
+        prefix='/payments',
+        tags=['payments'])
+
+    app.include_router(
+        mp_payments_router,
         prefix='/payments',
         tags=['payments'])
 

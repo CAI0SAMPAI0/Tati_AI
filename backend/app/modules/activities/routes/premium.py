@@ -4,10 +4,12 @@ routers/activities/premium.py
 Router para o Hub de Conteúdos Premium (Visão do Aluno).
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from app.core.exceptions import ContentNotFoundError, BusinessLogicError, UserNotFoundError
 from typing import List, Dict, Any
 from datetime import date, timedelta
+from app.modules.payments.services.mercadopago import MercadoPago
+from app.core.config import settings
 
 from app.core.dependencies.auth import get_current_user
 from app.modules.activities.services.premium_service import PremiumService
@@ -80,13 +82,14 @@ async def get_premium_access(
 @router.post('/{content_id}/buy')
 async def buy_premium_content(
     content_id: str,
+    request: Request,
     billingType: str = 'PIX',
     user: dict = Depends(get_current_user),
     service: PremiumService = Depends()
 ):
     """
-    Inicia o processo de compra via Asaas.
-    Gera uma cobrança avulsa e retorna os dados de pagamento.
+    Inicia o processo de compra via Mercado Pago.
+    Gera uma cobrança e retorna os dados de pagamento.
     """
     db = get_client()
     username = user['username']
@@ -115,29 +118,65 @@ async def buy_premium_content(
     if not user_db:
         raise UserNotFoundError(detail="Usuário não encontrado")
 
-    # 3. Garante Customer no Asaas
-    customer_id = await _get_or_create_asaas_customer(user_db)
+    raw_doc = (str(user_db.get('cpf') or user_db.get('cpf_cnpj') or '')
+               .replace('.', '').replace('-', '').replace('/', '').strip())
+               
+    if not raw_doc:
+        raise BusinessLogicError(detail="CPF/CNPJ é obrigatório para compras.")
 
-    # 4. Cria Cobrança no Asaas
-    # externalReference: PREMIUM:content_id:username
+    mp = MercadoPago()
     external_ref = f"PREMIUM:{content_id}:{username}"
-    due_date = (date.today() + timedelta(days=3)).isoformat()
-
-    try:
-        payment = await create_payment(
-            customer_id=customer_id,
-            billing_type=billingType,
-            value=resolved_price,
-            due_date=due_date,
-            description=f"Tati AI - Premium: {content['title']}",
-            external_reference=external_ref
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Erro ao gerar cobrança: {str(e)}")
-
-    payment_id = payment.get('id')
-    invoice_url = payment.get('invoiceUrl')
+    
+    if billingType == 'PIX':
+        payer = {
+            'email': user_db['email'],
+            'identification': {
+                'type': 'CPF',
+                'number': raw_doc
+            }
+        }
+        name_parts = (user_db.get('name') or username).strip().split(' ', 1)
+        if len(name_parts) > 0:
+            payer['first_name'] = name_parts[0]
+        if len(name_parts) > 1:
+            payer['last_name'] = name_parts[1]
+            
+        try:
+            payment = await mp.pay_with_pix(
+                amount=resolved_price,
+                description=f"Tati AI - Premium: {content['title']}",
+                payer=payer,
+                external_reference=external_ref
+            )
+            logging.info(f"[MP PIX DEBUG] status={payment.get('status')} status_detail={payment.get('status_detail')} poi={payment.get('point_of_interaction')}")
+            payment_id = str(payment.get('id'))
+            invoice_url = payment.get('point_of_interaction', {}).get('transaction_data', {}).get('ticket_url')
+            pix_qr_code = payment.get('point_of_interaction', {}).get('transaction_data', {}).get('qr_code_base64')
+            pix_copy_paste = payment.get('point_of_interaction', {}).get('transaction_data', {}).get('qr_code')
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Erro Mercado Pago: {exc}")
+            
+    elif billingType == 'DEBIT_CARD':
+        origin = request.headers.get('origin') or 'https://tati-ai.vercel.app'
+        try:
+            preference = await mp.create_preference_for_debit_card(
+                amount=resolved_price,
+                description=f"Tati AI - Premium: {content['title']}",
+                payer_name=user_db.get('name') or username,
+                payer_email=user_db['email'],
+                payer_cpf=raw_doc,
+                external_reference=external_ref,
+                success_url=f"{origin}/materiais"
+            )
+            payment_id = preference.get('id')
+            is_sandbox = settings.mp_access_token.startswith('TEST-')
+            invoice_url = preference.get('sandbox_init_point') if is_sandbox else preference.get('init_point')
+            pix_qr_code = None
+            pix_copy_paste = None
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Erro Mercado Pago (Preference): {exc}")
+    else:
+        raise HTTPException(status_code=400, detail="Método de pagamento não suportado para o Hub. Use PIX ou DEBIT_CARD.")
 
     # 5. Registra tentativa de compra no banco
     try:
@@ -154,19 +193,6 @@ async def buy_premium_content(
                 f'[Premium] Aviso: compra já existe (race): {username} - {content_id}')
         else:
             raise
-
-    # 6. Busca QR Code PIX se for o caso
-    pix_qr_code = None
-    pix_copy_paste = None
-    if billingType == 'PIX' and payment_id:
-        try:
-            pix_data = await get_pix_qr_code(payment_id)
-            pix_qr_code = pix_data.get('encodedImage')
-            pix_copy_paste = pix_data.get('payload')
-        except Exception as e:
-            logging.info(
-                f"[Premium] Aviso: não foi possível gerar QR Code PIX (verifique se há chave PIX no Asaas): {e}")
-            # Não lança erro, o usuário poderá usar o invoice_url
 
     return {
         "paymentId": payment_id,

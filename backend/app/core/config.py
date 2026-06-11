@@ -106,6 +106,11 @@ class Settings(BaseSettings):
         'sandbox', validation_alias='ASAAS_ENVIRONMENT')
     asaas_webhook_token: str = ''
 
+    # Mercado Pago Pagamentos
+    mp_public_key: str = Field('', validation_alias='MP_PUBLIC_KEY')
+    mp_access_token: str = Field('', validation_alias='MP_ACCESS_TOKEN')
+    mp_base_api_url: str = Field('https://api.mercadopago.com', validation_alias='MP_BASE_API_URL')
+
     # Cloudinary (Imagens)
     cloudinary_cloud_name: str = ''
     cloudinary_api_key: str = ''
