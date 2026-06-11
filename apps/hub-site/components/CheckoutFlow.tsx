@@ -130,12 +130,18 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
           headers,
         });
 
+        console.log('[DEBUG POLLING]', { status: res.status, ok: res.ok });
+
         if (res.ok) {
           const json = await res.json().catch(() => null);
+          console.log('[DEBUG POLLING JSON]', json);
           if (json && (json.url || json.pages)) {
             handlePaymentConfirmed(false);
             return;
           }
+        } else {
+          const errText = await res.text().catch(() => null);
+          console.log('[DEBUG POLLING ERROR TEXT]', errText);
         }
 
         if (res.status === 409) {
