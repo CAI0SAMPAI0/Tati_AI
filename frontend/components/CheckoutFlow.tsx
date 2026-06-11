@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ShoppingCart, CheckCircle, Lock, X, Loader2, XCircle, RefreshCw, Clock, Landmark, CreditCard, Zap } from 'lucide-react';
+import { ShoppingCart, CheckCircle, Lock, X, Loader2, XCircle, RefreshCw, Clock, Zap } from 'lucide-react';
 import { resolveApiUrl } from '@/lib/catalog';
 import { useAuth } from '@/providers/auth-provider';
 import { useRouter } from 'next/navigation';
@@ -99,13 +99,16 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
         });
 
         if (res.ok) {
-          // 200 = acesso liberado e conteúdo pronto
-          stopPolling();
-          setContentIsProcessing(false);
-          setPollingStatus('confirmed');
-          setStep('confirmed');
-          onAccessGranted?.();
-          return;
+          const json = await res.json().catch(() => null);
+          if (json && (json.url || json.pages)) {
+            // 200 = acesso liberado e conteúdo pronto
+            stopPolling();
+            setContentIsProcessing(false);
+            setPollingStatus('confirmed');
+            setStep('confirmed');
+            onAccessGranted?.();
+            return;
+          }
         }
 
         if (res.status === 409) {
@@ -263,7 +266,7 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
           rel="noopener noreferrer"
           className="btn-primary mt-6 inline-block w-full py-3 text-center"
         >
-          {billingType === 'DEBIT_CARD' ? 'Pagar com Cartão de Débito' : 'Ver boleto / fatura'}
+          Ver boleto / fatura
         </a>
       )}
 
@@ -427,10 +430,9 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
                 <label className="block text-[10px] font-black uppercase tracking-widest text-subtle">
                   Forma de pagamento
                 </label>
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1">
                   {[
                     { id: 'PIX', label: 'PIX', icon: Zap, sub: 'Imediato' },
-                    { id: 'DEBIT_CARD', label: 'Cartão de Débito', icon: CreditCard, sub: 'Débito' },
                   ].map((m) => {
                     const Icon = m.icon;
                     const active = billingType === m.id;
@@ -441,7 +443,7 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
                         onClick={() => setBillingType(m.id)}
                         className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-hub border transition-all duration-300 ${
                           active
-                            ? 'border-primary bg-primary/10 text-primary shadow-glow scale-[1.03]'
+                            ? 'border-primary bg-primary/10 text-primary shadow-glow scale-[1.01]'
                             : 'border-line hover:border-primary/40 text-muted bg-bgSecondary'
                         }`}
                       >

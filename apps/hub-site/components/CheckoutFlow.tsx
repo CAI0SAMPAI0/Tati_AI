@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ShoppingCart, CheckCircle, Lock, X, Loader2, XCircle, RefreshCw, Clock } from 'lucide-react';
+import { ShoppingCart, CheckCircle, Lock, X, Loader2, XCircle, RefreshCw, Clock, Zap } from 'lucide-react';
 import { resolveApiUrl } from '@/lib/catalog';
 import { useHubAuth } from '@/components/auth-provider';
 import { loginWithCredentials, getStoredSession } from '@tati/hub-core';
@@ -131,8 +131,11 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
         });
 
         if (res.ok) {
-          handlePaymentConfirmed(false);
-          return;
+          const json = await res.json().catch(() => null);
+          if (json && (json.url || json.pages)) {
+            handlePaymentConfirmed(false);
+            return;
+          }
         }
 
         if (res.status === 409) {
@@ -439,25 +442,37 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
                 </div>
               </div>
 
-              <div>
-                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-subtle">
+              <div className="space-y-3">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-subtle">
                   Forma de pagamento
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {['PIX', 'BOLETO', 'CREDIT_CARD'].map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setBillingType(type)}
-                      className={`rounded-hub border py-2.5 text-[10px] font-bold uppercase tracking-wide transition ${
-                        billingType === type
-                          ? 'border-primary bg-primary text-white'
-                          : 'border-line bg-bgSecondary text-muted hover:border-primary'
-                      }`}
-                    >
-                      {type === 'CREDIT_CARD' ? 'Cartão' : type}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-1">
+                  {[
+                    { id: 'PIX', label: 'PIX', icon: Zap, sub: 'Imediato' },
+                  ].map((m) => {
+                    const Icon = m.icon;
+                    const active = billingType === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setBillingType(m.id)}
+                        className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-hub border transition-all duration-300 ${
+                          active
+                            ? 'border-primary bg-primary/10 text-primary shadow-glow scale-[1.01]'
+                            : 'border-line hover:border-primary/40 text-muted bg-bgSecondary'
+                        }`}
+                      >
+                        <Icon size={16} strokeWidth={active ? 2.5 : 2} className={active ? 'animate-bounce text-primary' : 'text-muted'} />
+                        <div className="text-center">
+                          <p className="text-[10px] font-black uppercase tracking-wider">{m.label}</p>
+                          <p className={`text-[8px] leading-none mt-0.5 transition-opacity ${active ? 'text-primary/90 opacity-100' : 'text-subtle opacity-70'}`}>
+                            {m.sub}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
