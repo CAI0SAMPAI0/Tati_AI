@@ -356,7 +356,6 @@ class DashboardService:
         top_users = await run_in_threadpool(_fetch_recent_active)
 
         alerts = []
-        # Limita chamadas paralelas para não travar o rate limit
         sem = asyncio.Semaphore(5)
 
         async def analyze_user(username, msgs):

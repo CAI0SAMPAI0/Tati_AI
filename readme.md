@@ -16,7 +16,7 @@ A stack tecnológica foi desenhada para altíssima performance, escalabilidade e
 - **Frontend Legado:** Vanilla JS / HTML SPA
 - **Banco de Dados:** PostgreSQL (via Supabase)
 - **Cache & Mensageria:** Redis (via Upstash)
-- **Modelos de IA:** Groq (Llama 3), Anthropic (Claude), Google GenAI (Gemini)
+- **Modelos de IA:** Groq (Llama 3), Google GenAI (Gemini)
 - **Áudio (STT/TTS):** Whisper (OpenAI) / Edge TTS
 - **Autenticação:** JWT Customizado + Google Identity Services (OAuth)
 - **Pagamentos:** Integração com Asaas API
