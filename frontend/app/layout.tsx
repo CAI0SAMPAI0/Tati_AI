@@ -2,6 +2,7 @@ import { Sora, DM_Sans } from 'next/font/google';
 import './globals.css';
 import { AppProviders } from '@/providers/app-providers';
 import type { Metadata } from 'next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 export const metadata: Metadata = {
   title: 'Teacher Tati - AI English Learning',
@@ -47,6 +48,7 @@ export default function RootLayout({
         <AppProviders>
           {children}
         </AppProviders>
+        <SpeedInsights />
       </body>
     </html>
   );
