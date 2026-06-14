@@ -13,6 +13,7 @@ export function createServerQueryClient(): QueryClient {
     defaultOptions: {
       queries: {
         staleTime: SSR_STALE_TIME,
+        retry: false, // Desativa retentativas no servidor para evitar atrasos na navegacao
       },
     },
   });

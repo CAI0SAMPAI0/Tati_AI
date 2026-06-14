@@ -156,12 +156,11 @@ export async function prefetchRoute(
   const { createServerQueryClient, prefetchQueries } = await import('./ssr-prefetch');
   const { dehydrate } = await import('@tanstack/react-query');
   
-  const items = ROUTE_PREFETCHES[route]?.(ctx) || [];
-  const token = await getServerAuthToken();
-  const toPrefetch = withCommonQueries(items, token);
-  
-  if (toPrefetch.length > 0) {
-    return prefetchQueries(toPrefetch);
+  if (route === 'hub-catalog') {
+    const items = ROUTE_PREFETCHES[route]?.(ctx) || [];
+    if (items.length > 0) {
+      return prefetchQueries(items);
+    }
   }
   
   const queryClient = createServerQueryClient();

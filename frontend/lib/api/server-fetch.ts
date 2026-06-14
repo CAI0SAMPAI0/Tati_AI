@@ -32,7 +32,7 @@ export async function serverFetch<T>(endpoint: string, auth = true): Promise<T |
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
 
     const res = await fetch(`${base}${path}`, {
       headers,

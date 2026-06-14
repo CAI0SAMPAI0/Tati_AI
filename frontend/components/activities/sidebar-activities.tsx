@@ -65,7 +65,6 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
             <Link
               key={item.href}
               href={item.href}
-              prefetch={false}
               onClick={onClose}
               className={cn(
                 'flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all group',
@@ -85,7 +84,6 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
         <div className="p-4 border-t border-border">
           <Link
             href="/chat"
-            prefetch={false}
             className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold text-primary bg-primary/10 hover:bg-primary/20 transition-all"
           >
             <MessageSquare size={20} />
