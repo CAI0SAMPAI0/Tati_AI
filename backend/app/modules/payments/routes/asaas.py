@@ -491,17 +491,40 @@ async def get_status(current_user: dict = Depends(get_current_user)):
         }
 
     db = get_client()
-    sub = (
-        db.table('subscriptions')
-        .select(
-            'plan_type, status, expires_at, asaas_subscription_id, preferred_due_day'
+    try:
+        sub = (
+            db.table('subscriptions')
+            .select(
+                'plan_type, status, expires_at, asaas_subscription_id, preferred_due_day'
+            )
+            .eq('username', current_user['username'])
+            .order('created_at', desc=True)
+            .limit(1)
+            .execute()
+            .data
         )
-        .eq('username', current_user['username'])
-        .order('created_at', desc=True)
-        .limit(1)
-        .execute()
-        .data
-    )
+    except Exception as e:
+        import logging
+        logging.warning(f"[Asaas] Erro ao carregar status da assinatura completa: {e}. Tentando sem colunas extras.")
+        try:
+            sub = (
+                db.table('subscriptions')
+                .select(
+                    'plan_type, status, expires_at'
+                )
+                .eq('username', current_user['username'])
+                .order('created_at', desc=True)
+                .limit(1)
+                .execute()
+                .data
+            )
+            if sub:
+                sub[0]['preferred_due_day'] = 5
+                sub[0]['asaas_subscription_id'] = None
+                sub[0]['payment_id'] = None
+        except Exception as e_inner:
+            logging.error(f"[Asaas] Tabela subscriptions não disponível: {e_inner}")
+            sub = None
 
     if not sub:
         return {'has_subscription': False}

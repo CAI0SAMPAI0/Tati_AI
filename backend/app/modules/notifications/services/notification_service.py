@@ -22,16 +22,21 @@ class NotificationService:
         """Busca notificações recentes do usuário."""
 
         def _fetch():
-            return (
-                self.db.table('notifications')
-                .select('*')
-                .eq('username', username)
-                .order('created_at', desc=True)
-                .limit(limit)
-                .execute()
-                .data
-                or []
-            )
+            try:
+                return (
+                    self.db.table('notifications')
+                    .select('*')
+                    .eq('username', username)
+                    .order('created_at', desc=True)
+                    .limit(limit)
+                    .execute()
+                    .data
+                    or []
+                )
+            except Exception as e:
+                import logging
+                logging.error(f"[NotificationService] Erro ao buscar notificações: {e}")
+                return []
 
         return await run_in_threadpool(_fetch)
 
@@ -40,28 +45,38 @@ class NotificationService:
             notification_id: str,
             username: str) -> bool:
         def _update():
-            res = (
-                self.db.table('notifications')
-                .update({'is_read': True})
-                .eq('id', notification_id)
-                .eq('username', username)
-                .execute()
-            )
-            return bool(res.data)
+            try:
+                res = (
+                    self.db.table('notifications')
+                    .update({'is_read': True})
+                    .eq('id', notification_id)
+                    .eq('username', username)
+                    .execute()
+                )
+                return bool(res.data)
+            except Exception as e:
+                import logging
+                logging.error(f"[NotificationService] Erro ao marcar como lida: {e}")
+                return False
 
         return await run_in_threadpool(_update)
 
     async def mark_all_as_read(self, username: str) -> bool:
 
         def _update():
-            res = (
-                self.db.table('notifications')
-                .update({'is_read': True})
-                .eq('username', username)
-                .eq('is_read', False)
-                .execute()
-            )
-            return True
+            try:
+                res = (
+                    self.db.table('notifications')
+                    .update({'is_read': True})
+                    .eq('username', username)
+                    .eq('is_read', False)
+                    .execute()
+                )
+                return True
+            except Exception as e:
+                import logging
+                logging.error(f"[NotificationService] Erro ao marcar todas como lidas: {e}")
+                return False
 
         return await run_in_threadpool(_update)
 
@@ -71,15 +86,20 @@ class NotificationService:
         from datetime import datetime, timezone
 
         def _save():
-            data = {
-                'username': username,
-                'title': title,
-                'body': body,
-                'category': category,
-                'is_read': False,
-                'created_at': datetime.now(timezone.utc).isoformat(),
-            }
-            return self.db.table('notifications').insert(
-                data).execute().data
+            try:
+                data = {
+                    'username': username,
+                    'title': title,
+                    'body': body,
+                    'category': category,
+                    'is_read': False,
+                    'created_at': datetime.now(timezone.utc).isoformat(),
+                }
+                return self.db.table('notifications').insert(
+                    data).execute().data
+            except Exception as e:
+                import logging
+                logging.error(f"[NotificationService] Erro ao enviar notificação: {e}")
+                return {}
 
         return await run_in_threadpool(_save)

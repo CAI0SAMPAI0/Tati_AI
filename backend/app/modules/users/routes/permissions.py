@@ -306,17 +306,41 @@ def _is_free_mode_period(today: date) -> bool:
 
 
 def _get_active_subscription(username: str, db: Client) -> dict | None:
-    rows = (
-        db.table('subscriptions')
-        .select('id, plan_type, status, expires_at, preferred_due_day')
-        .eq('username', username)
-        .in_('status', ['active', 'grace'])
-        .order('expires_at', desc=True)
-        .limit(1)
-        .execute()
-        .data
-    )
-    return rows[0] if rows else None
+    try:
+        rows = (
+            db.table('subscriptions')
+            .select('id, plan_type, status, expires_at, preferred_due_day')
+            .eq('username', username)
+            .in_('status', ['active', 'grace'])
+            .order('expires_at', desc=True)
+            .limit(1)
+            .execute()
+            .data
+        )
+        return rows[0] if rows else None
+    except Exception as e:
+        import logging
+        logging.warning(f"[Permissions] Erro ao buscar assinaturas completas: {e}. Tentando sem preferred_due_day.")
+        try:
+            # Tenta sem o preferred_due_day, que pode ser coluna ausente
+            rows = (
+                db.table('subscriptions')
+                .select('id, plan_type, status, expires_at')
+                .eq('username', username)
+                .in_('status', ['active', 'grace'])
+                .order('expires_at', desc=True)
+                .limit(1)
+                .execute()
+                .data
+            )
+            if rows:
+                sub = rows[0]
+                sub['preferred_due_day'] = 5
+                return sub
+            return None
+        except Exception as e_inner:
+            logging.error(f"[Permissions] Tabela de assinaturas pode estar indisponível: {e_inner}")
+            return None
 
 
 def _get_free_messages_used(username: str, db: Client) -> int:

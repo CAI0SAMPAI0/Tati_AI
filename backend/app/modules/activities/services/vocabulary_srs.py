@@ -97,13 +97,18 @@ class VocabularySRSService:
             self, username: str) -> List[Dict[str, Any]]:
         """Busca palavras que precisam de revisão hoje."""
         def _fetch():
-            now = datetime.now(timezone.utc).isoformat()
-            return self.db.table('user_vocabulary')\
-                .select('*')\
-                .eq('username', username)\
-                .lte('next_review', now)\
-                .order('next_review')\
-                .execute().data or []
+            try:
+                now = datetime.now(timezone.utc).isoformat()
+                return self.db.table('user_vocabulary')\
+                    .select('*')\
+                    .eq('username', username)\
+                    .lte('next_review', now)\
+                    .order('next_review')\
+                    .execute().data or []
+            except Exception as e:
+                import logging
+                logging.error(f"[VocabularySRSService] Erro ao obter palavras para revisão: {e}")
+                return []
 
         return await run_in_threadpool(_fetch)
 

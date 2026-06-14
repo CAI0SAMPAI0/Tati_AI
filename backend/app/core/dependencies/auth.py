@@ -47,14 +47,34 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
 
     username = payload['sub']
     db = get_client()
-    rows = (
-        db.table('users')
-        .select(_USER_AUTH_FIELDS)
-        .eq('username', username)
-        .limit(1)
-        .execute()
-        .data
-    )
+    try:
+        rows = (
+            db.table('users')
+            .select(_USER_AUTH_FIELDS)
+            .eq('username', username)
+            .limit(1)
+            .execute()
+            .data
+        )
+    except Exception as e:
+        import logging
+        logging.warning(f"[Auth] Falha ao ler colunas completas do usuário: {e}. Tentando colunas básicas.")
+        basic_fields = 'username, name, email, role, level, focus, created_at'
+        try:
+            rows = (
+                db.table('users')
+                .select(basic_fields)
+                .eq('username', username)
+                .limit(1)
+                .execute()
+                .data
+            )
+        except Exception as e_inner:
+            logging.error(f"[Auth] Falha crítica ao ler usuário básico: {e_inner}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail='Erro de comunicação com o banco de dados',
+            )
 
     if not rows:
         raise HTTPException(
@@ -63,6 +83,19 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
         )
 
     user = rows[0]
+    # Injeta valores padrão caso colunas tenham falhado na consulta
+    default_values = {
+        'is_exempt': False,
+        'is_premium_active': False,
+        'plan_type': None,
+        'free_messages_used': 0,
+        'profile': None,
+        'preferred_due_day': None
+    }
+    for k, v in default_values.items():
+        if k not in user:
+            user[k] = v
+
     from app.core.config import settings
 
     user['is_staff'] = user.get('role') in settings.staff_roles
@@ -84,18 +117,47 @@ def get_current_user_optional(
         return None
 
     db = get_client()
-    rows = (
-        db.table('users')
-        .select(_USER_AUTH_FIELDS)
-        .eq('username', username)
-        .limit(1)
-        .execute()
-        .data
-    )
+    try:
+        rows = (
+            db.table('users')
+            .select(_USER_AUTH_FIELDS)
+            .eq('username', username)
+            .limit(1)
+            .execute()
+            .data
+        )
+    except Exception as e:
+        import logging
+        logging.warning(f"[Auth] Falha no get_current_user_optional com colunas completas: {e}. Tentando colunas básicas.")
+        basic_fields = 'username, name, email, role, level, focus, created_at'
+        try:
+            rows = (
+                db.table('users')
+                .select(basic_fields)
+                .eq('username', username)
+                .limit(1)
+                .execute()
+                .data
+            )
+        except Exception:
+            return None
+
     if not rows:
         return None
 
     user = rows[0]
+    default_values = {
+        'is_exempt': False,
+        'is_premium_active': False,
+        'plan_type': None,
+        'free_messages_used': 0,
+        'profile': None,
+        'preferred_due_day': None
+    }
+    for k, v in default_values.items():
+        if k not in user:
+            user[k] = v
+
     from app.core.config import settings
 
     user['is_staff'] = user.get('role') in settings.staff_roles

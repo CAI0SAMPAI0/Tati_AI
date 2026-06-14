@@ -103,6 +103,7 @@ export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose 
         <div className="p-4 border-t border-border space-y-2 shrink-0">
           <Link
             href="/chat"
+            prefetch={false}
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-primary bg-primary/10 hover:bg-primary/20 transition-all"
           >
             <MessageSquare size={20} />
@@ -110,6 +111,7 @@ export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose 
           </Link>
           <Link
             href="/settings"
+            prefetch={false}
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-text-muted hover:bg-bg-secondary transition-all"
           >
             <Settings size={20} />
