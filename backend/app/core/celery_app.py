@@ -43,6 +43,8 @@ celery_app.conf.update(
     broker_connection_retry_on_startup=True,
     # Evita que um worker trave pegando muitas tarefas pesadas de uma vez
     worker_prefetch_multiplier=1,
+    # Limita o numero de processos paralelos para evitar estouro de RAM (OOM) no Railway
+    worker_concurrency=2,
 )
 
 # Migracao do APScheduler para o Celery Beat (Cron Jobs)

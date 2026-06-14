@@ -15,4 +15,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Inicializa o processo do Celery Worker ouvindo a fila e processando o Cron (Beat)
-CMD ["celery", "-A", "app.core.celery_app", "worker", "--beat", "--loglevel=info"]
+CMD ["celery", "-A", "app.core.celery_app", "worker", "--beat", "--loglevel=info", "--concurrency=2"]
