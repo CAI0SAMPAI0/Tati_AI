@@ -34,7 +34,7 @@ function withCommonQueries(items: PrefetchItem[], token: string | null): Prefetc
   return [...common, ...items];
 }
 
-const ROUTE_PREFETCHES: Record<string, (ctx?: PrefetchContext) => PrefetchItem[]> = {
+export const ROUTE_PREFETCHES: Record<string, (ctx?: PrefetchContext) => PrefetchItem[]> = {
   activities: () => [
     { queryKey: ['activities-modules'], endpoint: ENDPOINTS.ACTIVITIES_MODULES },
     { queryKey: ['activities-master-module'], endpoint: '/admin/modules/personalized' },
@@ -51,7 +51,7 @@ const ROUTE_PREFETCHES: Record<string, (ctx?: PrefetchContext) => PrefetchItem[]
     { queryKey: ['weekly-plan-v2'], queryFn: weeklyPlanPrefetch },
   ],
   achievements: () => [
-    { queryKey: ['achievements-stats'], endpoint: '/dashboard/stats/my' },
+    { queryKey: ['my-stats'], endpoint: '/dashboard/stats/my' },
     { queryKey: ['achievements-streak'], endpoint: ENDPOINTS.STREAK },
     { queryKey: ['achievements-medals'], endpoint: '/activities/achievements/my' },
   ],
@@ -86,7 +86,7 @@ const ROUTE_PREFETCHES: Record<string, (ctx?: PrefetchContext) => PrefetchItem[]
   payment: () => [{ queryKey: ['plans'], endpoint: '/payments/plans' }],
   profile: () => [{ queryKey: ['subscription'], endpoint: '/users/permissions/subscription' }],
   progress: () => [
-    { queryKey: ['progress-xp'], endpoint: '/dashboard/stats/my' },
+    { queryKey: ['my-stats'], endpoint: '/dashboard/stats/my' },
     { queryKey: ['progress-streak'], endpoint: ENDPOINTS.STREAK },
     { queryKey: ['progress-weekly'], endpoint: `${ENDPOINTS.PROGRESS_WEEKLY}?lang=en-US` },
     { queryKey: ['progress-monthly'], endpoint: `${ENDPOINTS.PROGRESS_MONTHLY}?lang=en-US` },
@@ -153,16 +153,13 @@ export async function prefetchRoute(
   route: string,
   ctx?: PrefetchContext,
 ): Promise<DehydratedState> {
-  const { createServerQueryClient, prefetchQueries } = await import('./ssr-prefetch');
-  const { dehydrate } = await import('@tanstack/react-query');
-  
-  if (route === 'hub-catalog') {
-    const items = ROUTE_PREFETCHES[route]?.(ctx) || [];
-    if (items.length > 0) {
-      return prefetchQueries(items);
-    }
+  const items = ROUTE_PREFETCHES[route]?.(ctx) || [];
+  if (items.length > 0) {
+    return prefetchQueries(items);
   }
-  
+
+  const { createServerQueryClient } = await import('./ssr-prefetch');
+  const { dehydrate } = await import('@tanstack/react-query');
   const queryClient = createServerQueryClient();
   return dehydrate(queryClient);
 }

@@ -6,18 +6,23 @@ import type { WsIncomingMessage } from '@/lib/ws/types';
 import type { Message } from '@/lib/api/types';
 import { useAuth } from './useAuth';
 import { useErrorCountStore } from '@/store/error-store';
+import { useChatSocketInstance } from '@/providers/chat-socket-provider';
 import { apiPost } from '@/lib/api/client';
 import toast from 'react-hot-toast';
 
 export function useChatSocket(conversationId: string | null) {
   const { token } = useAuth();
+  const { socket } = useChatSocketInstance();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const streamingRef = useRef('');
   const [isConnected, setIsConnected] = useState(false);
-  const socketRef = useRef<ChatSocket | null>(null);
-  const { errorCount, increment, reset } = useErrorCountStore();
+  
+  const errorCount = useErrorCountStore(s => s.errorCount);
+  const increment = useErrorCountStore(s => s.increment);
+  const reset = useErrorCountStore(s => s.reset);
+  
   const convIdRef = useRef<string | null>(conversationId);
 
   // Sync ref with state
@@ -156,9 +161,9 @@ export function useChatSocket(conversationId: string | null) {
   }, [errorCount, increment, handleTriggerExercise]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!socket) return;
 
-    const ws = new ChatSocket({
+    socket.updateConfig({
       onEvent: handleMessage,
       onOpen: () => setIsConnected(true),
       onClose: () => setIsConnected(false),
@@ -166,19 +171,23 @@ export function useChatSocket(conversationId: string | null) {
       onUnauthorized: () => setIsConnected(false),
     });
 
-    socketRef.current = ws;
-    ws.connect();
+    // We set initial state if socket is already open
+    if (socket.readyState === WebSocket.OPEN) {
+      setIsConnected(true);
+    }
 
     return () => {
-      ws.disconnect();
+      // No need to disconnect here anymore, 
+      // but we could reset handlers if we wanted.
+      socket.updateConfig({ onEvent: () => {} });
     };
-  }, [token, handleMessage]);
+  }, [socket, handleMessage]);
 
   const sendMessage = useCallback(async (text: string, overrideConvId?: string) => {
-    if (!socketRef.current) return;
+    if (!socket) return;
     
     try {
-      await socketRef.current.waitUntilOpen();
+      await socket.waitUntilOpen();
     } catch (e) {
       console.error('Socket not ready:', e);
       return;
@@ -189,7 +198,7 @@ export function useChatSocket(conversationId: string | null) {
       convIdRef.current = overrideConvId;
     }
 
-    const sent = socketRef.current.send({
+    const sent = socket.send({
       type: 'text',
       content: text,
       conversation_id: currentId,
@@ -209,13 +218,13 @@ export function useChatSocket(conversationId: string | null) {
       if (prev.some(m => m.id === newUserMsg.id)) return prev;
       return [...prev, newUserMsg];
     });
-  }, []);
+  }, [socket]);
 
   const sendAudio = useCallback(async (base64: string, overrideConvId?: string) => {
-    if (!socketRef.current) return;
+    if (!socket) return;
     
     try {
-      await socketRef.current.waitUntilOpen();
+      await socket.waitUntilOpen();
     } catch (e) {
       console.error('Socket not ready:', e);
       return;
@@ -227,7 +236,7 @@ export function useChatSocket(conversationId: string | null) {
     }
     
     // We send 'audio' type as per the websocket protocol
-    const sent = socketRef.current.send({
+    const sent = socket.send({
       type: 'audio',
       audio: base64,
       conversation_id: currentId,
@@ -244,13 +253,13 @@ export function useChatSocket(conversationId: string | null) {
       };
       setMessages((prev) => [...prev, newUserMsg]);
     }
-  }, []);
+  }, [socket]);
 
   const sendFile = useCallback(async (filename: string, base64: string, caption?: string, overrideConvId?: string) => {
-    if (!socketRef.current) return;
+    if (!socket) return;
 
     try {
-      await socketRef.current.waitUntilOpen();
+      await socket.waitUntilOpen();
     } catch (e) {
       console.error('Socket not ready:', e);
       return;
@@ -261,7 +270,7 @@ export function useChatSocket(conversationId: string | null) {
       convIdRef.current = overrideConvId;
     }
     
-    const sent = socketRef.current.send({
+    const sent = socket.send({
       type: 'file',
       filename,
       content: base64, // backend expects base64 content in 'content' field
@@ -284,7 +293,7 @@ export function useChatSocket(conversationId: string | null) {
       };
       setMessages((prev) => [...prev, newUserMsg]);
     }
-  }, []);
+  }, [socket]);
 
   return {
     messages,

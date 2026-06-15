@@ -46,7 +46,7 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
             <Menu size={20} />
           </button>
         )}
-        <Link href={isHubOnly ? "/activities/hub" : "/chat"} className="font-display text-lg font-bold tracking-tight pl-2">
+        <Link href={isHubOnly ? "/activities/hub" : "/chat"} prefetch={true} className="font-display text-lg font-bold tracking-tight pl-2">
           Teacher <span className="text-primary">Tati</span>
         </Link>
       </div>
@@ -89,6 +89,7 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
 
           <Link
             href="/profile"
+            prefetch={true}
             className="flex items-center gap-2 pl-2 border-l border-border hover:opacity-80 transition-opacity"
           >
             <span className="hidden md:block text-xs font-semibold text-text truncate max-w-[100px]">

@@ -58,7 +58,11 @@ export class ChatSocket {
   private destroyed = false;
 
   constructor(config: ChatSocketConfig) {
-    this.config = config;
+    this.config = { ...config };
+  }
+
+  updateConfig(newConfig: Partial<ChatSocketConfig>): void {
+    Object.assign(this.config, newConfig);
   }
 
   connect(): void {

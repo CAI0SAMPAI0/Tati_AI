@@ -186,22 +186,12 @@ def register_all_routers(app: FastAPI) -> None:
 
 
     # ── Payments ──────────────────────────────────────────────
-    from app.modules.payments.routes.asaas import router as payments_router
-    from app.modules.payments.routes.asaas import asaas_webhook
     from app.modules.payments.routes.mercadopago import router as mp_payments_router
-
-    app.include_router(
-        payments_router,
-        prefix='/payments',
-        tags=['payments'])
 
     app.include_router(
         mp_payments_router,
         prefix='/payments',
         tags=['payments'])
-
-    # Root-level webhook alias to support Asaas webhook configured directly as /webhook
-    app.post('/webhook', tags=['payments'])(asaas_webhook)
 
     # ── Notifications ─────────────────────────────────────────
     from app.modules.notifications.routes.notifications import router as notifications_router

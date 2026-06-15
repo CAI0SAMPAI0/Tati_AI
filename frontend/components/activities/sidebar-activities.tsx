@@ -7,6 +7,7 @@ import { Target } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { usePrefetch } from '@/hooks/usePrefetch';
 
 interface SidebarActivitiesProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
   
   const pathname = usePathname();
   const { user } = useAuth();
+  const { prefetch } = usePrefetch();
 
   // Durante a fase de testes, apenas o professor/programador vê o Hub Premium
   const isAdminOrSpecial = user?.role === 'admin' || user?.role === 'teacher' || user?.username === 'Caio' || user?.username === 'caio' || user?.email?.toLowerCase().includes('caio');
@@ -65,6 +67,11 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={true}
+              onMouseEnter={() => {
+                const route = item.href === '/activities/hub' ? 'hub-catalog' : item.href.replace('/', '');
+                prefetch(route || 'chat');
+              }}
               onClick={onClose}
               className={cn(
                 'flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all group',
@@ -84,6 +91,8 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
         <div className="p-4 border-t border-border">
           <Link
             href="/chat"
+            prefetch={true}
+            onMouseEnter={() => prefetch('chat')}
             className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold text-primary bg-primary/10 hover:bg-primary/20 transition-all"
           >
             <MessageSquare size={20} />

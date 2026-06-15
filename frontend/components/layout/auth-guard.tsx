@@ -4,6 +4,8 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { Spinner } from '@/components/ui/spinner';
+import { NotificationProvider } from '@/providers/notification-provider';
+import { ChatSocketProvider } from '@/providers/chat-socket-provider';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { token, isLoaded, isBootstrappingProfile } = useAuth();
@@ -25,5 +27,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (!token) return null;
 
-  return <>{children}</>;
+  return (
+    <NotificationProvider>
+      <ChatSocketProvider>
+        {children}
+      </ChatSocketProvider>
+    </NotificationProvider>
+  );
 }

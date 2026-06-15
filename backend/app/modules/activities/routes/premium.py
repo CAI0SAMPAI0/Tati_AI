@@ -13,50 +13,11 @@ from app.core.config import settings
 
 from app.core.dependencies.auth import get_current_user
 from app.modules.activities.services.premium_service import PremiumService
-from app.modules.payments.services.asaas import (
-    create_customer,
-    get_customer_by_email,
-    create_payment,
-    get_pix_qr_code,
-)
+
 from app.core.database import get_client
 
 router = APIRouter()
 
-
-async def _get_or_create_asaas_customer(user_db: dict) -> str:
-    """Busca ou cria customer no Asaas."""
-    email = user_db['email']
-    raw_doc = (str(user_db.get('cpf') or user_db.get('cpf_cnpj') or '')
-               .replace('.', '').replace('-', '').replace('/', '').strip())
-
-    if not raw_doc:
-        raise BusinessLogicError(
-            detail="CPF/CNPJ é obrigatório para compras.")
-
-    customer = await get_customer_by_email(email)
-    if customer:
-        return customer['id']
-
-    phone = ''.join(
-        filter(
-            str.isdigit, str(
-                user_db.get('phone') or '')))
-    phone = phone if len(phone) >= 10 else None
-
-    try:
-        new_cust = await create_customer(
-            name=user_db.get('name') or user_db['username'],
-            email=email,
-            cpf_cnpj=raw_doc,
-            phone=phone
-        )
-        return new_cust['id']
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erro ao criar cliente no gateway: {
-                str(e)}")
 
 
 @router.get('/')

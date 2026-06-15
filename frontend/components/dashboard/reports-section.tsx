@@ -9,10 +9,15 @@ import { levelLabel, normalizeLevel } from '@/lib/constants/levels';
 
 const COLORS = ['#7c3aed', '#a855f7', '#c084fc', '#34d399', '#f59e0b'];
 
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell 
-} from 'recharts';
+const AdminActivityChart = dynamic(() => import('@/components/charts/admin-activity-chart'), {
+  ssr: false,
+  loading: () => <div className="h-[300px] w-full bg-bg-secondary rounded-2xl animate-pulse" />
+});
+
+const LevelDistributionChart = dynamic(() => import('@/components/charts/level-distribution-chart'), {
+  ssr: false,
+  loading: () => <div className="h-[300px] w-full bg-bg-secondary rounded-2xl animate-pulse" />
+});
 
 interface ReportsPayload {
   weekly_activity?: number[];
@@ -59,18 +64,7 @@ export function ReportsSection() {
             {'Weekly activity'}
           </h3>
           <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={weeklyActivity}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={12} tick={{ fill: 'var(--text-subtle)' }} />
-                <YAxis axisLine={false} tickLine={false} fontSize={12} tick={{ fill: 'var(--text-subtle)' }} />
-                <Tooltip 
-                  cursor={{ fill: 'rgba(124, 58, 237, 0.1)' }}
-                  contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }}
-                />
-                <Bar dataKey="messages" fill="#7c3aed" radius={[8, 8, 0, 0]} barSize={32} />
-              </BarChart>
-            </ResponsiveContainer>
+            <AdminActivityChart data={weeklyActivity} />
           </div>
         </div>
 
@@ -81,29 +75,7 @@ export function ReportsSection() {
             {'Level distribution'}
           </h3>
           <div className="h-[300px] w-full relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={levelDist}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={70}
-                  outerRadius={95}
-                  paddingAngle={8}
-                  dataKey="value"
-                  onClick={(data) => setSelectedLevel(data.name || null)}
-                  cursor="pointer"
-                >
-                  {levelDist.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="transparent" className="hover:opacity-80 transition-opacity outline-none" />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  formatter={(value, name, props) => [`${value} (${props.payload.percentage}%)`, name]}
-                  contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            <LevelDistributionChart data={levelDist} onSliceClick={(name) => setSelectedLevel(name)} />
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <span className="text-3xl font-black text-text">{totalStudents}</span>
                 <span className="text-[0.65rem] font-bold text-text-muted uppercase tracking-widest">{'Students'}</span>

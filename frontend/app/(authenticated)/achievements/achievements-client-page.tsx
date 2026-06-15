@@ -41,7 +41,7 @@ export default function AchievementsClientPage() {
   const [filter, setFilter] = useState('all');
 
   const { data: stats } = useQuery<DashboardStats>({
-    queryKey: ['achievements-stats'],
+    queryKey: ['my-stats'],
     queryFn: () => apiGet<DashboardStats>('/dashboard/stats/my'),
   });
   const { data: streak } = useQuery<StreakData>({

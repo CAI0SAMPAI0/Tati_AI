@@ -1,166 +1,692 @@
-## Product Requirements Document (PRD) - Tati AI
+# PRD – Tati AI
 
-> **Legenda:** `- [x]` concluído · `- [ ]` pendente · `- [~]` em andamento
+## 1. Visão Geral
 
-**Última atualização:** 2026-06-05
+### Contexto do produto
+Tati AI é uma plataforma full stack de aprendizado de inglês com IA, composta por um app principal do aluno (Next.js 14), um hub de materiais (Next.js), uma API backend (FastAPI), processamento assíncrono (Celery + Redis) e persistência em PostgreSQL via Supabase. A plataforma é organizada como monorepo, com um pacote compartilhado (`hub-core`) entre os frontends.
 
----
+### Problema que está sendo resolvido
+Usuários percebem atrasos perceptíveis ao navegar entre páginas (clique em link/menu até a renderização da nova rota). Isso prejudica a percepção de qualidade, aumenta a taxa de abandono e reduz o engajamento com atividades, chat e gamificação – funcionalidades que dependem de transições fluidas para manter o fluxo de estudo do aluno.
 
-### 1. Visão Geral do Produto
+### Estado atual da plataforma
+A maior parte das funcionalidades-chave já está implementada e operacional: autenticação, dashboard, chat com IA, avaliação CEFR, flashcards, vocabulário, gamificação, podcasts, simulações de conversação, pagamentos (Asaas/MercadoPago), hub de materiais e notificações. A infraestrutura de deploy (Railway para API, Vercel para frontends, Supabase para banco) está ativa. Persistem gargalos de performance no frontend, principalmente relacionados a navegação entre rotas, hidratação, carregamento de bibliotecas pesadas e padrões de fetch/cache.
 
-O Tati AI (Teacher Tati) é uma plataforma inovadora de ensino de inglês e hub de conteúdos premium baseada em Inteligência Artificial. O produto centraliza o aprendizado de idiomas em uma tutora virtual imersiva alimentada por LLMs modernos, combinada a um sistema de Hub Educacional contendo materiais exclusivos (e-books, flashcards, áudios e PDFs).
-
-**Objetivo de Engenharia Atual:** Otimizar o tempo de resposta do backend (FastAPI), migrar fluxos síncronos/bloqueantes para processamento em segundo plano distribuído (Celery) e implementar pipelines automáticos de IA para geração de conteúdo CEFR, garantindo estabilidade no consumo de recursos na infraestrutura da Railway.
-
----
-
-### 2. Público-Alvo e Padronização de Níveis (CEFR)
-
-Os níveis dos usuários devem seguir estritamente o padrão CEFR abaixo.
-
-**Regra de Migração:** Usuários com o nível antigo `Business English` devem ser migrados no banco de dados para `C1`.
-
-| Código | Label | Perfil |
-|--------|-------|--------|
-| A1 | Beginner | Precisa de traduções de suporte, correções detalhadas e ritmo cadenciado |
-| A2 | Pre-Intermediate | Foco na confiança para conversações básicas |
-| B1 | Intermediate | Introdução a vocabulário complexo e tempos verbais variados |
-| B2 | Upper-Intermediate | Prática de conversação mais fluida e gírias nativas |
-| C1 | Advanced | Simulações de entrevistas e discussões aprofundadas |
-| C2 | Mastery / Proficiency | Domínio completo do idioma |
-
-**Administrador (Professor/Time Tati):** Necessita de painéis para visualizar métricas, gerenciar licenças, cadastrar materiais, auditar chats e revisar/aprovar materiais gerados por IA.
+### Escopo do documento
+Este PRD cobre (1) diagnóstico e plano de otimização da navegação/performance do frontend como prioridade máxima (Sprint 0), e (2) a visão de produto, requisitos funcionais/não funcionais, arquitetura técnica, user stories, métricas e roadmap evolutivo das próximas fases da plataforma.
 
 ---
 
-### 3. Escopo e Funcionalidades Principais (Core Features)
+## 2. Sobre o Produto
 
-#### 3.1. Hub Premium Educacional (`apps/hub-site`)
-- [ ] **Vitrine e Leitor Seguro:** Catálogo de e-books e apostilas com sistema integrado de conversão de PDFs para imagens (pdf2image assíncrono), impedindo downloads não autorizados.
-- [ ] **Flashcards Interativos:** Treinamento de memória por repetição espaçada com geração automática de imagens via IA.
-- [ ] **Autenticação Unificada:** Login integrado (E-mail/Senha + Google OAuth) rápido e otimizado (TTFT < 400ms).
+### Descrição da plataforma
+Tati AI é um ecossistema de aprendizado de inglês orientado por IA, que combina trilhas personalizadas, prática conversacional com avatar/IA, avaliação contínua de nível (CEFR), gamificação (XP, troféus, rankings, desafios) e um hub de materiais educacionais comercializáveis para alunos e compradores externos.
 
-#### 3.2. Chat e Tutoria com Inteligência Artificial
-- [ ] **Interação Multimodal:** Suporte a texto, áudio (Whisper STT) e uploads de arquivo, com respostas em voz (Edge TTS).
-- [ ] **Orquestração de LLMs:** Integração com Groq (Llama 3), Anthropic Claude, e Gemini via RAG (Retrieval-Augmented Generation).
-- [ ] **AI Exercises (Correção Rigorosa):** Os exercícios e correções gerados pela IA devem ser estritamente em Inglês, mesmo que o usuário interaja em PT-BR. Nenhuma alternativa ou explicação de exercício pode conter texto em português.
+### Diferenciais
+- Tutor de IA conversacional (Tati) com RAG e julgamento semântico de respostas.
+- Avaliação automática de nível CEFR com geração dinâmica de conteúdo.
+- Gamificação completa (XP, streaks, troféus, rankings, competições).
+- Simulações de conversação com avatar.
+- Hub de materiais com precificação diferenciada por papel (aluno vs. comprador).
+- Suporte multiplataforma: web, PWA, mobile (Capacitor) e desktop (planejado via Tauri).
 
-#### 3.3. Automação de Materiais CEFR (Cron & Celery)
-- [ ] **Ingestão Automática:** Admins fazem upload de arquivos com o nível CEFR especificado no nome (ex: `B1_technology.pdf`).
-- [ ] **Pipeline de IA:** O Celery processa o arquivo em background e gera automaticamente Flashcards, Exercícios Variados e Simulações de Conversação.
-- [ ] **Agendamento:** Rotina padrão configurada para rodar 2x na semana (Cron Job). O professor terá uma interface no admin para alterar a frequência, horários e dias de execução.
-- [ ] **Dashboard de Curadoria:** Todo material gerado cai em uma aba com filtros de níveis. A professora pode abrir, ver o contexto, editar, excluir ou aprovar. Após aprovado, os materiais vão para as abas respectivas.
+### Principais funcionalidades
+- Autenticação e perfis de usuário.
+- Dashboard de progresso e metas.
+- Chat com IA (texto e voz, via WebSocket).
+- Avaliação e progressão CEFR.
+- Flashcards e SRS de vocabulário.
+- Quizzes, desafios e atividades personalizadas.
+- Podcasts com exercícios derivados.
+- Simulações de conversação com avatar.
+- Sistema de pagamentos e assinaturas.
+- Hub de materiais (compra, acesso seguro a documentos, catálogo).
+- Notificações push e relatórios diários/semanais.
 
 ---
 
-### 4. Arquitetura do Sistema e Stack
+## 3. Propósito
 
-A plataforma utiliza estrutura Monorepo (NPM Workspaces) para centralizar interfaces e lógica de negócio.
+### Objetivo de negócio
+Aumentar a retenção e a conversão de alunos para planos premium e produtos do hub, reduzindo atrito na experiência de uso – começando pela eliminação de lentidão perceptível na navegação, que impacta diretamente a percepção de qualidade do produto.
 
+### Objetivo educacional
+Oferecer uma jornada de aprendizado de inglês personalizada, adaptativa e gamificada, que mantenha o aluno engajado por meio de feedback rápido, prática constante e progressão visível de nível (CEFR).
+
+### Objetivo tecnológico
+Consolidar uma arquitetura frontend performática (Next.js 14 App Router) com navegação quase instantânea, aproveitando corretamente Server Components, prefetch, cache do React Query, code-splitting e streaming/Suspense, sem introduzir over-engineering.
+
+---
+
+## 4. Público-Alvo
+
+### Alunos iniciantes
+Usuários com nível CEFR A1–A2, que precisam de interfaces simples, feedback imediato e baixa carga cognitiva. Sensíveis a lentidão, pois desistem facilmente diante de fricção.
+
+### Alunos intermediários
+Usuários CEFR B1–B2, que utilizam mais intensamente chat, flashcards, simulações e atividades personalizadas. Navegam entre várias seções na mesma sessão de estudo.
+
+### Alunos avançados
+Usuários CEFR C1–C2, focados em desafios, podcasts e simulações avançadas, com maior expectativa de fluidez e velocidade na plataforma.
+
+### Professores
+Usuários que acessam o Hub de materiais para publicar, gerenciar e revisar conteúdos educacionais.
+
+### Administradores
+Usuários com acesso ao painel administrativo, responsáveis por dashboards de alunos/compradores, gestão de planos, preços e monitoramento de tarefas assíncronas.
+
+---
+
+## 5. Objetivos
+
+### Curto prazo
+- Melhorar performance do frontend, eliminando gargalos de carregamento inicial e bundle excessivo.
+- Melhorar experiência de navegação entre rotas, tornando as transições quase instantâneas via prefetch, cache e renderização otimizada.
+
+### Médio prazo
+- Aumentar retenção através de uma experiência fluida que reduza abandono em sessões de estudo.
+- Melhorar engajamento com chat, gamificação e simulações, reduzindo o tempo de espera entre interações.
+
+### Longo prazo
+- Escalar a plataforma para suportar crescimento de usuários simultâneos, mantendo performance.
+- Expandir monetização via hub de materiais, novos planos premium e novos públicos (compradores externos).
+
+---
+
+## 6. Requisitos Funcionais
+
+### Autenticação
+- Login, registro, refresh de sessão via JWT.
+- Diferenciação de papéis (aluno, comprador, professor, admin) com permissões.
+
+### Dashboard
+- Visão consolidada de progresso, XP, streaks, metas e resumo diário.
+- Separação de visões para alunos e compradores do hub.
+
+### Chat IA
+- Conversação em texto e voz com a Tati via WebSocket.
+- RAG para respostas contextualizadas e julgamento semântico de qualidade.
+
+### CEFR
+- Avaliação de nível via geração de exercícios e análise de respostas.
+- Atualização de nível do usuário com base em desempenho.
+
+### Flashcards
+- Sistema de repetição espaçada (SRS) para vocabulário.
+
+### Vocabulário
+- Listagem, busca e progresso de palavras aprendidas.
+
+### Gamificação
+- XP, troféus, conquistas, rankings e desafios.
+
+### Podcasts
+- Descoberta, recomendação e exercícios baseados em podcasts.
+
+### Simulações
+- Conversação simulada com avatar, com feedback de pronúncia.
+
+### Pagamentos
+- Integração com Asaas e MercadoPago, gestão de assinaturas.
+
+### Hub de materiais
+- Catálogo, checkout, acesso seguro a documentos, preços diferenciados por papel.
+
+### Notificações
+- Push notifications e agendamento via Celery.
+
+### Fluxograma Mermaid – Navegação principal do aluno
+
+```mermaid
+flowchart TD
+    A[Login] --> B[Dashboard]
+    B --> C[Chat IA]
+    B --> D[Atividades / Quizzes]
+    B --> E[Flashcards / Vocabulário]
+    B --> F[Podcasts]
+    B --> G[Simulações]
+    B --> H[Progresso / Metas]
+    B --> I[Hub de Materiais]
+    I --> J[Catálogo]
+    J --> K[Checkout]
+    K --> L[Meus Materiais]
 ```
-                            ┌────────────────────────┐
-                            │    Frontend (Vercel)   │
-                            └────────────────────────┘
-                                         │
-                        Requests HTTP    │   Conexão WebSocket
-                                         ▼
-                    ┌────────────────────────────────────────┐
-                    │        FastAPI API-Gateway (Railway)   │
-                    │   (Leve, Async Nativo, Sem Processos)    │
-                    └────────────────────────────────────────┘
-                       │                 │                │
-             Eventos   │      Cache /     │                │  Queries Async
-             Celery    │      Broker      │                │  (PostgREST)
-                       ▼                  ▼                ▼
-                ┌──────────────┐    ┌───────────────┐   ┌──────────────┐
-                │ Celery Worker│    │ Upstash Redis │   │   Supabase   │
-                │  (Railway)   │    │  (Cache/Fila) │   │ (PostgreSQL) │
-                └──────────────┘    └───────────────┘   └──────────────┘
-                        │
-                ┌───────┴───────┐
-                │ LibreOffice   │
-                │ Poppler-Utils │
-                │ ReportLab     │
-                └───────────────┘
+
+### Fluxograma Mermaid – Fluxo de avaliação CEFR
+
+```mermaid
+flowchart TD
+    A[Usuário inicia avaliação CEFR] --> B[Geração de exercícios]
+    B --> C[Usuário responde]
+    C --> D[Avaliação semântica da resposta]
+    D --> E{Nível suficiente?}
+    E -->|Sim| F[Atualiza nível CEFR do usuário]
+    E -->|Não| G[Gera novo conjunto de exercícios]
+    G --> C
+    F --> H[Atualiza dashboard e trilha personalizada]
+```
+
+### Fluxograma Mermaid – Fluxo de navegação otimizada (Sprint 0)
+
+```mermaid
+flowchart TD
+    A[Usuário clica em link/menu] --> B{Rota já prefetchada?}
+    B -->|Sim| C[Transição instantânea - cache local]
+    B -->|Não| D[Prefetch on hover/viewport]
+    D --> C
+    C --> E[Server Component renderiza shell]
+    E --> F[Client Components hidratam progressivamente]
+    F --> G[React Query hidrata dados via cache]
+    G --> H[Página totalmente interativa]
 ```
 
 ---
 
-### 5. Cronograma de Execução: Sprints Técnicas
+## 7. Requisitos Não Funcionais
 
-#### Sprint 1: Correções Críticas, Padronização e Otimização do Login
-**Status:** `[x]` concluída
+### Performance
+- Navegação entre rotas autenticadas deve ocorrer em menos de 200ms percebidos (uso de prefetch e cache).
+- Bundle inicial por rota reduzido via code-splitting e lazy loading de bibliotecas pesadas (Recharts, Framer Motion, ReactMarkdown).
 
-##### 5.1. Padronização CEFR (níveis A1–C2)
-- [x] **Migração DB (Supabase):** `scripts/migrate_cefr_levels.sql` executado (users, simulations, cefr_flashcards, modules, podcasts).
-- [x] **Backend – Enum centralizado:** `backend/app/core/enums.py` com `CEFRLevel`, `LEVEL_ALIAS_MAP`, `normalize_level()` e `cefr_window()`.
-- [x] **Backend – Utilitário de match:** `backend/app/core/utils/level_utils.py` usando `normalize_level`.
-- [x] **Backend – Serviços migrados:** auth, chat, simulation, ranking, podcasts, module_service, dashboard, progress, cefr/generator.
-- [x] **Backend – Defaults legados:** Substituído `'Intermediate'` por `'B1'` + `normalize_level()` nos serviços restantes.
-- [x] **Backend – Registro:** `auth_service.register_student` normaliza nível no insert.
-- [x] **hub-core – Fonte única:** `packages/hub-core/src/levels.ts` com tipos, opções e `normalizeLevel()`.
-- [x] **Frontend – Constantes:** `frontend/lib/constants/levels.ts` re-exporta do hub-core.
-- [x] **Frontend – Telas migradas:** login, profile, competitions, flashcards, simulations, modules.
-- [x] **Frontend – Admin:** student-modal, reports-section, cefr-section.
-- [x] **hub-site – Registro:** login-form com select CEFR e default `A1`.
+### Escalabilidade
+- Backend FastAPI deve suportar aumento de carga via workers Celery escaláveis horizontalmente.
+- Frontend deve suportar crescimento de páginas sem degradar tempo de build/deploy.
 
-##### 5.2. Demais itens da Sprint 1
-- [x] **Correção do Idioma nos AI Exercises:** Prompts de geração/correção (exercises, quizzes, weekly plan, url-to-module, podcasts) exigem conteúdo 100% em inglês.
-- [x] **Refatoração do Endpoint `/auth/login`:** Sem I/O pesado; `activate_special_user` em background; warmup movido para endpoint dedicado.
-- [x] **Endpoint isolado `GET /activities/podcasts/warmup`:** JWT + disparo em background; frontend chama após login/sessão.
-- [x] **Remoção de I/O de Terceiros no Hub (`/activities/hub`):** `get_content_access` lê status só do Supabase; `payment-status` evita Asaas se já confirmado.
+### Segurança
+- Autenticação JWT com expiração e refresh seguro.
+- Acesso a documentos do hub controlado por permissões e URLs assinadas/seguras.
 
----
+### Disponibilidade
+- API e frontends com monitoramento de uptime via Railway/Vercel.
+- Tarefas assíncronas críticas (notificações, CEFR) com retry via Celery.
 
-#### Sprint 2: Paralelismo de Queries e Migração Async
-**Status:** `[~]` parcial
+### Observabilidade
+- Logs de erro centralizados (Sentry já configurado em `sentry_config.py`).
+- Métricas de performance frontend (Web Vitals) coletadas e monitoradas.
 
-- [x] Paralelização de `/activities/personalized` com `asyncio.gather` (`personalized.py`).
-- [ ] Otimização de Queries N+1 via Supabase (PostgREST Joins) — ex.: buyers/orders no `dashboard_service` ainda em fetches separados.
+### Responsividade
+- Layouts adaptáveis com Tailwind, seguindo padrão mobile-first com breakpoints ajustados para sidebar.
+
+### Acessibilidade
+- HTML semântico, contraste adequado, navegação por teclado em componentes interativos.
 
 ---
 
-#### Sprint 3: Estruturação do Worker Celery + Infraestrutura (Railway)
-**Status:** `[~]` parcial
+## 8. Arquitetura Técnica
 
-- [x] Módulo Celery (`app/core/celery_app.py`) + beat schedule.
-- [x] `Dockerfile.api` e `Dockerfile.worker` existem.
-- [~] Lógica pesada migrada em parte (notificações, CEFR weekly via tasks).
-- [ ] Substituir APScheduler por Celery Beat — `notification_scheduler.py` ainda usa APScheduler em paralelo.
+### Stack Tecnológica
+- **Backend:** FastAPI (Python), PostgreSQL (Supabase), Redis (Upstash), Celery + Celery Beat.
+- **Frontend (app do aluno):** Next.js 14 (App Router), TypeScript, TailwindCSS, React Query, Zustand, WebSockets.
+- **Hub Site:** Next.js (App Router), TypeScript, TailwindCSS.
+- **Pacote compartilhado:** `@tati/hub-core` (TypeScript), usado por `frontend` e `hub-site`.
+- **Mobile:** Capacitor (wrapper do frontend web).
+- **Desktop:** Tauri (planejado).
+- **Infraestrutura:** Railway (API), Vercel (frontends), Supabase (banco).
+
+### Arquitetura de Componentes
+
+```mermaid
+flowchart TD
+    subgraph Frontend Apps
+        FE[frontend - App do Aluno]
+        HUB[hub-site - Hub de Materiais]
+    end
+    subgraph Shared
+        CORE["@tati/hub-core"]
+    end
+    subgraph Backend
+        API[FastAPI - main.py]
+        MODULES[Módulos de domínio]
+        CELERY[Celery Workers + Beat]
+    end
+    subgraph Infra
+        DB[(PostgreSQL - Supabase)]
+        REDIS[(Redis - Upstash)]
+    end
+
+    FE --> CORE
+    HUB --> CORE
+    FE -->|REST/WebSocket| API
+    HUB -->|REST| API
+    API --> MODULES
+    MODULES --> DB
+    MODULES --> CELERY
+    CELERY --> REDIS
+    CELERY --> DB
+```
+
+### Fluxo Frontend → Backend
+
+```mermaid
+sequenceDiagram
+    participant U as Usuário
+    participant FE as Frontend (Next.js)
+    participant API as FastAPI
+    participant DB as PostgreSQL
+
+    U->>FE: Navega para rota
+    FE->>FE: Server Component faz fetch inicial (SSR)
+    FE->>API: Requisição REST (com JWT)
+    API->>DB: Query via repository/service
+    DB-->>API: Dados
+    API-->>FE: Resposta JSON
+    FE-->>U: Página renderizada + hidratação React Query
+```
+
+### Fluxo de WebSockets
+
+```mermaid
+sequenceDiagram
+    participant U as Usuário
+    participant FE as Frontend (useChatSocket/useVoiceSocket)
+    participant WS as WebSocket Gateway (FastAPI)
+    participant CHAT as Módulo Chat (LLM/RAG)
+
+    U->>FE: Envia mensagem no chat
+    FE->>WS: Conecta/envia via socket
+    WS->>CHAT: Processa mensagem (prompt_builder, rag, llm)
+    CHAT-->>WS: Resposta gerada
+    WS-->>FE: Stream da resposta
+    FE-->>U: Exibe resposta em tempo real
+```
+
+### Fluxo de Tasks Assíncronas
+
+```mermaid
+flowchart TD
+    A[Evento disparado: ex. nova avaliação CEFR] --> B[Task enviada ao Celery via Redis]
+    B --> C[Worker Celery processa task]
+    C --> D{Tipo de task}
+    D -->|Notificação| E[notification_dispatcher]
+    D -->|CEFR| F[cefr_scheduler / generator]
+    D -->|Relatório| G[progress_report]
+    E --> H[(PostgreSQL)]
+    F --> H
+    G --> H
+    I[Celery Beat] -->|Agendamento periódico| B
+```
+
+### Estrutura de Dados
+
+```mermaid
+erDiagram
+    USERS ||--o{ USER_PROGRESS : possui
+    USERS ||--o{ ORDERS : realiza
+    USERS ||--o{ FLASHCARDS : possui
+    USERS ||--o{ ACHIEVEMENTS : conquista
+    USERS ||--o{ CEFR_ASSESSMENTS : realiza
+    USERS ||--o{ CHAT_SESSIONS : inicia
+    USERS ||--o{ SUBSCRIPTIONS : assina
+
+    HUB_ITEMS ||--o{ ORDERS : referenciado_em
+    HUB_ITEMS {
+        uuid id
+        string title
+        decimal price_students
+        decimal price_buyers
+        string type
+    }
+
+    ORDERS {
+        uuid id
+        uuid user_id
+        uuid hub_item_id
+        string status
+        decimal amount
+        timestamp created_at
+    }
+
+    USERS {
+        uuid id
+        string email
+        string password_hash
+        string role
+        string cefr_level
+    }
+
+    USER_PROGRESS {
+        uuid id
+        uuid user_id
+        int xp
+        int streak_days
+        timestamp updated_at
+    }
+
+    FLASHCARDS {
+        uuid id
+        uuid user_id
+        string word
+        string translation
+        timestamp next_review
+    }
+
+    ACHIEVEMENTS {
+        uuid id
+        uuid user_id
+        string trophy_type
+        timestamp earned_at
+    }
+
+    CEFR_ASSESSMENTS {
+        uuid id
+        uuid user_id
+        string level_result
+        timestamp evaluated_at
+    }
+
+    CHAT_SESSIONS {
+        uuid id
+        uuid user_id
+        timestamp started_at
+    }
+
+    SUBSCRIPTIONS {
+        uuid id
+        uuid user_id
+        string plan
+        string status
+        timestamp renewed_at
+    }
+```
 
 ---
 
-#### Sprint 4: Automação do Funil CEFR (Geração de Conteúdo IA)
-**Status:** `[~]` parcial
+## 9. Design System
 
-- [x] Upload CEFR + extração de nível no nome do arquivo (`cefr/admin/upload-material`, frontend `cefr-section`).
-- [x] Geração de Flashcards, Exercícios e Simulações (endpoints admin + `CEFRGeneratorService`).
-- [~] Cron Celery Beat 1x/semana (`geracao-semanal-cefr`); falta 2x/semana + UI admin para configurar frequência.
+> Implementado com TailwindCSS no Next.js (frontend e hub-site), com tokens centralizados em `lib/theme/tokens.ts`.
+
+### Cores
+- **Primária:** tons de azul/roxo para ações principais (CTAs, botões primários, links ativos).
+- **Secundária:** verde para indicadores de sucesso/progresso (XP, conquistas).
+- **Fundo:** branco/cinza claro no modo claro; cinza escuro/preto no modo escuro (via `useTheme`/`theme-provider`).
+- **Estados:** vermelho para erros/alertas, amarelo para avisos, azul-claro para informações.
+
+### Padrão de botões
+- Botão primário: fundo sólido na cor primária, texto branco, `rounded-lg`, `px-4 py-2`, hover com leve escurecimento.
+- Botão secundário: borda na cor primária, fundo transparente, texto na cor primária.
+- Botão de perigo: fundo vermelho para ações destrutivas (ex. cancelar assinatura).
+- Estados de loading/disabled com opacidade reduzida e cursor `not-allowed`.
+
+### Inputs e Forms
+- Inputs com `border`, `rounded-md`, `focus:ring-2` na cor primária.
+- Labels acima dos campos, mensagens de erro em vermelho abaixo do input.
+- Forms organizados em `flex flex-col gap-4`, com botão de submit alinhado à direita ou ocupando largura total em mobile.
+
+### Grids
+- Grid mobile-first: `grid-cols-1` como base, expandindo em breakpoints maiores.
+- Em layouts com sidebar, breakpoints deslocados (`lg:grid-cols-4` no lugar de `md:grid-cols-4`) para compensar o espaço da sidebar.
+
+### Menus
+- Sidebar fixa em desktop (`Sidebar.tsx`), colapsável/drawer em mobile.
+- Navbar superior (`Navbar.tsx`/`HubHeader.tsx`) com avatar, notificações e troca de tema.
+- Itens de menu ativos destacados com cor primária e fundo sutil.
+
+### Fontes
+- Fonte principal carregada via `next/font` para otimização (evitar FOIT/FOUT).
+- Hierarquia: títulos em peso `bold`/`semibold`, corpo em `normal`, tamanhos seguindo escala Tailwind (`text-sm` a `text-3xl`).
 
 ---
 
-#### Sprint 5: Dashboard Admin de Curadoria CEFR
-**Status:** `[~]` parcial
+## 10. User Stories
 
-- [~] API de curadoria pronta (`/cefr/admin/all`, PUT/DELETE por tipo).
-- [ ] Aba dedicada "AI Generated Materials" no dashboard com filtros por nível e fluxo de aprovação (hoje só upload/geração na aba CEFR Materials).
+### Módulo: Navegação/Performance (Sprint 0)
+**Épico:** Como aluno, quero navegar entre as páginas da plataforma sem perceber atraso, para manter o foco nos estudos.
+
+- **História:** Como aluno, ao clicar em um item do menu, espero que a próxima página apareça quase instantaneamente.
+- **Critérios de aceite:**
+  - O tempo entre o clique e a renderização inicial da nova rota é menor que 200ms em conexões normais.
+  - Rotas frequentemente acessadas são pré-carregadas (prefetch) antes do clique.
+  - Não há "flash" de tela em branco ou loading prolongado em transições internas.
+- **Regras de negócio:**
+  - Prefetch deve respeitar permissões do usuário (não pré-carregar rotas sem acesso).
+
+### Módulo: Autenticação
+**Épico:** Como usuário, quero acessar a plataforma de forma segura e rápida.
+
+- **História:** Como usuário, quero fazer login e ser redirecionado ao dashboard sem demora perceptível.
+- **Critérios de aceite:**
+  - Login retorna JWT válido e redireciona ao dashboard.
+  - Erros de credenciais exibem mensagem clara sem expor detalhes sensíveis.
+- **Regras de negócio:**
+  - Tokens expirados acionam refresh automático antes de falhar a requisição.
+
+### Módulo: Dashboard
+**Épico:** Como aluno, quero visualizar meu progresso de forma resumida ao entrar na plataforma.
+
+- **História:** Como aluno, quero ver meu XP, streak e metas atuais no dashboard.
+- **Critérios de aceite:**
+  - Dashboard carrega dados de progresso em até 1s após hidratação.
+  - Dados são cacheados via React Query para evitar refetch a cada navegação.
+- **Regras de negócio:**
+  - Compradores do hub veem uma visão de dashboard distinta da de alunos.
+
+### Módulo: Chat IA
+**Épico:** Como aluno, quero conversar com a Tati para praticar inglês.
+
+- **História:** Como aluno, quero enviar mensagens e receber respostas da IA em tempo real.
+- **Critérios de aceite:**
+  - Conexão WebSocket estabelecida sem bloquear renderização da página.
+  - Respostas da IA aparecem via streaming, sem indicadores de digitação duplicados.
+- **Regras de negócio:**
+  - Respostas passam por `semantic_judge` antes de serem consideradas válidas para avaliação de progresso.
+
+### Módulo: CEFR
+**Épico:** Como aluno, quero saber meu nível de inglês atual.
+
+- **História:** Como aluno, quero realizar uma avaliação e receber meu nível CEFR.
+- **Critérios de aceite:**
+  - Avaliação gera exercícios adequados ao histórico do aluno.
+  - Resultado atualiza o nível do usuário e reflete no dashboard.
+- **Regras de negócio:**
+  - Reavaliações periódicas são agendadas via `cefr_scheduler`.
+
+### Módulo: Flashcards/Vocabulário
+**Épico:** Como aluno, quero revisar vocabulário de forma espaçada.
+
+- **História:** Como aluno, quero receber flashcards para revisão no momento ideal.
+- **Critérios de aceite:**
+  - Flashcards são exibidos conforme algoritmo de repetição espaçada (SRS).
+  - Progresso de revisão é salvo e reflete no XP.
+- **Regras de negócio:**
+  - Palavras não revisadas dentro do prazo retornam ao topo da fila.
+
+### Módulo: Gamificação
+**Épico:** Como aluno, quero ser recompensado por minha consistência.
+
+- **História:** Como aluno, quero ganhar XP, troféus e ver minha posição no ranking.
+- **Critérios de aceite:**
+  - XP é atualizado imediatamente após conclusão de atividades.
+  - Troféus são exibidos com notificação visual ao serem conquistados.
+- **Regras de negócio:**
+  - Rankings são recalculados periodicamente via task assíncrona.
+
+### Módulo: Podcasts
+**Épico:** Como aluno, quero praticar escuta com podcasts relevantes ao meu nível.
+
+- **História:** Como aluno, quero receber recomendações de podcasts e exercícios relacionados.
+- **Critérios de aceite:**
+  - Recomendações consideram nível CEFR e histórico de escuta.
+  - Exercícios são gerados a partir do conteúdo do podcast.
+- **Regras de negócio:**
+  - Conteúdo recomendado respeita faixa de dificuldade do usuário.
+
+### Módulo: Simulações
+**Épico:** Como aluno, quero praticar conversação realista com um avatar.
+
+- **História:** Como aluno, quero simular uma conversa e receber feedback de pronúncia.
+- **Critérios de aceite:**
+  - Simulação inicia sem atraso perceptível na troca de tela.
+  - Feedback de pronúncia é exibido após a fala do usuário.
+- **Regras de negócio:**
+  - Avaliação de pronúncia usa `pronunciation_matcher` e `pronunciation_challenge`.
+
+### Módulo: Pagamentos
+**Épico:** Como usuário, quero assinar planos ou comprar materiais de forma segura.
+
+- **História:** Como usuário, quero escolher um plano e concluir o pagamento via Asaas ou MercadoPago.
+- **Critérios de aceite:**
+  - Checkout reflete status do pagamento em tempo real (via webhook/WebSocket).
+  - Assinatura é ativada automaticamente após confirmação.
+- **Regras de negócio:**
+  - Falhas de pagamento disparam notificação ao usuário via `payment_notifier`.
+
+### Módulo: Hub de Materiais
+**Épico:** Como comprador ou aluno, quero acessar materiais educacionais relevantes.
+
+- **História:** Como usuário, quero navegar pelo catálogo, comprar e acessar meus materiais.
+- **Critérios de aceite:**
+  - Preços exibidos respeitam o papel do usuário (`resolvePrice`).
+  - Materiais comprados aparecem em "Meus Materiais" com acesso seguro.
+- **Regras de negócio:**
+  - Acesso a documentos é controlado por `secure_document_service`.
+
+### Módulo: Notificações
+**Épico:** Como aluno, quero ser notificado sobre meu progresso e prazos.
+
+- **História:** Como aluno, quero receber notificações push sobre metas e streaks em risco.
+- **Critérios de aceite:**
+  - Notificações são entregues conforme agendamento do `notification_scheduler`.
+  - Usuário pode configurar preferências de notificação.
+- **Regras de negócio:**
+  - Notificações duplicadas no mesmo dia são suprimidas pelo `notification_dispatcher`.
 
 ---
 
-#### Sprint 6: Expansão Futura (Roadmap Pós-Backend)
-**Status:** `[ ]` pendente
+## 11. Métricas de Sucesso
 
-- [ ] Avatares em vídeo / animações labiais sincronizadas.
-- [ ] Embutir Frontend/PWA em WebView para mobile.
-- [ ] Suporte offline via Service Workers.
+### Produto
+- **Retenção:** retenção D1, D7 e D30 de alunos ativos.
+- **Conversão:** taxa de conversão de free para premium e de visitantes do hub para compradores.
+- **Engajamento:** sessões por semana, tempo médio de sessão, número de atividades concluídas por sessão.
+
+### Performance
+- **TTFB** (Time to First Byte): meta < 200ms nas rotas SSR.
+- **FCP** (First Contentful Paint): meta < 1.5s.
+- **LCP** (Largest Contentful Paint): meta < 2.5s.
+- **CLS** (Cumulative Layout Shift): meta < 0.1.
+- **INP** (Interaction to Next Paint): meta < 200ms.
+- **Tempo de navegação entre páginas:** meta < 200ms percebido para rotas internas autenticadas.
+
+### Negócio
+- **MRR** (Monthly Recurring Revenue): acompanhamento mensal de receita recorrente.
+- **Churn:** taxa de cancelamento de assinaturas mensal.
+- **Receita:** receita total (assinaturas + vendas do hub) por período.
 
 ---
 
-### 6. Histórico de Progresso
+## 12. Riscos e Mitigações
 
-| Data | Item | Notas |
-|------|------|-------|
-| 2026-06-05 | Padronização CEFR (código) | Enum backend, hub-core/levels.ts, componentes frontend e hub-site atualizados |
-| 2026-06-05 | Sprint 1 – login/warmup/hub/exercises | Login leve, warmup isolado, hub sem Asaas síncrono, prompts em inglês |
-| 2026-06-05 | Migração DB CEFR | Script executado no Supabase (A1:15, A2:10, B1:8, C1:2) |
-| 2026-06-05 | Logo dashboard | `tati_logo.jpg` copiado para `frontend/public/images/` |
+### Técnicos
+- **Risco:** Otimizações de prefetch/cache introduzirem inconsistência de dados (dados desatualizados).
+  - **Mitigação:** Definir estratégias de invalidação de cache do React Query por contexto (ex. revalidar após mutações).
+- **Risco:** Migração de APScheduler para Celery introduzir falhas de agendamento.
+  - **Mitigação:** Testes de integração para tasks críticas e monitoramento de execução via Celery Beat.
+- **Risco:** Erros de build no monorepo (ex. resolução do `@tati/hub-core`, hostnames do Docker Compose vazando para SSR) recorrerem.
+  - **Mitigação:** Padronizar variáveis de ambiente por ambiente (dev/prod) e validar build do monorepo no CI antes do deploy.
+
+### Produto
+- **Risco:** Otimizações de performance não se traduzirem em aumento perceptível de retenção.
+  - **Mitigação:** Medir métricas de performance e engajamento antes/depois de cada sprint para validar impacto.
+
+### Escalabilidade
+- **Risco:** Aumento de usuários sobrecarregar workers Celery ou conexões com Supabase.
+  - **Mitigação:** Monitorar uso de Redis/Upstash e configurar autoscaling de workers conforme demanda.
+
+### Segurança
+- **Risco:** Exposição de documentos do hub para usuários sem permissão.
+  - **Mitigação:** Reforçar testes do `secure_document_service` e revisão de permissões por papel (`resolvePrice`, `usePermissions`).
+
+---
+
+## 13. Lista de Tarefas
+
+### Sprint 0 – Performance Frontend (Prioridade Máxima)
+
+**Objetivo:** Tornar a navegação entre páginas praticamente instantânea, eliminando os principais gargalos de carregamento, hidratação e re-renderização.
+
+- [X] **Diagnóstico de gargalos de navegação**
+  - [X] Mapear todas as rotas do `frontend` em `(authenticated)` e `(public)`, listando providers e layouts envolvidos em cada uma (escopo: `app/(authenticated)/layout.tsx`, `app/(public)/layout.tsx`). Critério de conclusão: planilha/documento com rota → layouts → providers carregados.
+  - [X] Medir tempo de navegação atual entre 5 rotas mais usadas (dashboard, chat, activities, flashcards, progress) usando Chrome DevTools Performance/Lighthouse. Critério de conclusão: tabela com TTFB, FCP, LCP e INP por rota antes da otimização.
+  - [X] Auditar app-providers.tsx para identificar providers que re-renderizam a árvore inteira em cada navegação (ex. `query-provider`, `auth-provider`, `theme-provider`, `i18n-provider`, `notification-provider`, `hydration-provider`). Critério de conclusão: lista de providers com indicação de quais re-renderizam no nível raiz vs. quais podem ser movidos para layouts específicos.
+  - [X] Analisar bundle size por rota com `next build` + `@next/bundle-analyzer`. Critério de conclusão: relatório identificando as 5 maiores dependências por bundle (ex. Recharts, Framer Motion, ReactMarkdown, react-icons remanescentes).
+  - [X] Verificar uso de `<Link>` do Next.js vs. `<a>`/`router.push` em componentes de menu (`Sidebar.tsx`, `Navbar.tsx`, `HubHeader.tsx`). Critério de conclusão: lista de componentes de navegação que não usam `<Link>` (e portanto não se beneficiam de prefetch automático).
+
+- [ ] **Prefetch de rotas**
+  - [X] Garantir que todos os itens de menu principais usem `<Link>` do Next.js (não `onClick` com `router.push` sem prefetch). Escopo: `Sidebar.tsx`, `Navbar.tsx`, `HubHeader.tsx`. Critério de conclusão: todos os itens de menu navegáveis renderizam como `<Link>`.
+  - [X] Habilitar prefetch explícito (`prefetch={true}`) para rotas críticas do dashboard, chat e atividades, e `prefetch="hover"`/condicional para rotas menos acessadas. Critério de conclusão: rotas críticas definidas e configuradas explicitamente.
+  - [X] Implementar prefetch de dados via React Query (`queryClient.prefetchQuery`) ao passar o mouse sobre itens de menu de alto tráfego (dashboard, chat, progress). Escopo: hooks em `hooks/` e `lib/api/page-prefetches.ts`. Critério de conclusão: hover em item de menu dispara prefetch de query correspondente, validado via React Query Devtools.
+  - [ ] Revisar `lib/api/ssr-prefetch.tsx` e `lib/api/prefetch-hydration.tsx` para garantir que dados prefetchados no servidor sejam corretamente hidratados no cliente sem refetch duplicado. Critério de conclusão: nenhuma query duplicada no Network tab ao navegar para rota com prefetch.
+
+- [ ] **Otimização de layouts (Server vs. Client Components)**
+  - [ ] Revisar `app/(authenticated)/layout.tsx` para garantir que seja um Server Component, movendo lógica client-side (hooks, estado) para componentes filhos menores. Critério de conclusão: layout autenticado sem diretiva `"use client"` no nível raiz.
+  - [ ] Identificar componentes de UI estática (headers, footers, ícones de marca) que podem ser Server Components e remover `"use client"` desnecessário. Escopo: `BrandMark.tsx`, partes estáticas de `Navbar.tsx`/`Sidebar.tsx`. Critério de conclusão: componentes estáticos convertidos, sem perda de funcionalidade.
+  - [ ] Avaliar `create-server-page.tsx` e `server-fetch.ts` para padronizar busca de dados em Server Components nas páginas mais acessadas (dashboard, progress). Critério de conclusão: páginas-alvo usando padrão server-fetch consistente, sem fetch duplicado no cliente.
+  - [X] Isolar providers pesados (ex. `notification-provider`, `theme-provider`) para que só sejam montados dentro do layout autenticado, não no layout raiz, evitando custo em rotas públicas. Critério de conclusão: rotas em `(public)` não carregam providers exclusivos de área logada.
+
+- [ ] **Redução de re-renderizações**
+  - [X] Auditar error-store.ts (Zustand) e outros stores globais para garantir seletores granulares (evitar `useStore()` sem seletor, que causa re-render em qualquer mudança de estado). Critério de conclusão: todos os consumos de store usam seletores específicos.
+  - [ ] Revisar componentes de layout (`Sidebar.tsx`, `Navbar.tsx`) para uso de `React.memo` em itens de menu que não dependem de estado de rota. Critério de conclusão: itens de menu memoizados, sem re-render ao navegar entre rotas-irmãs.
+  - [ ] Verificar hooks `useAuth`, `usePermissions`, `useTheme`, `useI18n` quanto a recriação de objetos/funções em cada render (uso de `useMemo`/`useCallback` quando necessário). Critério de conclusão: hooks revisados e otimizados onde aplicável, sem regressão funcional.
+
+- [ ] **Cache de dados com React Query**
+  - [X] Definir staleTime e cacheTime/gcTime padrão no query-provider.tsx adequados ao tipo de dado (ex. dados de perfil com `staleTime` maior, dados de chat com `staleTime` menor). Critério de conclusão: configuração documentada e aplicada no `QueryClient` global.
+  - [X] Padronizar chaves de query (`queryKey`) em `lib/api/endpoints.ts`/hooks para evitar refetch desnecessário ao navegar entre rotas que compartilham dados (ex. dashboard e progress usando o mesmo `userProgress`). Critério de conclusão: queries compartilhadas usam mesma `queryKey` e não disparam fetch duplicado.
+  - [ ] Implementar `placeholderData`/`keepPreviousData` em queries de listas (ex. flashcards, vocabulário, hub catálogo) para evitar tela de loading completa ao navegar entre páginas paginadas. Critério de conclusão: navegação entre páginas de listas não exibe estado de loading vazio quando há dados em cache.
+
+- [ ] **Otimização de WebSockets**
+  - [X] Revisar useChatSocket.ts e useVoiceSocket.ts para garantir que a conexão WebSocket não seja recriada a cada navegação entre páginas (ex. mover gerenciamento de socket para um provider de nível superior dentro da área autenticada). Critério de conclusão: socket mantém conexão única ao navegar entre páginas que não são de chat/voz.
+  - [ ] Garantir que componentes que não usam o socket de chat (ex. dashboard, flashcards) não inicializem `useChatSocket`/`useVoiceSocket` indevidamente. Critério de conclusão: hooks de socket só são instanciados em rotas relevantes (`chat`, `voice`, `voice-only`).
+
+- [ ] **Middleware**
+  - [X] Revisar middleware do Next.js (autenticação/redirecionamento) para garantir que não execute lógica custosa (ex. chamadas de API síncronas) em todas as rotas. Critério de conclusão: middleware realiza apenas verificação leve de token/cookie, sem chamadas bloqueantes à API.
+  - [ ] Garantir que rotas estáticas/públicas (ex. login, landing) sejam excluídas do matcher do middleware quando não necessitam verificação de autenticação. Critério de conclusão: `matcher` do middleware revisado e restrito às rotas que realmente precisam.
+
+- [ ] **Bundle size e lazy loading**
+  - [X] Aplicar next/dynamic com ssr: false para componentes pesados não essenciais ao primeiro render (gráficos do dashboard com Recharts, animações com Framer Motion). Critério de conclusão: componentes-alvo carregados via `dynamic()`, ausentes do bundle inicial (validado no bundle analyzer).
+  - [X] Substituir usos remanescentes de react-icons por `lucide-react` (caso existam fora do já otimizado). Critério de conclusão: nenhuma importação de `react-icons` no projeto.
+  - [X] Revisar ReactMarkdown no chat (`message-bubble.tsx`) para lazy load apenas quando a primeira mensagem com markdown for exibida. Critério de conclusão: `ReactMarkdown` carregado via import dinâmico, não presente no bundle inicial da rota de chat.
+
+- [ ] **Streaming e Suspense**
+  - [X] Adicionar loading.tsx (Next.js App Router) para as rotas mais acessadas (`dashboard`, `chat`, `activities`, `progress`) com skeletons leves. Critério de conclusão: cada rota-alvo possui `loading.tsx` com skeleton correspondente ao layout final.
+  - [ ] Envolver seções de dados não críticos (ex. gráficos de progresso, rankings) em `<Suspense>` com fallback leve, permitindo que o shell da página renderize antes dos dados pesados. Critério de conclusão: seções identificadas usam `Suspense` e não bloqueiam o LCP da página.
+
+- [ ] **Hidratação**
+  - [ ] Revisar `hydration-provider.tsx` para garantir que não bloqueie a renderização inicial enquanto aguarda dados não essenciais (ex. notificações, tema). Critério de conclusão: hidratação de dados não críticos ocorre após o primeiro paint, sem tela branca.
+  - [ ] Validar, via `next build` e logs do navegador, ausência de erros de hydration mismatch nas rotas otimizadas. Critério de conclusão: build e console sem warnings de hydration mismatch nas rotas-alvo do Sprint 0.
+
+- [ ] **Validação final do Sprint 0**
+  - [ ] Re-medir TTFB, FCP, LCP, CLS, INP e tempo de navegação percebido nas 5 rotas auditadas inicialmente, comparando com a baseline. Critério de conclusão: relatório comparativo antes/depois, com metas da seção 11 atingidas ou justificativa de gaps remanescentes.
+  - [ ] Documentar decisões arquiteturais tomadas (providers movidos, queries padronizadas, componentes convertidos para Server Components) em `readme.md` ou documento técnico interno. Critério de conclusão: documentação atualizada e revisada.
+
+---
+
+### Sprint 1 – Consolidação de Backend Assíncrono
+
+- [ ] **Migração completa para Celery**
+  - [ ] Concluir remoção de código residual do APScheduler em `main.py`, corrigindo erro de sintaxe pendente. Critério de conclusão: `main.py` sem referências a APScheduler, aplicação inicia sem erros.
+  - [ ] Migrar jobs agendados (CEFR scheduler, notification scheduler, keepalive) para `celery_app.py` com Celery Beat. Critério de conclusão: todas as tasks periódicas registradas no Beat schedule.
+  - [ ] Configurar Upstash Redis como broker e backend de resultados, validando conexão em ambiente de produção (Railway). Critério de conclusão: workers conectam ao Upstash sem erros em produção.
+
+- [ ] **Monitoramento de tasks**
+  - [ ] Adicionar endpoint administrativo (`admin/routes/tasks.py`) para visualizar status de tasks Celery (pendentes, executando, falhas). Critério de conclusão: painel admin exibe lista de tasks com status.
+
+### Sprint 2 – Correção de Build do Monorepo
+
+- [ ] **Resolução do pacote `@tati/hub-core`**
+  - [ ] Corrigir resolução de workspace no `package.json` raiz para que `apps/hub-site` e `frontend` resolvam `@tati/hub-core` corretamente no build do Vercel. Critério de conclusão: build do Vercel para ambos os frontends conclui sem erro de resolução de módulo.
+  - [ ] Adicionar/validar `tsconfig.json` paths e referências de projeto para `packages/hub-core`. Critério de conclusão: type-checking funciona em ambos os frontends sem erros de path.
+
+- [ ] **Correção de hostname do Docker Compose em SSR**
+  - [ ] Identificar todas as variáveis de ambiente usadas em `server-fetch.ts`/`ssr-prefetch.tsx` que apontam para hostnames internos do Docker Compose. Critério de conclusão: lista de variáveis afetadas documentada.
+  - [ ] Configurar variáveis de ambiente específicas por ambiente (local/Docker vs. Vercel) para que SSR em produção use URLs públicas da API (Railway), não hostnames internos. Critério de conclusão: SSR em produção realiza fetch bem-sucedido para a API pública.
+
+### Sprint 3 – Engajamento e Gamificação
+
+- [ ] **Expansão de gamificação**
+  - [ ] Adicionar novos tipos de desafios semanais configuráveis via admin. Critério de conclusão: admin pode criar/editar desafios semanais via painel.
+  - [ ] Implementar notificações de "streak em risco" via `notification_dispatcher`. Critério de conclusão: usuários com streak ativo recebem notificação antes da meia-noite caso não tenham estudado.
+
+### Sprint 4 – Expansão do Hub de Materiais
+
+- [ ] **Novos formatos de conteúdo**
+  - [ ] Suporte a materiais em vídeo no catálogo do hub. Critério de conclusão: catálogo exibe e reproduz itens de vídeo com controle de acesso.
+  - [ ] Relatórios de vendas por categoria de material no dashboard administrativo. Critério de conclusão: admin visualiza receita por categoria em período selecionável.

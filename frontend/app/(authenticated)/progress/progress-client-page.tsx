@@ -10,6 +10,12 @@ import { cn } from '@/lib/utils';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import { Button } from '@/components/ui/button';
 import toast from 'react-hot-toast';
+import dynamic from 'next/dynamic';
+
+const ActivityBarChart = dynamic(() => import('@/components/charts/activity-bar-chart'), {
+  ssr: false,
+  loading: () => <div className="h-[220px] w-full bg-bg-secondary rounded-2xl animate-pulse" />
+});
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,9 +77,6 @@ const LEVEL_COLORS: Record<string, string> = {
   C2: 'from-primary to-violet-400',
 };
 
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-
-
 // ─── Skeleton helpers ─────────────────────────────────────────────────────────
 
 function StatSkeleton() {
@@ -96,7 +99,7 @@ export default function ProgressClientPage() {
   const [isDownloading, setIsDownloading] = useState(false);
 
   const { data: xpData, isLoading: xpLoading } = useQuery<XpData>({
-    queryKey: ['progress-xp'],
+    queryKey: ['my-stats'],
     queryFn: () => apiGet<XpData>('/dashboard/stats/my'),
   });
   const { data: streakData, isLoading: streakLoading } = useQuery<StreakData>({
@@ -334,40 +337,7 @@ export default function ProgressClientPage() {
                   <div className="w-full h-full bg-bg-secondary rounded-2xl animate-pulse" />
                 </div>
               ) : chartData.length > 0 ? (
-                <div className="h-[220px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                      <XAxis
-                        dataKey="name"
-                        axisLine={false}
-                        tickLine={false}
-                        fontSize={11}
-                        tick={{ fill: 'var(--text-subtle)' }}
-                      />
-                      <YAxis
-                        axisLine={false}
-                        tickLine={false}
-                        fontSize={11}
-                        tick={{ fill: 'var(--text-subtle)' }}
-                      />
-                      <Tooltip
-                        cursor={{ fill: 'rgba(124, 58, 237, 0.08)' }}
-                        contentStyle={{
-                          background: 'var(--surface)',
-                          border: '1px solid var(--border)',
-                          borderRadius: '16px',
-                        }}
-                        formatter={(value: any) => [value, 'Messages']}
-                      />
-                      <Bar
-                        dataKey="messages"
-                        fill="#7c3aed"
-                        radius={[6, 6, 0, 0]}
-                        barSize={period === 'monthly' ? 40 : 28}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                <ActivityBarChart data={chartData} barSize={period === 'monthly' ? 40 : 28} />
               ) : (
                 <div className="h-[220px] flex items-center justify-center text-text-muted text-sm">
                   No data available for this period.

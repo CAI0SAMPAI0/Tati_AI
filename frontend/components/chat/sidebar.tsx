@@ -15,6 +15,7 @@ import {
   Brain,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { usePrefetch } from '@/hooks/usePrefetch';
 
 import { cn, isStaff, canAccessDashboard } from '@/lib/utils';
 import { levelLabel } from '@/lib/constants/levels';
@@ -45,6 +46,7 @@ export function Sidebar({
   
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { prefetch } = usePrefetch();
 
   // SRS Check
   const { data: dueVocab = [] } = useQuery<any[]>({
@@ -182,6 +184,8 @@ export function Sidebar({
           {showDashboard && (
             <Link
               href="/dashboard"
+              prefetch={true}
+              onMouseEnter={() => prefetch('dashboard')}
               className="p-2 rounded-lg border border-border text-text-muted hover:bg-primary/10 hover:text-primary hover:border-primary/50 transition-all"
               title="Dashboard"
             >
@@ -190,6 +194,7 @@ export function Sidebar({
           )}
           <Link
             href="/settings"
+            onMouseEnter={() => prefetch('settings')}
             className="p-2 rounded-lg border border-border text-text-muted hover:bg-primary/10 hover:text-primary hover:border-primary/50 transition-all"
             title="Settings"
           >
@@ -198,6 +203,8 @@ export function Sidebar({
           {showActivities && (
             <Link
               href="/activities"
+              prefetch={true}
+              onMouseEnter={() => prefetch('activities')}
               className="p-2 rounded-lg border border-border text-text-muted hover:bg-primary/10 hover:text-primary hover:border-primary/50 transition-all"
               title="My Activities"
             >

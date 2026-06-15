@@ -1,13 +1,11 @@
 import { cookies } from 'next/headers';
 import { AUTH_TOKEN_COOKIE } from './auth-cookie';
 
-const DEFAULT_REMOTE_API_BASE = 'https://tatiai-production.up.railway.app';
-
 function resolveServerApiBase(): string {
   if (process.env.INTERNAL_API_URL) {
     return process.env.INTERNAL_API_URL;
   }
-  return process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_REMOTE_API_BASE;
+  return process.env.NEXT_PUBLIC_API_BASE_URL || '';
 }
 
 export async function getServerAuthToken(): Promise<string | null> {
@@ -32,7 +30,7 @@ export async function serverFetch<T>(endpoint: string, auth = true): Promise<T |
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     const res = await fetch(`${base}${path}`, {
       headers,
