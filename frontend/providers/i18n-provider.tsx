@@ -6,6 +6,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  useMemo,
   type ReactNode,
 } from 'react';
 import { type Locale, DEFAULT_LOCALE } from '@/lib/i18n/config';
@@ -79,8 +80,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     [messages],
   );
 
+  const value = useMemo(() => ({ locale, t, setLanguage }), [locale, t, setLanguage]);
+
   return (
-    <I18nContext.Provider value={{ locale, t, setLanguage }}>
+    <I18nContext.Provider value={value}>
       {isLoaded ? children : null}
     </I18nContext.Provider>
   );

@@ -6,7 +6,6 @@
   "main": "backend/main.py",
   "workspaces": [
     "frontend",
-    "frontend_2",
     "apps/*",
     "packages/*"
   ],
@@ -15,8 +14,6 @@
     "dev": "python backend/main.py",
     "dev:frontend": "npm run dev --workspace frontend",
     "dev:frontend:clean": "npm run dev:clean --workspace frontend",
-    "dev:frontend2": "npm run dev --workspace tati-ai-frontend-2",
-    "build:frontend2": "npm run build --workspace tati-ai-frontend-2",
     "dev:hub": "npm run dev --workspace @tati/hub-site",
     "dev:hub:clean": "npm run dev:clean --workspace @tati/hub-site",
     "install-pwa": "node pwa/create-pwa-icons.js && echo 'PWA files created successfully!'",

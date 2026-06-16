@@ -7,8 +7,10 @@ import {
   useState,
   useCallback,
   useRef,
+  useMemo,
   type ReactNode,
 } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { User } from '@/lib/api/types';
 import { ApiClientError, apiGet, registerUnauthorizedHandler } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
@@ -56,6 +58,7 @@ const AuthContext = createContext<AuthState>({
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -79,6 +82,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const saveSession = useCallback(async (newToken: string, newUser: User) => {
     setIsBootstrappingProfile(true);
+    // Reiniciar o cache do React Query ao entrar/logar
+    queryClient.clear();
     // Persist token first so /profile can authenticate immediately.
     saveStoredSession({ token: newToken, user: normalizeUserAvatar(newUser) });
     try {
@@ -95,8 +100,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(newToken);
       setIsBootstrappingProfile(false);
       triggerPodcastWarmup();
+
+      // Prefetch da tela de chat do usuário ao entrar
+      queryClient.prefetchQuery({
+        queryKey: ['due-vocab'],
+        queryFn: () => apiGet('/users/vocabulary/due'),
+      });
+      queryClient.prefetchQuery({
+        queryKey: ['payments-status'],
+        queryFn: () => apiGet(ENDPOINTS.PAYMENTS_STATUS),
+      });
+      queryClient.prefetchQuery({
+        queryKey: ['conversations'],
+        queryFn: () => apiGet(ENDPOINTS.CONVERSATIONS),
+      });
     }
-  }, []);
+  }, [queryClient]);
 
   const updateProfile = useCallback((newUser: User) => {
     setUser(prev => prev ? { ...prev, ...newUser } : newUser);
@@ -106,8 +125,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearStoredSession();
     setToken(null);
     setUser(null);
+    // Reiniciar o cache do React Query no logout
+    queryClient.clear();
     window.location.href = '/login';
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     logoutRef.current = logout;
@@ -124,8 +145,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Reiniciar cache ao carregar o estado inicial do usuário (entrada no sistema)
+    queryClient.clear();
+
     setToken(session.token);
     setUser(normalizeUserAvatar(session.user));
+
+    // Prefetch da tela de chat do usuário ao entrar já logado
+    queryClient.prefetchQuery({
+      queryKey: ['due-vocab'],
+      queryFn: () => apiGet('/users/vocabulary/due'),
+    });
+    queryClient.prefetchQuery({
+      queryKey: ['payments-status'],
+      queryFn: () => apiGet(ENDPOINTS.PAYMENTS_STATUS),
+    });
+    queryClient.prefetchQuery({
+      queryKey: ['conversations'],
+      queryFn: () => apiGet(ENDPOINTS.CONVERSATIONS),
+    });
 
     // Valida sessão no backend para evitar estado quebrado após refresh de página.
     apiGet<User>(ENDPOINTS.PROFILE)
@@ -146,7 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoaded(true);
         triggerPodcastWarmup();
       });
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     registerUnauthorizedHandler(() => {
@@ -173,19 +211,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const value = useMemo(() => ({
+    token,
+    user,
+    isLoaded,
+    isBootstrappingProfile,
+    saveSession,
+    updateProfile,
+    refreshUser,
+    logout,
+  }), [
+    token,
+    user,
+    isLoaded,
+    isBootstrappingProfile,
+    saveSession,
+    updateProfile,
+    refreshUser,
+    logout,
+  ]);
+
   return (
-    <AuthContext.Provider
-      value={{
-        token,
-        user,
-        isLoaded,
-        isBootstrappingProfile,
-        saveSession,
-        updateProfile,
-        refreshUser,
-        logout,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

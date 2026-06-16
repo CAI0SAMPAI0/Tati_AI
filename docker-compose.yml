@@ -18,32 +18,4 @@ services:
       retries: 3
       start_period: 40s
 
-  # ─── Frontend Tati AI (Next.js) ────────────────────────────────────────────
-  frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-      args:
-        NEXT_PUBLIC_API_BASE_URL: "http://localhost:8080"
-    ports:
-      - "3000:3000"
-    depends_on:
-      backend:
-        condition: service_healthy
-    restart: unless-stopped
 
-  # ─── Hub Site (Next.js) ────────────────────────────────────────────────────
-  hub:
-    build:
-      context: .
-      dockerfile: apps/hub-site/Dockerfile
-      args:
-        NEXT_PUBLIC_API_BASE_URL: "http://localhost:8080"
-    ports:
-      - "3001:3001"
-    environment:
-      NEXT_PUBLIC_API_BASE_URL: "http://localhost:8080"
-    depends_on:
-      backend:
-        condition: service_healthy
-    restart: unless-stopped

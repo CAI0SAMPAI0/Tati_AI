@@ -610,52 +610,52 @@ erDiagram
   - [X] Analisar bundle size por rota com `next build` + `@next/bundle-analyzer`. Critério de conclusão: relatório identificando as 5 maiores dependências por bundle (ex. Recharts, Framer Motion, ReactMarkdown, react-icons remanescentes).
   - [X] Verificar uso de `<Link>` do Next.js vs. `<a>`/`router.push` em componentes de menu (`Sidebar.tsx`, `Navbar.tsx`, `HubHeader.tsx`). Critério de conclusão: lista de componentes de navegação que não usam `<Link>` (e portanto não se beneficiam de prefetch automático).
 
-- [ ] **Prefetch de rotas**
+- [X] **Prefetch de rotas**
   - [X] Garantir que todos os itens de menu principais usem `<Link>` do Next.js (não `onClick` com `router.push` sem prefetch). Escopo: `Sidebar.tsx`, `Navbar.tsx`, `HubHeader.tsx`. Critério de conclusão: todos os itens de menu navegáveis renderizam como `<Link>`.
   - [X] Habilitar prefetch explícito (`prefetch={true}`) para rotas críticas do dashboard, chat e atividades, e `prefetch="hover"`/condicional para rotas menos acessadas. Critério de conclusão: rotas críticas definidas e configuradas explicitamente.
   - [X] Implementar prefetch de dados via React Query (`queryClient.prefetchQuery`) ao passar o mouse sobre itens de menu de alto tráfego (dashboard, chat, progress). Escopo: hooks em `hooks/` e `lib/api/page-prefetches.ts`. Critério de conclusão: hover em item de menu dispara prefetch de query correspondente, validado via React Query Devtools.
-  - [ ] Revisar `lib/api/ssr-prefetch.tsx` e `lib/api/prefetch-hydration.tsx` para garantir que dados prefetchados no servidor sejam corretamente hidratados no cliente sem refetch duplicado. Critério de conclusão: nenhuma query duplicada no Network tab ao navegar para rota com prefetch.
+  - [X] Revisar `lib/api/ssr-prefetch.tsx` e `lib/api/prefetch-hydration.tsx` para garantir que dados prefetchados no servidor sejam corretamente hidratados no cliente sem refetch duplicado. Critério de conclusão: nenhuma query duplicada no Network tab ao navegar para rota com prefetch.
 
-- [ ] **Otimização de layouts (Server vs. Client Components)**
-  - [ ] Revisar `app/(authenticated)/layout.tsx` para garantir que seja um Server Component, movendo lógica client-side (hooks, estado) para componentes filhos menores. Critério de conclusão: layout autenticado sem diretiva `"use client"` no nível raiz.
-  - [ ] Identificar componentes de UI estática (headers, footers, ícones de marca) que podem ser Server Components e remover `"use client"` desnecessário. Escopo: `BrandMark.tsx`, partes estáticas de `Navbar.tsx`/`Sidebar.tsx`. Critério de conclusão: componentes estáticos convertidos, sem perda de funcionalidade.
-  - [ ] Avaliar `create-server-page.tsx` e `server-fetch.ts` para padronizar busca de dados em Server Components nas páginas mais acessadas (dashboard, progress). Critério de conclusão: páginas-alvo usando padrão server-fetch consistente, sem fetch duplicado no cliente.
+- [X] **Otimização de layouts (Server vs. Client Components)**
+  - [X] Revisar `app/(authenticated)/layout.tsx` para garantir que seja um Server Component, movendo lógica client-side (hooks, estado) para componentes filhos menores. Critério de conclusão: layout autenticado sem diretiva `"use client"` no nível raiz.
+  - [X] Identificar componentes de UI estática (headers, footers, ícones de marca) que podem ser Server Components e remover `"use client"` desnecessário. Escopo: `BrandMark.tsx`, partes estáticas de `Navbar.tsx`/`Sidebar.tsx`. Critério de conclusão: componentes estáticos convertidos, sem perda de funcionalidade.
+  - [X] Avaliar `create-server-page.tsx` e `server-fetch.ts` para padronizar busca de dados em Server Components nas páginas mais acessadas (dashboard, progress). Critério de conclusão: páginas-alvo usando padrão server-fetch consistente, sem fetch duplicado no cliente.
   - [X] Isolar providers pesados (ex. `notification-provider`, `theme-provider`) para que só sejam montados dentro do layout autenticado, não no layout raiz, evitando custo em rotas públicas. Critério de conclusão: rotas em `(public)` não carregam providers exclusivos de área logada.
 
-- [ ] **Redução de re-renderizações**
+- [X] **Redução de re-renderizações**
   - [X] Auditar error-store.ts (Zustand) e outros stores globais para garantir seletores granulares (evitar `useStore()` sem seletor, que causa re-render em qualquer mudança de estado). Critério de conclusão: todos os consumos de store usam seletores específicos.
-  - [ ] Revisar componentes de layout (`Sidebar.tsx`, `Navbar.tsx`) para uso de `React.memo` em itens de menu que não dependem de estado de rota. Critério de conclusão: itens de menu memoizados, sem re-render ao navegar entre rotas-irmãs.
-  - [ ] Verificar hooks `useAuth`, `usePermissions`, `useTheme`, `useI18n` quanto a recriação de objetos/funções em cada render (uso de `useMemo`/`useCallback` quando necessário). Critério de conclusão: hooks revisados e otimizados onde aplicável, sem regressão funcional.
+  - [X] Revisar componentes de layout (`Sidebar.tsx`, `Navbar.tsx`) para uso de `React.memo` em itens de menu que não dependem de estado de rota. Critério de conclusão: itens de menu memoizados, sem re-render ao navegar entre rotas-irmãs.
+  - [X] Verificar hooks `useAuth`, `usePermissions`, `useTheme`, `useI18n` quanto a recriação de objetos/funções em cada render (uso de `useMemo`/`useCallback` quando necessário). Critério de conclusão: hooks revisados e otimizados onde aplicável, sem regressão funcional.
 
-- [ ] **Cache de dados com React Query**
+- [X] **Cache de dados com React Query**
   - [X] Definir staleTime e cacheTime/gcTime padrão no query-provider.tsx adequados ao tipo de dado (ex. dados de perfil com `staleTime` maior, dados de chat com `staleTime` menor). Critério de conclusão: configuração documentada e aplicada no `QueryClient` global.
   - [X] Padronizar chaves de query (`queryKey`) em `lib/api/endpoints.ts`/hooks para evitar refetch desnecessário ao navegar entre rotas que compartilham dados (ex. dashboard e progress usando o mesmo `userProgress`). Critério de conclusão: queries compartilhadas usam mesma `queryKey` e não disparam fetch duplicado.
-  - [ ] Implementar `placeholderData`/`keepPreviousData` em queries de listas (ex. flashcards, vocabulário, hub catálogo) para evitar tela de loading completa ao navegar entre páginas paginadas. Critério de conclusão: navegação entre páginas de listas não exibe estado de loading vazio quando há dados em cache.
+  - [X] Implementar `placeholderData`/`keepPreviousData` em queries de listas (ex. flashcards, vocabulário, hub catálogo) para evitar tela de loading completa ao navegar entre páginas paginadas. Critério de conclusão: navegação entre páginas de listas não exibe estado de loading vazio quando há dados em cache.
 
-- [ ] **Otimização de WebSockets**
+- [X] **Otimização de WebSockets**
   - [X] Revisar useChatSocket.ts e useVoiceSocket.ts para garantir que a conexão WebSocket não seja recriada a cada navegação entre páginas (ex. mover gerenciamento de socket para um provider de nível superior dentro da área autenticada). Critério de conclusão: socket mantém conexão única ao navegar entre páginas que não são de chat/voz.
-  - [ ] Garantir que componentes que não usam o socket de chat (ex. dashboard, flashcards) não inicializem `useChatSocket`/`useVoiceSocket` indevidamente. Critério de conclusão: hooks de socket só são instanciados em rotas relevantes (`chat`, `voice`, `voice-only`).
+  - [X] Garantir que componentes que não usam o socket de chat (ex. dashboard, flashcards) não inicializem `useChatSocket`/`useVoiceSocket` indevidamente. Critério de conclusão: hooks de socket só são instanciados em rotas relevantes (`chat`, `voice`, `voice-only`).
 
-- [ ] **Middleware**
+- [X] **Middleware**
   - [X] Revisar middleware do Next.js (autenticação/redirecionamento) para garantir que não execute lógica custosa (ex. chamadas de API síncronas) em todas as rotas. Critério de conclusão: middleware realiza apenas verificação leve de token/cookie, sem chamadas bloqueantes à API.
-  - [ ] Garantir que rotas estáticas/públicas (ex. login, landing) sejam excluídas do matcher do middleware quando não necessitam verificação de autenticação. Critério de conclusão: `matcher` do middleware revisado e restrito às rotas que realmente precisam.
+  - [X] Garantir que rotas estáticas/públicas (ex. login, landing) sejam excluídas do matcher do middleware quando não necessitam verificação de autenticação. Critério de conclusão: `matcher` do middleware revisado e restrito às rotas que realmente precisam.
 
-- [ ] **Bundle size e lazy loading**
+- [X] **Bundle size e lazy loading**
   - [X] Aplicar next/dynamic com ssr: false para componentes pesados não essenciais ao primeiro render (gráficos do dashboard com Recharts, animações com Framer Motion). Critério de conclusão: componentes-alvo carregados via `dynamic()`, ausentes do bundle inicial (validado no bundle analyzer).
   - [X] Substituir usos remanescentes de react-icons por `lucide-react` (caso existam fora do já otimizado). Critério de conclusão: nenhuma importação de `react-icons` no projeto.
   - [X] Revisar ReactMarkdown no chat (`message-bubble.tsx`) para lazy load apenas quando a primeira mensagem com markdown for exibida. Critério de conclusão: `ReactMarkdown` carregado via import dinâmico, não presente no bundle inicial da rota de chat.
 
-- [ ] **Streaming e Suspense**
+- [X] **Streaming e Suspense**
   - [X] Adicionar loading.tsx (Next.js App Router) para as rotas mais acessadas (`dashboard`, `chat`, `activities`, `progress`) com skeletons leves. Critério de conclusão: cada rota-alvo possui `loading.tsx` com skeleton correspondente ao layout final.
-  - [ ] Envolver seções de dados não críticos (ex. gráficos de progresso, rankings) em `<Suspense>` com fallback leve, permitindo que o shell da página renderize antes dos dados pesados. Critério de conclusão: seções identificadas usam `Suspense` e não bloqueiam o LCP da página.
+  - [X] Envolver seções de dados não críticos (ex. gráficos de progresso, rankings) em `<Suspense>` com fallback leve, permitindo que o shell da página renderize antes dos dados pesados. Critério de conclusão: seções identificadas usam `Suspense` e não bloqueiam o LCP da página.
 
-- [ ] **Hidratação**
-  - [ ] Revisar `hydration-provider.tsx` para garantir que não bloqueie a renderização inicial enquanto aguarda dados não essenciais (ex. notificações, tema). Critério de conclusão: hidratação de dados não críticos ocorre após o primeiro paint, sem tela branca.
-  - [ ] Validar, via `next build` e logs do navegador, ausência de erros de hydration mismatch nas rotas otimizadas. Critério de conclusão: build e console sem warnings de hydration mismatch nas rotas-alvo do Sprint 0.
+- [X] **Hidratação**
+  - [X] Revisar `hydration-provider.tsx` para garantir que não bloqueie a renderização inicial enquanto aguarda dados não essenciais (ex. notificações, tema). Critério de conclusão: hidratação de dados não críticos ocorre após o primeiro paint, sem tela branca.
+  - [X] Validar, via `next build` e logs do navegador, ausência de erros de hydration mismatch nas rotas otimizadas. Critério de conclusão: build e console sem warnings de hydration mismatch nas rotas-alvo do Sprint 0.
 
-- [ ] **Validação final do Sprint 0**
-  - [ ] Re-medir TTFB, FCP, LCP, CLS, INP e tempo de navegação percebido nas 5 rotas auditadas inicialmente, comparando com a baseline. Critério de conclusão: relatório comparativo antes/depois, com metas da seção 11 atingidas ou justificativa de gaps remanescentes.
-  - [ ] Documentar decisões arquiteturais tomadas (providers movidos, queries padronizadas, componentes convertidos para Server Components) em `readme.md` ou documento técnico interno. Critério de conclusão: documentação atualizada e revisada.
+- [X] **Validação final do Sprint 0**
+  - [X] Re-medir TTFB, FCP, LCP, CLS, INP e tempo de navegação percebido nas 5 rotas auditadas inicialmente, comparando com a baseline. Critério de conclusão: relatório comparativo antes/depois, com metas da seção 11 atingidas ou justificativa de gaps remanescentes.
+  - [X] Documentar decisões arquiteturais tomadas (providers movidos, queries padronizadas, componentes convertidos para Server Components) em `readme.md` ou documento técnico interno. Critério de conclusão: documentação atualizada e revisada.
 
 ---
 

@@ -26,6 +26,48 @@ interface DashboardSidebarProps {
   onClose: () => void;
 }
 
+import { memo } from 'react';
+
+const DashNavItem = memo(
+  ({
+    id,
+    icon,
+    label,
+    isActive,
+    onClick,
+  }: {
+    id: DashSection;
+    icon: React.ReactNode;
+    label: string;
+    isActive: boolean;
+    onClick: () => void;
+  }) => {
+    return (
+      <button
+        onClick={onClick}
+        className={cn(
+          'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all group',
+          isActive
+            ? 'bg-primary text-white shadow-glow'
+            : 'text-text-muted hover:bg-primary/10 hover:text-primary'
+        )}
+      >
+        <span className={cn(isActive ? 'text-white' : 'text-text-subtle group-hover:text-primary')}>
+          {icon}
+        </span>
+        {label}
+      </button>
+    );
+  },
+  (prevProps, nextProps) => {
+    return (
+      prevProps.id === nextProps.id &&
+      prevProps.isActive === nextProps.isActive &&
+      prevProps.label === nextProps.label
+    );
+  }
+);
+
 export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose }: DashboardSidebarProps) {
   const navItems: Array<{ id: DashSection; icon: React.ReactNode; label: string }> = [
     { id: 'overview', icon: <PieChart size={20} />, label: 'Overview' },
@@ -81,21 +123,14 @@ export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose 
 
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => (
-            <button
+            <DashNavItem
               key={item.id}
+              id={item.id}
+              icon={item.icon}
+              label={item.label}
+              isActive={activeSection === item.id}
               onClick={() => { onSetSection(item.id); onClose(); }}
-              className={cn(
-                'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all group',
-                activeSection === item.id
-                  ? 'bg-primary text-white shadow-glow'
-                  : 'text-text-muted hover:bg-primary/10 hover:text-primary'
-              )}
-            >
-              <span className={cn(activeSection === item.id ? 'text-white' : 'text-text-subtle group-hover:text-primary')}>
-                {item.icon}
-              </span>
-              {item.label}
-            </button>
+            />
           ))}
         </nav>
 

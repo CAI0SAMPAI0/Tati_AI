@@ -49,7 +49,7 @@ export async function prefetchQueries(items: PrefetchItem[]): Promise<Dehydrated
   return dehydrate(queryClient);
 }
 
-import HydrationProvider from '@/providers/hydration-provider';
+import HydrationProvider from './prefetch-hydration';
 
 export function PrefetchHydration({
   state,

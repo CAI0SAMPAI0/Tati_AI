@@ -14,6 +14,53 @@ interface SidebarActivitiesProps {
   onClose: () => void;
 }
 
+import { memo } from 'react';
+
+const NavItem = memo(
+  ({
+    href,
+    icon,
+    label,
+    isActive,
+    onMouseEnter,
+    onClick,
+  }: {
+    href: string;
+    icon: React.ReactNode;
+    label: string;
+    isActive: boolean;
+    onMouseEnter: () => void;
+    onClick: () => void;
+  }) => {
+    return (
+      <Link
+        href={href}
+        prefetch={true}
+        onMouseEnter={onMouseEnter}
+        onClick={onClick}
+        className={cn(
+          'flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all group',
+          isActive
+            ? 'bg-primary text-white shadow-glow'
+            : 'text-text-muted hover:bg-primary/10 hover:text-primary'
+        )}
+      >
+        <span className={cn(isActive ? 'text-white' : 'text-text-subtle group-hover:text-primary')}>
+          {icon}
+        </span>
+        {label}
+      </Link>
+    );
+  },
+  (prevProps, nextProps) => {
+    return (
+      prevProps.href === nextProps.href &&
+      prevProps.isActive === nextProps.isActive &&
+      prevProps.label === nextProps.label
+    );
+  }
+);
+
 export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
   
   const pathname = usePathname();
@@ -64,27 +111,18 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
 
         <nav className="flex-1 px-4 space-y-1">
           {navItems.map((item) => (
-            <Link
+            <NavItem
               key={item.href}
               href={item.href}
-              prefetch={true}
+              icon={item.icon}
+              label={item.label}
+              isActive={pathname === item.href}
               onMouseEnter={() => {
                 const route = item.href === '/activities/hub' ? 'hub-catalog' : item.href.replace('/', '');
                 prefetch(route || 'chat');
               }}
               onClick={onClose}
-              className={cn(
-                'flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all group',
-                pathname === item.href
-                  ? 'bg-primary text-white shadow-glow'
-                  : 'text-text-muted hover:bg-primary/10 hover:text-primary'
-              )}
-            >
-              <span className={cn(pathname === item.href ? 'text-white' : 'text-text-subtle group-hover:text-primary')}>
-                {item.icon}
-              </span>
-              {item.label}
-            </Link>
+            />
           ))}
         </nav>
 
