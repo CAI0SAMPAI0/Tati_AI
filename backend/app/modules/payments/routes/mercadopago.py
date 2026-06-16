@@ -1,6 +1,8 @@
 import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, WebSocket, WebSocketDisconnect
+import json
+
 from app.core.database import get_client
 from app.modules.payments.services.mercadopago import MercadoPago
 from app.modules.payments.services.payment_notifier import payment_notifier
@@ -250,3 +252,39 @@ async def sandbox_simulate_approve(payment_id: str):
 
     _mp_log(f"[SimulateApprove] Pagamento {payment_id} aprovado manualmente para {username} - {content_id}")
     return {'ok': True, 'payment_id': payment_id, 'username': username, 'content_id': content_id, 'status': 'confirmed'}
+
+
+@router.websocket('/ws')
+async def payments_ws(
+    websocket: WebSocket,
+    token: str | None = Query(None),
+):
+    """
+    WebSocket para escutar atualizações de status de pagamento em tempo real.
+    """
+    from app.core.security import decode_token
+    from fastapi import Query
+    
+    payload = decode_token(token) if token else None
+    if not payload:
+        await websocket.close(code=4001, reason='Token inválido')
+        return
+
+    username = payload['sub']
+    await payment_notifier.connect(websocket, username)
+    try:
+        while True:
+            raw = await websocket.receive_text()
+            try:
+                data = json.loads(raw)
+                if data.get('type') == 'ping':
+                    await websocket.send_json({'type': 'pong'})
+            except Exception:
+                pass
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        payment_notifier.disconnect(websocket, username)
+
