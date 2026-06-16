@@ -17,7 +17,7 @@ COPY frontend ./frontend
 COPY backend/assets/images/tati_logo.jpg ./frontend/public/images/tati_logo.jpg
 
 # Variáveis de build
-ARG NEXT_PUBLIC_API_BASE_URL=https://tatiai-production.up.railway.app
+ARG NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 
 # Build

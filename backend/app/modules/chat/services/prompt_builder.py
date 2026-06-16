@@ -91,7 +91,7 @@ def build_profile_instruction(profile: UserProfile) -> str:
         f'English Level: {lvl}\n'
         f'Main Focus: {profile.focus}\n\n'
         f'{level_rule}\n'
-        f'- Always address the student by their Real Name ({profile.name}) occasionally to make it personal.\n'
+        f'- Do NOT mention the student\'s name ({profile.name}) after the initial greeting/first message of the conversation. Never repeat their name in subsequent messages.\n'
         f"- Always align examples with the student's Main Focus."
     )
 

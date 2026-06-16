@@ -45,5 +45,7 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Precisamos de acesso ao microfone para você poder praticar a fala e conversação em inglês com a professora Tati.</string>
 </dict>
 </plist>

@@ -42,7 +42,7 @@ class Settings(BaseSettings):
         "{\n"
         '  "reply": "Your conversational or instructional response to the student.",\n'
         '  "correction": "A small correction if needed, or null if no correction is necessary.",\n'
-        '  "drill": "A pronunciation drill phrase if needed, or null.",\n'
+        '  "drill": null,\n'
         '  "report": "Pedagogical report content if requested, or null."\n'
         "}\n\n"
 
@@ -117,9 +117,7 @@ class Settings(BaseSettings):
         "- If no correction is necessary, return null.\n\n"
 
         "2. PRONUNCIATION DRILLS:\n"
-        "- Only populate the 'drill' field if there is a clear pronunciation issue.\n"
-        "- Use a short phrase targeting the specific sound.\n"
-        "- If no drill is needed, return null.\n\n"
+        "- Pronunciation drills are disabled. The 'drill' field must always be null.\n\n"
 
         "3. AUDIO GENERATION:\n"
         "- Generate audio only for the main teacher response.\n"

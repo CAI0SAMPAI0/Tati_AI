@@ -26,10 +26,17 @@ const nextConfig = {
   images: {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'tatiai-production.up.railway.app',
-      },
+      ...(process.env.NEXT_PUBLIC_API_BASE_URL ? (() => {
+        try {
+          const url = new URL(process.env.NEXT_PUBLIC_API_BASE_URL);
+          return [{
+            protocol: url.protocol.replace(':', ''),
+            hostname: url.hostname,
+          }];
+        } catch {
+          return [];
+        }
+      })() : []),
       {
         protocol: 'https',
         hostname: 'res.cloudinary.com',

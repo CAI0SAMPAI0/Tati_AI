@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tati-static-v2';
+const CACHE_NAME = 'tati-static-v3';
 const STATIC_ASSETS = ['/', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
 
 self.addEventListener('install', (event) => {

@@ -31,11 +31,11 @@ interface RequestOptions extends Omit<RequestInit, 'headers'> {
   _retried?: boolean;
 }
 
-const DEFAULT_REMOTE_API_BASE = 'https://tatiai-production.up.railway.app';
-const DEFAULT_REMOTE_WS_BASE = 'wss://tatiai-production.up.railway.app';
 const REFRESH_PATH = process.env.NEXT_PUBLIC_AUTH_REFRESH_PATH;
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_REMOTE_API_BASE;
-export const WS_BASE = process.env.NEXT_PUBLIC_WS_BASE_URL ?? DEFAULT_REMOTE_WS_BASE;
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
+export const WS_BASE = process.env.NEXT_PUBLIC_WS_BASE_URL ?? (
+  API_BASE ? API_BASE.replace(/^http/, 'ws') : ''
+);
 
 let onUnauthorized: (() => void) | null = null;
 
