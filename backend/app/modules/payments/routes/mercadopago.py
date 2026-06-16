@@ -55,11 +55,28 @@ async def mercadopago_webhook(request: Request):
         
         # Consulta os detalhes do pagamento no Mercado Pago usando nossa chave secreta
         mp = MercadoPago()
-        payment_details = await mp.get_payment(payment_id)
         
+        # Tenta buscar o pagamento, com até 3 retentativas e delay caso dê 404 (delay de propagação do MP)
+        payment_details = None
+        import asyncio
+        for attempt in range(3):
+            try:
+                payment_details = await mp.get_payment(payment_id)
+                break
+            except Exception as e:
+                if "404" in str(e) and attempt < 2:
+                    _mp_log(f"Payment {payment_id} not found (404) on attempt {attempt + 1}. Retrying in 1.5s...")
+                    await asyncio.sleep(1.5)
+                else:
+                    raise e
+                    
+        if not payment_details:
+            raise RuntimeError(f"Could not retrieve payment details for {payment_id}")
+            
         ext_ref = payment_details.get('external_reference')
         status = payment_details.get('status')
         _mp_log(f"Payment details: id={payment_id}, ext_ref={ext_ref}, status={status}")
+
         
         if not ext_ref:
             _mp_log(f"Payment {payment_id} does not have external_reference. Ignored.")
