@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, Request, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Request, HTTPException, WebSocket, WebSocketDisconnect, Query
 import json
 
 from app.core.database import get_client
@@ -263,7 +263,6 @@ async def payments_ws(
     WebSocket para escutar atualizações de status de pagamento em tempo real.
     """
     from app.core.security import decode_token
-    from fastapi import Query
     
     payload = decode_token(token) if token else None
     if not payload:
