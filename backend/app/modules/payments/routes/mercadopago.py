@@ -23,6 +23,19 @@ async def mercadopago_webhook(request: Request):
         body = await request.json()
         _mp_log(f"Webhook received: {body}")
         
+        # Encaminha o webhook para outro servidor se configurado (ex: do Railway para o Render)
+        import os
+        import httpx
+        forward_url = os.getenv("FORWARD_WEBHOOK_URL")
+        if forward_url:
+            _mp_log(f"Forwarding webhook to: {forward_url}")
+            try:
+                async with httpx.AsyncClient() as client:
+                    await client.post(forward_url, json=body, timeout=5.0)
+            except Exception as forward_err:
+                _mp_log(f"Error forwarding webhook: {forward_err}")
+
+        
         # O Mercado Pago pode mandar notificações com campos diferentes dependendo do evento.
         event_type = body.get('type')
         payment_id = body.get('data', {}).get('id')
