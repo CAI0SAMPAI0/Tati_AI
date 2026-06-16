@@ -4,7 +4,6 @@ import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Força o carregamento do .env da raiz do projeto ANTES de qualquer outro import
 env_path = Path(__file__).parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
@@ -19,7 +18,6 @@ from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
 
-# Sentry — Inicialização crítica para captura de exceções
 
 try:
     init_sentry()
@@ -28,8 +26,7 @@ except Exception as e:
 
 import os
 
-# Desativa docs em produção — gerar o schema OpenAPI de 100+ rotas
-# adiciona ~2s desnecessários em cada cold start
+
 is_local = os.getenv('VERCEL') is None
 _docs_url = '/docs' if (settings.debug or is_local) else None
 _redoc_url = '/redoc' if (settings.debug or is_local) else None
@@ -43,7 +40,6 @@ logging.basicConfig(
 
 print = logging.info
 
-#  App
 
 app = FastAPI(
     title='Teacher Tati AI',
@@ -52,8 +48,6 @@ app = FastAPI(
     docs_url=_docs_url,
     redoc_url=_redoc_url)
 
-
-#  Middlewares
 
 
 class ForceHTTPSMiddleware(BaseHTTPMiddleware):
@@ -70,8 +64,6 @@ class ForceHTTPSMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(ForceHTTPSMiddleware)
 
-# GZip — comprimindo respostas > 500 bytes (melhora ~60% em payloads
-# JSON)
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
 app.add_middleware(
@@ -98,25 +90,13 @@ app.add_middleware(
     allow_origin_regex=r'http://(localhost|127\.0\.0\.1|192\.168\.1\.3):[0-9]+',
 )
 
-
-# Rate Limiting (Upstash Redis)
-
 setup_rate_limiting(app)
 
-
-#  Routers (registro centralizado)
-
-
 register_all_routers(app)
-
 
 #  Startup Events
 @app.on_event('startup')
 async def startup_event() -> None:
-    import asyncio
-
-    # 1. Aquece a conexão com o banco imediatamente — resolve o cold start
-    #    da primeira tela aberta após o deploy
     async def _warmup():
         try:
             from app.core.database import get_client
@@ -133,7 +113,6 @@ async def startup_event() -> None:
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Captura qualquer erro não tratado e loga o traceback completo."""
-    # Sempre logamos no console/servidor
     logging.info(
         f"❌ [ERROR] {
             request.method} {
@@ -141,8 +120,6 @@ async def global_exception_handler(request: Request, exc: Exception):
                 type(exc).__name__}: {
                     str(exc)}")
 
-    # Em produção, escondemos o erro detalhado do usuário para evitar
-    # vazamento de dados
     error_detail = str(
         exc) if settings.debug else "Ocorreu um erro interno. Por favor, tente novamente mais tarde."
 
@@ -154,8 +131,7 @@ async def global_exception_handler(request: Request, exc: Exception):
             "path": request.url.path
         }
     )
-    # Adiciona cabeçalhos CORS manualmente para que o erro seja visível
-    # no frontend
+
     origin = request.headers.get(
         "Origin") or request.headers.get("origin")
     if origin:
