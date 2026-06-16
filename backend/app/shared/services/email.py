@@ -10,6 +10,16 @@ from email.mime.application import MIMEApplication
 
 from app.core.config import settings
 
+resend = None
+if getattr(settings, "resend_api_key", ""):
+    try:
+        import resend
+        resend.api_key = settings.resend_api_key
+    except Exception as e:
+        logging.info(f"[EmailSender] Failed to import real resend: {e}")
+        resend = None
+
+
 
 class EmailSender:
     def __init__(self) -> None:
@@ -421,4 +431,6 @@ class _ResendShim:
             return {"id": "stub"}
 
 
-resend = _ResendShim
+if resend is None:
+    resend = _ResendShim
+

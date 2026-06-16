@@ -683,7 +683,7 @@ erDiagram
 
 - [ ] **Expansão de gamificação**
   - [ ] Adicionar novos tipos de desafios semanais configuráveis via admin. Critério de conclusão: admin pode criar/editar desafios semanais via painel.
-  - [ ] Implementar notificações de "streak em risco" via `notification_dispatcher`. Critério de conclusão: usuários com streak ativo recebem notificação antes da meia-noite caso não tenham estudado.
+  - [X] Implementar notificações de "streak em risco" via `notification_dispatcher`. Critério de conclusão: usuários com streak ativo recebem notificação antes da meia-noite caso não tenham estudado.
 
 ### Sprint 4 – Expansão do Hub de Materiais
 

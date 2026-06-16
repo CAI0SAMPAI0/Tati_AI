@@ -26,10 +26,13 @@ try:
 except Exception as e:
     logging.info(f'[Startup] Erro ao iniciar Sentry: {e}')
 
+import os
+
 # Desativa docs em produção — gerar o schema OpenAPI de 100+ rotas
 # adiciona ~2s desnecessários em cada cold start
-_docs_url = '/docs' if settings.debug else None
-_redoc_url = '/redoc' if settings.debug else None
+is_local = os.getenv('VERCEL') is None
+_docs_url = '/docs' if (settings.debug or is_local) else None
+_redoc_url = '/redoc' if (settings.debug or is_local) else None
 
 
 logging.basicConfig(

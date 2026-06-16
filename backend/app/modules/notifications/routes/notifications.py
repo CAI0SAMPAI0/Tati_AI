@@ -43,3 +43,35 @@ async def mark_read(
     if not success:
         raise ContentNotFoundError(detail='Notificação não encontrada')
     return {'status': 'success'}
+
+
+@router.post('/test-streak-reminder')
+async def trigger_test_streak_reminder(
+    username: str,
+    streak: int = 5,
+):
+    """
+    Envia uma notificação de teste de ofensiva (Email + Push) em inglês.
+    Apenas para os usuários caio.sampaio e programador.
+    """
+    normalized_username = username.strip()
+    if normalized_username not in ["caio.sampaio", "programador"]:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=400,
+            detail="Test notifications are restricted to 'caio.sampaio' and 'programador' only."
+        )
+
+    from app.modules.notifications.services.notification_scheduler import STREAK_REMINDER_MESSAGES
+    import random
+    title, body_tpl = random.choice(STREAK_REMINDER_MESSAGES)
+    body = body_tpl.format(streak=streak)
+
+    from app.modules.notifications.services.notification_dispatcher import dispatch_universal_notification
+    await dispatch_universal_notification(normalized_username, title, body, url="/chat")
+    return {
+        "success": True,
+        "message": f"Test reminder notification dispatched successfully to {normalized_username}.",
+        "title": title,
+        "body": body
+    }

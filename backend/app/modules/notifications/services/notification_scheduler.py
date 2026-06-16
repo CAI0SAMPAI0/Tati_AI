@@ -24,6 +24,22 @@ STREAK_REMINDER_MESSAGES = [
      "You haven't practiced today yet. Keep your {streak}-day streak going!"),
     ("Almost forgot? 😅",
      "Quick reminder: your {streak}-day streak ends at midnight. Let's practice!"),
+    ("Is that it? Giving up so soon? 😏",
+     "Prove me wrong! Chat with Tati now and save your {streak}-day streak."),
+    ("Your English is crying in the corner... 😭",
+     "Just 5 minutes! Don't let your {streak}-day streak fade away. Tati is waiting!"),
+    ("Tati is getting lonely... 😢",
+     "Are you ignoring me? Let's have a quick chat now to keep your {streak}-day streak alive!"),
+    ("Your streak is about to go poof! 💨",
+     "Only you can save your {streak} days of progress. Log in and chat now!"),
+    ("Oops, did you lose your passion? 💔",
+     "Tati remembers when you practiced every day. Save your {streak}-day streak before it's too late!"),
+    ("Tatiana's avatar is looking at you 👀",
+     "She's not mad, just disappointed. Keep your {streak}-day streak alive right now!"),
+    ("Tati is watching your progress... 🧐",
+     "Your {streak}-day streak is about to expire. Open the chat and say hello!"),
+    ("Knock knock! Tati is here 🚪",
+     "I won't stop reminding you until you practice! Let's keep that {streak}-day streak shining!"),
 ]
 
 STREAK_BROKEN_MESSAGES = [
