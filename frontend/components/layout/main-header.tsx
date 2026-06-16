@@ -47,7 +47,7 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
           </button>
         )}
         <Link href={isHubOnly ? "/activities/hub" : "/chat"} prefetch={true} className="font-display text-lg font-bold tracking-tight pl-2">
-          Teacher <span className="text-primary">Tati</span>
+          Teacher <span className="text-primary">Taty</span>
         </Link>
       </div>
 

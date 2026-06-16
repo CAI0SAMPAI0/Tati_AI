@@ -35,6 +35,18 @@ export function resolveApiBase(): string {
 
 function resolvePath(path: string): string {
   if (/^https?:\/\//i.test(path)) return path;
+
+  // Materiais (Upload/Leitura/Processamento) devem passar pelo Railway por consumo de memória do Render
+  const isMaterialOperation = 
+    path.includes('/admin/premium') || 
+    path.includes('/activities/premium') || 
+    path.includes('/activities/hub');
+    
+  if (isMaterialOperation) {
+    const railwayBase = 'https://tatiai-production.up.railway.app';
+    return `${railwayBase}${path.startsWith('/') ? path : `/${path}`}`;
+  }
+
   const base = resolveApiBase();
   return `${base}${path.startsWith('/') ? path : `/${path}`}`;
 }

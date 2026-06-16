@@ -50,6 +50,17 @@ function isAbsoluteUrl(value: string): boolean {
 function resolvePath(path: string): string {
   if (isAbsoluteUrl(path)) return path;
   
+  // Materiais (Upload/Leitura/Processamento) devem passar pelo Railway por consumo de memória do Render
+  const isMaterialOperation = 
+    path.includes('/admin/premium') || 
+    path.includes('/activities/premium') || 
+    path.includes('/activities/hub');
+    
+  if (isMaterialOperation) {
+    const railwayBase = 'https://tatiai-production.up.railway.app';
+    return `${railwayBase}${path.startsWith('/') ? path : `/${path}`}`;
+  }
+
   // Se estiver rodando no servidor (SSR) dentro do Docker, usa o DNS interno
   if (typeof window === 'undefined' && process.env.INTERNAL_API_URL) {
     const base = process.env.INTERNAL_API_URL;

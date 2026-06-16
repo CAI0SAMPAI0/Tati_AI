@@ -39,7 +39,7 @@ export default function HubHeader({ onToggleMenu }: HubHeaderProps) {
           </button>
         )}
         <Link href="/materiais" className="font-display text-lg font-bold tracking-tight">
-          Teacher <span className="text-primary">Tati</span>
+          Teacher <span className="text-primary">Taty</span>
         </Link>
       </div>
 
