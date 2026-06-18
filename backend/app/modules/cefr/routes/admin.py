@@ -3,7 +3,8 @@ from typing import Optional, List
 from app.modules.cefr.services.generator import CEFRGeneratorService
 import re
 import unicodedata
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query, BackgroundTasks
+from app.core.task_manager import run_task_in_background
 from pydantic import BaseModel
 from typing import Any
 
@@ -192,6 +193,7 @@ async def delete_reference(reference_id: str, user=Depends(require_staff)):
 async def generate_flashcards(
     level: str, 
     topic: str, 
+    background_tasks: BackgroundTasks,
     count: int = 5,
     title: Optional[str] = None,
     reference_ids: Optional[List[str]] = Query(None),
@@ -202,10 +204,14 @@ async def generate_flashcards(
     """
     try:
         from app.modules.cefr.tasks import generate_cefr_flashcards_task
-        task = generate_cefr_flashcards_task.delay(level, topic, count, username=user['username'], custom_title=title, reference_ids=reference_ids)
+        task_id = run_task_in_background(
+            background_tasks,
+            generate_cefr_flashcards_task,
+            level, topic, count, username=user['username'], custom_title=title, reference_ids=reference_ids
+        )
         return {
             "success": True,
-            "task_id": task.id}
+            "task_id": task_id}
     except Exception as e:
         logging.info(f"[AdminRoute] Error triggering flashcard generation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -215,6 +221,7 @@ async def generate_flashcards(
 async def generate_exercises(
     level: str, 
     topic: str, 
+    background_tasks: BackgroundTasks,
     count: int = 3,
     title: Optional[str] = None,
     reference_ids: Optional[List[str]] = Query(None),
@@ -225,10 +232,14 @@ async def generate_exercises(
     """
     try:
         from app.modules.cefr.tasks import generate_cefr_exercises_task
-        task = generate_cefr_exercises_task.delay(level, topic, count, username=user['username'], custom_title=title, reference_ids=reference_ids)
+        task_id = run_task_in_background(
+            background_tasks,
+            generate_cefr_exercises_task,
+            level, topic, count, username=user['username'], custom_title=title, reference_ids=reference_ids
+        )
         return {
             "success": True,
-            "task_id": task.id}
+            "task_id": task_id}
     except Exception as e:
         logging.info(f"[AdminRoute] Error triggering exercises generation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -238,6 +249,7 @@ async def generate_exercises(
 async def generate_simulations(
     level: str, 
     topic: str, 
+    background_tasks: BackgroundTasks,
     count: int = 2,
     title: Optional[str] = None,
     reference_ids: Optional[List[str]] = Query(None),
@@ -248,10 +260,14 @@ async def generate_simulations(
     """
     try:
         from app.modules.cefr.tasks import generate_cefr_simulations_task
-        task = generate_cefr_simulations_task.delay(level, topic, count, username=user['username'], custom_title=title, reference_ids=reference_ids)
+        task_id = run_task_in_background(
+            background_tasks,
+            generate_cefr_simulations_task,
+            level, topic, count, username=user['username'], custom_title=title, reference_ids=reference_ids
+        )
         return {
             "success": True,
-            "task_id": task.id}
+            "task_id": task_id}
     except Exception as e:
         logging.info(f"[AdminRoute] Error triggering simulations generation: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -1,7 +1,8 @@
 import os
-from fastapi import APIRouter, Depends, HTTPException, Header, Query
+from fastapi import APIRouter, Depends, HTTPException, Header, Query, BackgroundTasks
 from app.core.celery_app import celery_app
 from app.core.dependencies.auth import get_current_user
+from app.core.task_manager import run_task_in_background, get_local_task_status, local_tasks_status
 
 router = APIRouter(tags=["Tasks"])
 
@@ -25,6 +26,9 @@ async def get_task_status(task_id: str, current_user: dict = Depends(get_current
     """
     Rota para o front-end monitorar o progresso de PDFs ou Relatorios pesados.
     """
+    if task_id.startswith("local_") or task_id in local_tasks_status:
+        return get_local_task_status(task_id)
+
     task_result = celery_app.AsyncResult(task_id)
     
     if task_result.state == "PENDING":
@@ -43,6 +47,7 @@ async def get_task_status(task_id: str, current_user: dict = Depends(get_current
 @router.post("/trigger/{task_name}")
 async def trigger_task(
     task_name: str,
+    background_tasks: BackgroundTasks,
     verified: bool = Depends(verify_cron_token)
 ):
     """
@@ -50,25 +55,25 @@ async def trigger_task(
     """
     if task_name == "streak_reminders":
         from app.modules.notifications.tasks import streak_reminders
-        task = streak_reminders.delay()
+        task_id = run_task_in_background(background_tasks, streak_reminders)
     elif task_name == "broken_streaks":
         from app.modules.notifications.tasks import broken_streaks
-        task = broken_streaks.delay()
+        task_id = run_task_in_background(background_tasks, broken_streaks)
     elif task_name == "check_inactivity":
         from app.modules.notifications.tasks import check_inactivity
-        task = check_inactivity.delay()
+        task_id = run_task_in_background(background_tasks, check_inactivity)
     elif task_name == "weekly_reports":
         from app.modules.notifications.tasks import weekly_reports
-        task = weekly_reports.delay()
+        task_id = run_task_in_background(background_tasks, weekly_reports)
     elif task_name == "cefr_weekly_gen":
         from app.modules.cefr.tasks import cefr_weekly_gen
-        task = cefr_weekly_gen.delay()
+        task_id = run_task_in_background(background_tasks, cefr_weekly_gen)
     else:
         raise HTTPException(status_code=400, detail=f"Unknown cron task: {task_name}")
         
     return {
         "success": True, 
         "message": f"Task '{task_name}' triggered in background.", 
-        "task_id": task.id
+        "task_id": task_id
     }
 

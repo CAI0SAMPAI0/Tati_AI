@@ -3,7 +3,8 @@ Router de Módulos e Lições.
 IMPORTANT: Static routes must come BEFORE dynamic /{module_id} to avoid shadowing.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
+from app.core.task_manager import run_task_in_background
 from app.core.exceptions import ContentNotFoundError
 from typing import Optional
 
@@ -13,11 +14,6 @@ from app.modules.activities.services.activity_service import ActivityService
 
 router = APIRouter()
 
-
-# ── Módulos & Lições ──────────────────────────────────────────────────
-
-
-# ── Static routes first (before /{module_id}) ─────────────────────────
 
 @router.get('/')
 async def list_modules(
@@ -45,6 +41,7 @@ async def get_weekly_goal(
 @router.post('/admin/generate-quiz')
 async def admin_generate_quiz(
     data: dict,
+    background_tasks: BackgroundTasks,
     user: dict = Depends(require_staff)
 ):
     """Gera um quiz via IA em background."""
@@ -54,18 +51,21 @@ async def admin_generate_quiz(
     level = normalize_level(data.get('level'), default='B1')
     num_questions = data.get('num_questions', 5)
     
-    task = generate_quiz_task.delay(
+    task_id = run_task_in_background(
+        background_tasks,
+        generate_quiz_task,
         topic=topic,
         level=level,
         num_questions=num_questions,
         username=user['username']
     )
-    return {"success": True, "task_id": task.id}
+    return {"success": True, "task_id": task_id}
 
 
 @router.post('/admin/generate-flashcards')
 async def admin_generate_flashcards(
     data: dict,
+    background_tasks: BackgroundTasks,
     user: dict = Depends(require_staff)
 ):
     """Gera flashcards via IA em background."""
@@ -75,13 +75,15 @@ async def admin_generate_flashcards(
     level = normalize_level(data.get('level'), default='B1')
     module_id = data.get('module_id')
     
-    task = generate_flashcards_task.delay(
+    task_id = run_task_in_background(
+        background_tasks,
+        generate_flashcards_task,
         theme=theme,
         level=level,
         module_id=module_id,
         username=user['username']
     )
-    return {"success": True, "task_id": task.id}
+    return {"success": True, "task_id": task_id}
 
 
 @router.post('/admin/upload')

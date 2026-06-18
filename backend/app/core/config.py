@@ -188,6 +188,7 @@ class Settings(BaseSettings):
     vapid_private_key: str = ''
     vapid_contact: str = ''
     enable_notification_scheduler: bool = True
+    use_celery: bool = False
 
     # Asaas Pagamentos
     api_asaas: str = Field('', validation_alias='API_ASAAS')

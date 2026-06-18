@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from app.core.task_manager import run_task_in_background
 from app.core.exceptions import ContentNotFoundError, BusinessLogicError
 from pydantic import BaseModel
 from typing import Optional
@@ -276,10 +277,12 @@ def get_simulation(
 
 @router.post('/simulations')
 async def create_simulation(
-        data: dict,
-        service: DashboardService = Depends(),
-        db: Client = Depends(get_db),
-        user=Depends(require_staff)):
+    data: dict,
+    background_tasks: BackgroundTasks,
+    service: DashboardService = Depends(),
+    db: Client = Depends(get_db),
+    user=Depends(require_staff)
+):
     """Cria uma nova simulação (manual ou via IA se is_ai_generated)."""
     if data.get('is_ai_generated') or data.get('use_ai_generation'):
         from app.modules.activities.tasks import generate_simulation_task
@@ -288,13 +291,15 @@ async def create_simulation(
         level = normalize_level(data.get('level') or data.get('difficulty'))
         instructions = data.get('instructions', '')
         
-        task = generate_simulation_task.delay(
+        task_id = run_task_in_background(
+            background_tasks,
+            generate_simulation_task,
             topic=topic,
             level=level,
             instructions=instructions,
             username=user['username']
         )
-        return {"success": True, "task_id": task.id}
+        return {"success": True, "task_id": task_id}
 
     # Limpeza de dados para evitar erro de coluna inexistente
     allowed_fields = {

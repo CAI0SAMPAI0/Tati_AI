@@ -7,18 +7,19 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Recupera as credenciais do Upstash Redis configuradas no Railway
+USE_CELERY = os.getenv("USE_CELERY", "false").lower() == "true"
 UPSTASH_URL = os.getenv('UPSTASH_REDIS_URL')
 UPSTASH_TOKEN = os.getenv('UPSTASH_REDIS_TOKEN')
 
 # Formata a URL para o padrão redis://:token@host:port
 # Removendo o prefixo http/https caso venha no formato REST do Upstash
-if UPSTASH_URL and UPSTASH_TOKEN:
+if USE_CELERY and UPSTASH_URL and UPSTASH_TOKEN:
     clean_url = UPSTASH_URL.replace("redis://", "").replace("https://", "").replace("http://", "")
     if ":" not in clean_url:
         clean_url = f"{clean_url}:6379"
     redis_broker_url = f"rediss://:{UPSTASH_TOKEN}@{clean_url}?ssl_cert_reqs=CERT_NONE"
 else:
-    redis_broker_url = UPSTASH_URL if UPSTASH_URL else "redis://localhost:6379/0"
+    redis_broker_url = "redis://localhost:6379/0"
 
 # Inicializa o Celery apontando para os modulos de tarefas
 celery_app = Celery(
