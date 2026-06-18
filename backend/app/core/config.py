@@ -189,6 +189,8 @@ class Settings(BaseSettings):
     vapid_contact: str = ''
     enable_notification_scheduler: bool = True
     use_celery: bool = False
+    worker_api_url: str = ""
+    is_heavy_worker: bool = False
 
     # Asaas Pagamentos
     api_asaas: str = Field('', validation_alias='API_ASAAS')

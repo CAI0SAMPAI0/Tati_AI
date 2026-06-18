@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from app.core.task_manager import run_task_in_background
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from app.core.task_manager import run_task_in_background, delegate_to_worker_if_needed
 from app.core.exceptions import ContentNotFoundError, BusinessLogicError
 from pydantic import BaseModel
 from typing import Optional
@@ -279,12 +279,17 @@ def get_simulation(
 async def create_simulation(
     data: dict,
     background_tasks: BackgroundTasks,
+    request: Request,
     service: DashboardService = Depends(),
     db: Client = Depends(get_db),
     user=Depends(require_staff)
 ):
     """Cria uma nova simulação (manual ou via IA se is_ai_generated)."""
     if data.get('is_ai_generated') or data.get('use_ai_generation'):
+        delegate_res = await delegate_to_worker_if_needed(request)
+        if delegate_res is not None:
+            return delegate_res
+            
         from app.modules.activities.tasks import generate_simulation_task
         
         topic = data.get('topic') or data.get('name', 'Nova Simulação')

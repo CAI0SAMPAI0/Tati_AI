@@ -3,8 +3,8 @@ from typing import Optional, List
 from app.modules.cefr.services.generator import CEFRGeneratorService
 import re
 import unicodedata
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query, BackgroundTasks
-from app.core.task_manager import run_task_in_background
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query, BackgroundTasks, Request
+from app.core.task_manager import run_task_in_background, delegate_to_worker_if_needed
 from pydantic import BaseModel
 from typing import Any
 
@@ -194,6 +194,7 @@ async def generate_flashcards(
     level: str, 
     topic: str, 
     background_tasks: BackgroundTasks,
+    request: Request,
     count: int = 5,
     title: Optional[str] = None,
     reference_ids: Optional[List[str]] = Query(None),
@@ -202,6 +203,9 @@ async def generate_flashcards(
     """
     Generates flashcards from indexed material using RAG in the background.
     """
+    delegate_res = await delegate_to_worker_if_needed(request)
+    if delegate_res is not None:
+        return delegate_res
     try:
         from app.modules.cefr.tasks import generate_cefr_flashcards_task
         task_id = run_task_in_background(
@@ -222,6 +226,7 @@ async def generate_exercises(
     level: str, 
     topic: str, 
     background_tasks: BackgroundTasks,
+    request: Request,
     count: int = 3,
     title: Optional[str] = None,
     reference_ids: Optional[List[str]] = Query(None),
@@ -230,6 +235,9 @@ async def generate_exercises(
     """
     Generates exercises from indexed material using RAG in the background.
     """
+    delegate_res = await delegate_to_worker_if_needed(request)
+    if delegate_res is not None:
+        return delegate_res
     try:
         from app.modules.cefr.tasks import generate_cefr_exercises_task
         task_id = run_task_in_background(
@@ -250,6 +258,7 @@ async def generate_simulations(
     level: str, 
     topic: str, 
     background_tasks: BackgroundTasks,
+    request: Request,
     count: int = 2,
     title: Optional[str] = None,
     reference_ids: Optional[List[str]] = Query(None),
@@ -258,6 +267,9 @@ async def generate_simulations(
     """
     Generates simulations from indexed material using RAG in the background.
     """
+    delegate_res = await delegate_to_worker_if_needed(request)
+    if delegate_res is not None:
+        return delegate_res
     try:
         from app.modules.cefr.tasks import generate_cefr_simulations_task
         task_id = run_task_in_background(

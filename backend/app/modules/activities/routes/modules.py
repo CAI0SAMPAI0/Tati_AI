@@ -3,8 +3,8 @@ Router de Módulos e Lições.
 IMPORTANT: Static routes must come BEFORE dynamic /{module_id} to avoid shadowing.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
-from app.core.task_manager import run_task_in_background
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, Request
+from app.core.task_manager import run_task_in_background, delegate_to_worker_if_needed
 from app.core.exceptions import ContentNotFoundError
 from typing import Optional
 
@@ -42,9 +42,14 @@ async def get_weekly_goal(
 async def admin_generate_quiz(
     data: dict,
     background_tasks: BackgroundTasks,
+    request: Request,
     user: dict = Depends(require_staff)
 ):
     """Gera um quiz via IA em background."""
+    delegate_res = await delegate_to_worker_if_needed(request)
+    if delegate_res is not None:
+        return delegate_res
+        
     from app.modules.activities.tasks import generate_quiz_task
     
     topic = data.get('content_titles') or data.get('title', 'English Practice')
@@ -66,9 +71,14 @@ async def admin_generate_quiz(
 async def admin_generate_flashcards(
     data: dict,
     background_tasks: BackgroundTasks,
+    request: Request,
     user: dict = Depends(require_staff)
 ):
     """Gera flashcards via IA em background."""
+    delegate_res = await delegate_to_worker_if_needed(request)
+    if delegate_res is not None:
+        return delegate_res
+        
     from app.modules.activities.tasks import generate_flashcards_task
     
     theme = data.get('theme')

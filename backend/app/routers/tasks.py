@@ -1,8 +1,8 @@
 import os
-from fastapi import APIRouter, Depends, HTTPException, Header, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Header, Query, BackgroundTasks, Request
 from app.core.celery_app import celery_app
 from app.core.dependencies.auth import get_current_user
-from app.core.task_manager import run_task_in_background, get_local_task_status, local_tasks_status
+from app.core.task_manager import run_task_in_background, get_local_task_status, local_tasks_status, delegate_to_worker_if_needed
 
 router = APIRouter(tags=["Tasks"])
 
@@ -13,8 +13,6 @@ async def verify_cron_token(
 ):
     cron_token = os.getenv("CRON_TOKEN")
     if not cron_token:
-        # Em desenvolvimento, se não estiver configurado, podemos dar bypass para testar fácil
-        # Mas em produção deve ser obrigatório.
         return True
     if x_cron_token != cron_token and token != cron_token:
         raise HTTPException(status_code=403, detail="Invalid CRON_TOKEN.")
@@ -22,10 +20,13 @@ async def verify_cron_token(
 
 
 @router.get("/status/{task_id}")
-async def get_task_status(task_id: str, current_user: dict = Depends(get_current_user)):
+async def get_task_status(task_id: str, request: Request, current_user: dict = Depends(get_current_user)):
     """
     Rota para o front-end monitorar o progresso de PDFs ou Relatorios pesados.
     """
+    delegate_res = await delegate_to_worker_if_needed(request)
+    if delegate_res is not None:
+        return delegate_res
     if task_id.startswith("local_") or task_id in local_tasks_status:
         return get_local_task_status(task_id)
 
@@ -47,12 +48,16 @@ async def get_task_status(task_id: str, current_user: dict = Depends(get_current
 @router.post("/trigger/{task_name}")
 async def trigger_task(
     task_name: str,
+    request: Request,
     background_tasks: BackgroundTasks,
     verified: bool = Depends(verify_cron_token)
 ):
     """
     Triggers a background Celery task securely. Used to support sleep mode on Railway by delegating cron schedules.
     """
+    delegate_res = await delegate_to_worker_if_needed(request)
+    if delegate_res is not None:
+        return delegate_res
     if task_name == "streak_reminders":
         from app.modules.notifications.tasks import streak_reminders
         task_id = run_task_in_background(background_tasks, streak_reminders)
