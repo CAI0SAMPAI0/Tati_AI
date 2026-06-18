@@ -316,7 +316,11 @@ function VoicePageContent() {
               audioRef.current.play().catch(() => {});
             }
           }}>
-            <VoiceAvatar state={state} audioElement={audioRef.current} />
+            <VoiceAvatar
+              state={state}
+              audioElement={audioRef.current}
+              lastAssistantText={messages.filter(m => m.role === 'assistant').at(-1)?.content}
+            />
           </div>
           <div className="text-center space-y-0.5 sm:space-y-3 px-4">
             <h1 className="text-lg sm:text-3xl md:text-5xl font-black text-text tracking-tighter line-clamp-1 md:line-clamp-2">
