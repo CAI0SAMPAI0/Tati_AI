@@ -25,6 +25,9 @@ jobs:
           git config --global user.email "github-actions-bot@example.com"
           git config --global user.name "GitHub Actions Bot"
           
+          # Ativa o Git LFS no runner
+          git lfs install
+          
           # Clone the Hugging Face Space repository into a temporary folder
           git clone https://caio007:$HF_TOKEN@huggingface.co/spaces/caio007/tati-ai-backend hf_space_dir
           
@@ -33,9 +36,14 @@ jobs:
           
           # Copy backend files into the Space directory
           cp -r backend/* hf_space_dir/
+          # Copia explicitamente o arquivo .gitattributes para a raiz da pasta do Space
+          cp backend/.gitattributes hf_space_dir/ || true
           
           # Enter the Space directory
           cd hf_space_dir
+          
+          # Inicializa o Git LFS localmente na pasta do Space
+          git lfs install --local
           
           # Check if there are changes to deploy
           git add .
