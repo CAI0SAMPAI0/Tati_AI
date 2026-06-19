@@ -18,12 +18,12 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 COPY . .
 
-EXPOSE 8080
+EXPOSE 7860
 
-# Healthcheck para Railway saber quando o container esta pronto
+# Healthcheck para Railway/Hugging Face saber quando o container esta pronto
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:8080/health || exit 1
+  CMD curl -f http://localhost:7860/health || exit 1
 
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-7860}"]
 
 

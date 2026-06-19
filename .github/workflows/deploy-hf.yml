@@ -1,0 +1,47 @@
+name: Deploy Backend to Hugging Face Spaces
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+  workflow_dispatch: {}
+
+jobs:
+  deploy-to-huggingface:
+    name: Sync Backend to Hugging Face
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git config --global user.email "github-actions-bot@example.com"
+          git config --global user.name "GitHub Actions Bot"
+          
+          # Clone the Hugging Face Space repository into a temporary folder
+          git clone https://caio007:$HF_TOKEN@huggingface.co/spaces/caio007/tati-ai-backend hf_space_dir
+          
+          # Remove existing files in the Space directory, keeping only the .git directory
+          find hf_space_dir -maxdepth 1 ! -name 'hf_space_dir' ! -name '.git' -exec rm -rf {} +
+          
+          # Copy backend files into the Space directory
+          cp -r backend/* hf_space_dir/
+          
+          # Enter the Space directory
+          cd hf_space_dir
+          
+          # Check if there are changes to deploy
+          git add .
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "Deploy automático: ${{ github.event.head_commit.message }}"
+            git push origin main
+          else
+            echo "Nenhuma alteração detectada no backend."
+          fi
