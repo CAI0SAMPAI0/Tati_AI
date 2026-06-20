@@ -24,6 +24,6 @@ EXPOSE 7860
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD curl -f http://localhost:7860/health || exit 1
 
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-7860}"]
-
+# Inicia o Celery (Worker + Beat para os agendamentos) em background e o Uvicorn em foreground
+CMD ["sh", "-c", "celery -A app.core.celery_app worker --beat --loglevel=info --concurrency=2 & uvicorn main:app --host 0.0.0.0 --port ${PORT:-7860}"]
 
