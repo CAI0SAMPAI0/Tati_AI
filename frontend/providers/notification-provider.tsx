@@ -85,8 +85,66 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [token, user]);
 
   const subscribeToPush = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const { Capacitor } = await import('@capacitor/core');
+      const isNative = Capacitor.isNativePlatform();
+
+      if (isNative) {
+        // ── NATIVE CAPACITOR PUSH ──────────────────
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        
+        let permStatus = await PushNotifications.checkPermissions();
+        if (permStatus.receive === 'prompt') {
+          permStatus = await PushNotifications.requestPermissions();
+        }
+        if (permStatus.receive !== 'granted') {
+          console.log('[Push] Capacitor native permission denied.');
+          toast.error("Permissão de notificação negada no aparelho.");
+          return;
+        }
+
+        await PushNotifications.register();
+        await PushNotifications.removeAllListeners();
+
+        // Escuta o registro do token FCM
+        await PushNotifications.addListener('registration', async (token) => {
+          console.log('[Push] Capacitor FCM token:', token.value);
+          try {
+            await apiPost('/notifications/subscribe', {
+              endpoint: `fcm:${token.value}`,
+              keys: {
+                p256dh: 'fcm',
+                auth: 'fcm'
+              },
+              user_agent: 'Capacitor Android'
+            });
+            console.log('[Push] FCM token registered successfully!');
+            toast.success("Notificações Push nativas ativadas! 🔔");
+          } catch (apiErr) {
+            console.error('[Push] Failed to save FCM token on server:', apiErr);
+          }
+        });
+
+        await PushNotifications.addListener('registrationError', (error) => {
+          console.error('[Push] Registration error:', error);
+          toast.error("Falha ao registrar token de push nativo.");
+        });
+
+        await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+          console.log('[Push] Foreground native push:', notification);
+          toast.success(`${notification.title}: ${notification.body}`, { duration: 5000 });
+        });
+
+        return;
+      }
+    } catch (capacitorErr) {
+      console.error('[Push] Capacitor init failed, falling back to Web Push:', capacitorErr);
+    }
+
+    // ── STANDARD WEB PUSH ──────────────────────────
     if (
-      typeof window === 'undefined' ||
       !('serviceWorker' in navigator) ||
       !('PushManager' in window)
     ) {

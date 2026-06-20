@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@capacitor/android": "^5.7.8",
-    "@capacitor/ios": "^5.7.8"
+    "@capacitor/ios": "^5.7.8",
+    "@capacitor/push-notifications": "^5.1.2"
   }
 }
