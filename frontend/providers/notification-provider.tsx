@@ -84,6 +84,75 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, [token, user]);
 
+  const subscribeToPush = useCallback(async () => {
+    if (
+      typeof window === 'undefined' ||
+      !('serviceWorker' in navigator) ||
+      !('PushManager' in window)
+    ) {
+      console.log('[Push] Push notifications not supported on this device/browser.');
+      return;
+    }
+
+    try {
+      // 1. Verifica ou solicita permissão de notificação
+      let permission = Notification.permission;
+      if (permission === 'default') {
+        permission = await Notification.requestPermission();
+      }
+      if (permission !== 'granted') {
+        console.log('[Push] Notification permission denied.');
+        return;
+      }
+
+      // 2. Aguarda o service worker ficar pronto
+      const registration = await navigator.serviceWorker.ready;
+
+      // 3. Busca a chave VAPID pública do backend
+      const keyData = await apiGet<{ public_key: string }>('/notifications/vapid-key');
+      if (!keyData || !keyData.public_key) {
+        console.error('[Push] Failed to retrieve VAPID key from backend.');
+        return;
+      }
+
+      // 4. Converte a chave VAPID para Uint8Array
+      const convertVapidKey = (base64String: string) => {
+        const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+          outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+      };
+
+      const applicationServerKey = convertVapidKey(keyData.public_key);
+
+      // 5. Inscreve o usuário no PushManager
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey,
+      });
+
+      // 6. Envia a inscrição para o backend salvar
+      const subJson = subscription.toJSON();
+      if (subJson.endpoint && subJson.keys?.p256dh && subJson.keys?.auth) {
+        await apiPost('/notifications/subscribe', {
+          endpoint: subJson.endpoint,
+          keys: {
+            p256dh: subJson.keys.p256dh,
+            auth: subJson.keys.auth,
+          },
+          user_agent: navigator.userAgent,
+        });
+        console.log('[Push] User successfully subscribed to push notifications!');
+      }
+    } catch (err) {
+      console.error('[Push] Subscription failed:', err);
+    }
+  }, []);
+
   useEffect(() => {
     if (!token || !user) {
       setNotifications([]);
@@ -94,10 +163,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
 
     fetchNotifications(true);
+    subscribeToPush();
     // Poll every 15 seconds for quick feedback on AI generation
     const interval = setInterval(() => fetchNotifications(false), 15 * 1000);
     return () => clearInterval(interval);
-  }, [token, user, fetchNotifications]);
+  }, [token, user, fetchNotifications, subscribeToPush]);
 
   const markRead = async (id: string) => {
     const notif = notifications.find((n) => n.id === id);

@@ -75,3 +75,60 @@ async def trigger_test_streak_reminder(
         "title": title,
         "body": body
     }
+
+
+from pydantic import BaseModel
+
+class PushKeysSchema(BaseModel):
+    p256dh: str
+    auth: str
+
+class PushSubscriptionSchema(BaseModel):
+    endpoint: str
+    keys: PushKeysSchema
+    user_agent: str = ''
+
+class PushUnsubscribeSchema(BaseModel):
+    endpoint: str
+
+
+@router.get('/vapid-key')
+async def get_vapid_key():
+    """Retorna a chave pública VAPID para registro no frontend."""
+    from app.modules.notifications.services.push_notifications import get_public_vapid_key
+    return {"public_key": get_public_vapid_key()}
+
+
+@router.post('/subscribe')
+async def subscribe_push(
+    subscription: PushSubscriptionSchema,
+    user=Depends(get_current_user),
+):
+    """Registra uma inscrição de notificação push para o usuário logado."""
+    from app.modules.notifications.services.push_notifications import save_push_subscription
+    success = save_push_subscription(
+        username=user['username'],
+        endpoint=subscription.endpoint,
+        p256dh=subscription.keys.p256dh,
+        auth=subscription.keys.auth,
+        user_agent=subscription.user_agent,
+    )
+    if not success:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=400,
+            detail="Failed to save push subscription"
+        )
+    return {"status": "success"}
+
+
+@router.post('/unsubscribe')
+async def unsubscribe_push(
+    subscription: PushUnsubscribeSchema,
+    user=Depends(get_current_user),
+):
+    """Remove uma inscrição de notificação push do usuário logado."""
+    from app.modules.notifications.services.push_notifications import disable_push_subscription
+    disable_push_subscription(username=user['username'], endpoint=subscription.endpoint)
+    return {"status": "success"}
+
