@@ -139,14 +139,23 @@ else:
     @app.on_event('startup')
     async def startup_event() -> None:
         async def _warmup():
+            import asyncio
             try:
                 from app.core.database import get_client
                 get_client().table('users').select('username').limit(1).execute()
                 logging.info('[Startup] Conexão com Supabase aquecida.')
             except Exception as exc:
                 logging.info(f'[Startup] Warmup do banco falhou: {exc}')
+                
+            try:
+                # Pré-carrega o modelo e o banco vetorial para evitar lentidão na primeira mensagem
+                from app.modules.chat.services.rag_search import _get_vectorstore
+                await asyncio.to_thread(_get_vectorstore)
+                logging.info('[Startup] Vectorstore pré-carregado (Hugging Face).')
+            except Exception as exc:
+                logging.info(f'[Startup] Falha ao pré-carregar Vectorstore: {exc}')
 
-        await _warmup() 
+        await _warmup()
 
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
