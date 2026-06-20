@@ -42,10 +42,18 @@ if os.getenv("RUN_AS_PROXY") == "true":
                     timeout=30.0
                 )
             
+            resp_headers = {k.lower(): v for k, v in response.headers.items()}
+            # Remove compression and length headers because httpx has decoded the body
+            resp_headers.pop("content-encoding", None)
+            resp_headers.pop("content-length", None)
+            resp_headers.pop("transfer-encoding", None)
+            resp_headers.pop("connection", None)
+            resp_headers.pop("keep-alive", None)
+            
             return Response(
                 content=response.content,
                 status_code=response.status_code,
-                headers=dict(response.headers)
+                headers=resp_headers
             )
         except Exception as e:
             logging.error(f"Proxy error: {e}")

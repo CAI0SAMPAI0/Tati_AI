@@ -159,6 +159,25 @@ async def list_premium_content(
             if p['status'] == 'confirmed':
                 purchased_ids.add(p['content_id'])
 
+        # Fallback: verifica nas tabelas orders + order_items (fluxo hub-site público)
+        try:
+            orders_res = db.table('orders')\
+                .select('id')\
+                .eq('username', username)\
+                .eq('status', 'confirmed')\
+                .execute()
+            
+            order_ids = [o['id'] for o in (orders_res.data or [])]
+            if order_ids:
+                items_res = db.table('order_items')\
+                    .select('content_id')\
+                    .in_('order_id', order_ids)\
+                    .execute()
+                for item in (items_res.data or []):
+                    purchased_ids.add(item['content_id'])
+        except Exception as e:
+            _hub_log(f"Error fetching orders fallback for listing: {e}")
+
     # 3. Formata resposta
     result = []
     from app.core.config import settings
