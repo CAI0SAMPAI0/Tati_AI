@@ -1,12 +1,13 @@
 import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, Request, HTTPException, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, Request, HTTPException, WebSocket, WebSocketDisconnect, Query, Depends
 import json
 
 from app.core.database import get_client
 from app.modules.payments.services.mercadopago import MercadoPago
 from app.modules.payments.services.payment_notifier import payment_notifier
 from app.core.config import settings
+from app.core.dependencies.auth import get_current_user
 
 
 router = APIRouter()
@@ -252,6 +253,60 @@ async def sandbox_simulate_approve(payment_id: str):
 
     _mp_log(f"[SimulateApprove] Pagamento {payment_id} aprovado manualmente para {username} - {content_id}")
     return {'ok': True, 'payment_id': payment_id, 'username': username, 'content_id': content_id, 'status': 'confirmed'}
+
+
+@router.get('/status')
+async def get_payment_status(
+    user: dict = Depends(get_current_user),
+):
+    """
+    Retorna o status da assinatura do usuário logado.
+    """
+    from app.core.database import get_client
+    db = get_client()
+    
+    from app.modules.payments.services.subscription_manager import SPECIAL_USERS
+    username = user.get('username')
+    is_special = username in SPECIAL_USERS or user.get('is_exempt', False)
+    
+    if is_special:
+        return {
+            'status': 'active',
+            'plan_type': 'full',
+            'paid_at': None,
+            'next_due_at': '2099-12-31'
+        }
+        
+    try:
+        rows = db.table('subscriptions')\
+            .select('status, plan_type, expires_at, created_at')\
+            .eq('username', username)\
+            .in_('status', ['active', 'grace', 'pending'])\
+            .order('expires_at', desc=True)\
+            .limit(1)\
+            .execute().data
+            
+        if rows:
+            sub = rows[0]
+            status = sub.get('status', 'inactive')
+            if status in ('active', 'grace'):
+                status = 'active'
+                
+            return {
+                'status': status,
+                'plan_type': sub.get('plan_type'),
+                'paid_at': sub.get('created_at'),
+                'next_due_at': sub.get('expires_at')
+            }
+    except Exception as e:
+        logging.error(f"[MercadoPago][get_payment_status] Erro ao buscar status de pagamento para {username}: {e}")
+        
+    return {
+        'status': 'inactive',
+        'plan_type': None,
+        'paid_at': None,
+        'next_due_at': None
+    }
 
 
 @router.websocket('/ws')

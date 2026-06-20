@@ -36,13 +36,14 @@ export function resolveApiBase(): string {
 function resolvePath(path: string): string {
   if (/^https?:\/\//i.test(path)) return path;
 
-  // Materiais (Upload/Leitura/Processamento) devem passar pelo Railway por consumo de memória do Render
-  const isMaterialOperation = 
+  // Materiais (Upload/Leitura/Processamento) e Pagamentos devem passar pelo Railway
+  const isRailwayOperation = 
     path.includes('/admin/premium') || 
     path.includes('/activities/premium') || 
-    path.includes('/activities/hub');
+    path.includes('/activities/hub') ||
+    path.includes('/payments');
     
-  if (isMaterialOperation) {
+  if (isRailwayOperation) {
     const railwayBase = 'https://tatiai-production.up.railway.app';
     return `${railwayBase}${path.startsWith('/') ? path : `/${path}`}`;
   }

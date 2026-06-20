@@ -50,13 +50,14 @@ function isAbsoluteUrl(value: string): boolean {
 function resolvePath(path: string): string {
   if (isAbsoluteUrl(path)) return path;
   
-  // Materiais (Upload/Leitura/Processamento) devem passar pelo Railway por consumo de memória do Render
-  const isMaterialOperation = 
+  // Materiais (Upload/Leitura/Processamento) e Pagamentos devem passar pelo Railway
+  const isRailwayOperation = 
     path.includes('/admin/premium') || 
     path.includes('/activities/premium') || 
-    path.includes('/activities/hub');
+    path.includes('/activities/hub') ||
+    path.includes('/payments');
     
-  if (isMaterialOperation) {
+  if (isRailwayOperation) {
     const railwayBase = 'https://tatiai-production.up.railway.app';
     return `${railwayBase}${path.startsWith('/') ? path : `/${path}`}`;
   }
