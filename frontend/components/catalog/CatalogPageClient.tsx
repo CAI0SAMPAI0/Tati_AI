@@ -79,7 +79,8 @@ export default function CatalogPageClient({ initialItems }: CatalogPageClientPro
     queryKey: ['hub-my-accesses'],
     queryFn: () => apiGet<PremiumCatalogItem[]>('/activities/hub'),
     enabled: Boolean(user),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 1000,
+    refetchInterval: 15 * 1000,
   });
 
   const handleAccessGranted = useCallback((id: string) => {
