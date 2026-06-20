@@ -5,7 +5,14 @@ import { useEffect } from 'react';
 export function RegisterServiceWorker() {
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
-    if (process.env.NODE_ENV !== 'production') return;
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      window.location.hostname !== 'localhost' &&
+      window.location.hostname !== '127.0.0.1'
+    ) {
+      return;
+    }
+
 
     // Escuta mudanças de controle para recarregar a página automaticamente
     // Isso garante que o usuário obtenha a versão mais recente sem precisar fechar e reabrir o app

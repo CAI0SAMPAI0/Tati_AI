@@ -102,6 +102,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       }
       if (permission !== 'granted') {
         console.log('[Push] Notification permission denied.');
+        toast.error("Permissão de notificação negada no navegador.");
         return;
       }
 
@@ -112,6 +113,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       const keyData = await apiGet<{ public_key: string }>('/notifications/vapid-key');
       if (!keyData || !keyData.public_key) {
         console.error('[Push] Failed to retrieve VAPID key from backend.');
+        toast.error("Erro ao buscar chave pública do servidor.");
         return;
       }
 
@@ -147,9 +149,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           user_agent: navigator.userAgent,
         });
         console.log('[Push] User successfully subscribed to push notifications!');
+        toast.success("Notificações Push ativadas com sucesso! 🔔");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('[Push] Subscription failed:', err);
+      toast.error(`Falha ao ativar Push: ${err?.message || err}`);
     }
   }, []);
 
