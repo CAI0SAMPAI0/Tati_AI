@@ -2,13 +2,12 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { apiGet } from '@/lib/api/client';
+import { apiGet, apiPost, apiUpload } from '@/lib/api/client';
 import { 
   Search, 
   Send, 
   FileText, 
   HelpCircle, 
-  Check, 
   X, 
   Users, 
   UploadCloud,
@@ -45,13 +44,20 @@ export function DispatchSection() {
   const [selectedQuizId, setSelectedQuizId] = useState<string>('');
   const [isSending, setIsSending] = useState(false);
 
+  // AI Quiz Generator States
+  const [showAiForm, setShowAiForm] = useState(false);
+  const [aiTopic, setAiTopic] = useState('');
+  const [aiLevel, setAiLevel] = useState('B1');
+  const [aiNumQuestions, setAiNumQuestions] = useState(5);
+  const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
+
   // Queries
   const { data: students, isLoading: loadingStudents } = useQuery<Student[]>({
     queryKey: ['admin-dispatch-students'],
     queryFn: () => apiGet<Student[]>('/dashboard/students'),
   });
 
-  const { data: quizzes, isLoading: loadingQuizzes } = useQuery<Quiz[]>({
+  const { data: quizzes, isLoading: loadingQuizzes, refetch: refetchQuizzes } = useQuery<Quiz[]>({
     queryKey: ['admin-dispatch-quizzes'],
     queryFn: () => apiGet<Quiz[]>('/dashboard/quizzes'),
     enabled: activeTab === 'quiz',
@@ -94,78 +100,101 @@ export function DispatchSection() {
     }
   };
 
+  const handleGenerateQuizAI = async () => {
+    if (!aiTopic.trim()) {
+      toast.error('Please enter a topic for the quiz.');
+      return;
+    }
+
+    setIsGeneratingQuiz(true);
+    const toastId = toast.loading('Generating quiz with AI...');
+
+    try {
+      const res = await apiPost<{ success: boolean; quiz_id: string; title: string; detail?: string }>(
+        '/dashboard/generate-quiz-ai',
+        {
+          topic: aiTopic,
+          num_questions: aiNumQuestions,
+          level: aiLevel,
+        }
+      );
+
+      if (res.ok && res.data.success) {
+        toast.success(`Quiz "${res.data.title}" generated successfully!`, { id: toastId });
+        await refetchQuizzes();
+        setSelectedQuizId(res.data.quiz_id);
+        setAiTopic('');
+        setShowAiForm(false);
+      } else {
+        toast.error(res.data.detail || 'Error generating quiz.', { id: toastId });
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to generate quiz.', { id: toastId });
+    } finally {
+      setIsGeneratingQuiz(false);
+    }
+  };
+
   const handleSend = async () => {
     if (selectedUsernames.length === 0) {
-      toast.error('Selecione pelo menos um aluno.');
+      toast.error('Please select at least one student.');
       return;
     }
 
     setIsSending(true);
-    const toastId = toast.loading('Enviando materiais e notificações...');
+    const toastId = toast.loading('Sending materials and notifications...');
 
     try {
       if (activeTab === 'file') {
         if (!file) {
-          toast.error('Selecione um arquivo para enviar.', { id: toastId });
+          toast.error('Please select a file to send.', { id: toastId });
           setIsSending(false);
           return;
         }
 
-        // Send file via Multipart Form Data
         const formData = new FormData();
         formData.append('file', file);
         formData.append('student_usernames', JSON.stringify(selectedUsernames));
 
-        const token = typeof window !== 'undefined' ? localStorage.getItem('tati_token') : null;
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/dashboard/dispatch-file`, {
-          method: 'POST',
-          headers: {
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-          },
-          body: formData,
-        });
+        const res = await apiUpload<{ success: boolean; detail?: string; dispatched_to?: number }>(
+          '/dashboard/dispatch-file',
+          formData
+        );
 
-        const data = await res.json();
-        if (res.ok && data.success) {
-          toast.success(`Arquivo enviado com sucesso para ${data.dispatched_to} aluno(s)!`, { id: toastId });
+        if (res.ok && res.data.success) {
+          toast.success(`File successfully sent to ${res.data.dispatched_to} student(s)!`, { id: toastId });
           setFile(null);
           setSelectedUsernames([]);
         } else {
-          toast.error(data.detail || 'Erro ao enviar arquivo.', { id: toastId });
+          toast.error(res.data.detail || 'Error sending file.', { id: toastId });
         }
       } else {
         if (!selectedQuizId) {
-          toast.error('Selecione um quiz para enviar.', { id: toastId });
+          toast.error('Please select a quiz to send.', { id: toastId });
           setIsSending(false);
           return;
         }
 
-        // Send quiz alert
-        const token = typeof window !== 'undefined' ? localStorage.getItem('tati_token') : null;
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/dashboard/dispatch-quiz`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
+        const res = await apiPost<{ success: boolean; detail?: string; dispatched_to?: number }>(
+          '/dashboard/dispatch-quiz',
+          {
             quiz_id: selectedQuizId,
             student_usernames: selectedUsernames,
-          }),
-        });
+          }
+        );
 
-        const data = await res.json();
-        if (res.ok && data.success) {
-          toast.success(`Quiz disparado com sucesso para ${data.dispatched_to} aluno(s)!`, { id: toastId });
+        if (res.ok && res.data.success) {
+          toast.success(`Quiz successfully dispatched to ${res.data.dispatched_to} student(s)!`, { id: toastId });
           setSelectedQuizId('');
           setSelectedUsernames([]);
         } else {
-          toast.error(data.detail || 'Erro ao disparar quiz.', { id: toastId });
+          toast.error(res.data.detail || 'Error dispatching quiz.', { id: toastId });
         }
       }
     } catch (err) {
       console.error(err);
-      toast.error('Falha de conexão com o servidor.', { id: toastId });
+      toast.error('Connection failure with the server.', { id: toastId });
     } finally {
       setIsSending(false);
     }
@@ -175,17 +204,17 @@ export function DispatchSection() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full max-h-[80vh] overflow-hidden">
-      {/* Coluna 1 & 2: Seleção de Alunos */}
+      {/* Column 1 & 2: Students Selection */}
       <div className="lg:col-span-2 bg-surface border border-border rounded-2xl flex flex-col h-[70vh] overflow-hidden shadow-sm">
-        {/* Topbar: Busca e Filtros */}
+        {/* Topbar: Search & Filters */}
         <div className="p-5 border-b border-border space-y-4 shrink-0 bg-surface/50 backdrop-blur-md">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-text flex items-center gap-2">
               <Users size={18} className="text-primary" />
-              <span>Selecionar Alunos</span>
+              <span>Select Students</span>
               {selectedUsernames.length > 0 && (
                 <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-black">
-                  {selectedUsernames.length} selecionado(s)
+                  {selectedUsernames.length} selected
                 </span>
               )}
             </h3>
@@ -196,7 +225,7 @@ export function DispatchSection() {
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle" />
               <input 
                 type="text"
-                placeholder="Buscar por nome ou @username..."
+                placeholder="Search by name or @username..."
                 className="w-full pl-10 pr-4 py-2 bg-bg border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -204,7 +233,7 @@ export function DispatchSection() {
             </div>
             
             <div className="flex items-center gap-2">
-              <span className="text-xs text-text-muted font-bold whitespace-nowrap">Nível CEFR:</span>
+              <span className="text-xs text-text-muted font-bold whitespace-nowrap">CEFR Level:</span>
               <div className="flex bg-bg border border-border rounded-xl p-0.5 gap-0.5">
                 {levels.map(l => (
                   <button
@@ -224,17 +253,17 @@ export function DispatchSection() {
           </div>
         </div>
 
-        {/* Lista de Alunos com Checkboxes */}
+        {/* Students List Table */}
         <div className="flex-1 overflow-y-auto divide-y divide-border/60 custom-scrollbar">
           {loadingStudents ? (
             <div className="h-full flex items-center justify-center text-text-muted text-sm gap-2">
               <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-              <span>Carregando alunos...</span>
+              <span>Loading students...</span>
             </div>
           ) : filteredStudents.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center p-8 text-center text-text-muted opacity-55">
               <Users size={40} className="mb-2 text-text-subtle" />
-              <p className="text-sm">Nenhum aluno encontrado para os filtros ativos.</p>
+              <p className="text-sm">No students found for the active filters.</p>
             </div>
           ) : (
             <table className="w-full text-left border-collapse">
@@ -248,9 +277,9 @@ export function DispatchSection() {
                       onChange={(e) => handleSelectAll(e.target.checked)}
                     />
                   </th>
-                  <th className="px-5 py-3.5">Nome</th>
-                  <th className="px-5 py-3.5">Nível</th>
-                  <th className="px-5 py-3.5">E-mail</th>
+                  <th className="px-5 py-3.5">Name</th>
+                  <th className="px-5 py-3.5">Level</th>
+                  <th className="px-5 py-3.5">Email</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -302,9 +331,9 @@ export function DispatchSection() {
         </div>
       </div>
 
-      {/* Coluna 3: Painel de Envio */}
+      {/* Column 3: Dispatch Panel */}
       <div className="bg-surface border border-border rounded-2xl flex flex-col h-[70vh] overflow-hidden shadow-sm">
-        {/* Seletor de Tipo */}
+        {/* Type Selector */}
         <div className="flex border-b border-border bg-surface/50 shrink-0">
           <button
             onClick={() => setActiveTab('file')}
@@ -315,7 +344,7 @@ export function DispatchSection() {
             }`}
           >
             <FileText size={16} />
-            <span>Enviar Material</span>
+            <span>Send Material</span>
           </button>
           <button
             onClick={() => setActiveTab('quiz')}
@@ -326,17 +355,17 @@ export function DispatchSection() {
             }`}
           >
             <HelpCircle size={16} />
-            <span>Enviar Quiz</span>
+            <span>Send Quiz</span>
           </button>
         </div>
 
-        {/* Conteúdo do Painel */}
+        {/* Panel Content */}
         <div className="flex-1 p-6 flex flex-col justify-between overflow-y-auto">
           <div className="space-y-6">
             {activeTab === 'file' ? (
               <div className="space-y-4">
                 <div className="text-xs text-text-muted font-medium uppercase tracking-wider leading-relaxed">
-                  Upload de Arquivos Pedagógicos (PDF, Docs, Imagens)
+                  Upload Pedagogical Files (PDF, Docs, Images)
                 </div>
 
                 <label className="border-2 border-dashed border-border hover:border-primary/50 dark:hover:border-primary/30 rounded-2xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer group transition-all bg-bg-secondary/20 hover:bg-primary/5">
@@ -349,8 +378,8 @@ export function DispatchSection() {
                     <UploadCloud size={24} />
                   </div>
                   <div className="text-center">
-                    <span className="text-sm font-bold text-primary hover:underline">Escolha um arquivo</span>
-                    <p className="text-xs text-text-muted mt-1">PDF, DOCX, PNG ou JPG de até 15MB</p>
+                    <span className="text-sm font-bold text-primary hover:underline">Choose a file</span>
+                    <p className="text-xs text-text-muted mt-1">PDF, DOCX, PNG or JPG up to 15MB</p>
                   </div>
                 </label>
 
@@ -376,40 +405,114 @@ export function DispatchSection() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="text-xs text-text-muted font-medium uppercase tracking-wider leading-relaxed">
-                  Selecione um quiz cadastrado na plataforma
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-text-muted font-medium uppercase tracking-wider leading-relaxed">
+                    Select a quiz registered on the platform
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAiForm(prev => !prev)}
+                    className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+                  >
+                    {showAiForm ? 'Select Quiz' : '✨ Generate with AI'}
+                  </button>
                 </div>
 
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-text-subtle">Quiz Disponíveis:</label>
-                  {loadingQuizzes ? (
-                    <div className="h-10 bg-bg border border-border rounded-xl flex items-center px-3 text-xs text-text-muted gap-2">
-                      <div className="w-3.5 h-3.5 border border-primary/30 border-t-primary rounded-full animate-spin" />
-                      <span>Buscando quizzes...</span>
+                {!showAiForm ? (
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-text-subtle">Available Quizzes:</label>
+                    {loadingQuizzes ? (
+                      <div className="h-10 bg-bg border border-border rounded-xl flex items-center px-3 text-xs text-text-muted gap-2">
+                        <div className="w-3.5 h-3.5 border border-primary/30 border-t-primary rounded-full animate-spin" />
+                        <span>Fetching quizzes...</span>
+                      </div>
+                    ) : (
+                      <select
+                        className="w-full px-3.5 py-2.5 bg-bg border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all font-medium text-text"
+                        value={selectedQuizId}
+                        onChange={(e) => setSelectedQuizId(e.target.value)}
+                      >
+                        <option value="">Select a quiz...</option>
+                        {quizzes?.map(q => (
+                          <option key={q.id} value={q.id}>
+                            [{q.level || '—'}] {q.title}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-bg-secondary/20 border border-border p-4 rounded-2xl space-y-4 animate-fade-in">
+                    <div className="text-xs font-bold text-primary">✨ AI Quiz Generator</div>
+                    
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-bold text-text-subtle">Topic / Theme:</label>
+                      <input
+                        type="text"
+                        placeholder="e.g., Present Perfect vs Past Simple"
+                        className="w-full px-3.5 py-2 bg-bg border border-border rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all text-text font-medium"
+                        value={aiTopic}
+                        onChange={(e) => setAiTopic(e.target.value)}
+                      />
                     </div>
-                  ) : (
-                    <select
-                      className="w-full px-3.5 py-2.5 bg-bg border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all font-medium text-text"
-                      value={selectedQuizId}
-                      onChange={(e) => setSelectedQuizId(e.target.value)}
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold text-text-subtle">Level:</label>
+                        <select
+                          className="w-full px-3 py-2 bg-bg border border-border rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all text-text font-medium"
+                          value={aiLevel}
+                          onChange={(e) => setAiLevel(e.target.value)}
+                        >
+                          <option value="A1">A1 - Beginner</option>
+                          <option value="A2">A2 - Elementary</option>
+                          <option value="B1">B1 - Intermediate</option>
+                          <option value="B2">B2 - Upper Intermediate</option>
+                          <option value="C1">C1 - Advanced</option>
+                          <option value="C2">C2 - Mastery</option>
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold text-text-subtle">Questions:</label>
+                        <select
+                          className="w-full px-3 py-2 bg-bg border border-border rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all text-text font-medium"
+                          value={aiNumQuestions}
+                          onChange={(e) => setAiNumQuestions(Number(e.target.value))}
+                        >
+                          <option value={3}>3 Questions</option>
+                          <option value={5}>5 Questions</option>
+                          <option value={10}>10 Questions</option>
+                          <option value={15}>15 Questions</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={isGeneratingQuiz || !aiTopic.trim()}
+                      onClick={handleGenerateQuizAI}
+                      className="w-full py-2 bg-primary hover:bg-primary-dark text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1 shadow-sm transition-all disabled:opacity-40"
                     >
-                      <option value="">Selecione um quiz...</option>
-                      {quizzes?.map(q => (
-                        <option key={q.id} value={q.id}>
-                          [{q.level || '—'}] {q.title}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
+                      {isGeneratingQuiz ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          <span>Generating...</span>
+                        </>
+                      ) : (
+                        <span>Generate Quiz</span>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
 
-          {/* Rodapé de Ação */}
+          {/* Action Footer */}
           <div className="border-t border-border pt-5 mt-6 space-y-4 bg-surface shrink-0">
             <div className="bg-primary/5 border border-primary/10 rounded-xl p-3.5 text-xs text-primary leading-relaxed">
-              💡 <strong>Regra de Notificação:</strong> Os e-mails contendo os materiais anexados chegarão na caixa de entrada dos alunos selecionados, acompanhados de uma notificação push no celular.
+              💡 <strong>Notification Rule:</strong> Emails with the attached materials will be sent to the selected students' inbox, accompanied by a mobile push notification.
             </div>
 
             <button
@@ -420,12 +523,12 @@ export function DispatchSection() {
               {isSending ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Disparando materiais...</span>
+                  <span>Sending materials...</span>
                 </>
               ) : (
                 <>
                   <Send size={15} />
-                  <span>Enviar para {selectedUsernames.length} aluno(s)</span>
+                  <span>Send to {selectedUsernames.length} student(s)</span>
                 </>
               )}
             </button>

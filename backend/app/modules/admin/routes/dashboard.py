@@ -39,6 +39,14 @@ class DispatchQuizRequest(BaseModel):
     student_usernames: List[str]
 
 
+class GenerateQuizAIRequest(BaseModel):
+    """Payload para gerar um quiz via IA."""
+
+    topic: str
+    num_questions: int = 5
+    level: str = 'B1'
+
+
 # ── Estatísticas e visão geral ────────────────────────────────────────
 
 
@@ -974,3 +982,100 @@ async def get_quizzes_admin(
         return res.data or []
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao buscar quizzes: {e}")
+
+
+@router.post('/generate-quiz-ai')
+async def generate_quiz_ai(
+    body: GenerateQuizAIRequest,
+    user=Depends(require_staff)
+):
+    """Gera um quiz pedagógico via IA (Groq) com base em um tema, nível e número de questões."""
+    from app.modules.chat.services.llm import groq_chat_json
+    from app.core.database import get_client
+
+    db = get_client()
+
+    # Prompt de geração do Quiz
+    prompt = (
+        f"You are an expert English teacher. Generate a high-quality pedagogical quiz about the topic: '{body.topic}' "
+        f"for an English learner at CEFR level: '{body.level}'.\n"
+        f"Number of questions to generate: {body.num_questions}.\n"
+        "All questions and options must be in English. The quiz should test grammatical accuracy, reading comprehension, or vocabulary related to the topic.\n\n"
+        "STRICT RULES:\n"
+        "1. Do NOT include question numbers or prefix the question text (e.g., write 'What is...' instead of '1. What is...').\n"
+        "2. Do NOT use labels like 'A)', 'B)', 'a)', 'b)' in the options (e.g., write 'apple' instead of 'A) apple').\n"
+        "3. Provide exactly 4 options per question.\n"
+        "4. Set 'correct_index' as a 0-indexed integer (0, 1, 2, or 3) indicating which option is correct.\n"
+        "5. Write a helpful explanation in English for the correct answer.\n"
+        "6. Return ONLY a valid JSON object matching the schema below. Do not include markdown codeblocks like ```json.\n\n"
+        "JSON SCHEMA:\n"
+        "{\n"
+        '  "title": "A short engaging title for the quiz",\n'
+        '  "description": "A brief description explaining what this quiz covers",\n'
+        '  "exercises": [\n'
+        '    {\n'
+        '      "question": "The question text",\n'
+        '      "options": ["Correct Option", "Distractor 1", "Distractor 2", "Distractor 3"],\n'
+        '      "correct_index": 0,\n'
+        '      "explanation": "Explanation why this is correct."\n'
+        '    }\n'
+        '  ]\n'
+        "}"
+    )
+
+    try:
+        data = await groq_chat_json(
+            messages=[{'role': 'user', 'content': prompt}],
+            max_tokens=2000,
+            temperature=0.3,
+        )
+
+        if not data or 'exercises' not in data or not data['exercises']:
+            raise HTTPException(
+                status_code=500,
+                detail="Erro ao gerar questões via IA: a resposta do LLM está vazia ou mal formatada."
+            )
+
+        quiz_title = data.get('title') or f"{body.topic} Quiz"
+        quiz_description = data.get('description') or f"AI-generated quiz about {body.topic} at level {body.level}."
+
+        PERSONALIZED_MODULE_ID = "00000000-0000-0000-0000-000000000001"
+
+        quiz_res = db.table('quizzes').insert({
+            'module_id': PERSONALIZED_MODULE_ID,
+            'title': quiz_title,
+            'description': quiz_description,
+            'level': body.level
+        }).execute()
+
+        if not quiz_res.data:
+            raise HTTPException(status_code=500, detail="Erro ao inserir o quiz no banco de dados.")
+
+        quiz_id = quiz_res.data[0]['id']
+
+        # Insere as questões na tabela quiz_questions
+        for i, q in enumerate(data.get('exercises', [])):
+            options = q.get('options', [])
+            if not options or len(options) < 2:
+                continue
+
+            correct_index = q.get('correct_index', 0)
+            if not (0 <= correct_index < len(options)):
+                correct_index = 0
+
+            db.table('quiz_questions').insert({
+                'quiz_id': quiz_id,
+                'question': q.get('question', 'Question'),
+                'options': options,
+                'correct_index': correct_index,
+                'explanation': q.get('explanation', ''),
+                'order': i
+            }).execute()
+
+        return {"success": True, "quiz_id": quiz_id, "title": quiz_title}
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro no processamento da IA ou inserção no banco: {e}"
+        )
