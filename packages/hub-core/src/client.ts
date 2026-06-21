@@ -36,19 +36,30 @@ export function resolveApiBase(): string {
 function resolvePath(path: string): string {
   if (/^https?:\/\//i.test(path)) return path;
 
+  const base = resolveApiBase();
+  const isBypassRedirect = 
+    base.includes('localhost') || 
+    base.includes('127.0.0.1') || 
+    base.includes('hf.space') ||
+    (typeof window !== 'undefined' && 
+      (window.location.hostname === 'localhost' || 
+       window.location.hostname === '127.0.0.1' || 
+       window.location.hostname.includes('hf.space')));
+
   // Materiais (Upload/Leitura/Processamento) e Pagamentos devem passar pelo Railway
   const isRailwayOperation = 
-    path.includes('/admin/premium') || 
-    path.includes('/activities/premium') || 
-    path.includes('/activities/hub') ||
-    path.includes('/payments');
+    !isBypassRedirect && (
+      path.includes('/admin/premium') || 
+      path.includes('/activities/premium') || 
+      path.includes('/activities/hub') ||
+      path.includes('/payments')
+    );
     
   if (isRailwayOperation) {
     const railwayBase = 'https://tatiai-production.up.railway.app';
     return `${railwayBase}${path.startsWith('/') ? path : `/${path}`}`;
   }
 
-  const base = resolveApiBase();
   return `${base}${path.startsWith('/') ? path : `/${path}`}`;
 }
 

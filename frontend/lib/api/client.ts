@@ -50,14 +50,18 @@ function isAbsoluteUrl(value: string): boolean {
 function resolvePath(path: string): string {
   if (isAbsoluteUrl(path)) return path;
   
-  const isLocal = API_BASE.includes('localhost') || 
-                  API_BASE.includes('127.0.0.1') || 
-                  (typeof window !== 'undefined' && 
-                    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'));
+  const isBypassRedirect = 
+    API_BASE.includes('localhost') || 
+    API_BASE.includes('127.0.0.1') || 
+    API_BASE.includes('hf.space') ||
+    (typeof window !== 'undefined' && 
+      (window.location.hostname === 'localhost' || 
+       window.location.hostname === '127.0.0.1' || 
+       window.location.hostname.includes('hf.space')));
 
   // Materiais (Upload/Leitura/Processamento) e Pagamentos devem passar pelo Railway
   const isRailwayOperation = 
-    !isLocal && (
+    !isBypassRedirect && (
       path.includes('/admin/premium') || 
       path.includes('/activities/premium') || 
       path.includes('/activities/hub') ||
