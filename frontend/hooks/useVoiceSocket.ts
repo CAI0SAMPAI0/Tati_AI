@@ -60,11 +60,28 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
     if (conversationId) {
       setActiveConvId(conversationId);
       convIdRef.current = conversationId;
+
+      // 1. Carrega do Cache Local (IndexedDB) para abertura instantânea
+      import('@/lib/db/indexedDB').then(({ getMessagesLocal }) => {
+        getMessagesLocal(conversationId).then((cachedMsgs) => {
+          if (cachedMsgs.length > 0) {
+            setMessages(cachedMsgs);
+          }
+        });
+      }).catch(err => console.error('IndexedDB load error in voice hook:', err));
+
+      // 2. SWR - Busca do backend e sincroniza
       apiGet<Message[]>(ENDPOINTS.CONVERSATION_MESSAGES(conversationId))
         .then(history => {
           // Só atualiza se houver histórico real para não sobrescrever a mensagem inicial das simulações
           if (history && history.length > 0) {
             setMessages(history);
+            
+            // Salva no cache local
+            import('@/lib/db/indexedDB').then(({ saveMessagesLocal }) => {
+              saveMessagesLocal(conversationId, history);
+            }).catch(err => console.error('IndexedDB save error in voice hook:', err));
+
             // Se a última mensagem for da IA e tiver áudio, toca ela (saudação inicial de simulação)
             const lastMsg = history[history.length - 1];
             if (lastMsg && lastMsg.role === 'assistant' && lastMsg.audio_b64) {
@@ -80,6 +97,15 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
       convIdRef.current = null;
     }
   }, [conversationId]);
+
+  // Synchronize messages state to local IndexedDB cache
+  useEffect(() => {
+    if (conversationId && messages && messages.length > 0) {
+      import('@/lib/db/indexedDB').then(({ saveMessagesLocal }) => {
+        saveMessagesLocal(conversationId, messages);
+      }).catch(err => console.error('IndexedDB sync error in useVoiceSocket:', err));
+    }
+  }, [messages, conversationId]);
 
   const handleMessage = useCallback((msg: WsIncomingMessage) => {
     const currentId = convIdRef.current;

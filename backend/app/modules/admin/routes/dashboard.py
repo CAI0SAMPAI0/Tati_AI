@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, File, UploadFile, Form
 from app.core.task_manager import run_task_in_background, delegate_to_worker_if_needed
 from app.core.exceptions import ContentNotFoundError, BusinessLogicError
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from app.core.enums import normalize_level
 
 from app.core.dependencies.auth import require_staff, get_current_user
@@ -30,6 +30,13 @@ class UrlGenerationRequest(BaseModel):
 
     url: str
     level: Optional[str] = 'B1'
+
+
+class DispatchQuizRequest(BaseModel):
+    """Payload para despachar um quiz para vários alunos."""
+
+    quiz_id: str
+    student_usernames: List[str]
 
 
 # ── Estatísticas e visão geral ────────────────────────────────────────
@@ -825,3 +832,145 @@ async def get_sales_by_category(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao gerar relatório de vendas: {e}")
+
+
+@router.post('/dispatch-file')
+async def dispatch_file(
+    file: UploadFile = File(...),
+    student_usernames: str = Form(...),  # Comma-separated or JSON list
+    user=Depends(require_staff)
+):
+    """Dispara um arquivo de estudo por e-mail e push no celular para os alunos selecionados."""
+    import json
+    import os
+    import tempfile
+    import shutil
+    from app.core.database import get_client
+    from app.shared.services.email import EmailSender
+    from app.modules.notifications.services.push_notifications import send_push_to_user
+
+    try:
+        usernames = json.loads(student_usernames)
+        if not isinstance(usernames, list):
+            usernames = [str(usernames)]
+    except Exception:
+        usernames = [u.strip() for u in student_usernames.split(',') if u.strip()]
+
+    if not usernames:
+        raise HTTPException(status_code=400, detail="Nenhum aluno selecionado.")
+
+    db = get_client()
+
+    # Salva o arquivo temporariamente no servidor
+    temp_dir = tempfile.gettempdir()
+    temp_path = os.path.join(temp_dir, file.filename)
+    with open(temp_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    email_sender = EmailSender()
+    success_count = 0
+
+    try:
+        # Busca os detalhes de e-mail e perfil dos alunos
+        res = db.table('users').select('username, email, profile').in_('username', usernames).execute()
+        students = res.data or []
+
+        for student in students:
+            email = student.get('email')
+            username = student.get('username')
+            profile = student.get('profile') or {}
+            name = profile.get('name') or username
+
+            if email:
+                # 1. Envia E-mail com o Anexo do Arquivo
+                email_sent = email_sender.send_dispatched_file_email(
+                    to_email=email,
+                    name=name,
+                    file_name=file.filename,
+                    file_path=temp_path
+                )
+
+                # 2. Envia Notificação Push Celular avisando do e-mail
+                if email_sent:
+                    success_count += 1
+                    send_push_to_user(
+                        username=username,
+                        title="Novo Material de Estudo! 📚",
+                        body=f"Teacher Tati te enviou o material '{file.filename}'. O arquivo foi enviado ao seu e-mail!",
+                        url="/chat"
+                    )
+    finally:
+        # Garante a limpeza do arquivo temporário
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+    return {"success": True, "dispatched_to": success_count}
+
+
+@router.post('/dispatch-quiz')
+async def dispatch_quiz(
+    body: DispatchQuizRequest,
+    user=Depends(require_staff)
+):
+    """Dispara uma notificação de e-mail e push celular alertando sobre um quiz pendente para os alunos selecionados."""
+    from app.core.database import get_client
+    from app.shared.services.email import EmailSender
+    from app.modules.notifications.services.push_notifications import send_push_to_user
+
+    if not body.student_usernames:
+        raise HTTPException(status_code=400, detail="Nenhum aluno selecionado.")
+
+    db = get_client()
+
+    # Busca o título do quiz para a mensagem
+    quiz_res = db.table('quizzes').select('title').eq('id', body.quiz_id).limit(1).execute()
+    if not quiz_res.data:
+        raise HTTPException(status_code=404, detail="Quiz não encontrado.")
+    quiz_title = quiz_res.data[0].get('title') or "Novo Quiz"
+
+    # Busca os detalhes de e-mail e perfil dos alunos
+    res = db.table('users').select('username, email, profile').in_('username', body.student_usernames).execute()
+    students = res.data or []
+
+    email_sender = EmailSender()
+    success_count = 0
+
+    for student in students:
+        email = student.get('email')
+        username = student.get('username')
+        profile = student.get('profile') or {}
+        name = profile.get('name') or username
+
+        if email:
+            # 1. Envia Alerta por E-mail
+            email_sent = email_sender.send_dispatched_quiz_email(
+                to_email=email,
+                name=name,
+                quiz_title=quiz_title
+            )
+
+            # 2. Envia Notificação Push Celular
+            if email_sent:
+                success_count += 1
+                send_push_to_user(
+                    username=username,
+                    title="Novo Quiz Disponível! 📝",
+                    body=f"Teacher Tati liberou o quiz '{quiz_title}' para você. Acesse suas atividades!",
+                    url="/activities"
+                )
+
+    return {"success": True, "dispatched_to": success_count}
+
+
+@router.get('/quizzes')
+async def get_quizzes_admin(
+    user=Depends(require_staff)
+):
+    """Lista todos os quizzes cadastrados no sistema."""
+    from app.core.database import get_client
+    db = get_client()
+    try:
+        res = db.table('quizzes').select('id, title, level').execute()
+        return res.data or []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar quizzes: {e}")

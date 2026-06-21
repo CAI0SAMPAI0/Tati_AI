@@ -30,6 +30,15 @@ export function useChatSocket(conversationId: string | null) {
     convIdRef.current = conversationId;
   }, [conversationId]);
 
+  // Synchronize messages state to local IndexedDB cache
+  useEffect(() => {
+    if (conversationId && messages && messages.length > 0) {
+      import('@/lib/db/indexedDB').then(({ saveMessagesLocal }) => {
+        saveMessagesLocal(conversationId, messages);
+      }).catch(err => console.error('IndexedDB sync error in useChatSocket:', err));
+    }
+  }, [messages, conversationId]);
+
   const handleTriggerExercise = useCallback(async () => {
     // Reset ANTES da chamada (fail-safe)
     reset();

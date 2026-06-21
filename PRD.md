@@ -756,3 +756,74 @@ erDiagram
 - [X] **Testes e Validação**
   - [X] Validar a integridade da conexão WebSocket e o tempo de resposta (latência) da IA.
   - [X] Testar a sincronia de áudio e a qualidade do som transmitido/recebido.
+
+---
+
+### Sprint 8 – Cache Local com IndexedDB e Carregamento Otimizado
+
+**Objetivo:** Eliminar a percepção de lentidão ao abrir o chat, permitindo carregamento instantâneo offline-first de mensagens salvas localmente e paginação eficiente (lazy loading) do histórico ao rolar a página.
+
+- [X] **Frontend: Cache Local (IndexedDB)**
+  - [X] Implementar um repositório local usando IndexedDB no frontend para persistir o histórico de mensagens localmente por canal/conversação.
+  - [X] Sincronizar o banco de dados local com o Supabase de forma otimizada em background ao abrir a conversa.
+- [X] **Frontend: Paginação de Mensagens (Lazy Loading)**
+  - [X] Adaptar a renderização da lista de mensagens no chat para exibir inicialmente apenas as 20 mensagens mais recentes.
+  - [X] Implementar carregamento sob demanda ao subir o scroll da tela, injetando novas mensagens de forma suave no DOM.
+- [X] **Testes e Validação**
+  - [X] Validar a integridade das mensagens ao alternar de conversa com e sem rede.
+  - [X] Verificar a performance de renderização em chats com histórico volumoso.
+
+---
+
+### Sprint 9 – Painel de Disparo Pedagógico (Arquivos, Quizzes e Notificações Multicanal)
+
+**Objetivo:** Criar um painel de controle administrativo para a Tatiana disparar materiais (PDF/outros arquivos) e Quizzes direcionados a turmas ou alunos específicos, integrando notificações de email e push celular de forma reativa.
+
+- [X] **Backend: Rota de Envio de Arquivos**
+  - [X] Criar endpoint `POST /api/admin/dispatch-file` que aceita arquivo (PDF/outros formatos) e lista de IDs de alunos.
+  - [X] Enviar o anexo do arquivo diretamente para o email de cada aluno usando o serviço de email configurado (Resend/SMTP).
+  - [X] Disparar notificação push via FCM para o celular de cada aluno com a mensagem indicando que o arquivo foi enviado ao seu email.
+- [X] **Backend: Rota de Envio de Quizzes**
+  - [X] Criar endpoint `POST /api/admin/dispatch-quiz` que aceita o ID do quiz e a lista de alunos selecionados.
+  - [X] Disparar email informativo e notificação push alertando os alunos sobre o novo quiz pendente em sua conta.
+- [X] **Frontend: Painel Administrativo da Tatiana**
+  - [X] Criar interface administrativa no dashboard da professora para seleção de alunos com suporte a checkboxes múltiplos, selecionar todos e filtros rápidos por nível CEFR (A1, A2, B1, B2...).
+  - [X] Adicionar inputs para upload de arquivos (PDF e outros formatos) e seletor de quizzes criados.
+  - [X] Implementar feedbacks visuais de envio (barra de progresso, estados de sucesso/erro).
+- [X] **Testes e Validação**
+  - [X] Escrever testes unitários e de integração para disparos de arquivos e quizzes por filtros de alunos.
+  - [X] Verificar recebimento do anexo de email e do respectivo push no Capacitor/dispositivo de simulação.
+
+---
+
+### Sprint 10 – Vocabulário Interativo com SRS (Flashcards)
+
+**Objetivo:** Permitir ao aluno salvar palavras do chat diretamente no seu deck pessoal de estudo, utilizando algoritmo de repetição espaçada (SRS).
+
+- [ ] **Backend: Modelagem e Algoritmo SRS**
+  - [ ] Criar endpoints para gerenciar flashcards do usuário com cálculo de próxima revisão.
+- [ ] **Frontend: Deck e Revisões**
+  - [ ] Exibir opção de adicionar palavras no dicionário a partir do popover de palavras no chat e tela de revisões diárias.
+
+---
+
+### Sprint 11 – Feedback de Fluência por IA (CEFR Tracking Avançado)
+
+**Objetivo:** Analisar a pronúncia e gramática das falas gravadas e gerar gráficos de evolução de nível CEFR do aluno ao longo do tempo.
+
+- [ ] **Backend: Métricas e Histórico**
+  - [ ] Criar agregadores de pontuação e rotas de histórico de proficiência.
+- [ ] **Frontend: Gráficos de Evolução**
+  - [ ] Integrar gráficos de barra/linha mostrando a evolução fonética no dashboard.
+
+---
+
+### Sprint 12 – Checklist de Objetivos em Simulações (Roleplay Dinâmico)
+
+**Objetivo:** Exibir missões e objetivos em tempo real no chat de simulação, marcando-os dinamicamente à medida que o aluno conversa.
+
+- [ ] **Backend: Julgamento de Objetivos**
+  - [ ] Analisar a conversa para certificar a realização de metas definidas.
+- [ ] **Frontend: Sidebar de Missões**
+  - [ ] Renderizar painel de checklist de objetivos cumpridos em tempo real na tela do avatar.
+

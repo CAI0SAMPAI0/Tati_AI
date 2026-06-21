@@ -15,6 +15,7 @@ import  SimulationsSection  from '@/components/dashboard/simulations-section';
 import { FlashcardsSection } from '@/components/dashboard/flashcards-section';
 import { PremiumSection } from '@/components/dashboard/premium-section';
 import { CefrSection } from '@/components/dashboard/cefr-section';
+import { DispatchSection } from '@/components/dashboard/dispatch-section';
 import { StudentModal } from '@/components/dashboard/student-modal';
 import { apiGet } from '@/lib/api/client';
 
@@ -33,12 +34,12 @@ export default function DashboardClientPage() {
   // Get tab from URL or localStorage
   const getInitialTab = (): DashSection => {
     const tabParam = searchParams.get('tab') as DashSection;
-    if (tabParam && ['overview', 'students', 'reports', 'modules', 'flashcards', 'simulations', 'premium', 'cefr'].includes(tabParam)) {
+    if (tabParam && ['overview', 'students', 'reports', 'modules', 'flashcards', 'simulations', 'premium', 'cefr', 'dispatch'].includes(tabParam)) {
       return tabParam;
     }
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('tati_last_dashboard_tab') as DashSection;
-      if (saved && ['overview', 'students', 'reports', 'modules', 'flashcards', 'simulations', 'premium', 'cefr'].includes(saved)) {
+      if (saved && ['overview', 'students', 'reports', 'modules', 'flashcards', 'simulations', 'premium', 'cefr', 'dispatch'].includes(saved)) {
         return saved;
       }
     }
@@ -79,7 +80,8 @@ export default function DashboardClientPage() {
     simulations: 'Simulations',
     flashcards: 'Flashcards',
     cefr: 'CEFR Materials',
-    submissions: 'Corrections'
+    submissions: 'Corrections',
+    dispatch: 'Dispatch Materials'
   };
 
   const sectionSubs: Record<string, string> = {
@@ -90,7 +92,8 @@ export default function DashboardClientPage() {
     simulations: 'Manage real-life conversation simulations',
     flashcards: 'Vocabulary deck management',
     cefr: 'CEFR diagnostic and RAG materials',
-    submissions: 'Student answers to review'
+    submissions: 'Student answers to review',
+    dispatch: 'Send files and quizzes to students'
   };
 
   // Fetching data
@@ -161,7 +164,8 @@ export default function DashboardClientPage() {
                   flashcards: 'Flashcards',
                   simulations: 'Simulations',
                   cefr: 'CEFR Materials',
-                  premium: 'Premium Hub'
+                  premium: 'Premium Hub',
+                  dispatch: 'Materials Dispatch'
                 }[activeSection] || activeSection}
               </h1>
               <p className="text-[0.7rem] text-text-muted font-medium uppercase tracking-wider">
@@ -174,7 +178,8 @@ export default function DashboardClientPage() {
                   flashcards: 'Study decks',
                   simulations: 'Real-world scenarios',
                   cefr: 'Diagnose and generate from PDFs',
-                  premium: 'Premium materials & payments'
+                  premium: 'Premium materials & payments',
+                  dispatch: 'Send files and quizzes to students'
                 }[activeSection]}
               </p>
 
@@ -200,6 +205,7 @@ export default function DashboardClientPage() {
           {activeSection === 'flashcards' && <FlashcardsSection />}
           {activeSection === 'cefr' && <CefrSection />}
           {activeSection === 'premium' && <PremiumSection />}
+          {activeSection === 'dispatch' && <DispatchSection />}
 
           {activeSection === 'students' && (
             <div className="bg-surface border border-border rounded-2xl overflow-hidden">

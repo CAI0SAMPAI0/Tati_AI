@@ -15,13 +15,51 @@ interface MessageListProps {
 export function MessageList({ messages, isStreaming, streamingContent, onEdit }: MessageListProps) {
   
   const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   
   const [activeWord, setActiveWord] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
+  const [visibleCount, setVisibleCount] = useState(20);
+  const prevLengthRef = useRef(messages.length);
+
+  // Se o total de mensagens aumentar (nova mensagem enviada/recebida), aumenta a contagem visível correspondente
+  useEffect(() => {
+    if (messages.length > prevLengthRef.current) {
+      const diff = messages.length - prevLengthRef.current;
+      setVisibleCount((prev) => prev + diff);
+    }
+    prevLengthRef.current = messages.length;
+  }, [messages.length]);
+
+  // Sempre rola para o final quando uma nova mensagem está sendo escrita/transmitida
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isStreaming, streamingContent]);
+  }, [messages.length, isStreaming, streamingContent]);
+
+  const handleScroll = () => {
+    if (!containerRef.current) return;
+    const { scrollTop } = containerRef.current;
+
+    // Se rolar para o topo e houver mais mensagens para carregar
+    if (scrollTop < 10 && visibleCount < messages.length) {
+      const scrollHeightBefore = containerRef.current.scrollHeight;
+      
+      setVisibleCount((prev) => {
+        const next = Math.min(messages.length, prev + 20);
+        
+        // Restaura a ancoragem do scroll para evitar pulo visual
+        setTimeout(() => {
+          if (containerRef.current) {
+            const diff = containerRef.current.scrollHeight - scrollHeightBefore;
+            containerRef.current.scrollTop = diff;
+          }
+        }, 0);
+        
+        return next;
+      });
+    }
+  };
 
   const handleWordClick = (word: string, x: number, y: number) => {
     setActiveWord(word);
@@ -29,9 +67,10 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit }:
   };
 
   const showWelcome = messages.length === 0 && !isStreaming;
+  const paginatedMessages = messages.slice(-visibleCount);
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin">
+    <div ref={containerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin">
       {showWelcome && (
         <div className="flex flex-col items-center justify-center py-12 text-center animate-fade-in">
           <div className="w-16 h-16 rounded-full border-[3px] border-primary/40 shadow-glow overflow-hidden mb-4">
@@ -64,7 +103,13 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit }:
         </div>
       )}
 
-      {messages.map((m, i) => (
+      {visibleCount < messages.length && (
+        <div className="text-center text-xs text-text-subtle py-2 opacity-60">
+          Scroll up to load older messages...
+        </div>
+      )}
+
+      {paginatedMessages.map((m, i) => (
         <MessageBubble 
           key={`${m.id}-${i}`} 
           message={m} 

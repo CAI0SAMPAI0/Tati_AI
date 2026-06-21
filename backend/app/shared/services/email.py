@@ -438,6 +438,49 @@ class EmailSender:
         """
         return self._send(user_email, subject, html)
 
+    def send_dispatched_file_email(
+            self,
+            to_email: str,
+            name: str,
+            file_name: str,
+            file_path: str) -> bool:
+        subject = f"📚 New Study Material: {file_name} — Teacher Tati"
+        html = f"""
+<div style="font-family:Arial,sans-serif;max-width:600px;color:#333;line-height:1.6;">
+<h2 style="color:#7828C8;">New Study Material from Teacher Tati! 📚</h2>
+<p>Hi <strong>{name}</strong>,</p>
+<p>Teacher Tati sent you a new study material: <strong>{file_name}</strong>.</p>
+<p>You can find the file attached directly to this email.</p>
+<hr style="border:0;border-top:1px solid #eee;margin:20px 0;">
+<p style="font-size:12px;color:#999;">Teacher Tati Team</p>
+</div>
+"""
+        return self._send(
+            to_email,
+            subject,
+            html,
+            attachments=[file_path])
+
+    def send_dispatched_quiz_email(
+            self,
+            to_email: str,
+            name: str,
+            quiz_title: str,
+            quiz_url: str = "https://tati-ai.vercel.app/activities") -> bool:
+        subject = f"📝 New Quiz available: {quiz_title} — Teacher Tati"
+        html = f"""
+<div style="font-family:Arial,sans-serif;max-width:600px;color:#333;line-height:1.6;">
+<h2 style="color:#7828C8;">New Quiz Available! 📝</h2>
+<p>Hi <strong>{name}</strong>,</p>
+<p>Teacher Tati assigned a new quiz for you: <strong>{quiz_title}</strong>.</p>
+<p>Click the link below to access your activities list and start the quiz:</p>
+<a href="{quiz_url}" style="display:inline-block;background:#7828C8;color:#fff;padding:0.6rem 1.4rem;border-radius:8px;text-decoration:none;margin-top:1rem;font-weight:bold;">Start Quiz →</a>
+<hr style="border:0;border-top:1px solid #eee;margin:20px 0;">
+<p style="font-size:12px;color:#999;">Teacher Tati Team</p>
+</div>
+"""
+        return self._send(to_email, subject, html)
+
 
 class _ResendShim:
     class Emails:

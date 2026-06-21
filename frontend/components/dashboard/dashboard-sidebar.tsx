@@ -13,11 +13,12 @@ import {
   Settings,
   X,
   Zap,
+  Send,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
-export type DashSection = 'overview' | 'students' | 'reports' | 'modules' | 'flashcards' | 'simulations' | 'premium' | 'cefr';
+export type DashSection = 'overview' | 'students' | 'reports' | 'modules' | 'flashcards' | 'simulations' | 'premium' | 'cefr' | 'dispatch';
 
 interface DashboardSidebarProps {
   activeSection: DashSection;
@@ -77,6 +78,7 @@ export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose 
     { id: 'flashcards', icon: <Layers size={20} />, label: 'Flashcards' },
     { id: 'simulations', icon: <Drama size={20} />, label: 'Simulations' },
     { id: 'cefr', icon: <BookOpen size={20} />, label: 'CEFR Materials' },
+    { id: 'dispatch', icon: <Send size={20} />, label: 'Dispatch Panel' },
     { id: 'premium', icon: <Zap size={20} />, label: 'Premium Hub' },
   ];
 

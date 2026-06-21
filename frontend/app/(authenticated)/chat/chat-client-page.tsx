@@ -49,10 +49,23 @@ export default function ChatClientPage() {
 
   useEffect(() => {
     if (currentConvId) {
+      // 1. Carrega do Cache Local (IndexedDB) para abertura instantânea
+      import('@/lib/db/indexedDB').then(({ getMessagesLocal }) => {
+        getMessagesLocal(currentConvId).then((cachedMsgs) => {
+          if (cachedMsgs.length > 0) {
+            setMessages(cachedMsgs);
+          }
+        });
+      }).catch(err => console.error('IndexedDB load error:', err));
+
+      // 2. SWR - Busca do backend e sincroniza
       apiGet<Message[]>(ENDPOINTS.CONVERSATION_MESSAGES(currentConvId))
         .then((msgs) => {
           if (msgs.length > 0) {
             setMessages(msgs);
+            import('@/lib/db/indexedDB').then(({ saveMessagesLocal }) => {
+              saveMessagesLocal(currentConvId, msgs);
+            }).catch(err => console.error('IndexedDB save error:', err));
           }
         })
         .catch((err) => console.error('Error loading messages:', err));
