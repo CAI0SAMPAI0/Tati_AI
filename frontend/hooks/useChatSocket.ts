@@ -142,16 +142,20 @@ export function useChatSocket(conversationId: string | null) {
         }
         break;
       case 'pdf_generated':
-        const pdfMsg: Message = {
-           id: `assistant-pdf-${Date.now()}`,
-           conversation_id: currentId || '',
-           role: 'assistant',
-           content: msg.text || '📄 Documento gerado com sucesso.',
-           created_at: new Date().toISOString(),
-           pdf_b64: msg.pdf_b64,
-           pdf_filename: msg.filename || 'Documento.pdf',
-        };
-        setMessages((prev) => [...prev, pdfMsg]);
+        setMessages((prev) => {
+          const last = [...prev];
+          for (let i = last.length - 1; i >= 0; i--) {
+            if (last[i].role === 'assistant') {
+              last[i] = {
+                ...last[i],
+                pdf_b64: msg.pdf_b64,
+                pdf_filename: msg.filename || 'Documento.pdf',
+              };
+              break;
+            }
+          }
+          return last;
+        });
         break;
       case 'error':
         setIsStreaming(false);

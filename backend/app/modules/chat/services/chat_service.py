@@ -330,10 +330,11 @@ class ChatService:
 
         is_pdf_generation = False
         pdf_filename = f"tati_doc_{conv_id}.pdf"
+        pre_tag_text = ""
         buffer = ''
 
         async for token in stream_llm(effective_prompt, history, max_tokens=max_tokens):
-            if not is_pdf_generation and len(buffer) < 80:
+            if not is_pdf_generation and len(buffer) < 500:
                 buffer += token
                 if '[GENERATE_PDF' in buffer and ']' in buffer:
                     is_pdf_generation = True
@@ -347,9 +348,14 @@ class ChatService:
                         if not pdf_filename.endswith('.pdf'):
                             pdf_filename += '.pdf'
 
-                    # Get everything after the tag
+                    # Extract pre-tag text and stream it immediately
+                    pre_tag_text = buffer[:start_idx].strip()
+                    if pre_tag_text:
+                        await websocket.send_json({'type': 'stream_token', 'content': pre_tag_text})
+
+                    # Get everything after the tag as PDF content
                     full_response = buffer[end_idx + 1:].lstrip()
-                elif len(buffer) >= 80 and '[GENERATE_PDF' not in buffer:
+                elif len(buffer) >= 500 and '[GENERATE_PDF' not in buffer:
                     # Flush buffer as normal text
                     full_response += buffer
                     await websocket.send_json({'type': 'stream_token', 'content': buffer})
@@ -360,8 +366,8 @@ class ChatService:
                     full_response += token
                     await websocket.send_json({'type': 'stream_token', 'content': token})
 
-        # Se terminou e buffer era menor que 80 e não era PDF
-        if not is_pdf_generation and len(buffer) < 80 and buffer:
+        # Se terminou e buffer era menor que 500 e não era PDF
+        if not is_pdf_generation and len(buffer) < 500 and buffer:
             if '[GENERATE_PDF' not in buffer:
                 full_response += buffer
                 await websocket.send_json({'type': 'stream_token', 'content': buffer})
@@ -393,7 +399,9 @@ class ChatService:
                 full_response,
                 websocket,
                 conv_id,
-                is_pdf_generation))
+                is_pdf_generation=is_pdf_generation,
+                pdf_filename=pdf_filename,
+                pre_tag=pre_tag_text))
 
         return pending_drill_target
 
@@ -421,7 +429,9 @@ class ChatService:
             full_response: str,
             websocket: WebSocket,
             conv_id: str,
-            is_pdf_generation: bool = False):
+            is_pdf_generation: bool = False,
+            pdf_filename: str = None,
+            pre_tag: str = ""):
         """Tarefas após o streaming terminar."""
         try:
             # 0. XP (Gamification) - Recompensa por mensagem enviada
@@ -439,9 +449,19 @@ class ChatService:
             if not is_pdf_generation:
                 tts_text = self._clean_tts_text(full_response)
                 audio_b64 = await text_to_speech(tts_text)
+                db_content = full_response
+            else:
+                filename_to_save = pdf_filename or f"tati_doc_{conv_id}.pdf"
+                # Join pre_tag and tag with content
+                parts = []
+                if pre_tag:
+                    parts.append(pre_tag)
+                parts.append(f"[GENERATE_PDF: {filename_to_save}]")
+                parts.append(full_response)
+                db_content = "\n".join(parts)
 
             await save_message(
-                conv_id, username, 'assistant', full_response, audio_b64=audio_b64
+                conv_id, username, 'assistant', db_content, audio_b64=audio_b64
             )
 
             # Envia áudio imediatamente se for modo voz (opcional, já

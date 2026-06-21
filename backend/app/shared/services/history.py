@@ -174,6 +174,40 @@ async def load_history(conversation_id: str) -> list[dict]:
         result = await _execute_db(_fetch)
         messages = result.data or []
         messages.reverse()
+
+        # Regenera PDFs sob demanda se a mensagem contiver a tag de PDF
+        for msg in messages:
+            content = msg.get('content') or ''
+            if msg.get('role') == 'assistant' and '[GENERATE_PDF:' in content:
+                try:
+                    import re
+                    import base64
+                    import os
+                    from app.shared.services.pdf_generator import generate_report_pdf
+
+                    # Regex para separar: (qualquer texto antes)\n[GENERATE_PDF: filename.pdf]\n(conteúdo do PDF)
+                    match = re.search(r'^(.*?)\s*\[GENERATE_PDF:\s*([^\]]+)\]\s*\n?(.*)', content, re.DOTALL)
+                    if match:
+                        pre_tag = match.group(1).strip()
+                        pdf_filename = match.group(2).strip()
+                        pdf_content = match.group(3).strip()
+
+                        # Se o arquivo já existe no temp, apenas usa, senão gera
+                        import tempfile
+                        pdf_path = os.path.join(tempfile.gettempdir(), pdf_filename)
+                        if not os.path.exists(pdf_path):
+                            pdf_path = generate_report_pdf(pdf_content, filename=pdf_filename)
+
+                        if os.path.exists(pdf_path):
+                            with open(pdf_path, 'rb') as f:
+                                pdf_b64 = base64.b64encode(f.read()).decode('utf-8')
+                            msg['pdf_b64'] = pdf_b64
+                            msg['pdf_filename'] = pdf_filename
+                            # Mostra apenas o pre-tag de introdução ou um texto padrão na bolha
+                            msg['content'] = pre_tag or '📄 Documento criado com sucesso!'
+                except Exception as ex:
+                    logging.info(f"[History Load] Falha ao processar/regenerar PDF: {ex}")
+
         return messages
     except Exception as e:
         logging.info(f'ERROR [load_history]: {e}')
