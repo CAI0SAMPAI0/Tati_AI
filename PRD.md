@@ -826,4 +826,3 @@ erDiagram
   - [ ] Analisar a conversa para certificar a realização de metas definidas.
 - [ ] **Frontend: Sidebar de Missões**
   - [ ] Renderizar painel de checklist de objetivos cumpridos em tempo real na tela do avatar.
-

@@ -40,7 +40,7 @@ export function DispatchSection() {
   const [selectedUsernames, setSelectedUsernames] = useState<string[]>([]);
 
   // Dispatch States
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [selectedQuizId, setSelectedQuizId] = useState<string>('');
   const [isSending, setIsSending] = useState(false);
 
@@ -96,7 +96,8 @@ export function DispatchSection() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setFile(e.target.files[0]);
+      const selected = Array.from(e.target.files);
+      setFiles(prev => [...prev, ...selected]);
     }
   };
 
@@ -147,14 +148,16 @@ export function DispatchSection() {
 
     try {
       if (activeTab === 'file') {
-        if (!file) {
+        if (files.length === 0) {
           toast.error('Please select a file to send.', { id: toastId });
           setIsSending(false);
           return;
         }
 
         const formData = new FormData();
-        formData.append('file', file);
+        files.forEach(f => {
+          formData.append('files', f);
+        });
         formData.append('student_usernames', JSON.stringify(selectedUsernames));
 
         const res = await apiUpload<{ success: boolean; detail?: string; dispatched_to?: number }>(
@@ -163,11 +166,11 @@ export function DispatchSection() {
         );
 
         if (res.ok && res.data.success) {
-          toast.success(`File successfully sent to ${res.data.dispatched_to} student(s)!`, { id: toastId });
-          setFile(null);
+          toast.success(`Materials successfully sent to ${res.data.dispatched_to} student(s)!`, { id: toastId });
+          setFiles([]);
           setSelectedUsernames([]);
         } else {
-          toast.error(res.data.detail || 'Error sending file.', { id: toastId });
+          toast.error(res.data.detail || 'Error sending materials.', { id: toastId });
         }
       } else {
         if (!selectedQuizId) {
@@ -373,33 +376,38 @@ export function DispatchSection() {
                     type="file" 
                     className="hidden" 
                     onChange={handleFileChange}
+                    multiple
                   />
                   <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
                     <UploadCloud size={24} />
                   </div>
                   <div className="text-center">
-                    <span className="text-sm font-bold text-primary hover:underline">Choose a file</span>
-                    <p className="text-xs text-text-muted mt-1">PDF, DOCX, PNG or JPG up to 15MB</p>
+                    <span className="text-sm font-bold text-primary hover:underline">Choose files</span>
+                    <p className="text-xs text-text-muted mt-1">PDF, DOCX, PNG or JPG up to 15MB each</p>
                   </div>
                 </label>
 
-                {file && (
-                  <div className="bg-bg border border-border p-4 rounded-xl flex items-center justify-between animate-fade-in">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
-                        <FileCheck size={18} />
+                {files.length > 0 && (
+                  <div className="space-y-2 max-h-[20vh] overflow-y-auto pr-1 custom-scrollbar">
+                    {files.map((file, idx) => (
+                      <div key={idx} className="bg-bg border border-border p-3 rounded-xl flex items-center justify-between animate-fade-in">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
+                            <FileCheck size={16} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-text truncate">{file.name}</p>
+                            <p className="text-[0.65rem] text-text-muted font-medium">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => setFiles(prev => prev.filter((_, i) => i !== idx))}
+                          className="p-1 hover:bg-surface-hover rounded-lg text-text-subtle transition-colors"
+                        >
+                          <X size={12} />
+                        </button>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-text truncate">{file.name}</p>
-                        <p className="text-[0.65rem] text-text-muted font-medium">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => setFile(null)}
-                      className="p-1.5 hover:bg-surface-hover rounded-lg text-text-subtle transition-colors"
-                    >
-                      <X size={14} />
-                    </button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -517,7 +525,7 @@ export function DispatchSection() {
 
             <button
               onClick={handleSend}
-              disabled={isSending || selectedUsernames.length === 0 || (activeTab === 'file' ? !file : !selectedQuizId)}
+              disabled={isSending || selectedUsernames.length === 0 || (activeTab === 'file' ? files.length === 0 : !selectedQuizId)}
               className="w-full py-3 px-4 bg-primary hover:bg-primary-dark disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all active:scale-95"
             >
               {isSending ? (

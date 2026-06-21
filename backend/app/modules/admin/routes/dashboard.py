@@ -844,11 +844,11 @@ async def get_sales_by_category(
 
 @router.post('/dispatch-file')
 async def dispatch_file(
-    file: UploadFile = File(...),
+    files: List[UploadFile] = File(...),
     student_usernames: str = Form(...),  # Comma-separated or JSON list
     user=Depends(require_staff)
 ):
-    """Dispara um arquivo de estudo por e-mail e push no celular para os alunos selecionados."""
+    """Dispara múltiplos arquivos de estudo por e-mail e push no celular para os alunos selecionados."""
     import json
     import os
     import tempfile
@@ -868,20 +868,25 @@ async def dispatch_file(
         raise HTTPException(status_code=400, detail="Nenhum aluno selecionado.")
 
     db = get_client()
-
-    # Salva o arquivo temporariamente no servidor
-    temp_dir = tempfile.gettempdir()
-    temp_path = os.path.join(temp_dir, file.filename)
-    with open(temp_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
     email_sender = EmailSender()
     success_count = 0
 
+    # Busca os detalhes de e-mail e perfil dos alunos
+    res = db.table('users').select('username, email, profile').in_('username', usernames).execute()
+    students = res.data or []
+
+    # Salva todos os arquivos temporariamente no servidor
+    temp_dir = tempfile.gettempdir()
+    saved_paths = []
+    file_names = []
+
     try:
-        # Busca os detalhes de e-mail e perfil dos alunos
-        res = db.table('users').select('username, email, profile').in_('username', usernames).execute()
-        students = res.data or []
+        for f in files:
+            temp_path = os.path.join(temp_dir, f.filename)
+            with open(temp_path, "wb") as buffer:
+                shutil.copyfileobj(f.file, buffer)
+            saved_paths.append(temp_path)
+            file_names.append(f.filename)
 
         for student in students:
             email = student.get('email')
@@ -890,27 +895,29 @@ async def dispatch_file(
             name = profile.get('name') or username
 
             if email:
-                # 1. Envia E-mail com o Anexo do Arquivo
-                email_sent = email_sender.send_dispatched_file_email(
+                # Envia E-mail com todos os anexos
+                email_sent = email_sender.send_dispatched_files_email(
                     to_email=email,
                     name=name,
-                    file_name=file.filename,
-                    file_path=temp_path
+                    file_names=file_names,
+                    file_paths=saved_paths
                 )
 
-                # 2. Envia Notificação Push Celular avisando do e-mail
+                # Envia Notificação Push Celular avisando dos e-mails
                 if email_sent:
                     success_count += 1
+                    files_str = ", ".join(file_names)
                     send_push_to_user(
                         username=username,
                         title="Novo Material de Estudo! 📚",
-                        body=f"Teacher Tati te enviou o material '{file.filename}'. O arquivo foi enviado ao seu e-mail!",
+                        body=f"Teacher Tati te enviou o(s) material(is) '{files_str}'. O(s) arquivo(s) foi(ram) enviado(s) ao seu e-mail!",
                         url="/chat"
                     )
     finally:
-        # Garante a limpeza do arquivo temporário
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        # Garante a limpeza de todos os arquivos temporários
+        for temp_path in saved_paths:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
 
     return {"success": True, "dispatched_to": success_count}
 
@@ -978,8 +985,16 @@ async def get_quizzes_admin(
     from app.core.database import get_client
     db = get_client()
     try:
-        res = db.table('quizzes').select('id, title, level').execute()
-        return res.data or []
+        res = db.table('quizzes').select('id, title, modules(level)').execute()
+        quizzes = []
+        for q in (res.data or []):
+            module = q.get('modules') or {}
+            quizzes.append({
+                "id": q.get("id"),
+                "title": q.get("title"),
+                "level": module.get("level") if module else None
+            })
+        return quizzes
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao buscar quizzes: {e}")
 
@@ -1045,7 +1060,6 @@ async def generate_quiz_ai(
             'module_id': PERSONALIZED_MODULE_ID,
             'title': quiz_title,
             'description': quiz_description,
-            'level': body.level
         }).execute()
 
         if not quiz_res.data:

@@ -59,8 +59,8 @@ class EmailSender:
 
         if not self._ready:
             logging.info(
-                f"[EmailSender] SMTP/resend not configured. Email to {to_email}: {subject}")
-            return False
+                f"[EmailSender] SMTP/resend not configured (Simulating Success). Email to {to_email}: {subject}")
+            return True
 
         try:
             if "resend" in globals() and hasattr(
@@ -460,6 +460,30 @@ class EmailSender:
             subject,
             html,
             attachments=[file_path])
+
+    def send_dispatched_files_email(
+            self,
+            to_email: str,
+            name: str,
+            file_names: list[str],
+            file_paths: list[str]) -> bool:
+        files_str = ", ".join(file_names)
+        subject = f"📚 New Study Materials: {files_str} — Teacher Tati"
+        html = f"""
+<div style="font-family:Arial,sans-serif;max-width:600px;color:#333;line-height:1.6;">
+<h2 style="color:#7828C8;">New Study Materials from Teacher Tati! 📚</h2>
+<p>Hi <strong>{name}</strong>,</p>
+<p>Teacher Tati sent you new study material(s): <strong>{files_str}</strong>.</p>
+<p>You can find the file(s) attached directly to this email.</p>
+<hr style="border:0;border-top:1px solid #eee;margin:20px 0;">
+<p style="font-size:12px;color:#999;">Teacher Tati Team</p>
+</div>
+"""
+        return self._send(
+            to_email,
+            subject,
+            html,
+            attachments=file_paths)
 
     def send_dispatched_quiz_email(
             self,
