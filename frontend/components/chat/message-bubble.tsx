@@ -24,8 +24,10 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const parsed = parseAIResponse(message.content);
+
   const handleCopy = () => {
-    const textToCopy = isUser ? message.content : parseAIResponse(message.content).reply;
+    const textToCopy = isUser ? message.content : parsed.reply;
     navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     toast.success('Copied to clipboard!');
@@ -111,11 +113,20 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
               {isUser ? (
                 <p className="whitespace-pre-wrap">{message.content}</p>
               ) : (
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-2">
                   <ClickableText
-                    content={parseAIResponse(message.content).reply}
+                    content={parsed.reply}
                     onWordClick={onWordClick || (() => { })}
                   />
+                  {parsed.correction && (
+                    <div className="mt-2 text-xs bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/20 text-amber-700 dark:text-amber-300 rounded-xl p-2.5 flex items-start gap-2 max-w-full text-left">
+                      <span className="text-base select-none">💡</span>
+                      <div className="flex-1">
+                        <span className="font-bold text-amber-800 dark:text-amber-200">Tati noticed: </span>
+                        <span className="italic">{parsed.correction}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

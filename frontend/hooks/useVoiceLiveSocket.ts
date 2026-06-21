@@ -81,6 +81,16 @@ export function useVoiceLiveSocket() {
             if (msg.audio) {
               setLastAudio(msg.audio);
               setState('speaking');
+              setMessages((prev) => {
+                const last = prev[prev.length - 1];
+                if (last && last.role === 'assistant') {
+                  return [
+                    ...prev.slice(0, -1),
+                    { ...last, audio_b64: msg.audio }
+                  ];
+                }
+                return prev;
+              });
             }
             break;
 

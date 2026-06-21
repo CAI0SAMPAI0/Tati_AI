@@ -283,6 +283,44 @@ async def chat_ws(
         traceback.print_exc()
 
 
+LIVE_SYSTEM_PROMPT = (
+    "You are TATI, a friendly and encouraging English teacher.\n\n"
+    "STRICT OUTPUT FORMAT:\n"
+    "You must ALWAYS respond in valid JSON format. Do not include any text or markdown code blocks (like ```json) outside the JSON. "
+    "Use the following structure:\n"
+    "{\n"
+    '  "reply": "Your conversational response to the student, suitable for voice conversation (1-2 sentences max).",\n'
+    '  "correction": "A small correction if the student made a grammar or vocabulary mistake in their English, or null if no correction is necessary."\n'
+    "}\n"
+)
+
+def clean_and_parse_json(text: str) -> tuple[str, str | None]:
+    import re
+    import json
+    clean = text.strip()
+    if clean.startswith('```'):
+        clean = re.sub(r'^```[\w]*\n?', '', clean)
+        clean = re.sub(r'\n?```$', '', clean.strip())
+    try:
+        # Tenta extrair qualquer coisa entre as chaves principais
+        match = re.search(r'\{.*\}', clean, re.DOTALL)
+        if match:
+            clean = match.group(0)
+        data = json.loads(clean)
+        reply = data.get('reply') or ''
+        correction = data.get('correction')
+        return reply.strip(), correction
+    except Exception:
+        # Fallback se falhar
+        match = re.search(r'"reply"\s*:\s*"([^"]*)"', clean)
+        if match:
+            reply = match.group(1)
+            correction_match = re.search(r'"correction"\s*:\s*"([^"]*)"', clean)
+            correction = correction_match.group(1) if correction_match else None
+            return reply, correction
+        return text, None
+
+
 @router.websocket('/live')
 async def voice_live_ws(
     websocket: WebSocket,
@@ -326,27 +364,25 @@ async def voice_live_ws(
                         })
 
                         from app.modules.chat.services.llm import groq_chat
-                        system_prompt = (
-                            "You are Tati, a friendly, encouraging English teacher. "
-                            "Keep your response short and suitable for voice conversation (1-2 sentences max)."
-                        )
                         messages = [
-                            {"role": "system", "content": system_prompt},
+                            {"role": "system", "content": LIVE_SYSTEM_PROMPT},
                             {"role": "user", "content": transcription}
                         ]
                         response_text = await groq_chat(messages)
+                        reply, correction = clean_and_parse_json(response_text)
+                        final_json = json.dumps({"reply": reply, "correction": correction})
 
                         await websocket.send_json({
                             'type': 'stream_token',
-                            'content': response_text
+                            'content': final_json
                         })
 
-                        audio_b64 = await text_to_speech(response_text)
+                        audio_b64 = await text_to_speech(reply)
                         if audio_b64:
                             await websocket.send_json({
                                 'type': 'audio_response',
                                 'audio': audio_b64,
-                                'content': response_text
+                                'content': final_json
                             })
 
                         await websocket.send_json({'type': 'stream_end'})
@@ -365,21 +401,24 @@ async def voice_live_ws(
 
                     from app.modules.chat.services.llm import groq_chat
                     messages = [
-                        {"role": "system", "content": "You are Tati, a friendly English teacher. Keep it short (1-2 sentences)."},
+                        {"role": "system", "content": LIVE_SYSTEM_PROMPT},
                         {"role": "user", "content": transcription}
                     ]
                     response_text = await groq_chat(messages)
+                    reply, correction = clean_and_parse_json(response_text)
+                    final_json = json.dumps({"reply": reply, "correction": correction})
+
                     await websocket.send_json({
                         'type': 'stream_token',
-                        'content': response_text
+                        'content': final_json
                     })
 
-                    audio_b64 = await text_to_speech(response_text)
+                    audio_b64 = await text_to_speech(reply)
                     if audio_b64:
                         await websocket.send_json({
                             'type': 'audio_response',
                             'audio': audio_b64,
-                            'content': response_text
+                            'content': final_json
                         })
                     await websocket.send_json({'type': 'stream_end'})
 

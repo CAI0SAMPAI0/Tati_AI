@@ -173,6 +173,11 @@ class Settings(BaseSettings):
     # OpenAI (Voz barata)
     openai_api_key: str = Field('', validation_alias='OPENAI_API_KEY')
 
+    # XTTS (Hugging Face / Custom Space)
+    xtts_api_url: str = Field('', validation_alias='XTTS_API_URL')
+    xtts_speaker_wav: str = Field('tatiana.wav', validation_alias='XTTS_SPEAKER_WAV')
+    xtts_language: str = Field('en', validation_alias='XTTS_LANGUAGE')
+
     # SMTP / Email
     smtp_host: str = 'smtp.gmail.com'
     smtp_port: int = 465
