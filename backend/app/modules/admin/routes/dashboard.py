@@ -894,25 +894,37 @@ async def dispatch_file(
             profile = student.get('profile') or {}
             name = profile.get('name') or username
 
+            email_sent = False
             if email:
-                # Envia E-mail com todos os anexos
-                email_sent = email_sender.send_dispatched_files_email(
-                    to_email=email,
-                    name=name,
-                    file_names=file_names,
-                    file_paths=saved_paths
-                )
-
-                # Envia Notificação Push Celular avisando dos e-mails
-                if email_sent:
-                    success_count += 1
-                    files_str = ", ".join(file_names)
-                    send_push_to_user(
-                        username=username,
-                        title="Novo Material de Estudo! 📚",
-                        body=f"Teacher Tati te enviou o(s) material(is) '{files_str}'. O(s) arquivo(s) foi(ram) enviado(s) ao seu e-mail!",
-                        url="/chat"
+                try:
+                    email_sent = email_sender.send_dispatched_files_email(
+                        to_email=email,
+                        name=name,
+                        file_names=file_names,
+                        file_paths=saved_paths
                     )
+                except Exception as e:
+                    import logging
+                    logging.exception(f"Error sending dispatched files email to {email}: {e}")
+                    email_sent = False
+
+            if not email_sent:
+                import logging
+                logging.warning(f"Email dispatch failed or was skipped for {username} ({email}), proceeding with push notification.")
+
+            # Always increment success count and trigger push notification
+            success_count += 1
+            files_str = ", ".join(file_names)
+            try:
+                send_push_to_user(
+                    username=username,
+                    title="Novo Material de Estudo! 📚",
+                    body=f"Teacher Tati te enviou o(s) material(is) '{files_str}'. O(s) arquivo(s) foi(ram) enviado(s) ao seu e-mail!",
+                    url="/chat"
+                )
+            except Exception as e:
+                import logging
+                logging.exception(f"Failed to send push notification to user {username}: {e}")
     finally:
         # Garante a limpeza de todos os arquivos temporários
         for temp_path in saved_paths:
@@ -956,23 +968,35 @@ async def dispatch_quiz(
         profile = student.get('profile') or {}
         name = profile.get('name') or username
 
+        email_sent = False
         if email:
-            # 1. Envia Alerta por E-mail
-            email_sent = email_sender.send_dispatched_quiz_email(
-                to_email=email,
-                name=name,
-                quiz_title=quiz_title
-            )
-
-            # 2. Envia Notificação Push Celular
-            if email_sent:
-                success_count += 1
-                send_push_to_user(
-                    username=username,
-                    title="Novo Quiz Disponível! 📝",
-                    body=f"Teacher Tati liberou o quiz '{quiz_title}' para você. Acesse suas atividades!",
-                    url="/activities"
+            try:
+                email_sent = email_sender.send_dispatched_quiz_email(
+                    to_email=email,
+                    name=name,
+                    quiz_title=quiz_title
                 )
+            except Exception as e:
+                import logging
+                logging.exception(f"Error sending dispatched quiz email to {email}: {e}")
+                email_sent = False
+
+        if not email_sent:
+            import logging
+            logging.warning(f"Email dispatch failed or was skipped for quiz to {username} ({email}), proceeding with push notification.")
+
+        # Always increment success count and trigger push notification
+        success_count += 1
+        try:
+            send_push_to_user(
+                username=username,
+                title="Novo Quiz Disponível! 📝",
+                body=f"Teacher Tati liberou o quiz '{quiz_title}' para você. Acesse suas atividades!",
+                url="/activities"
+            )
+        except Exception as e:
+            import logging
+            logging.exception(f"Failed to send push notification to user {username}: {e}")
 
     return {"success": True, "dispatched_to": success_count}
 
