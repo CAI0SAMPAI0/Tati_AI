@@ -138,6 +138,7 @@ function VoicePageContent() {
   const silenceTimerRef = useRef<number>(0);
   const streamRef = useRef<MediaStream | null>(null);
   const accumulatedAudioRef = useRef<Float32Array[]>([]);
+  const hasSpokenRef = useRef(false);
 
   useEffect(() => {
     if (activeConvId && activeConvId !== convId) {
@@ -149,7 +150,8 @@ function VoicePageContent() {
     if (isLiveMode && liveState === 'listening') {
       accumulatedAudioRef.current = [];
       silenceTimerRef.current = 0;
-      console.log('[Live VAD] State transitioned back to listening. Cleared accumulated audio buffer and silence timer.');
+      hasSpokenRef.current = false;
+      console.log('[Live VAD] State transitioned back to listening. Cleared accumulated audio buffer, silence timer, and hasSpoken flag.');
     }
   }, [liveState, isLiveMode]);
 
@@ -377,9 +379,14 @@ function VoicePageContent() {
             sum += inputData[i] * inputData[i];
           }
           const rms = Math.sqrt(sum / inputData.length);
+
+          if (rms > 0.022) {
+            hasSpokenRef.current = true;
+          }
           
           if (liveStateRef.current === 'speaking' && rms > 0.02) {
             if (audioRef.current) {
+              console.log('[Live VAD] User speech detected during playback. Interrupting AI audio.');
               audioRef.current.pause();
               setLiveState('listening');
             }
@@ -388,34 +395,36 @@ function VoicePageContent() {
           if (liveStateRef.current === 'listening') {
             accumulatedAudioRef.current.push(inputData);
             if (rms < 0.018) {
-              silenceTimerRef.current += 4096 / AudioCtx.sampleRate;
-              if (silenceTimerRef.current >= 0.3) {
-                // Log silence accumulation to console for visibility
-                console.log(`[Live VAD] Silence accumulating: ${silenceTimerRef.current.toFixed(2)}s / 1.0s (RMS: ${rms.toFixed(5)})`);
-              }
-              
-              if (silenceTimerRef.current >= 1.0) {
-                const totalLength = accumulatedAudioRef.current.reduce((acc, val) => acc + val.length, 0);
-                if (totalLength > 16000) {
-                  console.log(`[Live VAD] Silence threshold reached. Sending ${totalLength} samples of audio...`);
-                  const resultBuffer = new Float32Array(totalLength);
-                  let offset = 0;
-                  for (const chunk of accumulatedAudioRef.current) {
-                    resultBuffer.set(chunk, offset);
-                    offset += chunk.length;
+              if (hasSpokenRef.current) {
+                silenceTimerRef.current += 4096 / AudioCtx.sampleRate;
+                if (silenceTimerRef.current >= 0.3) {
+                  console.log(`[Live VAD] Silence accumulating: ${silenceTimerRef.current.toFixed(2)}s / 1.0s (RMS: ${rms.toFixed(5)})`);
+                }
+                
+                if (silenceTimerRef.current >= 1.0) {
+                  const totalLength = accumulatedAudioRef.current.reduce((acc, val) => acc + val.length, 0);
+                  if (totalLength > 16000) {
+                    console.log(`[Live VAD] Silence threshold reached. Sending ${totalLength} samples of audio...`);
+                    const resultBuffer = new Float32Array(totalLength);
+                    let offset = 0;
+                    for (const chunk of accumulatedAudioRef.current) {
+                      resultBuffer.set(chunk, offset);
+                      offset += chunk.length;
+                    }
+                    
+                    const wavBlob = exportWav(resultBuffer, AudioCtx.sampleRate);
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      const base64 = (reader.result as string).split(',')[1];
+                      sendAudioChunk(base64);
+                    };
+                    reader.readAsDataURL(wavBlob);
+                    
+                    accumulatedAudioRef.current = [];
+                    silenceTimerRef.current = 0;
+                    hasSpokenRef.current = false;
+                    setLiveState('processing');
                   }
-                  
-                  const wavBlob = exportWav(resultBuffer, AudioCtx.sampleRate);
-                  const reader = new FileReader();
-                  reader.onloadend = () => {
-                    const base64 = (reader.result as string).split(',')[1];
-                    sendAudioChunk(base64);
-                  };
-                  reader.readAsDataURL(wavBlob);
-                  
-                  accumulatedAudioRef.current = [];
-                  silenceTimerRef.current = 0;
-                  setLiveState('processing');
                 }
               }
             } else {
@@ -545,7 +554,28 @@ function VoicePageContent() {
         <div className="absolute bottom-[-10%] right-[-5%] w-[60%] h-[60%] rounded-full bg-accent/15 dark:bg-accent/5 blur-[120px] animate-pulse duration-[20s] [animation-delay:5s]" />
       </div>
 
-      <audio ref={audioRef} onEnded={() => setState('idle')} onPlay={() => setState('speaking')} onPause={() => setState('idle')} />
+      <audio 
+        ref={audioRef} 
+        onEnded={() => {
+          if (isLiveMode) {
+            setLiveState('listening');
+          } else {
+            setNormalState('idle');
+          }
+        }} 
+        onPlay={() => {
+          if (isLiveMode) {
+            setLiveState('speaking');
+          } else {
+            setNormalState('speaking');
+          }
+        }} 
+        onPause={() => {
+          if (!isLiveMode) {
+            setNormalState('idle');
+          }
+        }} 
+      />
 
       <motion.div initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} className="w-full md:w-[42%] lg:w-[38%] h-[38vh] sm:h-[40vh] md:h-full relative flex flex-col items-center justify-center p-4 sm:p-8 bg-white/40 dark:bg-[#0f1120]/60 backdrop-blur-3xl border-b md:border-b-0 md:border-r border-white/40 dark:border-white/10 z-20 shadow-2xl transition-all">
         <div className="absolute top-4 sm:top-6 left-4 sm:left-6 flex items-center gap-4">
