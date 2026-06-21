@@ -324,6 +324,9 @@ function VoicePageContent() {
       streamRef.current = stream;
       
       const AudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (AudioCtx.state === 'suspended') {
+        await AudioCtx.resume();
+      }
       audioContextRef.current = AudioCtx;
       
       const source = AudioCtx.createMediaStreamSource(stream);
@@ -380,8 +383,11 @@ function VoicePageContent() {
           }
           const rms = Math.sqrt(sum / inputData.length);
 
-          if (rms > 0.022) {
-            hasSpokenRef.current = true;
+          if (rms >= 0.018) {
+            if (!hasSpokenRef.current) {
+              hasSpokenRef.current = true;
+              console.log(`[Live VAD] Speech detected (RMS: ${rms.toFixed(5)}). Recording...`);
+            }
           }
           
           if (liveStateRef.current === 'speaking' && rms > 0.02) {
