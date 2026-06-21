@@ -18,6 +18,11 @@ const ActivityBarChart = dynamic(() => import('@/components/charts/activity-bar-
   loading: () => <div className="h-[220px] w-full bg-bg-secondary rounded-2xl animate-pulse" />
 });
 
+const FluencyEvolutionChart = dynamic(() => import('@/components/charts/fluency-evolution-chart'), {
+  ssr: false,
+  loading: () => <div className="h-[240px] w-full bg-bg-secondary rounded-2xl animate-pulse" />
+});
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface XpData {
@@ -115,6 +120,11 @@ export default function ProgressClientPage() {
   const { data: monthlyReport, isLoading: monthlyLoading } = useQuery<MonthlyReport>({
     queryKey: ['progress-monthly'],
     queryFn: () => apiGet<MonthlyReport>(`${ENDPOINTS.PROGRESS_MONTHLY}?lang=en-US`),
+  });
+
+  const { data: fluencyData, isLoading: fluencyLoading } = useQuery<any>({
+    queryKey: ['fluency-evolution'],
+    queryFn: () => apiGet<any>('/users/progress/fluency-evolution'),
   });
 
   const reportLoading = period === 'weekly' ? weeklyLoading : monthlyLoading;
@@ -406,6 +416,33 @@ export default function ProgressClientPage() {
                 </Link>
               </div>
             </div>
+          </div>
+          {/* ── Fluency & CEFR Evolution ── */}
+          <div className="bg-surface border border-border rounded-3xl p-6 space-y-6 group hover:border-primary/30 transition-all">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-1.5 h-6 bg-emerald-500 rounded-full" />
+                <h3 className="text-sm font-bold text-text">Fluency & CEFR Level Evolution</h3>
+              </div>
+              <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                Level: {fluencyData?.current_level || 'A1'}
+              </span>
+            </div>
+
+            {fluencyLoading ? (
+              <div className="h-[240px] flex items-center justify-center">
+                <div className="w-full h-full bg-bg-secondary rounded-2xl animate-pulse" />
+              </div>
+            ) : fluencyData ? (
+              <FluencyEvolutionChart
+                pronunciation={fluencyData.pronunciation || []}
+                cefr={fluencyData.cefr || []}
+              />
+            ) : (
+              <div className="h-[240px] flex items-center justify-center text-text-muted text-sm">
+                No fluency evolution data available.
+              </div>
+            )}
           </div>
 
           {/* ── Tips ── */}

@@ -11,6 +11,7 @@ import { ENDPOINTS } from '@/lib/api/endpoints';
 export function useVoiceSocket(conversationId: string | null, simulationId?: string | null) {
   const { token } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
+  const [completedObjectives, setCompletedObjectives] = useState<string[]>([]);
   const [state, setState] = useState<'idle' | 'listening' | 'processing' | 'speaking'>('idle');
   const [lastAudio, setLastAudio] = useState<string | null>(null);
   const [transcription, setTranscription] = useState('');
@@ -57,6 +58,7 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
 
   // Carregar histórico inicial se houver convId
   useEffect(() => {
+    setCompletedObjectives([]);
     if (conversationId) {
       setActiveConvId(conversationId);
       convIdRef.current = conversationId;
@@ -165,6 +167,9 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
         if (msg.audio) {
           setLastAudio(msg.audio);
           setState('speaking');
+          if (msg.completed_objectives) {
+            setCompletedObjectives(msg.completed_objectives);
+          }
           if (msg.content) {
             setMessages((prev) => {
               const last = prev[prev.length - 1];
@@ -184,6 +189,12 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
               }];
             });
           }
+        }
+        break;
+
+      case 'simulation_state':
+        if (msg.completed_objectives) {
+          setCompletedObjectives(msg.completed_objectives);
         }
         break;
 
@@ -268,6 +279,8 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
     lastAudio,
     transcription,
     sendAudio,
-    activeConvId
+    activeConvId,
+    completedObjectives,
+    setCompletedObjectives
   };
 }

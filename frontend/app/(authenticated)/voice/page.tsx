@@ -15,7 +15,9 @@ import {
   Moon,
   Sun,
   RefreshCcw,
-  Activity
+  Activity,
+  CheckCircle2,
+  Circle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVoiceSocket } from '@/hooks/useVoiceSocket';
@@ -104,7 +106,9 @@ function VoicePageContent() {
     transcription: normalTranscription,
     sendAudio,
     activeConvId,
-  } = useVoiceSocket(convId);
+    completedObjectives,
+    setCompletedObjectives
+  } = useVoiceSocket(convId, simulationId);
 
   const {
     messages: liveMessages,
@@ -167,11 +171,20 @@ function VoicePageContent() {
     return () => clearTimeout(timer);
   }, [state, setState]);
 
+  const [objectives, setObjectives] = useState<Array<{ id: string; text: string }>>([]);
+
   useEffect(() => {
     if (simulationId) {
       apiGet<any>(`/simulation/scenarios/${simulationId}`)
-        .then(res => setSimulationTitle(res.name))
-        .catch(() => setSimulationTitle('Simulation'));
+        .then(res => {
+          setSimulationTitle(res.name);
+          if (res.objectives) {
+            setObjectives(res.objectives);
+          }
+        })
+        .catch(() => {
+          setSimulationTitle('Simulation');
+        });
     }
   }, [simulationId]);
 
@@ -184,6 +197,12 @@ function VoicePageContent() {
       if (res.ok && res.data?.id) {
         const simData = res.data;
         setConvId(simData.id);
+        if (simData.objectives) {
+          setObjectives(simData.objectives);
+        }
+        if (simData.completed_objectives) {
+          setCompletedObjectives(simData.completed_objectives);
+        }
         if (simData.initial_message) {
           setMessages([{
             id: 'init',
@@ -668,6 +687,22 @@ function VoicePageContent() {
             </div>
           ) : (
             <AnimatePresence mode="popLayout" initial={false}>
+              {simulationId && objectives.length > 0 && (
+                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white/40 dark:bg-white/5 border border-white/40 dark:border-white/10 p-4 rounded-3xl mb-6 space-y-3 animate-fade-in shadow-xl backdrop-blur-xl">
+                  <p className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest">Mission Objectives</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {objectives.map(obj => {
+                      const isCompleted = completedObjectives.includes(obj.id);
+                      return (
+                        <div key={obj.id} className={cn("flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl border text-[0.7rem] transition-all font-bold tracking-tight", isCompleted ? "bg-success/15 border-success/30 text-success line-through" : "bg-white/60 dark:bg-[#111224]/80 border-white/60 dark:border-white/5 text-text-muted")}>
+                          {isCompleted ? <CheckCircle2 size={14} className="shrink-0 text-success" /> : <Circle size={14} className="shrink-0 text-text-subtle" />}
+                          <span className="truncate" title={obj.text}>{obj.text}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
               {messages.length === 0 && !transcription ? (
                  <div className="h-full flex flex-col items-center justify-center text-center opacity-40 gap-4 p-4">
                     <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 border-dashed border-primary/30 flex items-center justify-center">

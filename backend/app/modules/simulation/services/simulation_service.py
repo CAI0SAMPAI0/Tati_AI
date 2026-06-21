@@ -9,7 +9,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi import Depends
 from app.core.dependencies.db import get_db
 
-from app.modules.simulation.services.simulation import get_all_scenarios, get_scenario, evaluate_simulation
+from app.modules.simulation.services.simulation import get_all_scenarios, get_scenario, evaluate_simulation, get_scenario_objectives, check_objectives_completion
 from app.modules.chat.services.llm import groq_chat, transcribe_audio, text_to_speech
 from app.shared.services.history import save_message
 from app.core.enums import normalize_level
@@ -31,11 +31,12 @@ class SimulationService:
             self, scenario_id: str) -> Optional[Dict[str, Any]]:
         return await run_in_threadpool(get_scenario, scenario_id)
 
-    async def start_session(self,
-                            username: str,
-                            scenario_id: str,
-                            user_level: str = 'A1') -> Dict[str,
-                                                                  Any]:
+    async def start_session(
+        self,
+        username: str,
+        scenario_id: str,
+        user_level: str = 'A1'
+    ) -> Dict[str, Any]:
         """Inicializa uma nova sessão de simulação e retorna o ID da conversa com a primeira mensagem da IA."""
         import uuid
         conv_id = f"sim_{uuid.uuid4().hex[:8]}"
@@ -98,6 +99,8 @@ class SimulationService:
             "id": conv_id,
             "username": username,
             "scenario_id": scenario_id,
+            "objectives": get_scenario_objectives(scenario_id),
+            "completed_objectives": [],
             "initial_message": {
                 "role": "assistant",
                 "content": reply_text,
@@ -193,11 +196,28 @@ class SimulationService:
         except BaseException:
             pass
 
+        # Obter todas as falas do usuário nesta conversa para checar objetivos concluídos
+        completed_objectives = []
+        try:
+            res_msgs = self.db.table('messages')\
+                .select('content')\
+                .eq('session_id', conv_id)\
+                .eq('role', 'user')\
+                .execute()
+            user_texts = [r.get('content', '') for r in (res_msgs.data or [])]
+            if content not in user_texts:
+                user_texts.append(content)
+            completed_objectives = check_objectives_completion(scenario_id, user_texts)
+        except Exception as e:
+            import logging
+            logging.error(f"[SimulationService] Erro ao checar objetivos: {e}")
+
         return {
             'reply': reply_text,
             'scenario': scenario_id,
             'audio_b64': tts_b64,
             'conversation_id': conv_id,
+            'completed_objectives': completed_objectives
         }
 
     async def evaluate(

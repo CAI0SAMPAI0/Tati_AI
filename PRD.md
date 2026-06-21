@@ -800,10 +800,10 @@ erDiagram
 
 **Objetivo:** Permitir ao aluno salvar palavras do chat diretamente no seu deck pessoal de estudo, utilizando algoritmo de repetição espaçada (SRS).
 
-- [ ] **Backend: Modelagem e Algoritmo SRS**
-  - [ ] Criar endpoints para gerenciar flashcards do usuário com cálculo de próxima revisão.
-- [ ] **Frontend: Deck e Revisões**
-  - [ ] Exibir opção de adicionar palavras no dicionário a partir do popover de palavras no chat e tela de revisões diárias.
+- [X] **Backend: Modelagem e Algoritmo SRS**
+  - [X] Criar endpoints para gerenciar flashcards do usuário com cálculo de próxima revisão.
+- [X] **Frontend: Deck e Revisões**
+  - [X] Exibir opção de adicionar palavras no dicionário a partir do popover de palavras no chat e tela de revisões diárias.
 
 ---
 
@@ -811,10 +811,10 @@ erDiagram
 
 **Objetivo:** Analisar a pronúncia e gramática das falas gravadas e gerar gráficos de evolução de nível CEFR do aluno ao longo do tempo.
 
-- [ ] **Backend: Métricas e Histórico**
-  - [ ] Criar agregadores de pontuação e rotas de histórico de proficiência.
-- [ ] **Frontend: Gráficos de Evolução**
-  - [ ] Integrar gráficos de barra/linha mostrando a evolução fonética no dashboard.
+- [X] **Backend: Métricas e Histórico**
+  - [X] Criar agregadores de pontuação e rotas de histórico de proficiência.
+- [X] **Frontend: Gráficos de Evolução**
+  - [X] Integrar gráficos de barra/linha mostrando a evolução fonética no dashboard.
 
 ---
 
@@ -822,7 +822,7 @@ erDiagram
 
 **Objetivo:** Exibir missões e objetivos em tempo real no chat de simulação, marcando-os dinamicamente à medida que o aluno conversa.
 
-- [ ] **Backend: Julgamento de Objetivos**
-  - [ ] Analisar a conversa para certificar a realização de metas definidas.
-- [ ] **Frontend: Sidebar de Missões**
-  - [ ] Renderizar painel de checklist de objetivos cumpridos em tempo real na tela do avatar.
+- [X] **Backend: Julgamento de Objetivos**
+  - [X] Analisar a conversa para certificar a realização de metas definidas.
+- [X] **Frontend: Sidebar de Missões**
+  - [X] Renderizar painel de checklist de objetivos cumpridos em tempo real na tela do avatar.

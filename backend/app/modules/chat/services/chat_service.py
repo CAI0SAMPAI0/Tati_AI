@@ -401,7 +401,8 @@ class ChatService:
                 conv_id,
                 is_pdf_generation=is_pdf_generation,
                 pdf_filename=pdf_filename,
-                pre_tag=pre_tag_text))
+                pre_tag=pre_tag_text,
+                simulation_id=simulation_id))
 
         return pending_drill_target
 
@@ -431,7 +432,8 @@ class ChatService:
             conv_id: str,
             is_pdf_generation: bool = False,
             pdf_filename: str = None,
-            pre_tag: str = ""):
+            pre_tag: str = "",
+            simulation_id: Optional[str] = None):
         """Tarefas após o streaming terminar."""
         try:
             # 0. XP (Gamification) - Recompensa por mensagem enviada
@@ -468,6 +470,25 @@ class ChatService:
             # vai via WS se for o caso)
             if audio_b64 and not is_pdf_generation:
                 await websocket.send_json({'type': 'audio_response', 'audio': audio_b64, 'content': full_response})
+
+            if simulation_id:
+                try:
+                    from app.modules.simulation.services.simulation import check_objectives_completion
+                    res_msgs = self.db.table('messages')\
+                        .select('content')\
+                        .eq('session_id', conv_id)\
+                        .eq('role', 'user')\
+                        .execute()
+                    user_texts = [r.get('content', '') for r in (res_msgs.data or [])]
+                    if user_content not in user_texts:
+                        user_texts.append(user_content)
+                    completed_objectives = check_objectives_completion(simulation_id, user_texts)
+                    await websocket.send_json({
+                        'type': 'simulation_state',
+                        'completed_objectives': completed_objectives
+                    })
+                except Exception as e:
+                    logging.info(f'[Chat Post-Response] Erro ao enviar simulation_state: {e}')
 
             # 1. Podcast Discovery (Atraso de 2s para não impactar a
             # resposta imediata)

@@ -2,7 +2,7 @@ import os
 import sys
 sys.path.append(os.path.join(os.getcwd(), 'backend'))
 
-from app.core.database import get_client
+from backend.app.core.database import get_client
 
 def test():
     db = get_client()

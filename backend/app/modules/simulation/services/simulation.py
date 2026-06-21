@@ -119,7 +119,9 @@ def get_scenario(scenario_id: str) -> Optional[dict]:
         (s for s in DEFAULT_SIMULATIONS if s['id'] == scenario_id or s['slug'] == scenario_id),
         None)
     if fixed:
-        return fixed
+        res = fixed.copy()
+        res['objectives'] = get_scenario_objectives(res.get('slug'))
+        return res
 
     db = get_client()
     try:
@@ -128,7 +130,9 @@ def get_scenario(scenario_id: str) -> Optional[dict]:
                 '*').eq('id', scenario_id).single().execute()
         )
         if res.data:
-            return res.data
+            s_data = res.data.copy()
+            s_data['objectives'] = get_scenario_objectives(s_data.get('slug') or scenario_id)
+            return s_data
     except Exception as e:
         # Tenta buscar na tabela cefr_simulations
         try:
@@ -144,16 +148,22 @@ def get_scenario(scenario_id: str) -> Optional[dict]:
                     'system_prompt': cs.get('scenario'),
                     'greeting': f"Hello! Let's practice about: {cs.get('topic')}. {cs.get('scenario')[:100]}...",
                     'icon': '🎭',
-                    'emoji': '🎭'
+                    'emoji': '🎭',
+                    'objectives': get_scenario_objectives(f"cefr_sim_{cs['id']}")
                 }
         except Exception:
             logging.info(
                 f'[Simulation Service] Erro ao buscar cenário {scenario_id} no db e cefr_db: {e}')
 
     # Fallback final por slug se o ID parecer um slug
-    return next(
+    fixed_slug = next(
         (s for s in DEFAULT_SIMULATIONS if s['slug'] == scenario_id),
         None)
+    if fixed_slug:
+        res = fixed_slug.copy()
+        res['objectives'] = get_scenario_objectives(res.get('slug'))
+        return res
+    return None
 
 
 def get_scenario_prompt(scenario_id: str) -> Optional[str]:
@@ -198,3 +208,68 @@ def evaluate_simulation(messages: list[dict]) -> dict:
         'score': int(score),
         'feedback': feedback,
         'feedback_en': feedback_en}
+
+
+SCENARIO_OBJECTIVES = {
+    'airport_checkin': [
+        {'id': 'airport_1', 'text': 'Present your passport or ticket', 'keywords': ['passport', 'ticket', 'here is', 'here\'s']},
+        {'id': 'airport_2', 'text': 'Confirm your checked baggage count', 'keywords': ['bag', 'luggage', 'suitcase', 'check in', 'no bags']},
+        {'id': 'airport_3', 'text': 'State your seat preference (window or aisle)', 'keywords': ['window', 'aisle', 'seat']}
+    ],
+    'job_interview': [
+        {'id': 'job_1', 'text': 'Greet the interviewer politely', 'keywords': ['hello', 'hi ', 'good morning', 'nice to meet you', 'thank you for']},
+        {'id': 'job_2', 'text': 'Mention your professional strengths or skills', 'keywords': ['strength', 'skill', 'experience', 'worked', 'good at', 'focus']},
+        {'id': 'job_3', 'text': 'Ask a question about the role or company', 'keywords': ['question', 'salary', 'team', 'hours', 'benefits', 'culture']}
+    ],
+    'shopping': [
+        {'id': 'shop_1', 'text': 'Ask for a clothing item', 'keywords': ['shirt', 'pants', 'jeans', 'dress', 'jacket', 't-shirt', 'looking for']},
+        {'id': 'shop_2', 'text': 'Ask about sizes', 'keywords': ['size', 'medium', 'large', 'small', 'extra large', 'fit']},
+        {'id': 'shop_3', 'text': 'Inquire about the price', 'keywords': ['price', 'how much', 'cost', 'expensive', 'cheap']}
+    ],
+    'at_hotel': [
+        {'id': 'hotel_1', 'text': 'Provide your reservation name', 'keywords': ['name', 'reservation', 'book', 'key']},
+        {'id': 'hotel_2', 'text': 'Ask about breakfast hours or options', 'keywords': ['breakfast', 'eat', 'morning']},
+        {'id': 'hotel_3', 'text': 'Request the Wi-Fi password', 'keywords': ['wifi', 'wi-fi', 'internet', 'password', 'connection']}
+    ],
+    'at_doctor': [
+        {'id': 'doctor_1', 'text': 'Describe your medical symptoms', 'keywords': ['pain', 'feel', 'cough', 'fever', 'cold', 'flu', 'sick', 'hurt', 'headache', 'stomach']},
+        {'id': 'doctor_2', 'text': 'State how long you have felt sick', 'keywords': ['days', 'hours', 'since', 'week', 'yesterday']},
+        {'id': 'doctor_3', 'text': 'Ask for a treatment or prescription', 'keywords': ['medicine', 'pill', 'prescription', 'remedy', 'doctor', 'help']}
+    ],
+    'at_restaurant': [
+        {'id': 'rest_1', 'text': 'Order a drink', 'keywords': ['water', 'coke', 'juice', 'soda', 'drink', 'beer', 'wine']},
+        {'id': 'rest_2', 'text': 'Order your main dish', 'keywords': ['pasta', 'pizza', 'salad', 'steak', 'chicken', 'burger', 'fish', 'order']},
+        {'id': 'rest_3', 'text': 'Ask for the bill', 'keywords': ['bill', 'check', 'pay', 'credit card', 'cash']}
+    ]
+}
+
+DEFAULT_OBJECTIVES = [
+    {'id': 'gen_1', 'text': 'Introduce yourself clearly', 'keywords': ['name', 'hello', 'hi ', 'i am', 'introduce']},
+    {'id': 'gen_2', 'text': 'Explain your request or query', 'keywords': ['need', 'want', 'please', 'help', 'ask']},
+    {'id': 'gen_3', 'text': 'Close the conversation politely', 'keywords': ['thank you', 'thanks', 'goodbye', 'bye', 'see you']}
+]
+
+
+def get_scenario_objectives(scenario_id_or_slug: str) -> list[dict]:
+    """Retorna os objetivos específicos de um cenário."""
+    # Encontra por slug
+    slug = scenario_id_or_slug
+    if scenario_id_or_slug not in SCENARIO_OBJECTIVES:
+        found = next((s['slug'] for s in DEFAULT_SIMULATIONS if s['id'] == scenario_id_or_slug), None)
+        if found:
+            slug = found
+    return SCENARIO_OBJECTIVES.get(slug, DEFAULT_OBJECTIVES)
+
+
+def check_objectives_completion(scenario_id_or_slug: str, user_messages: list[str]) -> list[str]:
+    """Verifica quais objetivos foram concluídos analisando as falas do usuário."""
+    objectives = get_scenario_objectives(scenario_id_or_slug)
+    completed_ids = []
+
+    combined_text = " ".join(user_messages).lower()
+
+    for obj in objectives:
+        if any(kw in combined_text for kw in obj['keywords']):
+            completed_ids.append(obj['id'])
+
+    return completed_ids

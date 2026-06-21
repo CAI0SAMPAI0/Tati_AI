@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Volume2, Book, Sparkles } from 'lucide-react';
+import { X, Volume2, Book, Sparkles, Plus, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiPost } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
@@ -25,10 +25,14 @@ export default function WordTooltip({ word, position, onClose }: WordTooltipProp
   const [dict, setDict] = useState<DictData | null>(null);
   const [tatiAudio, setTatiAudio] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState<string | null>(null);
+  const [addingToVocab, setAddingToVocab] = useState(false);
+  const [isAdded, setIsAdded] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
+    setIsAdded(false);
+    setAddingToVocab(false);
     if (!word) return;
 
     const fetchData = async () => {
@@ -55,6 +59,28 @@ export default function WordTooltip({ word, position, onClose }: WordTooltipProp
 
     fetchData();
   }, [word]);
+
+  const handleAddToVocab = async () => {
+    if (!word) return;
+    setAddingToVocab(true);
+    const cleanedWord = word.toLowerCase().replace(/[^a-z'-]/g, '');
+    try {
+      const definition = dict?.meanings[0]?.definitions[0]?.definition || "Word from Chat";
+      const example = dict?.meanings[0]?.definitions[0]?.example || "";
+      const res = await apiPost('/users/vocabulary/add', {
+        word: cleanedWord,
+        definition,
+        example
+      });
+      if (res.ok) {
+        setIsAdded(true);
+      }
+    } catch (err) {
+      console.error('Error adding word to vocabulary:', err);
+    } finally {
+      setAddingToVocab(false);
+    }
+  };
 
   const playAudio = (src: string, id: string, isBase64 = false) => {
     if (audioRef.current) {
@@ -162,6 +188,35 @@ export default function WordTooltip({ word, position, onClose }: WordTooltipProp
              </div>
            </div>
         )}
+        {/* Add to Dictionary Button */}
+        <div className="pt-2 border-t border-border/50">
+          <button
+            onClick={handleAddToVocab}
+            disabled={addingToVocab || isAdded}
+            className={cn(
+              "w-full flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-[0.7rem] font-bold transition-all border",
+              isAdded
+                ? "bg-success/10 border-success/20 text-success cursor-default"
+                : addingToVocab
+                  ? "bg-surface border-border text-text-muted opacity-50 cursor-wait"
+                  : "bg-primary border-primary text-white hover:bg-primary/90 hover:border-primary/90"
+            )}
+          >
+            {isAdded ? (
+              <>
+                <Check size={12} />
+                ADDED TO DICTIONARY
+              </>
+            ) : addingToVocab ? (
+              "ADDING..."
+            ) : (
+              <>
+                <Plus size={12} />
+                ADD TO DICTIONARY
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

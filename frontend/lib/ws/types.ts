@@ -11,6 +11,7 @@ export type WsMessageType =
   | 'free_warning'
   | 'new_title'
   | 'pdf_generated'
+  | 'simulation_state'
   | 'error';
 
 export type WsOrigin = 'chat' | 'voice';
@@ -26,6 +27,7 @@ export interface WsIncomingMessage {
   filename?: string;
   result?: unknown;
   message?: string;
+  completed_objectives?: string[];
 }
 
 export interface WsOutgoingMessage {
