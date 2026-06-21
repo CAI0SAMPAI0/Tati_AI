@@ -64,13 +64,13 @@ export default function ShopClientPage() {
   const canBuy = userXp >= 150;
 
   return (
-    <div className="flex h-screen bg-bg overflow-hidden">
+    <div className="min-h-screen bg-bg flex flex-col md:flex-row">
       <SidebarActivities isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="flex-1 flex flex-col min-w-0 bg-bg-secondary/30 relative h-screen">
+      <div className="flex-1 flex flex-col min-w-0 md:ml-[280px] bg-bg-secondary/30 relative min-h-screen">
         <MainHeader onToggleMenu={() => setSidebarOpen(true)} />
 
-        <main className="flex-1 p-4 md:p-8 max-w-5xl w-full mx-auto animate-fade-in overflow-y-auto custom-scrollbar">
+        <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto animate-fade-in">
 
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
