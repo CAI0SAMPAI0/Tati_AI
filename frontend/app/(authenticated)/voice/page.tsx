@@ -146,6 +146,14 @@ function VoicePageContent() {
   }, [activeConvId, convId]);
 
   useEffect(() => {
+    if (isLiveMode && liveState === 'listening') {
+      accumulatedAudioRef.current = [];
+      silenceTimerRef.current = 0;
+      console.log('[Live VAD] State transitioned back to listening. Cleared accumulated audio buffer and silence timer.');
+    }
+  }, [liveState, isLiveMode]);
+
+  useEffect(() => {
     let timer: NodeJS.Timeout;
     if (state === 'processing') {
       timer = setTimeout(() => {
@@ -363,8 +371,6 @@ function VoicePageContent() {
         if (bufferOffset >= 4096) {
           const inputData = new Float32Array(buffer4096);
           bufferOffset = 0;
-
-          accumulatedAudioRef.current.push(inputData);
           
           let sum = 0;
           for (let i = 0; i < inputData.length; i++) {
@@ -380,6 +386,7 @@ function VoicePageContent() {
           }
           
           if (liveStateRef.current === 'listening') {
+            accumulatedAudioRef.current.push(inputData);
             if (rms < 0.018) {
               silenceTimerRef.current += 4096 / AudioCtx.sampleRate;
               if (silenceTimerRef.current >= 0.3) {
@@ -540,7 +547,7 @@ function VoicePageContent() {
 
       <audio ref={audioRef} onEnded={() => setState('idle')} onPlay={() => setState('speaking')} onPause={() => setState('idle')} />
 
-      <motion.div initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} className="w-full md:w-[42%] lg:w-[38%] h-[25vh] sm:h-[30vh] md:h-full relative flex flex-col items-center justify-center p-4 sm:p-8 bg-white/40 dark:bg-[#0f1120]/60 backdrop-blur-3xl border-b md:border-b-0 md:border-r border-white/40 dark:border-white/10 z-20 shadow-2xl transition-all">
+      <motion.div initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} className="w-full md:w-[42%] lg:w-[38%] h-[38vh] sm:h-[40vh] md:h-full relative flex flex-col items-center justify-center p-4 sm:p-8 bg-white/40 dark:bg-[#0f1120]/60 backdrop-blur-3xl border-b md:border-b-0 md:border-r border-white/40 dark:border-white/10 z-20 shadow-2xl transition-all">
         <div className="absolute top-4 sm:top-6 left-4 sm:left-6 flex items-center gap-4">
           <button onClick={() => router.back()} className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-white/50 dark:bg-[#1a1c2e]/60 border border-white/60 dark:border-white/10 text-text hover:text-primary transition-all active:scale-95 shadow-xl backdrop-blur-xl group">
             <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
@@ -569,7 +576,7 @@ function VoicePageContent() {
           </button>
         </div>
 
-        <div className="flex flex-col items-center gap-2 sm:gap-8 mt-2 md:mt-0">
+        <div className="flex flex-col items-center gap-2 sm:gap-8 mt-10 sm:mt-0">
           <div className="cursor-pointer hover:scale-105 active:scale-95 transition-all duration-700 scale-[0.6] sm:scale-90 md:scale-100" onClick={() => {
             if (isLiveMode) return;
             if (!convId) return;
