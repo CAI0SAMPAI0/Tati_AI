@@ -358,6 +358,10 @@ async def voice_live_ws(
                     )
 
                     if transcription and not transcription.startswith("[Erro"):
+                        from app.modules.users.services.streaks import record_study_day
+                        import asyncio
+                        asyncio.create_task(record_study_day(username, is_activity=True))
+
                         await websocket.send_json({
                             'type': 'transcription',
                             'text': transcription
@@ -394,6 +398,10 @@ async def voice_live_ws(
                     prompt="Live audio chunk."
                 )
                 if transcription and not transcription.startswith("[Erro"):
+                    from app.modules.users.services.streaks import record_study_day
+                    import asyncio
+                    asyncio.create_task(record_study_day(username, is_activity=True))
+
                     await websocket.send_json({
                         'type': 'transcription',
                         'text': transcription

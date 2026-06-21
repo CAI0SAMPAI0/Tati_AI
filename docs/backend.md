@@ -35,3 +35,17 @@ módulo/
 1.  **Injeção de Dependência**: Use `Depends()` para gerenciar sessões de banco de dados e autenticação.
 2.  **Tratamento de Erros**: Utilize exceções personalizadas definidas em `core/exceptions.py`.
 3.  **Documentação**: A API é auto-documentada via Swagger em `/docs` (em ambiente de desenvolvimento).
+
+## Sistema de Caching e Gamificação
+
+### Caching (Upstash Redis)
+Para otimizar o carregamento das telas do aluno e evitar sobrecarga de consultas lentas no PostgreSQL (como contagem de mensagens ou histórico de submissões), implementamos cache inteligente no `ProgressService` e `DashboardService`:
+- **Weekly & Monthly Reports**: Dados de relatórios são cacheados (TTL de 30 e 60 minutos, respectivamente) e reaproveitados nas requisições do frontend.
+- **User Stats & Fluency Evolution**: Os endpoints `/dashboard/stats/my` e `/users/progress/fluency-evolution` são cacheados por 3 e 5 minutos, respectivamente.
+- **Invalidação Automática**: Sempre que o usuário realiza qualquer atividade (envio de mensagem, quiz completo, vocabulário adicionado/revisado, podcast finalizado), o método `invalidate_user_cache(username)` é invocado, limpando todas as chaves do Redis daquele aluno para garantir que os dados atualizados sejam servidos no próximo acesso.
+
+### Gamificação (XP e Ofensivas/Streaks)
+Consolidamos o fluxo de ofensivas diárias do aluno:
+- **Regra de Ofensiva**: Qualquer atividade de estudo diária mantém a ofensiva ativa (enviar no mínimo 1 mensagem no chat regular ou live voice, completar um quiz, finalizar um podcast, revisar palavras no SRS ou adicionar novas palavras).
+- **Timezone consistente**: Todas as datas de estudo são gravadas e validadas no fuso horário UTC (`datetime.now(timezone.utc).date()`), evitando falhas na virada do dia local do aluno.
+- **XP**: O ganho de XP é padronizado (+10 por mensagem enviada, +25 por acerto em quiz, +50 por podcast/simulação completa, +15 por palavra adicionada no SRS, +10 por palavra revisada).

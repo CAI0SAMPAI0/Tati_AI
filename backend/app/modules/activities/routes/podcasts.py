@@ -710,10 +710,12 @@ async def mark_podcast_complete(
     # 🏆 Gamification
     try:
         from app.modules.activities.services.gamification_service import GamificationService
+        from app.modules.users.services.streaks import record_study_day
         gs = GamificationService()
         # Podcast completion is like a simulation/video lesson
         asyncio.create_task(gs.award_xp(username, gs.XP_REWARDS.get(
             'simulation_complete', 50), 'Podcast completed'))
+        asyncio.create_task(record_study_day(username, is_activity=True))
     except BaseException:
         pass
 

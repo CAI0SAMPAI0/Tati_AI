@@ -169,6 +169,8 @@ async def invalidate_user_cache(username: str):
         f'report:weekly:{username}',
         f'report:monthly:{username}',
         f'study_time:{username}',
+        f'user_stats:{username}',
+        f'fluency_evolution:{username}',
     ]
     for key in keys:
         await cache_delete(key)

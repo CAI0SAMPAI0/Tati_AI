@@ -826,3 +826,40 @@ erDiagram
   - [X] Analisar a conversa para certificar a realização de metas definidas.
 - [X] **Frontend: Sidebar de Missões**
   - [X] Renderizar painel de checklist de objetivos cumpridos em tempo real na tela do avatar.
+
+---
+
+### Sprint 13 – Otimização de Performance e Navegação (Remoção de Delay de Esqueleto)
+
+**Objetivo:** Eliminar a lentidão de carregamento inicial do dashboard e telas de progresso que exibem esqueletos por muito tempo, otimizando o cache de relatórios e contagens redundantes no banco de dados.
+
+- [X] **Backend: Cache Inteligente e Otimização**
+  - [X] Ajustar o cache de relatórios semanais e mensais no `ProgressService` para utilizar o cache existente em vez de limpá-lo a cada requisição.
+  - [X] Implementar cache no endpoint `/dashboard/stats/my` (com TTL de 3 minutos) para evitar consultas pesadas de contagem na tabela `messages`.
+  - [X] Implementar cache no endpoint `/users/progress/fluency-evolution` (com TTL de 5 minutos) para acelerar a renderização dos gráficos de fluência.
+  - [X] Adicionar invalidação automática desses caches no método `invalidate_user_cache` sempre que o usuário realizar ações que alterem seus dados.
+- [X] **Frontend: Resiliência na Hidratação**
+  - [X] Garantir que o prefetch e requisições concorrentes ocorram de forma fluida.
+
+---
+
+### Sprint 14 – Correção de Ofensivas (Streaks) e Central de Pontuação (XP)
+
+**Objetivo:** Corrigir a sincronia e contagem de streaks (ofensivas) para qualquer tipo de estudo do usuário e adicionar uma seção clara de como funciona o XP na tela de progresso.
+
+- [X] **Backend: Unificação de Streaks e Integração de Atividades**
+  - [X] Corrigir o timezone mismatch comparando e gravando as datas de estudo em UTC de forma consistente no banco.
+  - [X] Mudar a regra de streak de no mínimo 3 mensagens para 1 mensagem ou qualquer outra atividade estudantil diária (quiz, podcast, envio de atividade, flashcards).
+  - [X] Integrar `record_study_day` em todas as rotas e ações relevantes (submissão de quiz, podcast completo, revisões e adição no vocabulário/SRS, mensagens no live voice).
+- [X] **Frontend: Central de Explicação de Pontuação**
+  - [X] Adicionar card explicativo "How Points Work" na tela de progresso detalhando as regras de XP para o aluno.
+  - [X] Garantir que o streak seja atualizado corretamente na barra de progresso e cabeçalhos.
+
+---
+
+### Sprint 15 – Sincronização de Documentação Técnica
+
+**Objetivo:** Documentar as otimizações de performance e as novas regras de ofensiva e XP.
+
+- [X] **Documentação: Atualização de Guias**
+  - [X] Registrar as mudanças e lógica das Sprints 13 e 14 na documentação técnica.

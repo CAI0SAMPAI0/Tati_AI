@@ -407,6 +407,12 @@ class DashboardService:
 
     async def get_user_stats(self, username: str) -> Dict[str, Any]:
         """Estatísticas específicas de um aluno."""
+        from app.shared.services.upstash import cache_get, cache_set
+        cache_key = f'user_stats:{username}'
+        cached = await cache_get(cache_key)
+        if cached:
+            return cached
+
         def _fetch():
             try:
                 user_res = self.db.table('users').select('xp_data, level, focus').eq(
@@ -451,7 +457,11 @@ class DashboardService:
                 logging.info(
                     f"[DashboardService] Erro em get_user_stats: {e}")
                 return {}
-        return await run_in_threadpool(_fetch)
+        res = await run_in_threadpool(_fetch)
+        if res:
+            await cache_set(cache_key, res, ttl=180)  # 3 minutos de cache
+        return res
+
 
     async def update_student(
             self,

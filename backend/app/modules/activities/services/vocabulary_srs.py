@@ -38,6 +38,17 @@ class VocabularySRSService:
 
         await run_in_threadpool(_add)
 
+        # 🏆 Gamification
+        try:
+            from app.modules.activities.services.gamification_service import GamificationService
+            from app.modules.users.services.streaks import record_study_day
+            import asyncio
+            gs = GamificationService()
+            asyncio.create_task(gs.award_xp(username, 15, f"Added word: {word}"))
+            asyncio.create_task(record_study_day(username, is_activity=True))
+        except Exception:
+            pass
+
     async def record_review(
             self,
             entry_id: str,
@@ -92,6 +103,17 @@ class VocabularySRSService:
                 update_payload).eq('id', entry_id).execute()
 
         await run_in_threadpool(_update)
+
+        # 🏆 Gamification
+        try:
+            from app.modules.activities.services.gamification_service import GamificationService
+            from app.modules.users.services.streaks import record_study_day
+            import asyncio
+            gs = GamificationService()
+            asyncio.create_task(gs.award_xp(username, 10, "Vocabulary review"))
+            asyncio.create_task(record_study_day(username, is_activity=True))
+        except Exception:
+            pass
 
     async def get_due_words(
             self, username: str) -> List[Dict[str, Any]]:

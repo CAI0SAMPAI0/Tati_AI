@@ -47,7 +47,17 @@ class SubmissionService:
 
             return res.data[0]['id']
 
-        return await run_in_threadpool(_insert)
+        sub_id = await run_in_threadpool(_insert)
+
+        # Registra a ofensiva (streak)
+        try:
+            from app.modules.users.services.streaks import record_study_day
+            import asyncio
+            asyncio.create_task(record_study_day(username, is_activity=True))
+        except Exception:
+            pass
+
+        return sub_id
 
     async def get_my_submissions(
             self, username: str) -> List[Dict[str, Any]]:

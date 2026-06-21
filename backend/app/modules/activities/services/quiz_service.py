@@ -153,6 +153,7 @@ class QuizService:
         try:
             import asyncio
             from app.modules.activities.services.gamification_service import GamificationService
+            from app.modules.users.services.streaks import record_study_day
             gs = GamificationService()
             # XP reward: proportional to score (e.g., 100% -> 50 XP, 70%
             # -> 35 XP)
@@ -166,8 +167,9 @@ class QuizService:
                             quiz.get(
                                 'title',
                                 'Practice')}"))
+            asyncio.create_task(record_study_day(username, is_activity=True))
         except Exception as e:
-            logging.info(f'[QuizService] Error awarding XP: {e}')
+            logging.info(f'[QuizService] Error awarding XP / streak: {e}')
 
         return {
             'score': score,

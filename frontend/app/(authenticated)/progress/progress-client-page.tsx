@@ -445,25 +445,71 @@ export default function ProgressClientPage() {
             )}
           </div>
 
-          {/* ── Tips ── */}
-          <div className="bg-surface border border-border rounded-3xl p-6 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-yellow-500/10 flex items-center justify-center shrink-0">
-                <Lightbulb size={18} className="text-yellow-500" />
+          {/* ── Tips & Points system ── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* ── Tips ── */}
+            <div className="bg-surface border border-border rounded-3xl p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-yellow-500/10 flex items-center justify-center shrink-0">
+                  <Lightbulb size={18} className="text-yellow-500" />
+                </div>
+                <h3 className="text-sm font-bold text-text">Tips for Faster Growth</h3>
               </div>
-              <h3 className="text-sm font-bold text-text">Tips for Faster Growth</h3>
+
+              <ul className="space-y-3">
+                {TIPS.map((tip, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <span className="mt-0.5 w-5 h-5 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-[0.6rem] font-black text-primary shrink-0">
+                      {i + 1}
+                    </span>
+                    <p className="text-sm text-text-muted leading-relaxed">{tip}</p>
+                  </li>
+                ))}
+              </ul>
             </div>
 
-            <ul className="space-y-3">
-              {TIPS.map((tip, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <span className="mt-0.5 w-5 h-5 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-[0.6rem] font-black text-primary shrink-0">
-                    {i + 1}
-                  </span>
-                  <p className="text-sm text-text-muted leading-relaxed">{tip}</p>
-                </li>
-              ))}
-            </ul>
+            {/* ── How Points Work ── */}
+            <div className="bg-surface border border-border rounded-3xl p-6 space-y-4 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                    <Flame size={18} className="text-primary" />
+                  </div>
+                  <h3 className="text-sm font-bold text-text">How Points (XP) & Streaks Work</h3>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
+                    <span className="text-sm font-black text-primary leading-none">+10 XP</span>
+                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Chat message sent</span>
+                  </div>
+                  <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
+                    <span className="text-sm font-black text-emerald-500 leading-none">+25 XP</span>
+                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Correct quiz answer</span>
+                  </div>
+                  <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
+                    <span className="text-sm font-black text-orange-500 leading-none">+50 XP</span>
+                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Simulation or Podcast</span>
+                  </div>
+                  <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
+                    <span className="text-sm font-black text-blue-500 leading-none">+15 XP</span>
+                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Add word to SRS</span>
+                  </div>
+                  <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
+                    <span className="text-sm font-black text-violet-500 leading-none">+10 XP</span>
+                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Vocabulary review</span>
+                  </div>
+                  <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
+                    <span className="text-sm font-black text-pink-500 leading-none">+30 XP</span>
+                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Reaching study goal</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-[0.65rem] text-text-muted italic text-center border-t border-border/60 pt-3 mt-3">
+                🔥 <strong>Daily Study Streak:</strong> Doing <strong>any</strong> of the activities above once a day immediately maintains your streak. There is no minimum requirement!
+              </div>
+            </div>
           </div>
 
         </main>

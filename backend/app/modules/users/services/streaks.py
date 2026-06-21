@@ -11,7 +11,7 @@ from app.core.database import get_client
 
 
 def _today() -> date:
-    return date.today()
+    return datetime.now(timezone.utc).date()
 
 
 def _now_iso() -> str:
@@ -26,7 +26,7 @@ def _calculate_current_streak(streak_data: dict, today: date) -> int:
 
     # Ordena datas decrescente (garante que a mais recente é a primeira)
     sorted_dates = sorted([date.fromisoformat(d)
-                          for d in study_dates], reverse=True)
+                           for d in study_dates], reverse=True)
 
     last_study_date = sorted_dates[0]
     days_since_last = (today - last_study_date).days
@@ -71,7 +71,7 @@ async def apply_streak_freeze_if_needed(streak_data: dict, username: str) -> boo
     except Exception:
         return False
 
-    today = date.today()
+    today = _today()
     days_since_last = (today - last_date).days
     freeze_count = streak_data.get('streak_freeze_count', 0) or 0
 
@@ -117,7 +117,7 @@ async def get_streak(username: str) -> dict:
             if last_date_str:
                 try:
                     last_date = date.fromisoformat(last_date_str)
-                    today = date.today()
+                    today = _today()
                     days_since_last = (today - last_date).days
                     if days_since_last > 1:
                         streak_data['current_streak'] = 0
@@ -142,13 +142,13 @@ def _empty_streak() -> dict:
     }
 
 
-async def record_study_day(username: str) -> dict:
+async def record_study_day(username: str, is_activity: bool = False) -> dict:
     """Registra atividade hoje e atualiza o streak."""
     await get_streak(username)
 
     def _record():
         db = get_client()
-        today = date.today()
+        today = _today()
         today_str = today.isoformat()
 
         # 1. Conta mensagens do usuário HOJE
@@ -183,8 +183,8 @@ async def record_study_day(username: str) -> dict:
         if last_date_str == today_str:
             return streak_data
 
-        # 3. Verifica meta de 3 mensagens
-        if msg_count < 3:
+        # 3. Qualquer atividade ou pelo menos 1 mensagem conta!
+        if msg_count < 1 and not is_activity:
             db.table('users').update({'streak_data': streak_data}).eq(
                 'username', username).execute()
             return streak_data
@@ -221,6 +221,14 @@ async def record_study_day(username: str) -> dict:
 
     try:
         result = await _execute_db(_record)
+        
+        # Invalida o cache do Redis para forçar atualização no dashboard
+        try:
+            from app.shared.services.upstash import invalidate_user_cache
+            await invalidate_user_cache(username)
+        except Exception:
+            pass
+
         if isinstance(result, tuple):
             streak_data, previous_streak = result
             # Background tasks (Trophies/Notifs)
@@ -245,6 +253,7 @@ async def record_study_day(username: str) -> dict:
     except Exception as e:
         logging.info(f'[Streak] Erro ao gravar: {e}')
         return _empty_streak()
+
 
 
 async def get_streak_milestones(username: str) -> list[dict]:
