@@ -12,7 +12,8 @@ import {
   Save,
   RotateCcw,
   Smartphone,
-  Download
+  Download,
+  Bell
 } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 
@@ -22,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import toast from 'react-hot-toast';
 import { useTour } from '@/hooks/useTour';
+import { apiGet, apiPut } from '@/lib/api/client';
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
@@ -35,20 +37,57 @@ export default function SettingsPage() {
     enterSend: true,
   });
 
-  // Evita erro de hidratação com next-themes
+  const [prefs, setPrefs] = useState({
+    streaks: { email: true, push: true },
+    challenges: { email: true, push: true },
+    cefr: { email: true, push: true },
+  });
+
+  const handlePrefChange = (
+    category: 'streaks' | 'challenges' | 'cefr',
+    channel: 'email' | 'push',
+    value: boolean
+  ) => {
+    setPrefs((prev) => ({
+      ...prev,
+      [category]: {
+        ...prev[category],
+        [channel]: value,
+      },
+    }));
+  };
+
   useEffect(() => {
     setMounted(true);
     const saved = localStorage.getItem('tati_settings');
     if (saved) {
       try {
         setSettings(JSON.parse(saved));
-      } catch (e) { /* ignore */ }
+      } catch (e) {}
     }
+
+    async function loadPrefs() {
+      try {
+        const data = await apiGet<any>('/users/notification-preferences');
+        if (data && data.streaks) {
+          setPrefs(data);
+        }
+      } catch (err) {
+        console.error('Failed to load notification preferences:', err);
+      }
+    }
+    loadPrefs();
   }, []);
 
-  const handleSaveAll = () => {
+  const handleSaveAll = async () => {
     localStorage.setItem('tati_settings', JSON.stringify(settings));
-    toast.success('Saved successfully!');
+    try {
+      await apiPut('/users/notification-preferences', prefs);
+      toast.success('Saved successfully!');
+    } catch (err) {
+      console.error('Failed to save notification preferences:', err);
+      toast.error('Failed to save notification preferences.');
+    }
   };
 
   if (!mounted) return null;
@@ -69,7 +108,7 @@ export default function SettingsPage() {
         </header>
 
         <div className="space-y-6">
-          {/* Aparência */}
+
           <section className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
             <div className="p-6 border-b border-border bg-bg-secondary/30 flex items-center gap-3">
                <Palette size={20} className="text-primary" />
@@ -105,7 +144,7 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          {/* Áudio */}
+
           <section className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
             <div className="p-6 border-b border-border bg-bg-secondary/30 flex items-center gap-3">
                <Volume2 size={20} className="text-primary" />
@@ -133,7 +172,7 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          {/* Chat */}
+
           <section className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
             <div className="p-6 border-b border-border bg-bg-secondary/30 flex items-center gap-3">
                <MessageCircle size={20} className="text-primary" />
@@ -168,7 +207,103 @@ export default function SettingsPage() {
             </div>
       </section>
 
-      {/* App Installation */}
+
+          <section className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
+            <div className="p-6 border-b border-border bg-bg-secondary/30 flex items-center gap-3">
+               <Bell size={20} className="text-primary" />
+               <h2 className="font-bold text-sm uppercase tracking-wider">Notifications</h2>
+            </div>
+            <div className="p-6 space-y-6">
+               <div className="space-y-3 pb-6 border-b border-border">
+                 <div className="flex items-center justify-between">
+                   <div>
+                     <p className="text-sm font-bold text-text mb-0.5">Streaks</p>
+                     <p className="text-xs text-text-muted">Daily reminders and status alerts</p>
+                   </div>
+                 </div>
+                 <div className="flex items-center gap-6 pl-4">
+                   <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-text-muted hover:text-text">
+                     <input
+                       type="checkbox"
+                       className="w-4 h-4 rounded-md border-border text-primary focus:ring-primary/20 accent-primary"
+                       checked={prefs.streaks.email}
+                       onChange={(e) => handlePrefChange('streaks', 'email', e.target.checked)}
+                     />
+                     Email
+                   </label>
+                   <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-text-muted hover:text-text">
+                     <input
+                       type="checkbox"
+                       className="w-4 h-4 rounded-md border-border text-primary focus:ring-primary/20 accent-primary"
+                       checked={prefs.streaks.push}
+                       onChange={(e) => handlePrefChange('streaks', 'push', e.target.checked)}
+                     />
+                     Push Notification
+                   </label>
+                 </div>
+               </div>
+
+               <div className="space-y-3 pb-6 border-b border-border">
+                 <div className="flex items-center justify-between">
+                   <div>
+                     <p className="text-sm font-bold text-text mb-0.5">Challenges & Activities</p>
+                     <p className="text-xs text-text-muted">New weekly challenges and completed activity updates</p>
+                   </div>
+                 </div>
+                 <div className="flex items-center gap-6 pl-4">
+                   <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-text-muted hover:text-text">
+                     <input
+                       type="checkbox"
+                       className="w-4 h-4 rounded-md border-border text-primary focus:ring-primary/20 accent-primary"
+                       checked={prefs.challenges.email}
+                       onChange={(e) => handlePrefChange('challenges', 'email', e.target.checked)}
+                     />
+                     Email
+                   </label>
+                   <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-text-muted hover:text-text">
+                     <input
+                       type="checkbox"
+                       className="w-4 h-4 rounded-md border-border text-primary focus:ring-primary/20 accent-primary"
+                       checked={prefs.challenges.push}
+                       onChange={(e) => handlePrefChange('challenges', 'push', e.target.checked)}
+                     />
+                     Push Notification
+                   </label>
+                 </div>
+               </div>
+
+               <div className="space-y-3">
+                 <div className="flex items-center justify-between">
+                   <div>
+                     <p className="text-sm font-bold text-text mb-0.5">CEFR Level Updates</p>
+                     <p className="text-xs text-text-muted">Assessments schedule and level change notifications</p>
+                   </div>
+                 </div>
+                 <div className="flex items-center gap-6 pl-4">
+                   <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-text-muted hover:text-text">
+                     <input
+                       type="checkbox"
+                       className="w-4 h-4 rounded-md border-border text-primary focus:ring-primary/20 accent-primary"
+                       checked={prefs.cefr.email}
+                       onChange={(e) => handlePrefChange('cefr', 'email', e.target.checked)}
+                     />
+                     Email
+                   </label>
+                   <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-text-muted hover:text-text">
+                     <input
+                       type="checkbox"
+                       className="w-4 h-4 rounded-md border-border text-primary focus:ring-primary/20 accent-primary"
+                       checked={prefs.cefr.push}
+                       onChange={(e) => handlePrefChange('cefr', 'push', e.target.checked)}
+                     />
+                     Push Notification
+                   </label>
+                 </div>
+               </div>
+            </div>
+          </section>
+
+
       <section className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
         <div className="p-6 border-b border-border bg-bg-secondary/30 flex items-center gap-3">
           <Smartphone size={20} className="text-primary" />
@@ -192,7 +327,7 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      {/* Tour */}
+
       <section className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
         <div className="p-6 border-b border-border bg-bg-secondary/30 flex items-center gap-3">
           <RotateCcw size={20} className="text-primary" />

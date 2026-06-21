@@ -225,7 +225,7 @@ async def list_simulations(
         user=Depends(require_staff)) -> list:
     """Lista todas as simulações registradas."""
     normal_sims = await service.get_all_simulations()
-    
+
     # Map is_published/is_active
     for sim in normal_sims:
         if 'is_published' not in sim:
@@ -242,7 +242,7 @@ async def list_simulations(
             student_role = roles.get('student', '')
             ai_role = roles.get('ai', '')
             sys_prompt = f"You are {ai_role}. The user is {student_role}. Goal: {sim.get('goal')}. Scenario: {sim.get('scenario')}"
-            
+
             normal_sims.append({
                 'id': f"cefr_sim_{sim['id']}",
                 'name': f"CEFR {sim['level'].upper()}: {sim['topic']}",
@@ -289,13 +289,13 @@ async def create_simulation(
         delegate_res = await delegate_to_worker_if_needed(request)
         if delegate_res is not None:
             return delegate_res
-            
+
         from app.modules.activities.tasks import generate_simulation_task
-        
+
         topic = data.get('topic') or data.get('name', 'Nova Simulação')
         level = normalize_level(data.get('level') or data.get('difficulty'))
         instructions = data.get('instructions', '')
-        
+
         task_id = run_task_in_background(
             background_tasks,
             generate_simulation_task,
@@ -346,9 +346,10 @@ async def create_simulation(
             filtered_data['difficulty'] = normalize_level(val)
 
     from fastapi.concurrency import run_in_threadpool
+
     def _save():
         return db.table('simulations').insert(filtered_data).execute()
-        
+
     res = await run_in_threadpool(_save)
 
     # Desabilitado: Notificação global de nova simulação
@@ -394,7 +395,7 @@ def update_simulation(
             update_data['level'] = data['difficulty']
         if 'system_prompt' in data:
             update_data['scenario'] = data['system_prompt']
-            
+
         return db.table('cefr_simulations').update(update_data).eq('id', real_id).execute()
 
     allowed_fields = {
@@ -495,23 +496,23 @@ def get_dashboard_flashcards(
         try:
             cefr_res = db.table('cefr_flashcards').select('*').order('created_at', desc=True).execute()
             cefr_data = cefr_res.data or []
-            
+
             from collections import defaultdict
             import re
-            
+
             grouped_cf = defaultdict(list)
             for row in cefr_data:
                 row_level = row.get('level', 'A1').upper()
                 topic = row.get('topic') or 'General Vocabulary'
                 grouped_cf[(row_level, topic)].append(row)
-                
+
             for (lvl, topic), cards in grouped_cf.items():
                 topic_slug = re.sub(r'[^a-zA-Z0-9]', '_', topic.lower())
                 deck_id = f"cefr_fc_{lvl.lower()}_{topic_slug}"
-                
+
                 # Check if published
                 is_pub = all(c.get('is_published', False) for c in cards)
-                
+
                 data.append({
                     'id': deck_id,
                     'title': f"CEFR {lvl}: {topic}",
@@ -575,10 +576,10 @@ def update_flashcard_deck(
         if len(parts) >= 4:
             level = parts[2].upper()
             topic_slug = "_".join(parts[3:])
-            
+
             res = db.table('cefr_flashcards').select('*').eq('level', level).execute()
             rows = res.data or []
-            
+
             import re
             matched_rows = []
             for r in rows:
@@ -586,7 +587,7 @@ def update_flashcard_deck(
                 t_slug = re.sub(r'[^a-zA-Z0-9]', '_', t.lower())
                 if t_slug == topic_slug:
                     matched_rows.append(r)
-            
+
             if matched_rows:
                 matched_ids = [r['id'] for r in matched_rows]
                 update_data = {}
@@ -598,10 +599,10 @@ def update_flashcard_deck(
                     update_data['topic'] = title
                 if 'level' in data:
                     update_data['level'] = data['level']
-                
+
                 if update_data:
                     db.table('cefr_flashcards').update(update_data).in_('id', matched_ids).execute()
-                
+
                 if 'flashcards' in data and data['flashcards'] is not None:
                     db.table('cefr_flashcards').delete().in_('id', matched_ids).execute()
                     new_topic = update_data.get('topic', matched_rows[0].get('topic'))
@@ -617,7 +618,7 @@ def update_flashcard_deck(
                             'is_published': data.get('is_published', matched_rows[0].get('is_published', False))
                         }
                         db.table('cefr_flashcards').insert(card_payload).execute()
-                        
+
                 return {"success": True}
         return {"success": False, "error": "Invalid CEFR deck ID format"}
 
@@ -645,10 +646,10 @@ async def delete_flashcard_deck(
         if len(parts) >= 4:
             level = parts[2].upper()
             topic_slug = "_".join(parts[3:])
-            
+
             res = db.table('cefr_flashcards').select('*').eq('level', level).execute()
             rows = res.data or []
-            
+
             import re
             matched_rows = []
             for r in rows:
@@ -656,7 +657,7 @@ async def delete_flashcard_deck(
                 t_slug = re.sub(r'[^a-zA-Z0-9]', '_', t.lower())
                 if t_slug == topic_slug:
                     matched_rows.append(r)
-            
+
             if matched_rows:
                 matched_ids = [r['id'] for r in matched_rows]
                 db.table('cefr_flashcards').delete().in_('id', matched_ids).execute()
@@ -691,3 +692,136 @@ async def get_buyers(
         service: DashboardService = Depends(),
         user=Depends(require_staff)) -> list:
     return await service.get_buyers_list()
+
+
+class WeeklyChallengeModel(BaseModel):
+    week: str
+    words: list[dict]
+    difficulty: str = 'mixed'
+
+
+@router.post('/challenges')
+async def create_or_update_challenge(
+    body: WeeklyChallengeModel,
+    user: dict = Depends(require_staff)
+):
+    from app.core.database import get_client
+    from datetime import datetime, timezone
+    db = get_client()
+    data = {
+        'week': body.week,
+        'words': body.words,
+        'difficulty': body.difficulty,
+        'updated_at': datetime.now(timezone.utc).isoformat()
+    }
+    try:
+        res = db.table('weekly_challenges').upsert(data, on_conflict='week').execute()
+        return {'success': True, 'data': res.data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar desafio: {e}")
+
+
+@router.get('/challenges')
+async def list_custom_challenges(
+    user: dict = Depends(require_staff)
+):
+    from app.core.database import get_client
+    db = get_client()
+    try:
+        res = db.table('weekly_challenges').select('*').order('week', descending=True).execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar desafios: {e}")
+
+
+@router.delete('/challenges/{week}')
+async def delete_challenge(
+    week: str,
+    user: dict = Depends(require_staff)
+):
+    from app.core.database import get_client
+    db = get_client()
+    try:
+        db.table('weekly_challenges').delete().eq('week', week).execute()
+        return {'success': True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao deletar desafio: {e}")
+
+
+@router.get('/reports/sales-by-category')
+async def get_sales_by_category(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    user=Depends(require_staff)
+):
+    from app.core.database import get_client
+    from datetime import datetime
+    db = get_client()
+    try:
+        query = db.table('orders').select('*').eq('status', 'confirmed')
+        orders_res = query.execute()
+        orders = orders_res.data or []
+
+        if start_date:
+            try:
+                start_dt = datetime.fromisoformat(start_date)
+                orders = [o for o in orders if o.get('created_at') and datetime.fromisoformat(o['created_at'].replace('Z', '+00:00')) >= start_dt]
+            except Exception:
+                pass
+        if end_date:
+            try:
+                end_dt = datetime.fromisoformat(end_date)
+                orders = [o for o in orders if o.get('created_at') and datetime.fromisoformat(o['created_at'].replace('Z', '+00:00')) <= end_dt]
+            except Exception:
+                pass
+
+        if not orders:
+            return []
+
+        order_ids = [o['id'] for o in orders]
+        order_map = {o['id']: o for o in orders}
+
+        items_res = db.table('order_items').select('*').in_('order_id', order_ids).execute()
+        order_items = items_res.data or []
+
+        content_res = db.table('premium_content').select('id, category, title').execute()
+        contents = content_res.data or []
+        content_map = {c['id']: c for c in contents}
+
+        sales_by_category = {}
+        order_items_map = {}
+        for item in order_items:
+            oid = item['order_id']
+            order_items_map.setdefault(oid, []).append(item)
+
+        for oid, items in order_items_map.items():
+            order = order_map.get(oid)
+            if not order:
+                continue
+
+            mp_discount_per_item = 0.05 / len(items)
+
+            for item in items:
+                content_id = item['content_id']
+                content_info = content_map.get(content_id) or {}
+                category = (content_info.get('category') or 'other').lower()
+
+                price = float(item.get('price') or 0.0)
+                net_revenue = max(0.0, price - mp_discount_per_item)
+
+                if category not in sales_by_category:
+                    sales_by_category[category] = {
+                        'category': category,
+                        'total_sales': 0,
+                        'gross_revenue': 0.0,
+                        'net_revenue': 0.0
+                    }
+
+                sales_by_category[category]['total_sales'] += 1
+                sales_by_category[category]['gross_revenue'] += price
+                sales_by_category[category]['net_revenue'] += net_revenue
+
+        return list(sales_by_category.values())
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar relatório de vendas: {e}")

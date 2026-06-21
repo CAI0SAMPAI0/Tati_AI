@@ -92,8 +92,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       const isNative = Capacitor.isNativePlatform();
 
       if (isNative) {
-        // ── NATIVE CAPACITOR PUSH ──────────────────
-        const { PushNotifications } = await import('@capacitor/push-notifications');
+        const PushNotifications = (window as any).Capacitor.Plugins.PushNotifications;
         
         let permStatus = await PushNotifications.checkPermissions();
         if (permStatus.receive === 'prompt') {
@@ -105,11 +104,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        await PushNotifications.register();
-        await PushNotifications.removeAllListeners();
-
-        // Escuta o registro do token FCM
-        await PushNotifications.addListener('registration', async (token) => {
+        await PushNotifications.addListener('registration', async (token: any) => {
           console.log('[Push] Capacitor FCM token:', token.value);
           try {
             await apiPost('/notifications/subscribe', {
@@ -127,14 +122,37 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           }
         });
 
-        await PushNotifications.addListener('registrationError', (error) => {
+        await PushNotifications.addListener('registrationError', (error: any) => {
           console.error('[Push] Registration error:', error);
           toast.error("Falha ao registrar token de push nativo.");
         });
 
-        await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+        await PushNotifications.addListener('pushNotificationReceived', (notification: any) => {
           console.log('[Push] Foreground native push:', notification);
           toast.success(`${notification.title}: ${notification.body}`, { duration: 5000 });
+        });
+
+        await PushNotifications.addListener('pushNotificationActionPerformed', async (action: any) => {
+          console.log('[Push] Action performed:', action);
+          const { actionId, notification } = action;
+          
+          try {
+            await apiPost('/notifications/actions', {
+              action: actionId,
+              notification_id: notification.id || null,
+              category: notification.data?.click_action || null,
+              data: notification.data || null,
+            });
+            console.log(`[Push] Action '${actionId}' successfully processed on backend.`);
+          } catch (apiErr) {
+            console.error('[Push] Failed to report action click to backend:', apiErr);
+          }
+
+          if (actionId === 'study_now') {
+            window.location.href = '/activities';
+          } else if (actionId === 'postpone') {
+            toast.success("Lembrete de estudos adiado por 1 hora!");
+          }
         });
 
         return;
@@ -143,7 +161,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       console.error('[Push] Capacitor init failed, falling back to Web Push:', capacitorErr);
     }
 
-    // ── STANDARD WEB PUSH ──────────────────────────
     if (
       !('serviceWorker' in navigator) ||
       !('PushManager' in window)

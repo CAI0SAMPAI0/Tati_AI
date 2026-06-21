@@ -58,6 +58,10 @@ export const ROUTE_PREFETCHES: Record<string, (ctx?: PrefetchContext) => Prefetc
   progress: () => [
     { queryKey: ['my-stats'], endpoint: '/dashboard/stats/my' },
   ],
+  shop: () => [
+    { queryKey: ['my-stats'], endpoint: '/dashboard/stats/my' },
+    { queryKey: ['streak-data'], endpoint: ENDPOINTS.STREAK },
+  ],
   receipt: () => [{ queryKey: ['payments-status', 'receipt'], endpoint: ENDPOINTS.PAYMENTS_STATUS }],
   vocab: () => [
     { queryKey: ['due-vocab'], endpoint: '/users/vocabulary/due' },

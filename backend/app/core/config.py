@@ -288,6 +288,8 @@ class Settings(BaseSettings):
             'Tatiana',
             'Tati',
             'Tatiana Duarte',
+            'admin',
+            'Admin',
         )
 
 

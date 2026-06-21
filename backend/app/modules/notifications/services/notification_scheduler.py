@@ -208,6 +208,15 @@ class NotificationScheduler:
             days_since = (today - last_date).days
             if days_since != 2:
                 continue
+
+            from app.modules.users.services.streaks import apply_streak_freeze_if_needed
+            freeze_applied = await apply_streak_freeze_if_needed(streak_data, username)
+            if freeze_applied:
+                title = "Your streak was frozen and saved today! 🧊"
+                body = f"Your {current_streak}-day streak is safe. Keep learning tomorrow!"
+                await self._dispatch(username, title, body, category='streak_frozen', url='/chat')
+                continue
+
             already_sent = await run_in_threadpool(
                 lambda u=username: self._count_notifications_today(
                     u, 'streak_broken', now)

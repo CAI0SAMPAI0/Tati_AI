@@ -227,7 +227,7 @@ async def chat_ws(
     # logging.info(f'[WS] Payload: {payload}')
 
     if not payload:
-        logging.info(f'[WS] Rejeitando: Payload nulo')
+        logging.info('[WS] Rejeitando: Payload nulo')
         await websocket.close(code=4001, reason='Token inválido')
         return
 
@@ -240,11 +240,7 @@ async def chat_ws(
     # Se for simulação e não tiver mensagens, envia saudação inicial
     if simulation_id:
         try:
-            # Tenta pegar o conv_id do query se existir, ou espera a
-            # primeira mensagem
-            from app.shared.services.history import load_history
-            # Como não temos conv_id ainda (talvez), espera a primeira
-            # mensagem do user
+            pass
         except Exception:
             pass
 
@@ -281,9 +277,113 @@ async def chat_ws(
             # logging.info(f'[WS] Processamento finalizado')
 
     except WebSocketDisconnect:
-        # logging.info(f'[WS] Cliente desconectado')
         pass
-    except Exception as exc:
-        # logging.info(f'[WS] Erro CRÍTICO: {exc}')
+    except Exception:
         import traceback
         traceback.print_exc()
+
+
+@router.websocket('/live')
+async def voice_live_ws(
+    websocket: WebSocket,
+    token: str | None = Query(None),
+):
+    import json
+    import base64
+    from app.core.security import decode_token
+    from app.modules.chat.services.llm import transcribe_audio
+    payload = decode_token(token) if token else None
+    if not payload:
+        await websocket.close(code=4001, reason='Token inválido')
+        return
+
+    await websocket.accept()
+
+    try:
+        while True:
+            message = await websocket.receive()
+
+            if "text" in message:
+                raw_text = message["text"]
+                msg_data = json.loads(raw_text)
+
+                if msg_data.get('type') == 'ping':
+                    await websocket.send_json({'type': 'pong'})
+                    continue
+
+                if msg_data.get('type') == 'audio' and msg_data.get('audio'):
+                    audio_bytes = base64.b64decode(msg_data['audio'])
+
+                    transcription = await transcribe_audio(
+                        audio_bytes,
+                        prompt="Phonetic practice live stream."
+                    )
+
+                    if transcription and not transcription.startswith("[Erro"):
+                        await websocket.send_json({
+                            'type': 'transcription',
+                            'text': transcription
+                        })
+
+                        from app.modules.chat.services.llm import groq_chat
+                        system_prompt = (
+                            "You are Tati, a friendly, encouraging English teacher. "
+                            "Keep your response short and suitable for voice conversation (1-2 sentences max)."
+                        )
+                        messages = [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": transcription}
+                        ]
+                        response_text = await groq_chat(messages)
+
+                        await websocket.send_json({
+                            'type': 'stream_token',
+                            'content': response_text
+                        })
+
+                        audio_b64 = await text_to_speech(response_text)
+                        if audio_b64:
+                            await websocket.send_json({
+                                'type': 'audio_response',
+                                'audio': audio_b64,
+                                'content': response_text
+                            })
+
+                        await websocket.send_json({'type': 'stream_end'})
+
+            elif "bytes" in message:
+                audio_bytes = message["bytes"]
+                transcription = await transcribe_audio(
+                    audio_bytes,
+                    prompt="Live audio chunk."
+                )
+                if transcription and not transcription.startswith("[Erro"):
+                    await websocket.send_json({
+                        'type': 'transcription',
+                        'text': transcription
+                    })
+
+                    from app.modules.chat.services.llm import groq_chat
+                    messages = [
+                        {"role": "system", "content": "You are Tati, a friendly English teacher. Keep it short (1-2 sentences)."},
+                        {"role": "user", "content": transcription}
+                    ]
+                    response_text = await groq_chat(messages)
+                    await websocket.send_json({
+                        'type': 'stream_token',
+                        'content': response_text
+                    })
+
+                    audio_b64 = await text_to_speech(response_text)
+                    if audio_b64:
+                        await websocket.send_json({
+                            'type': 'audio_response',
+                            'audio': audio_b64,
+                            'content': response_text
+                        })
+                    await websocket.send_json({'type': 'stream_end'})
+
+    except WebSocketDisconnect:
+        pass
+    except Exception as exc:
+        logging.info(f'[LiveWS] Error: {exc}')

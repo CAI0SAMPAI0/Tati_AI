@@ -27,7 +27,12 @@ export function PronunciationPractice({ phrase, podcastId, onClose }: Pronunciat
   
   const [isRecording, setIsRecording] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
-  const [result, setResult] = useState<{ score: number; feedback: string; transcription: string } | null>(null);
+  const [result, setResult] = useState<{
+    score: number;
+    feedback: string;
+    transcription: string;
+    words?: { word: string; score: number; accuracy: string }[];
+  } | null>(null);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -88,10 +93,14 @@ export function PronunciationPractice({ phrase, podcastId, onClose }: Pronunciat
       reader.readAsDataURL(blob);
       reader.onloadend = async () => {
         const base64Audio = (reader.result as string).split(',')[1];
-        const res = await apiPost<{ score: number; feedback: string; transcription: string }>('/activities/podcasts/evaluate-pronunciation', {
+        const res = await apiPost<{
+          score: number;
+          feedback: string;
+          transcription: string;
+          words?: { word: string; score: number; accuracy: string }[];
+        }>('/speech/verify-pronunciation', {
           audio: base64Audio,
-          reference_text: phrase,
-          podcast_id: podcastId
+          reference_text: phrase
         });
         if (res.ok) {
           setResult(res.data);
@@ -123,8 +132,26 @@ export function PronunciationPractice({ phrase, podcastId, onClose }: Pronunciat
         )}
       </div>
 
-      <div className="p-4 bg-bg rounded-2xl border border-border italic text-center text-lg md:text-xl font-display text-text relative group">
-        "{phrase}"
+      <div className="p-4 bg-bg rounded-2xl border border-border italic text-center text-lg md:text-xl font-display text-text relative group flex items-center justify-center min-h-[64px]">
+        {result && result.words && result.words.length > 0 ? (
+          <div className="flex flex-wrap justify-center gap-x-2 gap-y-1">
+            {result.words.map((w, idx) => (
+              <span
+                key={idx}
+                className={cn(
+                  "font-bold transition-all duration-300",
+                  w.accuracy === 'correct' 
+                    ? "text-success drop-shadow-[0_1.5px_1.5px_rgba(34,197,94,0.15)]" 
+                    : "text-danger line-through decoration-wavy decoration-danger/40"
+                )}
+              >
+                {w.word}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <span>"{phrase}"</span>
+        )}
         <button 
           onClick={playReference}
           className="absolute -right-2 -top-2 bg-primary text-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-
 import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -20,7 +19,6 @@ if getattr(settings, "resend_api_key", ""):
         resend = None
 
 
-
 class EmailSender:
     def __init__(self) -> None:
         self.smtp_host = getattr(
@@ -29,26 +27,45 @@ class EmailSender:
         self.smtp_user = getattr(settings, "smtp_user", "")
         self.smtp_password = getattr(settings, "smtp_password", "")
         self._FROM = f"Teacher Tati <{self.smtp_user}>"
-        # Ready if SMTP is configured OR a resend API key is present
         self._ready = bool(
             (self.smtp_host and self.smtp_user and self.smtp_password) or getattr(
                 settings, "resend_api_key", ""))
 
     def _send(self, to_email: str, subject: str, html: str,
               attachments: list | None = None) -> bool:
+        try:
+            from app.core.database import get_client
+            db = get_client()
+            res = db.table('users').select('username, profile').eq('email', to_email).limit(1).execute()
+            if res.data:
+                profile = res.data[0].get('profile') or {}
+                prefs = profile.get('notification_preferences')
+                if prefs:
+                    s_lower = subject.lower()
+                    if 'streak' in s_lower or 'ofensiva' in s_lower or 'broken' in s_lower or 'alive' in s_lower:
+                        category = 'streaks'
+                    elif 'desafio' in s_lower or 'challenge' in s_lower or 'activity' in s_lower or 'submission' in s_lower:
+                        category = 'challenges'
+                    elif 'cefr' in s_lower or 'nível' in s_lower or 'level' in s_lower or 'report' in s_lower:
+                        category = 'cefr'
+                    else:
+                        category = 'challenges'
+
+                    if not prefs.get(category, {}).get('email', True):
+                        logging.info(f"[EmailSender] Suppressed email to {to_email} due to preferences (category: {category})")
+                        return False
+        except Exception as e:
+            logging.info(f"[EmailSender] Failed to check email preferences: {e}")
+
         if not self._ready:
             logging.info(
                 f"[EmailSender] SMTP/resend not configured. Email to {to_email}: {subject}")
             return False
 
-        # Prefer external resend service (used in tests). If available,
-        # call it first.
         try:
             if "resend" in globals() and hasattr(
                     resend, "Emails") and hasattr(
                     resend.Emails, "send"):
-                # Prepare payload expected by tests: include 'from',
-                # filter attachments into dicts
                 payload = {
                     "to": to_email,
                     "subject": subject,
@@ -108,7 +125,6 @@ class EmailSender:
             logging.info(f"[EmailSender] Error sending email: {exc}")
             return False
 
-    # Public convenience methods
     def send_report_email(
             self,
             to_email: str,
@@ -331,28 +347,28 @@ class EmailSender:
             name: str,
             username: str,
             password: str) -> bool:
-        subject = "Boas-vindas ao Tati AI Hub! 🚀 Suas credenciais de acesso"
+        subject = "Boas-vindas ao Tati AI Hub! Suas credenciais de acesso"
         html = f"""
-<div style="font-family:Arial,sans-serif;max-width:600px;background:#0a0a0c;padding:30px;border-radius:24px;color:#ffffff;border:1px solid #222;">
-    <h2 style="color:#7c3aed;margin-top:0;">Seja bem-vindo(a) ao Hub, {name}! 🎉</h2>
-    <p style="color:#a1a1aa;line-height:1.6;">Sua conta foi criada automaticamente para que você possa acessar seus materiais. Use as credenciais abaixo para entrar:</p>
+<div style="font-family:Arial,sans-serif;max-width:600px;background:#0a0a0c;padding:30px;border-radius:24px;color:#ffffff;border:1px solid #222">
+    <h2 style="color:#7c3aed;margin-top:0">Seja bem-vindo(a) ao Hub, {name}! 🎉</h2>
+    <p style="color:#a1a1aa;line-height:1.6">Sua conta foi criada automaticamente para que você possa acessar seus materiais. Use as credenciais abaixo para entrar:</p>
 
-    <div style="background:#111114;border:1px solid #333;border-radius:16px;padding:25px;margin:25px 0;text-align:center;">
-        <p style="margin:0 0 10px 0;color:#71717a;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Seu Usuário</p>
-        <p style="margin:0 0 20px 0;font-size:18px;font-weight:bold;color:#ffffff;">{username}</p>
+    <div style="background:#111114;border:1px solid #333;border-radius:16px;padding:25px;margin:25px 0;text-align:center">
+        <p style="margin:0 0 10px 0;color:#71717a;font-size:12px;text-transform:uppercase;letter-spacing:1px">Seu Usuário</p>
+        <p style="margin:0 0 20px 0;font-size:18px;font-weight:bold;color:#ffffff">{username}</p>
 
-        <p style="margin:0 0 10px 0;color:#71717a;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Sua Senha Temporária</p>
-        <p style="margin:0 0 0 0;font-size:24px;font-weight:bold;color:#7c3aed;">{password}</p>
+        <p style="margin:0 0 10px 0;color:#71717a;font-size:12px;text-transform:uppercase;letter-spacing:1px">Sua Senha Temporária</p>
+        <p style="margin:0 0 0 0;font-size:24px;font-weight:bold;color:#7c3aed">{password}</p>
     </div>
 
-    <p style="color:#f87171;font-size:14px;font-weight:bold;">⚠️ IMPORTANTE: Por segurança, recomendamos que você altere sua senha imediatamente após o primeiro login nas configurações do seu perfil.</p>
+    <p style="color:#f87171;font-size:14px;font-weight:bold">⚠️ IMPORTANTE: Por segurança, recomendamos que você altere sua senha imediatamente após o primeiro login nas configurações do seu perfil.</p>
 
-    <div style="text-align:center;margin-top:30px;">
-        <a href="http://localhost:3001/login" style="display:inline-block;background:#7c3aed;color:#ffffff;padding:14px 28px;border-radius:14px;text-decoration:none;font-weight:bold;box-shadow:0 10px 20px rgba(124,58,237,0.3);">Acessar o Hub agora →</a>
+    <div style="text-align:center;margin-top:30px">
+        <a href="http://localhost:3001/login" style="display:inline-block;background:#7c3aed;color:#ffffff;padding:14px 28px;border-radius:14px;text-decoration:none;font-weight:bold;box-shadow:0 10px 20px rgba(124,58,237,0.3)">Acessar o Hub agora →</a>
     </div>
 
-    <hr style="border:0;border-top:1px solid #222;margin:30px 0;">
-    <p style="font-size:12px;color:#52525b;text-align:center;">Equipe Teacher Tati AI</p>
+    <hr style="border:0;border-top:1px solid #222;margin:30px 0">
+    <p style="font-size:12px;color:#52525b;text-align:center">Equipe Teacher Tati AI</p>
 </div>
 """
         return self._send(to_email, subject, html)
@@ -427,10 +443,8 @@ class _ResendShim:
     class Emails:
         @staticmethod
         def send(payload: dict) -> dict:
-            # Minimal stub; tests will patch this method.
             return {"id": "stub"}
 
 
 if resend is None:
     resend = _ResendShim
-

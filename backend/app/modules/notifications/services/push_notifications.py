@@ -11,7 +11,7 @@ from app.core.database import get_client
 
 try:
     from pywebpush import WebPushException, webpush
-except Exception:  # pragma: no cover - dependência opcional em ambiente local.
+except Exception:
     WebPushException = Exception
     webpush = None
 
@@ -86,9 +86,8 @@ def _user_subscriptions(username: str) -> list[dict[str, Any]]:
             .eq('username', username)
             .eq('is_active', True)
             .execute()
-            .data
         )
-        return rows or []
+        return rows.data or []
     except Exception as exc:
         logging.info(f'[Push] Falha ao carregar subscriptions: {exc}')
         return []
@@ -97,7 +96,7 @@ def _user_subscriptions(username: str) -> list[dict[str, Any]]:
 def _get_fcm_access_token(service_account_path: str) -> str:
     from google.oauth2 import service_account
     from google.auth.transport.requests import Request
-    
+
     scopes = ['https://www.googleapis.com/auth/firebase.messaging']
     creds = service_account.Credentials.from_service_account_file(
         service_account_path, scopes=scopes
@@ -115,7 +114,14 @@ def _get_fcm_project_id(service_account_path: str) -> str | None:
         return None
 
 
-def send_native_fcm_notification(token: str, title: str, body: str, url: str = '/') -> bool:
+def send_native_fcm_notification(
+    token: str,
+    title: str,
+    body: str,
+    url: str = '/',
+    click_action: str = None,
+    actions: list = None,
+) -> bool:
     possible_paths = [
         os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))), 'service-account.json'),
         os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'service-account.json'),
@@ -125,31 +131,45 @@ def send_native_fcm_notification(token: str, title: str, body: str, url: str = '
         os.path.join(os.getcwd(), 'backend', 'service-account.json'),
         os.path.join(os.getcwd(), 'mobile_app', 'capacitor', 'service-account.json')
     ]
-    
+
     sa_path = None
     for p in possible_paths:
         if os.path.exists(p):
             sa_path = p
             break
-            
+
     if not sa_path:
         logging.info("[FCM] Native push failed: service-account.json not found in paths.")
         return False
-        
+
     project_id = _get_fcm_project_id(sa_path)
     if not project_id:
         logging.info("[FCM] Native push failed: project_id not found in service-account.json.")
         return False
-        
+
     try:
         access_token = _get_fcm_access_token(sa_path)
         fcm_url = f"https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
-        
+
         headers = {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json"
         }
-        
+
+        data_payload = {
+            "url": url
+        }
+        if click_action:
+            data_payload["click_action"] = click_action
+        if actions:
+            data_payload["actions"] = json.dumps(actions)
+
+        android_notification = {
+            "sound": "default"
+        }
+        if click_action:
+            android_notification["click_action"] = click_action
+
         payload = {
             "message": {
                 "token": token,
@@ -157,17 +177,13 @@ def send_native_fcm_notification(token: str, title: str, body: str, url: str = '
                     "title": title,
                     "body": body
                 },
-                "data": {
-                    "url": url
-                },
+                "data": data_payload,
                 "android": {
-                    "notification": {
-                        "sound": "default"
-                    }
+                    "notification": android_notification
                 }
             }
         }
-        
+
         resp = httpx.post(fcm_url, headers=headers, json=payload, timeout=10.0)
         if resp.status_code == 200:
             logging.info(f"[FCM] Native push successfully sent to token {token[:15]}...")
@@ -181,29 +197,63 @@ def send_native_fcm_notification(token: str, title: str, body: str, url: str = '
 
 
 def send_push_to_user(
-    username: str, title: str, body: str, url: str = '/'
+    username: str,
+    title: str,
+    body: str,
+    url: str = '/',
+    click_action: str = None,
+    actions: list = None,
 ) -> Dict[str, int]:
+    try:
+        db = get_client()
+        res = db.table('users').select('profile').eq('username', username).execute()
+        if res.data:
+            profile = res.data[0].get('profile') or {}
+            prefs = profile.get('notification_preferences')
+            if prefs:
+                t_lower = title.lower()
+                b_lower = body.lower()
+                if 'streak' in t_lower or 'ofensiva' in t_lower or 'broken' in t_lower or 'alive' in t_lower or 'freeze' in t_lower or 'saved today' in b_lower:
+                    category = 'streaks'
+                elif 'desafio' in t_lower or 'challenge' in t_lower or 'activity' in t_lower or 'submission' in t_lower:
+                    category = 'challenges'
+                elif 'cefr' in t_lower or 'nível' in t_lower or 'level' in t_lower or 'report' in t_lower:
+                    category = 'cefr'
+                else:
+                    category = 'challenges'
+
+                if not prefs.get(category, {}).get('push', True):
+                    logging.info(f"[Push] Suppressed push to {username} due to preferences (category: {category})")
+                    return {'sent': 0, 'failed': 0}
+    except Exception as e:
+        logging.info(f"[Push] Failed to check push preferences for {username}: {e}")
+
     sent = 0
     failed = 0
-    
+
     for row in _user_subscriptions(username):
         endpoint = str(row.get('endpoint') or '').strip()
         p256dh = str(row.get('p256dh') or '')
-        
+
         if endpoint.startswith('fcm:') or p256dh == 'fcm':
-            # 1. Enviar via Native FCM
             token = endpoint.replace('fcm:', '')
-            success = send_native_fcm_notification(token, title, body, url)
+            success = send_native_fcm_notification(
+                token=token,
+                title=title,
+                body=body,
+                url=url,
+                click_action=click_action,
+                actions=actions,
+            )
             if success:
                 sent += 1
             else:
                 failed += 1
         else:
-            # 2. Enviar via Web Push padrão
             if not _is_push_configured():
                 failed += 1
                 continue
-                
+
             subscription_info = {
                 'endpoint': endpoint,
                 'keys': {
@@ -212,9 +262,15 @@ def send_push_to_user(
                 },
             }
             try:
+                data_payload = {'title': title, 'body': body, 'url': url}
+                if click_action:
+                    data_payload['click_action'] = click_action
+                if actions:
+                    data_payload['actions'] = actions
+
                 webpush(
                     subscription_info=subscription_info,
-                    data=json.dumps({'title': title, 'body': body, 'url': url}),
+                    data=json.dumps(data_payload),
                     vapid_private_key=settings.vapid_private_key,
                     vapid_claims={'sub': settings.vapid_contact},
                     ttl=60 * 60,

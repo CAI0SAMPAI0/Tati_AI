@@ -14,18 +14,52 @@ import {
   Sparkles,
   Moon,
   Sun,
-  RefreshCcw
+  RefreshCcw,
+  Activity
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVoiceSocket } from '@/hooks/useVoiceSocket';
+import { useVoiceLiveSocket } from '@/hooks/useVoiceLiveSocket';
 import { VoiceAvatar } from '@/components/chat/voice-avatar';
 import { VoiceMessageBubble } from '@/components/chat/voice-message-bubble';
 import WordTooltip from '@/components/chat/word-tooltip';
 import { apiGet, apiPost } from '@/lib/api/client';
-import { ENDPOINTS } from '@/lib/api/endpoints';
 import toast from 'react-hot-toast';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
+
+function exportWav(samples: Float32Array, sampleRate: number): Blob {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+
+  const writeString = (view: DataView, offset: number, string: string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeString(view, 8, 'WAVE');
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(view, 36, 'data');
+  view.setUint32(40, samples.length * 2, true);
+
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++, offset += 2) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+
+  return new Blob([view], { type: 'audio/wav' });
+}
 
 function VoicePageContent() {
   const [Markdown, setMarkdown] = useState<any>(null);
@@ -46,10 +80,6 @@ function VoicePageContent() {
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
-  const [summary, setSummary] = useState<string | null>(null);
-  const [loadingSummary, setLoadingSummary] = useState(false);
-
   const [activeWord, setActiveWord] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
@@ -63,39 +93,66 @@ function VoicePageContent() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
+  const [isLiveMode, setIsLiveMode] = useState(false);
+
   const {
-    state,
-    setState,
-    messages,
-    setMessages,
-    lastAudio,
-    transcription,
+    state: normalState,
+    setState: setNormalState,
+    messages: normalMessages,
+    setMessages: setNormalMessages,
+    lastAudio: normalLastAudio,
+    transcription: normalTranscription,
     sendAudio,
     activeConvId,
   } = useVoiceSocket(convId);
 
-  // Sincroniza convId local com o activeConvId do hook (importante para novas conversas)
+  const {
+    messages: liveMessages,
+    setMessages: setLiveMessages,
+    state: liveState,
+    setState: setLiveState,
+    lastAudio: liveLastAudio,
+    transcription: liveTranscription,
+    connect: connectLive,
+    disconnect: disconnectLive,
+    sendAudioChunk
+  } = useVoiceLiveSocket();
+
+  const state = isLiveMode ? liveState : normalState;
+  const setState = isLiveMode ? setLiveState : setNormalState;
+  const messages = isLiveMode ? liveMessages : normalMessages;
+  const setMessages = isLiveMode ? setLiveMessages : setNormalMessages;
+  const lastAudio = isLiveMode ? liveLastAudio : normalLastAudio;
+  const transcription = isLiveMode ? liveTranscription : normalTranscription;
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationFrameRef = useRef<number>(0);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const silenceTimerRef = useRef<number>(0);
+  const streamRef = useRef<MediaStream | null>(null);
+  const accumulatedAudioRef = useRef<Float32Array[]>([]);
+
   useEffect(() => {
     if (activeConvId && activeConvId !== convId) {
       setConvId(activeConvId);
     }
   }, [activeConvId, convId]);
 
-  // Safety timeout for "processing" state
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (state === 'processing') {
       timer = setTimeout(() => {
         if (state === 'processing') {
-          console.warn('[VoicePage] Processing timeout - forcing idle');
           setState('idle');
         }
-      }, 15000); // 15s safety
+      }, 15000);
     }
     return () => clearTimeout(timer);
   }, [state, setState]);
 
-  // Load simulation details if needed
   useEffect(() => {
     if (simulationId) {
       apiGet<any>(`/simulation/scenarios/${simulationId}`)
@@ -126,7 +183,7 @@ function VoicePageContent() {
             const audioSrc = `data:audio/mp3;base64,${simData.initial_message.audio}`;
             if (audioRef.current) {
               audioRef.current.src = audioSrc;
-              audioRef.current.play().catch(e => console.error("Audio auto-play failed:", e));
+              audioRef.current.play().catch(() => {});
             }
           }
         }
@@ -136,7 +193,6 @@ function VoicePageContent() {
         setError('Could not start on server. Check your connection.');
       }
     } catch (err: any) {
-      console.error('Start simulation error:', err);
       setError(`Error: ${err.message || 'Connection failed'}`);
     } finally {
       setIsStarting(false);
@@ -152,11 +208,10 @@ function VoicePageContent() {
       toast.success('Simulation completed!');
       router.push('/activities');
     } catch (e) {
-      console.error('Error completing simulation:', e);
+      console.error(e);
     }
   };
 
-  // Auto-scroll
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTo({
@@ -166,13 +221,11 @@ function VoicePageContent() {
     }
   }, [messages, transcription]);
 
-  // Play audio when source changes
   useEffect(() => {
     if (lastAudio && audioRef.current) {
       const audio = audioRef.current;
       audio.src = `data:audio/mp3;base64,${lastAudio}`;
       audio.play().catch(e => {
-        console.warn('Audio play blocked:', e);
         if (e.name === 'NotAllowedError') {
           toast('Tap the avatar to listen.', { icon: '📢' });
         }
@@ -180,7 +233,6 @@ function VoicePageContent() {
     }
   }, [lastAudio]);
 
-  // Audio listeners
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -209,10 +261,8 @@ function VoicePageContent() {
   };
 
   const startRecording = async () => {
-    // Permite gravar se tiver convId OU se não for uma simulação (chat livre)
     if (!convId && !!simulationId) return;
     
-    // Pause any playing audio from Tati
     if (audioRef.current) {
       audioRef.current.pause();
     }
@@ -235,8 +285,7 @@ function VoicePageContent() {
       recorder.start();
       setState('listening');
     } catch (err) {
-      console.error('Mic error:', err);
-      toast.error('Erro de microfone: ' + (err instanceof Error ? err.message : 'Permissão negada ou sem microfone.'));
+      toast.error('Mic error: permission denied.');
     }
   };
 
@@ -246,6 +295,170 @@ function VoicePageContent() {
       setState('processing');
     }
   };
+
+  const startLiveMode = async () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+
+    setIsLiveMode(true);
+    setLiveMessages([]);
+    connectLive();
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      
+      const AudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioContextRef.current = AudioCtx;
+      
+      const source = AudioCtx.createMediaStreamSource(stream);
+      sourceRef.current = source;
+      
+      const analyser = AudioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      analyserRef.current = analyser;
+      source.connect(analyser);
+
+      const processor = AudioCtx.createScriptProcessor(4096, 1, 1);
+      processorRef.current = processor;
+      source.connect(processor);
+      processor.connect(AudioCtx.destination);
+      
+      accumulatedAudioRef.current = [];
+      setLiveState('listening');
+      
+      processor.onaudioprocess = (e) => {
+        const inputData = e.inputBuffer.getChannelData(0);
+        accumulatedAudioRef.current.push(new Float32Array(inputData));
+        
+        let sum = 0;
+        for (let i = 0; i < inputData.length; i++) {
+          sum += inputData[i] * inputData[i];
+        }
+        const rms = Math.sqrt(sum / inputData.length);
+        
+        if (liveState === 'speaking' && rms > 0.02) {
+          if (audioRef.current) {
+            audioRef.current.pause();
+            setLiveState('listening');
+          }
+        }
+        
+        if (liveState === 'listening') {
+          if (rms < 0.012) {
+            silenceTimerRef.current += 4096 / AudioCtx.sampleRate;
+            if (silenceTimerRef.current >= 1.5) {
+              const totalLength = accumulatedAudioRef.current.reduce((acc, val) => acc + val.length, 0);
+              if (totalLength > 16000) {
+                const resultBuffer = new Float32Array(totalLength);
+                let offset = 0;
+                for (const chunk of accumulatedAudioRef.current) {
+                  resultBuffer.set(chunk, offset);
+                  offset += chunk.length;
+                }
+                
+                const wavBlob = exportWav(resultBuffer, AudioCtx.sampleRate);
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  const base64 = (reader.result as string).split(',')[1];
+                  sendAudioChunk(base64);
+                };
+                reader.readAsDataURL(wavBlob);
+                
+                accumulatedAudioRef.current = [];
+                silenceTimerRef.current = 0;
+                setLiveState('processing');
+              }
+            }
+          } else {
+            silenceTimerRef.current = 0;
+          }
+        }
+      };
+    } catch (err) {
+      toast.error('Failed to start Live Mode mic.');
+    }
+  };
+
+  const stopLiveMode = () => {
+    setIsLiveMode(false);
+    disconnectLive();
+    setLiveState('idle');
+    
+    if (processorRef.current) {
+      processorRef.current.disconnect();
+      processorRef.current = null;
+    }
+    if (sourceRef.current) {
+      sourceRef.current.disconnect();
+      sourceRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    if (!canvasRef.current || !analyserRef.current || !isLiveMode) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const analyser = analyserRef.current;
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    const draw = () => {
+      animationFrameRef.current = requestAnimationFrame(draw);
+      analyser.getByteTimeDomainData(dataArray);
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.lineWidth = 3;
+      
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+      gradient.addColorStop(0, '#818cf8');
+      gradient.addColorStop(1, '#ec4899');
+      ctx.strokeStyle = gradient;
+      
+      ctx.beginPath();
+      const sliceWidth = canvas.width / bufferLength;
+      let x = 0;
+
+      for (let i = 0; i < bufferLength; i++) {
+        const v = dataArray[i] / 128.0;
+        const y = (v * canvas.height) / 2;
+
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+        x += sliceWidth;
+      }
+
+      ctx.lineTo(canvas.width, canvas.height / 2);
+      ctx.stroke();
+    };
+
+    draw();
+    return () => {
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+    };
+  }, [state, isLiveMode]);
+
+  useEffect(() => {
+    return () => {
+      disconnectLive();
+      if (processorRef.current) processorRef.current.disconnect();
+      if (audioContextRef.current) audioContextRef.current.close();
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+    };
+  }, [disconnectLive]);
 
   const togglePlayback = () => {
     if (!audioRef.current) return;
@@ -286,7 +499,6 @@ function VoicePageContent() {
 
       <audio ref={audioRef} onEnded={() => setState('idle')} onPlay={() => setState('speaking')} onPause={() => setState('idle')} />
 
-      {/* LEFT SECTION: Avatar */}
       <motion.div initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} className="w-full md:w-[42%] lg:w-[38%] h-[25vh] sm:h-[30vh] md:h-full relative flex flex-col items-center justify-center p-4 sm:p-8 bg-white/40 dark:bg-[#0f1120]/60 backdrop-blur-3xl border-b md:border-b-0 md:border-r border-white/40 dark:border-white/10 z-20 shadow-2xl transition-all">
         <div className="absolute top-4 sm:top-6 left-4 sm:left-6 flex items-center gap-4">
           <button onClick={() => router.back()} className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-white/50 dark:bg-[#1a1c2e]/60 border border-white/60 dark:border-white/10 text-text hover:text-primary transition-all active:scale-95 shadow-xl backdrop-blur-xl group">
@@ -296,6 +508,16 @@ function VoicePageContent() {
         </div>
 
         <div className="absolute top-4 sm:top-6 right-4 sm:right-6 flex items-center gap-3">
+          <button 
+            onClick={() => isLiveMode ? stopLiveMode() : startLiveMode()} 
+            className={cn(
+              "px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-xl flex items-center gap-2",
+              isLiveMode ? "bg-accent text-white" : "bg-white/50 dark:bg-[#1a1c2e]/60 border border-white/60 dark:border-white/10 text-text"
+            )}
+          >
+            <Activity size={14} className={isLiveMode ? "animate-pulse" : ""} />
+            {isLiveMode ? "Live: On" : "Live Mode"}
+          </button>
           {simulationId && (
             <button onClick={handleFinishSimulation} className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-success text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-success/90 transition-all active:scale-95 shadow-xl">
               Finish
@@ -308,6 +530,7 @@ function VoicePageContent() {
 
         <div className="flex flex-col items-center gap-2 sm:gap-8 mt-2 md:mt-0">
           <div className="cursor-pointer hover:scale-105 active:scale-95 transition-all duration-700 scale-[0.6] sm:scale-90 md:scale-100" onClick={() => {
+            if (isLiveMode) return;
             if (!convId) return;
             if (state === 'idle' && !audioRef.current?.src) startRecording();
             else if (state === 'speaking') togglePlayback();
@@ -334,7 +557,6 @@ function VoicePageContent() {
         </div>
       </motion.div>
 
-      {/* RIGHT SECTION: Chat */}
       <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} className="flex-1 flex flex-col min-h-0 bg-white/5 dark:bg-[#05060b]/40 relative z-10">
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-12 py-6 sm:py-10 space-y-6 sm:space-y-8 scrollbar-hide mask-fade-top-giant">
           {!convId && simulationId ? (
@@ -368,7 +590,7 @@ function VoicePageContent() {
                       <Mic size={24} className="text-primary/50" />
                     </div>
                     <p className="text-sm sm:text-lg italic tracking-widest text-center">
-                        {simulationId ? 'Waiting for simulation...' : 'Say "Hello" to start your class...'}
+                        {isLiveMode ? 'Live Mode Active. Start speaking continuous English...' : simulationId ? 'Waiting for simulation...' : 'Say "Hello" to start your class...'}
                     </p>
                  </div>
               ) : (
@@ -396,49 +618,56 @@ function VoicePageContent() {
           )}
         </div>
 
-        {/* Footer: Controls */}
         <footer className="p-2 sm:p-4 md:p-6 bg-white/60 dark:bg-[#0a0b14]/95 backdrop-blur-3xl border-t border-white/60 dark:border-white/10 shrink-0 pb-safe">
           <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center gap-4 md:gap-8">
             <div className="flex-1 w-full bg-white/30 dark:bg-white/5 rounded-2xl sm:rounded-3xl p-2 sm:p-4 space-y-2 shadow-lg border border-white/20">
-              <div className="flex items-center gap-2 sm:gap-4">
-                <button onClick={togglePlayback} disabled={!audioRef.current?.src} className={cn("w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center transition-all shadow-md active:scale-90", state === 'speaking' ? "bg-danger text-white" : "bg-primary text-white hover:scale-105")}>
-                  {state === 'speaking' ? <Square size={16} fill="white" /> : <Play size={16} fill="white" className="ml-0.5" />}
-                </button>
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <span className="text-[7px] sm:text-[9px] tabular-nums text-text-muted w-5 sm:w-7">{Math.floor(currentTime / 60)}:{(currentTime % 60).toFixed(0).padStart(2, '0')}</span>
-                    <input type="range" min="0" max={duration || 0} step="0.1" value={currentTime} onChange={(e) => handleSeek(parseFloat(e.target.value))} className="flex-1 h-1 bg-black/10 dark:bg-white/10 rounded-full appearance-none cursor-pointer accent-primary" />
-                    <span className="text-[7px] sm:text-[9px] tabular-nums text-text-muted w-5 sm:w-7">{Math.floor(duration / 60)}:{(duration % 60).toFixed(0).padStart(2, '0')}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 sm:gap-4">
-                       <div className="flex items-center gap-1.5 group">
-                          <Volume2 size={10} className="text-text-muted group-hover:text-primary transition-colors" />
-                          <input type="range" min="0" max="1" step="0.01" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="w-12 sm:w-16 h-0.5 bg-black/10 dark:bg-white/10 rounded-full appearance-none cursor-pointer accent-primary" />
-                       </div>
-                       <div className="flex items-center gap-1.5 sm:gap-2">
-                         {[0.75, 1, 1.25, 1.5].map(v => (
-                           <button key={v} onClick={() => setSpeed(v)} className={cn("text-[7px] sm:text-[9px] font-black transition-all px-1 rounded-sm", speed === v ? "text-primary bg-primary/5" : "text-text-muted hover:text-text")}>{v}x</button>
-                         ))}
-                       </div>
+              {isLiveMode ? (
+                <div className="h-16 w-full flex items-center justify-center">
+                  <canvas ref={canvasRef} width="400" height="60" className="w-full h-full max-h-[60px]" />
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 sm:gap-4">
+                  <button onClick={togglePlayback} disabled={!audioRef.current?.src} className={cn("w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center transition-all shadow-md active:scale-90", state === 'speaking' ? "bg-danger text-white" : "bg-primary text-white hover:scale-105")}>
+                    {state === 'speaking' ? <Square size={16} fill="white" /> : <Play size={16} fill="white" className="ml-0.5" />}
+                  </button>
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <span className="text-[7px] sm:text-[9px] tabular-nums text-text-muted w-5 sm:w-7">{Math.floor(currentTime / 60)}:{(currentTime % 60).toFixed(0).padStart(2, '0')}</span>
+                      <input type="range" min="0" max={duration || 0} step="0.1" value={currentTime} onChange={(e) => handleSeek(parseFloat(e.target.value))} className="flex-1 h-1 bg-black/10 dark:bg-white/10 rounded-full appearance-none cursor-pointer accent-primary" />
+                      <span className="text-[7px] sm:text-[9px] tabular-nums text-text-muted w-5 sm:w-7">{Math.floor(duration / 60)}:{(duration % 60).toFixed(0).padStart(2, '0')}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 sm:gap-4">
+                         <div className="flex items-center gap-1.5 group">
+                            <Volume2 size={10} className="text-text-muted group-hover:text-primary transition-colors" />
+                            <input type="range" min="0" max="1" step="0.01" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="w-12 sm:w-16 h-0.5 bg-black/10 dark:bg-white/10 rounded-full appearance-none cursor-pointer accent-primary" />
+                         </div>
+                         <div className="flex items-center gap-1.5 sm:gap-2">
+                           {[0.75, 1, 1.25, 1.5].map(v => (
+                             <button key={v} onClick={() => setSpeed(v)} className={cn("text-[7px] sm:text-[9px] font-black transition-all px-1 rounded-sm", speed === v ? "text-primary bg-primary/5" : "text-text-muted hover:text-text")}>{v}x</button>
+                           ))}
+                         </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-            <button 
-              onClick={state === 'listening' ? stopRecording : startRecording} 
-              disabled={state === 'processing' || (!convId && !!simulationId)} 
-              className={cn(
-                "w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center transition-all duration-500 shadow-2xl active:scale-95 border-4 border-white/20 shrink-0", 
-                (!convId && simulationId) ? "bg-text-subtle/20 opacity-50 cursor-not-allowed" : state === 'listening' ? "bg-danger" : state === 'processing' ? "bg-warning" : "bg-primary hover:scale-105"
               )}
-            >
-              {state === 'listening' ? <Square fill="white" size={24} /> : state === 'processing' ? <RotateCcw className="animate-spin text-white" /> : <Mic size={32} className="text-white" />}
-            </button>
+            </div>
+            {!isLiveMode && (
+              <button 
+                onClick={state === 'listening' ? stopRecording : startRecording} 
+                disabled={state === 'processing' || (!convId && !!simulationId)} 
+                className={cn(
+                  "w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center transition-all duration-500 shadow-2xl active:scale-95 border-4 border-white/20 shrink-0", 
+                  (!convId && simulationId) ? "bg-text-subtle/20 opacity-50 cursor-not-allowed" : state === 'listening' ? "bg-danger" : state === 'processing' ? "bg-warning" : "bg-primary hover:scale-105"
+                )}
+              >
+                {state === 'listening' ? <Square fill="white" size={24} /> : state === 'processing' ? <RotateCcw className="animate-spin text-white" /> : <Mic size={32} className="text-white" />}
+              </button>
+            )}
           </div>
           <p className="text-center mt-4 sm:mt-6 text-[8px] sm:text-[10px] font-black uppercase tracking-[0.3em] sm:tracking-[0.5em] text-text-subtle animate-pulse">
-            {(!convId && simulationId) ? 'Start simulation above' : state === 'listening' ? '🎙 Listening…' : state === 'processing' ? '⏳ Processing…' : 'Tap to speak'}
+            {isLiveMode ? 'Live continuous mode is active' : (!convId && simulationId) ? 'Start simulation above' : state === 'listening' ? '🎙 Listening…' : state === 'processing' ? '⏳ Processing…' : 'Tap to speak'}
           </p>
         </footer>
       </motion.div>
@@ -450,29 +679,6 @@ function VoicePageContent() {
           onClose={() => setActiveWord(null)} 
         />
       )}
-
-      <AnimatePresence>
-        {isSummaryOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSummaryOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-md" />
-            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="relative w-full max-w-xl bg-white dark:bg-[#0f1120] rounded-[30px] sm:rounded-[40px] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
-               <div className="p-6 sm:p-8 border-b border-border flex justify-between items-center">
-                  <h2 className="text-xl sm:text-2xl font-black">Pedagogical Summary</h2>
-                  <button onClick={() => setIsSummaryOpen(false)} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl"><X /></button>
-               </div>
-               <div className="flex-1 overflow-y-auto p-6 sm:p-8 prose dark:prose-invert max-w-none text-sm sm:text-base">
-                  {loadingSummary ? (
-                    <div className="py-10 sm:py-20 text-center animate-pulse">Generating summary...</div>
-                  ) : Markdown ? (
-                    <Markdown>{summary || ''}</Markdown>
-                  ) : (
-                    <div className="py-10 text-center animate-pulse">Loading...</div>
-                  )}
-               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }

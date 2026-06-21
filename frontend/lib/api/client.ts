@@ -50,12 +50,19 @@ function isAbsoluteUrl(value: string): boolean {
 function resolvePath(path: string): string {
   if (isAbsoluteUrl(path)) return path;
   
+  const isLocal = API_BASE.includes('localhost') || 
+                  API_BASE.includes('127.0.0.1') || 
+                  (typeof window !== 'undefined' && 
+                    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'));
+
   // Materiais (Upload/Leitura/Processamento) e Pagamentos devem passar pelo Railway
   const isRailwayOperation = 
-    path.includes('/admin/premium') || 
-    path.includes('/activities/premium') || 
-    path.includes('/activities/hub') ||
-    path.includes('/payments');
+    !isLocal && (
+      path.includes('/admin/premium') || 
+      path.includes('/activities/premium') || 
+      path.includes('/activities/hub') ||
+      path.includes('/payments')
+    );
     
   if (isRailwayOperation) {
     const railwayBase = 'https://tatiai-production.up.railway.app';

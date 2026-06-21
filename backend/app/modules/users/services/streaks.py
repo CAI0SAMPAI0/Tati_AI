@@ -56,7 +56,42 @@ async def _execute_db(func, retries=3):
                         attempt + 1}/{retries})...')
                 await asyncio.sleep(0.5 * (attempt + 1))
                 continue
-            raise e
+
+
+async def apply_streak_freeze_if_needed(streak_data: dict, username: str) -> bool:
+    if not streak_data:
+        return False
+
+    last_date_str = streak_data.get('last_study_date')
+    if not last_date_str:
+        return False
+
+    try:
+        last_date = date.fromisoformat(last_date_str)
+    except Exception:
+        return False
+
+    today = date.today()
+    days_since_last = (today - last_date).days
+    freeze_count = streak_data.get('streak_freeze_count', 0) or 0
+
+    if days_since_last > 1 and freeze_count > 0:
+        from datetime import timedelta
+        streak_data['streak_freeze_count'] = freeze_count - 1
+        yesterday = today - timedelta(days=1)
+        streak_data['last_study_date'] = yesterday.isoformat()
+
+        def _update():
+            db = get_client()
+            db.table('users').update({
+                'streak_data': streak_data,
+                'updated_at': datetime.now(timezone.utc).isoformat(),
+            }).eq('username', username).execute()
+
+        await _execute_db(_update)
+        return True
+
+    return False
 
 
 async def get_streak(username: str) -> dict:
@@ -77,6 +112,7 @@ async def get_streak(username: str) -> dict:
         streak_data = row.get('streak_data') if row else None
 
         if streak_data:
+            await apply_streak_freeze_if_needed(streak_data, username)
             last_date_str = streak_data.get('last_study_date')
             if last_date_str:
                 try:
@@ -108,6 +144,8 @@ def _empty_streak() -> dict:
 
 async def record_study_day(username: str) -> dict:
     """Registra atividade hoje e atualiza o streak."""
+    await get_streak(username)
+
     def _record():
         db = get_client()
         today = date.today()

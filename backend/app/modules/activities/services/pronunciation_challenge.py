@@ -55,19 +55,31 @@ WORD_BANK = {
 
 
 def get_current_week_challenge() -> dict:
-    """Retorna o challenge da semana atual."""
+    db = get_client()
     now = datetime.now(timezone.utc)
     week_str = f'{now.year}-W{now.isocalendar()[1]}'
+
+    try:
+        res = db.table('weekly_challenges').select('*').eq('week', week_str).execute()
+        if res.data:
+            challenge = res.data[0]
+            return {
+                'week': challenge.get('week'),
+                'words': challenge.get('words'),
+                'difficulty': challenge.get('difficulty', 'mixed'),
+                'is_custom': True
+            }
+    except Exception:
+        pass
+
     week_hash = int(hashlib.md5(week_str.encode()).hexdigest()[:8], 16)
 
-    # Seleciona palavras baseado na semana
     all_words = (
         WORD_BANK['A1'] + WORD_BANK['B1'] +
         WORD_BANK['C1']
     )
     start_idx = week_hash % len(all_words)
 
-    # Pega 5 palavras consecutivas
     words = []
     for i in range(5):
         words.append(all_words[(start_idx + i) % len(all_words)])
@@ -76,6 +88,7 @@ def get_current_week_challenge() -> dict:
         'week': week_str,
         'words': words,
         'difficulty': 'mixed',
+        'is_custom': False
     }
 
 

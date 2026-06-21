@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { MessageSquare, BookOpen, CalendarDays, Type, Flame, Lightbulb, Download } from 'lucide-react';
+import { MessageSquare, BookOpen, CalendarDays, Type, Flame, Lightbulb, Download, Snowflake, ShoppingBag } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
 import { apiGet, API_BASE } from '@/lib/api/client';
@@ -11,6 +11,7 @@ import { ENDPOINTS } from '@/lib/api/endpoints';
 import { Button } from '@/components/ui/button';
 import toast from 'react-hot-toast';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 
 const ActivityBarChart = dynamic(() => import('@/components/charts/activity-bar-chart'), {
   ssr: false,
@@ -32,6 +33,7 @@ interface XpData {
 interface StreakData {
   current_streak: number;
   longest_streak: number;
+  streak_freeze_count?: number;
 }
 
 interface WeeklyReport {
@@ -362,31 +364,46 @@ export default function ProgressClientPage() {
                 {streakLoading ? (
                   <div className="w-20 h-10 bg-bg-secondary rounded-xl animate-pulse" />
                 ) : (
-                  <div className="text-center">
+                  <div className="flex flex-col items-center">
                     <div className="text-5xl font-black text-text leading-none tabular-nums">
                       {streakData?.current_streak ?? 0}
                     </div>
                     <p className="text-xs font-bold text-text-subtle uppercase tracking-widest mt-1">
                       consecutive days
                     </p>
+                    {streakData?.streak_freeze_count && streakData.streak_freeze_count > 0 ? (
+                      <div className="flex items-center gap-1.5 mt-3 text-xs font-bold text-cyan-500 bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/20" title="Streak Freeze Active">
+                        <Snowflake size={14} className="animate-pulse" />
+                        <span>{streakData.streak_freeze_count} Freeze Active</span>
+                      </div>
+                    ) : null}
                   </div>
                 )}
               </div>
 
-              <div className="border-t border-border pt-4 flex items-center justify-between">
-                <p className="text-[0.65rem] font-bold text-text-muted uppercase tracking-widest">
-                  Record
-                </p>
-                {streakLoading ? (
-                  <div className="w-16 h-4 bg-bg-secondary rounded animate-pulse" />
-                ) : (
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-xl font-black text-primary tabular-nums">
-                      {streakData?.longest_streak ?? 0}
-                    </span>
-                    <span className="text-xs font-bold text-text-muted">days</span>
-                  </div>
-                )}
+              <div className="border-t border-border pt-4 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-[0.65rem] font-bold text-text-muted uppercase tracking-widest">
+                    Record
+                  </p>
+                  {streakLoading ? (
+                    <div className="w-16 h-4 bg-bg-secondary rounded animate-pulse" />
+                  ) : (
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-xl font-black text-primary tabular-nums">
+                        {streakData?.longest_streak ?? 0}
+                      </span>
+                      <span className="text-xs font-bold text-text-muted">days</span>
+                    </div>
+                  )}
+                </div>
+
+                <Link href="/shop" prefetch={true} className="w-full">
+                  <Button variant="secondary" size="sm" className="w-full gap-1.5 text-xs font-bold border-dashed border-primary/40 hover:border-primary text-primary hover:bg-primary/5">
+                    <ShoppingBag size={14} />
+                    Visit Shop to Buy Freezes
+                  </Button>
+                </Link>
               </div>
             </div>
           </div>

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, Trophy, ChartBar, MessageSquare, X, TrendingUp, Zap } from 'lucide-react';
+import { BookOpen, Trophy, ChartBar, MessageSquare, X, TrendingUp, Zap, ShoppingBag } from 'lucide-react';
 import { Target } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -78,6 +78,7 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
         { href: '/activities', icon: <BookOpen size={20} />, label: 'Activities' },
         { href: '/activities/hub', icon: <Zap size={20} />, label: 'Hub' },
         { href: '/progress', icon: <TrendingUp size={20} />, label: 'Progress' },
+        { href: '/shop', icon: <ShoppingBag size={20} />, label: 'Shop' },
         { href: '/goals', icon: <Target size={20} />, label: 'Goals' },
         { href: '/achievements', icon: <Trophy size={20} />, label: 'Achievements' },
         { href: '/competitions', icon: <ChartBar size={20} />, label: 'Competitions' },

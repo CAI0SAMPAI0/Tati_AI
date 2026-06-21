@@ -659,34 +659,100 @@ erDiagram
 
 ---
 
-### Sprint 1 – Consolidação de Backend Assíncrono
 
-- [ ] **Migração completa para Celery**
-  - [ ] Concluir remoção de código residual do APScheduler em `main.py`, corrigindo erro de sintaxe pendente. Critério de conclusão: `main.py` sem referências a APScheduler, aplicação inicia sem erros.
-  - [ ] Migrar jobs agendados (CEFR scheduler, notification scheduler, keepalive) para `celery_app.py` com Celery Beat. Critério de conclusão: todas as tasks periódicas registradas no Beat schedule.
-  - [ ] Configurar Upstash Redis como broker e backend de resultados, validando conexão em ambiente de produção (Railway). Critério de conclusão: workers conectam ao Upstash sem erros em produção.
+### Sprint 1 – Engajamento e Gamificação
 
-- [ ] **Monitoramento de tasks**
-  - [ ] Adicionar endpoint administrativo (`admin/routes/tasks.py`) para visualizar status de tasks Celery (pendentes, executando, falhas). Critério de conclusão: painel admin exibe lista de tasks com status.
-
-### Sprint 2 – Correção de Build do Monorepo
-
-- [ ] **Resolução do pacote `@tati/hub-core`**
-  - [ ] Corrigir resolução de workspace no `package.json` raiz para que `apps/hub-site` e `frontend` resolvam `@tati/hub-core` corretamente no build do Vercel. Critério de conclusão: build do Vercel para ambos os frontends conclui sem erro de resolução de módulo.
-  - [ ] Adicionar/validar `tsconfig.json` paths e referências de projeto para `packages/hub-core`. Critério de conclusão: type-checking funciona em ambos os frontends sem erros de path.
-
-- [ ] **Correção de hostname do Docker Compose em SSR**
-  - [ ] Identificar todas as variáveis de ambiente usadas em `server-fetch.ts`/`ssr-prefetch.tsx` que apontam para hostnames internos do Docker Compose. Critério de conclusão: lista de variáveis afetadas documentada.
-  - [ ] Configurar variáveis de ambiente específicas por ambiente (local/Docker vs. Vercel) para que SSR em produção use URLs públicas da API (Railway), não hostnames internos. Critério de conclusão: SSR em produção realiza fetch bem-sucedido para a API pública.
-
-### Sprint 3 – Engajamento e Gamificação
-
-- [ ] **Expansão de gamificação**
-  - [ ] Adicionar novos tipos de desafios semanais configuráveis via admin. Critério de conclusão: admin pode criar/editar desafios semanais via painel.
+- [X] **Expansão de gamificação**
+  - [X] Adicionar novos tipos de desafios semanais configuráveis via admin. Critério de conclusão: admin pode criar/editar desafios semanais via painel.
   - [X] Implementar notificações de "streak em risco" via `notification_dispatcher`. Critério de conclusão: usuários com streak ativo recebem notificação antes da meia-noite caso não tenham estudado.
 
-### Sprint 4 – Expansão do Hub de Materiais
+### Sprint 2 – Expansão do Hub de Materiais
 
-- [ ] **Novos formatos de conteúdo**
-  - [ ] Suporte a materiais em vídeo no catálogo do hub. Critério de conclusão: catálogo exibe e reproduz itens de vídeo com controle de acesso.
-  - [ ] Relatórios de vendas por categoria de material no dashboard administrativo. Critério de conclusão: admin visualiza receita por categoria em período selecionável.
+- [X] **Novos formatos de conteúdo**
+  - [X] Suporte a materiais em vídeo no catálogo do hub. Critério de conclusão: catálogo exibe e reproduz itens de vídeo com controle de acesso. (POR ENQUANTO NÃO, SERÁ APENAS ARQUIVOS COMO JÁ É, APENAS IGNORE!)
+  - [X] Relatórios de vendas por categoria de material no dashboard administrativo. Critério de conclusão: admin visualiza receita por categoria em período selecionável e contando com o desconto de R$0,05 do MP.
+
+---
+
+### Sprint 3 – Streak Freeze (Gamificação)
+
+**Objetivo:** Permitir que os alunos gastem XP ou troféus acumulados para comprar um "Streak Freeze" (Congelamento de Streak), que protege sua sequência de dias de estudo de expirar em dias em que não realizarem atividades.
+
+- [X] **Backend: Modelagem e Endpoints**
+  - [X] Criar migração para adicionar campo `streak_freeze_count` (integer, default 0) na tabela de usuários ou criar uma tabela de inventário de itens do usuário (`user_inventory`). *(Nota: Armazenado de forma nativa no JSONB de `streak_data` no Supabase, garantindo compatibilidade direta e sem atritos de migração)*
+  - [X] Criar endpoint `POST /api/gamification/purchase-freeze` para compra de Streak Freeze, validando se o usuário possui XP/troféus suficientes e deduzindo o custo correspondente. *(Nota: Criado como `POST /users/streaks/purchase-freeze`)*
+  - [X] Atualizar o job do Celery `broken_streaks` (`app.modules.notifications.tasks.broken_streaks`) para verificar se o usuário possui `streak_freeze_count > 0`. Em caso positivo, decrementar o contador em 1, manter a streak intacta e registrar o evento de congelamento.
+- [X] **Frontend: Exibição e Loja**
+  - [X] Adicionar um indicador visual de Streak Freeze no dashboard do aluno (ex: ícone de floco de neve com o número de freezes equipados).
+  - [X] Criar uma seção de "Loja de Recompensas" no frontend para que o aluno possa gastar seu XP acumulado na compra de itens (iniciando pelo Streak Freeze).
+  - [X] Mostrar uma modal informativa ou notificação especial no login se a streak do usuário tiver sido salva pelo uso de um Streak Freeze. *(Nota: Envia uma notificação push customizada informando que o freeze salvou a streak e exibe o selo "Freeze Active")*
+- [X] **Testes e Validação**
+  - [X] Escrever teste unitário para o fluxo de compra de Streak Freeze no backend.
+  - [X] Simular localmente o job `broken_streaks` para validar que a streak não é perdida se o usuário tiver um freeze ativo.
+
+---
+
+### Sprint 4 – Botões de Ação na Notificação (Quick Action Push)
+
+**Objetivo:** Adicionar botões interativos diretamente no push recebido pelo Android (Capacitor) ou PWA (ex: "Praticar Agora" ou "Adiar por 1h"), permitindo ações rápidas a partir da barra de notificações.
+
+- [ ] **Backend: Payload e Endpoints**
+  - [ ] Atualizar a lógica de envio no FCM v1 (`app.modules.notifications.services.push_notifications.py`) para incluir suporte a payloads com categorias e ações customizadas (`actions` / `click_action`).
+  - [ ] Criar um endpoint `POST /api/notifications/actions` para receber o clique das ações rápidas (ex: adiamento de alerta).
+- [ ] **Frontend & Mobile: Integração de Canal e Ações**
+  - [ ] Configurar os canais de notificação e categorias de ações no Capacitor/Android no código do aplicativo mobile.
+  - [ ] Atualizar o handler de cliques em notificações (`notification-provider.tsx` ou listener nativo do Capacitor) para tratar o clique nos botões específicos e despachar requisições para a API em background ou redirecionar o usuário.
+- [ ] **Testes e Validação**
+  - [ ] Enviar push de teste com botões de ação e verificar se eles aparecem na barra de status do emulador/dispositivo Android.
+  - [ ] Validar o clique no botão e se o endpoint backend correspondente é acionado com sucesso.
+
+---
+
+### Sprint 5 – Análise Fonética de Pronúncia (Phonetic Feedback)
+
+**Objetivo:** Oferecer análise fonética detalhada para exercícios de conversação e simulações, pintando as palavras ditas corretamente de verde e as incorretas de vermelho na tela do aluno.
+
+- [ ] **Backend: Processamento de Áudio e Fonemas**
+  - [ ] Criar endpoint `POST /api/speech/verify-pronunciation` que recebe o arquivo de áudio gravado e o texto de referência esperada.
+  - [ ] Integrar com uma API de Speech-to-Text avançada que forneça confiança por palavra ou fonema (ex: Azure Pronunciation Assessment ou Google Cloud Speech-to-Text com word-level confidence).
+  - [ ] Processar o resultado comparando o texto dito com o texto de referência, e retornar um JSON contendo a pontuação de precisão de cada palavra.
+- [ ] **Frontend: Feedback Visual**
+  - [ ] Adaptar a tela de simulação de conversa/avatar para capturar o áudio em formato compatível com a API backend.
+  - [ ] Renderizar o texto da resposta comparativa colorindo cada palavra dinamicamente com base nas pontuações de precisão retornadas pelo backend (Verde = Correto, Vermelho = Incorreto).
+- [ ] **Testes e Validação**
+  - [ ] Testar o processamento de áudios reais de teste (gravações corretas e incorretas) e checar o JSON de retorno.
+  - [ ] Validar o fluxo de gravação de áudio e renderização colorida no app.
+
+---
+
+### Sprint 6 – Central de Preferências de Notificações
+
+**Objetivo:** Permitir que o aluno configure, em seu perfil, quais tipos de notificação quer receber (Streaks, Desafios, CEFR) e por quais canais (Push, Email).
+
+- [ ] **Backend: Persistência e Filtros**
+  - [ ] Criar tabela ou coluna JSON `notification_preferences` na tabela de perfis de usuários para armazenar as preferências por canal.
+  - [ ] Criar rotas `GET /api/users/notification-preferences` e `PUT /api/users/notification-preferences`.
+  - [ ] Atualizar as rotinas de disparo e-mail/push para consultarem essas preferências antes de enviar qualquer mensagem.
+- [ ] **Frontend: Interface de Configurações**
+  - [ ] Desenvolver tela ou aba "Notificações" dentro das configurações de perfil do aluno.
+  - [ ] Criar componentes de toggle switch responsivos e elegantes para cada tipo de alerta e canal de comunicação.
+- [ ] **Testes e Validação**
+  - [ ] Escrever testes para verificar que e-mails/pushes não são enviados se a preferência correspondente estiver desmarcada.
+  - [ ] Validar o salvamento das opções no frontend e banco de dados.
+
+---
+
+### Sprint 7 – Voz em Tempo Real (Low-Latency Voice Mode)
+
+**Objetivo:** Proporcionar uma conversa dinâmica e contínua em tempo real com a Tati (IA) sem a necessidade de clicar em botões, utilizando WebSockets e streaming bidirecional de áudio com baixa latência (via Gemini Live API).
+
+- [ ] **Backend: Proxy de WebSocket e Streaming**
+  - [ ] Implementar uma rota WebSocket `/api/voice/live` usando FastAPI.
+  - [ ] Lidar com a conexão bidirecional com a Gemini Live API (ou serviço similar), enviando frames de áudio recebidos do cliente e recebendo os frames de áudio e texto de resposta da IA.
+- [ ] **Frontend: Interface e Web Audio**
+  - [ ] Desenvolver uma tela de "Conversação em Tempo Real" dedicada, apresentando ondas de áudio interativas (visualização em canvas) que pulsam ao falar/escutar.
+  - [ ] Implementar captura contínua de microfone e reprodução de buffers de áudio PCM sem cortes ou atrasos.
+  - [ ] Implementar detecção de silêncio/interrupção (VAD - Voice Activity Detection) no cliente para parar de falar quando a IA começar a responder e vice-versa.
+- [ ] **Testes e Validação**
+  - [ ] Validar a integridade da conexão WebSocket e o tempo de resposta (latência) da IA.
+  - [ ] Testar a sincronia de áudio e a qualidade do som transmitido/recebido.

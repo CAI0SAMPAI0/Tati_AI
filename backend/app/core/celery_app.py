@@ -3,16 +3,12 @@ from celery import Celery
 from celery.schedules import crontab
 from dotenv import load_dotenv
 
-# Carrega as variáveis de ambiente do .env para rodar localmente com Upstash
 load_dotenv()
 
-# Recupera as credenciais do Upstash Redis configuradas no Railway
 USE_CELERY = os.getenv("USE_CELERY", "false").lower() == "true"
-UPSTASH_URL = os.getenv('UPSTASH_REDIS_URL')
-UPSTASH_TOKEN = os.getenv('UPSTASH_REDIS_TOKEN')
+UPSTASH_URL = os.getenv("UPSTASH_REDIS_URL")
+UPSTASH_TOKEN = os.getenv("UPSTASH_REDIS_TOKEN")
 
-# Formata a URL para o padrão redis://:token@host:port
-# Removendo o prefixo http/https caso venha no formato REST do Upstash
 if USE_CELERY and UPSTASH_URL and UPSTASH_TOKEN:
     clean_url = UPSTASH_URL.replace("redis://", "").replace("https://", "").replace("http://", "")
     if ":" not in clean_url:
@@ -21,7 +17,6 @@ if USE_CELERY and UPSTASH_URL and UPSTASH_TOKEN:
 else:
     redis_broker_url = "redis://localhost:6379/0"
 
-# Inicializa o Celery apontando para os modulos de tarefas
 celery_app = Celery(
     "teacher_tati_tasks",
     broker=redis_broker_url,
@@ -31,10 +26,9 @@ celery_app = Celery(
         "app.modules.notifications.tasks",
         "app.modules.cefr.tasks",
         "app.modules.activities.tasks",
-    ]
+    ],
 )
 
-# Configuracoes de performance e otimizacao para o Upstash (Fila Leve)
 celery_app.conf.update(
     task_serializer="json",
     result_serializer="json",
@@ -42,13 +36,17 @@ celery_app.conf.update(
     timezone="America/Sao_Paulo",
     enable_utc=True,
     broker_connection_retry_on_startup=True,
-    # Evita que um worker trave pegando muitas tarefas pesadas de uma vez
     worker_prefetch_multiplier=1,
-    # Limita o numero de processos paralelos para evitar estouro de RAM (OOM) no Railway
     worker_concurrency=2,
+    broker_transport_options={
+        "polling_interval": 5.0,
+        "visibility_timeout": 3600,
+    },
+    result_expires=600,
+    worker_send_task_events=False,
+    task_send_sent_event=False,
 )
 
-# Migracao do APScheduler para o Celery Beat (Cron Jobs)
 celery_app.conf.beat_schedule = {
     "lembretes-streak-manha": {
         "task": "app.modules.notifications.tasks.streak_reminders",
@@ -68,7 +66,7 @@ celery_app.conf.beat_schedule = {
     },
     "checar-inatividade-alunos": {
         "task": "app.modules.notifications.tasks.check_inactivity",
-        "schedule": crontab(hour="*/12", minute=0),  # A cada 12 horas
+        "schedule": crontab(hour="*/12", minute=0),
     },
     "relatorios-semanais-pais": {
         "task": "app.modules.notifications.tasks.weekly_reports",
@@ -76,10 +74,10 @@ celery_app.conf.beat_schedule = {
     },
     "geracao-semanal-cefr": {
         "task": "app.modules.cefr.tasks.cefr_weekly_gen",
-        "schedule": crontab(minute="*"),  # Executa a cada minuto para checar schedules ativos
+        "schedule": crontab(minute=0),
     },
     "keepalive-banco": {
         "task": "app.core.tasks.keepalive",
-        "schedule": crontab(minute="*/4"),
+        "schedule": crontab(minute="*/30"),
     },
 }
