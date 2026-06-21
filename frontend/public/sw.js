@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tati-ai-v2.1.5';
+const CACHE_NAME = 'tati-ai-v2.1.6';
 const STATIC_ASSETS = ['/', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
 
 self.addEventListener('install', (event) => {
@@ -23,6 +23,12 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const request = event.request;
+  
+  // Ignora esquemas não-HTTP (ex: ws://, wss://, capacitor://, chrome-extension://, etc.)
+  if (!request.url.startsWith('http:') && !request.url.startsWith('https:')) {
+    return;
+  }
+
   const url = new URL(request.url);
 
   // Nunca cachear requests autenticadas/sensíveis.

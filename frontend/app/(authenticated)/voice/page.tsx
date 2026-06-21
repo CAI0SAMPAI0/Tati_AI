@@ -380,11 +380,17 @@ function VoicePageContent() {
           }
           
           if (liveStateRef.current === 'listening') {
-            if (rms < 0.012) {
+            if (rms < 0.018) {
               silenceTimerRef.current += 4096 / AudioCtx.sampleRate;
-              if (silenceTimerRef.current >= 1.5) {
+              if (silenceTimerRef.current >= 0.3) {
+                // Log silence accumulation to console for visibility
+                console.log(`[Live VAD] Silence accumulating: ${silenceTimerRef.current.toFixed(2)}s / 1.0s (RMS: ${rms.toFixed(5)})`);
+              }
+              
+              if (silenceTimerRef.current >= 1.0) {
                 const totalLength = accumulatedAudioRef.current.reduce((acc, val) => acc + val.length, 0);
                 if (totalLength > 16000) {
+                  console.log(`[Live VAD] Silence threshold reached. Sending ${totalLength} samples of audio...`);
                   const resultBuffer = new Float32Array(totalLength);
                   let offset = 0;
                   for (const chunk of accumulatedAudioRef.current) {

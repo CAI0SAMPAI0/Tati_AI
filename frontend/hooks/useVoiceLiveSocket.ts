@@ -85,7 +85,7 @@ export function useVoiceLiveSocket() {
             break;
 
           case 'stream_end':
-            setState('idle');
+            setState('listening');
             break;
         }
       } catch (err) {
