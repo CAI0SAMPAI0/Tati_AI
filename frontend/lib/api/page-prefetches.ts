@@ -37,18 +37,21 @@ function withCommonQueries(items: PrefetchItem[], token: string | null): Prefetc
 export const ROUTE_PREFETCHES: Record<string, (ctx?: PrefetchContext) => PrefetchItem[]> = {
   activities: () => [
     { queryKey: ['activities-modules'], endpoint: ENDPOINTS.ACTIVITIES_MODULES },
+    { queryKey: ['avatar-frames'], endpoint: '/avatar/frames' },
   ],
   achievements: () => [
     { queryKey: ['my-stats'], endpoint: '/dashboard/stats/my' },
   ],
   chat: () => [
     { queryKey: ['conversations'], endpoint: ENDPOINTS.CONVERSATIONS },
+    { queryKey: ['avatar-frames'], endpoint: '/avatar/frames' },
   ],
   competitions: () => [
     { queryKey: ['competitions-global-ranking'], endpoint: '/users/progress/ranking/top15' },
   ],
   dashboard: () => [
     { queryKey: ['admin-dashboard-stats'], endpoint: '/dashboard/stats' },
+    { queryKey: ['avatar-frames'], endpoint: '/avatar/frames' },
   ],
   goals: () => [
     { queryKey: ['goals'], endpoint: ENDPOINTS.GOALS },
@@ -57,6 +60,13 @@ export const ROUTE_PREFETCHES: Record<string, (ctx?: PrefetchContext) => Prefetc
   profile: () => [{ queryKey: ['subscription'], endpoint: '/users/permissions/subscription' }],
   progress: () => [
     { queryKey: ['my-stats'], endpoint: '/dashboard/stats/my' },
+    { queryKey: ['avatar-frames'], endpoint: '/avatar/frames' },
+  ],
+  voice: () => [
+    { queryKey: ['avatar-frames'], endpoint: '/avatar/frames' },
+  ],
+  'voice-only': () => [
+    { queryKey: ['avatar-frames'], endpoint: '/avatar/frames' },
   ],
   shop: () => [
     { queryKey: ['my-stats'], endpoint: '/dashboard/stats/my' },

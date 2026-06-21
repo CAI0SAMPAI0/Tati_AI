@@ -111,6 +111,22 @@ export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAva
     return `${API_BASE}${path.startsWith('/') ? path : '/' + path}`;
   }, []);
 
+  // Preload all frames in browser cache eagerly to prevent lag/flicker
+  useEffect(() => {
+    if (!frames || !frames.has_frames) return;
+    const fields = [
+      frames.normal, frames.meio, frames.aberta, frames.bem_aberta,
+      frames.frame_A, frames.frame_B, frames.frame_C, frames.frame_D,
+      frames.frame_E, frames.frame_F, frames.ouvindo, frames.piscando
+    ];
+    fields.forEach((path) => {
+      if (path) {
+        const img = new Image();
+        img.src = getUrl(path);
+      }
+    });
+  }, [frames, getUrl]);
+
   /**
    * changeMouth is STABLE (empty deps).
    * Reads framesRef/currentMouthRef instead of state → no stale closure.
