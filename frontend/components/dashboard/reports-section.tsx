@@ -223,7 +223,7 @@ export function ReportsSection() {
         ) : (
           <div className="space-y-6">
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="bg-bg-secondary/40 border border-border rounded-2xl p-4">
                 <p className="text-[0.65rem] font-bold text-text-muted uppercase tracking-wider mb-1">Total Sales Volume</p>
                 <p className="text-2xl font-black text-text">{totalSalesVolume} <span className="text-xs text-text-muted font-normal">units</span></p>
@@ -231,10 +231,6 @@ export function ReportsSection() {
               <div className="bg-bg-secondary/40 border border-border rounded-2xl p-4">
                 <p className="text-[0.65rem] font-bold text-text-muted uppercase tracking-wider mb-1">Gross Revenue</p>
                 <p className="text-2xl font-black text-text">R$ {totalGrossRevenue.toFixed(2)}</p>
-              </div>
-              <div className="bg-bg-secondary/40 border border-border rounded-2xl p-4 relative group">
-                <p className="text-[0.65rem] font-bold text-text-muted uppercase tracking-wider mb-1">Net Revenue <span className="text-emerald-500 font-bold" title="Takes into account the R$ 0,05 MP transaction discount">(MP Discounted)</span></p>
-                <p className="text-2xl font-black text-emerald-500">R$ {totalNetRevenue.toFixed(2)}</p>
               </div>
             </div>
 
@@ -246,7 +242,6 @@ export function ReportsSection() {
                     <th className="px-4 py-3">{'Category'}</th>
                     <th className="px-4 py-3 text-center">{'Sales Count'}</th>
                     <th className="px-4 py-3 text-right">{'Gross Revenue'}</th>
-                    <th className="px-4 py-3 text-right">{'Net Revenue (-R$0.05/sale)'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50 text-xs">
@@ -256,12 +251,11 @@ export function ReportsSection() {
                         <td className="px-4 py-3 font-semibold text-text capitalize">{item.category}</td>
                         <td className="px-4 py-3 text-center text-text-subtle font-bold">{item.total_sales}</td>
                         <td className="px-4 py-3 text-right text-text-subtle">R$ {item.gross_revenue.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right text-emerald-500 font-semibold">R$ {item.net_revenue.toFixed(2)}</td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={4} className="px-4 py-10 text-center text-text-muted italic">{'No sales data recorded in this period.'}</td>
+                      <td colSpan={3} className="px-4 py-10 text-center text-text-muted italic">{'No sales data recorded in this period.'}</td>
                     </tr>
                   )}
                 </tbody>

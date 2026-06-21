@@ -130,7 +130,11 @@ function VoicePageContent() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const processorRef = useRef<AudioWorkletNode | ScriptProcessorNode | null>(null);
+  const liveStateRef = useRef(liveState);
+  useEffect(() => {
+    liveStateRef.current = liveState;
+  }, [liveState]);
   const silenceTimerRef = useRef<number>(0);
   const streamRef = useRef<MediaStream | null>(null);
   const accumulatedAudioRef = useRef<Float32Array[]>([]);
@@ -320,7 +324,24 @@ function VoicePageContent() {
       analyserRef.current = analyser;
       source.connect(analyser);
 
-      const processor = AudioCtx.createScriptProcessor(4096, 1, 1);
+      const workletCode = `
+        class AudioAccumulator extends AudioWorkletProcessor {
+          process(inputs, outputs, parameters) {
+            const input = inputs[0];
+            if (input && input[0]) {
+              const channelData = input[0];
+              this.port.postMessage(channelData);
+            }
+            return true;
+          }
+        }
+        registerProcessor('audio-accumulator', AudioAccumulator);
+      `;
+      const blob = new Blob([workletCode], { type: 'application/javascript' });
+      const workletUrl = URL.createObjectURL(blob);
+      await AudioCtx.audioWorklet.addModule(workletUrl);
+
+      const processor = new AudioWorkletNode(AudioCtx, 'audio-accumulator');
       processorRef.current = processor;
       source.connect(processor);
       processor.connect(AudioCtx.destination);
@@ -328,51 +349,65 @@ function VoicePageContent() {
       accumulatedAudioRef.current = [];
       setLiveState('listening');
       
-      processor.onaudioprocess = (e) => {
-        const inputData = e.inputBuffer.getChannelData(0);
-        accumulatedAudioRef.current.push(new Float32Array(inputData));
-        
-        let sum = 0;
-        for (let i = 0; i < inputData.length; i++) {
-          sum += inputData[i] * inputData[i];
+      let buffer4096 = new Float32Array(4096);
+      let bufferOffset = 0;
+
+      processor.port.onmessage = (e) => {
+        const chunk = e.data;
+        if (bufferOffset + chunk.length > 4096) {
+          bufferOffset = 0;
         }
-        const rms = Math.sqrt(sum / inputData.length);
-        
-        if (liveState === 'speaking' && rms > 0.02) {
-          if (audioRef.current) {
-            audioRef.current.pause();
-            setLiveState('listening');
+        buffer4096.set(chunk, bufferOffset);
+        bufferOffset += chunk.length;
+
+        if (bufferOffset >= 4096) {
+          const inputData = new Float32Array(buffer4096);
+          bufferOffset = 0;
+
+          accumulatedAudioRef.current.push(inputData);
+          
+          let sum = 0;
+          for (let i = 0; i < inputData.length; i++) {
+            sum += inputData[i] * inputData[i];
           }
-        }
-        
-        if (liveState === 'listening') {
-          if (rms < 0.012) {
-            silenceTimerRef.current += 4096 / AudioCtx.sampleRate;
-            if (silenceTimerRef.current >= 1.5) {
-              const totalLength = accumulatedAudioRef.current.reduce((acc, val) => acc + val.length, 0);
-              if (totalLength > 16000) {
-                const resultBuffer = new Float32Array(totalLength);
-                let offset = 0;
-                for (const chunk of accumulatedAudioRef.current) {
-                  resultBuffer.set(chunk, offset);
-                  offset += chunk.length;
-                }
-                
-                const wavBlob = exportWav(resultBuffer, AudioCtx.sampleRate);
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                  const base64 = (reader.result as string).split(',')[1];
-                  sendAudioChunk(base64);
-                };
-                reader.readAsDataURL(wavBlob);
-                
-                accumulatedAudioRef.current = [];
-                silenceTimerRef.current = 0;
-                setLiveState('processing');
-              }
+          const rms = Math.sqrt(sum / inputData.length);
+          
+          if (liveStateRef.current === 'speaking' && rms > 0.02) {
+            if (audioRef.current) {
+              audioRef.current.pause();
+              setLiveState('listening');
             }
-          } else {
-            silenceTimerRef.current = 0;
+          }
+          
+          if (liveStateRef.current === 'listening') {
+            if (rms < 0.012) {
+              silenceTimerRef.current += 4096 / AudioCtx.sampleRate;
+              if (silenceTimerRef.current >= 1.5) {
+                const totalLength = accumulatedAudioRef.current.reduce((acc, val) => acc + val.length, 0);
+                if (totalLength > 16000) {
+                  const resultBuffer = new Float32Array(totalLength);
+                  let offset = 0;
+                  for (const chunk of accumulatedAudioRef.current) {
+                    resultBuffer.set(chunk, offset);
+                    offset += chunk.length;
+                  }
+                  
+                  const wavBlob = exportWav(resultBuffer, AudioCtx.sampleRate);
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    const base64 = (reader.result as string).split(',')[1];
+                    sendAudioChunk(base64);
+                  };
+                  reader.readAsDataURL(wavBlob);
+                  
+                  accumulatedAudioRef.current = [];
+                  silenceTimerRef.current = 0;
+                  setLiveState('processing');
+                }
+              }
+            } else {
+              silenceTimerRef.current = 0;
+            }
           }
         }
       };

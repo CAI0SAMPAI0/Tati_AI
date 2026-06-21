@@ -696,15 +696,15 @@ erDiagram
 
 **Objetivo:** Adicionar botões interativos diretamente no push recebido pelo Android (Capacitor) ou PWA (ex: "Praticar Agora" ou "Adiar por 1h"), permitindo ações rápidas a partir da barra de notificações.
 
-- [ ] **Backend: Payload e Endpoints**
-  - [ ] Atualizar a lógica de envio no FCM v1 (`app.modules.notifications.services.push_notifications.py`) para incluir suporte a payloads com categorias e ações customizadas (`actions` / `click_action`).
-  - [ ] Criar um endpoint `POST /api/notifications/actions` para receber o clique das ações rápidas (ex: adiamento de alerta).
-- [ ] **Frontend & Mobile: Integração de Canal e Ações**
-  - [ ] Configurar os canais de notificação e categorias de ações no Capacitor/Android no código do aplicativo mobile.
-  - [ ] Atualizar o handler de cliques em notificações (`notification-provider.tsx` ou listener nativo do Capacitor) para tratar o clique nos botões específicos e despachar requisições para a API em background ou redirecionar o usuário.
-- [ ] **Testes e Validação**
-  - [ ] Enviar push de teste com botões de ação e verificar se eles aparecem na barra de status do emulador/dispositivo Android.
-  - [ ] Validar o clique no botão e se o endpoint backend correspondente é acionado com sucesso.
+- [X] **Backend: Payload e Endpoints**
+  - [X] Atualizar a lógica de envio no FCM v1 (`app.modules.notifications.services.push_notifications.py`) para incluir suporte a payloads com categorias e ações customizadas (`actions` / `click_action`).
+  - [X] Criar um endpoint `POST /api/notifications/actions` para receber o clique das ações rápidas (ex: adiamento de alerta).
+- [X] **Frontend & Mobile: Integração de Canal e Ações**
+  - [X] Configurar os canais de notificação e categorias de ações no Capacitor/Android no código do aplicativo mobile.
+  - [X] Atualizar o handler de cliques em notificações (`notification-provider.tsx` ou listener nativo do Capacitor) para tratar o clique nos botões específicos e despachar requisições para a API em background ou redirecionar o usuário.
+- [X] **Testes e Validação**
+  - [X] Enviar push de teste com botões de ação e verificar se eles aparecem na barra de status do emulador/dispositivo Android.
+  - [X] Validar o clique no botão e se o endpoint backend correspondente é acionado com sucesso.
 
 ---
 
@@ -712,16 +712,16 @@ erDiagram
 
 **Objetivo:** Oferecer análise fonética detalhada para exercícios de conversação e simulações, pintando as palavras ditas corretamente de verde e as incorretas de vermelho na tela do aluno.
 
-- [ ] **Backend: Processamento de Áudio e Fonemas**
-  - [ ] Criar endpoint `POST /api/speech/verify-pronunciation` que recebe o arquivo de áudio gravado e o texto de referência esperada.
-  - [ ] Integrar com uma API de Speech-to-Text avançada que forneça confiança por palavra ou fonema (ex: Azure Pronunciation Assessment ou Google Cloud Speech-to-Text com word-level confidence).
-  - [ ] Processar o resultado comparando o texto dito com o texto de referência, e retornar um JSON contendo a pontuação de precisão de cada palavra.
-- [ ] **Frontend: Feedback Visual**
-  - [ ] Adaptar a tela de simulação de conversa/avatar para capturar o áudio em formato compatível com a API backend.
-  - [ ] Renderizar o texto da resposta comparativa colorindo cada palavra dinamicamente com base nas pontuações de precisão retornadas pelo backend (Verde = Correto, Vermelho = Incorreto).
-- [ ] **Testes e Validação**
-  - [ ] Testar o processamento de áudios reais de teste (gravações corretas e incorretas) e checar o JSON de retorno.
-  - [ ] Validar o fluxo de gravação de áudio e renderização colorida no app.
+- [X] **Backend: Processamento de Áudio e Fonemas**
+  - [X] Criar endpoint `POST /api/speech/verify-pronunciation` que recebe o arquivo de áudio gravado e o texto de referência esperada.
+  - [X] Integrar com uma API de Speech-to-Text avançada que forneça confiança por palavra ou fonema (ex: Azure Pronunciation Assessment ou Google Cloud Speech-to-Text com word-level confidence).
+  - [X] Processar o resultado comparando o texto dito com o texto de referência, e retornar um JSON contendo a pontuação de precisão de cada palavra.
+- [X] **Frontend: Feedback Visual**
+  - [X] Adaptar a tela de simulação de conversa/avatar para capturar o áudio em formato compatível com a API backend.
+  - [X] Renderizar o texto da resposta comparativa colorindo cada palavra dinamicamente com base nas pontuações de precisão retornadas pelo backend (Verde = Correto, Vermelho = Incorreto).
+- [X] **Testes e Validação**
+  - [X] Testar o processamento de áudios reais de teste (gravações corretas e incorretas) e checar o JSON de retorno.
+  - [X] Validar o fluxo de gravação de áudio e renderização colorida no app.
 
 ---
 
@@ -729,16 +729,16 @@ erDiagram
 
 **Objetivo:** Permitir que o aluno configure, em seu perfil, quais tipos de notificação quer receber (Streaks, Desafios, CEFR) e por quais canais (Push, Email).
 
-- [ ] **Backend: Persistência e Filtros**
-  - [ ] Criar tabela ou coluna JSON `notification_preferences` na tabela de perfis de usuários para armazenar as preferências por canal.
-  - [ ] Criar rotas `GET /api/users/notification-preferences` e `PUT /api/users/notification-preferences`.
-  - [ ] Atualizar as rotinas de disparo e-mail/push para consultarem essas preferências antes de enviar qualquer mensagem.
-- [ ] **Frontend: Interface de Configurações**
-  - [ ] Desenvolver tela ou aba "Notificações" dentro das configurações de perfil do aluno.
-  - [ ] Criar componentes de toggle switch responsivos e elegantes para cada tipo de alerta e canal de comunicação.
-- [ ] **Testes e Validação**
-  - [ ] Escrever testes para verificar que e-mails/pushes não são enviados se a preferência correspondente estiver desmarcada.
-  - [ ] Validar o salvamento das opções no frontend e banco de dados.
+- [X] **Backend: Persistência e Filtros**
+  - [X] Criar tabela ou coluna JSON `notification_preferences` na tabela de perfis de usuários para armazenar as preferências por canal.
+  - [X] Criar rotas `GET /api/users/notification-preferences` and `PUT /api/users/notification-preferences`.
+  - [X] Atualizar as rotinas de disparo e-mail/push para consultarem essas preferências antes de enviar qualquer mensagem.
+- [X] **Frontend: Interface de Configurações**
+  - [X] Desenvolver tela ou aba "Notificações" dentro das configurações de perfil do aluno.
+  - [X] Criar componentes de toggle switch responsivos e elegantes para cada tipo de alerta e canal de comunicação.
+- [X] **Testes e Validação**
+  - [X] Escrever testes para verificar que e-mails/pushes não são enviados se a preferência correspondente estiver desmarcada.
+  - [X] Validar o salvamento das opções no frontend e banco de dados.
 
 ---
 
@@ -746,13 +746,13 @@ erDiagram
 
 **Objetivo:** Proporcionar uma conversa dinâmica e contínua em tempo real com a Tati (IA) sem a necessidade de clicar em botões, utilizando WebSockets e streaming bidirecional de áudio com baixa latência (via Gemini Live API).
 
-- [ ] **Backend: Proxy de WebSocket e Streaming**
-  - [ ] Implementar uma rota WebSocket `/api/voice/live` usando FastAPI.
-  - [ ] Lidar com a conexão bidirecional com a Gemini Live API (ou serviço similar), enviando frames de áudio recebidos do cliente e recebendo os frames de áudio e texto de resposta da IA.
-- [ ] **Frontend: Interface e Web Audio**
-  - [ ] Desenvolver uma tela de "Conversação em Tempo Real" dedicada, apresentando ondas de áudio interativas (visualização em canvas) que pulsam ao falar/escutar.
-  - [ ] Implementar captura contínua de microfone e reprodução de buffers de áudio PCM sem cortes ou atrasos.
-  - [ ] Implementar detecção de silêncio/interrupção (VAD - Voice Activity Detection) no cliente para parar de falar quando a IA começar a responder e vice-versa.
-- [ ] **Testes e Validação**
-  - [ ] Validar a integridade da conexão WebSocket e o tempo de resposta (latência) da IA.
-  - [ ] Testar a sincronia de áudio e a qualidade do som transmitido/recebido.
+- [X] **Backend: Proxy de WebSocket e Streaming**
+  - [X] Implementar uma rota WebSocket `/api/voice/live` usando FastAPI.
+  - [X] Lidar com a conexão bidirecional com a Gemini Live API (ou serviço similar), enviando frames de áudio recebidos do cliente e recebendo os frames de áudio e texto de resposta da IA.
+- [X] **Frontend: Interface e Web Audio**
+  - [X] Desenvolver uma tela de "Conversação em Tempo Real" dedicada, apresentando ondas de áudio interativas (visualização em canvas) que pulsam ao falar/escutar.
+  - [X] Implementar captura contínua de microfone e reprodução de buffers de áudio PCM sem cortes ou atrasos.
+  - [X] Implementar detecção de silêncio/interrupção (VAD - Voice Activity Detection) no cliente para parar de falar quando a IA começar a responder e vice-versa.
+- [X] **Testes e Validação**
+  - [X] Validar a integridade da conexão WebSocket e o tempo de resposta (latência) da IA.
+  - [X] Testar a sincronia de áudio e a qualidade do som transmitido/recebido.

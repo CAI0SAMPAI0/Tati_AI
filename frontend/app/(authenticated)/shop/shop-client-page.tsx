@@ -40,7 +40,7 @@ export default function ShopClientPage() {
   const handlePurchaseFreeze = async () => {
     setIsPurchasing(true);
     try {
-      const res = await apiPost<any>('/users/streaks/purchase-freeze', {});
+      const res = await apiPost<any>('/users/streak/purchase-freeze', {});
       if (!res.ok) {
         const errorDetail = (res.data as any)?.detail || 'Erro ao realizar a compra';
         throw new Error(errorDetail);
