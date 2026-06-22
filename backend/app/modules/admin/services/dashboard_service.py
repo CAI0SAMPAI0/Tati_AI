@@ -750,13 +750,65 @@ class DashboardService:
             self,
             username: str,
             lang: str = 'en-US') -> dict:
-        """Retorna recomendações pedagógicas."""
-        # Simplificado por enquanto
+        """Retorna interesses mapeados e recomendações pedagógicas via IA."""
+        from app.modules.chat.services.llm import groq_chat_json
+        
+        def _fetch_messages():
+            try:
+                res = self.db.table('messages')\
+                    .select('content')\
+                    .eq('username', username)\
+                    .eq('role', 'user')\
+                    .order('created_at', desc=True)\
+                    .limit(30)\
+                    .execute()
+                return [m.get('content', '') for m in res.data or []]
+            except Exception:
+                return []
+                
+        user_msgs = await run_in_threadpool(_fetch_messages)
+        context = " | ".join(user_msgs)[:2000]
+        
+        prompt = (
+            f"Analyze the following recent English messages of student '{username}' to identify their personal/professional interests/hobbies, "
+            f"and generate 3 tailored pedagogical recommendations to improve their English.\n"
+            f"Student Messages: {context}\n\n"
+            "Return strictly a JSON object with this exact shape (hobbies/interests should be short tags, and recommendations should be in Portuguese):\n"
+            "{\n"
+            "  \"interests\": [\"Viagens\", \"Tecnologia\", \"Carreira\"],\n"
+            "  \"recommendations\": [\n"
+            "    {\"recommendation\": \"Praticar passados\", \"description\": \"Notei dificuldades no uso do Simple Past ao descrever suas viagens anteriores. Tente focar em falar sobre eventos passados hoje.\"},\n"
+            "    {\"recommendation\": \"Foco profissional\", \"description\": \"Como você usa inglês para reuniões de tecnologia, tente praticar termos corporativos como 'feedback' e 'milestones'.\"}\n"
+            "  ]\n"
+            "}\n"
+            "If the message history is empty, return generic but useful recommendations and interests like 'Conversação', 'Gramática'."
+        )
+        
+        try:
+            result = await groq_chat_json([{'role': 'user', 'content': prompt}])
+            if result and isinstance(result, dict) and 'interests' in result and 'recommendations' in result:
+                return result
+        except Exception as e:
+            logging.info(f"[DashboardService] Erro ao gerar interesses/recomendações via IA: {e}")
+            
+        # Fallback se a IA falhar ou retornar nulo
         return {
+            'interests': ['Geral', 'Gramática', 'Vocabulário'],
             'recommendations': [
-                'Pratique mais conversação sobre temas do seu dia a dia.',
-                'Assista a vídeos curtos sobre gramática básica.',
-                'Tente usar novas palavras do seu vocabulário nas conversas.']}
+                {
+                    'recommendation': 'Foco em Conversação',
+                    'description': 'Pratique mais conversação sobre temas do seu dia a dia com a Tati.'
+                },
+                {
+                    'recommendation': 'Revisão Gramatical',
+                    'description': 'Assista a vídeos curtos sobre gramática básica e tente aplicar no chat.'
+                },
+                {
+                    'recommendation': 'Vocabulário Ativo',
+                    'description': 'Tente usar novas palavras do seu vocabulário nas conversas diárias.'
+                }
+            ]
+        }
 
     async def generate_simulation(
             self,
