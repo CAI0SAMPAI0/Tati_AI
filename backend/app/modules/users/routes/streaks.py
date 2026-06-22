@@ -61,7 +61,7 @@ async def purchase_streak_freeze(
     if freeze_count >= 3:
         raise HTTPException(
             status_code=400,
-            detail="Você já possui o limite máximo de 3 Streak Freezes. Use um antes de comprar outro."
+            detail="You have already reached the maximum limit of 3 Streak Freezes. Use one before buying another."
         )
     streak_data['streak_freeze_count'] = freeze_count + 1
 
