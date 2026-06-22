@@ -640,7 +640,7 @@ class DashboardService:
 
 
     async def nudge_student(self, username: str, text: str) -> dict:
-        """Envia uma mensagem de nudge para o aluno via chat e notificação push."""
+        """Envia uma mensagem de nudge para o aluno via chat, push e email."""
         from datetime import datetime, timezone
         
         def _execute():
@@ -683,21 +683,25 @@ class DashboardService:
                 'updated_at': datetime.now(timezone.utc).isoformat()
             }).eq('id', conv_id).execute()
             
-            # 3. Dispara a notificação push
-            try:
-                from app.modules.notifications.services.push_notifications import send_push_to_user
-                send_push_to_user(
-                    username,
-                    title="Teacher Tati 🍎",
-                    body=text,
-                    url="/chat"
-                )
-            except Exception as push_err:
-                logging.warning(f"[DashboardService] Erro ao enviar push nudge: {push_err}")
-                
             return {"success": True}
             
-        return await run_in_threadpool(_execute)
+        res = await run_in_threadpool(_execute)
+        if not res.get("success"):
+            return res
+            
+        # 3. Dispara a notificação push e email universalmente
+        try:
+            from app.modules.notifications.services.notification_dispatcher import dispatch_universal_notification
+            await dispatch_universal_notification(
+                username,
+                title="Teacher Tati 🍎",
+                body=text,
+                url="/chat"
+            )
+        except Exception as push_err:
+            logging.warning(f"[DashboardService] Erro ao enviar push/email nudge: {push_err}")
+            
+        return {"success": True}
 
 
     async def update_student(
@@ -728,8 +732,16 @@ class DashboardService:
         def _fetch():
             try:
                 res = self.db.table('user_errors').select(
-                    '*').eq('username', username).order('created_at', desc=True).limit(50).execute()
-                return {'errors': res.data or []}
+                    'category').eq('username', username).execute()
+                data = res.data or []
+                counts = {}
+                for row in data:
+                    cat = row.get('category') or 'general'
+                    counts[cat] = counts.get(cat, 0) + 1
+                
+                grouped = [{'category': k, 'count': v} for k, v in counts.items()]
+                grouped.sort(key=lambda x: x['count'], reverse=True)
+                return {'errors': grouped}
             except Exception:
                 return {'errors': []}
         return await run_in_threadpool(_fetch)

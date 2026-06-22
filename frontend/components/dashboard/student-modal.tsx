@@ -133,7 +133,7 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
       const res = await apiGet<{ interests: string[]; recommendations: any[] }>(`/dashboard/students/${encodeURIComponent(localStudent.username)}/recommendations?lang=${lang}`);
       setInterests(res.interests || []);
       setRecommendations(res.recommendations || []);
-      toast.success('Saved successfully!');
+      toast.success('Interests analyzed successfully!');
     } catch (err) {
       toast.error('Error. Please try again.');
     } finally {

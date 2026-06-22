@@ -355,8 +355,8 @@ class NotificationScheduler:
             url: str = '/'):
         try:
             await self.ns.send_notification(username, title, body, category=category)
-            from app.modules.notifications.services.push_notifications import send_push_to_user
-            send_push_to_user(username, title=title, body=body, url=url)
+            from app.modules.notifications.services.notification_dispatcher import dispatch_universal_notification
+            await dispatch_universal_notification(username, title, body, url=url)
         except Exception as e:
             logging.info(
                 f'[Scheduler] Erro ao despachar para {username}: {e}')
