@@ -43,6 +43,55 @@ def _generate_kokoro_local(text: str) -> str:
         return ''
 
 
+async def _tts_elevenlabs(text: str) -> str:
+    """
+    Gera áudio com ElevenLabs usando rotação de chaves.
+    Suporta as chaves configuradas no .env: ELEVENLABS_API_KEY, ELEVENLABS_API_KEY_1, etc.
+    """
+    voice_id = settings.voice_id or os.getenv("VOICE_ID")
+    if not voice_id:
+        logging.warning("[TTS] ElevenLabs voice_id não está configurado.")
+        return ''
+
+    keys = settings.eleven_keys
+    if not keys:
+        return ''
+
+    import httpx
+    
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    payload = {
+        "text": text,
+        "model_id": "eleven_multilingual_v2",
+        "voice_settings": {
+            "stability": 0.5,
+            "similarity_boost": 0.75
+        }
+    }
+
+    for idx, key in enumerate(keys):
+        headers = {
+            "xi-api-key": key,
+            "Content-Type": "application/json",
+            "accept": "audio/mpeg"
+        }
+        try:
+            logging.info(f"[TTS] Tentando ElevenLabs com a chave {idx + 1}/{len(keys)}...")
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(url, json=payload, headers=headers, timeout=20.0)
+                if resp.status_code == 200:
+                    logging.info(f"✅ [TTS] Sucesso com ElevenLabs usando a chave {idx + 1}!")
+                    return base64.b64encode(resp.content).decode('utf-8')
+                else:
+                    logging.warning(
+                        f"[TTS] ElevenLabs com chave {idx + 1} retornou status {resp.status_code}: {resp.text[:150]}"
+                    )
+        except Exception as exc:
+            logging.warning(f"[TTS] Erro na requisição ElevenLabs com chave {idx + 1}: {exc}")
+
+    return ''
+
+
 async def _tts_kokoro(text: str) -> str:
     """
     Tenta gerar áudio com Kokoro-TTS.
@@ -201,9 +250,18 @@ async def _tts_xtts(text: str) -> str:
 async def generate_teacher_audio(texto: str) -> Optional[str]:
     """
     Recebe um texto (gerado pelo Groq), faz fallback automático na seguinte ordem:
-    Kokoro-TTS -> XTTS -> Edge TTS -> gTTS.
+    ElevenLabs (Voz Real) -> Kokoro-TTS (Voz Sintética de Qualidade) -> XTTS -> Edge TTS -> gTTS.
     """
-    # 1. Tentando Kokoro-TTS (Preferencial)
+    # 1. Tentando ElevenLabs (Voz real da Tatiana por clonagem se houver chaves configuradas e ativas)
+    if settings.eleven_keys:
+        logging.info("[AudioGenerator] Tentando ElevenLabs (Voz Real)...")
+        audio_b64 = await _tts_elevenlabs(texto)
+        if audio_b64:
+            logging.info("✅ [AudioGenerator] Sucesso na geração de áudio via ElevenLabs!")
+            return audio_b64
+        logging.warning("[AudioGenerator] ElevenLabs falhou (possível esgotamento de cota). Partindo para Kokoro-TTS...")
+
+    # 2. Tentando Kokoro-TTS (Voz sintética muito realista, local e grátis)
     logging.info("[AudioGenerator] Tentando Kokoro-TTS...")
     audio_b64 = await _tts_kokoro(texto)
     if audio_b64:
@@ -211,7 +269,7 @@ async def generate_teacher_audio(texto: str) -> Optional[str]:
         return audio_b64
     logging.warning("[AudioGenerator] Kokoro-TTS não pôde ser gerado (não configurado ou falhou).")
 
-    # 2. Tentando XTTS
+    # 3. Tentando XTTS
     if settings.xtts_api_url:
         logging.info("[AudioGenerator] Tentando XTTS (Hugging Face Space)...")
         audio_b64 = await _tts_xtts(texto)
@@ -220,7 +278,7 @@ async def generate_teacher_audio(texto: str) -> Optional[str]:
             return audio_b64
         logging.warning("[AudioGenerator] XTTS falhou. Tentando Edge TTS de fallback...")
 
-    # 3. Usando Edge TTS
+    # 4. Usando Edge TTS
     logging.info("[AudioGenerator] Tentando Edge TTS (JennyNeural)...")
     audio_b64 = await _tts_edge(texto)
     if audio_b64:
@@ -228,7 +286,7 @@ async def generate_teacher_audio(texto: str) -> Optional[str]:
             "✅ [AudioGenerator] Sucesso na geração de áudio via Edge TTS!")
         return audio_b64
 
-    # 4. Usando gTTS caso o Edge falhe
+    # 5. Usando gTTS caso o Edge falhe
     logging.info("[AudioGenerator] Tentando gTTS (Fallback final)...")
     audio_b64 = await _tts_gtts(texto)
     if audio_b64:
