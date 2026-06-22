@@ -484,11 +484,22 @@ class DashboardService:
         """Retorna analíticos detalhados de progresso e engajamento do aluno."""
         def _fetch():
             # 1. Obter progresso por módulo
-            modules = self.db.table('modules').select('id, title, order').order('order').execute().data or []
+            modules = self.db.table('modules').select('id, title, order, flashcards').order('order').execute().data or []
             quizzes = self.db.table('quizzes').select('id, module_id, title').execute().data or []
             user_progress = self.db.table('user_progress').select('quiz_id, score').eq('username', username).execute().data or []
             
             completed_quiz_ids = {p['quiz_id'] for p in user_progress}
+            
+            # Busca submissões do usuário na tabela activity_submissions para ver se completou módulos de flashcards/outros
+            try:
+                submissions = self.db.table('activity_submissions')\
+                    .select('module_id, activity_type')\
+                    .eq('username', username)\
+                    .execute()\
+                    .data or []
+                completed_module_ids = {s['module_id'] for s in submissions if s.get('module_id')}
+            except Exception:
+                completed_module_ids = set()
             
             # Agrupa quizzes por módulo
             quizzes_by_module = {}
@@ -503,12 +514,24 @@ class DashboardService:
                 mod_quizzes = quizzes_by_module.get(m_id, [])
                 total_quizzes = len(mod_quizzes)
                 
+                # Se o módulo tem quizzes, calculamos com base neles
                 if total_quizzes > 0:
                     completed_count = sum(1 for q in mod_quizzes if q['id'] in completed_quiz_ids)
+                    # Se não constar no user_progress, mas constar no activity_submissions como feito
+                    if completed_count == 0 and m_id in completed_module_ids:
+                        completed_count = total_quizzes
                     progress_pct = int((completed_count / total_quizzes) * 100)
+                    type_label = "Quizzes"
                 else:
-                    completed_count = 0
-                    progress_pct = 0
+                    # Módulos sem quizzes (ex: Decks de Flashcards, podcasts, lições de texto)
+                    total_quizzes = 1
+                    completed_count = 1 if m_id in completed_module_ids else 0
+                    progress_pct = 100 if completed_count == 1 else 0
+                    # Tenta inferir o tipo do módulo
+                    if m.get('flashcards') and len(m.get('flashcards') or []) > 0:
+                        type_label = "Flashcards"
+                    else:
+                        type_label = "Activity"
                     
                 module_progress_list.append({
                     "module_id": m_id,
@@ -516,74 +539,103 @@ class DashboardService:
                     "order": m.get('order', 0),
                     "total_quizzes": total_quizzes,
                     "completed_quizzes": completed_count,
-                    "progress_pct": progress_pct
+                    "progress_pct": progress_pct,
+                    "type_label": type_label
                 })
                 
             # 2. Obter tempo de estudo (últimos 7 dias)
             from datetime import date, timedelta
             start_date = date.today() - timedelta(days=6)
+            since_iso = datetime.combine(start_date, datetime.min.time()).replace(tzinfo=timezone.utc).isoformat()
             
             chart_data = []
-            avg_study_minutes = 0.0
-            total_study_seconds = 0
+            total_study_minutes = 0.0
             total_messages = 0
             total_activities = 0
             
+            # Inicializa estrutura para os 7 dias
+            days_map = {}
+            for i in range(7):
+                d = start_date + timedelta(days=i)
+                d_str = d.isoformat()
+                days_map[d_str] = {
+                    "date": d_str,
+                    "day_name": d.strftime('%a'),
+                    "study_minutes": 0.0,
+                    "messages_sent": 0,
+                    "activities_completed": 0
+                }
+                
             try:
-                sessions = self.db.table('user_study_sessions')\
-                    .select('date, study_seconds, messages_sent, activities_completed')\
+                # Busca sessões de estudo da tabela study_sessions
+                sessions = self.db.table('study_sessions')\
+                    .select('created_at, duration_minutes, activity_type')\
                     .eq('username', username)\
-                    .gte('date', start_date.isoformat())\
+                    .gte('created_at', since_iso)\
                     .execute()\
                     .data or []
                 
-                sessions_by_date = {s['date']: s for s in sessions}
-                
-                for i in range(7):
-                    d = start_date + timedelta(days=i)
-                    d_str = d.isoformat()
-                    s_data = sessions_by_date.get(d_str) or {}
-                    study_sec = s_data.get('study_seconds', 0) or 0
-                    msgs = s_data.get('messages_sent', 0) or 0
-                    acts = s_data.get('activities_completed', 0) or 0
-                    
-                    total_study_seconds += study_sec
-                    total_messages += msgs
-                    total_activities += acts
-                    
-                    chart_data.append({
-                        "date": d_str,
-                        "day_name": d.strftime('%a'),
-                        "study_minutes": round(study_sec / 60, 1),
-                        "messages_sent": msgs,
-                        "activities_completed": acts
-                    })
-                
-                avg_study_minutes = round((total_study_seconds / 60) / 7, 1)
+                for s in sessions:
+                    raw_dt = s.get('created_at')
+                    if raw_dt:
+                        try:
+                            dt = parse_dt(raw_dt)
+                            d_str = dt.date().isoformat()
+                            if d_str in days_map:
+                                days_map[d_str]["study_minutes"] += float(s.get('duration_minutes') or 0.0)
+                                days_map[d_str]["activities_completed"] += 1
+                        except Exception:
+                            pass
             except Exception as e:
-                logging.info(f"[DashboardService] user_study_sessions nao disponivel ou vazia: {e}")
-                # Fallback: dias vazios
-                for i in range(7):
-                    d = start_date + timedelta(days=i)
-                    chart_data.append({
-                        "date": d.isoformat(),
-                        "day_name": d.strftime('%a'),
-                        "study_minutes": 0.0,
-                        "messages_sent": 0,
-                        "activities_completed": 0
-                    })
+                logging.info(f"[DashboardService] Erro ao buscar study_sessions para analíticos: {e}")
+                
+            try:
+                # Busca mensagens da tabela messages
+                messages_list = self.db.table('messages')\
+                    .select('created_at, date')\
+                    .eq('username', username)\
+                    .eq('role', 'user')\
+                    .gte('created_at', since_iso)\
+                    .execute()\
+                    .data or []
+                
+                for m in messages_list:
+                    raw_dt = m.get('created_at') or m.get('date')
+                    if raw_dt:
+                        try:
+                            dt = parse_dt(raw_dt)
+                            d_str = dt.date().isoformat()
+                            if d_str in days_map:
+                                days_map[d_str]["messages_sent"] += 1
+                        except Exception:
+                            pass
+            except Exception as e:
+                logging.info(f"[DashboardService] Erro ao buscar mensagens para analíticos: {e}")
+                
+            # Consolida resultados
+            for d_str in sorted(days_map.keys()):
+                d_data = days_map[d_str]
+                # Estima tempo de chat: cada mensagem enviada conta como 1.5 minutos de leitura/escrita ativa
+                chat_est_minutes = d_data["messages_sent"] * 1.5
+                d_data["study_minutes"] = round(d_data["study_minutes"] + chat_est_minutes, 1)
+                
+                total_study_minutes += d_data["study_minutes"]
+                total_messages += d_data["messages_sent"]
+                total_activities += d_data["activities_completed"]
+                chart_data.append(d_data)
+                
+            avg_study_minutes = round(total_study_minutes / 7, 1)
             
             return {
                 "module_progress": module_progress_list,
                 "study_time_chart": chart_data,
                 "summary": {
                     "avg_study_minutes_daily": avg_study_minutes,
-                    "total_study_minutes_weekly": round(total_study_seconds / 60, 1),
+                    "total_study_minutes_weekly": round(total_study_minutes, 1),
                     "total_messages_weekly": total_messages,
                     "total_activities_weekly": total_activities
                 }
             }
-            
         return await run_in_threadpool(_fetch)
 
 

@@ -438,7 +438,7 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                             <div className="flex justify-between items-center text-xs">
                               <span className="font-bold text-text truncate max-w-[70%]">{mod.title}</span>
                               <span className="text-[0.65rem] font-bold text-text-muted">
-                                {mod.completed_quizzes}/{mod.total_quizzes} Quizzes
+                               {mod.completed_quizzes}/{mod.total_quizzes} {mod.type_label || "Quizzes"}
                               </span>
                             </div>
                             <div className="w-full bg-border/40 h-2 rounded-full overflow-hidden">
