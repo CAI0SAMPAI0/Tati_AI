@@ -6,21 +6,38 @@ from dotenv import load_dotenv
 load_dotenv()
 
 USE_CELERY = os.getenv("USE_CELERY", "false").lower() == "true"
+CLOUD_AMQP_URL = os.getenv("CLOUD_AMQP_URL")
 UPSTASH_URL = os.getenv("UPSTASH_REDIS_URL")
 UPSTASH_TOKEN = os.getenv("UPSTASH_REDIS_TOKEN")
 
-if USE_CELERY and UPSTASH_URL and UPSTASH_TOKEN:
+# Configura a URL de backend (Upstash Redis)
+redis_backend_url = None
+if UPSTASH_URL and UPSTASH_TOKEN:
     clean_url = UPSTASH_URL.replace("redis://", "").replace("https://", "").replace("http://", "")
     if ":" not in clean_url:
         clean_url = f"{clean_url}:6379"
-    redis_broker_url = f"rediss://:{UPSTASH_TOKEN}@{clean_url}?ssl_cert_reqs=CERT_NONE"
+    redis_backend_url = f"rediss://:{UPSTASH_TOKEN}@{clean_url}?ssl_cert_reqs=CERT_NONE"
+
+# Define o broker (preferência para CloudAMQP, fallback para Upstash ou Localhost)
+if USE_CELERY and CLOUD_AMQP_URL:
+    broker_url = CLOUD_AMQP_URL
+elif USE_CELERY and redis_backend_url:
+    broker_url = redis_backend_url
 else:
-    redis_broker_url = "redis://localhost:6379/0"
+    broker_url = "redis://localhost:6379/0"
+
+# Define o backend de resultados (preferência para Upstash Redis para persistência de status, fallback para rpc ou Localhost)
+if redis_backend_url:
+    backend_url = redis_backend_url
+elif CLOUD_AMQP_URL:
+    backend_url = "rpc://"
+else:
+    backend_url = "redis://localhost:6379/0"
 
 celery_app = Celery(
     "teacher_tati_tasks",
-    broker=redis_broker_url,
-    backend=redis_broker_url,
+    broker=broker_url,
+    backend=backend_url,
     include=[
         "app.core.tasks",
         "app.modules.notifications.tasks",

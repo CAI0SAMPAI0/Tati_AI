@@ -1,11 +1,108 @@
 import logging
 import io
 import base64
+import os
 from typing import Optional
+from fastapi.concurrency import run_in_threadpool
 from app.core.config import settings
 
 
-# tirado de llm e transportado para o gerador de áudio
+# Cache global do pipeline do Kokoro para não recarregar em cada requisição
+_kokoro_pipeline = None
+
+
+def _generate_kokoro_local(text: str) -> str:
+    """Função síncrona executada na threadpool para rodar o modelo Kokoro local."""
+    global _kokoro_pipeline
+    try:
+        import numpy as np
+        import soundfile as sf
+        from kokoro import KPipeline
+        
+        if _kokoro_pipeline is None:
+            logging.info("[TTS] Inicializando KPipeline para Kokoro local...")
+            _kokoro_pipeline = KPipeline(lang_code='a')
+            
+        voice = os.getenv("KOKORO_VOICE", "af_bella")
+        logging.info(f"[TTS] Gerando áudio via Kokoro local com a voz: {voice}")
+        generator = _kokoro_pipeline(text, voice=voice, speed=1.0)
+        
+        audio_chunks = []
+        for _, _, audio in generator:
+            audio_chunks.append(audio)
+            
+        if not audio_chunks:
+            return ''
+            
+        full_audio = np.concatenate(audio_chunks)
+        buf = io.BytesIO()
+        sf.write(buf, full_audio, 24000, format='WAV')
+        return base64.b64encode(buf.getvalue()).decode('utf-8')
+    except Exception as e:
+        logging.warning(f'[TTS] Erro no Kokoro local: {e}')
+        return ''
+
+
+async def _tts_kokoro(text: str) -> str:
+    """
+    Tenta gerar áudio com Kokoro-TTS.
+    1. Se KOKORO_API_URL estiver definido, tenta via API remota.
+    2. Fallback: tenta rodar o Kokoro localmente se a biblioteca 'kokoro' estiver instalada.
+    """
+    kokoro_api_url = os.getenv("KOKORO_API_URL")
+    if kokoro_api_url:
+        import httpx
+        logging.info(f"[TTS] Tentando Kokoro via API remota: {kokoro_api_url}")
+        try:
+            voice = os.getenv("KOKORO_VOICE", "af_bella")
+            endpoint = kokoro_api_url.rstrip('/')
+            
+            # Formato OpenAI padrão /v1/audio/speech
+            if not (endpoint.endswith('/speech') or endpoint.endswith('/tts') or endpoint.endswith('/speech')):
+                endpoint_url = f"{endpoint}/v1/audio/speech"
+            else:
+                endpoint_url = endpoint
+
+            payload = {
+                "model": "kokoro",
+                "input": text,
+                "voice": voice,
+                "response_format": "mp3"
+            }
+            
+            headers = {}
+            api_key = os.getenv("KOKORO_API_KEY")
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+                
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(endpoint_url, json=payload, headers=headers, timeout=20.0)
+                if resp.status_code == 200:
+                    return base64.b64encode(resp.content).decode('utf-8')
+                
+                # Tenta formato simples de fallback /tts
+                resp_simple = await client.post(
+                    f"{endpoint}/tts" if not endpoint.endswith('/tts') else endpoint,
+                    json={"text": text, "voice": voice},
+                    timeout=20.0
+                )
+                if resp_simple.status_code == 200:
+                    return base64.b64encode(resp_simple.content).decode('utf-8')
+        except Exception as api_err:
+            logging.warning(f"[TTS] Erro na API do Kokoro: {api_err}")
+
+    # Fallback local (biblioteca kokoro)
+    try:
+        import kokoro
+        import soundfile
+        logging.info("[TTS] Biblioteca 'kokoro' instalada. Iniciando inferência local...")
+        return await run_in_threadpool(_generate_kokoro_local, text)
+    except ImportError:
+        logging.info("[TTS] Biblioteca 'kokoro' não está instalada localmente.")
+        
+    return ''
+
+
 async def _tts_edge(text: str) -> str:
     """Edge TTS (Microsoft) - gratuito e boa qualidade."""
     try:
@@ -103,8 +200,18 @@ async def _tts_xtts(text: str) -> str:
 
 async def generate_teacher_audio(texto: str) -> Optional[str]:
     """
-    Recebe um texto (gerado pelo Groq), faz fallback automático para XTTS, Edge TTS e, em seguida, para gTTS.
+    Recebe um texto (gerado pelo Groq), faz fallback automático na seguinte ordem:
+    Kokoro-TTS -> XTTS -> Edge TTS -> gTTS.
     """
+    # 1. Tentando Kokoro-TTS (Preferencial)
+    logging.info("[AudioGenerator] Tentando Kokoro-TTS...")
+    audio_b64 = await _tts_kokoro(texto)
+    if audio_b64:
+        logging.info("✅ [AudioGenerator] Sucesso na geração de áudio via Kokoro-TTS!")
+        return audio_b64
+    logging.warning("[AudioGenerator] Kokoro-TTS não pôde ser gerado (não configurado ou falhou).")
+
+    # 2. Tentando XTTS
     if settings.xtts_api_url:
         logging.info("[AudioGenerator] Tentando XTTS (Hugging Face Space)...")
         audio_b64 = await _tts_xtts(texto)
@@ -113,7 +220,7 @@ async def generate_teacher_audio(texto: str) -> Optional[str]:
             return audio_b64
         logging.warning("[AudioGenerator] XTTS falhou. Tentando Edge TTS de fallback...")
 
-    # Usando Edge TTS
+    # 3. Usando Edge TTS
     logging.info("[AudioGenerator] Tentando Edge TTS (JennyNeural)...")
     audio_b64 = await _tts_edge(texto)
     if audio_b64:
@@ -121,7 +228,7 @@ async def generate_teacher_audio(texto: str) -> Optional[str]:
             "✅ [AudioGenerator] Sucesso na geração de áudio via Edge TTS!")
         return audio_b64
 
-    # Usando gTTS caso o Edge falhe
+    # 4. Usando gTTS caso o Edge falhe
     logging.info("[AudioGenerator] Tentando gTTS (Fallback final)...")
     audio_b64 = await _tts_gtts(texto)
     if audio_b64:

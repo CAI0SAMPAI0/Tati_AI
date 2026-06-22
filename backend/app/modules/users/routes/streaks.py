@@ -58,6 +58,11 @@ async def purchase_streak_freeze(
         streak_data = {}
 
     freeze_count = streak_data.get('streak_freeze_count', 0) or 0
+    if freeze_count >= 3:
+        raise HTTPException(
+            status_code=400,
+            detail="Você já possui o limite máximo de 3 Streak Freezes. Use um antes de comprar outro."
+        )
     streak_data['streak_freeze_count'] = freeze_count + 1
 
     service.db.table('users').update({

@@ -25,7 +25,7 @@ async def get_monthly(
     return await service.get_monthly_report(user['username'])
 
 
-@router.get('/progress/study-time')
+@router.get('/study-time')
 async def get_study_time(
     user=Depends(get_current_user), service: ProgressService = Depends()
 ):
@@ -221,7 +221,7 @@ def _calculate_rankings(db, start_date, end_date=None):
     return rankings
 
 
-@router.get('/progress/fluency-evolution')
+@router.get('/fluency-evolution')
 async def get_fluency_evolution(
     user=Depends(get_current_user), service: ProgressService = Depends()
 ):

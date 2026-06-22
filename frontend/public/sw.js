@@ -3,7 +3,16 @@ const STATIC_ASSETS = ['/', '/manifest.json', '/icons/icon-192x192.png', '/icons
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS)).then(() => self.skipWaiting()),
+    caches.open(CACHE_NAME)
+      .then((cache) => {
+        const promises = STATIC_ASSETS.map((asset) => {
+          return cache.add(asset).catch((err) => {
+            console.warn(`[Service Worker] Failed to cache static asset: ${asset}`, err);
+          });
+        });
+        return Promise.all(promises);
+      })
+      .then(() => self.skipWaiting()),
   );
 });
 

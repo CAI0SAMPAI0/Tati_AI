@@ -56,8 +56,7 @@ export function PodcastList() {
             onClick={() => router.push(`/podcasts/${p.id}`)}
             actionLabel={'▶ Play'}
             meta={[
-              { icon: <Tag size={12} />, label: p.level },
-              { icon: <Clock size={12} />, label: p.duration || '--:--' }
+              { icon: <Tag size={12} />, label: p.level }
             ]}
           />
         ))}

@@ -61,7 +61,7 @@ export default function ShopClientPage() {
 
   const userXp = xpData?.xp ?? 0;
   const freezeCount = streakData?.streak_freeze_count ?? 0;
-  const canBuy = userXp >= 150;
+  const canBuy = userXp >= 150 && freezeCount < 3;
 
   return (
     <div className="min-h-screen bg-bg flex flex-col md:flex-row">
@@ -137,10 +137,12 @@ export default function ShopClientPage() {
                 <Button
                   onClick={handlePurchaseFreeze}
                   disabled={isPurchasing || !canBuy || xpLoading}
-                  className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all"
+                  className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isPurchasing ? (
                     <Spinner size="sm" className="mr-1.5" />
+                  ) : freezeCount >= 3 ? (
+                    'Max Owned (3)'
                   ) : (
                     'Buy Freeze'
                   )}
