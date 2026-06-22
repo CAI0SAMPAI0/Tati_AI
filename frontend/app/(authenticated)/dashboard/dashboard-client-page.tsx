@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
   Menu,
   Search,
@@ -30,6 +30,7 @@ export default function DashboardClientPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { canAccessDashboard, isLoading: permissionsLoading } = usePermissions();
+  const queryClient = useQueryClient();
   
   // Get tab from URL or localStorage
   const getInitialTab = (): DashSection => {
@@ -247,7 +248,15 @@ export default function DashboardClientPage() {
                               {s.avatar_url ? <img src={s.avatar_url} alt="" className="w-full h-full rounded-full object-cover" /> : (s.name || s.username || '?').charAt(0).toUpperCase()}
                             </div>
                             <div className="min-w-0">
-                              <div className="text-sm font-bold truncate text-text group-hover:text-primary transition-colors">{s.name || s.username}</div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold truncate text-text group-hover:text-primary transition-colors">{s.name || s.username}</span>
+                                {s.risk_level === 'critical' && (
+                                  <span className="px-1.5 py-0.5 rounded bg-danger/10 text-danger text-[0.6rem] font-bold animate-pulse">Critical</span>
+                                )}
+                                {s.risk_level === 'warning' && (
+                                  <span className="px-1.5 py-0.5 rounded bg-warning/10 text-warning text-[0.6rem] font-bold">At Risk</span>
+                                )}
+                              </div>
                               <div className="text-[0.7rem] text-text-muted truncate">@{s.username}</div>
                             </div>
                           </div>
@@ -282,7 +291,7 @@ export default function DashboardClientPage() {
         onClose={() => setIsStudentModalOpen(false)}
         student={selectedStudent}
         onUpdate={() => {
-          // Trigger SWR mutation to refresh student list
+          queryClient.invalidateQueries({ queryKey: ['admin-dashboard-students'] });
         }}
       />
     </div>

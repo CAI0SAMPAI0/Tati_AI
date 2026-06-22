@@ -10,7 +10,9 @@ import {
   AlertCircle,
   Sparkles,
   RefreshCw,
-  Clock
+  Clock,
+  Send,
+  BarChart2
 } from 'lucide-react';
 import { DialogModal } from '@/components/ui/dialog-modal';
 import { Button } from '@/components/ui/button';
@@ -30,7 +32,7 @@ interface StudentModalProps {
 
 export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModalProps) {
   
-  const [activeTab, setActiveTab] = useState<'info' | 'prompt' | 'insight' | 'interests'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'prompt' | 'insight' | 'interests' | 'analytics'>('info');
   const [localStudent, setLocalStudent] = useState(student);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -39,6 +41,10 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
   const [interests, setInterests] = useState<string[]>([]);
   const [recommendations, setRecommendations] = useState<string[]>([]);
   const [promptText, setPromptText] = useState(student?.custom_prompt || '');
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [isFetchingAnalytics, setIsFetchingAnalytics] = useState(false);
+  const [nudgeMessage, setNudgeMessage] = useState('');
+  const [isNudging, setIsNudging] = useState(false);
   const lang = 'en-US';
 
   // Reset local state when student changes
@@ -48,6 +54,10 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
     setInsight(null);
     setInterests([]);
     setRecommendations([]);
+    setAnalytics(null);
+    if (student) {
+      setNudgeMessage(`Hi ${student.name || student.username}! Teacher Tati here. 🍎 I noticed you haven't practiced English lately. Let's do a quick chat session today?`);
+    }
   }, [student]);
 
   if (!localStudent) return null;
@@ -131,6 +141,38 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
     }
   };
 
+
+  const fetchAnalytics = async () => {
+    setIsFetchingAnalytics(true);
+    try {
+      const res = await apiGet<any>(`/dashboard/students/${encodeURIComponent(localStudent.username)}/analytics`);
+      setAnalytics(res);
+    } catch (err) {
+      toast.error('Failed to load student analytics.');
+    } finally {
+      setIsFetchingAnalytics(false);
+    }
+  };
+
+  const handleSendNudge = async () => {
+    if (!nudgeMessage.trim()) return;
+    setIsNudging(true);
+    try {
+      await apiPost(`/dashboard/students/${encodeURIComponent(localStudent.username)}/nudge`, { message: nudgeMessage });
+      toast.success('✔ Student nudged successfully!');
+    } catch (err) {
+      toast.error('✗ Failed to send nudge.');
+    } finally {
+      setIsNudging(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'analytics' && localStudent) {
+      fetchAnalytics();
+    }
+  }, [activeTab, localStudent]);
+
   return (
     <DialogModal 
       isOpen={isOpen} 
@@ -142,6 +184,7 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
         <div className="flex bg-bg-secondary p-1 rounded-xl overflow-x-auto no-scrollbar shrink-0">
           {[
             { id: 'info', icon: <User size={14} />, label: 'Profile' },
+            { id: 'analytics', icon: <BarChart2 size={14} />, label: 'Analytics' },
             { id: 'prompt', icon: <AlertCircle size={14} />, label: 'Prompt' },
             { id: 'insight', icon: <Brain size={14} />, label: 'Insight' },
             { id: 'interests', icon: <Target size={14} />, label: 'Interests' },
@@ -316,6 +359,145 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                     )}
                  </div>
                )}
+            </div>
+          )}
+
+          {activeTab === 'analytics' && (
+            <div className="space-y-6 animate-fade-in">
+              {isFetchingAnalytics ? (
+                <div className="flex justify-center items-center py-12">
+                  <RefreshCw size={24} className="animate-spin text-primary" />
+                </div>
+              ) : !analytics ? (
+                <p className="text-center text-xs text-text-muted">No analytics data available.</p>
+              ) : (
+                <>
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="p-3 bg-surface border border-border rounded-xl">
+                      <span className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block">Weekly Study</span>
+                      <p className="text-sm font-bold text-text mt-0.5">{analytics.summary?.total_study_minutes_weekly || 0} min</p>
+                      <span className="text-[0.6rem] text-text-muted">Avg {analytics.summary?.avg_study_minutes_daily || 0}m/day</span>
+                    </div>
+                    <div className="p-3 bg-surface border border-border rounded-xl">
+                      <span className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block">Interactions</span>
+                      <p className="text-sm font-bold text-text mt-0.5">{analytics.summary?.total_messages_weekly || 0} msgs</p>
+                      <span className="text-[0.6rem] text-text-muted">This week</span>
+                    </div>
+                    <div className="p-3 bg-surface border border-border rounded-xl">
+                      <span className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block">Activities</span>
+                      <p className="text-sm font-bold text-text mt-0.5">{analytics.summary?.total_activities_weekly || 0} done</p>
+                      <span className="text-[0.6rem] text-text-muted">Quizzes/Lessons</span>
+                    </div>
+                  </div>
+
+                  {/* Study Time Chart */}
+                  <div className="p-4 bg-surface border border-border rounded-2xl">
+                    <h4 className="text-xs font-bold text-text-muted uppercase tracking-widest mb-4 flex items-center gap-1.5">
+                      <BarChart2 size={14} /> Study Time (last 7 days)
+                    </h4>
+                    <div className="h-28 flex items-end gap-3 px-2 pt-2 border-b border-border pb-1">
+                      {(analytics.study_time_chart || []).map((day: any, idx: number) => {
+                        const maxVal = Math.max(...(analytics.study_time_chart || []).map((d: any) => d.study_minutes), 10);
+                        const heightPct = Math.min(100, Math.max(8, (day.study_minutes / maxVal) * 100));
+                        return (
+                          <div key={idx} className="flex-1 flex flex-col items-center group relative h-full justify-end">
+                            {/* Bar Tooltip */}
+                            <div className="absolute bottom-full mb-1 bg-neutral-950 text-white text-[0.6rem] p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-lg border border-border/20">
+                              <span className="font-bold">{day.study_minutes} min</span>
+                              <br />
+                              <span className="text-neutral-400">{day.messages_sent} msgs</span>
+                            </div>
+                            {/* Bar */}
+                            <div 
+                              className={cn(
+                                "w-full rounded-t-md transition-all duration-300", 
+                                day.study_minutes > 0 ? "bg-primary group-hover:bg-primary/80" : "bg-border/30"
+                              )} 
+                              style={{ height: `${heightPct}%` }}
+                            />
+                            {/* Label */}
+                            <span className="text-[0.65rem] text-text-muted mt-1.5 font-bold uppercase tracking-wider">{day.day_name}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Module Progress */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold text-text-muted uppercase tracking-widest">Syllabus Progress</h4>
+                    <div className="space-y-2.5 max-h-[160px] overflow-y-auto pr-1">
+                      {(!analytics.module_progress || analytics.module_progress.length === 0) ? (
+                        <p className="text-xs text-text-muted italic">No module progression found.</p>
+                      ) : (
+                        analytics.module_progress.map((mod: any) => (
+                          <div key={mod.module_id} className="p-3 bg-bg-secondary/40 border border-border/80 rounded-xl space-y-1.5">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="font-bold text-text truncate max-w-[70%]">{mod.title}</span>
+                              <span className="text-[0.65rem] font-bold text-text-muted">
+                                {mod.completed_quizzes}/{mod.total_quizzes} Quizzes
+                              </span>
+                            </div>
+                            <div className="w-full bg-border/40 h-2 rounded-full overflow-hidden">
+                              <div 
+                                className="bg-primary h-full rounded-full transition-all duration-500" 
+                                style={{ width: `${mod.progress_pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Risk Alert & Nudge Panel */}
+                  <div className={cn(
+                    "p-4 border rounded-2xl space-y-3",
+                    localStudent.risk_level !== 'active' 
+                      ? "bg-warning/5 border-warning/20" 
+                      : "bg-primary/5 border-primary/10"
+                  )}>
+                    <div className="flex items-start gap-3">
+                      <div className={cn(
+                        "p-2 rounded-lg shrink-0",
+                        localStudent.risk_level !== 'active' ? "bg-warning/10 text-warning" : "bg-primary/10 text-primary"
+                      )}>
+                        <AlertCircle size={18} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-bold text-xs text-text">
+                          {localStudent.risk_level !== 'active' 
+                            ? `Inactive for ${localStudent.days_inactive} days!` 
+                            : "Engagement status is healthy"}
+                        </h4>
+                        <p className="text-[0.7rem] text-text-muted mt-0.5">
+                          {localStudent.risk_level !== 'active'
+                            ? "Send a custom message directly to their chat to wake them up."
+                            : "Keep them motivated! You can send an encouraging message anytime."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 pt-1">
+                      <textarea
+                        className="w-full h-20 p-2.5 bg-bg border border-border rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all resize-none text-text"
+                        placeholder="Write a nudge message..."
+                        value={nudgeMessage}
+                        onChange={(e) => setNudgeMessage(e.target.value)}
+                      />
+                      <Button 
+                        onClick={handleSendNudge} 
+                        disabled={isNudging || !nudgeMessage.trim()}
+                        className="w-full text-xs py-1.5 h-auto gap-2"
+                      >
+                        {isNudging ? <RefreshCw size={12} className="animate-spin" /> : <Send size={12} />}
+                        Send Nudge
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

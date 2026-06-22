@@ -25,6 +25,11 @@ class StudentUpdate(BaseModel):
     custom_prompt: Optional[str] = None
 
 
+class StudentNudge(BaseModel):
+    """Payload para enviar uma mensagem nudge para um aluno."""
+    message: str
+
+
 class UrlGenerationRequest(BaseModel):
     """Payload para gerar um módulo a partir de uma URL externa."""
 
@@ -122,6 +127,28 @@ async def get_students(
         user=Depends(require_staff)) -> list:
     """Lista todos os alunos com metadados completos."""
     return await service.get_students_list()
+
+
+@router.get('/students/{username}/analytics')
+async def get_student_analytics(
+    username: str,
+    service: DashboardService = Depends(),
+    user=Depends(require_staff)
+) -> dict:
+    """Retorna o detalhamento de progresso de módulos e tempo de estudo semanal do aluno."""
+    return await service.get_student_detail_analytics(username)
+
+
+@router.post('/students/{username}/nudge')
+async def nudge_student(
+    username: str,
+    body: StudentNudge,
+    service: DashboardService = Depends(),
+    user=Depends(require_staff)
+) -> dict:
+    """Envia mensagem no chat e notificação push de aviso para o estudante."""
+    return await service.nudge_student(username, body.message)
+
 
 
 @router.put('/students/{username}')

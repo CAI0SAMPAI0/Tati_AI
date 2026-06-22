@@ -197,19 +197,36 @@ class DashboardService:
             processed_users = []
             from app.core.config import settings
             staff_roles = getattr(settings, 'staff_roles', [])
+            from datetime import datetime, timezone
 
             for u in users:
                 username = u.get('username')
                 if not username:
                     continue
 
-                # Prioriza data da última mensagem, senão data de
-                # criação
-                last_active_str = last_activity.get(
-                    username) or u.get('created_at', '')
+                # Prioriza data da última mensagem, senão data de criação
+                last_active_str = last_activity.get(username) or u.get('created_at', '')
+
+                # Calcula dias de inatividade e nível de risco
+                days_inactive = 0
+                risk_level = "active"
+                if last_active_str:
+                    try:
+                        last_active_dt = parse_dt(last_active_str)
+                        now = datetime.now(timezone.utc) if last_active_dt.tzinfo else datetime.now()
+                        delta = now - last_active_dt
+                        days_inactive = max(0, delta.days)
+                        if days_inactive > 14:
+                            risk_level = "critical"
+                        elif days_inactive > 7:
+                            risk_level = "warning"
+                    except Exception as date_err:
+                        logging.info(f"[DashboardService] Erro ao processar data para {username}: {date_err}")
 
                 u['is_staff'] = u.get('role') in staff_roles
                 u['last_active'] = last_active_str
+                u['days_inactive'] = days_inactive
+                u['risk_level'] = risk_level
 
                 processed_users.append(u)
 
@@ -461,6 +478,174 @@ class DashboardService:
         if res:
             await cache_set(cache_key, res, ttl=180)  # 3 minutos de cache
         return res
+
+
+    async def get_student_detail_analytics(self, username: str) -> Dict[str, Any]:
+        """Retorna analíticos detalhados de progresso e engajamento do aluno."""
+        def _fetch():
+            # 1. Obter progresso por módulo
+            modules = self.db.table('modules').select('id, title, order').order('order').execute().data or []
+            quizzes = self.db.table('quizzes').select('id, module_id, title').execute().data or []
+            user_progress = self.db.table('user_progress').select('quiz_id, score').eq('username', username).execute().data or []
+            
+            completed_quiz_ids = {p['quiz_id'] for p in user_progress}
+            
+            # Agrupa quizzes por módulo
+            quizzes_by_module = {}
+            for q in quizzes:
+                m_id = q.get('module_id')
+                if m_id is not None:
+                    quizzes_by_module.setdefault(m_id, []).append(q)
+                    
+            module_progress_list = []
+            for m in modules:
+                m_id = m['id']
+                mod_quizzes = quizzes_by_module.get(m_id, [])
+                total_quizzes = len(mod_quizzes)
+                
+                if total_quizzes > 0:
+                    completed_count = sum(1 for q in mod_quizzes if q['id'] in completed_quiz_ids)
+                    progress_pct = int((completed_count / total_quizzes) * 100)
+                else:
+                    completed_count = 0
+                    progress_pct = 0
+                    
+                module_progress_list.append({
+                    "module_id": m_id,
+                    "title": m['title'],
+                    "order": m.get('order', 0),
+                    "total_quizzes": total_quizzes,
+                    "completed_quizzes": completed_count,
+                    "progress_pct": progress_pct
+                })
+                
+            # 2. Obter tempo de estudo (últimos 7 dias)
+            from datetime import date, timedelta
+            start_date = date.today() - timedelta(days=6)
+            
+            chart_data = []
+            avg_study_minutes = 0.0
+            total_study_seconds = 0
+            total_messages = 0
+            total_activities = 0
+            
+            try:
+                sessions = self.db.table('user_study_sessions')\
+                    .select('date, study_seconds, messages_sent, activities_completed')\
+                    .eq('username', username)\
+                    .gte('date', start_date.isoformat())\
+                    .execute()\
+                    .data or []
+                
+                sessions_by_date = {s['date']: s for s in sessions}
+                
+                for i in range(7):
+                    d = start_date + timedelta(days=i)
+                    d_str = d.isoformat()
+                    s_data = sessions_by_date.get(d_str) or {}
+                    study_sec = s_data.get('study_seconds', 0) or 0
+                    msgs = s_data.get('messages_sent', 0) or 0
+                    acts = s_data.get('activities_completed', 0) or 0
+                    
+                    total_study_seconds += study_sec
+                    total_messages += msgs
+                    total_activities += acts
+                    
+                    chart_data.append({
+                        "date": d_str,
+                        "day_name": d.strftime('%a'),
+                        "study_minutes": round(study_sec / 60, 1),
+                        "messages_sent": msgs,
+                        "activities_completed": acts
+                    })
+                
+                avg_study_minutes = round((total_study_seconds / 60) / 7, 1)
+            except Exception as e:
+                logging.info(f"[DashboardService] user_study_sessions nao disponivel ou vazia: {e}")
+                # Fallback: dias vazios
+                for i in range(7):
+                    d = start_date + timedelta(days=i)
+                    chart_data.append({
+                        "date": d.isoformat(),
+                        "day_name": d.strftime('%a'),
+                        "study_minutes": 0.0,
+                        "messages_sent": 0,
+                        "activities_completed": 0
+                    })
+            
+            return {
+                "module_progress": module_progress_list,
+                "study_time_chart": chart_data,
+                "summary": {
+                    "avg_study_minutes_daily": avg_study_minutes,
+                    "total_study_minutes_weekly": round(total_study_seconds / 60, 1),
+                    "total_messages_weekly": total_messages,
+                    "total_activities_weekly": total_activities
+                }
+            }
+            
+        return await run_in_threadpool(_fetch)
+
+
+    async def nudge_student(self, username: str, text: str) -> dict:
+        """Envia uma mensagem de nudge para o aluno via chat e notificação push."""
+        from datetime import datetime, timezone
+        
+        def _execute():
+            # 1. Encontra a última conversa do aluno para associar a mensagem
+            convs = self.db.table('conversations')\
+                .select('id')\
+                .eq('username', username)\
+                .order('updated_at', desc=True)\
+                .limit(1)\
+                .execute()\
+                .data or []
+            
+            if convs:
+                conv_id = convs[0]['id']
+            else:
+                # Cria uma nova conversa se o aluno não tiver nenhuma
+                new_conv = {
+                    'username': username,
+                    'created_at': datetime.now(timezone.utc).isoformat(),
+                    'updated_at': datetime.now(timezone.utc).isoformat(),
+                }
+                res_conv = self.db.table('conversations').insert(new_conv).execute()
+                conv_id = res_conv.data[0]['id'] if res_conv.data else None
+                
+            if not conv_id:
+                return {"success": False, "error": "Could not identify/create conversation"}
+                
+            # 2. Insere a mensagem no chat com o papel 'assistant' (Teacher Tati)
+            now = datetime.now()
+            msg = {
+                'session_id': conv_id,
+                'username': username,
+                'role': 'assistant',
+                'content': text,
+                'date': now.strftime('%Y-%m-%d'),
+                'created_at': datetime.now(timezone.utc).isoformat()
+            }
+            self.db.table('messages').insert(msg).execute()
+            self.db.table('conversations').update({
+                'updated_at': datetime.now(timezone.utc).isoformat()
+            }).eq('id', conv_id).execute()
+            
+            # 3. Dispara a notificação push
+            try:
+                from app.modules.notifications.services.push_notifications import send_push_to_user
+                send_push_to_user(
+                    username,
+                    title="Teacher Tati 🍎",
+                    body=text,
+                    url="/chat"
+                )
+            except Exception as push_err:
+                logging.warning(f"[DashboardService] Erro ao enviar push nudge: {push_err}")
+                
+            return {"success": True}
+            
+        return await run_in_threadpool(_execute)
 
 
     async def update_student(

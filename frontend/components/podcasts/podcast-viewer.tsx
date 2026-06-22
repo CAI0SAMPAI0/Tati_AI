@@ -120,6 +120,7 @@ export function PodcastViewer({ podcast }: PodcastViewerProps) {
             <span className="flex items-center gap-1.5 text-[0.65rem] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-bg-secondary border border-border text-text-muted">
               {podcast.media_type === 'audio' ? <Waves size={14} /> : <CirclePlay size={14} />}
               {podcast.media_type === 'audio' ? 'Audio mode' : 'Video mode'}
+            </span>
           </div>
 
           <div className="space-y-2">
