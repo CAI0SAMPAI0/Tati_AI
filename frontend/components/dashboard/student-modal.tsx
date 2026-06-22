@@ -60,7 +60,7 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
     }
   }, [student]);
 
-  if (!localStudent) return null;
+
 
   const handleUpdateLevel = async (level: string) => {
     try {
@@ -172,6 +172,8 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
       fetchAnalytics();
     }
   }, [activeTab, localStudent]);
+
+  if (!localStudent) return null;
 
   return (
     <DialogModal 

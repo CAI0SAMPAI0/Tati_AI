@@ -176,8 +176,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         permission = await Notification.requestPermission();
       }
       if (permission !== 'granted') {
-        console.log('[Push] Notification permission denied.');
-        toast.error("Permissão de notificação negada no navegador.");
+        console.log('[Push] Notification permission denied or not granted.');
         return;
       }
 
@@ -224,11 +223,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           user_agent: navigator.userAgent,
         });
         console.log('[Push] User successfully subscribed to push notifications!');
-        toast.success("Notificações Push ativadas com sucesso! 🔔");
       }
     } catch (err: any) {
-      console.error('[Push] Subscription failed:', err);
-      toast.error(`Falha ao ativar Push: ${err?.message || err}`);
+      console.warn('[Push] Subscription failed (possibly blocked by browser/private mode/VPN):', err);
     }
   }, []);
 
