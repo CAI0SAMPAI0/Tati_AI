@@ -773,15 +773,15 @@ class DashboardService:
             f"Analyze the following recent English messages of student '{username}' to identify their personal/professional interests/hobbies, "
             f"and generate 3 tailored pedagogical recommendations to improve their English.\n"
             f"Student Messages: {context}\n\n"
-            "Return strictly a JSON object with this exact shape (hobbies/interests should be short tags, and recommendations should be in Portuguese):\n"
+            "Return strictly a JSON object with this exact shape (hobbies/interests should be short tags, and everything MUST be in English):\n"
             "{\n"
-            "  \"interests\": [\"Viagens\", \"Tecnologia\", \"Carreira\"],\n"
+            "  \"interests\": [\"Travel\", \"Technology\", \"Career\"],\n"
             "  \"recommendations\": [\n"
-            "    {\"recommendation\": \"Praticar passados\", \"description\": \"Notei dificuldades no uso do Simple Past ao descrever suas viagens anteriores. Tente focar em falar sobre eventos passados hoje.\"},\n"
-            "    {\"recommendation\": \"Foco profissional\", \"description\": \"Como você usa inglês para reuniões de tecnologia, tente praticar termos corporativos como 'feedback' e 'milestones'.\"}\n"
+            "    {\"recommendation\": \"Practice past tenses\", \"description\": \"I noticed struggles using the Simple Past when describing your previous trips. Try focusing on past events in your next chat.\"},\n"
+            "    {\"recommendation\": \"Business English focus\", \"description\": \"Since you use English for tech meetings, try practicing corporate terms like 'milestone', 'deliverable', and 'alignment'.\"}\n"
             "  ]\n"
             "}\n"
-            "If the message history is empty, return generic but useful recommendations and interests like 'Conversação', 'Gramática'."
+            "If the message history is empty, return generic but useful recommendations and interests like 'Conversation', 'Grammar'."
         )
         
         try:
@@ -793,19 +793,19 @@ class DashboardService:
             
         # Fallback se a IA falhar ou retornar nulo
         return {
-            'interests': ['Geral', 'Gramática', 'Vocabulário'],
+            'interests': ['General', 'Grammar', 'Vocabulary'],
             'recommendations': [
                 {
-                    'recommendation': 'Foco em Conversação',
-                    'description': 'Pratique mais conversação sobre temas do seu dia a dia com a Tati.'
+                    'recommendation': 'Focus on Conversation',
+                    'description': 'Practice more conversation on topics of your daily life with Tati.'
                 },
                 {
-                    'recommendation': 'Revisão Gramatical',
-                    'description': 'Assista a vídeos curtos sobre gramática básica e tente aplicar no chat.'
+                    'recommendation': 'Grammar Review',
+                    'description': 'Watch short videos about basic grammar and try to apply them in the chat.'
                 },
                 {
-                    'recommendation': 'Vocabulário Ativo',
-                    'description': 'Tente usar novas palavras do seu vocabulário nas conversas diárias.'
+                    'recommendation': 'Active Vocabulary',
+                    'description': 'Try using new words from your vocabulary list in your daily conversations.'
                 }
             ]
         }
