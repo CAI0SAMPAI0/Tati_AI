@@ -6,8 +6,10 @@ import type { Message } from '@/lib/api/types';
 import { cn, parseAIResponse } from '@/lib/utils';
 import { ClickableText } from './clickable-text';
 import { AudioPlayer } from './audio-player';
+import { ENDPOINTS } from '@/lib/api/endpoints';
+import { apiPost } from '@/lib/api/client';
 import { useState } from 'react';
-import { Pencil, Check, X, Copy } from 'lucide-react';
+import { Pencil, Check, X, Copy, Volume2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface MessageBubbleProps {
@@ -23,6 +25,8 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
   const [editContent, setEditContent] = useState(message.content);
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [ttsAudio, setTtsAudio] = useState<string | null>(null);
+  const [ttsLoading, setTtsLoading] = useState(false);
 
   const parsed = parseAIResponse(message.content);
 
@@ -32,6 +36,21 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
     setCopied(true);
     toast.success('Copied to clipboard!');
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleTTS = async () => {
+    if (ttsLoading) return;
+    setTtsLoading(true);
+    try {
+      const res = await apiPost<{ audio: string }>(ENDPOINTS.CHAT_TTS, { text: parsed.reply });
+      if (res.ok && res.data?.audio) {
+        setTtsAudio(res.data.audio);
+      }
+    } catch (e) {
+      console.error('Erro ao obter áudio TTS', e);
+    } finally {
+      setTtsLoading(false);
+    }
   };
 
   const handleSave = async () => {
@@ -118,6 +137,16 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
                     content={parsed.reply}
                     onWordClick={onWordClick || (() => { })}
                   />
+                  {!isUser && (
+                    <button
+                      onClick={handleTTS}
+                      disabled={ttsLoading}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-bg-secondary border border-border text-[0.65rem] font-bold text-text-muted hover:bg-primary/10 hover:border-primary/20 transition-all w-fit"
+                    >
+                      <Volume2 size={12} />
+                      {ttsLoading ? 'Carregando...' : 'Ouvir'}
+                    </button>
+                  )}
                   {parsed.correction && (
                     <div className="mt-2 text-xs bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/20 text-amber-700 dark:text-amber-300 rounded-xl p-2.5 flex items-start gap-2 max-w-full text-left">
                       <span className="text-base select-none">💡</span>
@@ -126,6 +155,9 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
                         <span className="italic">{parsed.correction}</span>
                       </div>
                     </div>
+                  )}
+                  {ttsAudio && (
+                    <AudioPlayer base64={ttsAudio} className="mt-2" />
                   )}
                 </div>
               )}

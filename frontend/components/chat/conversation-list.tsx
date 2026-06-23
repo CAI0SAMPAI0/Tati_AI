@@ -29,11 +29,20 @@ export function ConversationList({ currentId, onSelect, onDelete }: Conversation
     queryFn: async ({ pageParam = 0 }) => {
       const limit = 20;
       const offset = pageParam * limit;
-      return apiGet<Conversation[]>(`${ENDPOINTS.CONVERSATIONS}?limit=${limit}&offset=${offset}`);
+      try {
+        const data = await apiGet<Conversation[]>(
+          `${ENDPOINTS.CONVERSATIONS}?limit=${limit}&offset=${offset}`
+        );
+        return data ?? [];
+      } catch (e) {
+        console.error('Failed to fetch conversations page', e);
+        return [];
+      }
     },
     getNextPageParam: (lastPage, allPages) => {
-      // If less than limit returned, no more pages
-      return lastPage.length === 20 ? allPages.length : undefined;
+      // Safely handle undefined or empty lastPage
+      const pageLength = Array.isArray(lastPage) ? lastPage.length : 0;
+      return pageLength === 20 ? allPages.length : undefined;
     },
     initialPageParam: 0,
     staleTime: 15_000,
