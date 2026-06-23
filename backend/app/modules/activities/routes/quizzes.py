@@ -8,7 +8,7 @@ from app.core.exceptions import ContentNotFoundError
 from pydantic import BaseModel
 from typing import List
 
-from app.core.dependencies.auth import get_current_user
+from app.core.dependencies.auth import get_current_user, get_current_user_optional
 from app.modules.activities.services.quiz_service import QuizService
 
 router = APIRouter()
@@ -83,9 +83,14 @@ class QuizSubmission(BaseModel):
 
 
 @router.get('/{quiz_id}')
-async def get_quiz(quiz_id: str, service: QuizService = Depends()):
+async def get_quiz(
+    quiz_id: str,
+    user=Depends(get_current_user_optional),
+    service: QuizService = Depends()
+):
     """Busca um quiz pelo ID."""
-    quiz = await service.get_quiz(quiz_id)
+    username = user['username'] if user else None
+    quiz = await service.get_quiz(quiz_id, username=username)
     if not quiz:
         raise ContentNotFoundError(detail='Quiz não encontrado')
     return quiz

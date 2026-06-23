@@ -3,7 +3,7 @@ Router para Gerenciamento de Streaks.
 Refatorado para usar GamificationService.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from app.core.dependencies.auth import get_current_user
 from app.modules.activities.services.gamification_service import GamificationService
 
@@ -13,25 +13,37 @@ router = APIRouter()
 @router.get('/')
 @router.get('')
 async def get_streak(
+        request: Request,
         user=Depends(get_current_user),
         service: GamificationService = Depends()):
     """Retorna o streak atual do usuário."""
+    tz = request.headers.get('x-timezone')
+    if tz:
+        await service.update_user_timezone(user['username'], tz)
     return await service.get_streak_data(user['username'])
 
 
 @router.post('/record')
 async def record_activity(
+        request: Request,
         user=Depends(get_current_user),
         service: GamificationService = Depends()):
     """Registra atividade diária e atualiza o streak."""
+    tz = request.headers.get('x-timezone')
+    if tz:
+        await service.update_user_timezone(user['username'], tz)
     return await service.update_streak(user['username'])
 
 
 @router.get('/detail')
 async def get_streak_detail(
+        request: Request,
         user=Depends(get_current_user),
         service: GamificationService = Depends()):
     """Retorna detalhes estatísticos do streak."""
+    tz = request.headers.get('x-timezone')
+    if tz:
+        await service.update_user_timezone(user['username'], tz)
     return await service.get_streak_data(user['username'])
 
 

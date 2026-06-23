@@ -51,11 +51,11 @@ export function DialogModal({ isOpen, onClose, title, children, size = 'md' }: M
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             onClick={(e) => e.stopPropagation()}
             className={cn(
-              "relative w-full bg-surface border border-border rounded-3xl shadow-2xl p-6 flex flex-col z-10 max-h-[84vh]",
+              "relative w-full bg-surface border border-border rounded-3xl shadow-2xl p-4 md:p-6 flex flex-col z-10 max-h-[92vh] md:max-h-[84vh]",
               maxWidthClasses[size]
             )}
           >
-            <div className="flex justify-between items-center mb-6 shrink-0">
+            <div className="flex justify-between items-center mb-4 md:mb-6 shrink-0">
               <h2 className="text-xl font-bold text-text">{title}</h2>
               <button 
                 onClick={onClose} 

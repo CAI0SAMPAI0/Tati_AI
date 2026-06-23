@@ -282,3 +282,163 @@ def generate_report_pdf(
         onFirstPage=_header_footer,
         onLaterPages=_header_footer)
     return output_path
+
+
+def generate_certificate_pdf(student_name: str, level: str, date_str: str) -> str:
+    """
+    Gera um PDF de certificado de conclusão de nível CEFR no formato paisagem (landscape).
+    """
+    from reportlab.lib.pagesizes import landscape, A4
+    from reportlab.platypus import Table, TableStyle
+    import tempfile
+
+    output_path = os.path.join(tempfile.gettempdir(), f"certificate_{student_name.replace(' ', '_')}_{level}.pdf")
+
+    # Landscape A4 is 842.27 x 595.27
+    doc = SimpleDocTemplate(
+        output_path,
+        pagesize=landscape(A4),
+        leftMargin=30 * mm,
+        rightMargin=30 * mm,
+        topMargin=25 * mm,
+        bottomMargin=25 * mm
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CertTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=32,
+        leading=38,
+        textColor=PRIMARY,
+        alignment=1,
+        spaceAfter=15 * mm
+    )
+    subtitle_style = ParagraphStyle(
+        'CertSub',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=14,
+        leading=18,
+        textColor=DARK,
+        alignment=1,
+        spaceAfter=10 * mm
+    )
+    name_style = ParagraphStyle(
+        'CertName',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=28,
+        leading=34,
+        textColor=PRIMARY_L,
+        alignment=1,
+        spaceAfter=10 * mm
+    )
+    body_style = ParagraphStyle(
+        'CertBody',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=14,
+        leading=20,
+        textColor=DARK,
+        alignment=1,
+        spaceAfter=15 * mm
+    )
+    date_style = ParagraphStyle(
+        'CertDate',
+        parent=styles['Normal'],
+        fontName='Helvetica-Oblique',
+        fontSize=12,
+        leading=16,
+        textColor=MUTED,
+        alignment=1,
+        spaceAfter=20 * mm
+    )
+
+    story = []
+
+    story.append(Spacer(1, 10 * mm))
+    story.append(Paragraph("CERTIFICATE OF ACHIEVEMENT", title_style))
+    story.append(Paragraph("This is to certify that", subtitle_style))
+    story.append(Paragraph(student_name, name_style))
+    story.append(Paragraph(f"has successfully completed the English language course and achieved the CEFR level of", subtitle_style))
+    story.append(Paragraph(f"<b>{level}</b>", name_style))
+    story.append(Paragraph("under the guidance of Teacher Tatiana and the Tati AI learning platform.", body_style))
+    story.append(Paragraph(f"Granted on {date_str}", date_style))
+
+    sig_style_1 = ParagraphStyle(
+        'CertSig1',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=12,
+        leading=14,
+        textColor=DARK,
+        alignment=1
+    )
+    sig_style_2 = ParagraphStyle(
+        'CertSig2',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        leading=12,
+        textColor=MUTED,
+        alignment=1
+    )
+
+    sig_data = [
+        [
+            Paragraph("_______________________________", sig_style_2),
+            Paragraph("_______________________________", sig_style_2)
+        ],
+        [
+            Paragraph("<b>Tatiana</b>", sig_style_1),
+            Paragraph("<b>Tati AI Platform</b>", sig_style_1)
+        ],
+        [
+            Paragraph("Lead Teacher & Mentor", sig_style_2),
+            Paragraph("Academic Director", sig_style_2)
+        ]
+    ]
+
+    sig_table = Table(sig_data, colWidths=[90 * mm, 90 * mm])
+    sig_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+    ]))
+
+    story.append(sig_table)
+
+    def draw_background(canvas, doc):
+        canvas.saveState()
+        w, h = landscape(A4)
+
+        # Outer border
+        canvas.setStrokeColor(PRIMARY)
+        canvas.setLineWidth(4)
+        canvas.rect(10 * mm, 10 * mm, w - 20 * mm, h - 20 * mm)
+
+        # Inner thin border
+        canvas.setStrokeColor(PRIMARY_L)
+        canvas.setLineWidth(1)
+        canvas.rect(12 * mm, 12 * mm, w - 24 * mm, h - 24 * mm)
+
+        # Watermark/Logo
+        if _LOGO_PATH:
+            logo_size = 20 * mm
+            canvas.drawImage(
+                str(_LOGO_PATH),
+                w - 35 * mm,
+                h - 35 * mm,
+                width=logo_size,
+                height=logo_size,
+                preserveAspectRatio=True,
+                mask='auto'
+            )
+
+        canvas.restoreState()
+
+    doc.build(story, onFirstPage=draw_background)
+    return output_path

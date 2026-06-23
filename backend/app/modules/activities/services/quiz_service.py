@@ -18,8 +18,9 @@ class QuizService:
         else:
             self.db = db
 
-    async def get_quiz(self, quiz_id: str) -> Optional[Dict[str, Any]]:
-        """Busca um quiz e suas questões."""
+    async def get_quiz(self, quiz_id: str, username: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Busca um quiz e suas questões com embaralhamento determinístico."""
+        quiz = None
         if str(quiz_id).startswith('cefr_'):
             parts = quiz_id.split('_')
             if len(parts) >= 3:
@@ -62,45 +63,71 @@ class QuizService:
                         "module_id": "00000000-0000-0000-0000-000000000001",
                         "module_title": "AI Exercises",
                         "questions": questions}
-                return await run_in_threadpool(_fetch_cefr)
+                quiz = await run_in_threadpool(_fetch_cefr)
+        else:
+            def _fetch():
+                quiz_data = (
+                    self.db.table('quizzes')
+                    .select('*, modules(title, description, image_url, youtube_url, spotify_url, file_url)')
+                    .eq('id', quiz_id)
+                    .single()
+                    .execute()
+                    .data
+                )
+                if not quiz_data:
+                    return None
+
+                # Map module fields
+                mod = quiz_data.get('modules') or {}
+                if mod:
+                    quiz_data['module_title'] = mod.get('title')
+                    quiz_data['description'] = mod.get('description')
+                    quiz_data['image_url'] = mod.get('image_url')
+                    quiz_data['youtube_url'] = mod.get('youtube_url')
+                    quiz_data['spotify_url'] = mod.get('spotify_url')
+                    # remove to avoid confusing frontend
+                    quiz_data['file_url'] = mod.get('file_url')
+                    del quiz_data['modules']
+                questions_data = (
+                    self.db.table('quiz_questions')
+                    .select('*')
+                    .eq('quiz_id', quiz_id)
+                    .order('order', desc=False)
+                    .execute()
+                    .data
+                    or []
+                )
+                quiz_data['questions'] = questions_data
+                return quiz_data
+
+            quiz = await run_in_threadpool(_fetch)
+
+        if not quiz:
             return None
 
-        def _fetch():
-            quiz = (
-                self.db.table('quizzes')
-                .select('*, modules(title, description, image_url, youtube_url, spotify_url, file_url)')
-                .eq('id', quiz_id)
-                .single()
-                .execute()
-                .data
-            )
-            if not quiz:
-                return None
+        # Embaralhamento determinístico se username for fornecido
+        if username and quiz.get('questions'):
+            import random
+            import hashlib
 
-            # Map module fields
-            mod = quiz.get('modules') or {}
-            if mod:
-                quiz['module_title'] = mod.get('title')
-                quiz['description'] = mod.get('description')
-                quiz['image_url'] = mod.get('image_url')
-                quiz['youtube_url'] = mod.get('youtube_url')
-                quiz['spotify_url'] = mod.get('spotify_url')
-                # remove to avoid confusing frontend
-                quiz['file_url'] = mod.get('file_url')
-                del quiz['modules']
-            questions = (
-                self.db.table('quiz_questions')
-                .select('*')
-                .eq('quiz_id', quiz_id)
-                .order('order', desc=False)
-                .execute()
-                .data
-                or []
-            )
-            quiz['questions'] = questions
-            return quiz
+            seed_str = f"{username}_{quiz_id}"
+            seed_int = int(hashlib.md5(seed_str.encode('utf-8')).hexdigest(), 16)
+            rng = random.Random(seed_int)
 
-        return await run_in_threadpool(_fetch)
+            questions_list = list(quiz['questions'])
+            rng.shuffle(questions_list)
+
+            for q in questions_list:
+                if q.get('options') and len(q['options']) > 1:
+                    opts = list(q['options'])
+                    correct_opt = opts[q['correct_index']]
+                    rng.shuffle(opts)
+                    q['options'] = opts
+                    q['correct_index'] = opts.index(correct_opt)
+
+            quiz['questions'] = questions_list
+
+        return quiz
 
     async def evaluate_submission(
         self, username: str, quiz_id: str, answers: List[Dict[str, Any]]

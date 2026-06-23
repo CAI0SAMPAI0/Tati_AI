@@ -30,6 +30,19 @@ def check_inactivity():
 @celery_app.task(name="app.modules.notifications.tasks.weekly_reports")
 def weekly_reports():
     import asyncio
-    from app.modules.notifications.services.notification_scheduler import NotificationScheduler
-    scheduler = NotificationScheduler()
-    asyncio.run(scheduler.send_weekly_progress_reports())
+    import logging
+    from app.shared.services.upstash import acquire_lock, release_lock
+
+    async def _run():
+        # Adquire lock de 1 hora para evitar duplicadas
+        if not await acquire_lock("weekly_reports", expire_seconds=3600):
+            logging.info("[Celery Task] Outra execução de weekly_reports já está ativa ou foi executada recentemente. Pulando.")
+            return
+        try:
+            from app.modules.notifications.services.notification_scheduler import NotificationScheduler
+            scheduler = NotificationScheduler()
+            await scheduler.send_weekly_progress_reports()
+        finally:
+            await release_lock("weekly_reports")
+
+    asyncio.run(_run())

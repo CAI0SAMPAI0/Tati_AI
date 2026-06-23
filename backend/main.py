@@ -4,6 +4,7 @@ import sys
 import logging
 from pathlib import Path
 from dotenv import load_dotenv
+from app.shared.middleware.prompt_validation import PromptValidationMiddleware
 
 env_path = Path(__file__).parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
@@ -94,9 +95,11 @@ else:
         version='2.1.1',
         docs_url=_docs_url,
         redoc_url=_redoc_url)
+    # Register Prompt Validation Middleware
+    app.add_middleware(PromptValidationMiddleware)
 
     class ForceHTTPSMiddleware(BaseHTTPMiddleware):
-        """Força scheme HTTPS quando X-Forwarded-Proto indica proxy SSL."""
+        """Força scheme HTTPS e injeta cabeçalhos de segurança limpos."""
 
         async def dispatch(self, request: Request, call_next):
             if request.scope.get('type') == 'websocket':
@@ -104,7 +107,11 @@ else:
 
             if request.headers.get('x-forwarded-proto') == 'https':
                 request.scope['scheme'] = 'https'
-            return await call_next(request)
+
+            response = await call_next(request)
+            # Limpeza do Permissions-Policy para evitar warnings de features obsoletas (ex: browsing-topics, run-ad-auction)
+            response.headers["Permissions-Policy"] = "camera=(self), microphone=(self), geolocation=()"
+            return response
 
     app.add_middleware(ForceHTTPSMiddleware)
     app.add_middleware(GZipMiddleware, minimum_size=500)
@@ -118,9 +125,9 @@ else:
             'http://localhost:8000',
             'http://127.0.0.1:3000',
             'http://localhost:3000',
-            'http://192.168.1.3:3000',  # Local IP for mobile device access
-            'capacitor://localhost',      # Capacitor iOS origin
-            'http://localhost',           # Capacitor Android origin
+            'http://192.168.1.3:3000',
+            'capacitor://localhost',
+            'http://localhost',
             'https://tati-ai.vercel.app',
             'https://tati-ai.vercel.app/',
             'https://tati-ai-git-main-caio-andrades-projects.vercel.app',
@@ -148,7 +155,6 @@ else:
                 logging.info(f'[Startup] Warmup do banco falhou: {exc}')
                 
             try:
-                # Pré-carrega o modelo e o banco vetorial para evitar lentidão na primeira mensagem
                 from app.modules.chat.services.rag_search import _get_vectorstore
                 await asyncio.to_thread(_get_vectorstore)
                 logging.info('[Startup] Vectorstore pré-carregado (Hugging Face).')
@@ -196,7 +202,7 @@ else:
         return {
             'status': 'ok',
             "service": "Teacher Tati API",
-            "version": "2.1.1"
+            "version": "2.1.6"
         }
 
 if __name__ == '__main__':

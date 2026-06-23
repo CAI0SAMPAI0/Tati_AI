@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { MessageSquare, BookOpen, CalendarDays, Type, Flame, Lightbulb, Download, Snowflake, ShoppingBag } from 'lucide-react';
+import { MessageSquare, BookOpen, CalendarDays, Type, Flame, Lightbulb, Download, Snowflake, ShoppingBag, Trophy } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
 import { apiGet, API_BASE } from '@/lib/api/client';
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import toast from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import { useAuth } from '@/hooks/useAuth';
 
 const ActivityBarChart = dynamic(() => import('@/components/charts/activity-bar-chart'), {
   ssr: false,
@@ -101,6 +102,7 @@ function StatSkeleton() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ProgressClientPage() {
+  const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [period, setPeriod] = useState<Period>('weekly');
   const [isDownloading, setIsDownloading] = useState(false);
@@ -125,6 +127,11 @@ export default function ProgressClientPage() {
   const { data: fluencyData, isLoading: fluencyLoading } = useQuery<any>({
     queryKey: ['fluency-evolution'],
     queryFn: () => apiGet<any>('/users/progress/fluency-evolution'),
+  });
+
+  const { data: levelRankings, isLoading: rankingLoading } = useQuery<Record<string, any[]>>({
+    queryKey: ['progress-level-rankings'],
+    queryFn: () => apiGet<Record<string, any[]>>('/users/progress/ranking/by-level'),
   });
 
   const reportLoading = period === 'weekly' ? weeklyLoading : monthlyLoading;
@@ -333,10 +340,11 @@ export default function ProgressClientPage() {
           </div>
 
           {/* ── Chart + Streak ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* ── Chart + Streak + XP League ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
             {/* Bar Chart */}
-            <div className="bg-surface border border-border rounded-3xl p-6 space-y-6 group hover:border-primary/30 transition-all">
+            <div className="bg-surface border border-border rounded-3xl p-6 space-y-6 group hover:border-primary/30 transition-all lg:col-span-1">
               <div className="flex items-center gap-3">
                 <div className="w-1.5 h-6 bg-primary rounded-full" />
                 <h3 className="text-sm font-bold text-text">
@@ -416,6 +424,80 @@ export default function ProgressClientPage() {
                 </Link>
               </div>
             </div>
+
+            {/* Study Club / XP League Card */}
+            <div className="bg-surface border border-border rounded-3xl p-6 flex flex-col justify-between gap-4 group hover:border-primary/30 transition-all">
+              <div className="flex items-center gap-3">
+                <div className="w-1.5 h-6 bg-yellow-500 rounded-full" />
+                <h3 className="text-sm font-bold text-text">Study Club (XP League)</h3>
+              </div>
+
+              {rankingLoading ? (
+                <div className="flex-1 flex flex-col justify-center items-center py-4">
+                  <div className="w-full space-y-3">
+                    <div className="h-8 bg-bg-secondary rounded-xl animate-pulse w-full" />
+                    <div className="h-8 bg-bg-secondary rounded-xl animate-pulse w-full" />
+                    <div className="h-8 bg-bg-secondary rounded-xl animate-pulse w-full" />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-bold text-yellow-500 uppercase tracking-widest mb-3 bg-yellow-500/10 px-3 py-1.5 rounded-xl border border-yellow-500/20 inline-block">
+                      🏆 {xpData?.level || 'A1'} League
+                    </div>
+
+                    <div className="space-y-2">
+                      {((levelRankings?.[xpData?.level || 'A1'] || []) as any[]).slice(0, 3).map((r, i) => {
+                        const medals = ['🥇', '🥈', '🥉'];
+                        const isMe = r.username === user?.username;
+                        return (
+                          <div 
+                            key={r.username} 
+                            className={cn(
+                              "flex items-center justify-between text-xs p-2 rounded-xl border border-transparent",
+                              isMe ? "bg-primary/10 border-primary/20" : "bg-bg-secondary/40"
+                            )}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-sm">{medals[i] ?? `${i + 1}`}</span>
+                              <span className={cn("font-bold truncate max-w-[120px]", isMe ? "text-primary" : "text-text")}>
+                                {r.name || r.username} {isMe && "(You)"}
+                              </span>
+                            </div>
+                            <span className="font-black text-text-muted shrink-0 tabular-nums">{r.score} XP</span>
+                          </div>
+                        );
+                      })}
+                      {(!levelRankings?.[xpData?.level || 'A1'] || levelRankings?.[xpData?.level || 'A1'].length === 0) && (
+                        <p className="text-xs italic text-text-muted text-center py-4">No active students in this league yet.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border pt-4">
+                    <div className="flex items-center justify-between mb-3 text-xs">
+                      <span className="font-bold text-text-subtle uppercase tracking-wider">Your Position:</span>
+                      {(() => {
+                        const rankingList = levelRankings?.[xpData?.level || 'A1'] || [];
+                        const myIndex = rankingList.findIndex((r: any) => r.username === user?.username);
+                        if (myIndex !== -1) {
+                          return <span className="font-black text-primary">#{myIndex + 1} of {rankingList.length}</span>;
+                        }
+                        return <span className="text-text-muted italic">Not ranked</span>;
+                      })()}
+                    </div>
+                    <Link href="/competitions" prefetch={true} className="w-full">
+                      <Button variant="secondary" size="sm" className="w-full gap-1.5 text-xs font-bold border-dashed border-yellow-500/40 hover:border-yellow-500 text-yellow-600 hover:bg-yellow-500/5">
+                        <Trophy size={14} className="text-yellow-500" />
+                        View Full Competitions
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
           {/* ── Fluency & CEFR Evolution ── */}
           <div className="bg-surface border border-border rounded-3xl p-6 space-y-6 group hover:border-primary/30 transition-all">

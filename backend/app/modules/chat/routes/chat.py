@@ -69,8 +69,11 @@ async def new_conversation(
 
 @router.get('/conversations')
 async def get_conversations(
-        current_user: dict = Depends(get_current_user)):
-    return await list_conversations(current_user['username'])
+        current_user: dict = Depends(get_current_user),
+        limit: int = Query(default=20, ge=1),
+        offset: int = Query(default=0, ge=0),
+    ):
+    return await list_conversations(current_user['username'], limit=limit, offset=offset)
 
 
 @router.delete('/conversations/{conversation_id}',
@@ -126,17 +129,23 @@ async def edit_message(
     body: EditMessageBody,
     current_user: dict = Depends(get_current_user),
 ):
-    # message_id pode ser int ou str dependendo do banco, tentamos
-    # converter
-    try:
-        m_id = int(message_id)
-    except ValueError:
-        m_id = message_id
-
-    msg = await update_message(m_id, current_user['username'], body.content)
+    msg = await update_message(message_id, current_user['username'], body.content, conversation_id=conversation_id)
     if not msg:
         raise ContentNotFoundError(detail='Mensagem não encontrada')
     return msg
+
+    @router.post('/conversations/{conversation_id}/messages/{message_id}')
+    async def edit_message_post(
+        conversation_id: str,
+        message_id: str,
+        body: EditMessageBody,
+        current_user: dict = Depends(get_current_user),
+    ):
+        # Reuse same logic as PATCH endpoint
+        msg = await update_message(message_id, current_user['username'], body.content, conversation_id=conversation_id)
+        if not msg:
+            raise ContentNotFoundError(detail='Mensagem não encontrada')
+        return msg
 
 
 @router.get('/conversations/{conversation_id}/summary')
@@ -145,39 +154,10 @@ async def get_summary(
     lang: str = Query(default='pt'),
     current_user: dict = Depends(get_current_user),
 ):
-    from app.core.database import get_client
-    db = get_client()
-    # Verifica se a conversa pertence ao usuário
-    conv = db.table('conversations').select(
-        'username').eq('id', conversation_id).execute()
-    if not conv.data or conv.data[0]['username'] != current_user['username']:
-        raise ContentNotFoundError(detail='Conversa não encontrada')
-
-    # Restaurado lógica de resumo simplificada para manter
-    # compatibilidade
-    history = await load_history(conversation_id)
-    if not history or len(history) < 2:
-        raise HTTPException(400, 'Poucas mensagens')
-
-    text = '\n'.join(
-        [
-            f'{m["role"]}: {m["content"]}'
-            for m in history
-            if m['role'] in ('user', 'assistant')
-        ]
-    )
-
-    if lang.lower().startswith('en'):
-        prompt = f'Generate a pedagogical summary in English for this conversation:\n{text}'
-    else:
-        prompt = f'Gere um resumo pedagógico em Português para esta conversa:\n{text}'
-
-    try:
-        res = await groq_chat([{'role': 'user', 'content': prompt}])
-        return {'summary': res}
-    except Exception as e:
-        logging.info(f"Error in summary: {e}")
-        raise HTTPException(500, 'Erro ao gerar resumo')
+    from app.shared.services.history import get_summary as get_cached_summary
+    summary = await get_cached_summary(conversation_id)
+    # TODO: Add language translation based on 'lang' if needed
+    return summary
 
 
 @router.post('/tts')
@@ -226,13 +206,14 @@ async def chat_ws(
     payload = decode_token(ws_token) if ws_token else None
     # logging.info(f'[WS] Payload: {payload}')
 
+    # Accept connection first
+    await websocket.accept(subprotocol=subprotocol)
+
     if not payload:
         logging.info('[WS] Rejeitando: Payload nulo')
         await websocket.close(code=4001, reason='Token inválido')
         return
 
-    # logging.info(f'[WS] Aceitando conexÃ£o com subprotocol: {subprotocol}')
-    await websocket.accept(subprotocol=subprotocol)
     # logging.info(f'[WS] ConexÃ£o aceita para: {payload.get("sub")}')
     username = payload['sub']
     pending_drill_target = None

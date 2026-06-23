@@ -1,8 +1,10 @@
 'use client';
 
-import { Users, MessageSquare, Zap, ShoppingBag, ChevronRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Users, MessageSquare, Zap, ShoppingBag, ChevronRight, Activity } from 'lucide-react';
 import { StatCard } from './stat-card';
 import { formatTime } from '@/lib/utils';
+import { apiGet } from '@/lib/api/client';
 
 interface OverviewSectionProps {
   stats: any;
@@ -12,6 +14,14 @@ interface OverviewSectionProps {
 }
 
 export function OverviewSection({ stats, students, difficulties, onSeeAllStudents }: OverviewSectionProps) {
+  const [celeryStatus, setCeleryStatus] = useState<any>(null);
+
+  useEffect(() => {
+    apiGet<any>('/dashboard/celery/health')
+      .then(res => setCeleryStatus(res))
+      .catch(err => console.error('Celery health check failed:', err));
+  }, []);
+
   return (
     <div className="space-y-8">
       {/* ── Stat Cards ── */}
@@ -180,6 +190,47 @@ export function OverviewSection({ stats, students, difficulties, onSeeAllStudent
             </table>
           </div>
         </div>
+      </div>
+
+      {/* ── Celery Health Monitor ── */}
+      <div className="bg-surface border border-border rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Activity size={18} className="text-primary" />
+            <h3 className="font-bold text-text">Celery Task Manager Status</h3>
+          </div>
+          {celeryStatus && (
+            <span className={`text-[0.65rem] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+              celeryStatus.status === 'healthy' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
+            }`}>
+              {celeryStatus.status}
+            </span>
+          )}
+        </div>
+        {!celeryStatus ? (
+          <p className="text-xs text-text-muted">Loading queue status...</p>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-text-muted">Celery Enabled:</span>
+              <span className="font-semibold text-text">{celeryStatus.use_celery ? 'Yes' : 'No'}</span>
+            </div>
+            <div className="border-t border-border/60 pt-3">
+              <p className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider mb-2">Active Workers</p>
+              <div className="divide-y divide-border/40">
+                {celeryStatus.workers?.map((w: any) => (
+                  <div key={w.worker} className="flex items-center justify-between py-2 text-[0.7rem]">
+                    <span className="font-mono text-text-subtle truncate max-w-[200px] md:max-w-[400px]">{w.worker}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-text-muted">Tasks: {w.active_tasks}</span>
+                      <span className={`font-semibold capitalize ${w.status === 'online' ? 'text-success' : 'text-danger'}`}>{w.status}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

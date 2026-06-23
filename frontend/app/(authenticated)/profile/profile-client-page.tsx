@@ -46,6 +46,7 @@ export default function ProfileClientPage() {
     occupation: user?.occupation || '',
     level: normalizeLevel(user?.level),
     focus: user?.focus || 'General Conversation',
+    responsible_email: user?.profile?.responsible_email || '',
   });
 
   const [pwData, setFormDataPw] = useState({
@@ -62,6 +63,7 @@ export default function ProfileClientPage() {
         occupation: user.occupation || '',
         level: normalizeLevel(user.level),
         focus: user.focus || 'General Conversation',
+        responsible_email: user.profile?.responsible_email || '',
       });
     }
   }, [user]);
@@ -233,6 +235,15 @@ export default function ProfileClientPage() {
                       { value: 'Academic English', label: 'Academic English' },
                       { value: 'Job Interviews', label: 'Job Interviews' },
                     ]}
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-xs font-bold text-text-subtle uppercase ml-1">{'Guardian / Supervisor Email (Weekly Reports)'}</label>
+                  <Input
+                    type="email"
+                    placeholder="guardian@example.com"
+                    value={formData.responsible_email}
+                    onChange={(e) => setFormData({ ...formData, responsible_email: e.target.value })}
                   />
                 </div>
               </div>

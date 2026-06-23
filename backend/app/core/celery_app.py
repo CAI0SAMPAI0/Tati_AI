@@ -57,11 +57,14 @@ celery_app.conf.update(
     worker_concurrency=2,
     broker_transport_options={
         "polling_interval": 5.0,
-        "visibility_timeout": 3600,
+        "visibility_timeout": 7200,
     },
     result_expires=600,
     worker_send_task_events=False,
     task_send_sent_event=False,
+    task_time_limit=1800,
+    task_soft_time_limit=1500,
+    beat_max_loop_interval=300,
 )
 
 celery_app.conf.beat_schedule = {

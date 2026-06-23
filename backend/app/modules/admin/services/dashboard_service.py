@@ -140,12 +140,12 @@ class DashboardService:
 
         def _fetch() -> List[Dict[str, Any]]:
             try:
-                # Busca apenas colunas que temos certeza que existem
+                # Busca colunas incluindo streak_data
                 users = (
                     self.db.table('users')
                     .select(
                         'username, name, email, level, focus, '
-                        'created_at, role'
+                        'created_at, role, streak_data'
                     )
                     .not_.in_('username', EXCLUDED_USERS)
                     .neq('role', 'buyer')
@@ -222,6 +222,13 @@ class DashboardService:
                             risk_level = "warning"
                     except Exception as date_err:
                         logging.info(f"[DashboardService] Erro ao processar data para {username}: {date_err}")
+
+                st_data = u.get('streak_data') or {}
+                if not isinstance(st_data, dict):
+                    st_data = {}
+                u['current_streak'] = st_data.get('current_streak', 0)
+                u['longest_streak'] = st_data.get('longest_streak', 0)
+                u['streak_freeze_count'] = st_data.get('streak_freeze_count', 0)
 
                 u['is_staff'] = u.get('role') in staff_roles
                 u['last_active'] = last_active_str

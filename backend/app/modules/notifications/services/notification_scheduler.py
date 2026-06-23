@@ -325,7 +325,7 @@ class NotificationScheduler:
         def _fetch_active():
             seven_days_ago = (datetime.now(timezone.utc) -
                               timedelta(days=7)).isoformat()
-            return self._db.table('users').select('username, email, name').gte(
+            return self._db.table('users').select('username, email, name, profile').gte(
                 'last_active', seven_days_ago).execute().data or []
 
         students = await run_in_threadpool(_fetch_active)
@@ -333,15 +333,25 @@ class NotificationScheduler:
         for student in students:
             username = student['username']
             email = student.get('email')
-            if not email:
+            profile = student.get('profile') or {}
+            responsible_email = profile.get('responsible_email')
+
+            if not email and not responsible_email:
                 continue
             try:
                 pdf_path = await progress_report_service.generate_student_report(username, lang='en-US')
-                success = email_sender.send_report_email(
-                    email, student.get('name', username), pdf_path, lang='en-US')
-                logging.info(
-                    f"[Scheduler] Relatório {
-                        'enviado' if success else 'FALHOU'} para {username}")
+                
+                if email:
+                    success = email_sender.send_report_email(
+                        email, student.get('name', username), pdf_path, lang='en-US')
+                    logging.info(
+                        f"[Scheduler] Relatório {'enviado' if success else 'FALHOU'} para aluno {username}")
+                
+                if responsible_email:
+                    success_resp = email_sender.send_responsible_report_email(
+                        responsible_email, student.get('name', username), pdf_path)
+                    logging.info(
+                        f"[Scheduler] Relatório para responsável {'enviado' if success_resp else 'FALHOU'} para {responsible_email} (aluno: {username})")
             except Exception as e:
                 logging.info(
                     f'[Scheduler] Erro no relatório de {username}: {e}')

@@ -103,9 +103,11 @@ function buildHeaders(
   tokenOverride?: string | null,
 ): Record<string, string> {
   const token = tokenOverride ?? getToken();
+  const timezone = typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'America/Sao_Paulo';
   return {
     Accept: 'application/json',
     'Accept-Language': getLang(),
+    'x-timezone': timezone,
     ...(auth && token ? { Authorization: `Bearer ${token}` } : {}),
     ...extra,
   };

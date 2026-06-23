@@ -51,6 +51,12 @@ const nextConfig = {
   async headers() {
     return [
       {
+        source: '/:path*',
+        headers: [
+          { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self), geolocation=()' },
+        ],
+      },
+      {
         source: '/sw.js',
         headers: [
           { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' },

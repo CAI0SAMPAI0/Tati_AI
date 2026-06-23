@@ -10,12 +10,20 @@ from fastapi.concurrency import run_in_threadpool
 from app.core.database import get_client
 
 
-def _today() -> date:
-    return datetime.now(timezone.utc).date()
+def _today(tz_name: str = 'America/Sao_Paulo') -> date:
+    from zoneinfo import ZoneInfo
+    try:
+        return datetime.now(ZoneInfo(tz_name)).date()
+    except Exception:
+        return datetime.now(ZoneInfo('America/Sao_Paulo')).date()
 
 
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+def _now_iso(tz_name: str = 'America/Sao_Paulo') -> str:
+    from zoneinfo import ZoneInfo
+    try:
+        return datetime.now(ZoneInfo(tz_name)).isoformat()
+    except Exception:
+        return datetime.now(ZoneInfo('America/Sao_Paulo')).isoformat()
 
 
 def _calculate_current_streak(streak_data: dict, today: date) -> int:
@@ -71,7 +79,8 @@ async def apply_streak_freeze_if_needed(streak_data: dict, username: str) -> boo
     except Exception:
         return False
 
-    today = _today()
+    user_tz = streak_data.get('timezone', 'America/Sao_Paulo')
+    today = _today(user_tz)
     days_since_last = (today - last_date).days
     freeze_count = streak_data.get('streak_freeze_count', 0) or 0
 
@@ -112,12 +121,13 @@ async def get_streak(username: str) -> dict:
         streak_data = row.get('streak_data') if row else None
 
         if streak_data:
+            user_tz = streak_data.get('timezone', 'America/Sao_Paulo')
             await apply_streak_freeze_if_needed(streak_data, username)
             last_date_str = streak_data.get('last_study_date')
             if last_date_str:
                 try:
                     last_date = date.fromisoformat(last_date_str)
-                    today = _today()
+                    today = _today(user_tz)
                     days_since_last = (today - last_date).days
                     if days_since_last > 1:
                         streak_data['current_streak'] = 0
@@ -144,11 +154,12 @@ def _empty_streak() -> dict:
 
 async def record_study_day(username: str, is_activity: bool = False) -> dict:
     """Registra atividade hoje e atualiza o streak."""
-    await get_streak(username)
+    streak_data = await get_streak(username)
+    user_tz = streak_data.get('timezone', 'America/Sao_Paulo')
 
     def _record():
         db = get_client()
-        today = _today()
+        today = _today(user_tz)
         today_str = today.isoformat()
 
         # 1. Conta mensagens do usuário HOJE

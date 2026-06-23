@@ -152,6 +152,33 @@ class EmailSender:
             html,
             attachments=[pdf_path])
 
+    def send_responsible_report_email(
+            self,
+            to_email: str,
+            student_name: str,
+            pdf_path: str,
+            lang: str = "pt-BR") -> bool:
+        t = {
+            "subject": f"📊 Relatório de Progresso de {student_name} - Tati AI",
+            "title": f"Acompanhe a evolução de {student_name}!",
+            "body": f"Olá,<br/><br/>Como responsável por <strong>{student_name}</strong>, você está recebendo o relatório semanal de desempenho e assiduidade dos estudos de inglês no Tati AI.<br/><br/>Em anexo, você encontrará o relatório detalhado de progresso em PDF contendo as atividades realizadas, dias estudados e a evolução da proficiência.",
+            "footer": "Equipe Teacher Tati AI",
+        }
+        html = f"""
+<div style="font-family:Arial,sans-serif;max-width:600px;color:#333;">
+<h2 style="color:#6366f1;">{t['title']}</h2>
+<p>{t['body']}</p>
+<p>Qualquer dúvida ou feedback sobre o andamento dos estudos, sinta-se à vontade para entrar em contato conosco.</p>
+<hr style="border:0;border-top:1px solid #eee;margin:20px 0;">
+<p style="font-size:12px;color:#999;">{t['footer']}</p>
+</div>
+"""
+        return self._send(
+            to_email,
+            t["subject"],
+            html,
+            attachments=[pdf_path])
+
     def send_email(
             self,
             fromemail: str,

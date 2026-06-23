@@ -139,6 +139,35 @@ async def get_student_analytics(
     return await service.get_student_detail_analytics(username)
 
 
+@router.get('/students/{username}/certificate')
+async def get_student_certificate(
+    username: str,
+    user=Depends(require_staff)
+):
+    """Gera o certificado de conclusão de nível do aluno em PDF landscape."""
+    from app.core.database import get_client
+    from fastapi.responses import FileResponse
+    from app.shared.services.pdf_generator import generate_certificate_pdf
+    from datetime import datetime
+    
+    db = get_client()
+    res = db.table('users').select('name, level').eq('username', username).execute()
+    if not res.data:
+        raise HTTPException(404, detail="Student not found")
+        
+    student_name = res.data[0].get('name') or username
+    level = res.data[0].get('level') or 'A1'
+    date_str = datetime.now().strftime("%B %d, %Y")
+    
+    pdf_path = generate_certificate_pdf(student_name, level, date_str)
+    
+    return FileResponse(
+        pdf_path,
+        media_type="application/pdf",
+        filename=f"Certificate_{username.replace(' ', '_')}_{level}.pdf"
+    )
+
+
 @router.post('/students/{username}/nudge')
 async def nudge_student(
     username: str,
@@ -1144,3 +1173,58 @@ async def generate_quiz_ai(
             status_code=500,
             detail=f"Erro no processamento da IA ou inserção no banco: {e}"
         )
+
+
+@router.get('/celery/health')
+async def check_celery_health(user=Depends(require_staff)):
+    """Verifica a saúde do Celery, retornando workers ativos, agendamentos e status da fila."""
+    from app.core.celery_app import celery_app
+    import logging
+    import os
+
+    try:
+        inspect = celery_app.control.inspect(timeout=1.0)
+        active_workers = None
+        ping_res = None
+        registered_tasks = None
+
+        if inspect:
+            active_workers = inspect.active()
+            ping_res = inspect.ping()
+            registered_tasks = inspect.registered()
+
+        workers_status = []
+        if ping_res:
+            for worker, status in ping_res.items():
+                active_count = len(active_workers.get(worker, [])) if active_workers else 0
+                tasks = registered_tasks.get(worker, []) if registered_tasks else []
+                workers_status.append({
+                    "worker": worker,
+                    "status": "online" if status == {"ok": "pong"} else "offline",
+                    "active_tasks": active_count,
+                    "registered_tasks_count": len(tasks)
+                })
+
+        if not workers_status:
+            from app.core.celery_app import USE_CELERY
+            workers_status.append({
+                "worker": "celery_main_worker",
+                "status": "offline",
+                "active_tasks": 0,
+                "registered_tasks_count": 0,
+                "msg": f"Nenhum worker respondendo. USE_CELERY={USE_CELERY}"
+            })
+
+        return {
+            "status": "healthy" if any(w["status"] == "online" for w in workers_status) else "unhealthy",
+            "use_celery": os.getenv("USE_CELERY", "false").lower() == "true",
+            "workers": workers_status
+        }
+    except Exception as e:
+        logging.error(f"Erro ao inspecionar Celery: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "workers": []
+        }
+

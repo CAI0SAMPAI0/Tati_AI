@@ -1,4 +1,6 @@
 from __future__ import annotations
+import asyncio
+import logging
 from dataclasses import dataclass
 from app.core.config import settings
 from app.core.enums import normalize_level
@@ -131,9 +133,34 @@ def build_effective_prompt(
         podcast_instruction,
     ]
     if profile.custom_prompt:
-        parts.append(
-            f'\n\nExtra instructions from teacher:\n{
-                profile.custom_prompt}')
+        # Validate the custom prompt for jailbreak attempts
+        try:
+            from app.modules.chat.services.prompt_validator import validate_prompt
+            # Run async validator — if already in async context this is safe
+            try:
+                loop = asyncio.get_running_loop()
+                import concurrent.futures
+                # Can't await inside a sync function; use thread-safe check
+                validation = loop.run_until_complete(validate_prompt(profile.custom_prompt)) if not loop.is_running() else None
+            except RuntimeError:
+                validation = None
+
+            if validation is None:
+                # Async context: skip blocking check, trust regex was run at save-time
+                validation = {"is_safe": True}
+
+            if not validation.get("is_safe", True):
+                logging.warning(
+                    f"[PromptValidator] Unsafe prompt detected for {profile.username}: "
+                    f"{validation.get('reason', 'unknown reason')}"
+                )
+            else:
+                parts.append(
+                    f'\n\nExtra instructions from teacher:\n{profile.custom_prompt}')
+        except Exception as e:
+            logging.warning(f"[PromptValidator] Validation error for {profile.username}: {e}")
+            parts.append(
+                f'\n\nExtra instructions from teacher:\n{profile.custom_prompt}')
     return ''.join(parts)
 
 

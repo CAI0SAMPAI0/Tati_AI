@@ -171,7 +171,12 @@ class GamificationService:
     async def update_streak(self, username: str) -> Dict[str, Any]:
         """Incrementa o streak do usuário se ele praticou hoje."""
         streak_data = await self.get_streak_data(username)
-        today = date.today().isoformat()
+        user_tz = streak_data.get('timezone', 'America/Sao_Paulo')
+        from zoneinfo import ZoneInfo
+        from datetime import timedelta
+
+        today_date = datetime.now(ZoneInfo(user_tz)).date()
+        today = today_date.isoformat()
         last_date = streak_data.get('last_study_date')
 
         if last_date == today:
@@ -180,9 +185,7 @@ class GamificationService:
         # Lógica de incremento simplificada
         current = streak_data.get('current_streak', 0)
         if last_date:
-            from datetime import timedelta
-
-            yesterday = (date.today() - timedelta(days=1)).isoformat()
+            yesterday = (today_date - timedelta(days=1)).isoformat()
             if last_date == yesterday:
                 current += 1
             else:
@@ -196,8 +199,14 @@ class GamificationService:
             'current_streak': current,
             'longest_streak': longest,
             'last_study_date': today,
+            'timezone': user_tz,
             'updated_at': datetime.now(timezone.utc).isoformat(),
         }
+
+        # Manter dados adicionais do original
+        for k, v in streak_data.items():
+            if k not in updated_streak and k not in ['trophies_earned', 'total_questions', 'hours_saved']:
+                updated_streak[k] = v
 
         def _update():
             self.db.table('users').update({'streak_data': updated_streak}).eq(
@@ -205,3 +214,25 @@ class GamificationService:
 
         await self._execute_db(_update)
         return updated_streak
+
+    async def update_user_timezone(self, username: str, tz_name: str) -> None:
+        """Atualiza o timezone do usuário no JSON streak_data caso tenha mudado."""
+        if not tz_name:
+            return
+
+        def _fetch():
+            res = self.db.table('users').select('streak_data').eq('username', username).single().execute()
+            return res.data.get('streak_data') if res.data else {}
+
+        streak_data = await self._execute_db(_fetch) or {}
+        if not isinstance(streak_data, dict):
+            streak_data = {}
+
+        current_tz = streak_data.get('timezone')
+        if current_tz != tz_name:
+            streak_data['timezone'] = tz_name
+            def _update():
+                self.db.table('users').update({
+                    'streak_data': streak_data
+                }).eq('username', username).execute()
+            await self._execute_db(_update)

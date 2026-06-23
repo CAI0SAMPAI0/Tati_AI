@@ -12,13 +12,14 @@ import {
   RefreshCw,
   Clock,
   Send,
-  BarChart2
+  BarChart2,
+  Award
 } from 'lucide-react';
 import { DialogModal } from '@/components/ui/dialog-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-import { apiPut, apiPost, apiDelete, apiGet } from '@/lib/api/client';
+import { apiPut, apiPost, apiDelete, apiGet, API_BASE } from '@/lib/api/client';
 import toast from 'react-hot-toast';
 import { cn, formatTime, formatDateTime } from '@/lib/utils/index';
 import { CEFR_LEVELS, normalizeLevel, levelLabel } from '@/lib/constants/levels';
@@ -45,6 +46,7 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
   const [isFetchingAnalytics, setIsFetchingAnalytics] = useState(false);
   const [nudgeMessage, setNudgeMessage] = useState('');
   const [isNudging, setIsNudging] = useState(false);
+  const [isDownloadingCert, setIsDownloadingCert] = useState(false);
   const lang = 'en-US';
 
   // Reset local state when student changes
@@ -70,6 +72,35 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
       onUpdate();
     } catch (err) {
       toast.error('✗ Error saving. Please try again.');
+    }
+  };
+
+  const handleDownloadCertificate = async () => {
+    setIsDownloadingCert(true);
+    try {
+      const token = localStorage.getItem('token');
+      const url = `${API_BASE}/dashboard/students/${encodeURIComponent(localStudent.username)}/certificate`;
+
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!response.ok) throw new Error('Download failed');
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `Certificate_${localStudent.username}_${localStudent.level || 'A1'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(downloadUrl);
+      toast.success('✔ Certificate downloaded successfully!');
+    } catch (err) {
+      console.error(err);
+      toast.error('✗ Error downloading certificate. Please try again.');
+    } finally {
+      setIsDownloadingCert(false);
     }
   };
 
@@ -221,14 +252,18 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="p-3 bg-surface border border-border rounded-xl">
-                  <span className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider">{'Msgs'}</span>
-                  <p className="text-lg font-bold text-text">{localStudent.total_messages || 0}</p>
+                  <span className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block truncate">Messages</span>
+                  <p className="text-sm font-bold text-text mt-1">{localStudent.total_messages || 0}</p>
                 </div>
                 <div className="p-3 bg-surface border border-border rounded-xl">
-                  <span className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider">{'Level'}</span>
-                  <p className="text-lg font-bold text-primary">{localStudent.level ? levelLabel(localStudent.level) : '—'}</p>
+                  <span className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block truncate">Streak</span>
+                  <p className="text-sm font-bold text-warning mt-1">🔥 {localStudent.current_streak || 0} days</p>
+                </div>
+                <div className="p-3 bg-surface border border-border rounded-xl">
+                  <span className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block truncate">Freezes</span>
+                  <p className="text-sm font-bold text-info mt-1">❄️ {localStudent.streak_freeze_count || 0}/3</p>
                 </div>
               </div>
 
@@ -248,6 +283,22 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div className="pt-4 border-t border-border space-y-3">
+                <label className="text-xs font-bold text-text-muted uppercase tracking-widest block">{'Graduation & CEFR Certificate'}</label>
+                <Button
+                  onClick={handleDownloadCertificate}
+                  disabled={isDownloadingCert}
+                  className="w-full gap-2 bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-600 hover:to-amber-700 text-white font-bold shadow-md shadow-yellow-500/10 border-0"
+                >
+                  {isDownloadingCert ? (
+                    <span className="animate-spin">⏳</span>
+                  ) : (
+                    <Award size={16} />
+                  )}
+                  Download CEFR Certificate
+                </Button>
               </div>
 
               <div className="pt-4 border-t border-border">

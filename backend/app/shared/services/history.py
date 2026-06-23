@@ -2,7 +2,11 @@ import logging
 from fastapi.concurrency import run_in_threadpool
 import asyncio
 from datetime import datetime, timezone
+from fastapi import HTTPException
 from app.core.database import get_client
+
+# Simple in-memory cache for conversation summaries
+SUMMARY_CACHE: dict[str, dict] = {}
 
 
 def _now() -> str:
@@ -91,14 +95,16 @@ async def create_conversation(
     return conv
 
 
-async def list_conversations(username: str) -> list[dict]:
+async def list_conversations(username: str, limit: int = 20, offset: int = 0) -> list[dict]:
     db = get_client()
+    # Apply pagination: limit and offset (if supported by Supabase client)
     result = (
         db.table('conversations')
         .select('id, title, model, created_at, updated_at')
         .eq('username', username)
         .eq('is_simulation', False)
         .order('updated_at', desc=True)
+        .range(offset, offset + limit - 1)
         .execute()
     )
     return result.data
@@ -204,7 +210,7 @@ async def load_history(conversation_id: str) -> list[dict]:
                             msg['pdf_b64'] = pdf_b64
                             msg['pdf_filename'] = pdf_filename
                             # Mostra apenas o pre-tag de introdução ou um texto padrão na bolha
-                            msg['content'] = pre_tag or '📄 Documento criado com sucesso!'
+                            msg['content'] = pre_tag or '📄 Document created successfully!'
                 except Exception as ex:
                     logging.info(f"[History Load] Falha ao processar/regenerar PDF: {ex}")
 
@@ -212,6 +218,25 @@ async def load_history(conversation_id: str) -> list[dict]:
     except Exception as e:
         logging.info(f'ERROR [load_history]: {e}')
         return []
+
+
+async def get_summary(conversation_id: str) -> dict:
+    # Check in-memory cache for summary
+    if conversation_id in SUMMARY_CACHE:
+        return SUMMARY_CACHE[conversation_id]
+
+    try:
+        from app.modules.chat.services.llm import groq_chat
+        history = await load_llm_history(conversation_id)
+        prompt = f"Summarize this conversation: {history}"
+        res = await groq_chat([{'role': 'user', 'content': prompt}])
+        summary_result = {'summary': res}
+        # Store in cache
+        SUMMARY_CACHE[conversation_id] = summary_result
+        return summary_result
+    except Exception as e:
+        logging.info(f"Error in summary: {e}")
+        raise HTTPException(500, 'Erro ao gerar resumo')
 
 
 async def load_llm_history(conversation_id: str) -> list[dict]:
@@ -277,29 +302,22 @@ async def save_message(
 
 
 async def update_message(
-    message_id: int, username: str, content: str, audio_b64: str = None
+    message_id: str | int, username: str, content: str, audio_b64: str = None, conversation_id: str | None = None
 ) -> dict | None:
     def _update():
         db = get_client()
-        clean_content = content.replace(
-            '\x00', '').replace(
-            '\u0000', '')
+        clean_content = content.replace('\x00', '').replace('\u0000', '')
         update_data = {
             'content': clean_content,
             'updated_at': _now(),
         }
         if audio_b64:
             update_data['audio_b64'] = audio_b64
-
-        res = (
-            db.table('messages')
-            .update(update_data)
-            .eq('id', message_id)
-            .eq('username', username)
-            .execute()
-        )
+        query = db.table('messages').update(update_data).eq('id', message_id).eq('username', username)
+        if conversation_id:
+            query = query.eq('session_id', conversation_id)
+        res = query.execute()
         return res.data[0] if res.data else None
-
     try:
         return await _execute_db(_update)
     except Exception as e:

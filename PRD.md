@@ -873,18 +873,18 @@ erDiagram
 
 - [X] **Celery Fallback (Backend)**
   - [X] Adicionar tratamento em [task_manager.py](file:///C:/Users/caio/Documents/GitHub/Tati_AI/backend/app/core/task_manager.py) para redirecionar tarefas locais síncronas caso a fila do Celery/CloudAMQP falhe.
-- [ ] **Permissions-Policy Cleanup (Backend)**
-  - [ ] Remover recursos obsoletos (ex: `browsing-topics`, `run-ad-auction`) dos cabeçalhos HTTP do backend.
-- [ ] **Supabase Database Indexing (Database)**
-  - [ ] Adicionar índices nas chaves primárias e relacionais para otimizar os carregamentos do painel administrativo.
-- [ ] **Remoção de Alunos em Cascade (Database)**
-  - [ ] Configurar cascateamento (`ON DELETE CASCADE`) no banco para tornar a remoção de usuários 100% segura e livre de erros de FK.
-- [ ] **Configuração de Timeouts no Celery (Backend)**
-  - [ ] Ajustar parâmetros no Beat para evitar execução duplicada de relatórios semanais.
-- [ ] **Páginas Dinâmicas - Dynamic Imports (Frontend)**
-  - [ ] Usar imports dinâmicos no Next.js para os componentes pesados de gráficos e tabelas do Dashboard.
-- [ ] **Monitor de Saúde do Celery (Backend & Frontend)**
-  - [ ] Criar tela no painel de administração mostrando o status e saúde dos workers e filas ativas.
+- [X] **Permissions-Policy Cleanup (Backend)**
+  - [X] Remover recursos obsoletos (ex: `browsing-topics`, `run-ad-auction`) dos cabeçalhos HTTP do backend.
+- [X] **Supabase Database Indexing (Database)**
+  - [X] Adicionar índices nas chaves primárias e relacionais para otimizar os carregamentos do painel administrativo.
+- [X] **Remoção de Alunos em Cascade (Database)**
+  - [X] Configurar cascateamento (`ON DELETE CASCADE`) no banco para tornar a remoção de usuários 100% segura e livre de erros de FK.
+- [X] **Configuração de Timeouts no Celery (Backend)**
+  - [X] Ajustar parâmetros no Beat para evitar execução duplicada de relatórios semanais.
+- [X] **Páginas Dinâmicas - Dynamic Imports (Frontend)**
+  - [X] Usar imports dinâmicos no Next.js para os componentes pesados de gráficos e tabelas do Dashboard.
+- [X] **Monitor de Saúde do Celery (Backend & Frontend)**
+  - [X] Criar tela no painel de administração mostrando o status e saúde dos workers e filas ativas.
 
 ---
 
@@ -893,24 +893,24 @@ erDiagram
 **Objetivo:** Melhorar o engajamento diário, corrigir bugs visuais e refinar a lógica de ofensivas (streaks).
 **Agentes alocados:** [frontend-expert](file:///C:/Users/caio/Documents/GitHub/Tati_AI/agents/frontend-expert.md), [backend-expert](file:///C:/Users/caio/Documents/GitHub/Tati_AI/agents/backend-expert.md)
 
-- [ ] **Streak por Fuso Horário Local (Backend & Frontend)**
-  - [ ] Evitar quebras de streak incorretas calculando o fechamento do dia com base no fuso horário do dispositivo do aluno.
-- [ ] **Resiliência Offline do SW (Frontend)**
-  - [ ] Garantir que o Service Worker responda com uma página offline amigável para navegações sem internet.
-- [ ] **Embaralhamento das Questões (Backend)**
-  - [ ] Embaralhar as alternativas dos quizzes a cada tentativa para evitar memorização.
-- [ ] **Modais Responsivos (Frontend)**
-  - [ ] Ajustar os modais administrativos do dashboard para uso 100% amigável no celular.
-- [ ] **Indicadores Visuais de Streak Freezes (Frontend)**
-  - [ ] Mostrar a quantidade de congelamentos restantes ao lado do perfil do aluno no dashboard.
-- [ ] **Paginação de Mensagens do Chat (Frontend)**
-  - [ ] Limitar o carregamento inicial das conversas com a IA a 20 mensagens, carregando mais conforme o scroll.
-- [ ] **Clube de Estudos / Ligas de XP (Backend & Frontend)**
-  - [ ] Ligas competitivas agrupando estudantes do mesmo nível para incentivar a prática.
-- [ ] **Notificações Semanais para Responsáveis (Backend)**
-  - [ ] E-mails automáticos detalhando o progresso e assiduidade dos alunos.
-- [ ] **Certificado de Conclusão CEFR (Backend & Frontend)**
-  - [ ] Geração de PDFs de formatura para download quando a Tatiana declarar que o aluno concluiu o nível.
+- [X] **Streak por Fuso Horário Local (Backend & Frontend)**
+  - [X] Evitar quebras de streak incorretas calculando o fechamento do dia com base no fuso horário do dispositivo do aluno.
+- [X] **Resiliência Offline do SW (Frontend)**
+  - [X] Garantir que o Service Worker responda com uma página offline amigável para navegações sem internet.
+- [X] **Embaralhamento das Questões (Backend)**
+  - [X] Embaralhar as alternativas dos quizzes a cada tentativa para evitar memorização.
+- [X] **Modais Responsivos (Frontend)**
+  - [X] Ajustar os modais administrativos do dashboard para uso 100% amigável no celular.
+- [X] **Indicadores Visuais de Streak Freezes (Frontend)**
+  - [X] Mostrar a quantidade de congelamentos restantes ao lado do perfil do aluno no dashboard.
+- [X] **Paginação de Mensagens do Chat (Frontend)**
+  - [X] Limitar o carregamento inicial das conversas com a IA a 20 mensagens, carregando mais conforme o scroll.
+- [X] **Clube de Estudos / Ligas de XP (Backend & Frontend)**
+  - [X] Ligas competitivas agrupando estudantes do mesmo nível para incentivar a prática.
+- [X] **Notificações Semanais para Responsáveis (Backend)**
+  - [X] E-mails automáticos detalhando o progresso e assiduidade dos alunos.
+- [X] **Certificado de Conclusão CEFR (Backend & Frontend)**
+  - [X] Geração de PDFs de formatura para download quando a Tatiana declarar que o aluno concluiu o nível.
 
 ---
 
@@ -919,24 +919,24 @@ erDiagram
 **Objetivo:** Introduzir os novos módulos interativos de correção de escrita, pronúncia e vocabulário.
 **Agentes alocados:** [frontend-expert](file:///C:/Users/caio/Documents/GitHub/Tati_AI/agents/frontend-expert.md), [backend-expert](file:///C:/Users/caio/Documents/GitHub/Tati_AI/agents/backend-expert.md)
 
-- [ ] **Filtro de Erros Ortográficos Simples (Backend)**
-  - [ ] Evitar lotar o SRS do aluno com pequenos erros de digitação (typos), focando apenas em erros de gramática e vocabulário real.
-- [ ] **Suporte e Detecção de Permissão de Microfone (Frontend)**
-  - [ ] Instruções e modais informativos claros caso o navegador silencie ou bloqueie o microfone do usuário (Safari/Chrome).
-- [ ] **Writing Sandbox (Backend & Frontend)**
-  - [ ] Sandbox de correção detalhada de redações longas.
-- [ ] **Audio Scoring - Feedback de Pronúncia (Backend & Frontend)**
-  - [ ] Avaliação com notas de 0 a 100 com base em STT no chat.
-- [ ] **Vocab SRS Dashboard (Backend & Frontend)**
-  - [ ] Central de cartões de Spaced Repetition para memorização de termos.
-- [ ] **Hands-Free Audio Loop (Frontend)**
-  - [ ] Modo hands-free com microfone contínuo.
-- [ ] **Visual Grammar Sandbox (Frontend)**
-  - [ ] Exercícios interativos de montagem gramatical.
-- [ ] **Voice Calls Simuladas (Backend & Frontend)**
-  - [ ] Interface de roleplay por chamada de voz simulada.
-- [ ] **Criador de Cenários pelo Aluno (Backend & Frontend)**
-  - [ ] Aluno pode ditar em qual situação profissional/pessoal quer praticar.
+- [X] **Filtro de Erros Ortográficos Simples (Backend)**
+  - [X] Evitar lotar o SRS do aluno com pequenos erros de digitação (typos), focando apenas em erros de gramática e vocabulário real.
+- [X] **Suporte e Detecção de Permissão de Microfone (Frontend)**
+  - [X] Instruções e modais informativos claros caso o navegador silencie ou bloqueie o microfone do usuário (Safari/Chrome).
+- [X] **Writing Sandbox (Backend & Frontend)**
+  - [X] Sandbox de correção detalhada de redações longas.
+- [X] **Audio Scoring - Feedback de Pronúncia (Backend & Frontend)**
+  - [X] Avaliação com notas de 0 a 100 com base em STT no chat.
+- [X] **Vocab SRS Dashboard (Backend & Frontend)**
+  - [X] Central de cartões de Spaced Repetition para memorização de termos.
+- [X] **Hands-Free Audio Loop (Frontend)**
+  - [X] Modo hands-free com microfone contínuo.
+- [X] **Visual Grammar Sandbox (Frontend)**
+  - [X] Exercícios interativos de montagem gramatical.
+- [X] **Voice Calls Simuladas (Backend & Frontend)**
+  - [X] Interface de roleplay por chamada de voz simulada.
+- [X] **Criador de Cenários pelo Aluno (Backend & Frontend)**
+  - [X] Aluno pode ditar em qual situação profissional/pessoal quer praticar.
 
 ---
 
@@ -948,20 +948,11 @@ erDiagram
 - [X] **Dashboard Docente Avançado: Métricas & Nudges (Backend & Frontend)**
   - [X] Implementar endpoints de analíticas detalhadas do aluno e envio de nudges multicanal (e-mail + push) em [dashboard_service.py](file:///C:/Users/caio/Documents/GitHub/Tati_AI/backend/app/modules/admin/services/dashboard_service.py).
   - [X] Criar aba "Analytics" no frontend dentro do modal do aluno em [student-modal.tsx](file:///C:/Users/caio/Documents/GitHub/Tati_AI/frontend/components/dashboard/student-modal.tsx) com gráficos de engajamento semanal baseados em `study_sessions` e controle de envio de mensagens de incentivo.
-- [ ] **Validação de Prompts Customizados (Backend)**
-  - [ ] Validação contra tentativas de bypass/jailbreak nos prompts dos alunos.
-- [ ] **Harmonia Visual de Cores - Dark Mode (Frontend)**
-  - [ ] Ajustar pequenos detalhes visuais no tema escuro do dashboard.
-- [ ] **Atualizações em Tempo Real - SWR Cache (Frontend)**
-  - [ ] Sincronizar painéis automaticamente após modificações no painel.
-- [ ] **Copiloto de Chat em Tempo Real (Backend & Frontend)**
-  - [ ] Visualização de chats ativos e interjeição de mensagens manuais pela Tatiana.
-- [ ] **Distribuidor de Deveres de Casa - Homework Dispatcher (Backend & Frontend)**
   - [ ] Delegação em massa de exercícios para turmas específicas.
 - [ ] **Digest de Dificuldades - AI Digest (Backend)**
   - [ ] Relatórios automáticos para a Tatiana listando as matérias que a turma mais tem dificuldades.
 - [ ] **Sistema de Tags de Alunos (Backend & Frontend)**
-  - [ ] Identificadores e filtros para segmentar alunos por tipo de assinatura, interesse ou foco profissional.
+  - [ ] Identificadores e filtros para segmentar alunos por tipo de interesse ou foco profissional.
 - [ ] **Biblioteca de Prompts Globais (Backend & Frontend)**
   - [ ] Modelos de prompts criados por Tatiana prontificados para associação com alunos.
 - [ ] **Exportador de Relatório PDF Escolar (Backend & Frontend)**

@@ -66,8 +66,88 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          // Se estiver offline, serve a página do cache
-          return caches.match(request);
+          // Se estiver offline, tenta servir do cache. Se não estiver cacheado, serve uma página offline amigável.
+          return caches.match(request).then((cachedResponse) => {
+            if (cachedResponse) return cachedResponse;
+            return new Response(
+              `<!DOCTYPE html>
+              <html lang="en">
+              <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Offline - Teacher Tati AI</title>
+                <style>
+                  body {
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                    background-color: #0a0b0d;
+                    color: #f3f4f6;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    height: 100vh;
+                    margin: 0;
+                    text-align: center;
+                    padding: 20px;
+                    box-sizing: border-box;
+                  }
+                  .card {
+                    background-color: #121318;
+                    border: 1px solid #222530;
+                    border-radius: 20px;
+                    padding: 40px;
+                    max-width: 440px;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+                  }
+                  h1 {
+                    color: #6366f1;
+                    font-size: 24px;
+                    margin-top: 0;
+                    font-weight: 800;
+                  }
+                  p {
+                    font-size: 15px;
+                    line-height: 1.6;
+                    color: #9ca3af;
+                    margin-bottom: 24px;
+                  }
+                  .btn {
+                    display: inline-block;
+                    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+                    color: #ffffff;
+                    text-decoration: none;
+                    padding: 12px 28px;
+                    border-radius: 12px;
+                    font-weight: 700;
+                    font-size: 14px;
+                    transition: transform 0.2s, opacity 0.2s;
+                    border: none;
+                    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+                  }
+                  .btn:hover {
+                    transform: translateY(-1px);
+                    opacity: 0.95;
+                  }
+                  .icon {
+                    font-size: 56px;
+                    margin-bottom: 20px;
+                  }
+                </style>
+              </head>
+              <body>
+                <div class="card">
+                  <div class="icon">📶</div>
+                  <h1>Connection Lost</h1>
+                  <p>You are currently offline. Please check your internet connection and try reloading the page.</p>
+                  <a href="javascript:window.location.reload(true)" class="btn">Try to Reconnect</a>
+                </div>
+              </body>
+              </html>`,
+              {
+                headers: { 'Content-Type': 'text/html; charset=utf-8' }
+              }
+            );
+          });
         })
     );
     return;

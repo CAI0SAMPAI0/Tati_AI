@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { MessageSquare, Trash2, X } from 'lucide-react';
 import { apiGet, apiDelete } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
@@ -18,14 +18,28 @@ export function ConversationList({ currentId, onSelect, onDelete }: Conversation
   
   const queryClient = useQueryClient();
   const {
-    data: conversations,
+    data: infiniteData,
     error,
     isLoading,
-  } = useQuery({
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['conversations'],
-    queryFn: () => apiGet<Conversation[]>(ENDPOINTS.CONVERSATIONS),
+    queryFn: async ({ pageParam = 0 }) => {
+      const limit = 20;
+      const offset = pageParam * limit;
+      return apiGet<Conversation[]>(`${ENDPOINTS.CONVERSATIONS}?limit=${limit}&offset=${offset}`);
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      // If less than limit returned, no more pages
+      return lastPage.length === 20 ? allPages.length : undefined;
+    },
     staleTime: 15_000,
   });
+
+  // Flatten pages into a single list
+  const conversations = infiniteData?.pages.flat() ?? [];
 
   const groups = useMemo(() => {
     if (!conversations || !conversations.length) return null;
@@ -62,6 +76,12 @@ export function ConversationList({ currentId, onSelect, onDelete }: Conversation
     }
   };
 
+  const handleLoadMore = async () => {
+    if (hasNextPage) {
+      await fetchNextPage();
+    }
+  };
+
   if (error) {
     return (
       <div className="p-4 text-center text-xs text-danger">
@@ -70,12 +90,16 @@ export function ConversationList({ currentId, onSelect, onDelete }: Conversation
     );
   }
 
-  if (isLoading || !conversations) {
+  if (isLoading) {
     return (
       <div className="p-4 text-center text-xs text-text-muted animate-pulse">
         {'Loading...'}
       </div>
     );
+  }
+
+  if (!conversations) {
+    return null;
   }
 
   if (conversations.length === 0) {
@@ -124,6 +148,18 @@ export function ConversationList({ currentId, onSelect, onDelete }: Conversation
           </div>
         );
       })}
+      {/* Load more button */}
+      {hasNextPage && (
+        <div className="flex justify-center py-2">
+          <button
+            onClick={handleLoadMore}
+            disabled={isFetchingNextPage}
+            className="px-4 py-2 bg-primary/20 text-primary rounded hover:bg-primary/30 transition"
+          >
+            {isFetchingNextPage ? 'Carregando...' : 'Carregar mais'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

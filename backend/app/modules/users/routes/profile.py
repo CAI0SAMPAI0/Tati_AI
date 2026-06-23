@@ -25,6 +25,7 @@ class ProfileUpdate(BaseModel):
     occupation: Optional[str] = None
     cpf: Optional[str] = None
     cpf_cnpj: Optional[str] = None
+    responsible_email: Optional[str] = None
 
 
 @router.get('')

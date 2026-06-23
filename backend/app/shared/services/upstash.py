@@ -192,3 +192,33 @@ async def rate_limit_check(
     key: str, max_requests: int = 10, window_seconds: int = 60
 ) -> dict:
     return await upstash_service.rate_limit_check(key, max_requests, window_seconds)
+
+
+async def acquire_lock(lock_name: str, expire_seconds: int = 300) -> bool:
+    """Tenta obter um lock distribuído no Redis (SETNX). Retorna True se obtiver com sucesso."""
+    if not upstash_service._ensure_connected() or not upstash_service._redis:
+        return True  # Fallback se Redis estiver indisponível
+    try:
+        import asyncio
+        res = await asyncio.to_thread(
+            upstash_service._redis.set,
+            f"lock:{lock_name}",
+            "1",
+            ex=expire_seconds,
+            nx=True
+        )
+        return bool(res)
+    except Exception as e:
+        logging.info(f"[Lock] Erro ao adquirir lock {lock_name}: {e}")
+        return True  # Fallback para permitir processamento
+
+
+async def release_lock(lock_name: str):
+    """Libera um lock distribuído no Redis."""
+    if not upstash_service._ensure_connected() or not upstash_service._redis:
+        return
+    try:
+        import asyncio
+        await asyncio.to_thread(upstash_service._redis.delete, f"lock:{lock_name}")
+    except Exception as e:
+        logging.info(f"[Lock] Erro ao liberar lock {lock_name}: {e}")

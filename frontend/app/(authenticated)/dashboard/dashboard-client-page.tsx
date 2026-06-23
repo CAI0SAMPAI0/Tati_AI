@@ -8,14 +8,32 @@ import {
 } from 'lucide-react';
 import { DashboardSidebar, type DashSection } from '@/components/dashboard/dashboard-sidebar';
 
-import { OverviewSection } from '@/components/dashboard/overview-section';
-import { ReportsSection } from '@/components/dashboard/reports-section';
-import { ModulesSection } from '@/components/dashboard/modules-section';
-import  SimulationsSection  from '@/components/dashboard/simulations-section';
-import { FlashcardsSection } from '@/components/dashboard/flashcards-section';
-import { PremiumSection } from '@/components/dashboard/premium-section';
-import { CefrSection } from '@/components/dashboard/cefr-section';
-import { DispatchSection } from '@/components/dashboard/dispatch-section';
+import dynamic from 'next/dynamic';
+
+const OverviewSection = dynamic(() => import('@/components/dashboard/overview-section').then(mod => mod.OverviewSection), {
+  loading: () => <div className="h-48 flex items-center justify-center"><Spinner size="md" /></div>
+});
+const ReportsSection = dynamic(() => import('@/components/dashboard/reports-section').then(mod => mod.ReportsSection), {
+  loading: () => <div className="h-48 flex items-center justify-center"><Spinner size="md" /></div>
+});
+const ModulesSection = dynamic(() => import('@/components/dashboard/modules-section').then(mod => mod.ModulesSection), {
+  loading: () => <div className="h-48 flex items-center justify-center"><Spinner size="md" /></div>
+});
+const SimulationsSection = dynamic(() => import('@/components/dashboard/simulations-section'), {
+  loading: () => <div className="h-48 flex items-center justify-center"><Spinner size="md" /></div>
+});
+const FlashcardsSection = dynamic(() => import('@/components/dashboard/flashcards-section').then(mod => mod.FlashcardsSection), {
+  loading: () => <div className="h-48 flex items-center justify-center"><Spinner size="md" /></div>
+});
+const PremiumSection = dynamic(() => import('@/components/dashboard/premium-section').then(mod => mod.PremiumSection), {
+  loading: () => <div className="h-48 flex items-center justify-center"><Spinner size="md" /></div>
+});
+const CefrSection = dynamic(() => import('@/components/dashboard/cefr-section').then(mod => mod.CefrSection), {
+  loading: () => <div className="h-48 flex items-center justify-center"><Spinner size="md" /></div>
+});
+const DispatchSection = dynamic(() => import('@/components/dashboard/dispatch-section').then(mod => mod.DispatchSection), {
+  loading: () => <div className="h-48 flex items-center justify-center"><Spinner size="md" /></div>
+});
 import { StudentModal } from '@/components/dashboard/student-modal';
 import { apiGet } from '@/lib/api/client';
 
@@ -248,13 +266,19 @@ export default function DashboardClientPage() {
                               {s.avatar_url ? <img src={s.avatar_url} alt="" className="w-full h-full rounded-full object-cover" /> : (s.name || s.username || '?').charAt(0).toUpperCase()}
                             </div>
                             <div className="min-w-0">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center flex-wrap gap-1.5">
                                 <span className="text-sm font-bold truncate text-text group-hover:text-primary transition-colors">{s.name || s.username}</span>
                                 {s.risk_level === 'critical' && (
                                   <span className="px-1.5 py-0.5 rounded bg-danger/10 text-danger text-[0.6rem] font-bold animate-pulse">Critical</span>
                                 )}
                                 {s.risk_level === 'warning' && (
                                   <span className="px-1.5 py-0.5 rounded bg-warning/10 text-warning text-[0.6rem] font-bold">At Risk</span>
+                                )}
+                                {s.current_streak > 0 && (
+                                  <span className="px-1.5 py-0.5 rounded bg-warning/10 text-warning text-[0.6rem] font-bold" title={`${s.current_streak} days streak`}>🔥 {s.current_streak}</span>
+                                )}
+                                {s.streak_freeze_count > 0 && (
+                                  <span className="px-1.5 py-0.5 rounded bg-info/10 text-info text-[0.6rem] font-bold" title={`${s.streak_freeze_count} freezes remaining`}>❄️ {s.streak_freeze_count}</span>
                                 )}
                               </div>
                               <div className="text-[0.7rem] text-text-muted truncate">@{s.username}</div>
