@@ -1,6 +1,9 @@
 import { AuthGuard } from '@/components/layout/auth-guard';
 import dynamic from 'next/dynamic';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const TourLauncher = dynamic(
   () => import('@/components/onboarding/tour-launcher').then(m => m.TourLauncher as any),
   { ssr: false }
