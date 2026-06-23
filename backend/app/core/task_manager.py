@@ -27,27 +27,28 @@ def run_task_in_background(
     *args,
     **kwargs
 ) -> str:
-    use_celery = settings.use_celery
+    if settings.use_celery:
+        try:
+            task = task_func.delay(*args, **kwargs)
+            return task.id
+        except Exception as celery_err:
+            logging.error(f"[TaskManager] Celery delay failed, falling back to local execution: {celery_err}")
+            
+    task_id = f"local_{uuid.uuid4()}"
+    local_tasks_status[task_id] = {"status": "processing", "result": None}
     
-    if use_celery:
-        task = task_func.delay(*args, **kwargs)
-        return task.id
-    else:
-        task_id = f"local_{uuid.uuid4()}"
-        local_tasks_status[task_id] = {"status": "processing", "result": None}
-        
-        def wrapper():
-            try:
-                logging.info(f"[TaskManager] Running local background task {task_id}")
-                result = task_func(*args, **kwargs)
-                set_local_task_status(task_id, "success", result=result)
-                logging.info(f"[TaskManager] Local background task {task_id} succeeded")
-            except Exception as e:
-                logging.error(f"[TaskManager] Local background task {task_id} failed: {e}", exc_info=True)
-                set_local_task_status(task_id, "failed", error=str(e))
-                
-        background_tasks.add_task(wrapper)
-        return task_id
+    def wrapper():
+        try:
+            logging.info(f"[TaskManager] Running local background task {task_id}")
+            result = task_func(*args, **kwargs)
+            set_local_task_status(task_id, "success", result=result)
+            logging.info(f"[TaskManager] Local background task {task_id} succeeded")
+        except Exception as e:
+            logging.error(f"[TaskManager] Local background task {task_id} failed: {e}", exc_info=True)
+            set_local_task_status(task_id, "failed", error=str(e))
+            
+    background_tasks.add_task(wrapper)
+    return task_id
 
 
 async def delegate_to_worker_if_needed(request: Request):
