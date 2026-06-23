@@ -110,29 +110,56 @@ async def _stream_groq(
     ]
     last_error: Exception | None = None
 
-    for idx, key in enumerate(keys):
-        try:
-            client = AsyncGroq(api_key=key)
-            stream = await client.chat.completions.create(
-                model='llama-3.1-8b-instant',
-                messages=messages,
-                stream=True,
-                max_tokens=max_tokens,
-            )
-            async for chunk in stream:
-                content = chunk.choices[0].delta.content
-                if content:
-                    yield content
+    # Models to try in order: fast small model first, fallback to large if 413
+    model_queue = ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile']
+    current_model_idx = 0
+
+    while current_model_idx < len(model_queue):
+        current_model = model_queue[current_model_idx]
+        succeeded = False
+
+        for idx, key in enumerate(keys):
+            try:
+                client = AsyncGroq(api_key=key)
+                stream = await client.chat.completions.create(
+                    model=current_model,
+                    messages=messages,
+                    stream=True,
+                    max_tokens=max_tokens,
+                )
+                async for chunk in stream:
+                    content = chunk.choices[0].delta.content
+                    if content:
+                        yield content
+                succeeded = True
+                return
+            except Exception as exc:
+                last_error = exc
+                err_str = str(exc)
+                logging.info(
+                    f'[Groq stream] model={current_model} key {idx + 1}/{len(keys)} falhou: {err_str[:120]}')
+
+                # 413: payload too large — don't retry other keys, jump to next model
+                if '413' in err_str:
+                    logging.warning(
+                        f'[Groq stream] 413 Too Large for {current_model}. Tentando próximo modelo...')
+                    break
+
+                if _should_try_next_key(exc):
+                    continue
+                break
+
+        if succeeded:
             return
-        except Exception as exc:
-            last_error = exc
-            logging.info(
-                f'[Groq stream] key {idx + 1}/{len(keys)} falhou: {str(exc)[:100]}')
-            if _should_try_next_key(exc):
-                continue
+
+        # If we hit 413, escalate to the next model
+        if last_error and '413' in str(last_error):
+            current_model_idx += 1
+        else:
             break
 
-    yield f'[Erro Groq: todas as {len(keys)} chave(s) falharam. Ãšltimo: {str(last_error)[:120]}]'
+    yield f'[Erro Groq: todas as {len(keys)} chave(s) falharam. Último: {str(last_error)[:120]}]'
+
 
 
 async def _groq_chat_attempt(

@@ -118,31 +118,18 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit }:
         />
       ))}
 
-      {isStreaming && streamingContent && (
+      {isStreaming && (
         <MessageBubble
           message={{
             id: 'streaming',
             role: 'assistant',
-            content: streamingContent,
+            content: streamingContent ?? '',
             created_at: new Date().toISOString(),
             conversation_id: 'streaming',
           }}
           isStreaming
           onWordClick={handleWordClick}
         />
-      )}
-
-      {isStreaming && !streamingContent && (
-        <div key="typing-indicator" className="flex gap-3 animate-fade-in">
-          <div className="w-7 h-7 rounded-full border border-border bg-surface overflow-hidden shrink-0 mt-1 shadow-sm">
-             <Image src="/images/tati_logo.jpg" alt="Tati" className="w-full h-full object-cover" width={28} height={28} />
-          </div>
-          <div className="bg-surface border border-border px-4 py-3 rounded-xl rounded-bl-sm flex gap-1.5 items-center shadow-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce [animation-delay:-0.3s]" />
-            <span className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce [animation-delay:-0.15s]" />
-            <span className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce" />
-          </div>
-        </div>
       )}
 
       <div ref={bottomRef} className="h-2" />

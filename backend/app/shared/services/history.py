@@ -240,16 +240,25 @@ async def get_summary(conversation_id: str) -> dict:
 
 
 async def load_llm_history(conversation_id: str) -> list[dict]:
-    """Carrega mensagens no formato esperado pela LLM: role + content."""
+    """Carrega mensagens no formato esperado pela LLM: role + content.
+
+    Limita ao contexto das últimas 20 mensagens para não ultrapassar o
+    limite de tokens dos modelos Groq (especialmente o llama-3.1-8b-instant
+    com ~8k tokens de contexto).
+    """
     messages = await load_history(conversation_id)
+
+    # Janela de contexto: mantém só as últimas 20 mensagens
+    MAX_HISTORY_MESSAGES = 20
+    if len(messages) > MAX_HISTORY_MESSAGES:
+        messages = messages[-MAX_HISTORY_MESSAGES:]
 
     history = []
     for msg in messages:
         content = msg.get('content') or ''
-        # Truncar conteúdo muito longo para não estourar o contexto da
-        # LLM
-        if len(content) > 2000:
-            content = content[:2000] + \
+        # Truncar conteúdo muito longo para não estourar o contexto da LLM
+        if len(content) > 1500:
+            content = content[:1500] + \
                 '\n\n[Texto truncado devido ao limite de tamanho]'
         history.append(
             {'role': msg.get('role', 'user'), 'content': content})

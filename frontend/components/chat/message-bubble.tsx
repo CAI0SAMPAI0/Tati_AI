@@ -6,10 +6,8 @@ import type { Message } from '@/lib/api/types';
 import { cn, parseAIResponse } from '@/lib/utils';
 import { ClickableText } from './clickable-text';
 import { AudioPlayer } from './audio-player';
-import { ENDPOINTS } from '@/lib/api/endpoints';
-import { apiPost } from '@/lib/api/client';
 import { useState } from 'react';
-import { Pencil, Check, X, Copy, Volume2 } from 'lucide-react';
+import { Pencil, Check, X, Copy } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface MessageBubbleProps {
@@ -25,10 +23,13 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
   const [editContent, setEditContent] = useState(message.content);
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [ttsAudio, setTtsAudio] = useState<string | null>(null);
-  const [ttsLoading, setTtsLoading] = useState(false);
 
   const parsed = parseAIResponse(message.content);
+
+  // Has a file attachment (PDF) — no audio for these messages
+  const hasFile = !!(message.pdf_b64);
+  // Has audio from the message itself (e.g. voice mode responses)
+  const hasAudio = !hasFile && !!(message.audio_url || message.audio_b64);
 
   const handleCopy = () => {
     const textToCopy = isUser ? message.content : parsed.reply;
@@ -36,21 +37,6 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
     setCopied(true);
     toast.success('Copied to clipboard!');
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleTTS = async () => {
-    if (ttsLoading) return;
-    setTtsLoading(true);
-    try {
-      const res = await apiPost<{ audio: string }>(ENDPOINTS.CHAT_TTS, { text: parsed.reply });
-      if (res.ok && res.data?.audio) {
-        setTtsAudio(res.data.audio);
-      }
-    } catch (e) {
-      console.error('Erro ao obter áudio TTS', e);
-    } finally {
-      setTtsLoading(false);
-    }
   };
 
   const handleSave = async () => {
@@ -133,20 +119,30 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
                 <p className="whitespace-pre-wrap">{message.content}</p>
               ) : (
                 <div className="flex flex-col gap-2">
-                  <ClickableText
-                    content={parsed.reply}
-                    onWordClick={onWordClick || (() => { })}
-                  />
-                  {!isUser && (
-                    <button
-                      onClick={handleTTS}
-                      disabled={ttsLoading}
-                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-bg-secondary border border-border text-[0.65rem] font-bold text-text-muted hover:bg-primary/10 hover:border-primary/20 transition-all w-fit"
-                    >
-                      <Volume2 size={12} />
-                      {ttsLoading ? 'Carregando...' : 'Ouvir'}
-                    </button>
+                  {/* While streaming with no content yet, show animated dots */}
+                  {isStreaming && !parsed.reply ? (
+                    <span className="flex gap-1 items-center py-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary/50 animate-bounce [animation-delay:-0.3s]" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary/50 animate-bounce [animation-delay:-0.15s]" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary/50 animate-bounce" />
+                    </span>
+                  ) : (
+                    <>
+                      <ClickableText
+                        content={parsed.reply}
+                        onWordClick={onWordClick || (() => { })}
+                      />
+                      {/* Show animated dots at the end of text while streaming */}
+                      {isStreaming && (
+                        <span className="inline-flex gap-1 items-center ml-1">
+                          <span className="w-1 h-1 rounded-full bg-text-subtle animate-bounce [animation-delay:-0.3s]" />
+                          <span className="w-1 h-1 rounded-full bg-text-subtle animate-bounce [animation-delay:-0.15s]" />
+                          <span className="w-1 h-1 rounded-full bg-text-subtle animate-bounce" />
+                        </span>
+                      )}
+                    </>
                   )}
+
                   {parsed.correction && (
                     <div className="mt-2 text-xs bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/20 text-amber-700 dark:text-amber-300 rounded-xl p-2.5 flex items-start gap-2 max-w-full text-left">
                       <span className="text-base select-none">💡</span>
@@ -155,9 +151,6 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
                         <span className="italic">{parsed.correction}</span>
                       </div>
                     </div>
-                  )}
-                  {ttsAudio && (
-                    <AudioPlayer base64={ttsAudio} className="mt-2" />
                   )}
                 </div>
               )}
@@ -210,7 +203,8 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
           </div>
         )}
 
-        {(message.audio_url || message.audio_b64) && !isStreaming && (
+        {/* AudioPlayer shows automatically when audio is present, never for PDF messages */}
+        {hasAudio && !isStreaming && (
           <AudioPlayer url={message.audio_url || undefined} base64={message.audio_b64 || undefined} />
         )}
 
@@ -221,4 +215,3 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
     </div>
   );
 }
-
