@@ -43,7 +43,6 @@ export const ROUTE_PREFETCHES: Record<string, (ctx?: PrefetchContext) => Prefetc
     { queryKey: ['my-stats'], endpoint: '/dashboard/stats/my' },
   ],
   chat: () => [
-    { queryKey: ['conversations'], endpoint: ENDPOINTS.CONVERSATIONS },
     { queryKey: ['avatar-frames'], endpoint: '/avatar/frames' },
   ],
   competitions: () => [

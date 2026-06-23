@@ -170,10 +170,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      if (typeof window === 'undefined' || !('Notification' in window)) {
+        console.log('[Push] Notification API not supported on this browser.');
+        return;
+      }
+
       // 1. Verifica ou solicita permissão de notificação
-      let permission = Notification.permission;
+      let permission = window.Notification.permission;
       if (permission === 'default') {
-        permission = await Notification.requestPermission();
+        permission = await window.Notification.requestPermission();
       }
       if (permission !== 'granted') {
         console.log('[Push] Notification permission denied or not granted.');

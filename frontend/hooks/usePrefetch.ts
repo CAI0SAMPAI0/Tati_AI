@@ -21,7 +21,6 @@ const CLIENT_PREFETCHES: Record<string, { queryKey: string[], endpoint: string }
   chat: [
     { queryKey: ['due-vocab'], endpoint: '/users/vocabulary/due' },
     { queryKey: ['payments-status'], endpoint: ENDPOINTS.PAYMENTS_STATUS },
-    { queryKey: ['conversations'], endpoint: ENDPOINTS.CONVERSATIONS },
   ],
   progress: [
     { queryKey: ['my-stats'], endpoint: '/dashboard/stats/my' },

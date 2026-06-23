@@ -110,10 +110,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         queryKey: ['payments-status'],
         queryFn: () => apiGet(ENDPOINTS.PAYMENTS_STATUS),
       });
-      queryClient.prefetchQuery({
-        queryKey: ['conversations'],
-        queryFn: () => apiGet(ENDPOINTS.CONVERSATIONS),
-      });
     }
   }, [queryClient]);
 
@@ -159,10 +155,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.prefetchQuery({
       queryKey: ['payments-status'],
       queryFn: () => apiGet(ENDPOINTS.PAYMENTS_STATUS),
-    });
-    queryClient.prefetchQuery({
-      queryKey: ['conversations'],
-      queryFn: () => apiGet(ENDPOINTS.CONVERSATIONS),
     });
 
     // Valida sessão no backend para evitar estado quebrado após refresh de página.
