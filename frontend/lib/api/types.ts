@@ -16,6 +16,14 @@ export interface User {
   nickname?: string;
   occupation?: string;
   focus?: string;
+  /**
+   * Optional nested profile information returned by the backend.
+   * Currently used for `responsible_email` in the profile page.
+   */
+  profile?: {
+    responsible_email?: string;
+    // add other profile fields here when needed
+  };
 }
 
 export interface AuthLoginResponse {

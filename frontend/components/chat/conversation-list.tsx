@@ -35,6 +35,7 @@ export function ConversationList({ currentId, onSelect, onDelete }: Conversation
       // If less than limit returned, no more pages
       return lastPage.length === 20 ? allPages.length : undefined;
     },
+    initialPageParam: 0,
     staleTime: 15_000,
   });
 
