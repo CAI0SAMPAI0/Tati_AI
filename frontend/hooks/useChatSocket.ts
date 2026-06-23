@@ -24,6 +24,7 @@ export function useChatSocket(conversationId: string | null) {
   const reset = useErrorCountStore(s => s.reset);
   
   const convIdRef = useRef<string | null>(conversationId);
+  const pendingPdfRef = useRef<{ pdf_b64: string; filename: string } | null>(null);
 
   // Sync ref with state
   useEffect(() => {
@@ -66,6 +67,7 @@ export function useChatSocket(conversationId: string | null) {
         setIsStreaming(true);
         setStreamingContent('');
         streamingRef.current = '';
+        pendingPdfRef.current = null;
         break;
       case 'stream_token':
         const tok = msg.token || msg.content || '';
@@ -82,6 +84,8 @@ export function useChatSocket(conversationId: string | null) {
             role: 'assistant',
             content: finalContent,
             created_at: new Date().toISOString(),
+            pdf_b64: pendingPdfRef.current?.pdf_b64 || null,
+            pdf_filename: pendingPdfRef.current?.filename || null,
           };
           
           setMessages((prev) => {
@@ -107,6 +111,7 @@ export function useChatSocket(conversationId: string | null) {
 
           setStreamingContent('');
           streamingRef.current = '';
+          pendingPdfRef.current = null;
         }
         break;
       case 'transcription':
@@ -151,20 +156,28 @@ export function useChatSocket(conversationId: string | null) {
         }
         break;
       case 'pdf_generated':
-        setMessages((prev) => {
-          const last = [...prev];
-          for (let i = last.length - 1; i >= 0; i--) {
-            if (last[i].role === 'assistant') {
-              last[i] = {
-                ...last[i],
-                pdf_b64: msg.pdf_b64,
-                pdf_filename: msg.filename || 'Documento.pdf',
-              };
-              break;
+        pendingPdfRef.current = {
+          pdf_b64: msg.pdf_b64 || '',
+          filename: msg.filename || 'Documento.pdf',
+        };
+        if (msg.text) {
+          streamingRef.current = msg.text;
+          setStreamingContent(msg.text);
+        }
+        break;
+      case 'message_id_update':
+        if (msg.real_id && msg.role) {
+          setMessages((prev) => {
+            const last = [...prev];
+            for (let i = last.length - 1; i >= 0; i--) {
+              if (last[i].role === msg.role) {
+                last[i] = { ...last[i], id: String(msg.real_id) };
+                break;
+              }
             }
-          }
-          return last;
-        });
+            return last;
+          });
+        }
         break;
       case 'error':
         setIsStreaming(false);
@@ -199,6 +212,7 @@ export function useChatSocket(conversationId: string | null) {
   const sendMessage = useCallback(async (text: string, overrideConvId?: string) => {
     if (!socket) return;
     
+    pendingPdfRef.current = null;
     try {
       await socket.waitUntilOpen();
     } catch (e) {
@@ -236,6 +250,7 @@ export function useChatSocket(conversationId: string | null) {
   const sendAudio = useCallback(async (base64: string, overrideConvId?: string) => {
     if (!socket) return;
     
+    pendingPdfRef.current = null;
     try {
       await socket.waitUntilOpen();
     } catch (e) {
@@ -271,6 +286,7 @@ export function useChatSocket(conversationId: string | null) {
   const sendFile = useCallback(async (filename: string, base64: string, caption?: string, overrideConvId?: string) => {
     if (!socket) return;
 
+    pendingPdfRef.current = null;
     try {
       await socket.waitUntilOpen();
     } catch (e) {

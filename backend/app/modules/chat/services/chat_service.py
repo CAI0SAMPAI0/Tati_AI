@@ -213,7 +213,13 @@ class ChatService:
 
         user_audio_b64 = msg.get(
             'audio') if msg_type == 'audio' else None
-        await save_message(conv_id, username, 'user', content, audio_b64=user_audio_b64)
+        saved_user_msg = await save_message(conv_id, username, 'user', content, audio_b64=user_audio_b64)
+        if saved_user_msg and 'id' in saved_user_msg:
+            await websocket.send_json({
+                'type': 'message_id_update',
+                'role': 'user',
+                'real_id': saved_user_msg['id']
+            })
         history.append({'role': 'user', 'content': content})
 
         # Streak e metadados (rápido)
@@ -374,7 +380,18 @@ class ChatService:
 
         if is_pdf_generation:
             try:
-                from app.shared.services.pdf_generator import generate_report_pdf
+                from app.shared.services.pdf_generator import generate_report_pdf, extract_pdf_and_clean
+                
+                # Reconstruct full LLM response to clean it from JSON delimiters
+                entire_response = buffer[:start_idx] + tag_content + full_response
+                pre_tag_extracted, pdf_filename_extracted, pdf_content = extract_pdf_and_clean(entire_response)
+                
+                if pdf_filename_extracted:
+                    pdf_filename = pdf_filename_extracted
+                
+                pre_tag_text = pre_tag_extracted or pre_tag_text
+                full_response = pdf_content
+
                 pdf_path = generate_report_pdf(
                     full_response.strip(), filename=pdf_filename)
                 with open(pdf_path, 'rb') as f:
@@ -383,7 +400,7 @@ class ChatService:
                     'type': 'pdf_generated',
                     'pdf_b64': pdf_b64,
                     'filename': pdf_filename,
-                    'text': '📄 Document created successfully!'
+                    'text': pre_tag_text or '📄 Document created successfully!'
                 })
             except Exception as e:
                 logging.info(f"Error generating PDF: {e}")
@@ -462,9 +479,18 @@ class ChatService:
                 parts.append(full_response)
                 db_content = "\n".join(parts)
 
-            await save_message(
+            saved_assistant_msg = await save_message(
                 conv_id, username, 'assistant', db_content, audio_b64=audio_b64
             )
+            if saved_assistant_msg and 'id' in saved_assistant_msg:
+                try:
+                    await websocket.send_json({
+                        'type': 'message_id_update',
+                        'role': 'assistant',
+                        'real_id': saved_assistant_msg['id']
+                    })
+                except Exception as ws_err:
+                    logging.info(f"Error sending assistant message ID update: {ws_err}")
 
             # Envia áudio imediatamente se for modo voz (opcional, já
             # vai via WS se for o caso)

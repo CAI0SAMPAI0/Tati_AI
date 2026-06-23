@@ -7,7 +7,7 @@ import { cn, parseAIResponse } from '@/lib/utils';
 import { ClickableText } from './clickable-text';
 import { AudioPlayer } from './audio-player';
 import { useState } from 'react';
-import { Pencil, Check, X, Copy } from 'lucide-react';
+import { Pencil, Check, X, Copy, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface MessageBubbleProps {
@@ -15,9 +15,10 @@ interface MessageBubbleProps {
   isStreaming?: boolean;
   onWordClick?: (word: string, x: number, y: number) => void;
   onEdit?: (messageId: string, newContent: string) => Promise<void>;
+  onResend?: (content: string) => void;
 }
 
-export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: MessageBubbleProps) {
+export function MessageBubble({ message, isStreaming, onWordClick, onEdit, onResend }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
@@ -80,36 +81,35 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
           )}
         >
           {isEditing ? (
-            <div className="flex flex-col gap-2 min-w-[200px]">
+            <div className="flex flex-col gap-2 w-full min-w-[260px] sm:min-w-[400px] md:min-w-[500px] max-w-full">
               <textarea
-                className="w-full bg-white/10 text-white border border-white/20 rounded-lg p-2 text-sm outline-none focus:border-white/40 resize-none"
+                className="w-full min-h-[100px] max-h-[300px] bg-white/10 text-white border border-white/20 rounded-xl p-3 text-sm outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 resize-y"
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
                 autoFocus
-                rows={Math.max(2, editContent.split('\n').length)}
               />
-              <div className="flex justify-end gap-1.5">
+              <div className="flex justify-end gap-2 mt-1">
                 <button
                   onClick={() => {
                     setIsEditing(false);
                     setEditContent(message.content);
                   }}
-                  className="p-1 hover:bg-white/10 rounded-md transition-colors"
+                  className="px-3 py-1.5 hover:bg-white/10 rounded-lg text-xs font-semibold text-white/80 transition-colors"
                   disabled={isSaving}
                 >
-                  <X size={14} />
+                  Cancel
                 </button>
                 <button
                   onClick={handleSave}
-                  className="p-1 bg-white/20 hover:bg-white/30 rounded-md transition-colors flex items-center gap-1 px-2"
+                  className="px-3 py-1.5 bg-white text-primary hover:bg-white/90 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-sm"
                   disabled={isSaving}
                 >
                   {isSaving ? (
-                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
                   ) : (
-                    <Check size={14} />
+                    <Check size={13} />
                   )}
-                  <span className="text-[0.7rem] font-bold">Save</span>
+                  Save
                 </button>
               </div>
             </div>
@@ -165,12 +165,22 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit }: Mes
                 </button>
               )}
 
+              {isUser && onResend && !isStreaming && (
+                <button
+                  onClick={() => onResend(message.content)}
+                  className="absolute -left-16 top-1/2 -translate-y-1/2 p-1.5 text-text-subtle hover:text-primary opacity-0 group-hover:opacity-100 transition-all bg-surface border border-border rounded-lg shadow-sm"
+                  title="Resend message"
+                >
+                  <RotateCcw size={12} />
+                </button>
+              )}
+
               {!isStreaming && (
                 <button
                   onClick={handleCopy}
                   className={cn(
                     "absolute top-1/2 -translate-y-1/2 p-1.5 text-text-subtle hover:text-primary opacity-0 group-hover:opacity-100 transition-all bg-surface border border-border rounded-lg shadow-sm z-10",
-                    isUser ? (onEdit ? "-left-16" : "-left-8") : "-right-8"
+                    isUser ? (onEdit ? (onResend ? "-left-24" : "-left-16") : "-left-8") : "-right-8"
                   )}
                   title="Copy message"
                 >

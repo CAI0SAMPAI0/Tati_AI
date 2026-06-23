@@ -135,6 +135,9 @@ export function parseAIResponse(content: string): { reply: string; correction?: 
        }
        return { reply: partial.replace(/\\"/g, '"').replace(/\\n/g, '\n') };
     }
+    if (content.trim().startsWith('{')) {
+      return { reply: '' };
+    }
   }
 
   return { reply: content };

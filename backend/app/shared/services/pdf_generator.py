@@ -2,7 +2,7 @@ import os
 import re
 import tempfile
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -180,7 +180,9 @@ def _header_footer(canvas, doc):
 
     canvas.setFont('Helvetica', 8)
     canvas.setFillColor(MUTED)
-    date_str = datetime.now().strftime('%Y-%m-%d %H:%M')
+    # Sao Paulo, Brasil (UTC-3)
+    sao_paulo_tz = timezone(timedelta(hours=-3))
+    date_str = datetime.now(sao_paulo_tz).strftime('%Y-%m-%d %H:%M')
     canvas.drawString(
         doc.leftMargin,
         doc.bottomMargin - 9 * mm,
@@ -442,3 +444,54 @@ def generate_certificate_pdf(student_name: str, level: str, date_str: str) -> st
 
     doc.build(story, onFirstPage=draw_background)
     return output_path
+
+
+def extract_pdf_and_clean(content: str):
+    """
+    Parses JSON from LLM response (or works with raw strings) to get the clean reply.
+    Then, extracts pre_tag text, pdf_filename, and pdf_content.
+    """
+    import json
+    import re
+
+    reply_content = ""
+    # 1. Tenta tratar como JSON completo primeiro
+    try:
+        clean = content.strip()
+        if clean.startswith('```'):
+            clean = re.sub(r'^```[\w]*\n?', '', clean)
+            clean = re.sub(r'\n?```$', '', clean.strip())
+        
+        match = re.search(r'\{.*\}', clean, re.DOTALL)
+        if match:
+            data = json.loads(match.group(0))
+            reply_content = data.get('reply') or ''
+        else:
+            reply_content = content
+    except Exception:
+        # Fallback se falhar
+        match = re.search(r'"reply"\s*:\s*"([^"]*)"', content)
+        if match:
+            reply_content = match.group(1).replace('\\"', '"').replace('\\n', '\n')
+        else:
+            reply_content = content
+
+    # 2. Agora extrai pre_tag, filename e pdf_content a partir do reply_content limpo
+    pre_tag = ""
+    pdf_filename = None
+    pdf_content = reply_content
+
+    if '[GENERATE_PDF' in reply_content:
+        start_idx = reply_content.find('[GENERATE_PDF')
+        end_idx = reply_content.find(']', start_idx)
+        if end_idx != -1:
+            tag_content = reply_content[start_idx:end_idx + 1]
+            if ':' in tag_content:
+                pdf_filename = tag_content.split(':', 1)[1].strip(' ]')
+                if not pdf_filename.endswith('.pdf'):
+                    pdf_filename += '.pdf'
+            
+            pre_tag = reply_content[:start_idx].strip()
+            pdf_content = reply_content[end_idx + 1:].strip()
+
+    return pre_tag, pdf_filename, pdf_content

@@ -12,6 +12,7 @@ export type WsMessageType =
   | 'new_title'
   | 'pdf_generated'
   | 'simulation_state'
+  | 'message_id_update'
   | 'error';
 
 export type WsOrigin = 'chat' | 'voice';
@@ -28,6 +29,8 @@ export interface WsIncomingMessage {
   result?: unknown;
   message?: string;
   completed_objectives?: string[];
+  real_id?: string | number;
+  role?: 'user' | 'assistant';
 }
 
 export interface WsOutgoingMessage {

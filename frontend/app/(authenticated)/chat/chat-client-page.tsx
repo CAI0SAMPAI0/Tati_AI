@@ -103,8 +103,8 @@ export default function ChatClientPage() {
           setConvTitle(res.data.title);
           router.replace(`/chat?conv_id=${convId}`, { scroll: false });
         } else {
-            console.error('Failed to create conversation:', res.data);
-            return;
+          console.error('Failed to create conversation:', res.data);
+          return;
         }
       } catch (err) {
         console.error('Error creating conversation:', err);
@@ -154,7 +154,7 @@ export default function ChatClientPage() {
       });
 
       if (res.ok) {
-        setMessages((prev) => prev.map(m => 
+        setMessages((prev) => prev.map(m =>
           m.id === messageId ? { ...m, content: newContent } : m
         ));
         toast.success('Message updated.');
@@ -166,6 +166,32 @@ export default function ChatClientPage() {
       toast.error('Error connecting to server.');
     }
   };
+
+  // Resend a message (e.g., after editing error)
+  const handleResend = useCallback(async (content: string) => {
+    if (!currentConvId) {
+      // If no conversation yet, create one like handleSend does
+      try {
+        const convRes = await apiPost<Conversation>(ENDPOINTS.CONVERSATIONS, {
+          title: content.substring(0, 20) + '...'
+        });
+        if (convRes.ok) {
+          const newId = convRes.data.id;
+          setCurrentConvId(newId);
+          setConvTitle(convRes.data.title);
+          router.replace(`/chat?conv_id=${newId}`, { scroll: false });
+          sendMessage(content, newId);
+        } else {
+          toast.error('Could not create conversation for resend.');
+        }
+      } catch (err) {
+        console.error('Error creating conversation for resend:', err);
+        toast.error('Error creating conversation.');
+      }
+    } else {
+      sendMessage(content, currentConvId);
+    }
+  }, [currentConvId, sendMessage, router]);
 
   const handleSendFile = async (filename: string, base64: string, caption?: string) => {
     let convId = currentConvId;
@@ -245,7 +271,7 @@ export default function ChatClientPage() {
           title={convTitle}
           onToggleSidebar={() => setSidebarOpen(true)}
           onShowSummary={handleOpenSummary}
-          onSwitchToVoice={() => router.push(currentConvId ? `/voice?conv_id=${currentConvId}` : '/voice')}     
+          onSwitchToVoice={() => router.push(currentConvId ? `/voice?conv_id=${currentConvId}` : '/voice')}
           showSummaryBtn={messages.length >= 3}
         />
 
@@ -255,19 +281,20 @@ export default function ChatClientPage() {
             isStreaming={isStreaming}
             streamingContent={streamingContent}
             onEdit={handleEditMessage}
+            onResend={handleResend}
           />
         </div>
-          <div className="p-2 md:p-6 bg-gradient-to-t from-bg via-bg/80 to-transparent">
-            <div className="max-w-4xl mx-auto w-full">
-              <ChatInput
-                onSend={handleSend}
-                onSendAudio={handleSendAudio}
-                onSendFile={handleSendFile}
-                disabled={false}
-                isStreaming={isStreaming}
-              />
-            </div>
+        <div className="p-2 md:p-6 bg-gradient-to-t from-bg via-bg/80 to-transparent">
+          <div className="max-w-4xl mx-auto w-full">
+            <ChatInput
+              onSend={handleSend}
+              onSendAudio={handleSendAudio}
+              onSendFile={handleSendFile}
+              disabled={false}
+              isStreaming={isStreaming}
+            />
           </div>
+        </div>
       </div>
 
       <AnimatePresence>
@@ -291,7 +318,7 @@ export default function ChatClientPage() {
                   <h2 className="text-xl font-bold text-text">Pedagogical Summary</h2>
                   <p className="text-xs text-text-muted mt-0.5">Analysis of your practice with Teacher Tati</p>
                 </div>
-                <button 
+                <button
                   onClick={() => setIsSummaryOpen(false)}
                   className="p-2 rounded-lg hover:bg-surface-hover transition-colors"
                 >

@@ -10,9 +10,10 @@ interface MessageListProps {
   isStreaming: boolean;
   streamingContent: string;
   onEdit?: (messageId: string, newContent: string) => Promise<void>;
+  onResend?: (content: string) => void;
 }
 
-export function MessageList({ messages, isStreaming, streamingContent, onEdit }: MessageListProps) {
+export function MessageList({ messages, isStreaming, streamingContent, onEdit, onResend }: MessageListProps) {
   
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -115,6 +116,7 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit }:
           message={m} 
           onWordClick={handleWordClick}
           onEdit={onEdit}
+          onResend={onResend}
         />
       ))}
 

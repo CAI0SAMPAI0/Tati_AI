@@ -186,18 +186,13 @@ async def load_history(conversation_id: str) -> list[dict]:
             content = msg.get('content') or ''
             if msg.get('role') == 'assistant' and '[GENERATE_PDF:' in content:
                 try:
-                    import re
                     import base64
                     import os
-                    from app.shared.services.pdf_generator import generate_report_pdf
+                    from app.shared.services.pdf_generator import generate_report_pdf, extract_pdf_and_clean
 
-                    # Regex para separar: (qualquer texto antes)\n[GENERATE_PDF: filename.pdf]\n(conteúdo do PDF)
-                    match = re.search(r'^(.*?)\s*\[GENERATE_PDF:\s*([^\]]+)\]\s*\n?(.*)', content, re.DOTALL)
-                    if match:
-                        pre_tag = match.group(1).strip()
-                        pdf_filename = match.group(2).strip()
-                        pdf_content = match.group(3).strip()
-
+                    # Usa o extrator robusto para limpar qualquer sujeira de JSON
+                    pre_tag, pdf_filename, pdf_content = extract_pdf_and_clean(content)
+                    if pdf_filename:
                         # Se o arquivo já existe no temp, apenas usa, senão gera
                         import tempfile
                         pdf_path = os.path.join(tempfile.gettempdir(), pdf_filename)
@@ -322,14 +317,25 @@ async def update_message(
         }
         if audio_b64:
             update_data['audio_b64'] = audio_b64
-        query = db.table('messages').update(update_data).eq('id', message_id).eq('username', username)
+
+        try:
+            db_id = int(message_id)
+        except ValueError:
+            db_id = message_id
+
+        import logging
+        logging.info(f"[DB Update message debug] message_id={message_id}, db_id={db_id}, username={username}, conversation_id={conversation_id}")
+
+        query = db.table('messages').update(update_data).eq('id', db_id).eq('username', username)
         if conversation_id:
             query = query.eq('session_id', conversation_id)
         res = query.execute()
+        logging.info(f"[DB Update message debug] Query result data: {res.data}")
         return res.data[0] if res.data else None
     try:
         return await _execute_db(_update)
     except Exception as e:
+        import logging
         logging.info(f'ERROR [update_message]: {e}')
         return None
 

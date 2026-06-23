@@ -199,10 +199,20 @@ else:
 
     @app.get('/health')
     async def health():
+        from app.shared.services.history import update_message
+        msg_id = 'c5c0b412-6314-418d-9416-b8a7292d5cb4'
+        username = 'programador'
+        conversation_id = '20260616_114636_progra'
+        content = "Create a pdf for me with 10 exercises about the Present Perfect, 10 exercises about Verb to be and Must be [EDITED]"
+        try:
+            res_msg = await update_message(msg_id, username, content, conversation_id=conversation_id)
+        except Exception as e:
+            res_msg = f"EXCEPTION: {e}"
         return {
             'status': 'ok',
             "service": "Teacher Tati API",
-            "version": "2.1.6"
+            "version": "2.1.6",
+            "db_update_check": res_msg
         }
 
 if __name__ == '__main__':
