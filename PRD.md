@@ -863,3 +863,109 @@ erDiagram
 
 - [X] **Documentação: Atualização de Guias**
   - [X] Registrar as mudanças e lógica das Sprints 13 e 14 na documentação técnica.
+
+---
+
+### Sprint 16 – Milestone 1: Estabilidade, Banco de Dados & Infra (Segurança)
+
+**Objetivo:** Otimizar o backend, corrigir warnings do console e preparar o Supabase para maior tráfego.
+**Agentes alocados:** [backend-expert](file:///C:/Users/caio/Documents/GitHub/Tati_AI/agents/backend-expert.md), [frontend-expert](file:///C:/Users/caio/Documents/GitHub/Tati_AI/agents/frontend-expert.md), [docs-expert](file:///C:/Users/caio/Documents/GitHub/Tati_AI/agents/docs-expert.md)
+
+- [X] **Celery Fallback (Backend)**
+  - [X] Adicionar tratamento em [task_manager.py](file:///C:/Users/caio/Documents/GitHub/Tati_AI/backend/app/core/task_manager.py) para redirecionar tarefas locais síncronas caso a fila do Celery/CloudAMQP falhe.
+- [ ] **Permissions-Policy Cleanup (Backend)**
+  - [ ] Remover recursos obsoletos (ex: `browsing-topics`, `run-ad-auction`) dos cabeçalhos HTTP do backend.
+- [ ] **Supabase Database Indexing (Database)**
+  - [ ] Adicionar índices nas chaves primárias e relacionais para otimizar os carregamentos do painel administrativo.
+- [ ] **Remoção de Alunos em Cascade (Database)**
+  - [ ] Configurar cascateamento (`ON DELETE CASCADE`) no banco para tornar a remoção de usuários 100% segura e livre de erros de FK.
+- [ ] **Configuração de Timeouts no Celery (Backend)**
+  - [ ] Ajustar parâmetros no Beat para evitar execução duplicada de relatórios semanais.
+- [ ] **Páginas Dinâmicas - Dynamic Imports (Frontend)**
+  - [ ] Usar imports dinâmicos no Next.js para os componentes pesados de gráficos e tabelas do Dashboard.
+- [ ] **Monitor de Saúde do Celery (Backend & Frontend)**
+  - [ ] Criar tela no painel de administração mostrando o status e saúde dos workers e filas ativas.
+
+---
+
+### Sprint 17 – Milestone 2: Gamificação e Otimização da Trilha (Alunos)
+
+**Objetivo:** Melhorar o engajamento diário, corrigir bugs visuais e refinar a lógica de ofensivas (streaks).
+**Agentes alocados:** [frontend-expert](file:///C:/Users/caio/Documents/GitHub/Tati_AI/agents/frontend-expert.md), [backend-expert](file:///C:/Users/caio/Documents/GitHub/Tati_AI/agents/backend-expert.md)
+
+- [ ] **Streak por Fuso Horário Local (Backend & Frontend)**
+  - [ ] Evitar quebras de streak incorretas calculando o fechamento do dia com base no fuso horário do dispositivo do aluno.
+- [ ] **Resiliência Offline do SW (Frontend)**
+  - [ ] Garantir que o Service Worker responda com uma página offline amigável para navegações sem internet.
+- [ ] **Embaralhamento das Questões (Backend)**
+  - [ ] Embaralhar as alternativas dos quizzes a cada tentativa para evitar memorização.
+- [ ] **Modais Responsivos (Frontend)**
+  - [ ] Ajustar os modais administrativos do dashboard para uso 100% amigável no celular.
+- [ ] **Indicadores Visuais de Streak Freezes (Frontend)**
+  - [ ] Mostrar a quantidade de congelamentos restantes ao lado do perfil do aluno no dashboard.
+- [ ] **Paginação de Mensagens do Chat (Frontend)**
+  - [ ] Limitar o carregamento inicial das conversas com a IA a 20 mensagens, carregando mais conforme o scroll.
+- [ ] **Clube de Estudos / Ligas de XP (Backend & Frontend)**
+  - [ ] Ligas competitivas agrupando estudantes do mesmo nível para incentivar a prática.
+- [ ] **Notificações Semanais para Responsáveis (Backend)**
+  - [ ] E-mails automáticos detalhando o progresso e assiduidade dos alunos.
+- [ ] **Certificado de Conclusão CEFR (Backend & Frontend)**
+  - [ ] Geração de PDFs de formatura para download quando a Tatiana declarar que o aluno concluiu o nível.
+
+---
+
+### Sprint 18 – Milestone 3: Prática Oral, Redações e Aprendizado Ativo (Alunos)
+
+**Objetivo:** Introduzir os novos módulos interativos de correção de escrita, pronúncia e vocabulário.
+**Agentes alocados:** [frontend-expert](file:///C:/Users/caio/Documents/GitHub/Tati_AI/agents/frontend-expert.md), [backend-expert](file:///C:/Users/caio/Documents/GitHub/Tati_AI/agents/backend-expert.md)
+
+- [ ] **Filtro de Erros Ortográficos Simples (Backend)**
+  - [ ] Evitar lotar o SRS do aluno com pequenos erros de digitação (typos), focando apenas em erros de gramática e vocabulário real.
+- [ ] **Suporte e Detecção de Permissão de Microfone (Frontend)**
+  - [ ] Instruções e modais informativos claros caso o navegador silencie ou bloqueie o microfone do usuário (Safari/Chrome).
+- [ ] **Writing Sandbox (Backend & Frontend)**
+  - [ ] Sandbox de correção detalhada de redações longas.
+- [ ] **Audio Scoring - Feedback de Pronúncia (Backend & Frontend)**
+  - [ ] Avaliação com notas de 0 a 100 com base em STT no chat.
+- [ ] **Vocab SRS Dashboard (Backend & Frontend)**
+  - [ ] Central de cartões de Spaced Repetition para memorização de termos.
+- [ ] **Hands-Free Audio Loop (Frontend)**
+  - [ ] Modo hands-free com microfone contínuo.
+- [ ] **Visual Grammar Sandbox (Frontend)**
+  - [ ] Exercícios interativos de montagem gramatical.
+- [ ] **Voice Calls Simuladas (Backend & Frontend)**
+  - [ ] Interface de roleplay por chamada de voz simulada.
+- [ ] **Criador de Cenários pelo Aluno (Backend & Frontend)**
+  - [ ] Aluno pode ditar em qual situação profissional/pessoal quer praticar.
+
+---
+
+### Sprint 19 – Milestone 4: Copiloto e Controle Pedagógico (Professora Tatiana)
+
+**Objetivo:** Entregar o painel definitivo de controle para a Tatiana gerenciar e intervir nas turmas.
+**Agentes alocados:** [frontend-expert](file:///C:/Users/caio/Documents/GitHub/Tati_AI/agents/frontend-expert.md), [backend-expert](file:///C:/Users/caio/Documents/GitHub/Tati_AI/agents/backend-expert.md), [docs-expert](file:///C:/Users/caio/Documents/GitHub/Tati_AI/agents/docs-expert.md)
+
+- [X] **Dashboard Docente Avançado: Métricas & Nudges (Backend & Frontend)**
+  - [X] Implementar endpoints de analíticas detalhadas do aluno e envio de nudges multicanal (e-mail + push) em [dashboard_service.py](file:///C:/Users/caio/Documents/GitHub/Tati_AI/backend/app/modules/admin/services/dashboard_service.py).
+  - [X] Criar aba "Analytics" no frontend dentro do modal do aluno em [student-modal.tsx](file:///C:/Users/caio/Documents/GitHub/Tati_AI/frontend/components/dashboard/student-modal.tsx) com gráficos de engajamento semanal baseados em `study_sessions` e controle de envio de mensagens de incentivo.
+- [ ] **Validação de Prompts Customizados (Backend)**
+  - [ ] Validação contra tentativas de bypass/jailbreak nos prompts dos alunos.
+- [ ] **Harmonia Visual de Cores - Dark Mode (Frontend)**
+  - [ ] Ajustar pequenos detalhes visuais no tema escuro do dashboard.
+- [ ] **Atualizações em Tempo Real - SWR Cache (Frontend)**
+  - [ ] Sincronizar painéis automaticamente após modificações no painel.
+- [ ] **Copiloto de Chat em Tempo Real (Backend & Frontend)**
+  - [ ] Visualização de chats ativos e interjeição de mensagens manuais pela Tatiana.
+- [ ] **Distribuidor de Deveres de Casa - Homework Dispatcher (Backend & Frontend)**
+  - [ ] Delegação em massa de exercícios para turmas específicas.
+- [ ] **Digest de Dificuldades - AI Digest (Backend)**
+  - [ ] Relatórios automáticos para a Tatiana listando as matérias que a turma mais tem dificuldades.
+- [ ] **Sistema de Tags de Alunos (Backend & Frontend)**
+  - [ ] Identificadores e filtros para segmentar alunos por tipo de assinatura, interesse ou foco profissional.
+- [ ] **Biblioteca de Prompts Globais (Backend & Frontend)**
+  - [ ] Modelos de prompts criados por Tatiana prontificados para associação com alunos.
+- [ ] **Exportador de Relatório PDF Escolar (Backend & Frontend)**
+  - [ ] Relatório acadêmico assinado para compartilhamento com pais ou empresas patrocinadoras.
+- [ ] **Editor de Simulações CEFR Avançado (Backend & Frontend)**
+  - [ ] Painel para cadastrar cenários complexos com listas de vocabulário e gramática mandatórios.
+
