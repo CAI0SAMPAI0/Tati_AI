@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts';
 
 interface FluencyEvolutionChartProps {
@@ -8,29 +9,30 @@ interface FluencyEvolutionChartProps {
 }
 
 export default function FluencyEvolutionChart({ pronunciation, cefr }: FluencyEvolutionChartProps) {
-  // Merge and sort data by date
-  const map: Record<string, { name: string; pronunciation?: number; cefr?: number }> = {};
+  const chartData = useMemo(() => {
+    const map: Record<string, { name: string; pronunciation?: number; cefr?: number }> = {};
 
-  pronunciation.forEach(p => {
-    const parts = p.date.split('-');
-    const label = parts.length >= 3 ? `${parts[2]}/${parts[1]}` : p.date; // DD/MM
-    map[p.date] = { name: label, pronunciation: p.score };
-  });
+    pronunciation.forEach(p => {
+      const parts = p.date.split('-');
+      const label = parts.length >= 3 ? `${parts[2]}/${parts[1]}` : p.date;
+      map[p.date] = { name: label, pronunciation: p.score };
+    });
 
-  cefr.forEach(c => {
-    const parts = c.date.split('-');
-    const label = parts.length >= 3 ? `${parts[2]}/${parts[1]}` : c.date; // DD/MM
-    const existing = map[c.date];
-    map[c.date] = {
-      name: label,
-      pronunciation: existing?.pronunciation,
-      cefr: c.score
-    };
-  });
+    cefr.forEach(c => {
+      const parts = c.date.split('-');
+      const label = parts.length >= 3 ? `${parts[2]}/${parts[1]}` : c.date;
+      const existing = map[c.date];
+      map[c.date] = {
+        name: label,
+        pronunciation: existing?.pronunciation,
+        cefr: c.score
+      };
+    });
 
-  const chartData = Object.keys(map)
-    .sort()
-    .map(key => map[key]);
+    return Object.keys(map)
+      .sort()
+      .map(key => map[key]);
+  }, [pronunciation, cefr]);
 
   return (
     <div className="h-[240px] w-full">

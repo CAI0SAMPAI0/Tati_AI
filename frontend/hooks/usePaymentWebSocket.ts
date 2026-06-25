@@ -16,6 +16,12 @@ interface PaymentStatusMessage {
 export function usePaymentWebSocket(onConfirmed?: (data: PaymentStatusMessage) => void, onRefused?: (data: PaymentStatusMessage) => void) {
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
   const ws = useRef<WebSocket | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const onConfirmedRef = useRef(onConfirmed);
+  const onRefusedRef = useRef(onRefused);
+  onConfirmedRef.current = onConfirmed;
+  onRefusedRef.current = onRefused;
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -29,7 +35,6 @@ export function usePaymentWebSocket(onConfirmed?: (data: PaymentStatusMessage) =
 
       socket.onopen = () => {
         setStatus('connected');
-        console.log('[PaymentWS] Connected');
       };
 
       socket.onmessage = (event) => {
@@ -37,41 +42,37 @@ export function usePaymentWebSocket(onConfirmed?: (data: PaymentStatusMessage) =
           const data = JSON.parse(event.data) as PaymentStatusMessage;
           if (data.type === 'payment_status') {
             if (data.status === 'confirmed') {
-              onConfirmed?.(data);
+              onConfirmedRef.current?.(data);
             } else if (data.status === 'refused') {
-              onRefused?.(data);
+              onRefusedRef.current?.(data);
             }
           }
         } catch (e) {
           if (event.data === 'pong') return;
-          console.error('[PaymentWS] Error parsing message', e);
         }
       };
 
       socket.onclose = () => {
         setStatus('disconnected');
-        console.log('[PaymentWS] Disconnected');
-        // Retry after 5 seconds if not explicitly closed
-        setTimeout(() => {
+        reconnectTimerRef.current = setTimeout(() => {
           if (ws.current?.readyState === WebSocket.CLOSED) {
             connect();
           }
         }, 5000);
       };
 
-      socket.onerror = (error) => {
-        console.error('[PaymentWS] Error', error);
-      };
+      socket.onerror = () => {};
     };
 
     connect();
 
     return () => {
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       if (ws.current) {
         ws.current.close();
       }
     };
-  }, [onConfirmed, onRefused]);
+  }, []);
 
   return { status };
 }

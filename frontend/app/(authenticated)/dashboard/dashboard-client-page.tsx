@@ -124,6 +124,7 @@ export default function DashboardClientPage() {
     queryKey: ['admin-dashboard-students'],
     queryFn: () => apiGet<any[]>('/dashboard/students'),
     refetchInterval: 10000,
+    refetchIntervalInBackground: false, // Pausa polling quando a aba está em background
   });
   const { data: difficulties } = useQuery<any>({
     queryKey: ['admin-dashboard-difficulties'],

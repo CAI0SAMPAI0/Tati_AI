@@ -1,7 +1,10 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
+
+const ReactMarkdownLazy = dynamic(() => import('react-markdown'), { ssr: false });
 
 interface ClickableTextProps {
   content: string;
@@ -11,19 +14,10 @@ interface ClickableTextProps {
 }
 
 export function ClickableText({ content, isMarkdown = true, onWordClick, className }: ClickableTextProps) {
-  const [Markdown, setMarkdown] = useState<any>(null);
-  const [gfm, setGfm] = useState<any>(null);
-
-  useEffect(() => {
-    if (!isMarkdown) return;
-    Promise.all([
-      import('react-markdown'),
-      import('remark-gfm')
-    ]).then(([mdModule, gfmModule]) => {
-      setMarkdown(() => mdModule.default);
-      setGfm(() => gfmModule.default);
-    });
-  }, [isMarkdown]);
+  const gfmRef = useRef<any>(null);
+  if (gfmRef.current === null) {
+    import('remark-gfm').then(m => { gfmRef.current = m.default; });
+  }
 
   const handleClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -34,13 +28,6 @@ export function ClickableText({ content, isMarkdown = true, onWordClick, classNa
       }
     }
   };
-
-  const processedContent = useMemo(() => {
-    // This is a simplified way to wrap words. 
-    // For real markdown, we might need a custom renderer.
-    // However, we can use a custom component for 'p', 'li', etc. in ReactMarkdown.
-    return content;
-  }, [content]);
 
   if (!isMarkdown) {
     const parts = content.split(/(\s+)/);
@@ -61,14 +48,10 @@ export function ClickableText({ content, isMarkdown = true, onWordClick, classNa
     );
   }
 
-  if (!Markdown || !gfm) {
-    return <div className={cn("prose-container", className)}>{content}</div>;
-  }
-
   return (
     <div className={cn("prose-container", className)} onClick={handleClick}>
-      <Markdown 
-        remarkPlugins={[gfm]}
+      <ReactMarkdownLazy
+        remarkPlugins={gfmRef.current ? [gfmRef.current] : []}
         components={{
           p: ({ children }: any) => <p>{wrapChildren(children)}</p>,
           li: ({ children }: any) => <li>{wrapChildren(children)}</li>,
@@ -80,8 +63,8 @@ export function ClickableText({ content, isMarkdown = true, onWordClick, classNa
           strong: ({ children }: any) => <strong>{wrapChildren(children)}</strong>,
         }}
       >
-        {processedContent}
-      </Markdown>
+        {content}
+      </ReactMarkdownLazy>
     </div>
   );
 }

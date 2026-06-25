@@ -6,7 +6,7 @@ import type { Message } from '@/lib/api/types';
 import { cn, parseAIResponse } from '@/lib/utils';
 import { ClickableText } from './clickable-text';
 import { AudioPlayer } from './audio-player';
-import { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Pencil, Check, X, Copy, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -18,14 +18,14 @@ interface MessageBubbleProps {
   onResend?: (content: string) => void;
 }
 
-export function MessageBubble({ message, isStreaming, onWordClick, onEdit, onResend }: MessageBubbleProps) {
+export const MessageBubble = React.memo(function MessageBubble({ message, isStreaming, onWordClick, onEdit, onResend }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const parsed = parseAIResponse(message.content);
+  const parsed = useMemo(() => parseAIResponse(message.content), [message.content]);
 
   // Has a file attachment (PDF) — no audio for these messages
   const hasFile = !!(message.pdf_b64);
@@ -224,4 +224,4 @@ export function MessageBubble({ message, isStreaming, onWordClick, onEdit, onRes
       </div>
     </div>
   );
-}
+});

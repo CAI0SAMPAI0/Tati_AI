@@ -6,6 +6,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  useMemo,
   useRef,
   type ReactNode,
 } from 'react';
@@ -252,14 +253,53 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    fetchNotifications(true);
-    subscribeToPush();
-    // Poll every 15 seconds for quick feedback on AI generation
-    const interval = setInterval(() => fetchNotifications(false), 15 * 1000);
-    return () => clearInterval(interval);
+    // Atrasa o fetch inicial 3s para não competir com o render crítico da página
+    const initialTimer = setTimeout(() => {
+      fetchNotifications(true);
+      subscribeToPush();
+    }, 3000);
+
+    // Poll a cada 15s, mas pausa quando a aba está em background
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    const startPolling = () => {
+      if (interval) return;
+      interval = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          fetchNotifications(false);
+        }
+      }, 30 * 1000);
+    };
+
+    const stopPolling = () => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        // Recarrega imediatamente ao voltar para a aba
+        fetchNotifications(false);
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    startPolling();
+
+    return () => {
+      clearTimeout(initialTimer);
+      stopPolling();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [token, user, fetchNotifications, subscribeToPush]);
 
-  const markRead = async (id: string) => {
+
+  const markRead = useCallback(async (id: string) => {
     const notif = notifications.find((n) => n.id === id);
     if (!notif || notif.is_read) return;
     try {
@@ -269,9 +309,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       // fail silently
     }
-  };
+  }, [notifications]);
 
-  const markAllRead = async () => {
+  const markAllRead = useCallback(async () => {
     try {
       await apiPost(ENDPOINTS.NOTIFICATIONS_READ_ALL, {}).catch(() => null);
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
@@ -279,19 +319,19 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       // fail silently
     }
-  };
+  }, []);
+
+  const refresh = useCallback(async () => {
+    await fetchNotifications(false);
+  }, [fetchNotifications]);
+
+  const value = useMemo(
+    () => ({ notifications, unreadCount, loading, markRead, markAllRead, refresh }),
+    [notifications, unreadCount, loading, markRead, markAllRead, refresh]
+  );
 
   return (
-    <NotificationContext.Provider
-      value={{
-        notifications,
-        unreadCount,
-        loading,
-        markRead,
-        markAllRead,
-        refresh: () => fetchNotifications(false),
-      }}
-    >
+    <NotificationContext.Provider value={value}>
       {children}
     </NotificationContext.Provider>
   );

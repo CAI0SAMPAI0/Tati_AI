@@ -4,8 +4,17 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { Spinner } from '@/components/ui/spinner';
-import { NotificationProvider } from '@/providers/notification-provider';
-import { ChatSocketProvider } from '@/providers/chat-socket-provider';
+import dynamic from 'next/dynamic';
+
+// Lazy: não bloqueia o render inicial das rotas autenticadas
+const NotificationProvider = dynamic(
+  () => import('@/providers/notification-provider').then(m => m.NotificationProvider),
+  { ssr: false }
+);
+const ChatSocketProvider = dynamic(
+  () => import('@/providers/chat-socket-provider').then(m => m.ChatSocketProvider),
+  { ssr: false }
+);
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { token, isLoaded, isBootstrappingProfile } = useAuth();

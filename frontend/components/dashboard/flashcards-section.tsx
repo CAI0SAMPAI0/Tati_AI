@@ -277,9 +277,17 @@ export function FlashcardsSection() {
         const taskId = res.data.task_id;
         toast.loading('Generating flashcards with AI...', { id: taskId });
         
-        // Poll status
+        const MAX_POLL_RETRIES = 60;
+        let pollRetries = 0;
         const pollInterval = setInterval(async () => {
           try {
+            pollRetries++;
+            if (pollRetries > MAX_POLL_RETRIES) {
+              clearInterval(pollInterval);
+              setIsGenerating(false);
+              toast.error('Generation timed out. Please try again.', { id: taskId });
+              return;
+            }
             const statusRes = await apiGet<{status: string; error?: string}>(`/tasks/status/${taskId}`);
             if (statusRes) {
               if (statusRes.status === 'success') {

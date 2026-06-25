@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 
-import { useTheme } from 'next-themes';
+import { useTheme } from '@/hooks/useTheme';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';

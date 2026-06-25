@@ -12,6 +12,8 @@ import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 
 
+import dynamic from 'next/dynamic';
+
 import { 
   BookOpen, 
   Search, 
@@ -25,9 +27,11 @@ import {
   Edit2,
   Save
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
+
+const MotionDiv = dynamic(() => import('framer-motion').then(m => m.motion.div), { ssr: false });
+const AnimatePresence = dynamic(() => import('framer-motion').then(m => m.AnimatePresence), { ssr: false });
 
 interface VocabWord {
   id: string;
@@ -261,7 +265,7 @@ export default function VocabClientPage() {
               <AnimatePresence mode="popLayout">
                 {filteredWords.length > 0 ? (
                   filteredWords.map((word) => (
-                    <motion.div
+                    <MotionDiv
                       key={word.id}
                       layout
                       initial={{ opacity: 0, y: 10 }}
@@ -354,7 +358,7 @@ export default function VocabClientPage() {
                           <Trash2 size={18} />
                         </Button>
                       </div>
-                    </motion.div>
+                    </MotionDiv>
                   ))
                 ) : (
                   <div className="text-center py-20 bg-surface/50 border border-dashed border-border rounded-[2.5rem] space-y-4">

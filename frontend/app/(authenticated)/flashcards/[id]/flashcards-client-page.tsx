@@ -8,7 +8,10 @@ import { MainHeader } from '@/components/layout/main-header';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Volume2, RotateCcw, Check, X, HelpCircle, Sparkles, ArrowRight, Image as ImageIcon } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import dynamic from 'next/dynamic';
+
+const MotionDiv = dynamic(() => import('framer-motion').then(m => m.motion.div), { ssr: false });
+const AnimatePresence = dynamic(() => import('framer-motion').then(m => m.AnimatePresence), { ssr: false });
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -197,7 +200,7 @@ export default function FlashcardsClientPage() {
       <div className="min-h-screen bg-bg flex flex-col">
         <MainHeader onToggleMenu={() => {}} />
         <main className="flex-1 flex flex-col items-center justify-center p-6">
-          <motion.div
+          <MotionDiv
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             className="w-full max-w-lg bg-surface border border-border rounded-3xl p-10 text-center space-y-8 shadow-2xl"
@@ -251,7 +254,7 @@ export default function FlashcardsClientPage() {
                 Back <ArrowRight size={16} />
               </Button>
             </div>
-          </motion.div>
+          </MotionDiv>
         </main>
       </div>
     );
@@ -278,7 +281,7 @@ export default function FlashcardsClientPage() {
           </button>
           <div className="flex items-center gap-3">
             <div className="flex-1 h-1.5 bg-border rounded-full overflow-hidden">
-              <motion.div
+              <MotionDiv
                 className="h-full bg-primary rounded-full"
                 animate={{ width: `${progress}%` }}
                 transition={{ duration: 0.4 }}
@@ -289,7 +292,7 @@ export default function FlashcardsClientPage() {
         </div>
 
         <AnimatePresence mode="wait">
-          <motion.div
+          <MotionDiv
             key={currentIndex}
             initial={{ opacity: 0, x: 40 }}
             animate={{ opacity: 1, x: 0 }}
@@ -423,7 +426,7 @@ export default function FlashcardsClientPage() {
                 )}
               </div>
             </div>
-          </motion.div>
+          </MotionDiv>
         </AnimatePresence>
       </main>
     </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import React, { memo, useMemo, useState } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { MessageSquare, Trash2, X } from 'lucide-react';
 import { apiGet, apiDelete } from '@/lib/api/client';
@@ -14,7 +14,7 @@ interface ConversationListProps {
   onDelete?: (id: string) => void;
 }
 
-export function ConversationList({ currentId, onSelect, onDelete }: ConversationListProps) {
+export const ConversationList = memo(function ConversationList({ currentId, onSelect, onDelete }: ConversationListProps) {
   
   const queryClient = useQueryClient();
   const {
@@ -172,4 +172,4 @@ export function ConversationList({ currentId, onSelect, onDelete }: Conversation
       )}
     </div>
   );
-}
+});

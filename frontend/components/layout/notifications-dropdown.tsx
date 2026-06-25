@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
 import { Bell, BellOff, CheckCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNotifications } from '@/providers/notification-provider';
@@ -33,7 +33,7 @@ function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-US');
 }
 
-export function NotificationsDropdown() {
+export const NotificationsDropdown = memo(function NotificationsDropdown() {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const { notifications, unreadCount, loading, markRead, markAllRead, refresh } = useNotifications();
@@ -133,4 +133,4 @@ export function NotificationsDropdown() {
       )}
     </div>
   );
-}
+});

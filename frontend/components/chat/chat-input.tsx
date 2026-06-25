@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, memo } from 'react';
 import { Paperclip, Mic, Send, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -14,7 +14,7 @@ interface ChatInputProps {
   isStreaming?: boolean;
 }
 
-export function ChatInput({ onSend, onSendAudio, onSendFile, disabled, isStreaming }: ChatInputProps) {
+export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFile, disabled, isStreaming }: ChatInputProps) {
   const [text, setText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -335,4 +335,4 @@ export function ChatInput({ onSend, onSendAudio, onSendFile, disabled, isStreami
       </div>
     </div>
   );
-}
+});

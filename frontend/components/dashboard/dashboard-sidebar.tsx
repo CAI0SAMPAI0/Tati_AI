@@ -18,6 +18,18 @@ import {
 
 import { cn } from '@/lib/utils';
 
+const NAV_ITEMS: Array<{ id: DashSection; icon: React.ReactNode; label: string }> = [
+  { id: 'overview', icon: <PieChart size={20} />, label: 'Overview' },
+  { id: 'students', icon: <Users size={20} />, label: 'Students' },
+  { id: 'reports', icon: <LineChart size={20} />, label: 'Reports' },
+  { id: 'modules', icon: <BookOpen size={20} />, label: 'Modules' },
+  { id: 'flashcards', icon: <Layers size={20} />, label: 'Flashcards' },
+  { id: 'simulations', icon: <Drama size={20} />, label: 'Simulations' },
+  { id: 'cefr', icon: <BookOpen size={20} />, label: 'CEFR Materials' },
+  { id: 'dispatch', icon: <Send size={20} />, label: 'Dispatch Panel' },
+  { id: 'premium', icon: <Zap size={20} />, label: 'Premium Hub' },
+];
+
 export type DashSection = 'overview' | 'students' | 'reports' | 'modules' | 'flashcards' | 'simulations' | 'premium' | 'cefr' | 'dispatch';
 
 interface DashboardSidebarProps {
@@ -70,18 +82,6 @@ const DashNavItem = memo(
 );
 
 export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose }: DashboardSidebarProps) {
-  const navItems: Array<{ id: DashSection; icon: React.ReactNode; label: string }> = [
-    { id: 'overview', icon: <PieChart size={20} />, label: 'Overview' },
-    { id: 'students', icon: <Users size={20} />, label: 'Students' },
-    { id: 'reports', icon: <LineChart size={20} />, label: 'Reports' },
-    { id: 'modules', icon: <BookOpen size={20} />, label: 'Modules' },
-    { id: 'flashcards', icon: <Layers size={20} />, label: 'Flashcards' },
-    { id: 'simulations', icon: <Drama size={20} />, label: 'Simulations' },
-    { id: 'cefr', icon: <BookOpen size={20} />, label: 'CEFR Materials' },
-    { id: 'dispatch', icon: <Send size={20} />, label: 'Dispatch Panel' },
-    { id: 'premium', icon: <Zap size={20} />, label: 'Premium Hub' },
-  ];
-
   return (
     <>
       {/* Overlay para mobile */}
@@ -124,7 +124,7 @@ export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose 
         </div>
 
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
-          {navItems.map((item) => (
+          {NAV_ITEMS.map((item) => (
             <DashNavItem
               key={item.id}
               id={item.id}

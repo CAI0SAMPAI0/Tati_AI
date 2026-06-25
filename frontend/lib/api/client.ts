@@ -156,9 +156,14 @@ async function request(path: string, options: RequestOptions = {}): Promise<Resp
   const { headers, auth = true, retry401 = true, _retried = false, ...init } = options;
   const url = resolvePath(path);
   
+  // GETs usam cache HTTP do browser (melhora performance em navegações repetidas).
+  // Mutations (POST, PUT, PATCH, DELETE) forçam no-cache para garantir dados frescos.
+  const method = (init.method ?? 'GET').toUpperCase();
+  const defaultCache = method === 'GET' ? 'default' : 'no-store';
+
   try {
     const response = await fetch(url, {
-      cache: 'no-store',
+      cache: defaultCache,
       ...init,
       headers: buildHeaders(headers, auth),
     });

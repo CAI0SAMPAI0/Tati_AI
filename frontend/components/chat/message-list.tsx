@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Message } from '@/lib/api/types';
 import { MessageBubble } from './message-bubble';
 
@@ -23,8 +23,8 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit, o
 
   const [visibleCount, setVisibleCount] = useState(20);
   const prevLengthRef = useRef(messages.length);
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Se o total de mensagens aumentar (nova mensagem enviada/recebida), aumenta a contagem visível correspondente
   useEffect(() => {
     if (messages.length > prevLengthRef.current) {
       const diff = messages.length - prevLengthRef.current;
@@ -33,23 +33,23 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit, o
     prevLengthRef.current = messages.length;
   }, [messages.length]);
 
-  // Sempre rola para o final quando uma nova mensagem está sendo escrita/transmitida
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+    scrollTimerRef.current = setTimeout(() => {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 50);
   }, [messages.length, isStreaming, streamingContent]);
 
-  const handleScroll = () => {
+  const handleScroll = useCallback(() => {
     if (!containerRef.current) return;
     const { scrollTop } = containerRef.current;
 
-    // Se rolar para o topo e houver mais mensagens para carregar
     if (scrollTop < 10 && visibleCount < messages.length) {
       const scrollHeightBefore = containerRef.current.scrollHeight;
       
       setVisibleCount((prev) => {
         const next = Math.min(messages.length, prev + 20);
         
-        // Restaura a ancoragem do scroll para evitar pulo visual
         setTimeout(() => {
           if (containerRef.current) {
             const diff = containerRef.current.scrollHeight - scrollHeightBefore;
@@ -60,7 +60,7 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit, o
         return next;
       });
     }
-  };
+  }, [visibleCount, messages.length]);
 
   const handleWordClick = (word: string, x: number, y: number) => {
     setActiveWord(word);

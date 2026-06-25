@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ChatSocket } from '@/lib/ws/chat-socket';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -46,8 +46,13 @@ export function ChatSocketProvider({ children }: { children: React.ReactNode }) 
     };
   }, [token, user]);
 
+  const value = useMemo(
+    () => ({ socket: socketRef.current, isConnected }),
+    [isConnected]
+  );
+
   return (
-    <ChatSocketContext.Provider value={{ socket: socketRef.current, isConnected }}>
+    <ChatSocketContext.Provider value={value}>
       {children}
     </ChatSocketContext.Provider>
   );

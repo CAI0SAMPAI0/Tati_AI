@@ -19,7 +19,11 @@ import {
   CheckCircle2,
   Circle
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import dynamic from 'next/dynamic';
+
+const MotionDiv = dynamic(() => import('framer-motion').then(m => m.motion.div), { ssr: false });
+const AnimatePresence = dynamic(() => import('framer-motion').then(m => m.AnimatePresence), { ssr: false });
+
 import { useVoiceSocket } from '@/hooks/useVoiceSocket';
 import { useVoiceLiveSocket } from '@/hooks/useVoiceLiveSocket';
 import { VoiceAvatar } from '@/components/chat/voice-avatar';
@@ -27,7 +31,7 @@ import { VoiceMessageBubble } from '@/components/chat/voice-message-bubble';
 import WordTooltip from '@/components/chat/word-tooltip';
 import { apiGet, apiPost } from '@/lib/api/client';
 import toast from 'react-hot-toast';
-import { useTheme } from 'next-themes';
+import { useTheme } from '@/hooks/useTheme';
 import { cn } from '@/lib/utils';
 
 function exportWav(samples: Float32Array, sampleRate: number): Blob {
@@ -573,7 +577,7 @@ function VoicePageContent() {
   }
 
   return (
-    <div className="fixed inset-0 bg-[#f4f7ff] dark:bg-[#05060b] flex flex-col md:flex-row font-sans overflow-hidden transition-colors duration-1000">
+    <div className="fixed inset-0 bg-[#f4f7ff] dark:bg-[#05060b] flex flex-col md:flex-row font-sans overflow-hidden">
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute top-[-15%] left-[-10%] w-[80%] h-[80%] rounded-full bg-primary/10 dark:bg-primary/5 blur-[140px] animate-pulse duration-[15s]" />
         <div className="absolute bottom-[-10%] right-[-5%] w-[60%] h-[60%] rounded-full bg-accent/15 dark:bg-accent/5 blur-[120px] animate-pulse duration-[20s] [animation-delay:5s]" />
@@ -602,7 +606,7 @@ function VoicePageContent() {
         }} 
       />
 
-      <motion.div initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} className="w-full md:w-[42%] lg:w-[38%] h-[38vh] sm:h-[40vh] md:h-full relative flex flex-col items-center justify-center p-4 sm:p-8 bg-white/40 dark:bg-[#0f1120]/60 backdrop-blur-3xl border-b md:border-b-0 md:border-r border-white/40 dark:border-white/10 z-20 shadow-2xl transition-all">
+      <MotionDiv initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} className="w-full md:w-[42%] lg:w-[38%] h-[38vh] sm:h-[40vh] md:h-full relative flex flex-col items-center justify-center p-4 sm:p-8 bg-white/40 dark:bg-[#0f1120]/60 backdrop-blur-3xl border-b md:border-b-0 md:border-r border-white/40 dark:border-white/10 z-20 shadow-2xl transition-all">
         <div className="absolute top-4 sm:top-6 left-4 sm:left-6 flex items-center gap-4">
           <button onClick={() => router.back()} className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-white/50 dark:bg-[#1a1c2e]/60 border border-white/60 dark:border-white/10 text-text hover:text-primary transition-all active:scale-95 shadow-xl backdrop-blur-xl group">
             <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
@@ -658,9 +662,9 @@ function VoicePageContent() {
             </div>
           </div>
         </div>
-      </motion.div>
+      </MotionDiv>
 
-      <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} className="flex-1 flex flex-col min-h-0 bg-white/5 dark:bg-[#05060b]/40 relative z-10">
+      <MotionDiv initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} className="flex-1 flex flex-col min-h-0 bg-white/5 dark:bg-[#05060b]/40 relative z-10">
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-12 py-6 sm:py-10 space-y-6 sm:space-y-8 scrollbar-hide mask-fade-top-giant">
           {!convId && simulationId ? (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-8 p-6">
@@ -688,7 +692,7 @@ function VoicePageContent() {
           ) : (
             <AnimatePresence mode="popLayout" initial={false}>
               {simulationId && objectives.length > 0 && (
-                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white/40 dark:bg-white/5 border border-white/40 dark:border-white/10 p-4 rounded-3xl mb-6 space-y-3 animate-fade-in shadow-xl backdrop-blur-xl">
+                <MotionDiv initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white/40 dark:bg-white/5 border border-white/40 dark:border-white/10 p-4 rounded-3xl mb-6 space-y-3 animate-fade-in shadow-xl backdrop-blur-xl">
                   <p className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest">Mission Objectives</p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {objectives.map(obj => {
@@ -701,7 +705,7 @@ function VoicePageContent() {
                       );
                     })}
                   </div>
-                </motion.div>
+                </MotionDiv>
               )}
               {messages.length === 0 && !transcription ? (
                  <div className="h-full flex flex-col items-center justify-center text-center opacity-40 gap-4 p-4">
@@ -716,9 +720,9 @@ function VoicePageContent() {
                 <>
                   <div className="w-full flex flex-col gap-6 sm:gap-8">
                     {messages.map((m) => (
-                      <motion.div key={m.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full">
+                      <MotionDiv key={m.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full">
                         <VoiceMessageBubble message={m} onWordClick={handleWordClick} />
-                      </motion.div>
+                      </MotionDiv>
                     ))}
                   </div>
                   {state === 'processing' && (
@@ -789,7 +793,7 @@ function VoicePageContent() {
             {isLiveMode ? 'Live continuous mode is active' : (!convId && simulationId) ? 'Start simulation above' : state === 'listening' ? '🎙 Listening…' : state === 'processing' ? '⏳ Processing…' : 'Tap to speak'}
           </p>
         </footer>
-      </motion.div>
+      </MotionDiv>
 
       {activeWord && (
         <WordTooltip 

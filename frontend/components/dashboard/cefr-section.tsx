@@ -649,8 +649,19 @@ export function CefrSection() {
         const taskId = res.data.task_id;
         toast.loading(`Starting generation of ${type}...`, { id: taskId, duration: 4000 });
 
+        const MAX_POLL_RETRIES = 60;
+        let pollRetries = 0;
         const pollInterval = setInterval(async () => {
           try {
+            pollRetries++;
+            if (pollRetries > MAX_POLL_RETRIES) {
+              clearInterval(pollInterval);
+              if (type === 'flashcards') setGeneratingFlashcards(false);
+              else if (type === 'exercises') setGeneratingExercises(false);
+              else if (type === 'simulations') setGeneratingSimulations(false);
+              toast.error('Generation timed out. Please try again.', { id: taskId });
+              return;
+            }
             const statusRes = await apiGet<{ status: string; error?: string }>(`/tasks/status/${taskId}`);
             if (statusRes) {
               if (statusRes.status === 'success') {

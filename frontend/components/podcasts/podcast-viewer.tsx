@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useRouter } from 'next/navigation';
@@ -33,7 +33,7 @@ export function PodcastViewer({ podcast }: PodcastViewerProps) {
   const [isCompleted, setIsCompleted] = useState(false);
 
   const queryClient = useQueryClient();
-  const handleComplete = async () => {
+  const handleComplete = useCallback(async () => {
     setIsCompleting(true);
     try {
       await apiPost(`/activities/podcasts/${podcast.id}/complete`, {});
@@ -44,7 +44,7 @@ export function PodcastViewer({ podcast }: PodcastViewerProps) {
     } finally {
       setIsCompleting(false);
     }
-  };
+  }, [podcast.id, queryClient]);
   const { data: generated } = useQuery<{ exercises: Array<Record<string, any>> }>({
     queryKey: ['podcast-exercises', podcast.id],
     queryFn: () => apiGet(`/activities/podcasts/${podcast.id}/exercises`),
@@ -74,7 +74,7 @@ export function PodcastViewer({ podcast }: PodcastViewerProps) {
     return 'bg-bg-secondary text-text-muted border-border';
   }, [podcast.level]);
 
-  const exercises = generated?.exercises || [];
+  const exercises = useMemo(() => generated?.exercises ?? [], [generated?.exercises]);
   const currentExercise = exercises[exerciseIndex];
   useEffect(() => {
     if (exerciseIndex > 0 && exerciseIndex >= exercises.length) setExerciseIndex(0);

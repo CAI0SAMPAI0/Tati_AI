@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+
+  // Não expõe o header "X-Powered-By: Next.js" (segurança + performance)
+  poweredByHeader: false,
+
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -83,7 +87,7 @@ const nextConfig = {
     ];
   },
 
-  webpack(config) {
+  webpack(config, { dev }) {
     config.module.rules.push({
       test: /\.m?js$/,
       include: /node_modules/,
@@ -91,11 +95,43 @@ const nextConfig = {
         fullySpecified: false,
       },
     });
+
+    // Em produção, otimiza o split de chunks para carregar menos JS por página
+    if (!dev) {
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          chunks: 'all',
+          cacheGroups: {
+            vendor: {
+              test: /[\\/]node_modules[\\/]/,
+              name: 'vendors',
+              chunks: 'all',
+              priority: 10,
+            },
+            framerMotion: {
+              test: /[\\/]node_modules[\\/]framer-motion[\\/]/,
+              name: 'framer-motion',
+              chunks: 'async',
+              priority: 20,
+            },
+            recharts: {
+              test: /[\\/]node_modules[\\/]recharts[\\/]/,
+              name: 'recharts',
+              chunks: 'async',
+              priority: 20,
+            },
+          },
+        },
+      };
+    }
+
     return config;
   },
 };
 
+// IMPORTANTE: productionBrowserSourceMaps removido — infla bundles 2-3x em produção.
+// Para depurar erros em produção, use error tracking (ex: Sentry) em vez de source maps inline.
 module.exports = {
   ...nextConfig,
-  productionBrowserSourceMaps: true,
 }

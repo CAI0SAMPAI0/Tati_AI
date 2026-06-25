@@ -1,8 +1,23 @@
 'use client';
 
+import React from 'react';
 import { Play, CheckCircle2, CircleHelp, Headphones, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+const statusConfig = {
+  new: { label: 'New', className: 'bg-primary/15 text-primary border-primary/30' },
+  done: { label: 'Completed', className: 'bg-success/15 text-success border-success/30' },
+  corrected: { label: 'Corrected', className: 'bg-info/15 text-info border-info/30' },
+  pending: { label: 'Pending', className: 'bg-warning/15 text-warning border-warning/30' },
+} as const;
+
+const typeIcons = {
+  quiz: <CircleHelp size={18} />,
+  flashcard: <Play size={18} />,
+  exercise: <FileText size={18} />,
+  simulation: <Play size={18} />,
+  podcast: <Headphones size={18} />,
+} as const;
 
 interface ActivityCardProps {
   title: string;
@@ -18,7 +33,7 @@ interface ActivityCardProps {
   score?: number;
 }
 
-export function ActivityCard({
+export const ActivityCard = React.memo(function ActivityCard({
   title,
   description,
   type,
@@ -31,20 +46,6 @@ export function ActivityCard({
   isOutline,
   score
 }: ActivityCardProps) {
-  const statusConfig = {
-    new: { label: 'New', className: 'bg-primary/15 text-primary border-primary/30' },
-    done: { label: 'Completed', className: 'bg-success/15 text-success border-success/30' },
-    corrected: { label: 'Corrected', className: 'bg-info/15 text-info border-info/30' },
-    pending: { label: 'Pending', className: 'bg-warning/15 text-warning border-warning/30' },
-  };
-
-  const typeIcons = {
-    quiz: <CircleHelp size={18} />,
-    flashcard: <Play size={18} />,
-    exercise: <FileText size={18} />,
-    simulation: <Play size={18} />,
-    podcast: <Headphones size={18} />,
-  };
 
   return (
     <article 
@@ -117,4 +118,4 @@ export function ActivityCard({
       </button>
     </article>
   );
-}
+});

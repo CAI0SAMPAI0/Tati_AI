@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Trophy,
@@ -17,6 +17,23 @@ import { SidebarActivities } from '@/components/activities/sidebar-activities';
 import { apiGet } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
 import { ENDPOINTS } from '@/lib/api/endpoints';
+
+const CATEGORIES = [
+  { id: 'all', icon: <Trophy size={16} />, label: 'All' },
+  { id: 'questions', icon: <Target size={16} />, label: 'Questions' },
+  { id: 'streak', icon: <Flame size={16} />, label: 'Streak' },
+  { id: 'credits', icon: <Coins size={16} />, label: 'Credits' },
+  { id: 'time', icon: <Clock size={16} />, label: 'Time' },
+  { id: 'milestones', icon: <Star size={16} />, label: 'Milestones' },
+];
+
+const CATEGORY_MAP: Record<string, string[]> = {
+  questions: ['question', 'questions', 'quiz', 'quizzes'],
+  streak: ['streak'],
+  credits: ['credit', 'credits', 'xp', 'score'],
+  time: ['time', 'study_time', 'hours'],
+  milestones: ['milestone', 'milestones', 'goal', 'goals'],
+};
 
 interface DashboardStats {
   trophies_earned?: number;
@@ -53,27 +70,13 @@ export default function AchievementsClientPage() {
     queryFn: () => apiGet<Medal[]>('/activities/achievements/my'),
   });
 
-  const categories = [
-    { id: 'all', icon: <Trophy size={16} />, label: 'All' },
-    { id: 'questions', icon: <Target size={16} />, label: 'Questions' },
-    { id: 'streak', icon: <Flame size={16} />, label: 'Streak' },
-    { id: 'credits', icon: <Coins size={16} />, label: 'Credits' },
-    { id: 'time', icon: <Clock size={16} />, label: 'Time' },
-    { id: 'milestones', icon: <Star size={16} />, label: 'Milestones' },
-  ];
-
-  const categoryMap: Record<string, string[]> = {
-    questions: ['question', 'questions', 'quiz', 'quizzes'],
-    streak: ['streak'],
-    credits: ['credit', 'credits', 'xp', 'score'],
-    time: ['time', 'study_time', 'hours'],
-    milestones: ['milestone', 'milestones', 'goal', 'goals'],
-  };
-  const filteredMedals = (medals || []).filter((m) => {
-    if (filter === 'all') return true;
-    const cat = String(m.category || '').toLowerCase();
-    return (categoryMap[filter] || []).some((token) => cat.includes(token));
-  });
+  const filteredMedals = useMemo(() => {
+    return (medals || []).filter((m) => {
+      if (filter === 'all') return true;
+      const cat = String(m.category || '').toLowerCase();
+      return (CATEGORY_MAP[filter] || []).some((token) => cat.includes(token));
+    });
+  }, [medals, filter]);
 
   const trophyCount = medals ? medals.filter(m => m.unlocked).length : 0;
   const trophyProgress = (trophyCount / 50) * 100;
@@ -137,7 +140,7 @@ export default function AchievementsClientPage() {
           </div>
           <div className="space-y-6">
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-              {categories.map((c) => (
+              {CATEGORIES.map((c) => (
                 <button key={c.id} onClick={() => setFilter(c.id)} className={cn('flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border', filter === c.id ? 'bg-primary text-white border-primary shadow-glow' : 'bg-surface border-border text-text-muted hover:border-primary/40 hover:text-text')}>
                   {c.icon}
                   {c.label}

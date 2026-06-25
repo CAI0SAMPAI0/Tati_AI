@@ -9,11 +9,12 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
 };
 
+// Apenas o weight usado em display (h1/h2/h3) — reduz download da fonte
 const sora = Sora({
   subsets: ['latin'],
   variable: '--font-display',
   display: 'swap',
-  weight: ['700', '800'],
+  weight: ['700'],
   preload: true,
 });
 
@@ -25,6 +26,8 @@ const dmSans = DM_Sans({
   style: ['normal'],
   preload: true,
 });
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
 
 export default function RootLayout({
   children,
@@ -42,6 +45,10 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="Tati AI" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <link rel="icon" href="/images/tati_logo.jpg" />
+
+        {/* Preconnect ao backend para reduzir latência de rede nas primeiras requests */}
+        {API_BASE && <link rel="preconnect" href={API_BASE} />}
+        {API_BASE && <link rel="dns-prefetch" href={API_BASE} />}
       </head>
       <body>
         <AppProviders>

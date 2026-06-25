@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MessageSquare, BookOpen, CalendarDays, Type, Flame, Lightbulb, Download, Snowflake, ShoppingBag, Trophy } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
@@ -136,31 +136,33 @@ export default function ProgressClientPage() {
 
   const reportLoading = period === 'weekly' ? weeklyLoading : monthlyLoading;
 
-  // Derive stats from active period report
   const activeReport = period === 'weekly' ? weeklyReport : monthlyReport;
 
-  const stats = activeReport
-    ? {
+  const stats = useMemo(() => {
+    if (!activeReport) return null;
+    return {
       total_messages: activeReport.total_messages,
       total_conversations: activeReport.total_conversations,
       study_days: activeReport.study_days,
       unique_words_used: activeReport.unique_words_used,
-    }
-    : null;
+    };
+  }, [activeReport]);
 
-  // Build chart data
-  const chartData =
-    period === 'weekly' && weeklyReport
-      ? weeklyReport.messages_by_day.map((val, i) => ({
+  const chartData = useMemo(() => {
+    if (period === 'weekly' && weeklyReport) {
+      return weeklyReport.messages_by_day.map((val, i) => ({
         name: weeklyReport.days_of_week[i] ?? `D${i + 1}`,
         messages: val,
-      }))
-      : period === 'monthly' && monthlyReport
-        ? monthlyReport.messages_by_week.map((val, i) => ({
-          name: `Wk ${i + 1}`,
-          messages: val,
-        }))
-        : [];
+      }));
+    }
+    if (period === 'monthly' && monthlyReport) {
+      return monthlyReport.messages_by_week.map((val, i) => ({
+        name: `Wk ${i + 1}`,
+        messages: val,
+      }));
+    }
+    return [];
+  }, [period, weeklyReport, monthlyReport]);
 
   const handleDownloadReport = async () => {
     setIsDownloading(true);

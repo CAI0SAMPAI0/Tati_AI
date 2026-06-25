@@ -1,22 +1,46 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Sidebar } from '@/components/chat/sidebar';
-import { ChatTopbar } from '@/components/chat/topbar';
-import { MessageList } from '@/components/chat/message-list';
-import { ChatInput } from '@/components/chat/chat-input';
-import { fetchWeeklyPlan } from '@/lib/api/weekly-plan';
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { apiGet, apiPost, apiPatch } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import type { Message, Conversation } from '@/lib/api/types';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 
+
+const Sidebar = dynamic(
+  () => import('@/components/chat/sidebar').then(m => m.Sidebar),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="hidden md:flex w-[280px] bg-bg-secondary border-r border-border flex-col animate-pulse">
+        <div className="p-6"><div className="h-8 w-32 bg-surface rounded-lg" /></div>
+        <div className="flex-1 px-3 space-y-3">
+          {Array(6).fill(0).map((_, i) => <div key={i} className="h-11 w-full bg-surface rounded-xl" />)}
+        </div>
+      </div>
+    ),
+  }
+);
+const ChatTopbar = dynamic(
+  () => import('@/components/chat/topbar').then(m => m.ChatTopbar),
+  { ssr: false, loading: () => <div className="h-16 border-b border-border bg-bg animate-pulse" /> }
+);
+const MessageList = dynamic(
+  () => import('@/components/chat/message-list').then(m => m.MessageList),
+  { ssr: false, loading: () => <div className="flex-1 bg-bg" /> }
+);
+const ChatInput = dynamic(
+  () => import('@/components/chat/chat-input').then(m => m.ChatInput),
+  { ssr: false, loading: () => <div className="h-16 bg-surface/30 animate-pulse rounded-2xl mx-4 mb-4" /> }
+);
+
+// framer-motion (~75KB) — só necessário no modal de summary
+const MotionDiv = dynamic(() => import('framer-motion').then(m => m.motion.div), { ssr: false });
+const AnimatePresence = dynamic(() => import('framer-motion').then(m => m.AnimatePresence), { ssr: false });
 const ReactMarkdown = dynamic(() => import('@/components/chat/markdown-wrapper'), { ssr: false });
 
 export default function ChatClientPage() {
@@ -49,7 +73,6 @@ export default function ChatClientPage() {
 
   useEffect(() => {
     if (currentConvId) {
-      // 1. Carrega do Cache Local (IndexedDB) para abertura instantânea
       import('@/lib/db/indexedDB').then(({ getMessagesLocal }) => {
         getMessagesLocal(currentConvId).then((cachedMsgs) => {
           if (cachedMsgs.length > 0) {
@@ -58,7 +81,6 @@ export default function ChatClientPage() {
         });
       }).catch(err => console.error('IndexedDB load error:', err));
 
-      // 2. SWR - Busca do backend e sincroniza
       apiGet<Message[]>(ENDPOINTS.CONVERSATION_MESSAGES(currentConvId))
         .then((msgs) => {
           if (msgs.length > 0) {
@@ -167,10 +189,8 @@ export default function ChatClientPage() {
     }
   };
 
-  // Resend a message (e.g., after editing error)
   const handleResend = useCallback(async (content: string) => {
     if (!currentConvId) {
-      // If no conversation yet, create one like handleSend does
       try {
         const convRes = await apiPost<Conversation>(ENDPOINTS.CONVERSATIONS, {
           title: content.substring(0, 20) + '...'
@@ -248,13 +268,6 @@ export default function ChatClientPage() {
     }
   }, [searchParams, router, currentConvId]);
 
-  const { data: weeklyPlan } = useQuery({
-    queryKey: ['weekly-plan'],
-    queryFn: fetchWeeklyPlan,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const weeklyTopics = weeklyPlan?.topics ?? [];
 
   return (
     <div className="flex h-screen bg-bg overflow-hidden selection:bg-primary/20">
@@ -266,7 +279,7 @@ export default function ChatClientPage() {
         onClose={() => setSidebarOpen(false)}
       />
 
-      <div className="flex-1 flex flex-col min-w-0 relative bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/5 via-bg to-bg">
+      <div className="flex-1 flex flex-col min-w-0 relative bg-bg">
         <ChatTopbar
           title={convTitle}
           onToggleSidebar={() => setSidebarOpen(true)}
@@ -300,14 +313,14 @@ export default function ChatClientPage() {
       <AnimatePresence>
         {isSummaryOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-12">
-            <motion.div
+            <MotionDiv
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsSummaryOpen(false)}
               className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             />
-            <motion.div
+            <MotionDiv
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -349,7 +362,7 @@ export default function ChatClientPage() {
                   Close
                 </button>
               </div>
-            </motion.div>
+            </MotionDiv>
           </div>
         )}
       </AnimatePresence>

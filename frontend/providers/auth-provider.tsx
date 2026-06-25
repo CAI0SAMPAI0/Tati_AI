@@ -147,6 +147,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(session.token);
     setUser(normalizeUserAvatar(session.user));
 
+    // ✅ CRÍTICO: Marca como carregado IMEDIATAMENTE com dados do localStorage.
+    // Isso elimina a network call do caminho crítico de renderização (LCP).
+    // A validação contra o backend acontece em background sem bloquear o UI.
+    setIsLoaded(true);
+
     // Prefetch da tela de chat do usuário ao entrar já logado
     queryClient.prefetchQuery({
       queryKey: ['due-vocab'],
@@ -157,26 +162,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryFn: () => apiGet(ENDPOINTS.PAYMENTS_STATUS),
     });
 
-    // Valida sessão no backend para evitar estado quebrado após refresh de página.
+    // Valida sessão no backend em background (não bloqueia renderização).
+    // Se o token expirou (401), faz logout; erros de rede são ignorados.
     apiGet<User>(ENDPOINTS.PROFILE)
       .then((freshUser) => {
         const normalizedUser = normalizeUserAvatar(freshUser);
         setUser(normalizedUser);
         saveStoredSession({ token: session.token, user: normalizedUser, refreshToken: session.refreshToken });
+        triggerPodcastWarmup();
       })
       .catch((err) => {
         if (err instanceof ApiClientError && err.status === 401) {
+          // Token inválido — faz logout silencioso
           logoutRef.current();
-        } else {
-          // Erro de rede não deve derrubar sessão imediatamente.
-          setUser(session.user);
         }
-      })
-      .finally(() => {
-        setIsLoaded(true);
-        triggerPodcastWarmup();
+        // Erro de rede: mantém sessão atual sem derrubar o usuário
       });
   }, [queryClient]);
+
 
   useEffect(() => {
     registerUnauthorizedHandler(() => {

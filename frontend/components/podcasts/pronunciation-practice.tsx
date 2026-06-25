@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { 
@@ -15,7 +15,10 @@ import {
 import { apiPost } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/spinner';
-import { motion, AnimatePresence } from 'framer-motion';
+import dynamic from 'next/dynamic';
+
+const MotionDiv = dynamic(() => import('framer-motion').then(m => m.motion.div), { ssr: false });
+const AnimatePresence = dynamic(() => import('framer-motion').then(m => m.AnimatePresence), { ssr: false });
 
 interface PronunciationPracticeProps {
   phrase: string;
@@ -36,12 +39,27 @@ export function PronunciationPractice({ phrase, podcastId, onClose }: Pronunciat
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      window.speechSynthesis.cancel();
+    };
+  }, []);
 
   const playReference = async () => {
     try {
       const res = await apiPost<{ audio: string }>('/chat/tts', { text: phrase });
       if (res.ok && res.data.audio) {
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
         const audio = new Audio(`data:audio/mp3;base64,${res.data.audio}`);
+        audioRef.current = audio;
         audio.play();
       } else {
         throw new Error('TTS failed');
@@ -186,7 +204,7 @@ export function PronunciationPractice({ phrase, podcastId, onClose }: Pronunciat
 
         <AnimatePresence>
           {result && (
-            <motion.div 
+            <MotionDiv 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               className="w-full space-y-4"
@@ -230,7 +248,7 @@ export function PronunciationPractice({ phrase, podcastId, onClose }: Pronunciat
                   "{result.feedback}"
                 </p>
               </div>
-            </motion.div>
+            </MotionDiv>
           )}
         </AnimatePresence>
 

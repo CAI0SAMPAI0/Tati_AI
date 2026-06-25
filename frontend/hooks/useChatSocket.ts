@@ -31,13 +31,31 @@ export function useChatSocket(conversationId: string | null) {
     convIdRef.current = conversationId;
   }, [conversationId]);
 
-  // Synchronize messages state to local IndexedDB cache
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSaveRef = useRef<{ conversationId: string; messages: Message[] } | null>(null);
+
   useEffect(() => {
     if (conversationId && messages && messages.length > 0) {
-      import('@/lib/db/indexedDB').then(({ saveMessagesLocal }) => {
-        saveMessagesLocal(conversationId, messages);
-      }).catch(err => console.error('IndexedDB sync error in useChatSocket:', err));
+      pendingSaveRef.current = { conversationId, messages };
+      if (!saveTimerRef.current) {
+        saveTimerRef.current = setTimeout(() => {
+          saveTimerRef.current = null;
+          const pending = pendingSaveRef.current;
+          if (pending) {
+            import('@/lib/db/indexedDB').then(({ saveMessagesLocal }) => {
+              saveMessagesLocal(pending.conversationId, pending.messages);
+            }).catch(err => console.error('IndexedDB sync error in useChatSocket:', err));
+            pendingSaveRef.current = null;
+          }
+        }, 1000);
+      }
     }
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
   }, [messages, conversationId]);
 
   const handleTriggerExercise = useCallback(async () => {
