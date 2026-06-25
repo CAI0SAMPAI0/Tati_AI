@@ -155,6 +155,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           }
         });
 
+        await PushNotifications.createChannel({
+          id: 'fcm_default_channel',
+          name: 'Notificações',
+          importance: 4,
+          visibility: 1,
+        });
+
+        await PushNotifications.register();
+
         return;
       }
     } catch (capacitorErr) {

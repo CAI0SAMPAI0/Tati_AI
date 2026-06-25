@@ -165,7 +165,8 @@ def send_native_fcm_notification(
             data_payload["actions"] = json.dumps(actions)
 
         android_notification = {
-            "sound": "default"
+            "sound": "default",
+            "channel_id": "fcm_default_channel",
         }
         if click_action:
             android_notification["click_action"] = click_action
