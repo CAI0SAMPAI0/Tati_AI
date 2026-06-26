@@ -83,7 +83,7 @@ export default function PaymentClientPage() {
         </div>
         <Link href="/chat" className="flex items-center gap-2 text-text-muted hover:text-primary transition-colors font-bold text-sm">
           <ArrowLeft size={18} />
-          <span>Voltar ao Chat</span>
+          <span>Back to Chat</span>
         </Link>
       </header>
       
