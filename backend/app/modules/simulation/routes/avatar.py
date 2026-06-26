@@ -15,17 +15,18 @@ _AVATAR_DIR = Path(
     __file__).parent.parent.parent.parent.parent / 'assets' / 'avatar'
 
 _FRAME_FILES: dict[str, str] = {
-    'normal': 'avatar_tati_normal.png',
-    'meio': 'avatar_tati_meio.png',
-    'bem_aberta': 'avatar_tati_bem_aberta.png',
-    'ouvindo': 'avatar_tati_ouvindo.png',
-    'piscando': 'avatar_tati_piscando.png',
-    'frame_A': 'frame_A.png',
-    'frame_B': 'frame_B.png',
-    'frame_C': 'frame_C.png',
-    'frame_D': 'frame_D.png',
-    'frame_E': 'frame_E.png',
-    'frame_F': 'frame_F.png',
+    'normal': 'avatar_tati_normal.webp',
+    'meio': 'avatar_tati_meio.webp',
+    'aberta': 'avatar_tati_aberta.webp',
+    'bem_aberta': 'avatar_tati_bem_aberta.webp',
+    'ouvindo': 'avatar_tati_ouvindo.webp',
+    'piscando': 'tati_piscando.webp',
+    'frame_A': 'frame_A.webp',
+    'frame_B': 'frame_B.webp',
+    'frame_C': 'frame_C.webp',
+    'frame_D': 'frame_D.webp',
+    'frame_E': 'frame_E.webp',
+    'frame_F': 'frame_F.webp',
 }
 
 _EXT_TO_MIME = {
@@ -34,6 +35,7 @@ _EXT_TO_MIME = {
     '.jpeg': 'jpeg',
     '.gif': 'gif',
     '.webp': 'webp',
+    '.avif': 'avif',
 }
 
 

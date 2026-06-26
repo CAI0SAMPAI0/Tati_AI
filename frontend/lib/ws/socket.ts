@@ -31,8 +31,6 @@ export class TatiWebSocket {
       finalUrl += `&simulation_id=${this.config.simulationId}`;
     }
     
-    console.log('[DEBUG] Tentando conectar em:', finalUrl);
-
     try {
       this.ws = new WebSocket(finalUrl);
     } catch (e) {      console.error('Failed to create WebSocket:', e);
@@ -40,7 +38,6 @@ export class TatiWebSocket {
     }
 
     this.ws.onopen = () => {
-      console.log('WS Connected');
       this.startPing();
       this.config.onOpen?.();
     };

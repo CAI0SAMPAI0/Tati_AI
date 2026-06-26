@@ -40,6 +40,7 @@ const config: Config = {
         success: 'var(--success)',
         warning: 'var(--warning)',
         danger: 'var(--danger)',
+        accent: 'var(--accent)',
         ink: 'var(--text)',
         muted: 'var(--text-muted)',
         subtle: 'var(--text-subtle)',

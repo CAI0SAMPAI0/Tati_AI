@@ -32,9 +32,10 @@ import WordTooltip from '@/components/chat/word-tooltip';
 import { apiGet, apiPost } from '@/lib/api/client';
 import toast from 'react-hot-toast';
 import { useTheme } from '@/hooks/useTheme';
+import { useAuth } from '@/providers/auth-provider';
 import { cn } from '@/lib/utils';
 
-function exportWav(samples: Float32Array, sampleRate: number): Blob {
+function exportWavRaw(samples: Float32Array, sampleRate: number): ArrayBuffer {
   const buffer = new ArrayBuffer(44 + samples.length * 2);
   const view = new DataView(buffer);
 
@@ -64,7 +65,7 @@ function exportWav(samples: Float32Array, sampleRate: number): Blob {
     view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
   }
 
-  return new Blob([view], { type: 'audio/wav' });
+  return buffer;
 }
 
 function VoicePageContent() {
@@ -77,7 +78,8 @@ function VoicePageContent() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { theme, setTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
+  const { user } = useAuth();
   const convIdParam = searchParams.get('conv_id');
   const simulationId = searchParams.get('simulation_id');
 
@@ -334,6 +336,11 @@ function VoicePageContent() {
   };
 
   const startLiveMode = async () => {
+    if (user?.username !== 'programador') {
+      toast.error('Modo Live está em desenvolvimento. Em breve disponível!');
+      return;
+    }
+
     if (audioRef.current) {
       audioRef.current.pause();
     }
@@ -365,8 +372,7 @@ function VoicePageContent() {
           process(inputs, outputs, parameters) {
             const input = inputs[0];
             if (input && input[0]) {
-              const channelData = input[0];
-              this.port.postMessage(channelData);
+              this.port.postMessage(new Float32Array(input[0]));
             }
             return true;
           }
@@ -384,19 +390,23 @@ function VoicePageContent() {
       
       accumulatedAudioRef.current = [];
       setLiveState('listening');
+      liveStateRef.current = 'listening';
       
       let buffer4096 = new Float32Array(4096);
       let bufferOffset = 0;
 
       processor.port.onmessage = (e) => {
         const chunk = e.data;
-        if (bufferOffset + chunk.length > 4096) {
-          bufferOffset = 0;
-        }
-        buffer4096.set(chunk, bufferOffset);
-        bufferOffset += chunk.length;
+        let chunkOff = 0;
+        while (chunkOff < chunk.length) {
+          const space = 4096 - bufferOffset;
+          const toCopy = Math.min(chunk.length - chunkOff, space);
+          buffer4096.set(chunk.subarray(chunkOff, chunkOff + toCopy), bufferOffset);
+          bufferOffset += toCopy;
+          chunkOff += toCopy;
 
-        if (bufferOffset >= 4096) {
+          if (bufferOffset < 4096) break;
+          
           const inputData = new Float32Array(buffer4096);
           bufferOffset = 0;
           
@@ -418,6 +428,7 @@ function VoicePageContent() {
               console.log('[Live VAD] User speech detected during playback. Interrupting AI audio.');
               audioRef.current.pause();
               setLiveState('listening');
+              liveStateRef.current = 'listening';
             }
           }
           
@@ -441,18 +452,20 @@ function VoicePageContent() {
                       offset += chunk.length;
                     }
                     
-                    const wavBlob = exportWav(resultBuffer, AudioCtx.sampleRate);
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      const base64 = (reader.result as string).split(',')[1];
-                      sendAudioChunk(base64);
-                    };
-                    reader.readAsDataURL(wavBlob);
+                    const wavBuffer = exportWavRaw(resultBuffer, AudioCtx.sampleRate);
+                    const bytes = new Uint8Array(wavBuffer);
+                    let binary = '';
+                    for (let i = 0; i < bytes.length; i++) {
+                      binary += String.fromCharCode(bytes[i]);
+                    }
+                    const base64 = btoa(binary);
+                    sendAudioChunk(base64);
                     
                     accumulatedAudioRef.current = [];
                     silenceTimerRef.current = 0;
                     hasSpokenRef.current = false;
                     setLiveState('processing');
+                    liveStateRef.current = 'processing';
                   }
                 }
               }
@@ -471,6 +484,7 @@ function VoicePageContent() {
     setIsLiveMode(false);
     disconnectLive();
     setLiveState('idle');
+    liveStateRef.current = 'idle';
     
     if (processorRef.current) {
       processorRef.current.disconnect();
@@ -615,23 +629,26 @@ function VoicePageContent() {
         </div>
 
         <div className="absolute top-4 sm:top-6 right-4 sm:right-6 flex items-center gap-3">
-          <button 
-            onClick={() => isLiveMode ? stopLiveMode() : startLiveMode()} 
-            className={cn(
-              "px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-xl flex items-center gap-2",
-              isLiveMode ? "bg-accent text-white" : "bg-white/50 dark:bg-[#1a1c2e]/60 border border-white/60 dark:border-white/10 text-text"
-            )}
-          >
-            <Activity size={14} className={isLiveMode ? "animate-pulse" : ""} />
-            {isLiveMode ? "Live: On" : "Live Mode"}
-          </button>
+          {user?.username === 'programador' && (
+            <button 
+              onClick={() => isLiveMode ? stopLiveMode() : startLiveMode()} 
+              className={cn(
+                "px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-xl flex items-center gap-2",
+                isLiveMode ? "text-white" : "bg-white/50 dark:bg-[#1a1c2e]/60 border border-white/60 dark:border-white/10 text-text"
+              )}
+              style={isLiveMode ? { backgroundColor: 'var(--accent)' } : undefined}
+            >
+              <Activity size={14} className={isLiveMode ? "animate-pulse" : ""} />
+              {isLiveMode ? "Live: On" : "Live Mode"}
+            </button>
+          )}
           {simulationId && (
             <button onClick={handleFinishSimulation} className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-success text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-success/90 transition-all active:scale-95 shadow-xl">
               Finish
             </button>
           )}
-          <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="p-1.5 sm:p-2.5 rounded-xl bg-white/50 dark:bg-[#1a1c2e]/60 border border-white/60 dark:border-white/10 text-text-muted hover:text-primary transition-all active:scale-95 shadow-xl backdrop-blur-xl">
-             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          <button onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')} className="p-1.5 sm:p-2.5 rounded-xl bg-white/50 dark:bg-[#1a1c2e]/60 border border-white/60 dark:border-white/10 text-text-muted hover:text-primary transition-all active:scale-95 shadow-xl backdrop-blur-xl">
+             {resolvedTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
         </div>
 

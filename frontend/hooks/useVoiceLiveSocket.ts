@@ -103,8 +103,8 @@ export function useVoiceLiveSocket() {
       }
     };
 
-    ws.onclose = () => {
-      console.log('[LiveWS] Closed');
+    ws.onclose = (event) => {
+      console.log(`[LiveWS] Closed: code=${event.code} reason=${event.reason} wasClean=${event.wasClean}`);
       reconnectTimerRef.current = setTimeout(() => connect(), 3000);
     };
 

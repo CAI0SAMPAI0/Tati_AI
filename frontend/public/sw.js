@@ -169,7 +169,11 @@ self.addEventListener('fetch', (event) => {
         const copy = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
         return response;
+      }).catch(() => {
+        // Falha silenciosa se o fetch falhar (ex: requisição de API sem cache)
       });
+    }).catch(() => {
+      // Falha silenciosa se o cache lookup falhar
     }),
   );
 });

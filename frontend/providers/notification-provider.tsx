@@ -85,8 +85,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, [token, user]);
 
+  const pushAttemptedRef = useRef(false);
+
   const subscribeToPush = useCallback(async () => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || pushAttemptedRef.current) return;
+    pushAttemptedRef.current = true;
+
+    if (process.env.NODE_ENV !== 'production') return;
 
     try {
       const { Capacitor } = await import('@capacitor/core');
@@ -94,30 +99,24 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
       if (isNative) {
         const PushNotifications = (window as any).Capacitor.Plugins.PushNotifications;
-        
+
         let permStatus = await PushNotifications.checkPermissions();
         if (permStatus.receive === 'prompt') {
           permStatus = await PushNotifications.requestPermissions();
         }
         if (permStatus.receive !== 'granted') {
           console.log('[Push] Capacitor native permission denied.');
-          toast.error("Permissão de notificação negada no aparelho.");
           return;
         }
 
         await PushNotifications.addListener('registration', async (token: any) => {
-          console.log('[Push] Capacitor FCM token:', token.value);
           try {
             await apiPost('/notifications/subscribe', {
               endpoint: `fcm:${token.value}`,
-              keys: {
-                p256dh: 'fcm',
-                auth: 'fcm'
-              },
+              keys: { p256dh: 'fcm', auth: 'fcm' },
               user_agent: 'Capacitor Android'
             });
-            console.log('[Push] FCM token registered successfully!');
-            toast.success("Notificações Push nativas ativadas! 🔔");
+            // FCM token registered
           } catch (apiErr) {
             console.error('[Push] Failed to save FCM token on server:', apiErr);
           }
@@ -125,18 +124,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
         await PushNotifications.addListener('registrationError', (error: any) => {
           console.error('[Push] Registration error:', error);
-          toast.error("Falha ao registrar token de push nativo.");
         });
 
         await PushNotifications.addListener('pushNotificationReceived', (notification: any) => {
-          console.log('[Push] Foreground native push:', notification);
           toast.success(`${notification.title}: ${notification.body}`, { duration: 5000 });
         });
 
         await PushNotifications.addListener('pushNotificationActionPerformed', async (action: any) => {
-          console.log('[Push] Action performed:', action);
           const { actionId, notification } = action;
-          
           try {
             await apiPost('/notifications/actions', {
               action: actionId,
@@ -144,11 +139,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
               category: notification.data?.click_action || null,
               data: notification.data || null,
             });
-            console.log(`[Push] Action '${actionId}' successfully processed on backend.`);
           } catch (apiErr) {
             console.error('[Push] Failed to report action click to backend:', apiErr);
           }
-
           if (actionId === 'study_now') {
             window.location.href = '/activities';
           } else if (actionId === 'postpone') {
@@ -156,57 +149,55 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           }
         });
 
-        await PushNotifications.createChannel({
-          id: 'fcm_default_channel',
-          name: 'Notificações',
-          importance: 4,
-          visibility: 1,
-        });
-
         await PushNotifications.register();
-
         return;
       }
-    } catch (capacitorErr) {
-      console.error('[Push] Capacitor init failed, falling back to Web Push:', capacitorErr);
+    } catch {
+      if (pushAttemptedRef.current) return;
     }
 
     if (
       !('serviceWorker' in navigator) ||
-      !('PushManager' in window)
+      !('PushManager' in window) ||
+      !('Notification' in window)
     ) {
-      console.log('[Push] Push notifications not supported on this device/browser.');
       return;
     }
 
+    let permission = window.Notification.permission;
+    if (permission === 'default') {
+      permission = await window.Notification.requestPermission();
+    }
+    if (permission !== 'granted') return;
+
     try {
-      if (typeof window === 'undefined' || !('Notification' in window)) {
-        console.log('[Push] Notification API not supported on this browser.');
-        return;
-      }
-
-      // 1. Verifica ou solicita permissão de notificação
-      let permission = window.Notification.permission;
-      if (permission === 'default') {
-        permission = await window.Notification.requestPermission();
-      }
-      if (permission !== 'granted') {
-        console.log('[Push] Notification permission denied or not granted.');
-        return;
-      }
-
-      // 2. Aguarda o service worker ficar pronto
       const registration = await navigator.serviceWorker.ready;
 
-      // 3. Busca a chave VAPID pública do backend
+      const existingSub = await registration.pushManager.getSubscription();
+      if (existingSub) {
+        const subJson = existingSub.toJSON();
+        if (subJson.endpoint) {
+          try {
+            await apiPost('/notifications/subscribe', {
+              endpoint: subJson.endpoint,
+              keys: {
+                p256dh: subJson.keys?.p256dh || '',
+                auth: subJson.keys?.auth || '',
+              },
+              user_agent: navigator.userAgent,
+            });
+          } catch {
+          }
+        }
+        return;
+      }
+
       const keyData = await apiGet<{ public_key: string }>('/notifications/vapid-key');
       if (!keyData || !keyData.public_key) {
         console.error('[Push] Failed to retrieve VAPID key from backend.');
-        toast.error("Erro ao buscar chave pública do servidor.");
         return;
       }
 
-      // 4. Converte a chave VAPID para Uint8Array
       const convertVapidKey = (base64String: string) => {
         const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
         const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -218,15 +209,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         return outputArray;
       };
 
-      const applicationServerKey = convertVapidKey(keyData.public_key);
-
-      // 5. Inscreve o usuário no PushManager
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey,
+        applicationServerKey: convertVapidKey(keyData.public_key),
       });
 
-      // 6. Envia a inscrição para o backend salvar
       const subJson = subscription.toJSON();
       if (subJson.endpoint && subJson.keys?.p256dh && subJson.keys?.auth) {
         await apiPost('/notifications/subscribe', {
@@ -237,10 +224,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           },
           user_agent: navigator.userAgent,
         });
-        console.log('[Push] User successfully subscribed to push notifications!');
+        console.log('[Push] User subscribed to push notifications!');
       }
     } catch (err: any) {
-      console.warn('[Push] Subscription failed (possibly blocked by browser/private mode/VPN):', err);
+      console.warn('[Push] Subscription failed:', err);
     }
   }, []);
 
