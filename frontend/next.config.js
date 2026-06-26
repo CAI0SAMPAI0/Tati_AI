@@ -101,12 +101,12 @@ const nextConfig = {
       config.optimization = {
         ...config.optimization,
         splitChunks: {
-          chunks: 'all',
+          chunks: 'async',
           cacheGroups: {
             vendor: {
               test: /[\\/]node_modules[\\/]/,
               name: 'vendors',
-              chunks: 'all',
+              chunks: 'async',
               priority: 10,
             },
             framerMotion: {

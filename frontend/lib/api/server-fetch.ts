@@ -22,7 +22,6 @@ export async function serverFetch<T>(endpoint: string, auth = true): Promise<T |
     const headers: Record<string, string> = {
       Accept: 'application/json',
       'Content-Type': 'application/json',
-      Connection: 'close',
     };
 
     if (token) {
