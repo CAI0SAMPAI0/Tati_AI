@@ -1,12 +1,5 @@
-import { prefetchRoute } from '@/lib/api/page-prefetches';
-import { PrefetchHydration } from '@/lib/api/ssr-prefetch';
 import MyMaterialsClientPage from './meus-materiais-client-page';
 
-export default async function Page() {
-  const state = await prefetchRoute('hub-my-materials');
-  return (
-    <PrefetchHydration state={state}>
-      <MyMaterialsClientPage />
-    </PrefetchHydration>
-  );
+export default function Page() {
+  return <MyMaterialsClientPage />;
 }
