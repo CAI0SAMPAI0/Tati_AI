@@ -100,4 +100,8 @@ celery_app.conf.beat_schedule = {
         "task": "app.core.tasks.keepalive",
         "schedule": crontab(minute="*/30"),
     },
+    "keepalive-waha": {
+        "task": "app.core.tasks.waha_keepalive",
+        "schedule": crontab(minute="*/5"),
+    },
 }
