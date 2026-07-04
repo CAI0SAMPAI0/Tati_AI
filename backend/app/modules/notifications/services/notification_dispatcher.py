@@ -79,7 +79,7 @@ async def dispatch_universal_notification(
         await WahaService.ensure_awake()
         whatsapp_text = f"*{title}*\n\n{body}"
         if url and url != '/':
-            whatsapp_text += f"\n\nAcesse no App: https://tati-ai.vercel.app{url}"
+            whatsapp_text += f"\n\nAccess in the app: https://tati-ai.vercel.app{url}"
         
         wa_res = await WahaService.send_message(recipient_username=username, text=whatsapp_text, sender_username=sender_username, db=db)
         logging.info(f'[Dispatcher] WhatsApp send result for {username}: {wa_res}')

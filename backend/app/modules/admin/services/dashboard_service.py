@@ -656,7 +656,7 @@ class DashboardService:
             create_notification(
                 username=username,
                 category='nudge',
-                title="Teacher Tati 🍎",
+                title="Teacher Tati 👩‍🏫",
                 message=text,
                 send_push=False  # dispatch_universal_notification vai tratar do push
             )
@@ -668,7 +668,7 @@ class DashboardService:
             from app.modules.notifications.services.notification_dispatcher import dispatch_universal_notification
             await dispatch_universal_notification(
                 username,
-                title="Teacher Tati 🍎",
+                title="Teacher Tati 👩‍🏫",
                 body=text,
                 url="/chat",
                 sender_username=sender_username

@@ -1002,7 +1002,7 @@ async def dispatch_file(
                 from app.modules.notifications.services.waha_service import WahaService
                 title = "Novo Material de Estudo! 📚"
                 body = f"Teacher Tati te enviou o(s) material(is) '{files_str}'. O(s) arquivo(s) foi(ram) enviado(s) ao seu e-mail!"
-                whatsapp_text = f"*{title}*\n\n{body}\n\nAcesse no App: https://tati-ai.vercel.app/chat"
+                whatsapp_text = f"*{title}*\n\n{body}\n\nAccess in the app: https://tati-ai.vercel.app/chat"
                 await WahaService.send_message(
                     recipient_username=username,
                     text=whatsapp_text,
@@ -1105,7 +1105,7 @@ async def dispatch_quiz(
             from app.modules.notifications.services.waha_service import WahaService
             title = "Novo Quiz Disponível! 📝"
             body = f"Teacher Tati liberou o quiz '{quiz_title}' para você. Acesse suas atividades!"
-            whatsapp_text = f"*{title}*\n\n{body}\n\nAcesse no App: https://tati-ai.vercel.app/activities"
+            whatsapp_text = f"*{title}*\n\n{body}\n\nAccess in the app: https://tati-ai.vercel.app/activities"
             await WahaService.send_message(
                 recipient_username=username,
                 text=whatsapp_text,

@@ -378,7 +378,7 @@ def notify_all_students(
                 from app.modules.notifications.services.waha_service import WahaService
                 whatsapp_text = f"*{title}*\n\n{message}"
                 if url and url != '/':
-                    whatsapp_text += f"\n\nAcesse no App: https://tati-ai.vercel.app{url}"
+                    whatsapp_text += f"\n\nAccess in the app: https://tati-ai.vercel.app{url}"
                 
                 try:
                     loop = asyncio.get_running_loop()
