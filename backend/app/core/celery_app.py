@@ -100,8 +100,18 @@ celery_app.conf.beat_schedule = {
         "task": "app.core.tasks.keepalive",
         "schedule": crontab(minute="*/30"),
     },
-    "keepalive-waha": {
+    # Wake WAHA 5 min before each notification window so it's ready when messages fire.
+    # Between windows Railway will let it sleep, saving RAM.
+    "keepalive-waha-manha": {
         "task": "app.core.tasks.waha_keepalive",
-        "schedule": crontab(minute="*/5"),
+        "schedule": crontab(hour=7, minute=55),   # 5 min before morning reminders (8h)
+    },
+    "keepalive-waha-tarde": {
+        "task": "app.core.tasks.waha_keepalive",
+        "schedule": crontab(hour=12, minute=55),  # 5 min before afternoon reminders (13h)
+    },
+    "keepalive-waha-noite": {
+        "task": "app.core.tasks.waha_keepalive",
+        "schedule": crontab(hour=20, minute=55),  # 5 min before night reminders (21h)
     },
 }

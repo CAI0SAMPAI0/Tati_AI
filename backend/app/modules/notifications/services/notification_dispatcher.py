@@ -72,15 +72,17 @@ async def dispatch_universal_notification(
         logging.info(
             '[Dispatcher] Email não enviado (Email null ou Resend sem API Key)')
 
-    # 4. ENVIAR WHATSAPP (Se habilitado e configurado no perfil do aluno)
+    # 4. SEND WHATSAPP (if enabled and configured on student profile)
     try:
         from app.modules.notifications.services.waha_service import WahaService
+        # Wake up WAHA first in case it's sleeping on Railway (cold start ~10-30s)
+        await WahaService.ensure_awake()
         whatsapp_text = f"*{title}*\n\n{body}"
         if url and url != '/':
             whatsapp_text += f"\n\nAcesse no App: https://tati-ai.vercel.app{url}"
         
         wa_res = await WahaService.send_message(recipient_username=username, text=whatsapp_text, sender_username=sender_username, db=db)
-        logging.info(f'[Dispatcher] Resultado envio WhatsApp para {username}: {wa_res}')
+        logging.info(f'[Dispatcher] WhatsApp send result for {username}: {wa_res}')
     except Exception as e:
         logging.exception(f'[Dispatcher] Erro ao enviar WhatsApp para {username}: {e}')
 

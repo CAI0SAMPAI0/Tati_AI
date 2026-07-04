@@ -1,8 +1,10 @@
+import asyncio
 import logging
 import httpx
 from typing import Dict, Any, List, Optional
 from fastapi.concurrency import run_in_threadpool
 from app.core.config import settings
+
 
 class WahaService:
     @staticmethod
@@ -13,11 +15,32 @@ class WahaService:
         return headers
 
     @staticmethod
+    async def ensure_awake(retries: int = 8, delay: float = 4.0) -> bool:
+        """Wakes up WAHA if sleeping (Railway cold start) and waits until it is ready.
+        Returns True if WAHA responds, False if all retries are exhausted."""
+        url = f"{settings.waha_api_url}/api/server/status"
+        headers = WahaService._get_headers()
+        for attempt in range(retries):
+            try:
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    res = await client.get(url, headers=headers)
+                    if res.status_code in (200, 401):
+                        logging.info(f"[WAHA] Awake after {attempt + 1} attempt(s).")
+                        return True
+            except Exception:
+                pass
+            logging.info(f"[WAHA] Waiting for cold start... attempt {attempt + 1}/{retries}")
+            await asyncio.sleep(delay)
+        logging.warning("[WAHA] Service did not respond after all retries.")
+        return False
+
+    @staticmethod
     async def start_session(session_name: str) -> Dict[str, Any]:
-        """Inicia uma sessão no WAHA."""
+        """Creates and starts a WAHA session for the given user."""
         url = f"{settings.waha_api_url}/api/sessions"
         payload = {"name": session_name}
         headers = WahaService._get_headers()
+
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 res = await client.post(url, json=payload, headers=headers)
