@@ -24,11 +24,13 @@ import { Select } from '@/components/ui/select';
 import toast from 'react-hot-toast';
 import { useTour } from '@/hooks/useTour';
 import { apiGet, apiPut } from '@/lib/api/client';
+import { useAuth } from '@/providers/auth-provider';
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const { restartTour } = useTour();
+  const { user, updateProfile } = useAuth();
   const [mounted, setMounted] = useState(false);
 
   const [settings, setSettings] = useState({
@@ -42,6 +44,9 @@ export default function SettingsPage() {
     challenges: { email: true, push: true },
     cefr: { email: true, push: true },
   });
+
+  const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [allowWhatsappNotifications, setAllowWhatsappNotifications] = useState(false);
 
   const handlePrefChange = (
     category: 'streaks' | 'challenges' | 'cefr',
@@ -79,14 +84,38 @@ export default function SettingsPage() {
     loadPrefs();
   }, []);
 
+  useEffect(() => {
+    if (user) {
+      setWhatsappNumber(user.profile?.whatsapp_number || '');
+      setAllowWhatsappNotifications(user.profile?.allow_whatsapp_notifications ?? false);
+    }
+  }, [user]);
+
   const handleSaveAll = async () => {
     localStorage.setItem('tati_settings', JSON.stringify(settings));
     try {
       await apiPut('/users/notification-preferences', prefs);
+      
+      await apiPut('/profile', {
+        whatsapp_number: whatsappNumber.trim() || null,
+        allow_whatsapp_notifications: allowWhatsappNotifications,
+      });
+
+      if (user) {
+        updateProfile({
+          ...user,
+          profile: {
+            ...user.profile,
+            whatsapp_number: whatsappNumber.trim() || undefined,
+            allow_whatsapp_notifications: allowWhatsappNotifications,
+          }
+        });
+      }
+
       toast.success('Saved successfully!');
     } catch (err) {
-      console.error('Failed to save notification preferences:', err);
-      toast.error('Failed to save notification preferences.');
+      console.error('Failed to save settings:', err);
+      toast.error('Failed to save settings.');
     }
   };
 
@@ -303,10 +332,49 @@ export default function SettingsPage() {
             </div>
           </section>
 
+          <section className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
+            <div className="p-6 border-b border-border bg-bg-secondary/30 flex items-center gap-3">
+               <MessageCircle size={20} className="text-primary" />
+               <h2 className="font-bold text-sm uppercase tracking-wider">WhatsApp Notifications</h2>
+            </div>
+            <div className="p-6 space-y-6">
+               <div className="flex flex-col gap-2">
+                 <label className="text-sm font-bold text-text">WhatsApp Number</label>
+                 <div className="relative max-w-md">
+                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-text-muted">
+                     +55
+                   </span>
+                   <input
+                     type="tel"
+                     placeholder="(11) 99999-9999"
+                     value={whatsappNumber}
+                     onChange={(e) => setWhatsappNumber(e.target.value)}
+                     className="w-full pl-12 pr-4 py-3 bg-bg border border-border rounded-2xl text-sm font-bold text-text placeholder-text-muted/50 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
+                   />
+                 </div>
+                 <p className="text-[0.65rem] text-text-subtle leading-normal">
+                   Informe o número com DDI/DDD (ex: 11999999999).
+                 </p>
+               </div>
 
-      <section className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
-        <div className="p-6 border-b border-border bg-bg-secondary/30 flex items-center gap-3">
-          <Smartphone size={20} className="text-primary" />
+               <label className="flex items-center justify-between cursor-pointer group pt-6 border-t border-border">
+                  <div>
+                    <p className="text-sm font-bold text-text mb-0.5">Enable WhatsApp Notifications</p>
+                    <p className="text-xs text-text-muted">Receive study materials, quiz alerts, and teacher updates on WhatsApp</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    className="w-5 h-5 rounded-md border-border text-primary focus:ring-primary/20 transition-all accent-primary"
+                    checked={allowWhatsappNotifications}
+                    onChange={(e) => setAllowWhatsappNotifications(e.target.checked)}
+                  />
+               </label>
+            </div>
+          </section>
+
+          <section className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
+            <div className="p-6 border-b border-border bg-bg-secondary/30 flex items-center gap-3">
+              <Smartphone size={20} className="text-primary" />
           <h2 className="font-bold text-sm uppercase tracking-wider">Mobile App</h2>
         </div>
         <div className="p-6">

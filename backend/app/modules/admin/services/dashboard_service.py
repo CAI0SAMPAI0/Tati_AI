@@ -646,67 +646,35 @@ class DashboardService:
         return await run_in_threadpool(_fetch)
 
 
-    async def nudge_student(self, username: str, text: str) -> dict:
-        """Envia uma mensagem de nudge para o aluno via chat, push e email."""
+    async def nudge_student(self, username: str, text: str, sender_username: Optional[str] = None) -> dict:
+        """Envia uma mensagem de nudge para o aluno criando uma notificação no topo e disparando por push, email e WhatsApp."""
         from datetime import datetime, timezone
+        from app.modules.notifications.services.notifications import create_notification
         
-        def _execute():
-            # 1. Encontra a última conversa do aluno para associar a mensagem
-            convs = self.db.table('conversations')\
-                .select('id')\
-                .eq('username', username)\
-                .order('updated_at', desc=True)\
-                .limit(1)\
-                .execute()\
-                .data or []
+        # 1. Cria a notificação para o aluno (aparece no topo da tela / dropdown de notificações)
+        try:
+            create_notification(
+                username=username,
+                category='nudge',
+                title="Teacher Tati 🍎",
+                message=text,
+                send_push=False  # dispatch_universal_notification vai tratar do push
+            )
+        except Exception as e:
+            logging.error(f"[DashboardService] Erro ao criar notificação de nudge: {e}")
             
-            if convs:
-                conv_id = convs[0]['id']
-            else:
-                # Cria uma nova conversa se o aluno não tiver nenhuma
-                new_conv = {
-                    'username': username,
-                    'created_at': datetime.now(timezone.utc).isoformat(),
-                    'updated_at': datetime.now(timezone.utc).isoformat(),
-                }
-                res_conv = self.db.table('conversations').insert(new_conv).execute()
-                conv_id = res_conv.data[0]['id'] if res_conv.data else None
-                
-            if not conv_id:
-                return {"success": False, "error": "Could not identify/create conversation"}
-                
-            # 2. Insere a mensagem no chat com o papel 'assistant' (Teacher Tati)
-            now = datetime.now()
-            msg = {
-                'session_id': conv_id,
-                'username': username,
-                'role': 'assistant',
-                'content': text,
-                'date': now.strftime('%Y-%m-%d'),
-                'created_at': datetime.now(timezone.utc).isoformat()
-            }
-            self.db.table('messages').insert(msg).execute()
-            self.db.table('conversations').update({
-                'updated_at': datetime.now(timezone.utc).isoformat()
-            }).eq('id', conv_id).execute()
-            
-            return {"success": True}
-            
-        res = await run_in_threadpool(_execute)
-        if not res.get("success"):
-            return res
-            
-        # 3. Dispara a notificação push e email universalmente
+        # 2. Dispara a notificação push, email e WhatsApp universalmente
         try:
             from app.modules.notifications.services.notification_dispatcher import dispatch_universal_notification
             await dispatch_universal_notification(
                 username,
                 title="Teacher Tati 🍎",
                 body=text,
-                url="/chat"
+                url="/chat",
+                sender_username=sender_username
             )
         except Exception as push_err:
-            logging.warning(f"[DashboardService] Erro ao enviar push/email nudge: {push_err}")
+            logging.warning(f"[DashboardService] Erro ao enviar push/email/WhatsApp nudge: {push_err}")
             
         return {"success": True}
 

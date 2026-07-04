@@ -161,6 +161,16 @@ else:
             except Exception as exc:
                 logging.info(f'[Startup] Falha ao pré-carregar Vectorstore: {exc}')
 
+            # Auto-start WAHA sessions configured in settings
+            try:
+                from app.modules.notifications.services.waha_service import WahaService
+                sessions = [s.strip() for s in settings.waha_auto_start_sessions.split(',') if s.strip()]
+                logging.info(f'[Startup] Auto-starting WAHA sessions: {sessions}')
+                for session in sessions:
+                    asyncio.create_task(WahaService.start_session(session))
+            except Exception as exc:
+                logging.info(f'[Startup] Failed to auto-start WAHA sessions: {exc}')
+
         await _warmup()
 
     @app.exception_handler(Exception)

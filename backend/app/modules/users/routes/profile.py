@@ -26,6 +26,9 @@ class ProfileUpdate(BaseModel):
     cpf: Optional[str] = None
     cpf_cnpj: Optional[str] = None
     responsible_email: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    allow_whatsapp_notifications: Optional[bool] = None
+    whatsapp_onboarded: Optional[bool] = None
 
 
 @router.get('')

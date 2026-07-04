@@ -176,7 +176,7 @@ async def nudge_student(
     user=Depends(require_staff)
 ) -> dict:
     """Envia mensagem no chat e notificação push de aviso para o estudante."""
-    return await service.nudge_student(username, body.message)
+    return await service.nudge_student(username, body.message, sender_username=user['username'])
 
 
 
@@ -971,6 +971,21 @@ async def dispatch_file(
             # Always increment success count and trigger push notification
             success_count += 1
             files_str = ", ".join(file_names)
+            
+            # Cria notificação no banco de dados para aparecer no topo da tela do aluno
+            try:
+                from app.modules.notifications.services.notifications import create_notification
+                create_notification(
+                    username=username,
+                    category='nudge',
+                    title="Novo Material de Estudo! 📚",
+                    message=f"Teacher Tati te enviou o(s) material(is) '{files_str}'. O(s) arquivo(s) foi(ram) enviado(s) ao seu e-mail!",
+                    send_push=False
+                )
+            except Exception as ne:
+                import logging
+                logging.exception(f"Failed to create notification for file dispatch: {ne}")
+
             try:
                 send_push_to_user(
                     username=username,
@@ -981,6 +996,22 @@ async def dispatch_file(
             except Exception as e:
                 import logging
                 logging.exception(f"Failed to send push notification to user {username}: {e}")
+
+            # Envia via WhatsApp (se habilitado)
+            try:
+                from app.modules.notifications.services.waha_service import WahaService
+                title = "Novo Material de Estudo! 📚"
+                body = f"Teacher Tati te enviou o(s) material(is) '{files_str}'. O(s) arquivo(s) foi(ram) enviado(s) ao seu e-mail!"
+                whatsapp_text = f"*{title}*\n\n{body}\n\nAcesse no App: https://tati-ai.vercel.app/chat"
+                await WahaService.send_message(
+                    recipient_username=username,
+                    text=whatsapp_text,
+                    sender_username=user['username'],
+                    db=db
+                )
+            except Exception as we:
+                import logging
+                logging.warning(f"Failed to send WhatsApp notification to user {username}: {we}")
     finally:
         # Garante a limpeza de todos os arquivos temporários
         for temp_path in saved_paths:
@@ -1043,6 +1074,21 @@ async def dispatch_quiz(
 
         # Always increment success count and trigger push notification
         success_count += 1
+        
+        # Cria notificação no banco de dados para aparecer no topo da tela do aluno
+        try:
+            from app.modules.notifications.services.notifications import create_notification
+            create_notification(
+                username=username,
+                category='nudge',
+                title="Novo Quiz Disponível! 📝",
+                message=f"Teacher Tati liberou o quiz '{quiz_title}' para você. Acesse suas atividades!",
+                send_push=False
+            )
+        except Exception as ne:
+            import logging
+            logging.exception(f"Failed to create notification for quiz dispatch: {ne}")
+
         try:
             send_push_to_user(
                 username=username,
@@ -1053,6 +1099,22 @@ async def dispatch_quiz(
         except Exception as e:
             import logging
             logging.exception(f"Failed to send push notification to user {username}: {e}")
+
+        # Envia via WhatsApp (se habilitado)
+        try:
+            from app.modules.notifications.services.waha_service import WahaService
+            title = "Novo Quiz Disponível! 📝"
+            body = f"Teacher Tati liberou o quiz '{quiz_title}' para você. Acesse suas atividades!"
+            whatsapp_text = f"*{title}*\n\n{body}\n\nAcesse no App: https://tati-ai.vercel.app/activities"
+            await WahaService.send_message(
+                recipient_username=username,
+                text=whatsapp_text,
+                sender_username=user['username'],
+                db=db
+            )
+        except Exception as we:
+            import logging
+            logging.warning(f"Failed to send WhatsApp notification to user {username}: {we}")
 
     return {"success": True, "dispatched_to": success_count}
 
@@ -1227,4 +1289,56 @@ async def check_celery_health(user=Depends(require_staff)):
             "error": str(e),
             "workers": []
         }
+
+
+@router.get('/waha/sessions')
+async def get_waha_sessions(user=Depends(require_staff)):
+    """Returns all WAHA sessions and their status."""
+    from app.modules.notifications.services.waha_service import WahaService
+    return await WahaService.get_sessions()
+
+
+@router.post('/waha/session/start')
+async def start_waha_session(user=Depends(require_staff)):
+    """Starts the WAHA session for the logged-in user (e.g. 'professor' or 'programador')."""
+    from app.modules.notifications.services.waha_service import WahaService
+    session_name = user['username']
+    return await WahaService.start_session(session_name)
+
+
+@router.post('/waha/session/stop')
+async def stop_waha_session(user=Depends(require_staff)):
+    """Stops the WAHA session for the logged-in user."""
+    from app.modules.notifications.services.waha_service import WahaService
+    session_name = user['username']
+    return await WahaService.stop_session(session_name)
+
+
+@router.get('/waha/session/qr')
+async def get_waha_session_qr(session: Optional[str] = None, user=Depends(require_staff)):
+    """Proxy to return the session QR code as an image."""
+    from app.modules.notifications.services.waha_service import WahaService
+    from fastapi import Response
+    
+    session_name = session or user['username']
+    image_bytes = await WahaService.get_qr_code_image(session_name)
+    if not image_bytes:
+        raise HTTPException(status_code=404, detail="QR code not available or session is already connected.")
+        
+    return Response(content=image_bytes, media_type="image/png")
+
+
+@router.get('/waha/session/screenshot')
+async def get_waha_session_screenshot(session: Optional[str] = None, user=Depends(require_staff)):
+    """Proxy para retornar o screenshot atual da sessão do WhatsApp Web."""
+    from app.modules.notifications.services.waha_service import WahaService
+    from fastapi import Response
+    
+    session_name = session or user['username']
+    image_bytes = await WahaService.get_screenshot_image(session_name)
+    if not image_bytes:
+        raise HTTPException(status_code=404, detail="Screenshot not available.")
+        
+    return Response(content=image_bytes, media_type="image/png")
+
 

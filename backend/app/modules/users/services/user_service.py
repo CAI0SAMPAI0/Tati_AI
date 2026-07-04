@@ -107,7 +107,7 @@ class UserService:
                 and v is not None
             }
             profile = rows[0].get('profile') or {}
-            for field in ('nickname', 'occupation', 'responsible_email'):
+            for field in ('nickname', 'occupation', 'responsible_email', 'whatsapp_number', 'allow_whatsapp_notifications', 'whatsapp_onboarded'):
                 if body.get(field) is not None:
                     profile[field] = body[field]
 

@@ -47,6 +47,8 @@ export default function ProfileClientPage() {
     level: normalizeLevel(user?.level),
     focus: user?.focus || 'General Conversation',
     responsible_email: user?.profile?.responsible_email || '',
+    whatsapp_number: user?.profile?.whatsapp_number || '',
+    allow_whatsapp_notifications: user?.profile?.allow_whatsapp_notifications ?? false,
   });
 
   const [pwData, setFormDataPw] = useState({
@@ -64,6 +66,8 @@ export default function ProfileClientPage() {
         level: normalizeLevel(user.level),
         focus: user.focus || 'General Conversation',
         responsible_email: user.profile?.responsible_email || '',
+        whatsapp_number: user.profile?.whatsapp_number || '',
+        allow_whatsapp_notifications: user.profile?.allow_whatsapp_notifications ?? false,
       });
     }
   }, [user]);
@@ -245,6 +249,32 @@ export default function ProfileClientPage() {
                     value={formData.responsible_email}
                     onChange={(e) => setFormData({ ...formData, responsible_email: e.target.value })}
                   />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-xs font-bold text-text-subtle uppercase ml-1">{'WhatsApp Number'}</label>
+                  <Input
+                    type="tel"
+                    placeholder="5511999999999"
+                    value={formData.whatsapp_number}
+                    onChange={(e) => setFormData({ ...formData, whatsapp_number: e.target.value })}
+                  />
+                </div>
+                <div className="md:col-span-2 flex items-start gap-3 bg-bg-secondary/40 p-4 rounded-2xl border border-border/50 select-none">
+                  <input
+                    type="checkbox"
+                    id="allow_whatsapp_notifications"
+                    checked={formData.allow_whatsapp_notifications}
+                    onChange={(e) => setFormData({ ...formData, allow_whatsapp_notifications: e.target.checked })}
+                    className="mt-1 accent-emerald-500 w-4 h-4 rounded shrink-0"
+                  />
+                  <label htmlFor="allow_whatsapp_notifications" className="space-y-0.5 cursor-pointer">
+                    <div className="text-xs font-bold text-text">
+                      {'Permitir notificações via WhatsApp'}
+                    </div>
+                    <div className="text-[0.65rem] text-text-subtle leading-normal">
+                      {'Receber materiais de estudo, avisos de quizzes e lembretes diretamente no WhatsApp.'}
+                    </div>
+                  </label>
                 </div>
               </div>
             </div>

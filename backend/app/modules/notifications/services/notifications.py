@@ -372,6 +372,26 @@ def notify_all_students(
                 except BaseException:
                     pass
 
+            # Envia via WhatsApp (WahaService valida permissões e número automaticamente)
+            try:
+                import asyncio
+                from app.modules.notifications.services.waha_service import WahaService
+                whatsapp_text = f"*{title}*\n\n{message}"
+                if url and url != '/':
+                    whatsapp_text += f"\n\nAcesse no App: https://tati-ai.vercel.app{url}"
+                
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = None
+                
+                if loop and loop.is_running():
+                    loop.create_task(WahaService.send_message(recipient_username=username, text=whatsapp_text, db=db))
+                else:
+                    asyncio.run(WahaService.send_message(recipient_username=username, text=whatsapp_text, db=db))
+            except Exception as wexc:
+                logging.info(f'[Notif] Erro ao enviar WhatsApp em notify_all_students para {username}: {wexc}')
+
     except Exception as e:
         logging.info(f'[Notif] Erro ao notificar todos: {e}')
 

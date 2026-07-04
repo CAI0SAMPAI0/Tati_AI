@@ -193,6 +193,11 @@ class Settings(BaseSettings):
     vapid_private_key: str = ''
     vapid_contact: str = ''
     enable_notification_scheduler: bool = True
+
+    # WAHA WhatsApp HTTP API
+    waha_api_url: str = 'http://localhost:3010'
+    waha_api_key: str = 'local_waha_key'
+    waha_auto_start_sessions: str = 'programador'
     use_celery: bool = False
     worker_api_url: str = ""
     is_heavy_worker: bool = False

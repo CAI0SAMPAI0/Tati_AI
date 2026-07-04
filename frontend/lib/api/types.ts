@@ -22,7 +22,9 @@ export interface User {
    */
   profile?: {
     responsible_email?: string;
-    // add other profile fields here when needed
+    whatsapp_number?: string;
+    allow_whatsapp_notifications?: boolean;
+    whatsapp_onboarded?: boolean;
   };
 }
 

@@ -119,12 +119,27 @@ class CEFRScheduler:
             logging.info(f"[CEFR Scheduler] Levels selected for this run: {selected_levels}")
 
             for level in selected_levels:
-                topic = random.choice(EVERYDAY_TOPICS)
+                # 1. Filter topics that have already been generated for this level to avoid redundancy and excessive generation
+                available_topics = list(EVERYDAY_TOPICS)
+                random.shuffle(available_topics)
+                
+                topic = None
+                for t in available_topics:
+                    # Check if content has already been generated for this topic and level
+                    exists_res = self.client.table("cefr_flashcards").select("id").eq("level", level).eq("topic", t).limit(1).execute()
+                    if not exists_res.data:
+                        topic = t
+                        break
+                
+                # If all topics already have content, choose a random one to avoid blocking
+                if not topic:
+                    topic = random.choice(EVERYDAY_TOPICS)
+
                 logging.info(f"[CEFR Scheduler] Generating content for {level} on topic '{topic}'...")
 
-                # Generate Flashcards (10)
+                # Generate Flashcards (5)
                 if "flashcards" in types:
-                    flashcards = await CEFRGeneratorService.generate_flashcards(level=level, topic=topic, count=10)
+                    flashcards = await CEFRGeneratorService.generate_flashcards(level=level, topic=topic, count=5)
                     if flashcards:
                         saved_cards = []
                         for card in flashcards:
@@ -141,9 +156,9 @@ class CEFRScheduler:
                                 saved_cards.extend(insert_res.data)
                         logging.info(f"[CEFR Scheduler] Saved {len(saved_cards)} flashcards for {level}.")
 
-                # Generate Exercises (10)
+                # Generate Exercises (5)
                 if "exercises" in types:
-                    exercises = await CEFRGeneratorService.generate_exercises(level=level, topic=topic, count=10)
+                    exercises = await CEFRGeneratorService.generate_exercises(level=level, topic=topic, count=5)
                     if exercises:
                         saved_exercises = []
                         for ex in exercises:
