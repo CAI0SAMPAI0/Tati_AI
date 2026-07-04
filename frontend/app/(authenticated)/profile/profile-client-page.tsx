@@ -269,10 +269,10 @@ export default function ProfileClientPage() {
                   />
                   <label htmlFor="allow_whatsapp_notifications" className="space-y-0.5 cursor-pointer">
                     <div className="text-xs font-bold text-text">
-                      {'Permitir notificações via WhatsApp'}
+                      {'Allow notifications via WhatsApp'}
                     </div>
                     <div className="text-[0.65rem] text-text-subtle leading-normal">
-                      {'Receber materiais de estudo, avisos de quizzes e lembretes diretamente no WhatsApp.'}
+                      {'Receive study materials, quiz alerts and reminders directly on WhatsApp.'}
                     </div>
                   </label>
                 </div>
