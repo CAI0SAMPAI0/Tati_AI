@@ -45,7 +45,7 @@ async def get_task_status(task_id: str, request: Request, current_user: dict = D
     return {"status": task_result.state.lower(), "result": None}
 
 
-@router.post("/trigger/{task_name}")
+@router.api_route("/trigger/{task_name}", methods=["GET", "POST"])
 async def trigger_task(
     task_name: str,
     request: Request,
