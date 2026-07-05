@@ -29,7 +29,18 @@ export function WhatsappSection() {
   const { data: sessions, isLoading, refetch, isRefetching } = useQuery<SessionData[]>({
     queryKey: ['waha-sessions'],
     queryFn: () => apiGet<SessionData[]>('/dashboard/waha/sessions'),
-    refetchInterval: 5000, // atualiza a cada 5s
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      const mySession = data?.find(s => s.name === sessionName);
+      const status = mySession ? mySession.status : 'DISCONNECTED';
+      if (status === 'WORKING') {
+        return 60000; // Poll every 60s when connected to avoid waking up Railway
+      }
+      if (status === 'DISCONNECTED') {
+        return 30000; // Poll every 30s when disconnected
+      }
+      return 5000; // Poll every 5s during setup/scan phases
+    },
   });
 
   const mySession = sessions?.find(s => s.name === sessionName);
