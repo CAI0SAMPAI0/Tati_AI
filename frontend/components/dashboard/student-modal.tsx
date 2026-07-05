@@ -58,7 +58,7 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
     setRecommendations([]);
     setAnalytics(null);
     if (student) {
-      setNudgeMessage(`Hi ${student.name || student.username}! Teacher Tati here. 🍎 I noticed you haven't practiced English lately. Let's do a quick chat session today?`);
+      setNudgeMessage(`Hi ${student.name || student.username}! Teacher Tati here. I noticed you haven't practiced English lately. Let's do a quick chat session today?`);
     }
   }, [student]);
 
