@@ -237,9 +237,6 @@ export function WhatsappSection() {
               </div>
             </div>
           )}
-
-
-          )}
         </div>
       </div>
     </div>
