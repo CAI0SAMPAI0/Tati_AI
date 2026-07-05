@@ -58,30 +58,40 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       const data = await apiGet<AppNotification[]>(ENDPOINTS.NOTIFICATIONS);
       const list = Array.isArray(data) ? data : [];
       
-      setNotifications(list);
-      setUnreadCount(list.filter((n) => !n.is_read).length);
-
       const unreadNudges = list.filter(n => !n.is_read && n.category === 'nudge');
 
       if (initialLoadDone.current) {
         // Check for new notifications to show toast
         const newNotifs = list.filter(n => !n.is_read && !lastNotifIds.current.has(n.id));
         newNotifs.forEach(n => {
+          let shown = false;
           // Toast AI generations or general notifications
           if (n.category === 'new_activity' || n.category === 'correction' || n.category === 'ai_generation') {
              toast.success(`${n.title}: ${n.body}`, { duration: 6000 });
+             shown = true;
           } else if (n.category === 'nudge') {
              toast(`${n.title}: ${n.body}`, { icon: '🍎', duration: 8000 });
+             shown = true;
           } else if (n.category !== 'reminder') {
              toast(`${n.title}: ${n.body}`, { icon: '🔔', duration: 5000 });
+             shown = true;
+          }
+          if (shown) {
+            apiPost(ENDPOINTS.NOTIFICATION_READ(n.id), {}).catch(() => null);
+            n.is_read = true;
           }
         });
       } else {
         // Show unread nudges on initial load so the user sees them at the top of the screen immediately
         unreadNudges.forEach(n => {
           toast(`${n.title}: ${n.body}`, { icon: '🍎', duration: 8000 });
+          apiPost(ENDPOINTS.NOTIFICATION_READ(n.id), {}).catch(() => null);
+          n.is_read = true;
         });
       }
+
+      setNotifications(list);
+      setUnreadCount(list.filter((n) => !n.is_read).length);
 
       // Update seen IDs
       const currentIds = new Set(list.map(n => n.id));
