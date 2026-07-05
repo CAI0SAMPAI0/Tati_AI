@@ -9,12 +9,12 @@ import {
   BookOpen,
   Layers,
   Drama,
-  MessageSquare,
   Settings,
   X,
   Zap,
   Send,
 } from 'lucide-react';
+import { FaWhatsapp } from 'react-icons/fa';
 
 import { cn } from '@/lib/utils';
 
@@ -28,7 +28,7 @@ const NAV_ITEMS: Array<{ id: DashSection; icon: React.ReactNode; label: string }
   { id: 'cefr', icon: <BookOpen size={20} />, label: 'CEFR Materials' },
   { id: 'dispatch', icon: <Send size={20} />, label: 'Dispatch Panel' },
   { id: 'premium', icon: <Zap size={20} />, label: 'Premium Hub' },
-  { id: 'whatsapp', icon: <MessageSquare size={20} />, label: 'WhatsApp Config' },
+  { id: 'whatsapp', icon: <FaWhatsapp size={20} />, label: 'WhatsApp Config' },
 ];
 
 export type DashSection = 'overview' | 'students' | 'reports' | 'modules' | 'flashcards' | 'simulations' | 'premium' | 'cefr' | 'dispatch' | 'whatsapp';

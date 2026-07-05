@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { MessageSquare, RefreshCw, Power, CheckCircle, AlertCircle, QrCode, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { RefreshCw, Power, CheckCircle, AlertCircle, QrCode, Loader2 } from 'lucide-react';
+import { FaWhatsapp } from 'react-icons/fa';
 import { apiGet, apiPost, API_BASE } from '@/lib/api/client';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -155,7 +156,7 @@ export function WhatsappSection() {
         {/* Header */}
         <div className="p-6 border-b border-border bg-bg-secondary/30 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <MessageSquare size={20} className="text-primary" />
+            <FaWhatsapp size={20} className="text-primary" />
             <div>
               <h2 className="font-bold text-sm uppercase tracking-wider text-text">WhatsApp Session (WAHA)</h2>
               <p className="text-xs text-text-muted">Manage the WhatsApp connection for notification delivery</p>
