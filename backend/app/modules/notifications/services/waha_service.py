@@ -67,13 +67,22 @@ class WahaService:
 
     @staticmethod
     async def stop_session(session_name: str) -> Dict[str, Any]:
-        """Para/deleta uma sessão no WAHA."""
+        """Para/deleta uma sessão no WAHA, deslogando para limpar as credenciais do banco."""
+        logout_url = f"{settings.waha_api_url}/api/sessions/{session_name}/logout"
         url = f"{settings.waha_api_url}/api/sessions/{session_name}"
         headers = WahaService._get_headers()
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                # 1. Tenta deslogar para limpar chaves no PostgreSQL
+                try:
+                    await client.post(logout_url, headers=headers)
+                    logging.info(f"[WAHA] Logout successful for session {session_name}.")
+                except Exception as logout_err:
+                    logging.warning(f"[WAHA] Logout request failed (continuing to delete): {logout_err}")
+                
+                # 2. Deleta a sessão da memória do WAHA
                 res = await client.delete(url, headers=headers)
-                if res.status_code in (200, 204):
+                if res.status_code in (200, 204, 404):
                     return {"success": True}
                 return {"success": False, "error": res.text, "status_code": res.status_code}
         except Exception as e:
