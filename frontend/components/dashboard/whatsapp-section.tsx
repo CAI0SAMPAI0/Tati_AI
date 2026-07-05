@@ -20,9 +20,7 @@ export function WhatsappSection() {
   const sessionName = user?.username || 'default';
   
   const [qrBlobUrl, setQrBlobUrl] = useState<string>('');
-  const [screenshotBlobUrl, setScreenshotBlobUrl] = useState<string>('');
   const [loadingQr, setLoadingQr] = useState(false);
-  const [loadingScreenshot, setLoadingScreenshot] = useState(false);
   const [isStartingOrStopping, setIsStartingOrStopping] = useState(false);
 
   // Consulta status das sessões do WAHA
@@ -70,28 +68,7 @@ export function WhatsappSection() {
     }
   };
 
-  // Carrega Screenshot via fetch
-  const loadScreenshot = async () => {
-    setLoadingScreenshot(true);
-    try {
-      const response = await fetch(`${API_BASE}/dashboard/waha/session/screenshot?session=${sessionName}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
-        },
-      });
-      if (response.ok) {
-        const blob = await response.blob();
-        if (screenshotBlobUrl) URL.revokeObjectURL(screenshotBlobUrl);
-        setScreenshotBlobUrl(URL.createObjectURL(blob));
-      } else {
-        setScreenshotBlobUrl('');
-      }
-    } catch (e) {
-      console.error('[WAHA] Error loading screenshot:', e);
-    } finally {
-      setLoadingScreenshot(false);
-    }
-  };
+
 
   useEffect(() => {
     if (sessionStatus === 'SCAN_QR_CODE') {
@@ -128,7 +105,6 @@ export function WhatsappSection() {
       if (res.ok) {
         toast.success('Session stopped successfully.', { id: toastId });
         setQrBlobUrl('');
-        setScreenshotBlobUrl('');
         await refetch();
       } else {
         toast.error('Error stopping session.', { id: toastId });
@@ -261,38 +237,7 @@ export function WhatsappSection() {
             </div>
           )}
 
-          {/* Screenshot area for debug / control */}
-          {sessionStatus !== 'DISCONNECTED' && (
-            <div className="border border-border rounded-2xl overflow-hidden bg-bg">
-              <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-bg-secondary/20">
-                <h3 className="text-xs font-black uppercase tracking-wider text-text-subtle flex items-center gap-2">
-                  <ImageIcon size={14} />
-                  Screen View (WhatsApp Web)
-                </h3>
-                <Button
-                  onClick={loadScreenshot}
-                  disabled={loadingScreenshot}
-                  variant="secondary"
-                  className="text-[0.65rem] px-3 py-1.5 h-auto gap-1.5"
-                >
-                  <RefreshCw size={10} className={loadingScreenshot ? 'animate-spin' : ''} />
-                  Refresh Screenshot
-                </Button>
-              </div>
-              <div className="p-4 flex items-center justify-center min-h-[200px]">
-                {loadingScreenshot ? (
-                  <Spinner size="md" />
-                ) : screenshotBlobUrl ? (
-                  <img
-                    src={screenshotBlobUrl}
-                    alt="WhatsApp Web Screenshot"
-                    className="max-w-full h-auto rounded-lg border border-border shadow-sm max-h-[300px]"
-                  />
-                ) : (
-                  <p className="text-xs text-text-muted">Click "Refresh Screenshot" to view the browser window.</p>
-                )}
-              </div>
-            </div>
+
           )}
         </div>
       </div>
