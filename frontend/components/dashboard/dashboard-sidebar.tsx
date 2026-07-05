@@ -9,6 +9,7 @@ import {
   BookOpen,
   Layers,
   Drama,
+  MessageSquare,
   Settings,
   X,
   Zap,
