@@ -194,18 +194,18 @@ class EmailSender:
 
     def send_email(
             self,
-            fromemail: str,
             to_email: str,
             subject: str,
-            html: str) -> bool:
+            html: str,
+            fromemail: str | None = None) -> bool:
         return self._send(to_email, subject, html)
 
     def _send_smtp_email(
             self,
-            fromemail: str,
             to_email: str,
             subject: str,
-            html: str) -> bool:
+            html: str,
+            fromemail: str | None = None) -> bool:
         return self._send(to_email, subject, html)
 
     def send_reset_email(

@@ -59,7 +59,6 @@ async def dispatch_universal_notification(
             </div>
             """
             email_sender.send_email(
-                fromemail="Teacher Tati <tatiai@resend.dev>",
                 to_email=user_email,
                 subject=title,
                 html=html
