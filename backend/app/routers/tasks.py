@@ -34,7 +34,7 @@ async def smtp_probe(token: str = Query(None)):
     for host, port, desc in HOSTS:
         try:
             t0 = time.time()
-            s = socket.create_connection((host, port), timeout=4)
+            s = socket.create_connection((host, port), timeout=1.0)
             s.close()
             ms = round((time.time() - t0) * 1000)
             results.append({"desc": desc, "host": host, "port": port, "ok": True, "ms": ms})
