@@ -63,8 +63,11 @@ class EmailSender:
                 f"[EmailSender] SMTP/resend not configured (Simulating Success). Email to {to_email}: {subject}")
             return True
 
-        # 1. Tenta enviar via SMTP (Gmail) primeiro se estiver configurado
-        if self.smtp_configured:
+        # Hugging Face Spaces bloqueia portas SMTP (465/587) — usar somente Resend HTTP
+        running_on_hf = bool(os.getenv("SPACE_ID") or os.getenv("HF_SPACE_ID") or os.getenv("SYSTEM") == "spaces")
+
+        # 1. Tenta enviar via SMTP (Gmail) — apenas se NÃO estiver no HF Space
+        if self.smtp_configured and not running_on_hf:
             try:
                 msg = MIMEMultipart()
                 msg["From"] = self._FROM
@@ -98,13 +101,15 @@ class EmailSender:
                     if self.smtp_user and self.smtp_password:
                         server.login(self.smtp_user, self.smtp_password)
                     server.send_message(msg)
-                
+
                 logging.info(f"[EmailSender] Email sent successfully via SMTP to {to_email}")
                 return True
             except Exception as exc:
                 logging.error(f"[EmailSender] SMTP sending failed: {exc}. Trying Resend fallback if configured...")
+        elif running_on_hf and self.smtp_configured:
+            logging.info(f"[EmailSender] Running on HF Space — skipping SMTP (port blocked), using Resend HTTP directly.")
 
-        # 2. Fallback para o Resend se o SMTP falhar ou não estiver configurado
+        # 2. Fallback para o Resend (HTTP — funciona em todos os ambientes incluindo HF)
         try:
             if "resend" in globals() and hasattr(
                     resend, "Emails") and hasattr(
