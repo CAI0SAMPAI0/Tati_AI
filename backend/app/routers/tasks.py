@@ -47,6 +47,29 @@ async def smtp_probe(token: str = Query(None)):
         "all": results,
         "recommendation": working[0] if working else None,
     }
+@router.get("/smtp-debug")
+async def smtp_debug(token: str = Query(None)):
+    """
+    Retorna as configurações do SMTP atualmente ativas na aplicação.
+    Use: GET /tasks/smtp-debug?token=cai0_based
+    """
+    import os
+    cron_token = os.getenv("CRON_TOKEN", "cai0_based")
+    if token != cron_token:
+        raise HTTPException(status_code=403, detail="Invalid token.")
+
+    from app.core.config import settings
+
+    return {
+        "smtp_host": settings.smtp_host,
+        "smtp_port": settings.smtp_port,
+        "smtp_user": settings.smtp_user,
+        "smtp_password_present": bool(settings.smtp_password),
+        "smtp_from": settings.smtp_from,
+        "env_smtp_port": os.getenv("SMTP_PORT"),
+        "env_smtp_host": os.getenv("SMTP_HOST"),
+    }
+
 
 
 @router.get("/health")
