@@ -63,11 +63,34 @@ class EmailSender:
                 f"[EmailSender] SMTP/resend not configured (Simulating Success). Email to {to_email}: {subject}")
             return True
 
-        # Hugging Face Spaces bloqueia portas SMTP (465/587) — usar somente Resend HTTP
+        # Hugging Face Spaces bloqueia portas SMTP (465/587) — delegar ao Celery worker
         running_on_hf = bool(os.getenv("SPACE_ID") or os.getenv("HF_SPACE_ID") or os.getenv("SYSTEM") == "spaces")
 
-        # 1. Tenta enviar via SMTP (Gmail) — apenas se NÃO estiver no HF Space
-        if self.smtp_configured and not running_on_hf:
+        if running_on_hf:
+            # Delega para o Celery worker (Amazon Linux), que tem acesso SMTP completo
+            try:
+                from app.core.celery_app import USE_CELERY
+                if USE_CELERY:
+                    from app.core.tasks import send_email_task
+                    send_email_task.delay(to_email, subject, html, attachments)
+                    logging.info(f"[EmailSender] Email queued via Celery for {to_email}: {subject}")
+                    return True
+            except Exception as e:
+                logging.warning(f"[EmailSender] Celery delegation failed ({e}), trying Resend HTTP...")
+            # Fallback Resend se Celery não estiver disponível
+            try:
+                if "resend" in globals() and hasattr(resend, "Emails") and hasattr(resend.Emails, "send"):
+                    payload = {"to": to_email, "subject": subject, "html": html,
+                               "from": "Teacher Tati <tatiai@resend.dev>"}
+                    resp = resend.Emails.send(payload)
+                    logging.info(f"[EmailSender] Email sent via Resend to {to_email}")
+                    return bool(resp)
+            except Exception as exc:
+                logging.error(f"[EmailSender] Resend also failed: {exc}")
+            return False
+
+        # Fora do HF: tenta SMTP Gmail normalmente
+        if self.smtp_configured:
             try:
                 msg = MIMEMultipart()
                 msg["From"] = self._FROM
@@ -81,57 +104,38 @@ class EmailSender:
                             with open(file_path, "rb") as f:
                                 part = MIMEApplication(
                                     f.read(), Name=os.path.basename(file_path))
-                                part["Content-Disposition"] = f'attachment; filename="{
-                                    os.path.basename(file_path)}"'
+                                part["Content-Disposition"] = f'attachment; filename="{os.path.basename(file_path)}"'
                                 msg.attach(part)
 
                 if self.smtp_port == 465:
-                    server_class = smtplib.SMTP_SSL
-                    use_starttls = False
+                    with smtplib.SMTP_SSL(self.smtp_host, self.smtp_port, timeout=15) as server:
+                        server.login(self.smtp_user, self.smtp_password)
+                        server.send_message(msg)
                 else:
-                    server_class = smtplib.SMTP
-                    use_starttls = True
-
-                with server_class(self.smtp_host, self.smtp_port, timeout=15) as server:
-                    server.set_debuglevel(0)
-                    server.ehlo()
-                    if use_starttls and server.has_extn("STARTTLS"):
+                    with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=15) as server:
+                        server.ehlo()
                         server.starttls()
                         server.ehlo()
-                    if self.smtp_user and self.smtp_password:
                         server.login(self.smtp_user, self.smtp_password)
-                    server.send_message(msg)
+                        server.send_message(msg)
 
-                logging.info(f"[EmailSender] Email sent successfully via SMTP to {to_email}")
+                logging.info(f"[EmailSender] Email sent via SMTP to {to_email}")
                 return True
             except Exception as exc:
-                logging.error(f"[EmailSender] SMTP sending failed: {exc}. Trying Resend fallback if configured...")
-        elif running_on_hf and self.smtp_configured:
-            logging.info(f"[EmailSender] Running on HF Space — skipping SMTP (port blocked), using Resend HTTP directly.")
+                logging.error(f"[EmailSender] SMTP failed: {exc}. Trying Resend...")
 
-        # 2. Fallback para o Resend (HTTP — funciona em todos os ambientes incluindo HF)
+        # Fallback Resend
         try:
-            if "resend" in globals() and hasattr(
-                    resend, "Emails") and hasattr(
-                    resend.Emails, "send"):
-                payload = {
-                    "to": to_email,
-                    "subject": subject,
-                    "html": html,
-                    "from": "Teacher Tati <tatiai@resend.dev>"}
+            if "resend" in globals() and hasattr(resend, "Emails") and hasattr(resend.Emails, "send"):
+                payload = {"to": to_email, "subject": subject, "html": html,
+                           "from": "Teacher Tati <tatiai@resend.dev>"}
                 if attachments:
-                    prepared = []
-                    for p in attachments:
-                        try:
-                            if os.path.exists(p):
-                                prepared.append(
-                                    {"filename": os.path.basename(p), "path": p})
-                        except Exception:
-                            continue
+                    prepared = [{"filename": os.path.basename(p), "path": p}
+                                for p in (attachments or []) if p and os.path.exists(p)]
                     if prepared:
                         payload["attachments"] = prepared
                 resp = resend.Emails.send(payload)
-                logging.info(f"[EmailSender] Email sent successfully via Resend to {to_email}")
+                logging.info(f"[EmailSender] Email sent via Resend to {to_email}")
                 return bool(resp)
         except Exception as exc:
             logging.error(f"[EmailSender] Resend fallback failed: {exc}")
