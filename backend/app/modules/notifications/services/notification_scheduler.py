@@ -268,11 +268,35 @@ class NotificationScheduler:
     async def check_user_inactivity(self):
         logging.info('[Scheduler] Verificando inatividade...')
 
-        def _fetch():
-            return self._db.table('users').select(
-                'username, name, weekly_plan').execute().data or []
+        def _fetch_users_and_activity():
+            try:
+                users = self._db.table('users').select(
+                    'username, name, weekly_plan').execute().data or []
+                
+                # Busca as últimas mensagens para mapear última atividade
+                msg_rows = (
+                    self._db.table('messages')
+                    .select('username, created_at')
+                    .eq('role', 'user')
+                    .order('created_at', desc=True)
+                    .limit(2000)
+                    .execute()
+                    .data
+                    or []
+                )
+                
+                last_activity = {}
+                for r in msg_rows:
+                    uname = r.get('username')
+                    if uname and uname not in last_activity:
+                        last_activity[uname] = r.get('created_at')
+                
+                return users, last_activity
+            except Exception as e:
+                logging.error(f"[Scheduler] Erro ao buscar atividade/usuários: {e}")
+                return [], {}
 
-        users = await run_in_threadpool(_fetch)
+        users, last_activity = await run_in_threadpool(_fetch_users_and_activity)
         now = datetime.now(timezone.utc)
         count = 0
 
@@ -280,9 +304,12 @@ class NotificationScheduler:
             username = str(row.get('username') or '').strip()
             if not username:
                 continue
-            last_active_str = str(row.get('last_active') or '').strip()
+            
+            # Se o usuário nunca enviou mensagens, não mandamos lembretes de inatividade
+            last_active_str = last_activity.get(username)
             if not last_active_str:
                 continue
+                
             try:
                 last_active = datetime.fromisoformat(
                     last_active_str.replace('Z', '+00:00'))
@@ -322,13 +349,31 @@ class NotificationScheduler:
 
         email_sender = EmailSender()
 
-        def _fetch_active():
-            seven_days_ago = (datetime.now(timezone.utc) -
-                              timedelta(days=7)).isoformat()
-            return self._db.table('users').select('username, email, name, profile').gte(
-                'last_active', seven_days_ago).execute().data or []
+        def _fetch_active_usernames():
+            # Obtém usuários que enviaram mensagens nos últimos 7 dias
+            seven_days_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+            try:
+                msg_data = self._db.table('messages').select('username').gte(
+                    'created_at', seven_days_ago).execute().data or []
+                return list(set(m['username'] for m in msg_data if m.get('username')))
+            except Exception as e:
+                logging.error(f"[Scheduler] Erro ao buscar mensagens recentes: {e}")
+                return []
 
-        students = await run_in_threadpool(_fetch_active)
+        active_usernames = _fetch_active_usernames()
+        if not active_usernames:
+            logging.info("[Scheduler] Nenhum aluno ativo nos últimos 7 dias.")
+            return
+
+        def _fetch_users():
+            try:
+                return self._db.table('users').select('username, email, name, profile').in_(
+                    'username', active_usernames).execute().data or []
+            except Exception as e:
+                logging.error(f"[Scheduler] Erro ao carregar alunos ativos: {e}")
+                return []
+
+        students = await run_in_threadpool(_fetch_users)
 
         for student in students:
             username = student['username']
