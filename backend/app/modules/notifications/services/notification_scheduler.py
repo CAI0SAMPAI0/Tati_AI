@@ -80,6 +80,11 @@ INACTIVITY_MESSAGES = [
 ]
 
 
+# Usuários/roles admin que não devem receber notificações automáticas
+ADMIN_ROLES = {'programador', 'professor', 'professora', 'Professor', 'Professora'}
+ADMIN_USERNAMES = {'programador', 'professor'}
+
+
 class NotificationScheduler:
     def __init__(self):
         self.scheduler = AsyncIOScheduler()
@@ -92,6 +97,12 @@ class NotificationScheduler:
         """Conexão lazy — só acessa o banco quando necessário."""
         from app.core.database import get_client
         return get_client()
+
+    def _is_admin(self, row: dict) -> bool:
+        """Retorna True se o usuário é admin (não deve receber notifs automáticas)."""
+        username = str(row.get('username') or '').strip()
+        role = str(row.get('role') or '').strip()
+        return username in ADMIN_USERNAMES or role in ADMIN_ROLES
 
     def start(self):
         self.scheduler.add_job(
@@ -137,7 +148,7 @@ class NotificationScheduler:
 
         def _fetch():
             return self._db.table('users').select(
-                'username, name, streak_data').execute().data or []
+                'username, name, role, streak_data').execute().data or []
 
         users = await run_in_threadpool(_fetch)
         now = datetime.now(timezone.utc)
@@ -147,6 +158,9 @@ class NotificationScheduler:
         for row in users:
             username = str(row.get('username') or '').strip()
             if not username:
+                continue
+            # Admins não recebem notificações automáticas de streak
+            if self._is_admin(row):
                 continue
             streak_data = row.get('streak_data') or {}
             if not isinstance(streak_data, dict):
@@ -182,7 +196,7 @@ class NotificationScheduler:
 
         def _fetch():
             return self._db.table('users').select(
-                'username, name, streak_data').execute().data or []
+                'username, name, role, streak_data').execute().data or []
 
         users = await run_in_threadpool(_fetch)
         now = datetime.now(timezone.utc)
@@ -192,6 +206,9 @@ class NotificationScheduler:
         for row in users:
             username = str(row.get('username') or '').strip()
             if not username:
+                continue
+            # Admins não recebem notificações automáticas de streak
+            if self._is_admin(row):
                 continue
             streak_data = row.get('streak_data') or {}
             if not isinstance(streak_data, dict):
@@ -304,6 +321,9 @@ class NotificationScheduler:
             username = str(row.get('username') or '').strip()
             if not username:
                 continue
+            # Admins não recebem notificações automáticas de inatividade
+            if self._is_admin(row):
+                continue
             
             # Se o usuário nunca enviou mensagens, não mandamos lembretes de inatividade
             last_active_str = last_activity.get(username)
@@ -367,7 +387,7 @@ class NotificationScheduler:
 
         def _fetch_users():
             try:
-                return self._db.table('users').select('username, email, name, profile').in_(
+                return self._db.table('users').select('username, email, name, role, profile').in_(
                     'username', active_usernames).execute().data or []
             except Exception as e:
                 logging.error(f"[Scheduler] Erro ao carregar alunos ativos: {e}")
@@ -377,6 +397,9 @@ class NotificationScheduler:
 
         for student in students:
             username = student['username']
+            # Admins não recebem relatórios semanais automáticos
+            if self._is_admin(student):
+                continue
             email = student.get('email')
             profile = student.get('profile') or {}
             responsible_email = profile.get('responsible_email')
