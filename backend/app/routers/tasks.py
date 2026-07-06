@@ -7,6 +7,48 @@ from app.core.task_manager import run_task_in_background, get_local_task_status,
 router = APIRouter(tags=["Tasks"])
 
 
+@router.get("/smtp-probe")
+async def smtp_probe(token: str = Query(None)):
+    """
+    Testa quais portas SMTP são acessíveis de dentro do HF Space.
+    Use: GET /tasks/smtp-probe?token=cai0_based
+    """
+    import socket, time
+    cron_token = os.getenv("CRON_TOKEN", "cai0_based")
+    if token != cron_token:
+        raise HTTPException(status_code=403, detail="Invalid token.")
+
+    HOSTS = [
+        ("smtp.gmail.com",                        465,  "Gmail SSL"),
+        ("smtp.gmail.com",                        587,  "Gmail TLS"),
+        ("smtp.sendgrid.net",                     587,  "SendGrid TLS"),
+        ("smtp.sendgrid.net",                     2525, "SendGrid 2525"),
+        ("in-v3.mailjet.com",                     587,  "Mailjet TLS"),
+        ("in-v3.mailjet.com",                     443,  "Mailjet 443"),
+        ("smtp-relay.brevo.com",                  587,  "Brevo TLS"),
+        ("smtp-relay.brevo.com",                  2525, "Brevo 2525"),
+        ("smtp.postmarkapp.com",                  587,  "Postmark TLS"),
+        ("smtp.postmarkapp.com",                  2525, "Postmark 2525"),
+    ]
+    results = []
+    for host, port, desc in HOSTS:
+        try:
+            t0 = time.time()
+            s = socket.create_connection((host, port), timeout=4)
+            s.close()
+            ms = round((time.time() - t0) * 1000)
+            results.append({"desc": desc, "host": host, "port": port, "ok": True, "ms": ms})
+        except Exception as e:
+            results.append({"desc": desc, "host": host, "port": port, "ok": False, "error": str(e)})
+
+    working = [r for r in results if r["ok"]]
+    return {
+        "working": working,
+        "all": results,
+        "recommendation": working[0] if working else None,
+    }
+
+
 @router.get("/health")
 async def celery_health(token: str = Query(None)):
     """
