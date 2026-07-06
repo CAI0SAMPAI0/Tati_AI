@@ -288,7 +288,7 @@ class NotificationScheduler:
         def _fetch_users_and_activity():
             try:
                 users = self._db.table('users').select(
-                    'username, name, weekly_plan').execute().data or []
+                    'username, name, role, weekly_plan').execute().data or []
                 
                 # Busca as últimas mensagens para mapear última atividade
                 msg_rows = (
