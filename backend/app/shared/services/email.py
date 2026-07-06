@@ -26,10 +26,11 @@ class EmailSender:
         self.smtp_port = int(getattr(settings, "smtp_port", 465))
         self.smtp_user = getattr(settings, "smtp_user", "")
         self.smtp_password = getattr(settings, "smtp_password", "")
-        self._FROM = f"Teacher Tati <{self.smtp_user}>"
-        self._ready = bool(
-            (self.smtp_host and self.smtp_user and self.smtp_password) or getattr(
-                settings, "resend_api_key", ""))
+        self.smtp_from = getattr(settings, "smtp_from", "") or self.smtp_user
+        self._FROM = f"Teacher Tati <{self.smtp_from}>"
+        
+        self.smtp_configured = bool(self.smtp_host and self.smtp_user and self.smtp_password)
+        self._ready = self.smtp_configured or bool(getattr(settings, "resend_api_key", ""))
 
     def _send(self, to_email: str, subject: str, html: str,
               attachments: list | None = None) -> bool:
@@ -62,6 +63,48 @@ class EmailSender:
                 f"[EmailSender] SMTP/resend not configured (Simulating Success). Email to {to_email}: {subject}")
             return True
 
+        # 1. Tenta enviar via SMTP (Gmail) primeiro se estiver configurado
+        if self.smtp_configured:
+            try:
+                msg = MIMEMultipart()
+                msg["From"] = self._FROM
+                msg["To"] = to_email
+                msg["Subject"] = subject
+                msg.attach(MIMEText(html, "html"))
+
+                if attachments:
+                    for file_path in attachments:
+                        if os.path.exists(file_path):
+                            with open(file_path, "rb") as f:
+                                part = MIMEApplication(
+                                    f.read(), Name=os.path.basename(file_path))
+                                part["Content-Disposition"] = f'attachment; filename="{
+                                    os.path.basename(file_path)}"'
+                                msg.attach(part)
+
+                if self.smtp_port == 465:
+                    server_class = smtplib.SMTP_SSL
+                    use_starttls = False
+                else:
+                    server_class = smtplib.SMTP
+                    use_starttls = True
+
+                with server_class(self.smtp_host, self.smtp_port, timeout=15) as server:
+                    server.set_debuglevel(0)
+                    server.ehlo()
+                    if use_starttls and server.has_extn("STARTTLS"):
+                        server.starttls()
+                        server.ehlo()
+                    if self.smtp_user and self.smtp_password:
+                        server.login(self.smtp_user, self.smtp_password)
+                    server.send_message(msg)
+                
+                logging.info(f"[EmailSender] Email sent successfully via SMTP to {to_email}")
+                return True
+            except Exception as exc:
+                logging.error(f"[EmailSender] SMTP sending failed: {exc}. Trying Resend fallback if configured...")
+
+        # 2. Fallback para o Resend se o SMTP falhar ou não estiver configurado
         try:
             if "resend" in globals() and hasattr(
                     resend, "Emails") and hasattr(
@@ -83,47 +126,12 @@ class EmailSender:
                     if prepared:
                         payload["attachments"] = prepared
                 resp = resend.Emails.send(payload)
+                logging.info(f"[EmailSender] Email sent successfully via Resend to {to_email}")
                 return bool(resp)
         except Exception as exc:
-            logging.info(f"[EmailSender] resend service failed: {exc}")
+            logging.error(f"[EmailSender] Resend fallback failed: {exc}")
 
-        msg = MIMEMultipart()
-        msg["From"] = self._FROM
-        msg["To"] = to_email
-        msg["Subject"] = subject
-        msg.attach(MIMEText(html, "html"))
-
-        if attachments:
-            for file_path in attachments:
-                if os.path.exists(file_path):
-                    with open(file_path, "rb") as f:
-                        part = MIMEApplication(
-                            f.read(), Name=os.path.basename(file_path))
-                        part["Content-Disposition"] = f'attachment; filename="{
-                            os.path.basename(file_path)}"'
-                        msg.attach(part)
-
-        try:
-            if self.smtp_port == 465:
-                server_class = smtplib.SMTP_SSL
-                use_starttls = False
-            else:
-                server_class = smtplib.SMTP
-                use_starttls = True
-
-            with server_class(self.smtp_host, self.smtp_port, timeout=15) as server:
-                server.set_debuglevel(0)
-                server.ehlo()
-                if use_starttls and server.has_extn("STARTTLS"):
-                    server.starttls()
-                    server.ehlo()
-                if self.smtp_user and self.smtp_password:
-                    server.login(self.smtp_user, self.smtp_password)
-                server.send_message(msg)
-            return True
-        except Exception as exc:
-            logging.info(f"[EmailSender] Error sending email: {exc}")
-            return False
+        return False
 
     def send_report_email(
             self,
