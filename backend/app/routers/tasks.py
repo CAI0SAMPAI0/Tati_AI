@@ -7,6 +7,63 @@ from app.core.task_manager import run_task_in_background, get_local_task_status,
 router = APIRouter(tags=["Tasks"])
 
 
+@router.get("/health")
+async def celery_health(token: str = Query(None)):
+    """
+    Verifica se o Celery Beat está ativo e mostra o status de cada task agendada.
+    Use: GET /tasks/health?token=cai0_based
+    """
+    import os
+    import httpx
+    from datetime import datetime, timezone
+    from app.core.celery_app import celery_app, USE_CELERY
+
+    cron_token = os.getenv("CRON_TOKEN", "cai0_based")
+    if token != cron_token:
+        raise HTTPException(status_code=403, detail="Invalid token.")
+
+    # Testa conexão com o broker Celery
+    broker_ok = False
+    broker_error = None
+    try:
+        celery_app.control.inspect(timeout=3).ping()
+        broker_ok = True
+    except Exception as e:
+        broker_error = str(e)
+
+    # Testa o WAHA diretamente
+    waha_status = None
+    waha_error = None
+    try:
+        from app.core.config import settings
+        waha_url = f"{settings.waha_api_url}/api/server/status"
+        waha_headers = {"X-Api-Key": settings.waha_api_key}
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            r = await client.get(waha_url, headers=waha_headers)
+            waha_status = r.status_code
+            waha_ok = r.status_code == 200
+    except Exception as e:
+        waha_ok = False
+        waha_error = str(e)
+
+    # Lista as tasks agendadas
+    schedule = {name: str(conf["schedule"]) for name, conf in celery_app.conf.beat_schedule.items()}
+
+    return {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "celery_enabled": USE_CELERY,
+        "broker_connected": broker_ok,
+        "broker_error": broker_error,
+        "waha": {
+            "ok": waha_ok,
+            "http_status": waha_status,
+            "error": waha_error,
+        },
+        "beat_schedule": schedule,
+        "tip": "Se broker_connected=false, o Celery worker pode estar inativo ou o broker (CloudAMQP/Redis) inacessível.",
+    }
+
+
 async def verify_cron_token(
     x_cron_token: str = Header(None, alias="X-Cron-Token"),
     token: str = Query(None)
