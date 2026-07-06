@@ -106,10 +106,14 @@ async def send_inactivity_report(token: str = Query(None)):
 
     sent_rows = ""
     for n in notifs:
-        u_info = user_map.get(n['username'], {"email": "N/A", "name": n['username']})
+        username = n['username']
+        # Ignora administradores no relatório de inatividade
+        if username in ('programador', 'professor'):
+            continue
+        u_info = user_map.get(username, {"email": "N/A", "name": username})
         sent_rows += f"""
         <tr>
-            <td style="padding:10px;border-bottom:1px solid #eee;"><strong>{n['username']}</strong> ({u_info.get('name') or n['username']})</td>
+            <td style="padding:10px;border-bottom:1px solid #eee;"><strong>{username}</strong> ({u_info.get('name') or username})</td>
             <td style="padding:10px;border-bottom:1px solid #eee;">{u_info.get('email') or 'N/A'}</td>
             <td style="padding:10px;border-bottom:1px solid #eee;color:#4f46e5;">{n['title']}</td>
             <td style="padding:10px;border-bottom:1px solid #eee;font-size:13px;color:#555;">{n['body']}</td>
