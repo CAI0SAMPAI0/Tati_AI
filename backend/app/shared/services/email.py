@@ -71,9 +71,11 @@ class EmailSender:
         except Exception:
             pass
 
-        if not _in_celery_worker:
-            # Estamos no FastAPI (HF Space bloqueia SMTP) — delegar ao Celery worker via CloudAMQP
-            # O worker roda na Railway/Amazon Linux e tem acesso SMTP completo
+        # Porta 2525 é liberada no Hugging Face. Se a porta configurada for 2525, enviamos diretamente sem delegar ao Celery.
+        use_direct_smtp = self.smtp_configured and int(self.smtp_port) == 2525
+
+        if not _in_celery_worker and not use_direct_smtp:
+            # Estamos no FastAPI (HF Space bloqueia portas padrão) — delegar ao Celery worker
             try:
                 from app.core.tasks import send_email_task
                 send_email_task.delay(to_email, subject, html, attachments)
@@ -81,6 +83,7 @@ class EmailSender:
                 return True
             except Exception as e:
                 logging.warning(f"[EmailSender] Celery delegation falhou ({e}), tentando SMTP direto...")
+
 
         # Fora do HF: tenta SMTP Gmail normalmente
         if self.smtp_configured:
