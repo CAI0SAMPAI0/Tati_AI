@@ -63,31 +63,24 @@ class EmailSender:
                 f"[EmailSender] SMTP/resend not configured (Simulating Success). Email to {to_email}: {subject}")
             return True
 
-        # Hugging Face Spaces bloqueia portas SMTP (465/587) — delegar ao Celery worker
-        running_on_hf = bool(os.getenv("SPACE_ID") or os.getenv("HF_SPACE_ID") or os.getenv("SYSTEM") == "spaces")
+        # Detecta se estamos dentro de um worker Celery ou no processo FastAPI
+        _in_celery_worker = False
+        try:
+            from celery._state import get_current_task
+            _in_celery_worker = get_current_task() is not None
+        except Exception:
+            pass
 
-        if running_on_hf:
-            # Delega para o Celery worker (Amazon Linux), que tem acesso SMTP completo
+        if not _in_celery_worker:
+            # Estamos no FastAPI (HF Space bloqueia SMTP) — delegar ao Celery worker via CloudAMQP
+            # O worker roda na Railway/Amazon Linux e tem acesso SMTP completo
             try:
-                from app.core.celery_app import USE_CELERY
-                if USE_CELERY:
-                    from app.core.tasks import send_email_task
-                    send_email_task.delay(to_email, subject, html, attachments)
-                    logging.info(f"[EmailSender] Email queued via Celery for {to_email}: {subject}")
-                    return True
+                from app.core.tasks import send_email_task
+                send_email_task.delay(to_email, subject, html, attachments)
+                logging.info(f"[EmailSender] 📧 Email enfileirado via Celery para {to_email}: {subject}")
+                return True
             except Exception as e:
-                logging.warning(f"[EmailSender] Celery delegation failed ({e}), trying Resend HTTP...")
-            # Fallback Resend se Celery não estiver disponível
-            try:
-                if "resend" in globals() and hasattr(resend, "Emails") and hasattr(resend.Emails, "send"):
-                    payload = {"to": to_email, "subject": subject, "html": html,
-                               "from": "Teacher Tati <tatiai@resend.dev>"}
-                    resp = resend.Emails.send(payload)
-                    logging.info(f"[EmailSender] Email sent via Resend to {to_email}")
-                    return bool(resp)
-            except Exception as exc:
-                logging.error(f"[EmailSender] Resend also failed: {exc}")
-            return False
+                logging.warning(f"[EmailSender] Celery delegation falhou ({e}), tentando SMTP direto...")
 
         # Fora do HF: tenta SMTP Gmail normalmente
         if self.smtp_configured:
