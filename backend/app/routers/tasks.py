@@ -71,8 +71,87 @@ async def smtp_debug(token: str = Query(None)):
     }
 
 
+@router.get("/send-inactivity-report")
+async def send_inactivity_report(token: str = Query(None)):
+    """
+    Busca todas as notificações de retenção enviadas hoje e envia um relatório detalhado
+    para o e-mail do programador (cmsampaio135@gmail.com) direto do Hugging Face.
+    Use: GET /tasks/send-inactivity-report?token=cai0_based
+    """
+    import os
+    from datetime import datetime, timezone, timedelta
+    from app.core.database import get_client
+    from app.shared.services.email import EmailSender
+
+    cron_token = os.getenv("CRON_TOKEN", "cai0_based")
+    if token != cron_token:
+        raise HTTPException(status_code=403, detail="Invalid token.")
+
+    db = get_client()
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    tomorrow_start = (now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)).isoformat()
+
+    try:
+        # Busca notificações
+        notifs = db.table('notifications').select(
+            'username, title, body, created_at'
+        ).eq('category', 'retention').gte('created_at', today_start).lt('created_at', tomorrow_start).execute().data or []
+
+        # Busca dados adicionais de e-mail dos usuários
+        users = db.table('users').select('username, email, name').execute().data or []
+        user_map = {u['username']: u for u in users}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao consultar banco: {e}")
+
+    sent_rows = ""
+    for n in notifs:
+        u_info = user_map.get(n['username'], {"email": "N/A", "name": n['username']})
+        sent_rows += f"""
+        <tr>
+            <td style="padding:10px;border-bottom:1px solid #eee;"><strong>{n['username']}</strong> ({u_info.get('name') or n['username']})</td>
+            <td style="padding:10px;border-bottom:1px solid #eee;">{u_info.get('email') or 'N/A'}</td>
+            <td style="padding:10px;border-bottom:1px solid #eee;color:#4f46e5;">{n['title']}</td>
+            <td style="padding:10px;border-bottom:1px solid #eee;font-size:13px;color:#555;">{n['body']}</td>
+        </tr>"""
+
+    html = f"""
+    <html><body style="font-family:sans-serif;color:#333;line-height:1.6;padding:20px;">
+    <h2 style="color:#7c3aed;">📊 Relatório Detalhado de Envios (Inatividade)</h2>
+    <p>Olá Programador,</p>
+    <p>Segue abaixo a relação dos alunos que receberam a notificação de inatividade hoje e as respectivas mensagens enviadas.</p>
+
+    <table style="width:100%;border-collapse:collapse;margin-top:20px;">
+      <thead><tr style="background:#7c3aed;color:white;">
+        <th style="padding:12px;text-align:left;">Aluno</th>
+        <th style="padding:12px;text-align:left;">E-mail</th>
+        <th style="padding:12px;text-align:left;">Assunto / Título</th>
+        <th style="padding:12px;text-align:left;">Mensagem Enviada</th>
+      </tr></thead>
+      <tbody>{sent_rows or '<tr><td colspan=4 style="padding:20px;text-align:center;">Nenhuma notificação enviada hoje.</td></tr>'}</tbody>
+    </table>
+
+    <p style="margin-top:40px;font-size:12px;color:#999;border-top:1px solid #eee;padding-top:10px;">
+        Teacher Tati AI System Hub - Relatório Automático (Brevo SMTP 2525)
+    </p>
+    </body></html>"""
+
+    email_sender = EmailSender()
+    success = email_sender.send_email(
+        to_email="cmsampaio135@gmail.com",
+        subject=f"📊 Relatório Detalhado de Notificações - {now.strftime('%d/%m/%Y')}",
+        html=html
+    )
+
+    return {
+        "success": success,
+        "notifs_count": len(notifs),
+        "recipient": "cmsampaio135@gmail.com"
+    }
+
 
 @router.get("/health")
+
 async def celery_health(token: str = Query(None)):
     """
     Verifica se o Celery Beat está ativo e mostra o status de cada task agendada.
