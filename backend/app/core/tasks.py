@@ -49,10 +49,13 @@ def send_email_task(self, to_email: str, subject: str, html: str, attachments: l
         return False
 
     try:
+        from email.utils import make_msgid, formatdate
         msg = MIMEMultipart()
         msg["From"] = f"Teacher Tati <{smtp_from}>"
         msg["To"] = to_email
         msg["Subject"] = subject
+        msg["Message-ID"] = make_msgid(domain=smtp_host.replace("smtp.", ""))
+        msg["Date"] = formatdate(localtime=True)
         msg.attach(MIMEText(html, "html"))
 
         if attachments:

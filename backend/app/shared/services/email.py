@@ -86,10 +86,13 @@ class EmailSender:
         # Fora do HF: tenta SMTP Gmail/outro normalmente
         if self.smtp_configured:
             try:
+                from email.utils import make_msgid, formatdate
                 msg = MIMEMultipart()
                 msg["From"] = self._FROM
                 msg["To"] = to_email
                 msg["Subject"] = subject
+                msg["Message-ID"] = make_msgid(domain=self.smtp_host.replace("smtp.", ""))
+                msg["Date"] = formatdate(localtime=True)
                 msg.attach(MIMEText(html, "html"))
 
                 if attachments:
