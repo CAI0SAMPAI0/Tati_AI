@@ -171,6 +171,21 @@ else:
             except Exception as exc:
                 logging.info(f'[Startup] Failed to auto-start WAHA sessions: {exc}')
 
+            # Inicia o Celery Worker de forma programática se USE_CELERY for true
+            if os.getenv("USE_CELERY", "false").lower() == "true":
+                try:
+                    import subprocess
+                    import sys
+                    # Inicia celery em subprocesso sem bloquear o loop de eventos
+                    subprocess.Popen(
+                        [sys.executable, "-m", "celery", "-A", "app.core.celery_app", "worker", "--beat", "--loglevel=info", "--concurrency=2"],
+                        stdout=None,
+                        stderr=None
+                    )
+                    logging.info('[Startup] Celery Worker + Beat inicializados com sucesso via subprocesso!')
+                except Exception as exc:
+                    logging.info(f'[Startup] Falha ao inicializar Celery Worker programaticamente: {exc}')
+
         await _warmup()
 
     @app.exception_handler(Exception)
@@ -214,12 +229,17 @@ else:
         username = 'programador'
         conversation_id = '20260616_114636_progra'
         content = "Create a pdf for me with 10 exercises about the Present Perfect, 10 exercises about Verb to be and Must be [EDITED]"
+        
+        db_status = "ok"
         try:
             res_msg = await update_message(msg_id, username, content, conversation_id=conversation_id)
         except Exception as e:
-            res_msg = f"EXCEPTION: {e}"
+            res_msg = f"TEST_FAILED: {e}"
+            db_status = "error"
+            
         return {
             'status': 'ok',
+            'database': db_status,
             "service": "Teacher Tati API",
             "version": "2.1.6",
             "db_update_check": res_msg

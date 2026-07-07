@@ -24,6 +24,6 @@ EXPOSE 7860
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD curl -f http://localhost:7860/health || exit 1
 
-# Inicia o Celery (Worker + Beat) em background apenas se USE_CELERY=true, e o Uvicorn em foreground
-CMD ["sh", "-c", "if [ \"$USE_CELERY\" = \"true\" ]; then celery -A app.core.celery_app worker --beat --loglevel=info --concurrency=2 & fi; uvicorn main:app --host 0.0.0.0 --port ${PORT:-7860}"]
+# Inicia o Uvicorn. Se USE_CELERY=true, o main.py inicia o Celery de forma programática nos bastidores
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-7860}"]
 
