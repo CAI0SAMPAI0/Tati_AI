@@ -71,8 +71,11 @@ class EmailSender:
         except Exception:
             pass
 
-        if not _in_celery_worker:
-            # Estamos no FastAPI (HF Space bloqueia portas padrão de SMTP) — delegar ao Celery worker (Railway)
+        # Detecta se estamos rodando no Hugging Face (onde as portas SMTP são bloqueadas)
+        _running_on_hf = bool(os.getenv("SPACE_ID") or os.getenv("HF_SPACE_ID") or os.getenv("SYSTEM") == "spaces")
+
+        if _running_on_hf and not _in_celery_worker:
+            # Estamos no FastAPI na Hugging Face — delegar ao Celery worker (que roda na nuvem liberada)
             try:
                 from app.core.celery_app import celery_app
                 celery_app.send_task(
