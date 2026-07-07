@@ -158,7 +158,7 @@ async def send_inactivity_report(token: str = Query(None)):
             "smtp_configured": email_sender.smtp_configured
         }
         success = email_sender.send_email(
-            to_email="cmsampaio135@gmail.com",
+            to_email="cmsampaio71@gmail.com",
             subject=f"📊 Relatório Detalhado de Notificações - {now.strftime('%d/%m/%Y')}",
             html=html
         )
