@@ -5,34 +5,40 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-USE_CELERY = os.getenv("USE_CELERY", "false").lower() == "true"
-CLOUD_AMQP_URL = os.getenv("CLOUD_AMQP_URL")
-UPSTASH_URL = os.getenv("UPSTASH_REDIS_URL")
-UPSTASH_TOKEN = os.getenv("UPSTASH_REDIS_TOKEN")
+# Função auxiliar para gerar dinamicamente as URLs do broker e backend
+def get_celery_configurations():
+    # Força recarregamento do dotenv
+    load_dotenv(override=True)
+    
+    amqp_url = os.getenv("CLOUD_AMQP_URL")
+    upstash_url = os.getenv("UPSTASH_REDIS_URL")
+    upstash_token = os.getenv("UPSTASH_REDIS_TOKEN")
+    
+    redis_backend_url = None
+    if upstash_url and upstash_token:
+        clean_url = upstash_url.replace("redis://", "").replace("https://", "").replace("http://", "")
+        if ":" not in clean_url:
+            clean_url = f"{clean_url}:6379"
+        redis_backend_url = f"rediss://:{upstash_token}@{clean_url}?ssl_cert_reqs=CERT_NONE"
+        
+    if amqp_url:
+        broker_url = amqp_url
+    elif redis_backend_url:
+        broker_url = redis_backend_url
+    else:
+        broker_url = "redis://localhost:6379/0"
+        
+    if redis_backend_url:
+        backend_url = redis_backend_url
+    elif amqp_url:
+        backend_url = "rpc://"
+    else:
+        backend_url = "redis://localhost:6379/0"
+        
+    return broker_url, backend_url
 
-# Configura a URL de backend (Upstash Redis)
-redis_backend_url = None
-if UPSTASH_URL and UPSTASH_TOKEN:
-    clean_url = UPSTASH_URL.replace("redis://", "").replace("https://", "").replace("http://", "")
-    if ":" not in clean_url:
-        clean_url = f"{clean_url}:6379"
-    redis_backend_url = f"rediss://:{UPSTASH_TOKEN}@{clean_url}?ssl_cert_reqs=CERT_NONE"
-
-# Define o broker (preferência para CloudAMQP, fallback para Upstash ou Localhost)
-if USE_CELERY and CLOUD_AMQP_URL:
-    broker_url = CLOUD_AMQP_URL
-elif USE_CELERY and redis_backend_url:
-    broker_url = redis_backend_url
-else:
-    broker_url = "redis://localhost:6379/0"
-
-# Define o backend de resultados (preferência para Upstash Redis para persistência de status, fallback para rpc ou Localhost)
-if redis_backend_url:
-    backend_url = redis_backend_url
-elif CLOUD_AMQP_URL:
-    backend_url = "rpc://"
-else:
-    backend_url = "redis://localhost:6379/0"
+# Obtém dinamicamente
+broker_url, backend_url = get_celery_configurations()
 
 celery_app = Celery(
     "teacher_tati_tasks",
