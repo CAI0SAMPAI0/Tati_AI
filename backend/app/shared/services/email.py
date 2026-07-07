@@ -71,57 +71,8 @@ class EmailSender:
         except Exception:
             pass
 
-        # Porta 2525 é liberada no Hugging Face. Se a porta configurada for 2525, enviamos diretamente sem delegar ao Celery.
-        use_direct_smtp = self.smtp_configured and int(self.smtp_port) == 2525
-
-        # Se for Brevo, podemos enviar via API HTTPS (porta 443) usando a chave SMTP como API key.
-        # Isso contorna bloqueios de IP de rede e limites de SMTP.
-        is_brevo = "brevo" in self.smtp_host.lower() or "sib" in self.smtp_host.lower()
-
-        if is_brevo and self.smtp_password:
-            try:
-                import httpx
-                import base64
-                # Prepara anexos em Base64 para a API do Brevo
-                brevo_attachments = []
-                if attachments:
-                    for file_path in attachments:
-                        if os.path.exists(file_path):
-                            with open(file_path, "rb") as f:
-                                content_b64 = base64.b64encode(f.read()).decode("utf-8")
-                            brevo_attachments.append({
-                                "content": content_b64,
-                                "name": os.path.basename(file_path)
-                            })
-
-                payload = {
-                    "sender": {"name": "Teacher Tati", "email": self.smtp_from},
-                    "to": [{"email": to_email}],
-                    "subject": subject,
-                    "htmlContent": html,
-                }
-                if brevo_attachments:
-                    payload["attachment"] = brevo_attachments
-
-                headers = {
-                    "accept": "application/json",
-                    "api-key": self.smtp_password,
-                    "content-type": "application/json"
-                }
-
-                # Dispara a requisição HTTPS síncrona
-                with httpx.Client(timeout=15.0) as client:
-                    r = client.post("https://api.brevo.com/v3/smtp/email", json=payload, headers=headers)
-                    if r.status_code in (200, 201, 202):
-                        logging.info(f"[EmailSender] Email sent successfully via Brevo HTTPS API to {to_email}")
-                        return True
-                    else:
-                        logging.error(f"[EmailSender] Brevo API returned status {r.status_code}: {r.text}")
-            except Exception as e:
-                logging.error(f"[EmailSender] Failed to send via Brevo API: {e}. Trying fallback...")
-
-        if not _in_celery_worker and not use_direct_smtp:
-            # Estamos no FastAPI (HF Space bloqueia portas padrão) — delegar ao Celery worker
+        if not _in_celery_worker:
+            # Estamos no FastAPI (HF Space bloqueia portas padrão de SMTP) — delegar ao Celery worker (Railway)
             try:
                 from app.core.tasks import send_email_task
                 send_email_task.delay(to_email, subject, html, attachments)
@@ -129,6 +80,7 @@ class EmailSender:
                 return True
             except Exception as e:
                 logging.warning(f"[EmailSender] Celery delegation falhou ({e}), tentando SMTP direto...")
+
 
 
         # Fora do HF: tenta SMTP Gmail/outro normalmente
