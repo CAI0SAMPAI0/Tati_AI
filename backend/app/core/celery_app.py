@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+USE_CELERY = os.getenv("USE_CELERY", "false").lower() == "true"
+
 # Função auxiliar para gerar dinamicamente as URLs do broker e backend
 def get_celery_configurations():
     # Força recarregamento do dotenv
