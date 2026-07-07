@@ -127,15 +127,55 @@ class EmailSender:
             except Exception as exc:
                 logging.error(f"[EmailSender] SMTP failed: {exc}. Trying Resend...")
 
-        # Fallback 1: Brevo HTTP API (Porta 443 liberada em todas as nuvens)
+        # Fallback 1: Resend HTTP API (Porta 443 liberada em todas as nuvens)
+        try:
+            resend_key = os.getenv("RESEND_API_KEY")
+            if resend_key:
+                import requests
+                import base64
+                headers = {
+                    "Authorization": f"Bearer {resend_key}",
+                    "Content-Type": "application/json"
+                }
+                
+                # Resend exige o remetente padrão onboarding@resend.dev em contas de teste gratuitas
+                payload = {
+                    "from": "Teacher Tati <onboarding@resend.dev>",
+                    "to": [to_email],
+                    "subject": subject,
+                    "html": html
+                }
+                
+                # Adiciona anexos para Resend se houver
+                if attachments:
+                    payload_attachments = []
+                    for path in attachments:
+                        if os.path.exists(path):
+                            with open(path, "rb") as f:
+                                encoded = base64.b64encode(f.read()).decode("utf-8")
+                                payload_attachments.append({
+                                    "content": encoded,
+                                    "filename": os.path.basename(path)
+                                })
+                    if payload_attachments:
+                        payload["attachments"] = payload_attachments
+
+                resp = requests.post("https://api.resend.com/emails", json=payload, headers=headers, timeout=15)
+                if resp.status_code in [200, 201, 202]:
+                    logging.info(f"[EmailSender] Email sent via Resend HTTP API to {to_email}")
+                    return True
+                else:
+                    logging.error(f"[EmailSender] Resend API failed with status {resp.status_code}: {resp.text}")
+        except Exception as exc:
+            logging.error(f"[EmailSender] Resend API exception: {exc}")
+
+        # Fallback 2: Brevo HTTP API (Porta 443 liberada em todas as nuvens)
         try:
             import requests
-            # Tenta BREVO_API_KEY primeiro, depois SMTP_PASSWORD, depois RESEND_API_KEY se aplicável
             brevo_key = os.getenv("BREVO_API_KEY")
             if not brevo_key:
                 brevo_key = self.smtp_password if "xsmtpsib" in str(self.smtp_password) else os.getenv("SMTP_PASSWORD")
             if not brevo_key:
-                # Caso a chave da Brevo tenha sido salva na variável RESEND_API_KEY
                 cand = os.getenv("RESEND_API_KEY")
                 if cand and "xsmtpsib" in cand:
                     brevo_key = cand
@@ -146,7 +186,6 @@ class EmailSender:
                     "content-type": "application/json",
                     "api-key": brevo_key
                 }
-                # Determina o remetente oficial dinamicamente para evitar falhas de DMARC
                 sender_email = os.getenv("SMTP_FROM") or self.smtp_from or self.smtp_user or "caio.matos@aedb.br"
                 payload = {
                     "sender": {"name": "Teacher Tati", "email": sender_email},
@@ -154,7 +193,6 @@ class EmailSender:
                     "subject": subject,
                     "htmlContent": html
                 }
-                # Adiciona anexos em formato Base64 se houver
                 if attachments:
                     import base64
                     payload_attachments = []
@@ -177,22 +215,6 @@ class EmailSender:
                     logging.error(f"[EmailSender] Brevo API failed with status {resp.status_code}: {resp.text}")
         except Exception as exc:
             logging.error(f"[EmailSender] Brevo API exception: {exc}")
-
-        # Fallback 2: Resend
-        try:
-            if "resend" in globals() and hasattr(resend, "Emails") and hasattr(resend.Emails, "send"):
-                payload = {"to": to_email, "subject": subject, "html": html,
-                           "from": "Teacher Tati <tatiai@resend.dev>"}
-                if attachments:
-                    prepared = [{"filename": os.path.basename(p), "path": p}
-                                for p in (attachments or []) if p and os.path.exists(p)]
-                    if prepared:
-                        payload["attachments"] = prepared
-                resp = resend.Emails.send(payload)
-                logging.info(f"[EmailSender] Email sent via Resend to {to_email}")
-                return bool(resp)
-        except Exception as exc:
-            logging.error(f"[EmailSender] Resend fallback failed: {exc}")
 
         return False
 
