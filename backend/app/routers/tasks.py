@@ -143,14 +143,15 @@ async def send_inactivity_report(token: str = Query(None)):
     </body></html>"""
 
     try:
-        from app.core.tasks import send_email_task
-        send_email_task.delay(
+        email_sender = EmailSender()
+        success = email_sender.send_email(
             to_email="cmsampaio135@gmail.com",
             subject=f"📊 Relatório Detalhado de Notificações - {now.strftime('%d/%m/%Y')}",
             html=html
         )
-        success = True
     except Exception as e:
+        import logging
+        logging.error(f"[send-inactivity-report] EmailSender call failed: {e}")
         success = False
 
     return {
