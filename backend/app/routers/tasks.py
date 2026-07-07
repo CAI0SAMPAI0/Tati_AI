@@ -89,8 +89,8 @@ async def send_inactivity_report(token: str = Query(None)):
 
     db = get_client()
     now = datetime.now(timezone.utc)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-    tomorrow_start = (now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)).isoformat()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat().replace("+00:00", "Z")
+    tomorrow_start = (now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)).isoformat().replace("+00:00", "Z")
 
     try:
         # Busca notificações
@@ -102,7 +102,9 @@ async def send_inactivity_report(token: str = Query(None)):
         users = db.table('users').select('username, email, name').execute().data or []
         user_map = {u['username']: u for u in users}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao consultar banco: {e}")
+        import logging
+        logging.error(f"[send-inactivity-report] Database query failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao consultar banco de dados: {e}")
 
     sent_rows = ""
     for n in notifs:
