@@ -68,6 +68,10 @@ async def smtp_debug(token: str = Query(None)):
         "smtp_from": settings.smtp_from,
         "env_smtp_port": os.getenv("SMTP_PORT"),
         "env_smtp_host": os.getenv("SMTP_HOST"),
+        "has_cloud_amqp": bool(os.getenv("CLOUD_AMQP_URL")),
+        "has_upstash_redis_url": bool(os.getenv("UPSTASH_REDIS_URL")),
+        "has_upstash_redis_token": bool(os.getenv("UPSTASH_REDIS_TOKEN")),
+        "env_keys_list": list(os.environ.keys())
     }
 
 
