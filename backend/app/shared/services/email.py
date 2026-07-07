@@ -130,8 +130,16 @@ class EmailSender:
         # Fallback 1: Brevo HTTP API (Porta 443 liberada em todas as nuvens)
         try:
             import requests
-            # Usamos a chave da Brevo contida na variável SMTP_PASSWORD
-            brevo_key = self.smtp_password if "xsmtpsib" in str(self.smtp_password) else os.getenv("SMTP_PASSWORD")
+            # Tenta BREVO_API_KEY primeiro, depois SMTP_PASSWORD, depois RESEND_API_KEY se aplicável
+            brevo_key = os.getenv("BREVO_API_KEY")
+            if not brevo_key:
+                brevo_key = self.smtp_password if "xsmtpsib" in str(self.smtp_password) else os.getenv("SMTP_PASSWORD")
+            if not brevo_key:
+                # Caso a chave da Brevo tenha sido salva na variável RESEND_API_KEY
+                cand = os.getenv("RESEND_API_KEY")
+                if cand and "xsmtpsib" in cand:
+                    brevo_key = cand
+
             if brevo_key:
                 headers = {
                     "accept": "application/json",
