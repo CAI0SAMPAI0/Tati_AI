@@ -145,6 +145,21 @@ else:
 
     @app.on_event('startup')
     async def startup_event() -> None:
+        # Inicia o Celery Worker de forma programática se USE_CELERY for true
+        if os.getenv("USE_CELERY", "false").lower() == "true":
+            try:
+                import subprocess
+                import sys
+                # Inicia celery em subprocesso sem bloquear o loop de eventos
+                subprocess.Popen(
+                    [sys.executable, "-m", "celery", "-A", "app.core.celery_app", "worker", "--beat", "--loglevel=info", "--concurrency=2"],
+                    stdout=None,
+                    stderr=None
+                )
+                logging.info('[Startup] Celery Worker + Beat inicializados com sucesso via subprocesso!')
+            except Exception as exc:
+                logging.info(f'[Startup] Falha ao inicializar Celery Worker programaticamente: {exc}')
+
         async def _warmup():
             import asyncio
             try:
@@ -170,21 +185,6 @@ else:
                     asyncio.create_task(WahaService.start_session(session))
             except Exception as exc:
                 logging.info(f'[Startup] Failed to auto-start WAHA sessions: {exc}')
-
-            # Inicia o Celery Worker de forma programática se USE_CELERY for true
-            if os.getenv("USE_CELERY", "false").lower() == "true":
-                try:
-                    import subprocess
-                    import sys
-                    # Inicia celery em subprocesso sem bloquear o loop de eventos
-                    subprocess.Popen(
-                        [sys.executable, "-m", "celery", "-A", "app.core.celery_app", "worker", "--beat", "--loglevel=info", "--concurrency=2"],
-                        stdout=None,
-                        stderr=None
-                    )
-                    logging.info('[Startup] Celery Worker + Beat inicializados com sucesso via subprocesso!')
-                except Exception as exc:
-                    logging.info(f'[Startup] Falha ao inicializar Celery Worker programaticamente: {exc}')
 
         await _warmup()
 
