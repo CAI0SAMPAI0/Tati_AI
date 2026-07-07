@@ -146,8 +146,10 @@ class EmailSender:
                     "content-type": "application/json",
                     "api-key": brevo_key
                 }
+                # Determina o remetente oficial dinamicamente para evitar falhas de DMARC
+                sender_email = os.getenv("SMTP_FROM") or self.smtp_from or self.smtp_user or "caio.matos@aedb.br"
                 payload = {
-                    "sender": {"name": "Teacher Tati", "email": "caio.matos@aedb.br"},
+                    "sender": {"name": "Teacher Tati", "email": sender_email},
                     "to": [{"email": to_email}],
                     "subject": subject,
                     "htmlContent": html
