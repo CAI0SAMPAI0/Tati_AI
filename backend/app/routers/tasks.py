@@ -278,6 +278,18 @@ async def trigger_task(
     elif task_name == "cefr_weekly_gen":
         from app.modules.cefr.tasks import cefr_weekly_gen
         task_id = run_task_in_background(background_tasks, cefr_weekly_gen)
+    elif task_name == "trigger-test-notif":
+        # Dispara todas as notificações de teste para caio.sampaio
+        from app.modules.notifications.services.notification_dispatcher import dispatch_universal_notification
+        # Dispara
+        await dispatch_universal_notification(
+            username="caio.sampaio",
+            title="Teacher Tati 👩‍🏫",
+            body="Hey Caio! This is a test notification. It should arrive on WhatsApp, Email and App without Spam! 🚀",
+            url="/chat",
+            sender_username="programador"
+        )
+        task_id = "test_run_success"
     else:
         raise HTTPException(status_code=400, detail=f"Unknown cron task: {task_name}")
         
