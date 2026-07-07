@@ -298,6 +298,59 @@ async def trigger_task(
     elif task_name == "weekly_reports":
         from app.modules.notifications.tasks import weekly_reports
         task_id = run_task_in_background(background_tasks, weekly_reports)
+    elif task_name == "trigger-all-inactivity-nudges":
+        # Dispara nudges para todos os alunos classificados como inativos (warning ou critical)
+        from app.core.database import get_client
+        from app.modules.notifications.services.notification_dispatcher import dispatch_universal_notification
+        db = get_client()
+        
+        # Busca usuários
+        users = db.table('users').select('username, name, email, role, streak_data, created_at').execute().data or []
+        
+        # Busca última mensagem
+        msg_rows = db.table('messages').select('username, created_at').eq('role', 'user').order('created_at', desc=True).limit(2000).execute().data or []
+        last_activity = {}
+        for r in msg_rows:
+            uname = r.get('username')
+            if uname and uname not in last_activity:
+                last_activity[uname] = r.get('created_at')
+
+        from datetime import datetime, timezone
+        from dateutil.parser import parse as parse_dt
+        
+        count = 0
+        for u in users:
+            username = u.get('username')
+            role = u.get('role')
+            email = u.get('email')
+            
+            # Pula staff e usuários sem e-mail
+            if not username or role in ['programador', 'professor', 'admin'] or not email:
+                continue
+                
+            last_active_str = last_activity.get(username) or u.get('created_at', '')
+            days_inactive = 0
+            if last_active_str:
+                try:
+                    last_active_dt = parse_dt(last_active_str)
+                    now = datetime.now(timezone.utc) if last_active_dt.tzinfo else datetime.now()
+                    days_inactive = (now - last_active_dt).days
+                except Exception:
+                    pass
+            
+            if days_inactive > 7:
+                # Aluno inativo! Disparar Nudge
+                count += 1
+                background_tasks.add_task(
+                    dispatch_universal_notification,
+                    username=username,
+                    title="Teacher Tati 👩‍🏫",
+                    body=f"Hi {u.get('name', username)}! We missed you. You haven't practiced English in {days_inactive} days. Let's do a quick exercise today? 🚀",
+                    url="/chat",
+                    sender_username="programador"
+                )
+        
+        return {"success": True, "message": f"Nudges enfileirados para {count} alunos inativos."}
     elif task_name == "cefr_weekly_gen":
         from app.modules.cefr.tasks import cefr_weekly_gen
         task_id = run_task_in_background(background_tasks, cefr_weekly_gen)
