@@ -83,5 +83,5 @@ async def dispatch_universal_notification(
         wa_res = await WahaService.send_message(recipient_username=username, text=whatsapp_text, sender_username=sender_username, db=db)
         logging.info(f'[Dispatcher] WhatsApp send result for {username}: {wa_res}')
     except Exception as e:
-        logging.exception(f'[Dispatcher] Erro ao enviar WhatsApp para {username}: {e}')
+        logging.warning(f'[Dispatcher] Erro ao enviar WhatsApp para {username}: {e}')
 
