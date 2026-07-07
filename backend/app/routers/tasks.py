@@ -146,8 +146,17 @@ async def send_inactivity_report(token: str = Query(None)):
     </p>
     </body></html>"""
 
+    smtp_info = {}
+    error_detail = None
     try:
         email_sender = EmailSender()
+        smtp_info = {
+            "smtp_host": email_sender.smtp_host,
+            "smtp_port": email_sender.smtp_port,
+            "smtp_user": email_sender.smtp_user,
+            "smtp_from": email_sender.smtp_from,
+            "smtp_configured": email_sender.smtp_configured
+        }
         success = email_sender.send_email(
             to_email="cmsampaio135@gmail.com",
             subject=f"📊 Relatório Detalhado de Notificações - {now.strftime('%d/%m/%Y')}",
@@ -156,12 +165,15 @@ async def send_inactivity_report(token: str = Query(None)):
     except Exception as e:
         import logging
         logging.error(f"[send-inactivity-report] EmailSender call failed: {e}")
+        error_detail = str(e)
         success = False
 
     return {
         "success": success,
         "notifs_count": len(notifs),
-        "recipient": "cmsampaio135@gmail.com"
+        "recipient": "cmsampaio135@gmail.com",
+        "smtp_info": smtp_info,
+        "error_detail": error_detail
     }
 
 
