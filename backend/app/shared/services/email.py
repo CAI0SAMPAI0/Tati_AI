@@ -127,7 +127,48 @@ class EmailSender:
             except Exception as exc:
                 logging.error(f"[EmailSender] SMTP failed: {exc}. Trying Resend...")
 
-        # Fallback Resend
+        # Fallback 1: Brevo HTTP API (Porta 443 liberada em todas as nuvens)
+        try:
+            import requests
+            # Usamos a chave da Brevo contida na variável SMTP_PASSWORD
+            brevo_key = self.smtp_password if "xsmtpsib" in str(self.smtp_password) else os.getenv("SMTP_PASSWORD")
+            if brevo_key:
+                headers = {
+                    "accept": "application/json",
+                    "content-type": "application/json",
+                    "api-key": brevo_key
+                }
+                payload = {
+                    "sender": {"name": "Teacher Tati", "email": "caio.matos@aedb.br"},
+                    "to": [{"email": to_email}],
+                    "subject": subject,
+                    "htmlContent": html
+                }
+                # Adiciona anexos em formato Base64 se houver
+                if attachments:
+                    import base64
+                    payload_attachments = []
+                    for path in attachments:
+                        if os.path.exists(path):
+                            with open(path, "rb") as f:
+                                encoded = base64.b64encode(f.read()).decode("utf-8")
+                                payload_attachments.append({
+                                    "content": encoded,
+                                    "name": os.path.basename(path)
+                                })
+                    if payload_attachments:
+                        payload["attachment"] = payload_attachments
+
+                resp = requests.post("https://api.brevo.com/v3/smtp/email", json=payload, headers=headers, timeout=15)
+                if resp.status_code in [200, 201, 202]:
+                    logging.info(f"[EmailSender] Email sent via Brevo HTTP API to {to_email}")
+                    return True
+                else:
+                    logging.error(f"[EmailSender] Brevo API failed with status {resp.status_code}: {resp.text}")
+        except Exception as exc:
+            logging.error(f"[EmailSender] Brevo API exception: {exc}")
+
+        # Fallback 2: Resend
         try:
             if "resend" in globals() and hasattr(resend, "Emails") and hasattr(resend.Emails, "send"):
                 payload = {"to": to_email, "subject": subject, "html": html,
