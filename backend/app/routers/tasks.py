@@ -307,14 +307,6 @@ async def trigger_task(
         # Busca usuários
         users = db.table('users').select('username, name, email, role, streak_data, created_at').execute().data or []
         
-        # Busca última mensagem
-        msg_rows = db.table('messages').select('username, created_at').eq('role', 'user').order('created_at', desc=True).limit(2000).execute().data or []
-        last_activity = {}
-        for r in msg_rows:
-            uname = r.get('username')
-            if uname and uname not in last_activity:
-                last_activity[uname] = r.get('created_at')
-
         from datetime import datetime, timezone
         from dateutil.parser import parse as parse_dt
         
@@ -328,7 +320,14 @@ async def trigger_task(
             if not username or role in ['programador', 'professor', 'admin'] or not email:
                 continue
                 
-            last_active_str = last_activity.get(username) or u.get('created_at', '')
+            # Busca a última mensagem enviada por esse usuário de forma precisa
+            last_msg = db.table('messages').select('created_at').eq('username', username).eq('role', 'user').order('created_at', desc=True).limit(1).execute().data or []
+            
+            if last_msg:
+                last_active_str = last_msg[0].get('created_at')
+            else:
+                last_active_str = u.get('created_at') or ''
+
             days_inactive = 0
             if last_active_str:
                 try:
