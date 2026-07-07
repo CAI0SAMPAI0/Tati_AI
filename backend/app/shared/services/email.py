@@ -74,12 +74,15 @@ class EmailSender:
         if not _in_celery_worker:
             # Estamos no FastAPI (HF Space bloqueia portas padrão de SMTP) — delegar ao Celery worker (Railway)
             try:
-                from app.core.tasks import send_email_task
-                send_email_task.delay(to_email, subject, html, attachments)
-                logging.info(f"[EmailSender] 📧 Email enfileirado via Celery para {to_email}: {subject}")
+                from app.core.celery_app import celery_app
+                celery_app.send_task(
+                    "app.core.tasks.send_email_task",
+                    args=[to_email, subject, html, attachments]
+                )
+                logging.info(f"[EmailSender] 📧 Email enfileirado via Celery (send_task) para {to_email}: {subject}")
                 return True
             except Exception as e:
-                logging.warning(f"[EmailSender] Celery delegation falhou ({e}), tentando SMTP direto...")
+                logging.warning(f"[EmailSender] Celery send_task delegation falhou ({e}), tentando SMTP direto...")
 
 
 
