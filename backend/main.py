@@ -40,7 +40,7 @@ if os.getenv("RUN_AS_PROXY") == "true":
                     headers=headers,
                     content=body,
                     params=params,
-                    timeout=30.0
+                    timeout=120.0
                 )
             
             resp_headers = {k.lower(): v for k, v in response.headers.items()}
