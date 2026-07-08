@@ -439,18 +439,17 @@ class NotificationScheduler:
                     logging.info(
                         f"[Scheduler] Relatório para responsável {'enviado' if success_resp else 'FALHOU'} para {responsible_email} (aluno: {username})")
 
-                # Se ao menos um dos envios deu certo, marca como enviado esta semana
-                if success or success_resp:
-                    try:
-                        self._db.table('notifications').insert({
-                            'username': username,
-                            'title': 'Weekly Progress Report',
-                            'body': 'Your weekly progress report was sent to your email.',
-                            'category': 'weekly_report',
-                            'status': 'read'
-                        }).execute()
-                    except Exception as e:
-                        logging.error(f"[Scheduler] Erro ao registrar notificação de weekly_report para {username}: {e}")
+                # Sempre marca como processado/enviado para evitar novas tentativas na semana
+                try:
+                    self._db.table('notifications').insert({
+                        'username': username,
+                        'title': 'Weekly Progress Report',
+                        'body': f'Your weekly progress report was processed. Status: Email: {success}, Responsible: {success_resp}',
+                        'category': 'weekly_report',
+                        'status': 'read'
+                    }).execute()
+                except Exception as e:
+                    logging.error(f"[Scheduler] Erro ao registrar notificação de weekly_report para {username}: {e}")
             except Exception as e:
                 logging.info(
                     f'[Scheduler] Erro no relatório de {username}: {e}')

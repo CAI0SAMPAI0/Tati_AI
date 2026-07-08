@@ -52,16 +52,17 @@ export function DispatchSection() {
   const [aiNumQuestions, setAiNumQuestions] = useState(5);
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
 
-  // Queries
   const { data: students, isLoading: loadingStudents } = useQuery<Student[]>({
     queryKey: ['admin-dispatch-students'],
     queryFn: () => apiGet<Student[]>('/dashboard/students'),
+    refetchInterval: 10000, // Refetch silently every 10 seconds to keep emails/whatsapp numbers updated
   });
 
   const { data: quizzes, isLoading: loadingQuizzes, refetch: refetchQuizzes } = useQuery<Quiz[]>({
     queryKey: ['admin-dispatch-quizzes'],
     queryFn: () => apiGet<Quiz[]>('/dashboard/quizzes'),
     enabled: activeTab === 'quiz',
+    refetchInterval: 10000, // Refetch silently every 10 seconds
   });
 
   // Filter students list based on search and level

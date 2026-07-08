@@ -124,11 +124,13 @@ export default function ActivitiesClientPage() {
         ? ENDPOINTS.ACTIVITIES_MODULES
         : `${ENDPOINTS.ACTIVITIES_MODULES}?level=${filterLevel}`
     ),
+    refetchInterval: 10000, // Silently fetch updates every 10 seconds
   });
 
   const { data: masterModule } = useQuery<any>({
     queryKey: ['activities-master-module'],
     queryFn: () => apiGet<any>('/admin/modules/personalized'),
+    refetchInterval: 10000, // Silently fetch updates every 10 seconds
   });
 
   const { data: simulationsRaw = [] } = useQuery<SimulationItem[]>({
@@ -163,6 +165,7 @@ export default function ActivitiesClientPage() {
   const { data: userProfile } = useQuery({
     queryKey: ['my-profile'],
     queryFn: () => apiGet<any>('/profile'),
+    refetchInterval: 10000, // Silently fetch profile updates every 10 seconds to keep study materials fresh
   });
 
   useQuery({
