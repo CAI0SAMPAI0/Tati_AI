@@ -946,18 +946,19 @@ async def edit_dispatched_file(
     body: EditFileRequest,
     user=Depends(require_staff)
 ):
-    """Edita a mensagem ou o nome de exibição de um arquivo enviado para um aluno."""
+    """Edita a mensagem ou o nome de exibição de um arquivo enviado para um aluno e reenvia as notificações."""
     from app.core.database import get_client
     import logging
 
     db = get_client()
 
     try:
-        res = db.table('users').select('profile').eq('username', username).limit(1).execute()
+        res = db.table('users').select('email, profile').eq('username', username).limit(1).execute()
         if res.data:
             profile = res.data[0].get('profile') or {}
             study_mats = profile.get('study_materials') or []
             updated = False
+            target_mat = None
             for m in study_mats:
                 if m.get('filename') == filename:
                     if body.message is not None:
@@ -965,10 +966,92 @@ async def edit_dispatched_file(
                     if body.filename is not None:
                         m['display_filename'] = body.filename
                     m['is_edited'] = True
+                    target_mat = m
                     updated = True
-            if updated:
+            if updated and target_mat:
                 profile['study_materials'] = study_mats
                 db.table('users').update({'profile': profile}).eq('username', username).execute()
+
+                # Trigger re-sending of notifications
+                try:
+                    import httpx
+                    import tempfile
+                    import os
+                    from app.shared.services.email import EmailSender
+                    from app.modules.notifications.services.push_notifications import send_push_to_user
+                    from app.modules.notifications.services.notifications import create_notification
+                    from app.modules.notifications.services.waha_service import WahaService
+
+                    email_sender = EmailSender()
+                    student_email = res.data[0].get('email')
+                    name = profile.get('name') or username
+                    msg_text = target_mat.get('message') or ""
+                    furl = target_mat.get('url')
+                    displayFname = target_mat.get('display_filename') or target_mat.get('filename') or filename
+
+                    # 1. DB notification
+                    try:
+                        db_msg = msg_text if msg_text else f"O material '{displayFname}' foi atualizado."
+                        create_notification(
+                            username=username,
+                            category='nudge',
+                            title="Material Atualizado! 📚",
+                            message=db_msg,
+                            send_push=False
+                        )
+                    except Exception as ne:
+                        logging.warning(f"Error creating DB notification on edit: {ne}")
+
+                    # 2. Push notification
+                    try:
+                        push_body = msg_text if msg_text else f"O material '{displayFname}' foi atualizado."
+                        send_push_to_user(
+                            username=username,
+                            title="Material de Estudo Atualizado! 📚",
+                            body=push_body,
+                            url="/chat"
+                        )
+                    except Exception as pe:
+                        logging.warning(f"Error sending push on edit: {pe}")
+
+                    # 3. Email re-send
+                    if student_email and furl:
+                        try:
+                            temp_dir = tempfile.gettempdir()
+                            temp_path = os.path.join(temp_dir, displayFname)
+                            async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
+                                resp = await client.get(furl)
+                                with open(temp_path, "wb") as bf:
+                                    bf.write(resp.content)
+                            
+                            email_sender.send_dispatched_files_email(
+                                to_email=student_email,
+                                name=name,
+                                file_names=[displayFname],
+                                file_paths=[temp_path],
+                                custom_message=f"[UPDATED] {msg_text}" if msg_text else None
+                            )
+                            if os.path.exists(temp_path):
+                                os.remove(temp_path)
+                        except Exception as ee:
+                            logging.exception(f"Error re-sending email on edit: {ee}")
+
+                    # 4. WhatsApp re-send
+                    try:
+                        if furl:
+                            caption = f"[UPDATED] {msg_text}" if msg_text else f"Here is the updated material: {displayFname}"
+                            await WahaService.send_file(
+                                recipient_username=username,
+                                file_url=furl,
+                                filename=displayFname,
+                                caption=caption,
+                                sender_username=user['username'],
+                                db=db
+                            )
+                    except Exception as we:
+                        logging.warning(f"Error sending WhatsApp on edit: {we}")
+                except Exception as notify_err:
+                    logging.exception(f"Error executing notification triggers: {notify_err}")
     except Exception as pe:
         logging.error(f"[EditFile] Erro ao editar profile de {username}: {pe}")
         raise HTTPException(status_code=500, detail="Erro ao editar arquivo")
