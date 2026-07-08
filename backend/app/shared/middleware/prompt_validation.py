@@ -17,11 +17,14 @@ compiled_patterns = [re.compile(p, re.IGNORECASE) for p in JAILBREAK_PATTERNS]
 class PromptValidationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         if request.method in ("POST", "PUT", "PATCH"):
-            try:
-                body = await request.json()
-            except Exception:
-                body = {}
-            # Assume user prompt is under a field named 'prompt' or 'message'
+            # Só tenta ler JSON se o content-type for application/json
+            content_type = request.headers.get("content-type", "")
+            body = {}
+            if "application/json" in content_type:
+                try:
+                    body = await request.json()
+                except Exception:
+                    body = {}
             prompt = body.get("prompt") or body.get("message") or ""
             if isinstance(prompt, str):
                 for pattern in compiled_patterns:
