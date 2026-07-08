@@ -585,24 +585,27 @@ class EmailSender:
             file_names: list[str],
             file_paths: list[str],
             custom_message: str | None = None) -> bool:
-        files_str = ", ".join(file_names)
-        subject = f"📚 New Study Materials: {files_str} — Teacher Tati"
-        
-        message_html = ""
         if custom_message:
-            message_html = f"""
-            <div style="background:#f9f9f9; border-left:4px solid #7828C8; padding:15px; margin:15px 0; border-radius:4px; font-style:italic;">
-                "{custom_message}"
-            </div>
-            """
-            
-        html = f"""
+            subject = "New message from Teacher Tati 📚"
+            html = f"""
+<div style="font-family:Arial,sans-serif;max-width:600px;color:#333;line-height:1.6;">
+<p>Hi <strong>{name}</strong>,</p>
+<div style="background:#f9f9f9; border-left:4px solid #7828C8; padding:15px; margin:15px 0; border-radius:4px; font-size: 15px;">
+    {custom_message}
+</div>
+<p style="font-size:13px;color:#666;margin-top:15px;">The study material file(s) are attached to this email.</p>
+<hr style="border:0;border-top:1px solid #eee;margin:20px 0;">
+<p style="font-size:12px;color:#999;">Teacher Tati Team</p>
+</div>
+"""
+        else:
+            subject = "📚 New Study Materials — Teacher Tati"
+            html = f"""
 <div style="font-family:Arial,sans-serif;max-width:600px;color:#333;line-height:1.6;">
 <h2 style="color:#7828C8;">New Study Materials from Teacher Tati! 📚</h2>
 <p>Hi <strong>{name}</strong>,</p>
-<p>Teacher Tati sent you new study material(s): <strong>{files_str}</strong>.</p>
-{message_html}
-<p>You can find the file(s) attached directly to this email.</p>
+<p>Teacher Tati sent you new study material(s) for your English practice.</p>
+<p>You can find the file(s) attached directly to this email or access them in the study materials section of the app.</p>
 <hr style="border:0;border-top:1px solid #eee;margin:20px 0;">
 <p style="font-size:12px;color:#999;">Teacher Tati Team</p>
 </div>

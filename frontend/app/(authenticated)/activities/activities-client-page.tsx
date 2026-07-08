@@ -517,8 +517,11 @@ export default function ActivitiesClientPage() {
                 {studyMaterials.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {studyMaterials.map((mat: any, idx: number) => {
-                      const isPdf = mat.filename.toLowerCase().endsWith('.pdf');
-                      const isImage = /\.(png|jpe?g|gif|webp)$/i.test(mat.filename);
+                      const displayFname = mat.display_filename || mat.filename;
+                      const isDeleted = mat.is_deleted === true;
+                      const isEdited = mat.is_edited === true;
+                      const isPdf = displayFname.toLowerCase().endsWith('.pdf');
+                      const isImage = /\.(png|jpe?g|gif|webp)$/i.test(displayFname);
                       const dateStr = mat.date_received 
                         ? new Date(mat.date_received).toLocaleDateString('pt-BR', {
                             day: '2-digit',
@@ -532,12 +535,16 @@ export default function ActivitiesClientPage() {
                       return (
                         <div 
                           key={idx}
-                          className="bg-surface border border-border rounded-2xl p-5 flex flex-col justify-between hover:border-primary/45 hover:shadow-md transition-all hover:-translate-y-0.5"
+                          className={cn(
+                            "bg-surface border rounded-2xl p-5 flex flex-col justify-between hover:shadow-md transition-all hover:-translate-y-0.5",
+                            isDeleted ? "border-danger/30 opacity-75 bg-danger/5" : "border-border hover:border-primary/45"
+                          )}
                         >
                           <div className="space-y-4">
                             <div className="flex items-start gap-4">
                               <div className={cn(
                                 "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border",
+                                isDeleted ? "bg-danger/10 text-danger border-danger/20" :
                                 isPdf ? "bg-red-500/10 text-red-500 border-red-500/20" :
                                 isImage ? "bg-blue-500/10 text-blue-500 border-blue-500/20" :
                                 "bg-primary/10 text-primary border-primary/20"
@@ -545,9 +552,21 @@ export default function ActivitiesClientPage() {
                                 <FileText size={24} />
                               </div>
                               <div className="min-w-0 flex-1">
-                                <h4 className="text-sm font-bold text-text truncate" title={mat.filename}>
-                                  {mat.filename}
-                                </h4>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className={cn("text-sm font-bold text-text truncate", isDeleted && "line-through text-text-muted")} title={displayFname}>
+                                    {displayFname}
+                                  </h4>
+                                  {isEdited && !isDeleted && (
+                                    <span className="text-[0.6rem] font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                                      Editado
+                                    </span>
+                                  )}
+                                  {isDeleted && (
+                                    <span className="text-[0.6rem] font-bold bg-danger/10 text-danger px-1.5 py-0.5 rounded">
+                                      Apagado
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="text-[0.7rem] text-text-muted mt-0.5">
                                   Received on {dateStr}
                                 </p>
@@ -556,14 +575,23 @@ export default function ActivitiesClientPage() {
 
                             {mat.message && (
                               <div className="bg-bg-secondary/40 border-l-4 border-primary rounded-r-xl p-3.5 text-xs text-text-muted italic space-y-1">
-                                <span className="font-bold text-[0.65rem] text-primary uppercase tracking-wider block">Message from Teacher Tati:</span>
+                                <span className="font-bold text-[0.65rem] text-primary uppercase tracking-wider block">
+                                  Message from Teacher Tati: {isEdited && <span className="text-[0.6rem] font-normal text-text-muted lowercase tracking-normal">(editada)</span>}
+                                </span>
                                 <span>&ldquo;{mat.message}&rdquo;</span>
                               </div>
                             )}
                           </div>
 
                           <div className="mt-5 flex gap-2">
-                            {isPdf ? (
+                            {isDeleted ? (
+                              <button
+                                disabled
+                                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-border text-text-muted cursor-not-allowed"
+                              >
+                                Indisponível (Removido)
+                              </button>
+                            ) : isPdf ? (
                               <>
                                 <a
                                   href={`https://docs.google.com/viewer?url=${encodeURIComponent(mat.url)}&embedded=true`}

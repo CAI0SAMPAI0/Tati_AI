@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiPost, apiUpload, apiDelete } from '@/lib/api/client';
+import { apiGet, apiPost, apiUpload, apiDelete, apiPut } from '@/lib/api/client';
 import { 
   Search, 
   Send, 
@@ -14,6 +14,7 @@ import {
   FileCheck,
   Trash2,
   History,
+  Pencil,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -48,6 +49,34 @@ export function DispatchSection() {
   const [isSending, setIsSending] = useState(false);
   const [customMessage, setCustomMessage] = useState('');
   const [isDeletingFile, setIsDeletingFile] = useState<string | null>(null);
+
+  // Edit Dispatched File States
+  const [editingFile, setEditingFile] = useState<any | null>(null);
+  const [editMessage, setEditMessage] = useState('');
+  const [editFilename, setEditFilename] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const handleEditFile = async () => {
+    if (!editingFile) return;
+    setIsSavingEdit(true);
+    try {
+      const res = await apiPut(`/dashboard/dispatch-file/${encodeURIComponent(editingFile.username)}/${encodeURIComponent(editingFile.filename)}`, {
+        message: editMessage,
+        filename: editFilename
+      });
+      if ((res as any).ok !== false) {
+        toast.success('Material updated successfully.');
+        setEditingFile(null);
+        queryClient.invalidateQueries({ queryKey: ['admin-dispatched-files'] });
+      } else {
+        toast.error('Failed to update material.');
+      }
+    } catch {
+      toast.error('Error updating material.');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
 
   // AI Quiz Generator States
   const [showAiForm, setShowAiForm] = useState(false);
@@ -430,37 +459,95 @@ export function DispatchSection() {
                     {dispatchedFiles.map((f: any, i: number) => {
                       const key = `${f.username}::${f.filename}`;
                       const isDeleting = isDeletingFile === key;
+                      const isEditing = editingFile?.username === f.username && editingFile?.filename === f.filename;
                       const dateStr = f.date_received
                         ? new Date(f.date_received).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
                         : '';
+                      const displayFname = f.display_filename || f.filename;
                       return (
-                        <div key={i} className="bg-bg border border-border rounded-xl p-3 flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
-                            <FileText size={16} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold text-text truncate">{f.filename}</p>
-                            <p className="text-[0.65rem] text-text-muted">@{f.username} · {dateStr}</p>
-                            {f.message && <p className="text-[0.6rem] text-primary italic truncate">"{f.message}"</p>}
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            {f.url && (
-                              <a href={f.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-surface-hover text-text-muted transition-colors" title="Open file">
-                                <FileText size={13} />
-                              </a>
-                            )}
-                            <button
-                              onClick={() => handleDeleteFile(f.username, f.filename)}
-                              disabled={isDeleting}
-                              className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-500/60 hover:text-red-500 transition-colors disabled:opacity-40"
-                              title="Delete"
-                            >
-                              {isDeleting ? (
-                                <div className="w-3 h-3 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
+                        <div key={i} className={cn("bg-bg border rounded-xl p-3 flex flex-col gap-2 transition-all", f.is_deleted ? "border-danger/25 bg-danger/5 opacity-70" : "border-border")}>
+                          <div className="flex items-center gap-3">
+                            <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", f.is_deleted ? "bg-danger/10 text-danger" : "bg-red-500/10 text-red-500")}>
+                              <FileText size={16} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              {isEditing ? (
+                                <div className="space-y-2 py-1">
+                                  <input
+                                    type="text"
+                                    value={editFilename}
+                                    onChange={(e) => setEditFilename(e.target.value)}
+                                    placeholder="Rename file display name..."
+                                    className="w-full px-2 py-1 bg-surface border border-border rounded text-xs outline-none text-text"
+                                  />
+                                  <textarea
+                                    value={editMessage}
+                                    onChange={(e) => setEditMessage(e.target.value)}
+                                    placeholder="Edit message..."
+                                    className="w-full px-2 py-1 bg-surface border border-border rounded text-xs outline-none text-text resize-y min-h-[40px]"
+                                  />
+                                  <div className="flex gap-1.5 justify-end">
+                                    <button
+                                      onClick={() => setEditingFile(null)}
+                                      className="px-2.5 py-1 rounded text-[0.65rem] font-bold bg-surface border border-border text-text-muted hover:bg-surface-hover"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      onClick={handleEditFile}
+                                      disabled={isSavingEdit}
+                                      className="px-2.5 py-1 rounded text-[0.65rem] font-bold bg-primary text-white hover:bg-primary-dark disabled:opacity-50"
+                                    >
+                                      {isSavingEdit ? 'Saving...' : 'Save'}
+                                    </button>
+                                  </div>
+                                </div>
                               ) : (
-                                <Trash2 size={13} />
+                                <>
+                                  <p className={cn("text-xs font-bold text-text truncate", f.is_deleted && "line-through text-text-subtle")}>
+                                    {displayFname}
+                                    {f.is_edited && <span className="ml-1.5 text-[0.55rem] font-normal text-primary lowercase tracking-normal bg-primary/10 px-1 rounded">(editado)</span>}
+                                    {f.is_deleted && <span className="ml-1.5 text-[0.55rem] font-normal text-danger lowercase tracking-normal bg-danger/10 px-1 rounded">(removido)</span>}
+                                  </p>
+                                  <p className="text-[0.65rem] text-text-muted">@{f.username} · {dateStr}</p>
+                                  {f.message && <p className="text-[0.65rem] text-primary italic truncate mt-0.5">"{f.message}"</p>}
+                                </>
                               )}
-                            </button>
+                            </div>
+                            {!isEditing && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                {f.url && !f.is_deleted && (
+                                  <a href={f.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-surface-hover text-text-muted transition-colors" title="Open file">
+                                    <FileText size={13} />
+                                  </a>
+                                )}
+                                {!f.is_deleted && (
+                                  <button
+                                    onClick={() => {
+                                      setEditingFile(f);
+                                      setEditFilename(displayFname);
+                                      setEditMessage(f.message || '');
+                                    }}
+                                    className="p-1.5 rounded-lg hover:bg-surface-hover text-text-muted hover:text-primary transition-colors"
+                                    title="Edit filename / message"
+                                  >
+                                    <Pencil size={13} />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleDeleteFile(f.username, f.filename)}
+                                  disabled={isDeleting || f.is_deleted}
+                                  className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-500/60 hover:text-red-500 transition-colors disabled:opacity-40"
+                                  title={f.is_deleted ? "Already deleted" : "Delete"}
+                                >
+                                  {isDeleting ? (
+                                    <div className="w-3 h-3 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
+                                  ) : (
+                                    <Trash2 size={13} />
+                                  )}
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );

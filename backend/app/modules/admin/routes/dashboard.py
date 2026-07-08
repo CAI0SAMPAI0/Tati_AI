@@ -897,13 +897,19 @@ async def get_sales_by_category(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao gerar relatório de vendas: {e}")
 
+from pydantic import BaseModel
+
+class EditFileRequest(BaseModel):
+    message: Optional[str] = None
+    filename: Optional[str] = None  # to rename display filename if needed
+
 @router.delete('/dispatch-file/{username}/{filename}')
 async def delete_dispatched_file(
     username: str,
     filename: str,
     user=Depends(require_staff)
 ):
-    """Remove um arquivo enviado para um aluno do seu perfil e do Supabase Storage."""
+    """Marca um arquivo enviado para um aluno como apagado no seu perfil."""
     from app.core.database import get_client
     import logging
 
@@ -916,17 +922,56 @@ async def delete_dispatched_file(
     except Exception as st_err:
         logging.warning(f"[DeleteFile] Não foi possível remover do Storage: {st_err}")
 
-    # Remove from user profile
+    # Set is_deleted = True in user profile
     try:
         res = db.table('users').select('profile').eq('username', username).limit(1).execute()
         if res.data:
             profile = res.data[0].get('profile') or {}
             study_mats = profile.get('study_materials') or []
-            study_mats = [m for m in study_mats if m.get('filename') != filename]
+            for m in study_mats:
+                if m.get('filename') == filename:
+                    m['is_deleted'] = True
             profile['study_materials'] = study_mats
             db.table('users').update({'profile': profile}).eq('username', username).execute()
     except Exception as pe:
         logging.error(f"[DeleteFile] Erro ao atualizar profile de {username}: {pe}")
+
+    return {"success": True}
+
+
+@router.put('/dispatch-file/{username}/{filename}')
+async def edit_dispatched_file(
+    username: str,
+    filename: str,
+    body: EditFileRequest,
+    user=Depends(require_staff)
+):
+    """Edita a mensagem ou o nome de exibição de um arquivo enviado para um aluno."""
+    from app.core.database import get_client
+    import logging
+
+    db = get_client()
+
+    try:
+        res = db.table('users').select('profile').eq('username', username).limit(1).execute()
+        if res.data:
+            profile = res.data[0].get('profile') or {}
+            study_mats = profile.get('study_materials') or []
+            updated = False
+            for m in study_mats:
+                if m.get('filename') == filename:
+                    if body.message is not None:
+                        m['message'] = body.message
+                    if body.filename is not None:
+                        m['display_filename'] = body.filename
+                    m['is_edited'] = True
+                    updated = True
+            if updated:
+                profile['study_materials'] = study_mats
+                db.table('users').update({'profile': profile}).eq('username', username).execute()
+    except Exception as pe:
+        logging.error(f"[EditFile] Erro ao editar profile de {username}: {pe}")
+        raise HTTPException(status_code=500, detail="Erro ao editar arquivo")
 
     return {"success": True}
 
@@ -943,12 +988,16 @@ async def list_dispatched_files(user=Depends(require_staff)):
         profile = row.get('profile') or {}
         mats = profile.get('study_materials') or []
         for m in mats:
+            # We also return deleted ones to list them or filter them, but let's send active info
             result.append({
                 'username': row['username'],
                 'filename': m.get('filename'),
+                'display_filename': m.get('display_filename'),
                 'url': m.get('url'),
                 'date_received': m.get('date_received'),
                 'message': m.get('message'),
+                'is_edited': m.get('is_edited', False),
+                'is_deleted': m.get('is_deleted', False),
             })
     # Sort by date desc
     result.sort(key=lambda x: x.get('date_received') or '', reverse=True)
@@ -1120,9 +1169,7 @@ async def dispatch_file(
             # Cria notificação no banco de dados para aparecer no topo da tela do aluno
             try:
                 from app.modules.notifications.services.notifications import create_notification
-                notif_msg = f"Teacher Tati te enviou o(s) material(is) '{files_str}'. Acesse a aba de materiais ou seu e-mail para baixar!"
-                if message:
-                    notif_msg = f"{message} (Material(is) enviado(s): {files_str})"
+                notif_msg = message if message else "Teacher Tati te enviou novos materiais de estudo. Acesse a aba de materiais!"
                 create_notification(
                     username=username,
                     category='nudge',
@@ -1135,9 +1182,7 @@ async def dispatch_file(
                 logging.exception(f"Failed to create notification for file dispatch: {ne}")
 
             try:
-                push_body = f"Teacher Tati te enviou o(s) material(is) '{files_str}'. Acesse no app!"
-                if message:
-                    push_body = message
+                push_body = message if message else "Teacher Tati te enviou novos materiais de estudo. Acesse no app!"
                 send_push_to_user(
                     username=username,
                     title="Novo Material de Estudo! 📚",
@@ -1154,9 +1199,7 @@ async def dispatch_file(
                 for fname, furl in zip(file_names, storage_urls):
                     if furl:
                         title = f"Material de Estudo: {fname} 📚"
-                        caption = f"Hi {name}! Here is the study material '{fname}' sent by Teacher Tati."
-                        if message:
-                            caption += f"\n\nMessage from Tati:\n{message}"
+                        caption = message if message else f"Hi {name}! Here is the study material sent by Teacher Tati."
                         await WahaService.send_file(
                             recipient_username=username,
                             file_url=furl,
@@ -1167,10 +1210,8 @@ async def dispatch_file(
                         )
                     else:
                         title = "Novo Material de Estudo! 📚"
-                        body = f"Teacher Tati te enviou o(s) material(is) '{fname}'. O arquivo foi enviado ao seu e-mail!"
-                        whatsapp_text = f"*{title}*\n\n{body}\n\nAccess in the app: https://tati-ai.vercel.app/chat"
-                        if message:
-                            whatsapp_text += f"\n\nMessage from Tati:\n{message}"
+                        body = message if message else f"Teacher Tati te enviou novos materiais de estudo."
+                        whatsapp_text = body if message else f"*{title}*\n\n{body}\n\nAccess in the app: https://tati-ai.vercel.app/chat"
                         await WahaService.send_message(
                             recipient_username=username,
                             text=whatsapp_text,
