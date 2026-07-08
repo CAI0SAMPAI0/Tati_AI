@@ -43,6 +43,7 @@ export function DispatchSection() {
   const [files, setFiles] = useState<File[]>([]);
   const [selectedQuizId, setSelectedQuizId] = useState<string>('');
   const [isSending, setIsSending] = useState(false);
+  const [customMessage, setCustomMessage] = useState('');
 
   // AI Quiz Generator States
   const [showAiForm, setShowAiForm] = useState(false);
@@ -159,6 +160,9 @@ export function DispatchSection() {
           formData.append('files', f);
         });
         formData.append('student_usernames', JSON.stringify(selectedUsernames));
+        if (customMessage.trim()) {
+          formData.append('message', customMessage.trim());
+        }
 
         const res = await apiUpload<{ success: boolean; detail?: string; dispatched_to?: number }>(
           '/dashboard/dispatch-file',
@@ -168,6 +172,7 @@ export function DispatchSection() {
         if (res.ok && res.data.success) {
           toast.success(`Materials successfully sent to ${res.data.dispatched_to} student(s)!`, { id: toastId });
           setFiles([]);
+          setCustomMessage('');
           setSelectedUsernames([]);
         } else {
           toast.error(res.data.detail || 'Error sending materials.', { id: toastId });
@@ -410,6 +415,16 @@ export function DispatchSection() {
                     ))}
                   </div>
                 )}
+
+                <div className="flex flex-col gap-1.5 mt-2">
+                  <label className="text-xs font-bold text-text-subtle">Personalized Message (Optional):</label>
+                  <textarea
+                    value={customMessage}
+                    onChange={(e) => setCustomMessage(e.target.value)}
+                    placeholder="Write a message to send along with the files..."
+                    className="w-full min-h-[80px] p-3 bg-bg border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all font-medium text-text resize-y"
+                  />
+                </div>
               </div>
             ) : (
               <div className="space-y-4">

@@ -12,6 +12,8 @@ import {
   History,
   Search,
   Sparkles,
+  FileText,
+  Download,
 } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
@@ -21,8 +23,9 @@ import { apiGet } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/useAuth';
 
-type TabType = 'quiz' | 'flashcards' | 'simulations' | 'podcasts' | 'exercises';
+type TabType = 'quiz' | 'flashcards' | 'simulations' | 'podcasts' | 'exercises' | 'materials';
 
 const PERSONALIZED_MODULE_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -56,6 +59,7 @@ interface PodcastItem {
   title: string;
   description?: string;
   thumbnail?: string;
+  level?: string;
 }
 interface FlashcardDeck {
   id: string;
@@ -75,15 +79,19 @@ interface UserError {
 
 export default function ActivitiesClientPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('quiz');
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [visiblePodcastsCount, setVisiblePodcastsCount] = useState(10);
+  const [filterLevel, setFilterLevel] = useState<string>('All');
+
+  const isStaff = user?.role && ['professor', 'professora', 'programador', 'Tatiana', 'Tati', 'Professora', 'Programador', 'admin', 'Admin'].includes(user.role);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('tati_last_activity_tab') as TabType;
-      if (saved && ['quiz', 'flashcards', 'simulations', 'podcasts', 'exercises'].includes(saved)) {
+      if (saved && ['quiz', 'flashcards', 'simulations', 'podcasts', 'exercises', 'materials'].includes(saved)) {
         setActiveTab(saved);
       }
     }
@@ -94,8 +102,12 @@ export default function ActivitiesClientPage() {
   }, [activeTab]);
 
   const { data: modules = [] } = useQuery<ModuleItem[]>({
-    queryKey: ['activities-modules'],
-    queryFn: () => apiGet<ModuleItem[]>(ENDPOINTS.ACTIVITIES_MODULES),
+    queryKey: ['activities-modules', filterLevel],
+    queryFn: () => apiGet<ModuleItem[]>(
+      filterLevel === 'All'
+        ? ENDPOINTS.ACTIVITIES_MODULES
+        : `${ENDPOINTS.ACTIVITIES_MODULES}?level=${filterLevel}`
+    ),
   });
 
   const { data: masterModule } = useQuery<any>({
@@ -108,8 +120,12 @@ export default function ActivitiesClientPage() {
     queryFn: () => apiGet<SimulationItem[]>('/simulation/scenarios'),
   });
   const { data: podcastsRaw = [] } = useQuery<PodcastItem[]>({
-    queryKey: ['activities-podcasts'],
-    queryFn: () => apiGet<PodcastItem[]>('/activities/podcasts/recommendations?lang=en-US'),
+    queryKey: ['activities-podcasts', filterLevel],
+    queryFn: () => apiGet<PodcastItem[]>(
+      filterLevel === 'All'
+        ? '/activities/podcasts/recommendations?lang=en-US'
+        : `/activities/podcasts/recommendations?lang=en-US&level=${filterLevel}`
+    ),
   });
   const { data: flashcardsRaw = [] } = useQuery<FlashcardDeck[]>({
     queryKey: ['activities-flashcards'],
@@ -128,15 +144,26 @@ export default function ActivitiesClientPage() {
     queryFn: () => apiGet<UserError[]>('/users/progress/errors/recent'),
   });
 
+  const { data: userProfile } = useQuery({
+    queryKey: ['my-profile'],
+    queryFn: () => apiGet<any>('/profile'),
+  });
+
   useQuery({
     queryKey: ['weekly-plan-v2'],
     queryFn: fetchWeeklyPlan,
     staleTime: 5 * 60 * 1000,
   });
 
+  const studyMaterials = useMemo(() => {
+    const mats = userProfile?.profile?.study_materials || [];
+    if (!searchQuery) return mats;
+    return mats.filter((m: any) => m.filename.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [userProfile, searchQuery]);
+
   const quizzes = useMemo(() => {
     if (!modules) return [];
-    const list: Array<QuizItem & { module_title: string }> = [];
+    const list: Array<QuizItem & { module_title: string; is_published?: boolean; level?: string }> = [];
     modules.forEach((m) => {
       if (m.id === PERSONALIZED_MODULE_ID) return;
       (m.quizzes || []).forEach((q) => {
@@ -149,6 +176,8 @@ export default function ActivitiesClientPage() {
             ...q,
             module_title: m.title,
             user_status: m.user_status,
+            is_published: (m as any).is_published,
+            level: m.level,
           });
         }
       });
@@ -207,6 +236,7 @@ export default function ActivitiesClientPage() {
     { id: 'flashcards', icon: <Layers size={18} />, label: 'Flashcards', count: flashcards.length },
     { id: 'simulations', icon: <Drama size={18} />, label: 'Simulations', count: simulations.length },
     { id: 'podcasts', icon: <Podcast size={18} />, label: 'Podcasts', count: podcasts.length },
+    { id: 'materials', icon: <FileBox size={18} />, label: 'Study Materials', count: studyMaterials.length },
   ];
 
   return (
@@ -225,15 +255,35 @@ export default function ActivitiesClientPage() {
               </p>
             </div>
 
-            <div className="relative w-full md:w-80">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle" size={18} />
-              <input
-                type="text"
-                placeholder="Search activity..."
-                className="w-full pl-10 pr-4 py-2.5 bg-surface border border-border rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-stretch sm:items-center">
+              {isStaff && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-text-subtle uppercase tracking-wider whitespace-nowrap">Filter by Level:</span>
+                  <select
+                    value={filterLevel}
+                    onChange={(e) => setFilterLevel(e.target.value)}
+                    className="px-3 py-2 bg-surface border border-border rounded-2xl text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all cursor-pointer text-text"
+                  >
+                    <option value="All">All Levels</option>
+                    <option value="A1">A1</option>
+                    <option value="A2">A2</option>
+                    <option value="B1">B1</option>
+                    <option value="B2">B2</option>
+                    <option value="C1">C1</option>
+                    <option value="C2">C2</option>
+                  </select>
+                </div>
+              )}
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle" size={18} />
+                <input
+                  type="text"
+                  placeholder="Search activity..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-surface border border-border rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
             </div>
           </header>
 
@@ -276,12 +326,13 @@ export default function ActivitiesClientPage() {
                       meta={[
                         {
                           icon: <Layers size={14} />,
-                          label:
-                            modules?.find(
-                              (m) => m.id === q.id || m.quizzes?.some((qz) => qz.id === q.id),
-                            )?.level || 'all',
+                          label: q.level || 'all',
                         },
-                      ]}
+                        isStaff && {
+                          icon: <Play size={14} />,
+                          label: q.is_published ? 'Published' : 'Draft',
+                        }
+                      ].filter(Boolean) as any}
                     />
                   ))
                 ) : (
@@ -372,6 +423,12 @@ export default function ActivitiesClientPage() {
                         status={podcastProgress?.completed?.includes(p.id) ? 'done' : 'new'}
                         onClick={() => router.push(`/podcasts/${p.id}`)}
                         actionLabel="Play"
+                        meta={[
+                          {
+                            icon: <Layers size={14} />,
+                            label: p.level || 'all',
+                          }
+                        ]}
                       />
                     ))
                   ) : (
@@ -435,6 +492,80 @@ export default function ActivitiesClientPage() {
                 ) : (
                   <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
                     No simulations available.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'materials' && (
+              <div className="space-y-6">
+                {studyMaterials.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {studyMaterials.map((mat: any, idx: number) => {
+                      const isPdf = mat.filename.toLowerCase().endsWith('.pdf');
+                      const isImage = /\.(png|jpe?g|gif|webp)$/i.test(mat.filename);
+                      const dateStr = mat.date_received 
+                        ? new Date(mat.date_received).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })
+                        : '';
+                        
+                      return (
+                        <div 
+                          key={idx}
+                          className="bg-surface border border-border rounded-2xl p-5 flex flex-col justify-between hover:border-primary/45 hover:shadow-md transition-all hover:-translate-y-0.5"
+                        >
+                          <div className="space-y-4">
+                            <div className="flex items-start gap-4">
+                              <div className={cn(
+                                "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border",
+                                isPdf ? "bg-red-500/10 text-red-500 border-red-500/20" :
+                                isImage ? "bg-blue-500/10 text-blue-500 border-blue-500/20" :
+                                "bg-primary/10 text-primary border-primary/20"
+                              )}>
+                                <FileText size={24} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h4 className="text-sm font-bold text-text truncate" title={mat.filename}>
+                                  {mat.filename}
+                                </h4>
+                                <p className="text-[0.7rem] text-text-muted mt-0.5">
+                                  Received on {dateStr}
+                                </p>
+                              </div>
+                            </div>
+
+                            {mat.message && (
+                              <div className="bg-bg-secondary/40 border-l-4 border-primary rounded-r-xl p-3.5 text-xs text-text-muted italic space-y-1">
+                                <span className="font-bold text-[0.65rem] text-primary uppercase tracking-wider block">Message from Teacher Tati:</span>
+                                <span>&ldquo;{mat.message}&rdquo;</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="mt-5 flex gap-2">
+                            <a 
+                              href={mat.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-hover transition-colors shadow-sm"
+                            >
+                              <Download size={14} />
+                              Download / Open File
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
+                    <FileBox size={40} className="mx-auto mb-4 opacity-20" />
+                    <p>No study materials available yet.</p>
                   </div>
                 )}
               </div>

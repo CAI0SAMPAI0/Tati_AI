@@ -23,7 +23,8 @@ async def list_modules(
 ):
     """Lista todos os módulos disponíveis com status de conclusão do usuário."""
     effective_level = level or user.get('level')
-    return await service.list_modules(effective_level, user['username'])
+    is_staff = user.get('is_staff', False)
+    return await service.list_modules(effective_level, user['username'], is_staff=is_staff)
 
 
 @router.get('/weekly-goal')

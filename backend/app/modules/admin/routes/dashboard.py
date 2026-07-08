@@ -902,6 +902,7 @@ async def get_sales_by_category(
 async def dispatch_file(
     files: List[UploadFile] = File(...),
     student_usernames: str = Form(...),  # Comma-separated or JSON list
+    message: Optional[str] = Form(None),
     user=Depends(require_staff)
 ):
     """Dispara múltiplos arquivos de estudo por e-mail e push no celular para os alunos selecionados."""
@@ -990,7 +991,8 @@ async def dispatch_file(
                     study_mats.append({
                         "filename": fname,
                         "url": furl,
-                        "date_received": datetime.now(timezone.utc).isoformat()
+                        "date_received": datetime.now(timezone.utc).isoformat(),
+                        "message": message
                     })
             
             profile["study_materials"] = study_mats
@@ -1007,7 +1009,8 @@ async def dispatch_file(
                         to_email=email,
                         name=name,
                         file_names=file_names,
-                        file_paths=saved_paths
+                        file_paths=saved_paths,
+                        custom_message=message
                     )
                 except Exception as e:
                     import logging
@@ -1025,11 +1028,14 @@ async def dispatch_file(
             # Cria notificação no banco de dados para aparecer no topo da tela do aluno
             try:
                 from app.modules.notifications.services.notifications import create_notification
+                notif_msg = f"Teacher Tati te enviou o(s) material(is) '{files_str}'. Acesse a aba de materiais ou seu e-mail para baixar!"
+                if message:
+                    notif_msg = f"{message} (Material(is) enviado(s): {files_str})"
                 create_notification(
                     username=username,
                     category='nudge',
                     title="Novo Material de Estudo! 📚",
-                    message=f"Teacher Tati te enviou o(s) material(is) '{files_str}'. Acesse a aba de materiais ou seu e-mail para baixar!",
+                    message=notif_msg,
                     send_push=False
                 )
             except Exception as ne:
@@ -1037,10 +1043,13 @@ async def dispatch_file(
                 logging.exception(f"Failed to create notification for file dispatch: {ne}")
 
             try:
+                push_body = f"Teacher Tati te enviou o(s) material(is) '{files_str}'. Acesse no app!"
+                if message:
+                    push_body = message
                 send_push_to_user(
                     username=username,
                     title="Novo Material de Estudo! 📚",
-                    body=f"Teacher Tati te enviou o(s) material(is) '{files_str}'. Acesse no app!",
+                    body=push_body,
                     url="/chat"
                 )
             except Exception as e:
@@ -1054,6 +1063,8 @@ async def dispatch_file(
                     if furl:
                         title = f"Material de Estudo: {fname} 📚"
                         caption = f"Hi {name}! Here is the study material '{fname}' sent by Teacher Tati."
+                        if message:
+                            caption += f"\n\nMessage from Tati:\n{message}"
                         await WahaService.send_file(
                             recipient_username=username,
                             file_url=furl,
@@ -1066,6 +1077,8 @@ async def dispatch_file(
                         title = "Novo Material de Estudo! 📚"
                         body = f"Teacher Tati te enviou o(s) material(is) '{fname}'. O arquivo foi enviado ao seu e-mail!"
                         whatsapp_text = f"*{title}*\n\n{body}\n\nAccess in the app: https://tati-ai.vercel.app/chat"
+                        if message:
+                            whatsapp_text += f"\n\nMessage from Tati:\n{message}"
                         await WahaService.send_message(
                             recipient_username=username,
                             text=whatsapp_text,
@@ -1100,10 +1113,11 @@ async def dispatch_quiz(
     db = get_client()
 
     # Busca o título do quiz para a mensagem
-    quiz_res = db.table('quizzes').select('title').eq('id', body.quiz_id).limit(1).execute()
+    quiz_res = db.table('quizzes').select('*').eq('id', body.quiz_id).limit(1).execute()
     if not quiz_res.data:
         raise HTTPException(status_code=404, detail="Quiz não encontrado.")
-    quiz_title = quiz_res.data[0].get('title') or "Novo Quiz"
+    orig_quiz = quiz_res.data[0]
+    quiz_title = orig_quiz.get('title') or "Novo Quiz"
 
     # Busca os detalhes de e-mail e perfil dos alunos
     res = db.table('users').select('username, email, profile').in_('username', body.student_usernames).execute()
@@ -1112,11 +1126,39 @@ async def dispatch_quiz(
     email_sender = EmailSender()
     success_count = 0
 
+    # Busca questões originais do quiz de template
+    orig_questions = db.table('quiz_questions').select('*').eq('quiz_id', body.quiz_id).execute().data or []
+
     for student in students:
         email = student.get('email')
         username = student.get('username')
         profile = student.get('profile') or {}
         name = profile.get('name') or username
+
+        # Cria clone do quiz associado ao usuário específico
+        PERSONALIZED_MODULE_ID = "00000000-0000-0000-0000-000000000001"
+        cloned_quiz_res = db.table('quizzes').insert({
+            'module_id': PERSONALIZED_MODULE_ID,
+            'title': orig_quiz.get('title'),
+            'description': orig_quiz.get('description'),
+            'username': username
+        }).execute()
+        
+        if not cloned_quiz_res.data:
+            continue
+            
+        cloned_quiz_id = cloned_quiz_res.data[0]['id']
+        
+        # Cria clones de todas as questões
+        for q in orig_questions:
+            db.table('quiz_questions').insert({
+                'quiz_id': cloned_quiz_id,
+                'question': q.get('question'),
+                'options': q.get('options'),
+                'correct_index': q.get('correct_index'),
+                'explanation': q.get('explanation'),
+                'order': q.get('order')
+            }).execute()
 
         email_sent = False
         if email:
@@ -1124,7 +1166,8 @@ async def dispatch_quiz(
                 email_sent = email_sender.send_dispatched_quiz_email(
                     to_email=email,
                     name=name,
-                    quiz_title=quiz_title
+                    quiz_title=quiz_title,
+                    quiz_url=f"https://tati-ai.vercel.app/quiz/{cloned_quiz_id}"
                 )
             except Exception as e:
                 import logging

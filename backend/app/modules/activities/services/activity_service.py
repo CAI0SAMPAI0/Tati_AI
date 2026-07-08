@@ -22,7 +22,8 @@ class ActivityService:
 
     async def list_modules(self,
                            level: Optional[str] = None,
-                           username: Optional[str] = None) -> List[Dict[str,
+                           username: Optional[str] = None,
+                           is_staff: bool = False) -> List[Dict[str,
                                                                         Any]]:
         """Lista módulos filtrados por nível e inclui status do usuário se logado."""
         # Se houver usuário, não usamos cache global pois a resposta é
@@ -34,9 +35,10 @@ class ActivityService:
                 return cached
 
         def _fetch():
-            # Busca módulos publicados.
-            query = self.db.table('modules').select(
-                '*, quizzes(*)').eq('is_published', True)
+            # Busca módulos. Se não for staff, traz apenas os publicados.
+            query = self.db.table('modules').select('*, quizzes(*)')
+            if not is_staff:
+                query = query.eq('is_published', True)
             try:
                 data = query.order(
                     'created_at', desc=True).execute().data or []

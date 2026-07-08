@@ -490,6 +490,7 @@ async def get_podcast_progress(
 @router.get('/recommendations', response_model=List[Podcast])
 async def get_podcast_recommendations(
     user: dict = Depends(get_current_user),
+    level: str | None = None,
     lang: str | None = None,
     accept_language: str | None = Header(default=None),
 ):
@@ -497,13 +498,18 @@ async def get_podcast_recommendations(
     availability_service = MediaAvailabilityService()
 
     username = user.get('username')
-    user_level_raw = str(user.get('level', 'A1'))
+    is_staff = user.get('is_staff', False)
+    
+    user_level_raw = level or str(user.get('level', 'A1'))
     user_level = recommender._normalize_user_level(user_level_raw)
     ui_lang = _normalize_ui_lang(lang or accept_language)
 
     def _fetch_db():
         db = get_client()
-        return db.table('podcasts').select('id, title, description, level, thumbnail, embed_url, duration, category, source_name, source_type, media_type, external_url, has_full_transcript').eq('user_id', username).execute().data or []
+        query = db.table('podcasts').select('id, title, description, level, thumbnail, embed_url, duration, category, source_name, source_type, media_type, external_url, has_full_transcript')
+        if not is_staff:
+            query = query.eq('user_id', username)
+        return query.execute().data or []
 
     try:
         rows = await run_in_threadpool(_fetch_db)
@@ -518,10 +524,12 @@ async def get_podcast_recommendations(
         if sanitized:
             catalog.append(sanitized)
 
-    # 2. Filtrar por nível CEFR do usuário (mantém podcasts 'all' levels)
+    # 2. Filtrar por nível CEFR (mantém podcasts 'all' levels)
     def _levels_match(podcast_level: str, u_level: str) -> bool:
         pl = (podcast_level or '').lower().strip()
         ul = u_level.lower().strip()
+        if is_staff and (level is None or level.lower() == 'all'):
+            return True
         return pl in ('', 'all', 'todos', ul)
 
     visible_catalog = [item for item in catalog if _levels_match(item.get('level', ''), user_level)]
