@@ -258,6 +258,12 @@ class PodcastExerciseService:
                 f"Student level: {user_level}\n"
                 "Compare word by word. Score 0-100 based on accuracy.\n"
                 "In feedback: point out specific words they missed or mispronounced, and praise what was right.\n"
+                "PROMPT RULES FOR PRONUNCIATION FEEDBACK:\n"
+                "- Identify which specific words were pronounced incorrectly.\n"
+                "- Show only the correct word spelling, and encourage natural repetition of the correct word.\n"
+                "- NEVER show phonetic transcriptions (No IPA symbols, e.g., NO \"/wɜːrk/\", NO \"/ˈwɜːrd/\").\n"
+                "- NEVER try to spell out or write down the phonetic sounds of the word (e.g., NO \"uãrk\", NO \"uãrd\").\n"
+                "- Keep corrections natural, brief, and conversational without phonetics lessons.\n"
                 "Be encouraging but honest. If score < 70, give the correct phrase again.\n"
                 "Feedback MUST be in English only.\n"
                 'Return JSON: { "score": 80, "feedback": "..." }'

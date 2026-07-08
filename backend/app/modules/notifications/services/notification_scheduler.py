@@ -400,6 +400,22 @@ class NotificationScheduler:
             # Admins não recebem relatórios semanais automáticos
             if self._is_admin(student):
                 continue
+
+            # Verifica se já recebeu relatório semanal nos últimos 6 dias para evitar spam
+            six_days_ago = (datetime.now(timezone.utc) - timedelta(days=6)).isoformat()
+            try:
+                already_sent_res = self._db.table('notifications') \
+                    .select('id') \
+                    .eq('username', username) \
+                    .eq('category', 'weekly_report') \
+                    .gte('created_at', six_days_ago) \
+                    .execute()
+                if already_sent_res.data:
+                    logging.info(f"[Scheduler] Relatório semanal já foi enviado para {username} nos últimos 6 dias. Pulando.")
+                    continue
+            except Exception as e:
+                logging.error(f"[Scheduler] Erro ao checar envio anterior de relatório para {username}: {e}")
+
             email = student.get('email')
             profile = student.get('profile') or {}
             responsible_email = profile.get('responsible_email')
@@ -409,17 +425,32 @@ class NotificationScheduler:
             try:
                 pdf_path = await progress_report_service.generate_student_report(username, lang='en-US')
                 
+                success = False
                 if email:
                     success = email_sender.send_report_email(
                         email, student.get('name', username), pdf_path, lang='en-US')
                     logging.info(
                         f"[Scheduler] Relatório {'enviado' if success else 'FALHOU'} para aluno {username}")
                 
+                success_resp = False
                 if responsible_email:
                     success_resp = email_sender.send_responsible_report_email(
                         responsible_email, student.get('name', username), pdf_path)
                     logging.info(
                         f"[Scheduler] Relatório para responsável {'enviado' if success_resp else 'FALHOU'} para {responsible_email} (aluno: {username})")
+
+                # Se ao menos um dos envios deu certo, marca como enviado esta semana
+                if success or success_resp:
+                    try:
+                        self._db.table('notifications').insert({
+                            'username': username,
+                            'title': 'Weekly Progress Report',
+                            'body': 'Your weekly progress report was sent to your email.',
+                            'category': 'weekly_report',
+                            'status': 'read'
+                        }).execute()
+                    except Exception as e:
+                        logging.error(f"[Scheduler] Erro ao registrar notificação de weekly_report para {username}: {e}")
             except Exception as e:
                 logging.info(
                     f'[Scheduler] Erro no relatório de {username}: {e}')

@@ -121,7 +121,6 @@ def upload_raw_file(file_bytes: bytes, filename: str) -> str:
             file_bytes,
             public_id=f'tati_ai/materials/{filename}',
             resource_type='raw',
-            folder='tati_ai/materials',
             overwrite=True,
         )
         return result.get('secure_url', '')

@@ -1406,7 +1406,7 @@ export function CefrSection() {
                   },
                   {
                     id: 'modules',
-                    label: `Modules (${activeGroupedExercises.length})`
+                    label: `Quizzes (${activeGroupedExercises.length})`
                   },
                   {
                     id: 'simulations',
@@ -1515,7 +1515,7 @@ export function CefrSection() {
                   if (activeGroupedExercises.length === 0) {
                     return (
                       <div className="text-center py-10 text-text-muted border border-dashed border-border rounded-xl">
-                        <p className="text-sm">No exercise modules found for the selected level and status.</p>
+                        <p className="text-sm">No exercise quizzes found for the selected level and status.</p>
                       </div>
                     );
                   }

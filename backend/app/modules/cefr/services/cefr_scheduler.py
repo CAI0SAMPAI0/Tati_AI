@@ -197,6 +197,41 @@ class CEFRScheduler:
                         logging.info(f"[CEFR Scheduler] Saved {len(saved_simulations)} simulations for {level}.")
 
             logging.info("[CEFR Scheduler] Autonomous generation finished successfully!")
+            
+            # Notifica a Tatiana (little.tathy@gmail.com) por e-mail
+            try:
+                from app.shared.services.email import EmailSender
+                email_sender = EmailSender()
+                
+                email_subject = "✨ New CEFR Materials Generated Automatically"
+                email_html = f"""
+                <div style="font-family: sans-serif; max-width: 600px; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
+                    <h2 style="color: #6c5ce7;">✨ Autonomous CEFR Generation Complete</h2>
+                    <p>Hello Tatiana,</p>
+                    <p>New educational materials have been automatically generated for Teacher Tati platform:</p>
+                    <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                        <tr style="background-color: #f8f9fa;">
+                            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Generated Topic</th>
+                            <td style="padding: 10px; border: 1px solid #ddd;"><b>{topic}</b></td>
+                        </tr>
+                        <tr>
+                            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Processed Levels</th>
+                            <td style="padding: 10px; border: 1px solid #ddd;">{', '.join(selected_levels)}</td>
+                        </tr>
+                        <tr style="background-color: #f8f9fa;">
+                            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Materials Types</th>
+                            <td style="padding: 10px; border: 1px solid #ddd;">{', '.join(types)}</td>
+                        </tr>
+                    </table>
+                    <p>These draft items are now stored in the database awaiting review and publication via the Admin Dashboard.</p>
+                    <br/>
+                    <p>Best regards,<br/><b>Teacher Tati AI System</b></p>
+                </div>
+                """
+                email_sender.send_email(to_email="little.tathy@gmail.com", subject=email_subject, html=email_html)
+                logging.info("[CEFR Scheduler] Sent generation report email to Tatiana.")
+            except Exception as mail_err:
+                logging.error(f"[CEFR Scheduler] Error sending report email to Tatiana: {mail_err}")
 
         except Exception as e:
             logging.error(f"[CEFR Scheduler] Error during autonomous generation: {e}")
