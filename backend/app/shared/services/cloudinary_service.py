@@ -106,3 +106,26 @@ def upload_image_file(
     except Exception as e:
         logging.info(f'[Cloudinary] Erro no upload de arquivo: {e}')
         return ''
+
+
+def upload_raw_file(file_bytes: bytes, filename: str) -> str:
+    """
+    Faz upload de qualquer arquivo (PDF, EPUB, etc.) para o Cloudinary e retorna a URL pública de download.
+    """
+    try:
+        if not settings.cloudinary_cloud_name:
+            logging.info('[Cloudinary] Configuração ausente!')
+            return ''
+
+        result = cloudinary.uploader.upload(
+            file_bytes,
+            public_id=f'tati_ai/materials/{filename}',
+            resource_type='raw',
+            folder='tati_ai/materials',
+            overwrite=True,
+        )
+        return result.get('secure_url', '')
+    except Exception as e:
+        logging.info(f'[Cloudinary] Erro no upload de arquivo raw: {e}')
+        return ''
+

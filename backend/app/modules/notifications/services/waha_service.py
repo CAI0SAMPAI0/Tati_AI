@@ -285,3 +285,102 @@ class WahaService:
         except Exception as e:
             logging.error(f"[WAHA] Error sending WhatsApp message: {e}")
             return {"success": False, "error": str(e)}
+
+    @staticmethod
+    async def send_file(recipient_username: str, file_url: str, filename: str, caption: Optional[str] = None, sender_username: Optional[str] = None, db = None) -> Dict[str, Any]:
+        """
+        Envia um arquivo (PDF, imagem, etc.) hospedado em uma URL via WhatsApp usando a API /api/sendFile do WAHA.
+        """
+        if not db:
+            from app.core.database import get_client
+            db = get_client()
+
+        # 1. Obter informações do destinatário e normalizar número
+        try:
+            rows = db.table('users').select('username, role, profile').eq('username', recipient_username).execute().data
+        except Exception as e:
+            logging.error(f"[WAHA] Error fetching recipient {recipient_username} for file: {e}")
+            return {"success": False, "error": f"Recipient not found: {e}"}
+
+        if not rows:
+            return {"success": False, "error": "Recipient not found in database"}
+
+        recipient = rows[0]
+        profile = recipient.get("profile") or {}
+        allow_notif = profile.get("allow_whatsapp_notifications")
+        whatsapp_number = profile.get("whatsapp_number")
+
+        if not allow_notif or not whatsapp_number:
+            return {"success": False, "error": "WhatsApp notifications disabled or number missing"}
+
+        normalized_number = WahaService.normalize_whatsapp_number(whatsapp_number)
+        if not normalized_number:
+            return {"success": False, "error": "Invalid WhatsApp number"}
+
+        # 2. Determinar qual sessão usar
+        sessions = await WahaService.get_sessions()
+        working_sessions = [s for s in sessions if s.get("status") == "WORKING"]
+        
+        if not working_sessions:
+            return {"success": False, "error": "No active WhatsApp sessions found"}
+
+        selected_session = None
+        if sender_username:
+            for s in working_sessions:
+                if s.get("name") == sender_username:
+                    selected_session = s
+                    break
+
+        if not selected_session:
+            if recipient_username.lower().strip() == "caio.sampaio":
+                for s in working_sessions:
+                    if s.get("name") in ("programador", "caio.sampaio"):
+                        selected_session = s
+                        break
+            if not selected_session:
+                for s in working_sessions:
+                    if WahaService._is_tatiana_session(s.get("name")):
+                        selected_session = s
+                        break
+            if not selected_session:
+                selected_session = working_sessions[0]
+
+        session_name = selected_session.get("name")
+
+        # 3. Enviar o arquivo
+        url = f"{settings.waha_api_url}/api/sendFile"
+        
+        mimetype = "application/octet-stream"
+        fname_lower = filename.lower()
+        if fname_lower.endswith(".pdf"):
+            mimetype = "application/pdf"
+        elif fname_lower.endswith(".epub"):
+            mimetype = "application/epub+zip"
+        elif fname_lower.endswith((".png", ".jpg", ".jpeg")):
+            mimetype = "image/png"
+
+        payload = {
+            "session": session_name,
+            "chatId": f"{normalized_number}@c.us",
+            "file": {
+                "url": file_url,
+                "filename": filename,
+                "mimetype": mimetype
+            }
+        }
+        if caption:
+            payload["caption"] = caption
+
+        headers = WahaService._get_headers()
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                res = await client.post(url, json=payload, headers=headers)
+                if res.status_code in (200, 201):
+                    logging.info(f"[WAHA] File sent successfully to {recipient_username} using session {session_name}")
+                    return {"success": True, "data": res.json()}
+                logging.error(f"[WAHA] Failed to send file, status={res.status_code}: {res.text}")
+                return {"success": False, "error": res.text, "status_code": res.status_code}
+        except Exception as e:
+            logging.error(f"[WAHA] Error sending WhatsApp file: {e}")
+            return {"success": False, "error": str(e)}

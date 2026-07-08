@@ -931,24 +931,54 @@ async def dispatch_file(
     res = db.table('users').select('username, email, profile').in_('username', usernames).execute()
     students = res.data or []
 
-    # Salva todos os arquivos temporariamente no servidor
+    # Salva todos os arquivos temporariamente no servidor e envia ao Cloudinary
     temp_dir = tempfile.gettempdir()
     saved_paths = []
     file_names = []
+    cloudinary_urls = []
 
     try:
+        from app.shared.services.cloudinary_service import upload_raw_file
+        
         for f in files:
             temp_path = os.path.join(temp_dir, f.filename)
             with open(temp_path, "wb") as buffer:
                 shutil.copyfileobj(f.file, buffer)
             saved_paths.append(temp_path)
             file_names.append(f.filename)
+            
+            # Fazer upload para o Cloudinary para ter a URL permanente de download
+            with open(temp_path, "rb") as f_bytes:
+                url_cloud = upload_raw_file(f_bytes.read(), f.filename)
+                cloudinary_urls.append(url_cloud if url_cloud else "")
+
+        from datetime import datetime, timezone
 
         for student in students:
             email = student.get('email')
             username = student.get('username')
             profile = student.get('profile') or {}
             name = profile.get('name') or username
+
+            # Salva no histórico de materiais de estudo do aluno no profile
+            study_mats = profile.get("study_materials") or []
+            if not isinstance(study_mats, list):
+                study_mats = []
+                
+            for fname, furl in zip(file_names, cloudinary_urls):
+                if furl:
+                    study_mats.append({
+                        "filename": fname,
+                        "url": furl,
+                        "date_received": datetime.now(timezone.utc).isoformat()
+                    })
+            
+            profile["study_materials"] = study_mats
+            try:
+                db.table('users').update({'profile': profile}).eq('username', username).execute()
+            except Exception as pe_err:
+                import logging
+                logging.error(f"[Dispatch] Erro ao atualizar profile para {username}: {pe_err}")
 
             email_sent = False
             if email:
@@ -979,7 +1009,7 @@ async def dispatch_file(
                     username=username,
                     category='nudge',
                     title="Novo Material de Estudo! 📚",
-                    message=f"Teacher Tati te enviou o(s) material(is) '{files_str}'. O(s) arquivo(s) foi(ram) enviado(s) ao seu e-mail!",
+                    message=f"Teacher Tati te enviou o(s) material(is) '{files_str}'. Acesse a aba de materiais ou seu e-mail para baixar!",
                     send_push=False
                 )
             except Exception as ne:
@@ -990,25 +1020,38 @@ async def dispatch_file(
                 send_push_to_user(
                     username=username,
                     title="Novo Material de Estudo! 📚",
-                    body=f"Teacher Tati te enviou o(s) material(is) '{files_str}'. O(s) arquivo(s) foi(ram) enviado(s) ao seu e-mail!",
+                    body=f"Teacher Tati te enviou o(s) material(is) '{files_str}'. Acesse no app!",
                     url="/chat"
                 )
             except Exception as e:
                 import logging
                 logging.exception(f"Failed to send push notification to user {username}: {e}")
 
-            # Envia via WhatsApp (se habilitado)
+            # Envia via WhatsApp (se habilitado) enviando os arquivos reais!
             try:
                 from app.modules.notifications.services.waha_service import WahaService
-                title = "Novo Material de Estudo! 📚"
-                body = f"Teacher Tati te enviou o(s) material(is) '{files_str}'. O(s) arquivo(s) foi(ram) enviado(s) ao seu e-mail!"
-                whatsapp_text = f"*{title}*\n\n{body}\n\nAccess in the app: https://tati-ai.vercel.app/chat"
-                await WahaService.send_message(
-                    recipient_username=username,
-                    text=whatsapp_text,
-                    sender_username=user['username'],
-                    db=db
-                )
+                for fname, furl in zip(file_names, cloudinary_urls):
+                    if furl:
+                        title = f"Material de Estudo: {fname} 📚"
+                        caption = f"Hi {name}! Here is the study material '{fname}' sent by Teacher Tati."
+                        await WahaService.send_file(
+                            recipient_username=username,
+                            file_url=furl,
+                            filename=fname,
+                            caption=caption,
+                            sender_username=user['username'],
+                            db=db
+                        )
+                    else:
+                        title = "Novo Material de Estudo! 📚"
+                        body = f"Teacher Tati te enviou o(s) material(is) '{fname}'. O arquivo foi enviado ao seu e-mail!"
+                        whatsapp_text = f"*{title}*\n\n{body}\n\nAccess in the app: https://tati-ai.vercel.app/chat"
+                        await WahaService.send_message(
+                            recipient_username=username,
+                            text=whatsapp_text,
+                            sender_username=user['username'],
+                            db=db
+                        )
             except Exception as we:
                 import logging
                 logging.warning(f"Failed to send WhatsApp notification to user {username}: {we}")
