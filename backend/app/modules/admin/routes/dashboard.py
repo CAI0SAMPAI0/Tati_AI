@@ -931,26 +931,46 @@ async def dispatch_file(
     res = db.table('users').select('username, email, profile').in_('username', usernames).execute()
     students = res.data or []
 
-    # Salva todos os arquivos temporariamente no servidor e envia ao Cloudinary
+    # Salva todos os arquivos temporariamente no servidor e envia ao Supabase Storage
     temp_dir = tempfile.gettempdir()
     saved_paths = []
     file_names = []
-    cloudinary_urls = []
+    storage_urls = []
 
     try:
-        from app.shared.services.cloudinary_service import upload_raw_file
+        from app.modules.cefr.routes.admin import sanitize_filename
         
+        # Garante que o bucket público do Supabase exista
+        bucket_name = "study-materials"
+        try:
+            db.storage.create_bucket(bucket_name, options={"public": True})
+        except Exception:
+            pass
+
         for f in files:
             temp_path = os.path.join(temp_dir, f.filename)
             with open(temp_path, "wb") as buffer:
                 shutil.copyfileobj(f.file, buffer)
             saved_paths.append(temp_path)
-            file_names.append(f.filename)
             
-            # Fazer upload para o Cloudinary para ter a URL permanente de download
-            with open(temp_path, "rb") as f_bytes:
-                url_cloud = upload_raw_file(f_bytes.read(), f.filename)
-                cloudinary_urls.append(url_cloud if url_cloud else "")
+            # Sanitiza nome do arquivo para o Supabase
+            safe_fname = sanitize_filename(f.filename)
+            file_names.append(safe_fname)
+            
+            # Fazer upload para o Supabase Storage
+            try:
+                with open(temp_path, "rb") as f_bytes:
+                    db.storage.from_(bucket_name).upload(
+                        path=safe_fname,
+                        file=f_bytes.read(),
+                        file_options={"cache-control": "3600", "upsert": "true"}
+                    )
+                url_storage = db.storage.from_(bucket_name).get_public_url(safe_fname)
+                storage_urls.append(url_storage if url_storage else "")
+            except Exception as st_err:
+                import logging
+                logging.exception(f"Erro ao subir arquivo {f.filename} para o Supabase Storage: {st_err}")
+                storage_urls.append("")
 
         from datetime import datetime, timezone
 
@@ -965,7 +985,7 @@ async def dispatch_file(
             if not isinstance(study_mats, list):
                 study_mats = []
                 
-            for fname, furl in zip(file_names, cloudinary_urls):
+            for fname, furl in zip(file_names, storage_urls):
                 if furl:
                     study_mats.append({
                         "filename": fname,
@@ -1030,7 +1050,7 @@ async def dispatch_file(
             # Envia via WhatsApp (se habilitado) enviando os arquivos reais!
             try:
                 from app.modules.notifications.services.waha_service import WahaService
-                for fname, furl in zip(file_names, cloudinary_urls):
+                for fname, furl in zip(file_names, storage_urls):
                     if furl:
                         title = f"Material de Estudo: {fname} 📚"
                         caption = f"Hi {name}! Here is the study material '{fname}' sent by Teacher Tati."

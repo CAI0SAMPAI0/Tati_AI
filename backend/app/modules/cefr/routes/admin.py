@@ -579,9 +579,9 @@ class CEFRExerciseGroupSave(BaseModel):
 
 @router.put("/flashcards/group")
 async def toggle_publish_flashcard_group(
-    level: str,
-    topic: str,
-    is_published: bool,
+    level: str = Query(...),
+    topic: str = Query(...),
+    is_published: bool = Query(...),
     user=Depends(require_staff)
 ):
     client = get_client()
@@ -591,6 +591,7 @@ async def toggle_publish_flashcard_group(
     except Exception as e:
         logging.error(f"[AdminRoute] Error toggling flashcard group: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @router.delete("/flashcards/group")
@@ -641,9 +642,9 @@ async def save_flashcard_group(
 
 @router.put("/exercises/group")
 async def toggle_publish_exercise_group(
-    level: str,
-    topic: str,
-    is_published: bool,
+    level: str = Query(...),
+    topic: str = Query(...),
+    is_published: bool = Query(...),
     user=Depends(require_staff)
 ):
     client = get_client()
