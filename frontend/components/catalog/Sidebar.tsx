@@ -44,7 +44,7 @@ export default function HubSidebar({ isOpen, onClose }: SidebarProps) {
 
       <aside
         className={`fixed left-0 top-0 z-[70] flex h-screen w-64 flex-col border-r border-line bg-surface shadow-sm transition-transform duration-300 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+          isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex items-center justify-between border-b border-line p-5">

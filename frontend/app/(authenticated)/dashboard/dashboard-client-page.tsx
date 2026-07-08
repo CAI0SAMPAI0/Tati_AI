@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { DashboardSidebar, type DashSection } from '@/components/dashboard/dashboard-sidebar';
 import { cn } from '@/lib/utils';
+import { useSidebarState } from '@/hooks/useSidebarState';
 
 import dynamic from 'next/dynamic';
 
@@ -70,24 +71,8 @@ export default function DashboardClientPage() {
   };
 
   const [activeSection, setActiveSection] = useState<DashSection>(getInitialTab());
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const { sidebarOpen, toggleSidebar: handleToggleSidebar, closeSidebar: handleCloseSidebar } = useSidebarState();
   const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const collapsed = localStorage.getItem('tati_sidebar_collapsed') === 'true';
-      const isMobile = window.innerWidth < 768;
-      setSidebarOpen(isMobile ? false : !collapsed);
-    }
-  }, []);
-
-  const handleToggleSidebar = () => {
-    setSidebarOpen(prev => {
-      const next = !prev;
-      localStorage.setItem('tati_sidebar_collapsed', String(!next));
-      return next;
-    });
-  };
 
   // Update URL and storage when section changes
   const handleSetSection = (section: DashSection) => {
@@ -184,7 +169,7 @@ export default function DashboardClientPage() {
         activeSection={activeSection} 
         onSetSection={handleSetSection}
         isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
+        onClose={handleCloseSidebar}
       />
 
       <div className={cn("flex-1 flex flex-col min-w-0 bg-bg-secondary/30 relative h-screen transition-all duration-300", sidebarOpen ? "md:pl-[280px]" : "md:pl-0")}>

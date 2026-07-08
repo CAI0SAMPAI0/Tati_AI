@@ -96,8 +96,8 @@ export function Sidebar({
 
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 w-[280px] bg-bg-secondary border-r border-border z-[70] flex flex-col transition-transform md:relative md:translate-x-0',
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+          'fixed inset-y-0 left-0 w-[280px] bg-bg-secondary border-r border-border z-[70] flex flex-col transition-transform duration-300',
+          isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
         )}
       >
         {/* Header */}

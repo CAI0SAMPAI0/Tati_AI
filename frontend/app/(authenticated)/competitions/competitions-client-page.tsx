@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
+import { useSidebarState } from '@/hooks/useSidebarState';
 import { apiGet } from '@/lib/api/client';
 
 import { useAuth } from '@/hooks/useAuth';
@@ -30,7 +31,7 @@ interface RankingEntry {
 
 export default function CompetitionsClientPage() {
   const { user } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { sidebarOpen, toggleSidebar: handleToggleSidebar, closeSidebar: handleCloseSidebar } = useSidebarState();
   const [rankingMode, setRankingMode] = useState<'global' | 'level'>('global');
   const [selectedLevelCat, setSelectedLevelLevelCat] = useState<CEFRLevel>('A1');
 
@@ -47,11 +48,11 @@ export default function CompetitionsClientPage() {
   const isLoading = globalLoading || levelLoading;
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col md:flex-row">
-      <SidebarActivities isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+    <div className="min-h-screen bg-bg flex flex-col md:flex-row overflow-x-hidden">
+      <SidebarActivities isOpen={sidebarOpen} onClose={handleCloseSidebar} />
 
-      <div className="flex-1 flex flex-col min-w-0 md:ml-[280px]">
-        <MainHeader onToggleMenu={() => setSidebarOpen(true)} />
+      <div className={cn("flex-1 flex flex-col min-w-0 transition-all duration-300", sidebarOpen ? "md:ml-[280px]" : "md:ml-0")}>
+        <MainHeader onToggleMenu={handleToggleSidebar} />
 
         <main className="p-4 md:p-8 max-w-4xl w-full mx-auto space-y-8 animate-fade-in">
           <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">

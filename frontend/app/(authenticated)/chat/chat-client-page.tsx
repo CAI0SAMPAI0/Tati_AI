@@ -9,6 +9,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import dynamic from 'next/dynamic';
+import { cn } from '@/lib/utils';
+import { useSidebarState } from '@/hooks/useSidebarState';
 
 
 const Sidebar = dynamic(
@@ -50,7 +52,7 @@ export default function ChatClientPage() {
     searchParams.get('conv_id') ?? searchParams.get('id'),
   );
   const [convTitle, setConvTitle] = useState('Teacher Tati');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { sidebarOpen, toggleSidebar: handleToggleSidebar, closeSidebar: handleCloseSidebar } = useSidebarState();
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
@@ -100,16 +102,20 @@ export default function ChatClientPage() {
   }, [currentConvId, setMessages]);
 
   const handleSelectConv = useCallback((id: string) => {
-    setSidebarOpen(false);
+    if (window.innerWidth < 768) {
+      handleCloseSidebar();
+    }
     router.push(`/chat?conv_id=${id}`);
-  }, [router]);
+  }, [router, handleCloseSidebar]);
 
   const handleNewChat = useCallback(() => {
     setMessages([]);
     setConvTitle('Teacher Tati');
-    setSidebarOpen(false);
+    if (window.innerWidth < 768) {
+      handleCloseSidebar();
+    }
     router.push('/chat');
-  }, [router, setMessages]);
+  }, [router, setMessages, handleCloseSidebar]);
 
   const handleSend = async (text: string) => {
     let convId = currentConvId;
@@ -270,19 +276,19 @@ export default function ChatClientPage() {
 
 
   return (
-    <div className="flex h-screen bg-bg overflow-hidden selection:bg-primary/20">
+    <div className="flex h-screen bg-bg overflow-hidden selection:bg-primary/20 relative">
       <Sidebar
         currentConvId={currentConvId}
         onSelectConv={handleSelectConv}
         onNewChat={handleNewChat}
         isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
+        onClose={handleCloseSidebar}
       />
 
-      <div className="flex-1 flex flex-col min-w-0 relative bg-bg">
+      <div className={cn("flex-1 flex flex-col min-w-0 relative bg-bg transition-all duration-300", sidebarOpen ? "md:pl-[280px]" : "md:pl-0")}>
         <ChatTopbar
           title={convTitle}
-          onToggleSidebar={() => setSidebarOpen(true)}
+          onToggleSidebar={handleToggleSidebar}
           onShowSummary={handleOpenSummary}
           onSwitchToVoice={() => router.push(currentConvId ? `/voice?conv_id=${currentConvId}` : '/voice')}
           showSummaryBtn={messages.length >= 3}

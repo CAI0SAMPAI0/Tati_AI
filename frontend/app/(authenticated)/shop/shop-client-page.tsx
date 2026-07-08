@@ -5,7 +5,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Sparkles, Snowflake, Zap, Lock, Coins, Menu } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
+import { useSidebarState } from '@/hooks/useSidebarState';
 import { apiGet, apiPost } from '@/lib/api/client';
+import { cn } from '@/lib/utils';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import { Button } from '@/components/ui/button';
 import toast from 'react-hot-toast';
@@ -23,7 +25,7 @@ interface StreakData {
 }
 
 export default function ShopClientPage() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { sidebarOpen, toggleSidebar: handleToggleSidebar, closeSidebar: handleCloseSidebar } = useSidebarState();
   const [isPurchasing, setIsPurchasing] = useState(false);
   const queryClient = useQueryClient();
 
@@ -64,11 +66,11 @@ export default function ShopClientPage() {
   const canBuy = userXp >= 150 && freezeCount < 3;
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col md:flex-row">
-      <SidebarActivities isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+    <div className="min-h-screen bg-bg flex flex-col md:flex-row overflow-x-hidden">
+      <SidebarActivities isOpen={sidebarOpen} onClose={handleCloseSidebar} />
 
-      <div className="flex-1 flex flex-col min-w-0 md:ml-[280px] bg-bg-secondary/30 relative min-h-screen">
-        <MainHeader onToggleMenu={() => setSidebarOpen(true)} />
+      <div className={cn("flex-1 flex flex-col min-w-0 transition-all duration-300 relative min-h-screen bg-bg-secondary/30", sidebarOpen ? "md:ml-[280px]" : "md:ml-0")}>
+        <MainHeader onToggleMenu={handleToggleSidebar} />
 
         <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto animate-fade-in">
 

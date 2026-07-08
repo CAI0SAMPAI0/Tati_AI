@@ -34,7 +34,7 @@ export default function HubHeader({ onToggleMenu }: HubHeaderProps) {
           <button
             type="button"
             onClick={onToggleMenu}
-            className="rounded-md p-2 text-muted hover:bg-bgSecondary md:hidden"
+            className="rounded-md p-2 text-muted hover:bg-bgSecondary"
             aria-label="Abrir menu"
           >
             <Menu size={20} />

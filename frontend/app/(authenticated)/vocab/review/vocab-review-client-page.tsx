@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost } from '@/lib/api/client';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
+import { useSidebarState } from '@/hooks/useSidebarState';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 
@@ -31,7 +32,7 @@ interface VocabSRS {
 export default function VocabReviewClientPage() {
   
   const queryClient = useQueryClient();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { sidebarOpen, toggleSidebar: handleToggleSidebar, closeSidebar: handleCloseSidebar } = useSidebarState();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [isFinished, setIsFullyFinished] = useState(false);
@@ -86,11 +87,11 @@ export default function VocabReviewClientPage() {
   );
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col md:flex-row">
-      <SidebarActivities isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+    <div className="min-h-screen bg-bg flex flex-col md:flex-row overflow-x-hidden">
+      <SidebarActivities isOpen={sidebarOpen} onClose={handleCloseSidebar} />
 
-      <div className="flex-1 flex flex-col min-w-0 md:ml-[280px]">
-        <MainHeader onToggleMenu={() => setSidebarOpen(true)} />
+      <div className={cn("flex-1 flex flex-col min-w-0 transition-all duration-300", sidebarOpen ? "md:ml-[280px]" : "md:ml-0")}>
+        <MainHeader onToggleMenu={handleToggleSidebar} />
 
         <main className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center">
           <div className="max-w-2xl w-full space-y-8 animate-in fade-in duration-500 py-10">

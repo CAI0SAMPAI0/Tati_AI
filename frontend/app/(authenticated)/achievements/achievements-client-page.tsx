@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
+import { useSidebarState } from '@/hooks/useSidebarState';
 import { apiGet } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
 import { ENDPOINTS } from '@/lib/api/endpoints';
@@ -54,7 +55,7 @@ interface Medal {
 }
 
 export default function AchievementsClientPage() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { sidebarOpen, toggleSidebar: handleToggleSidebar, closeSidebar: handleCloseSidebar } = useSidebarState();
   const [filter, setFilter] = useState('all');
 
   const { data: stats } = useQuery<DashboardStats>({
@@ -82,10 +83,10 @@ export default function AchievementsClientPage() {
   const trophyProgress = (trophyCount / 50) * 100;
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col md:flex-row">
-      <SidebarActivities isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="flex-1 flex flex-col min-w-0 md:ml-[280px]">
-        <MainHeader onToggleMenu={() => setSidebarOpen(true)} />
+    <div className="min-h-screen bg-bg flex flex-col md:flex-row overflow-x-hidden">
+      <SidebarActivities isOpen={sidebarOpen} onClose={handleCloseSidebar} />
+      <div className={cn("flex-1 flex flex-col min-w-0 transition-all duration-300", sidebarOpen ? "md:ml-[280px]" : "md:ml-0")}>
+        <MainHeader onToggleMenu={handleToggleSidebar} />
         <main className="p-4 md:p-8 max-w-7xl w-full mx-auto space-y-8 animate-fade-in">
           <header>
             <h1 className="text-2xl md:text-3xl font-display font-bold text-text mb-2">My Achievements</h1>

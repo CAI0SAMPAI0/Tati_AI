@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
+import { useSidebarState } from '@/hooks/useSidebarState';
 import { ActivityCard } from '@/components/activities/activity-card';
 import { fetchWeeklyPlan } from '@/lib/api/weekly-plan';
 import { apiGet } from '@/lib/api/client';
@@ -82,25 +83,9 @@ export default function ActivitiesClientPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('quiz');
   const [searchQuery, setSearchQuery] = useState('');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const { sidebarOpen, toggleSidebar: handleToggleSidebar, closeSidebar: handleCloseSidebar } = useSidebarState();
   const [visiblePodcastsCount, setVisiblePodcastsCount] = useState(10);
   const [filterLevel, setFilterLevel] = useState<string>('All');
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const collapsed = localStorage.getItem('tati_sidebar_collapsed') === 'true';
-      const isMobile = window.innerWidth < 768;
-      setSidebarOpen(isMobile ? false : !collapsed);
-    }
-  }, []);
-
-  const handleToggleSidebar = () => {
-    setSidebarOpen(prev => {
-      const next = !prev;
-      localStorage.setItem('tati_sidebar_collapsed', String(!next));
-      return next;
-    });
-  };
 
   const isStaff = user?.role && ['professor', 'professora', 'programador', 'Tatiana', 'Tati', 'Professora', 'Programador', 'admin', 'Admin'].includes(user.role);
 
@@ -212,6 +197,16 @@ export default function ActivitiesClientPage() {
               user_status: { is_done: q.status === 'done', score: q.score },
             });
           }
+        } else {
+          if (!searchQuery || q.title.toLowerCase().includes(searchQuery.toLowerCase())) {
+            list.push({
+              ...q,
+              module_title: 'Personalized Practice',
+              user_status: { is_done: q.status === 'completed' || q.status === 'done', score: q.score },
+              is_published: true,
+              level: 'All',
+            });
+          }
         }
       });
     }
@@ -260,7 +255,7 @@ export default function ActivitiesClientPage() {
 
   return (
     <div className="min-h-screen bg-bg flex flex-col md:flex-row overflow-x-hidden">
-      <SidebarActivities isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <SidebarActivities isOpen={sidebarOpen} onClose={handleCloseSidebar} />
 
       <div className={cn("flex-1 flex flex-col min-w-0 transition-all duration-300", sidebarOpen ? "md:ml-[280px]" : "md:ml-0")}>
         <MainHeader onToggleMenu={handleToggleSidebar} />

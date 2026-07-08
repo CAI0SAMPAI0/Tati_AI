@@ -24,7 +24,7 @@ export function ChatTopbar({
       <div className="flex items-center gap-3 overflow-hidden">
         <button aria-label="Abrir menu"
           onClick={onToggleSidebar}
-          className="p-1.5 rounded-md hover:bg-surface-hover text-text-muted md:hidden"
+          className="p-1.5 rounded-md hover:bg-surface-hover text-text-muted"
         >
           <Menu size={20} />
         </button>

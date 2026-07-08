@@ -6,6 +6,7 @@ import { apiGet, apiPost, apiDelete } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
+import { useSidebarState } from '@/hooks/useSidebarState';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,7 +53,7 @@ export default function GoalsClientPage() {
   
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { sidebarOpen, toggleSidebar: handleToggleSidebar, closeSidebar: handleCloseSidebar } = useSidebarState();
   const [formData, setFormData] = useState({ 
     type: 'daily_minutes', 
     target: 30, 
@@ -134,11 +135,11 @@ export default function GoalsClientPage() {
   );
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col md:flex-row">
-      <SidebarActivities isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+    <div className="min-h-screen bg-bg flex flex-col md:flex-row overflow-x-hidden">
+      <SidebarActivities isOpen={sidebarOpen} onClose={handleCloseSidebar} />
 
-      <div className="flex-1 flex flex-col min-w-0 md:ml-[280px]">
-        <MainHeader onToggleMenu={() => setSidebarOpen(true)} />
+      <div className={cn("flex-1 flex flex-col min-w-0 transition-all duration-300", sidebarOpen ? "md:ml-[280px]" : "md:ml-0")}>
+        <MainHeader onToggleMenu={handleToggleSidebar} />
 
         <main className="flex-1 p-4 md:p-8">
           {isLoading ? (

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRight, Calendar, CheckCircle2, Circle, Target, Sparkles, Podcast, Play, FileText, LayoutGrid } from 'lucide-react';
+import { ChevronRight, Calendar, CheckCircle2, Circle, Target, Sparkles, Podcast, Play, FileText, LayoutGrid, ChevronDown } from 'lucide-react';
 import { fetchWeeklyPlan, WeeklyTopic } from '@/lib/api/weekly-plan';
 import { apiGet } from '@/lib/api/client';
 import { useRouter } from 'next/navigation';
@@ -25,6 +25,21 @@ export function WeeklyPlan() {
   });
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [isCollapsed, setIsCollapsed] = useState(true);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsCollapsed(localStorage.getItem('tati_weekly_goal_collapsed') === 'true');
+    }
+  }, []);
+
+  const toggleCollapse = () => {
+    setIsCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('tati_weekly_goal_collapsed', String(next));
+      return next;
+    });
+  };
 
   if (error || isLoading || !plan || !plan.topics || plan.topics.length === 0) return null;
 
@@ -49,7 +64,10 @@ export function WeeklyPlan() {
 
   return (
     <div className="mx-3 my-4 p-4 bg-surface border border-border/60 rounded-[1.5rem] shadow-sm hover:shadow-md transition-all duration-300 group/plan">
-      <div className="flex items-center justify-between mb-4">
+      <div 
+        className="flex items-center justify-between mb-3 cursor-pointer hover:opacity-90 select-none"
+        onClick={toggleCollapse}
+      >
         <div className="flex items-center gap-2.5">
           <div className="p-2 bg-primary/10 rounded-xl text-primary group-hover/plan:scale-110 transition-transform">
             <Target size={16} />
@@ -61,18 +79,24 @@ export function WeeklyPlan() {
             <p className="text-[0.6rem] font-medium text-text-muted">Your focus for today</p>
           </div>
         </div>
-        <div className="flex flex-col items-end">
-          <span className="text-[0.8rem] font-black text-primary leading-none">
-            {Math.round(progressPercent)}%
-          </span>
-          <span className="text-[0.55rem] font-bold text-text-muted uppercase tracking-tighter">
-            {completedCount}/{plan.topics.length} Done
-          </span>
+        <div className="flex items-center gap-2">
+          <div className="flex flex-col items-end">
+            <span className="text-[0.8rem] font-black text-primary leading-none">
+              {Math.round(progressPercent)}%
+            </span>
+            <span className="text-[0.55rem] font-bold text-text-muted uppercase tracking-tighter">
+              {completedCount}/{plan.topics.length}
+            </span>
+          </div>
+          <ChevronDown 
+            size={16} 
+            className={cn("text-text-muted transition-transform duration-300", isCollapsed ? "rotate-0" : "rotate-180")} 
+          />
         </div>
       </div>
 
       {/* Progress Bar */}
-      <div className="h-2 bg-bg-secondary rounded-full overflow-hidden mb-5 p-0.5 border border-border/20">
+      <div className="h-2 bg-bg-secondary rounded-full overflow-hidden mb-4 p-0.5 border border-border/20">
         <motion.div 
           initial={{ width: 0 }}
           animate={{ width: `${progressPercent}%` }}
@@ -85,8 +109,17 @@ export function WeeklyPlan() {
         />
       </div>
 
-      {/* Category Tabs */}
-      <div className="flex items-center gap-1 overflow-x-auto pb-3 mb-1 no-scrollbar">
+      <AnimatePresence initial={false}>
+        {!isCollapsed && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
+            {/* Category Tabs */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-3 mb-1 no-scrollbar">
         {CATEGORIES.map(cat => {
           const count = cat.id === 'all' 
             ? plan.topics.length 
@@ -187,6 +220,9 @@ export function WeeklyPlan() {
           </p>
         </div>
       )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
