@@ -17,6 +17,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { cn } from '@/lib/utils';
 
 interface Student {
   username: string;
