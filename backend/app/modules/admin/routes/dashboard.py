@@ -948,29 +948,36 @@ async def dispatch_file(
         except Exception:
             pass
 
+        import mimetypes
+        import time
         for f in files:
             temp_path = os.path.join(temp_dir, f.filename)
             with open(temp_path, "wb") as buffer:
                 shutil.copyfileobj(f.file, buffer)
             saved_paths.append(temp_path)
             
-            # Sanitiza nome do arquivo para o Supabase
-            safe_fname = sanitize_filename(f.filename)
+            # Sanitiza nome do arquivo e adiciona timestamp único
+            base, ext = os.path.splitext(f.filename)
+            safe_fname = f"{sanitize_filename(base)}_{int(time.time())}{ext}"
             file_names.append(safe_fname)
             
             # Fazer upload para o Supabase Storage
+            guessed_type = mimetypes.guess_type(f.filename)[0]
+            content_type = f.content_type or guessed_type or "application/octet-stream"
             try:
                 with open(temp_path, "rb") as f_bytes:
                     db.storage.from_(bucket_name).upload(
                         path=safe_fname,
                         file=f_bytes.read(),
                         file_options={
-                            "cache-control": "3600",
+                            "cache-control": "315360000",
                             "upsert": "true",
-                            "content-type": f.content_type or "application/octet-stream"
+                            "content-type": content_type
                         }
                     )
-                url_storage = db.storage.from_(bucket_name).get_public_url(safe_fname)
+                # Gera Signed URL com validade de 10 anos (315360000 segundos) para garantir acesso
+                res_signed = db.storage.from_(bucket_name).create_signed_url(safe_fname, 315360000)
+                url_storage = res_signed.get('signedURL') or res_signed.get('signed_url')
                 storage_urls.append(url_storage if url_storage else "")
             except Exception as st_err:
                 import logging

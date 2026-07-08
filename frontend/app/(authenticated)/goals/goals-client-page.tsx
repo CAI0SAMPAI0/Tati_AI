@@ -7,6 +7,7 @@ import { ENDPOINTS } from '@/lib/api/endpoints';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
 import { useSidebarState } from '@/hooks/useSidebarState';
+import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
