@@ -23,7 +23,7 @@ const NAV_ITEMS: Array<{ id: DashSection; icon: React.ReactNode; label: string }
   { id: 'overview', icon: <PieChart size={20} />, label: 'Overview' },
   { id: 'students', icon: <Users size={20} />, label: 'Students' },
   { id: 'reports', icon: <LineChart size={20} />, label: 'Reports' },
-  { id: 'modules', icon: <BookOpen size={20} />, label: 'Modules' },
+  { id: 'modules', icon: <BookOpen size={20} />, label: 'Quizzes' },
   { id: 'flashcards', icon: <Layers size={20} />, label: 'Flashcards' },
   { id: 'simulations', icon: <Drama size={20} />, label: 'Simulations' },
   { id: 'cefr', icon: <BookOpen size={20} />, label: 'CEFR Materials' },

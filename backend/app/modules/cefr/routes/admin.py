@@ -360,6 +360,147 @@ async def get_all_content():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class CEFRFlashcardGroupSave(BaseModel):
+    old_level: str
+    old_topic: str
+    new_level: str
+    new_topic: str
+    flashcards: List[dict]
+
+
+class CEFRExerciseGroupSave(BaseModel):
+    old_level: str
+    old_topic: str
+    new_level: str
+    new_topic: str
+    exercises: List[dict]
+
+
+@router.put("/flashcards/group")
+async def toggle_publish_flashcard_group(
+    level: str = Query(...),
+    topic: str = Query(...),
+    is_published: bool = Query(...),
+    user=Depends(require_staff)
+):
+    client = get_client()
+    try:
+        res = client.table("cefr_flashcards").update({"is_published": is_published}).eq("level", level).eq("topic", topic).execute()
+        return {"success": True, "updated": len(res.data or [])}
+    except Exception as e:
+        logging.error(f"[AdminRoute] Error toggling flashcard group: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/flashcards/group")
+async def delete_flashcard_group(
+    level: str,
+    topic: str,
+    user=Depends(require_staff)
+):
+    client = get_client()
+    try:
+        client.table("cefr_flashcards").delete().eq("level", level).eq("topic", topic).execute()
+        return {"success": True, "message": f"Deleted flashcards group '{topic}' for level '{level}'"}
+    except Exception as e:
+        logging.error(f"[AdminRoute] Error deleting flashcard group: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/flashcards/group/save")
+async def save_flashcard_group(
+    body: CEFRFlashcardGroupSave,
+    user=Depends(require_staff)
+):
+    client = get_client()
+    try:
+        # Delete old
+        client.table("cefr_flashcards").delete().eq("level", body.old_level).eq("topic", body.old_topic).execute()
+        
+        # Insert new
+        inserted = []
+        for card in body.flashcards:
+            data = {
+                "level": body.new_level,
+                "topic": body.new_topic,
+                "front": card.get("front"),
+                "back": card.get("back"),
+                "explanation": card.get("explanation"),
+                "image_url": card.get("image_url"),
+                "is_published": card.get("is_published", False)
+            }
+            res = client.table("cefr_flashcards").insert(data).execute()
+            if res.data:
+                inserted.extend(res.data)
+        return {"success": True, "inserted": len(inserted)}
+    except Exception as e:
+        logging.error(f"[AdminRoute] Error saving flashcard group: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/exercises/group")
+async def toggle_publish_exercise_group(
+    level: str = Query(...),
+    topic: str = Query(...),
+    is_published: bool = Query(...),
+    user=Depends(require_staff)
+):
+    client = get_client()
+    try:
+        res = client.table("cefr_exercises").update({"is_published": is_published}).eq("level", level).eq("topic", topic).execute()
+        return {"success": True, "updated": len(res.data or [])}
+    except Exception as e:
+        logging.error(f"[AdminRoute] Error toggling exercise group: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/exercises/group")
+async def delete_exercise_group(
+    level: str,
+    topic: str,
+    user=Depends(require_staff)
+):
+    client = get_client()
+    try:
+        client.table("cefr_exercises").delete().eq("level", level).eq("topic", topic).execute()
+        return {"success": True, "message": f"Deleted exercise group '{topic}' for level '{level}'"}
+    except Exception as e:
+        logging.error(f"[AdminRoute] Error deleting exercise group: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/exercises/group/save")
+async def save_exercise_group(
+    body: CEFRExerciseGroupSave,
+    user=Depends(require_staff)
+):
+    client = get_client()
+    try:
+        # Delete old
+        client.table("cefr_exercises").delete().eq("level", body.old_level).eq("topic", body.old_topic).execute()
+        
+        # Insert new
+        inserted = []
+        for ex in body.exercises:
+            data = {
+                "level": body.new_level,
+                "topic": body.new_topic,
+                "type": "multiple_choice",
+                "question": ex.get("question"),
+                "options": ex.get("options"),
+                "correct_index": ex.get("correct_index"),
+                "explanation": ex.get("explanation"),
+                "is_published": ex.get("is_published", False)
+            }
+            res = client.table("cefr_exercises").insert(data).execute()
+            if res.data:
+                inserted.extend(res.data)
+        return {"success": True, "inserted": len(inserted)}
+    except Exception as e:
+        logging.error(f"[AdminRoute] Error saving exercise group: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.put("/exercises/{exercise_id}")
 async def update_cefr_exercise(
         exercise_id: str,
@@ -558,146 +699,4 @@ async def delete_schedule(schedule_id: str, user=Depends(require_staff)):
         return {"success": True, "message": "Schedule deleted successfully."}
     except Exception as e:
         logging.error(f"[AdminRoute] Error deleting schedule: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-class CEFRFlashcardGroupSave(BaseModel):
-    old_level: str
-    old_topic: str
-    new_level: str
-    new_topic: str
-    flashcards: List[dict]
-
-
-class CEFRExerciseGroupSave(BaseModel):
-    old_level: str
-    old_topic: str
-    new_level: str
-    new_topic: str
-    exercises: List[dict]
-
-
-@router.put("/flashcards/group")
-async def toggle_publish_flashcard_group(
-    level: str = Query(...),
-    topic: str = Query(...),
-    is_published: bool = Query(...),
-    user=Depends(require_staff)
-):
-    client = get_client()
-    try:
-        res = client.table("cefr_flashcards").update({"is_published": is_published}).eq("level", level).eq("topic", topic).execute()
-        return {"success": True, "updated": len(res.data or [])}
-    except Exception as e:
-        logging.error(f"[AdminRoute] Error toggling flashcard group: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-
-@router.delete("/flashcards/group")
-async def delete_flashcard_group(
-    level: str,
-    topic: str,
-    user=Depends(require_staff)
-):
-    client = get_client()
-    try:
-        client.table("cefr_flashcards").delete().eq("level", level).eq("topic", topic).execute()
-        return {"success": True, "message": f"Deleted flashcards group '{topic}' for level '{level}'"}
-    except Exception as e:
-        logging.error(f"[AdminRoute] Error deleting flashcard group: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/flashcards/group/save")
-async def save_flashcard_group(
-    body: CEFRFlashcardGroupSave,
-    user=Depends(require_staff)
-):
-    client = get_client()
-    try:
-        # Delete old
-        client.table("cefr_flashcards").delete().eq("level", body.old_level).eq("topic", body.old_topic).execute()
-        
-        # Insert new
-        inserted = []
-        for card in body.flashcards:
-            data = {
-                "level": body.new_level,
-                "topic": body.new_topic,
-                "front": card.get("front"),
-                "back": card.get("back"),
-                "explanation": card.get("explanation"),
-                "image_url": card.get("image_url"),
-                "is_published": card.get("is_published", False)
-            }
-            res = client.table("cefr_flashcards").insert(data).execute()
-            if res.data:
-                inserted.extend(res.data)
-        return {"success": True, "inserted": len(inserted)}
-    except Exception as e:
-        logging.error(f"[AdminRoute] Error saving flashcard group: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.put("/exercises/group")
-async def toggle_publish_exercise_group(
-    level: str = Query(...),
-    topic: str = Query(...),
-    is_published: bool = Query(...),
-    user=Depends(require_staff)
-):
-    client = get_client()
-    try:
-        res = client.table("cefr_exercises").update({"is_published": is_published}).eq("level", level).eq("topic", topic).execute()
-        return {"success": True, "updated": len(res.data or [])}
-    except Exception as e:
-        logging.error(f"[AdminRoute] Error toggling exercise group: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.delete("/exercises/group")
-async def delete_exercise_group(
-    level: str,
-    topic: str,
-    user=Depends(require_staff)
-):
-    client = get_client()
-    try:
-        client.table("cefr_exercises").delete().eq("level", level).eq("topic", topic).execute()
-        return {"success": True, "message": f"Deleted exercise group '{topic}' for level '{level}'"}
-    except Exception as e:
-        logging.error(f"[AdminRoute] Error deleting exercise group: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/exercises/group/save")
-async def save_exercise_group(
-    body: CEFRExerciseGroupSave,
-    user=Depends(require_staff)
-):
-    client = get_client()
-    try:
-        # Delete old
-        client.table("cefr_exercises").delete().eq("level", body.old_level).eq("topic", body.old_topic).execute()
-        
-        # Insert new
-        inserted = []
-        for ex in body.exercises:
-            data = {
-                "level": body.new_level,
-                "topic": body.new_topic,
-                "type": "multiple_choice",
-                "question": ex.get("question"),
-                "options": ex.get("options"),
-                "correct_index": ex.get("correct_index"),
-                "explanation": ex.get("explanation"),
-                "is_published": ex.get("is_published", False)
-            }
-            res = client.table("cefr_exercises").insert(data).execute()
-            if res.data:
-                inserted.extend(res.data)
-        return {"success": True, "inserted": len(inserted)}
-    except Exception as e:
-        logging.error(f"[AdminRoute] Error saving exercise group: {e}")
         raise HTTPException(status_code=500, detail=str(e))
