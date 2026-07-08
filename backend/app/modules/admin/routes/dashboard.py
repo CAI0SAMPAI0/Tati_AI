@@ -897,6 +897,86 @@ async def get_sales_by_category(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao gerar relatório de vendas: {e}")
 
+@router.delete('/dispatch-file/{username}/{filename}')
+async def delete_dispatched_file(
+    username: str,
+    filename: str,
+    user=Depends(require_staff)
+):
+    """Remove um arquivo enviado para um aluno do seu perfil e do Supabase Storage."""
+    from app.core.database import get_client
+    import logging
+
+    db = get_client()
+
+    # Remove from Supabase Storage
+    bucket_name = "study-materials"
+    try:
+        db.storage.from_(bucket_name).remove([filename])
+    except Exception as st_err:
+        logging.warning(f"[DeleteFile] Não foi possível remover do Storage: {st_err}")
+
+    # Remove from user profile
+    try:
+        res = db.table('users').select('profile').eq('username', username).limit(1).execute()
+        if res.data:
+            profile = res.data[0].get('profile') or {}
+            study_mats = profile.get('study_materials') or []
+            study_mats = [m for m in study_mats if m.get('filename') != filename]
+            profile['study_materials'] = study_mats
+            db.table('users').update({'profile': profile}).eq('username', username).execute()
+    except Exception as pe:
+        logging.error(f"[DeleteFile] Erro ao atualizar profile de {username}: {pe}")
+
+    return {"success": True}
+
+
+@router.get('/dispatched-files')
+async def list_dispatched_files(user=Depends(require_staff)):
+    """Lista todos os arquivos enviados por todos os alunos (materiais de estudo)."""
+    from app.core.database import get_client
+
+    db = get_client()
+    res = db.table('users').select('username, profile').execute()
+    result = []
+    for row in (res.data or []):
+        profile = row.get('profile') or {}
+        mats = profile.get('study_materials') or []
+        for m in mats:
+            result.append({
+                'username': row['username'],
+                'filename': m.get('filename'),
+                'url': m.get('url'),
+                'date_received': m.get('date_received'),
+                'message': m.get('message'),
+            })
+    # Sort by date desc
+    result.sort(key=lambda x: x.get('date_received') or '', reverse=True)
+    return result
+
+
+@router.get('/view-file')
+async def view_file_proxy(url: str, user=Depends(require_staff)):
+    """Proxy para abrir arquivos (PDFs) diretamente no navegador com Content-Disposition: inline."""
+    import httpx
+    from fastapi.responses import StreamingResponse
+
+    async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
+        resp = await client.get(url)
+    
+    content_type = resp.headers.get('content-type', 'application/octet-stream')
+    # Force inline for PDFs
+    disposition = 'inline'
+    
+    return StreamingResponse(
+        iter([resp.content]),
+        media_type=content_type,
+        headers={
+            'Content-Disposition': disposition,
+            'Cache-Control': 'public, max-age=86400',
+        }
+    )
+
 
 @router.post('/dispatch-file')
 async def dispatch_file(
@@ -905,6 +985,7 @@ async def dispatch_file(
     message: Optional[str] = Form(None),
     user=Depends(require_staff)
 ):
+
     """Dispara múltiplos arquivos de estudo por e-mail e push no celular para os alunos selecionados."""
     import json
     import os

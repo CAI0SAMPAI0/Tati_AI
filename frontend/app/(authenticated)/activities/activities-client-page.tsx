@@ -562,15 +562,36 @@ export default function ActivitiesClientPage() {
                           </div>
 
                           <div className="mt-5 flex gap-2">
-                            <a 
-                              href={mat.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-hover transition-colors shadow-sm"
-                            >
-                              <Download size={14} />
-                              Download / Open File
-                            </a>
+                            {isPdf ? (
+                              <>
+                                <a
+                                  href={`https://docs.google.com/viewer?url=${encodeURIComponent(mat.url)}&embedded=true`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-hover transition-colors shadow-sm"
+                                >
+                                  <FileText size={14} />
+                                  Open PDF
+                                </a>
+                                <a
+                                  href={mat.url}
+                                  download
+                                  className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-surface border border-border text-text-muted hover:bg-bg-secondary transition-colors"
+                                >
+                                  <Download size={14} />
+                                </a>
+                              </>
+                            ) : (
+                              <a
+                                href={mat.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-hover transition-colors shadow-sm"
+                              >
+                                <Download size={14} />
+                                Open File
+                              </a>
+                            )}
                           </div>
                         </div>
                       );

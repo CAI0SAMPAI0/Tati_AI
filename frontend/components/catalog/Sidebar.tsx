@@ -77,7 +77,7 @@ export default function HubSidebar({ isOpen, onClose }: SidebarProps) {
               <Link
                 key={item.name}
                 href={item.href}
-                onClick={onClose}
+                onClick={() => { if (typeof window !== 'undefined' && window.innerWidth < 768) onClose?.(); }}
                 className={`flex items-center gap-3 rounded-hub px-3 py-2.5 text-sm font-semibold transition-colors ${
                   isActive
                     ? 'bg-primarySoft text-primary'
@@ -97,7 +97,7 @@ export default function HubSidebar({ isOpen, onClose }: SidebarProps) {
             <Link
               key={item.name}
               href={item.href}
-              onClick={onClose}
+              onClick={() => { if (typeof window !== 'undefined' && window.innerWidth < 768) onClose?.(); }}
               className="flex items-center gap-3 rounded-hub px-3 py-2.5 text-sm font-semibold text-muted transition-colors hover:bg-bgSecondary hover:text-ink"
             >
               <item.icon size={18} />

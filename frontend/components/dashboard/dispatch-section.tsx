@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { apiGet, apiPost, apiUpload } from '@/lib/api/client';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiGet, apiPost, apiUpload, apiDelete } from '@/lib/api/client';
 import { 
   Search, 
   Send, 
@@ -11,7 +11,9 @@ import {
   X, 
   Users, 
   UploadCloud,
-  FileCheck
+  FileCheck,
+  Trash2,
+  History,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -30,7 +32,8 @@ interface Quiz {
 
 export function DispatchSection() {
   // Tabs
-  const [activeTab, setActiveTab] = useState<'file' | 'quiz'>('file');
+  const [activeTab, setActiveTab] = useState<'file' | 'quiz' | 'history'>('file');
+  const queryClient = useQueryClient();
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -44,6 +47,7 @@ export function DispatchSection() {
   const [selectedQuizId, setSelectedQuizId] = useState<string>('');
   const [isSending, setIsSending] = useState(false);
   const [customMessage, setCustomMessage] = useState('');
+  const [isDeletingFile, setIsDeletingFile] = useState<string | null>(null);
 
   // AI Quiz Generator States
   const [showAiForm, setShowAiForm] = useState(false);
@@ -64,6 +68,31 @@ export function DispatchSection() {
     enabled: activeTab === 'quiz',
     refetchInterval: 10000, // Refetch silently every 10 seconds
   });
+
+  const { data: dispatchedFiles = [], isLoading: loadingFiles } = useQuery<any[]>({
+    queryKey: ['admin-dispatched-files'],
+    queryFn: () => apiGet<any[]>('/dashboard/dispatched-files'),
+    enabled: activeTab === 'history',
+    refetchInterval: activeTab === 'history' ? 15000 : false,
+  });
+
+  const handleDeleteFile = async (username: string, filename: string) => {
+    const key = `${username}::${filename}`;
+    setIsDeletingFile(key);
+    try {
+      const res = await apiDelete(`/dashboard/dispatch-file/${encodeURIComponent(username)}/${encodeURIComponent(filename)}`);
+      if ((res as any).ok !== false) {
+        toast.success('File deleted successfully.');
+        queryClient.invalidateQueries({ queryKey: ['admin-dispatched-files'] });
+      } else {
+        toast.error('Failed to delete file.');
+      }
+    } catch {
+      toast.error('Error deleting file.');
+    } finally {
+      setIsDeletingFile(null);
+    }
+  };
 
   // Filter students list based on search and level
   const filteredStudents = useMemo(() => {
@@ -366,12 +395,80 @@ export function DispatchSection() {
             <HelpCircle size={16} />
             <span>Send Quiz</span>
           </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all border-b-2 ${
+              activeTab === 'history'
+                ? 'border-primary text-primary bg-primary/5'
+                : 'border-transparent text-text-muted hover:text-text hover:bg-surface-hover'
+            }`}
+          >
+            <History size={16} />
+            <span>Sent Files</span>
+          </button>
         </div>
 
         {/* Panel Content */}
         <div className="flex-1 p-6 flex flex-col justify-between overflow-y-auto">
           <div className="space-y-6">
-            {activeTab === 'file' ? (
+            {activeTab === 'history' ? (
+              <div className="space-y-3">
+                <div className="text-xs text-text-muted font-medium uppercase tracking-wider">
+                  Files Sent to Students
+                </div>
+                {loadingFiles ? (
+                  <div className="flex items-center gap-2 text-sm text-text-muted py-8 justify-center">
+                    <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                    Loading...
+                  </div>
+                ) : dispatchedFiles.length === 0 ? (
+                  <div className="py-12 text-center text-text-muted text-sm border border-dashed border-border rounded-2xl">
+                    No files sent yet.
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
+                    {dispatchedFiles.map((f: any, i: number) => {
+                      const key = `${f.username}::${f.filename}`;
+                      const isDeleting = isDeletingFile === key;
+                      const dateStr = f.date_received
+                        ? new Date(f.date_received).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+                        : '';
+                      return (
+                        <div key={i} className="bg-bg border border-border rounded-xl p-3 flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
+                            <FileText size={16} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-text truncate">{f.filename}</p>
+                            <p className="text-[0.65rem] text-text-muted">@{f.username} · {dateStr}</p>
+                            {f.message && <p className="text-[0.6rem] text-primary italic truncate">"{f.message}"</p>}
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {f.url && (
+                              <a href={f.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-surface-hover text-text-muted transition-colors" title="Open file">
+                                <FileText size={13} />
+                              </a>
+                            )}
+                            <button
+                              onClick={() => handleDeleteFile(f.username, f.filename)}
+                              disabled={isDeleting}
+                              className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-500/60 hover:text-red-500 transition-colors disabled:opacity-40"
+                              title="Delete"
+                            >
+                              {isDeleting ? (
+                                <div className="w-3 h-3 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
+                              ) : (
+                                <Trash2 size={13} />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : activeTab === 'file' ? (
               <div className="space-y-4">
                 <div className="text-xs text-text-muted font-medium uppercase tracking-wider leading-relaxed">
                   Upload Pedagogical Files (PDF, Docs, Images)
@@ -533,7 +630,7 @@ export function DispatchSection() {
             )}
           </div>
 
-          {/* Action Footer */}
+          {activeTab !== 'history' && (
           <div className="border-t border-border pt-5 mt-6 space-y-4 bg-surface shrink-0">
             <div className="bg-primary/5 border border-primary/10 rounded-xl p-3.5 text-xs text-primary leading-relaxed">
               💡 <strong>Notification Rule:</strong> Emails with the attached materials will be sent to the selected students' inbox, accompanied by a mobile push notification.
@@ -557,6 +654,7 @@ export function DispatchSection() {
               )}
             </button>
           </div>
+          )}
         </div>
       </div>
     </div>

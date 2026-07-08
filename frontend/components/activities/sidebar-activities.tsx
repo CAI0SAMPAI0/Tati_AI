@@ -122,7 +122,9 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
                 const route = item.href === '/activities/hub' ? 'hub-catalog' : item.href.replace('/', '');
                 prefetch(route || 'chat');
               }}
-              onClick={onClose}
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.innerWidth < 768) onClose();
+              }}
             />
           ))}
         </nav>
