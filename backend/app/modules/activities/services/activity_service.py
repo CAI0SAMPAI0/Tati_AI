@@ -60,17 +60,23 @@ class ActivityService:
                 data = query.execute().data or []
 
             # Se logado, busca submissões do usuário para estes módulos
-            submissions_map = {}
+            submissions_map = {}     # module_id -> best score
+            quiz_submissions_map = {}  # quiz_id -> best score
             if username and data:
                 module_ids = [m['id'] for m in data]
-                subs = self.db.table('activity_submissions').select('module_id, score').eq(
+                subs = self.db.table('activity_submissions').select('module_id, score, metadata, activity_type').eq(
                     'username', username).in_('module_id', module_ids).execute().data or []
                 for s in subs:
-                    # Guardamos a melhor pontuação de cada módulo
+                    score = s.get('score') or 0
+                    # Module-level map
                     m_id = s['module_id']
-                    if m_id not in submissions_map or s['score'] > submissions_map.get(
-                            m_id, -1):
-                        submissions_map[m_id] = s['score']
+                    if m_id not in submissions_map or score > submissions_map.get(m_id, -1):
+                        submissions_map[m_id] = score
+                    # Quiz-level map (from metadata.quiz_id)
+                    meta = s.get('metadata') or {}
+                    q_id = str(meta.get('quiz_id') or '')
+                    if q_id and (q_id not in quiz_submissions_map or score > quiz_submissions_map.get(q_id, -1)):
+                        quiz_submissions_map[q_id] = score
 
             # Filtro e anexação de status
             filtered = []
@@ -79,12 +85,23 @@ class ActivityService:
                 if m.get('id') == MASTER_MODULE_ID:
                     continue
 
-                # Anexa status do usuário
+                # Anexa status do usuário (módulo)
                 score = submissions_map.get(m['id'])
                 m['user_status'] = {
                     'is_done': score is not None,
                     'score': score
                 }
+
+                # Anexa status individual por quiz (dentro do módulo)
+                for q in m.get('quizzes') or []:
+                    q_id = str(q.get('id') or '')
+                    if q_id in quiz_submissions_map:
+                        q['user_status'] = {
+                            'is_done': True,
+                            'score': quiz_submissions_map[q_id]
+                        }
+                    else:
+                        q['user_status'] = {'is_done': False, 'score': None}
 
                 # Filtro usando lógica unificada
                 if matches_level(

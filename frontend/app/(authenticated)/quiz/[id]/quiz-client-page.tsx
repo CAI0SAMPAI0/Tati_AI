@@ -115,11 +115,20 @@ export default function QuizClientPage() {
     const newAnswers = [...userAnswers];
     newAnswers[currentIdx] = selectedOpt;
     setUserAnswers(newAnswers);
+    // Return updated answers so handleNext can use them synchronously
+    return newAnswers;
   };
 
   const handleNext = async () => {
+    // Ensure current answer is saved before moving on
+    const latestAnswers: number[] = [...userAnswers];
+    if (selectedOpt !== null) {
+      latestAnswers[currentIdx] = selectedOpt;
+    }
+    setUserAnswers(latestAnswers);
+
     if (isLast) {
-      await handleSubmit();
+      await handleSubmit(latestAnswers);
     } else {
       setCurrentIdx(currentIdx + 1);
       setIsChecked(false);
@@ -127,19 +136,21 @@ export default function QuizClientPage() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (finalAnswers?: number[]) => {
     setIsSubmitting(true);
+    // Use passed answers (fresh, synchronous) or fall back to state
+    const answers = finalAnswers ?? userAnswers;
     try {
       const payload = {
-        answers: userAnswers.map((selected_index, idx) => {
-          const original_index = shuffledQuestions[idx].originalIndices 
-            ? shuffledQuestions[idx].originalIndices[selected_index] 
+        answers: answers.map((selected_index, idx) => {
+          const original_index = shuffledQuestions[idx]?.originalIndices 
+            ? shuffledQuestions[idx].originalIndices![selected_index] 
             : selected_index;
           return {
             question_id: shuffledQuestions[idx].id,
             selected_index: original_index
           };
-        })
+        }).filter(a => a.question_id != null)
       };
       const res = await apiPost<QuizResult>(`/activities/quizzes/${id}/submit`, payload);
       if (res.ok) {

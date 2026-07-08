@@ -179,7 +179,8 @@ export default function ActivitiesClientPage() {
           list.push({
             ...q,
             module_title: m.title,
-            user_status: m.user_status,
+            // Use per-quiz user_status if available, fall back to module status
+            user_status: q.user_status ?? m.user_status,
             is_published: (m as any).is_published,
             level: m.level,
           });
