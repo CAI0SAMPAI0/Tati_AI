@@ -98,7 +98,7 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
       <aside
         className={cn(
           'fixed inset-y-0 left-0 w-[280px] bg-bg-secondary border-r border-border z-[70] flex flex-col transition-transform duration-300',
-          isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
+          isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
         )}
       >
         <div className="flex items-center justify-between p-6 shrink-0">

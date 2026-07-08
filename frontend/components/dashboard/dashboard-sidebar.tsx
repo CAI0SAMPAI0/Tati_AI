@@ -98,16 +98,10 @@ export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose 
       {/* Sidebar */}
       <aside
         className={cn(
-          // Mobile: comportamento atual com slide
           'fixed inset-y-0 left-0 z-[70] w-[280px]',
-          // Desktop: sticky no topo com altura da viewport
-          'md:sticky md:top-0 md:z-auto',
-          // Estilos visuais
           'bg-bg-secondary border-r border-border flex flex-col h-screen shrink-0',
-          // Transições mobile
           'transition-transform duration-300',
-          isOpen ? 'translate-x-0' : '-translate-x-full',
-          'md:translate-x-0'
+          isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
         )}
       >
         <div className="p-6 shrink-0 flex items-center justify-between">

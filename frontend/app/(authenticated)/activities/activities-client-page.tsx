@@ -82,9 +82,25 @@ export default function ActivitiesClientPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('quiz');
   const [searchQuery, setSearchQuery] = useState('');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [visiblePodcastsCount, setVisiblePodcastsCount] = useState(10);
   const [filterLevel, setFilterLevel] = useState<string>('All');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const collapsed = localStorage.getItem('tati_sidebar_collapsed') === 'true';
+      const isMobile = window.innerWidth < 768;
+      setSidebarOpen(isMobile ? false : !collapsed);
+    }
+  }, []);
+
+  const handleToggleSidebar = () => {
+    setSidebarOpen(prev => {
+      const next = !prev;
+      localStorage.setItem('tati_sidebar_collapsed', String(!next));
+      return next;
+    });
+  };
 
   const isStaff = user?.role && ['professor', 'professora', 'programador', 'Tatiana', 'Tati', 'Professora', 'Programador', 'admin', 'Admin'].includes(user.role);
 
@@ -240,11 +256,11 @@ export default function ActivitiesClientPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col md:flex-row">
+    <div className="min-h-screen bg-bg flex flex-col md:flex-row overflow-x-hidden">
       <SidebarActivities isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="flex-1 flex flex-col min-w-0 md:ml-[280px]">
-        <MainHeader onToggleMenu={() => setSidebarOpen(true)} />
+      <div className={cn("flex-1 flex flex-col min-w-0 transition-all duration-300", sidebarOpen ? "md:ml-[280px]" : "md:ml-0")}>
+        <MainHeader onToggleMenu={handleToggleSidebar} />
 
         <main className="p-4 md:p-8 max-w-7xl w-full mx-auto animate-fade-in">
           <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">

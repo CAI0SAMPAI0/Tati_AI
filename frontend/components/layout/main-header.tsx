@@ -41,7 +41,7 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
         {onToggleMenu && (
           <button
             onClick={onToggleMenu}
-            className="p-2 rounded-md hover:bg-surface-hover text-text-muted md:hidden"
+            className="p-2 rounded-md hover:bg-surface-hover text-text-muted"
           >
             <Menu size={20} />
           </button>

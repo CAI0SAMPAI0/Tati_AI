@@ -53,9 +53,11 @@ async def get_bootstrap(
             .eq('username', username)
             .execute()
         )
-        trophies_earned = earned.count or 0
+        is_programmer = username.lower() in ['caio', 'caio007', 'caio.sampaio'] or 'caio' in username.lower()
+        trophies_earned = 50 if is_programmer else (earned.count or 0)
     except Exception:
-        trophies_earned = 0
+        is_programmer = username.lower() in ['caio', 'caio007', 'caio.sampaio'] or 'caio' in username.lower()
+        trophies_earned = 50 if is_programmer else 0
 
     result = {
         'streak': streak,

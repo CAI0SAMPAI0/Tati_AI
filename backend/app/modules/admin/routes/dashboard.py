@@ -964,7 +964,11 @@ async def dispatch_file(
                     db.storage.from_(bucket_name).upload(
                         path=safe_fname,
                         file=f_bytes.read(),
-                        file_options={"cache-control": "3600", "upsert": "true"}
+                        file_options={
+                            "cache-control": "3600",
+                            "upsert": "true",
+                            "content-type": f.content_type or "application/octet-stream"
+                        }
                     )
                 url_storage = db.storage.from_(bucket_name).get_public_url(safe_fname)
                 storage_urls.append(url_storage if url_storage else "")

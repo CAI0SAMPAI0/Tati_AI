@@ -7,6 +7,7 @@ import {
   Search,
 } from 'lucide-react';
 import { DashboardSidebar, type DashSection } from '@/components/dashboard/dashboard-sidebar';
+import { cn } from '@/lib/utils';
 
 import dynamic from 'next/dynamic';
 
@@ -69,8 +70,24 @@ export default function DashboardClientPage() {
   };
 
   const [activeSection, setActiveSection] = useState<DashSection>(getInitialTab());
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const collapsed = localStorage.getItem('tati_sidebar_collapsed') === 'true';
+      const isMobile = window.innerWidth < 768;
+      setSidebarOpen(isMobile ? false : !collapsed);
+    }
+  }, []);
+
+  const handleToggleSidebar = () => {
+    setSidebarOpen(prev => {
+      const next = !prev;
+      localStorage.setItem('tati_sidebar_collapsed', String(!next));
+      return next;
+    });
+  };
 
   // Update URL and storage when section changes
   const handleSetSection = (section: DashSection) => {
@@ -170,12 +187,12 @@ export default function DashboardClientPage() {
         onClose={() => setSidebarOpen(false)}
       />
 
-      <div className="flex-1 flex flex-col min-w-0 bg-bg-secondary/30 relative h-screen">
+      <div className={cn("flex-1 flex flex-col min-w-0 bg-bg-secondary/30 relative h-screen transition-all duration-300", sidebarOpen ? "md:pl-[280px]" : "md:pl-0")}>
         <header className="h-16 border-b border-border bg-bg/80 backdrop-blur-md sticky top-0 z-40 px-4 md:px-8 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button 
-              onClick={() => setSidebarOpen(true)}
-              className="p-2 rounded-md hover:bg-surface-hover md:hidden text-text-muted"
+              onClick={handleToggleSidebar}
+              className="p-2 rounded-md hover:bg-surface-hover text-text-muted"
             >
               <Menu size={20} />
             </button>

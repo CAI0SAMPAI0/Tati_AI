@@ -22,8 +22,11 @@ async def list_modules(
     service: ActivityService = Depends()
 ):
     """Lista todos os módulos disponíveis com status de conclusão do usuário."""
-    effective_level = level or user.get('level')
     is_staff = user.get('is_staff', False)
+    if is_staff and (not level or level == 'All' or level == 'ALL'):
+        effective_level = None
+    else:
+        effective_level = level or user.get('level')
     return await service.list_modules(effective_level, user['username'], is_staff=is_staff)
 
 
