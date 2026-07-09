@@ -7,31 +7,25 @@ class Settings(BaseSettings):
     port: int = 8000
     debug: bool = False
 
-    # Autenticação
     jwt_secret_key: str = Field(...)
     jwt_algorithm: str = 'HS256'
     access_token_expire_minutes: int = 21600
 
-    # Google OAuth
     google_client_id: str = ''
 
-    # Supabase
     supabase_url: str = ''
     supabase_key: str = ''
     supabase_service_key: str = Field(
         '', validation_alias='SUPABASE_SERVICE_KEY')
 
-    # LLM Providers
     llm_provider: str = 'groq'
     gemini_model: str = 'gemini-2.0-flash'
 
-    # Gemini Multi-key
     gemini_api_key: str = ''
     gemini_api_key_1: str = ''
     gemini_api_key_2: str = ''
     gemini_api_key_3: str = ''
 
-    # Prompt do Sistema
     system_prompt: str = (
         "You are TATI, a dedicated, friendly, and professional English teacher. "
         "Your primary goal is to help the student practice conversation, improve fluency, and build confidence in English.\n\n"
@@ -109,17 +103,21 @@ class Settings(BaseSettings):
         "'I am here to help you learn English, and I am not allowed to discuss that topic. Let's get back to our English practice!'\n\n"
 
         "PEDAGOGICAL RULES (FOR THE 'correction' AND 'drill' FIELDS):\n"
-
         "1. ERROR CORRECTION:\n"
         "- Only populate the 'correction' field if the mistake impedes understanding or is a repeated bad habit.\n"
         "- Keep corrections short and constructive.\n"
         "- Limit to one correction per turn.\n"
         "- If no correction is necessary, return null.\n\n"
 
-        "2. PRONUNCIATION DRILLS:\n"
+        "2. PRONUNCIATION CORRECTION RULE (CRITICAL):\n"
+        "- NEVER provide IPA symbols, phonetic transcriptions, sound decomposition, syllable spelling, pronunciation approximations, or written sound representations such as \"Ah-kee-tekt\", \"Sh-she\", or \"/ʃiː/\".\n"
+        "- Do NOT transform pronunciation corrections into a phonetics lesson or explanation.\n"
+        "- When correcting pronunciation, identify the problematic word/phrase, state that the pronunciation needs improvement, provide ONLY the correctly spelled word or phrase, and ask the student to repeat it. (e.g., \"You need to improve the pronunciation of 'architect'. Listen and repeat: architect.\" or \"Good try. Let's practice this word again: architect.\").\n\n"
+
+        "3. PRONUNCIATION DRILLS:\n"
         "- Pronunciation drills are disabled. The 'drill' field must always be null.\n\n"
 
-        "3. AUDIO GENERATION:\n"
+        "4. AUDIO GENERATION:\n"
         "- Generate audio only for the main teacher response.\n"
         "- Do not generate audio for the 'drill' field.\n"
         "- Do not generate audio for the 'correction' field.\n"
@@ -149,7 +147,6 @@ class Settings(BaseSettings):
         )
 
 
-    # Groq Multi-key
     groq_api_key: str = ''
     groq_api_key_1: str = ''
     groq_api_key_2: str = ''
@@ -157,7 +154,6 @@ class Settings(BaseSettings):
     groq_api_key_4: str = ''
     groq_api_key_5: str = ''
 
-    # Voz TTS Multi-key
     elevenlabs_api_key: str = Field(
         '', validation_alias='ELEVENLABS_API_KEY')
     elevenlabs_api_key_1: str = Field(
@@ -170,15 +166,12 @@ class Settings(BaseSettings):
         '9BWTSay5S4Btt9P88fC2',
         validation_alias='VOICE_ID')
 
-    # OpenAI (Voz barata)
     openai_api_key: str = Field('', validation_alias='OPENAI_API_KEY')
 
-    # XTTS (Hugging Face / Custom Space)
     xtts_api_url: str = Field('', validation_alias='XTTS_API_URL')
     xtts_speaker_wav: str = Field('tatiana.wav', validation_alias='XTTS_SPEAKER_WAV')
     xtts_language: str = Field('en', validation_alias='XTTS_LANGUAGE')
 
-    # SMTP / Email
     smtp_host: str = 'smtp.gmail.com'
     smtp_port: int = 465
     smtp_user: str = ''
@@ -188,13 +181,11 @@ class Settings(BaseSettings):
     mailjet_api_key: str = ''
     mailjet_secret_key: str = ''
 
-    # Push notifications (Web Push / VAPID)
     vapid_public_key: str = ''
     vapid_private_key: str = ''
     vapid_contact: str = ''
     enable_notification_scheduler: bool = True
 
-    # WAHA WhatsApp HTTP API
     waha_api_url: str = 'http://localhost:3010'
     waha_api_key: str = 'local_waha_key'
     waha_auto_start_sessions: str = 'programador'
@@ -202,28 +193,18 @@ class Settings(BaseSettings):
     worker_api_url: str = ""
     is_heavy_worker: bool = False
 
-    # Asaas Pagamentos
-    api_asaas: str = Field('', validation_alias='API_ASAAS')
-    asaas_environment: str = Field(
-        'sandbox', validation_alias='ASAAS_ENVIRONMENT')
-    asaas_webhook_token: str = ''
-
-    # Mercado Pago Pagamentos
     mp_public_key: str = Field('', validation_alias='MP_PUBLIC_KEY')
     mp_access_token: str = Field('', validation_alias='MP_ACCESS_TOKEN')
     mp_base_api_url: str = Field('https://api.mercadopago.com', validation_alias='MP_BASE_API_URL')
 
-    # Cloudinary (Imagens)
     cloudinary_cloud_name: str = ''
     cloudinary_api_key: str = ''
     cloudinary_api_secret: str = ''
 
-    # Tavily Search
     tavily_api_key: str = ''
     tavily_api_key_1: str = ''
     tavily_api_key_2: str = ''
 
-    # Discovery limits (videos per day/week)
     video_limit_per_day: int = 3
     video_limit_per_week: int = 5
 

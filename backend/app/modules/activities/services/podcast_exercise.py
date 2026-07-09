@@ -261,9 +261,10 @@ class PodcastExerciseService:
                 "PROMPT RULES FOR PRONUNCIATION FEEDBACK:\n"
                 "- Identify which specific words were pronounced incorrectly.\n"
                 "- Show only the correct word spelling, and encourage natural repetition of the correct word.\n"
-                "- NEVER show phonetic transcriptions (No IPA symbols, e.g., NO \"/wɜːrk/\", NO \"/ˈwɜːrd/\").\n"
-                "- NEVER try to spell out or write down the phonetic sounds of the word (e.g., NO \"uãrk\", NO \"uãrd\").\n"
+                "- NEVER show phonetic transcriptions (No IPA symbols, e.g., NO \"/wɜːrk/\", NO \"/ˈwɜːrd/\", NO \"/ʃiː/\").\n"
+                "- NEVER try to spell out or write down the phonetic sounds or approximations of the word/phrase (e.g., NO \"uãrk\", NO \"uãrd\", NO \"Ah-kee-tekt\", NO \"Sh-she\", NO sound decomposition or syllable spelling).\n"
                 "- Keep corrections natural, brief, and conversational without phonetics lessons.\n"
+                "- When correcting pronunciation, identify the problematic word/phrase, state that the pronunciation needs improvement, provide ONLY the correctly spelled word or phrase, and ask the student to repeat it. (e.g., \"You need to improve the pronunciation of 'architect'. Listen and repeat: architect.\" or \"Good try. Let's practice this word again: architect.\").\n"
                 "Be encouraging but honest. If score < 70, give the correct phrase again.\n"
                 "Feedback MUST be in English only.\n"
                 'Return JSON: { "score": 80, "feedback": "..." }'

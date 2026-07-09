@@ -48,10 +48,10 @@ class PronunciationMatcher:
         PROMPT RULES FOR PRONUNCIATION FEEDBACK:
         - Identify which specific words were pronounced incorrectly.
         - Show only the correct word spelling, and encourage natural repetition of the correct word.
-        - Explain the error briefly if necessary, but keep it conversational.
-        - NEVER show phonetic transcriptions (No IPA symbols, e.g., NO "/wɜːrk/", NO "/ˈwɜːrd/").
-        - NEVER try to spell out or write down the phonetic sounds of the word (e.g., NO "uãrk", NO "uãrd").
-        - DO NOT make this a phonetics lesson. Prioritise natural repetition (e.g., "The word 'work' needs adjustment. Listen and repeat: work.").
+        - NEVER show phonetic transcriptions (No IPA symbols, e.g., NO "/wɜːrk/", NO "/ˈwɜːrd/", NO "/ʃiː/").
+        - NEVER try to spell out or write down the phonetic sounds or approximations of the word/phrase (e.g., NO "uãrk", NO "uãrd", NO "Ah-kee-tekt", NO "Sh-she", NO sound decomposition or syllable spelling).
+        - DO NOT make this a phonetics lesson or explanation. Prioritise natural repetition.
+        - When correcting pronunciation, identify the problematic word/phrase, state that the pronunciation needs improvement, provide ONLY the correctly spelled word or phrase, and ask the student to repeat it. (e.g., "You need to improve the pronunciation of 'architect'. Listen and repeat: architect." or "Good try. Let's practice this word again: architect.").
 
         Return ONLY valid JSON:
         {{
