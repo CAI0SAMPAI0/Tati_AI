@@ -57,7 +57,7 @@ export default function PedidosClientPage() {
     <div className="space-y-8 p-6 md:p-10">
       <div>
         <h1 className="section-title text-3xl">Pedidos</h1>
-        <p className="mt-2 text-muted">Histórico de compras no Tati Hub.</p>
+        <p className="mt-2 text-muted">Histórico de compras no Taty Hub.</p>
       </div>
 
       {error && (

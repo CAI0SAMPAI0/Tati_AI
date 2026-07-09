@@ -200,7 +200,7 @@ export function LoginForm() {
 
             <div className="relative z-10">
               <p className="mb-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
-                Tati Hub Premium
+                Taty Hub Premium
               </p>
 
               <h1 className="mb-4 text-4xl font-semibold leading-tight tracking-tight text-ink">

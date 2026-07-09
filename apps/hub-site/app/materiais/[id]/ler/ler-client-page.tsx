@@ -33,7 +33,7 @@ export default function LerClientPage() {
     return null;
   }
 
-  const watermarkText = user?.email ? `${user.email} · Tati Hub` : 'Tati Hub · Uso exclusivo';
+  const watermarkText = user?.email ? `${user.email} · Taty Hub` : 'Taty Hub · Uso exclusivo';
 
   return (
     <div className="mx-auto max-w-4xl p-6 md:p-10">

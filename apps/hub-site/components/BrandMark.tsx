@@ -31,7 +31,7 @@ export default function BrandMark({
           isHero ? 'text-sm md:text-base' : 'text-[10px]'
         }`}
       >
-        {subtitle ?? (isHero ? 'English Class' : 'Tati Hub')}
+        {subtitle ?? (isHero ? 'English Class' : 'Taty Hub')}
       </span>
     </span>
   );
