@@ -33,7 +33,7 @@ async def verify_pronunciation(
     transcription = await transcribe_audio(
         audio_bytes,
         filename='temp.wav',
-        prompt=f"Reference text: {ref_clean}"
+        prompt="Transcribe the speech verbatim. Do not normalize or correct mispronunciations."
     )
 
     if not transcription or transcription.startswith("[Erro"):

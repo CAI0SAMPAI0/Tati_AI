@@ -19,7 +19,7 @@ class PronunciationMatcher:
         user_level = normalize_level(user_level)
         # 1. Transcrever com Whisper via Groq (otimizado para captura
         # fonética no llm.py)
-        transcription = await transcribe_audio(audio_bytes, prompt=f"Reference text: {reference_text}")
+        transcription = await transcribe_audio(audio_bytes, prompt="Transcribe the speech verbatim. Do not normalize or correct mispronunciations.")
 
         if not transcription or transcription.startswith("[Erro"):
             return {

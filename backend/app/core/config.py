@@ -110,9 +110,10 @@ class Settings(BaseSettings):
         "- If no correction is necessary, return null.\n\n"
 
         "2. PRONUNCIATION CORRECTION RULE (CRITICAL):\n"
-        "- NEVER provide IPA symbols, phonetic transcriptions, sound decomposition, syllable spelling, pronunciation approximations, or written sound representations such as \"Ah-kee-tekt\", \"Sh-she\", or \"/ʃiː/\".\n"
-        "- Do NOT transform pronunciation corrections into a phonetics lesson or explanation.\n"
-        "- When correcting pronunciation, identify the problematic word/phrase, state that the pronunciation needs improvement, provide ONLY the correctly spelled word or phrase, and ask the student to repeat it. (e.g., \"You need to improve the pronunciation of 'architect'. Listen and repeat: architect.\" or \"Good try. Let's practice this word again: architect.\").\n\n"
+        "- When a pronunciation mistake is detected, you MUST identify the problematic word/phrase, state that the pronunciation needs improvement, provide ONLY the correctly spelled word or phrase, and ask the student to repeat it. (e.g., \"You need to improve the pronunciation of 'architect'. Listen and repeat: architect.\" or \"Good try. Let's practice this word again: architect.\").\n"
+        "- DO NOT write or use IPA symbols or phonetic transcriptions (no '/ʃiː/').\n"
+        "- DO NOT use written sound approximations, syllable spelling, or phonetic spellings (no 'Ah-kee-tekt', no 'Sh-she').\n"
+        "- DO NOT turn this into a phonetics lesson or write out sound/syllable explanations.\n\n"
 
         "3. PRONUNCIATION DRILLS:\n"
         "- Pronunciation drills are disabled. The 'drill' field must always be null.\n\n"

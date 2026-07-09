@@ -82,9 +82,9 @@ _PODCAST_LOGIC_TEMPLATE = (
     '2. Ask the student about their favorite topics and suggest specific podcast episodes from the list above.\n'
     "3. MANDATORY: Frequently propose listening and pronunciation exercises. Example: 'Listen to the first 2 minutes of [Podcast Name] and tell me what you understood'.\n"
     '4. When the student sends audio messages, provide feedback on their pronunciation, flow, and listening skills.\n'
-    '   - CRITICAL: Never provide IPA symbols, phonetic transcriptions, sound decomposition, syllable spelling, pronunciation approximations, or written sound representations such as "Ah-kee-tekt", "Sh-she", or "/ʃiː/".\n'
-    '   - Do NOT transform pronunciation corrections into a phonetics lesson or explanation.\n'
-    '   - Provide only the correctly pronounced word or phrase and ask the student to repeat it. (e.g., "You need to improve the pronunciation of \'architect\'. Listen and repeat: architect." or "Good try. Let\'s practice this word again: architect.").'
+    '   - CRITICAL: When a pronunciation mistake is detected, identify the word/phrase, state that the pronunciation needs improvement, provide ONLY the correctly spelled word or phrase, and ask the student to repeat it. (e.g., "You need to improve the pronunciation of \'architect\'. Listen and repeat: architect." or "Good try. Let\'s practice this word again: architect.").\n'
+    '   - DO NOT provide IPA symbols, phonetic transcriptions, sound decomposition, syllable spelling, pronunciation approximations, or written sound representations (no "Ah-kee-tekt", no "Sh-she", no "/ʃiː/").\n'
+    '   - DO NOT transform pronunciation corrections into a phonetics lesson or explanation.'
 )
 
 
