@@ -33,6 +33,37 @@ async def verify_pronunciation(
         )
 
     ref_clean = req.reference_text.strip()
+
+    # 0. Try Azure Speech Pronunciation Assessment if configured
+    from app.shared.services.azure_speech_service import azure_speech_service
+    if azure_speech_service.is_configured:
+        azure_res = azure_speech_service.evaluate_pronunciation(audio_bytes, ref_clean)
+        if "error" not in azure_res:
+            score = azure_res["score"]
+            if score >= 85:
+                feedback = "Amazing! Your pronunciation is excellent."
+            elif score >= 60:
+                feedback = "Good job! You had a few minor slips, but you are very clear."
+            else:
+                feedback = "Keep practicing! Listen to Tati's audio and try repeating again."
+
+            return {
+                "score": score,
+                "transcription": ref_clean,
+                "words": azure_res["words"],
+                "feedback": feedback,
+                "metadata": {
+                    "accuracy_score": azure_res["accuracy_score"],
+                    "fluency_score": azure_res["fluency_score"],
+                    "completeness_score": azure_res["completeness_score"]
+                },
+                "phonetic": {
+                    "provider": "azure",
+                    "raw_result": azure_res["raw_json"]
+                }
+            }
+        else:
+            logger.warning(f"Azure Speech evaluation error (falling back to local): {azure_res.get('error')}")
     trans_data = await transcribe_audio_verbose(
         audio_bytes,
         filename='temp.wav',

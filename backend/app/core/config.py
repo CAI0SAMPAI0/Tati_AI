@@ -203,6 +203,9 @@ class Settings(BaseSettings):
     cloudinary_api_key: str = ''
     cloudinary_api_secret: str = ''
 
+    azure_speech_key: str = Field('', validation_alias='AZURE_SPEECH_KEY')
+    azure_speech_region: str = Field('eastus', validation_alias='AZURE_SPEECH_REGION')
+
     tavily_api_key: str = ''
     tavily_api_key_1: str = ''
     tavily_api_key_2: str = ''
