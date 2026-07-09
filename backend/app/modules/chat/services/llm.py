@@ -50,10 +50,10 @@ async def transcribe_audio(
             # Expanded common English verbs to improve contextual
             # accuracy
             default_prompt = (
-                "Transcribe the audio verbatim, word-for-word, exactly as spoken in English. "
-                "Ignore background noise, clicks, breathing, or trailing silences. "
-                "Context: English learning practice. Do not auto-correct grammar or pronunciation errors. "
-                "Do not add extra filler words, pronouns, or prepositions if they were not fully spoken."
+                "Transcribe the audio verbatim, exactly as spoken in English. "
+                "The speaker has a Portuguese accent; transcribe their English words accurately and verbatim. "
+                "Do not change statement sentences into questions, and do not auto-correct grammar or pronunciation errors. "
+                "Ignore background noise, clicks, breathing, or trailing silences."
             )
             effective_prompt = (
                 f'{default_prompt} {prompt}' if prompt else default_prompt)
@@ -92,10 +92,10 @@ async def transcribe_audio_verbose(
         try:
             client = AsyncGroq(api_key=key)
             default_prompt = (
-                "Transcribe the audio verbatim, word-for-word, exactly as spoken in English. "
-                "Ignore background noise, clicks, breathing, or trailing silences. "
-                "Context: English learning practice. Do not auto-correct grammar or pronunciation errors. "
-                "Do not add extra filler words, pronouns, or prepositions if they were not fully spoken."
+                "Transcribe the audio verbatim, exactly as spoken in English. "
+                "The speaker has a Portuguese accent; transcribe their English words accurately and verbatim. "
+                "Do not change statement sentences into questions, and do not auto-correct grammar or pronunciation errors. "
+                "Ignore background noise, clicks, breathing, or trailing silences."
             )
             effective_prompt = f'{default_prompt} {prompt}' if prompt else default_prompt
 
