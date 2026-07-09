@@ -13,7 +13,7 @@ from fastapi import WebSocket
 from fastapi.concurrency import run_in_threadpool
 
 from app.core.config import settings
-from app.modules.chat.services.llm import stream_llm, text_to_speech, transcribe_audio
+from app.modules.chat.services.llm import stream_llm, text_to_speech, transcribe_audio, transcribe_audio_verbose
 from app.shared.services.history import save_message, load_llm_history, auto_title
 from app.core.enums import normalize_level
 from app.modules.chat.services.prompt_builder import UserProfile, build_effective_prompt
@@ -162,10 +162,35 @@ class ChatService:
         msg_type = msg.get('type')
 
         # 1. Transcrição ou Extração de Arquivo
+        audio_metadata = {}
+        phonetic_feedback_info = ""
         if msg_type == 'audio':
             # logging.info(f'[ChatService] Transcrevendo áudio para {username}...')
             audio_bytes = base64.b64decode(msg.get('audio', ''))
-            content = await transcribe_audio(audio_bytes, filename='input.webm')
+            trans_data = await transcribe_audio_verbose(audio_bytes, filename='input.webm')
+            content = trans_data.get("text", "") if isinstance(trans_data, dict) else ""
+            if isinstance(trans_data, dict) and "segments" in trans_data:
+                audio_metadata = {
+                    "segments": trans_data["segments"],
+                    "language": trans_data.get("language"),
+                    "duration": trans_data.get("duration")
+                }
+            # Run local phonetic analysis to detect mismatch phonemes
+            if content:
+                try:
+                    from app.shared.services.phonetic_service import phonetic_service
+                    phonetic_res = phonetic_service.evaluate_pronunciation(audio_bytes, content)
+                    if phonetic_res and phonetic_res.get("mismatches"):
+                        mismatches = phonetic_res.get("mismatches", [])
+                        phonetic_feedback_info = (
+                            f"\n\n--- LOCAL PHONETIC ACCURACY ANALYSIS ---\n"
+                            f"The phonetic analyzer detected mismatches in these expected phonemes (which suggests the student mispronounced them): "
+                            f"{', '.join(mismatches)}\n"
+                            f"Expected IPA sequence: {phonetic_res.get('expected_ipa')}\n"
+                            f"Spoken IPA sequence: {phonetic_res.get('spoken_ipa')}\n"
+                        )
+                except Exception as pe:
+                    logging.error(f"Error in chat phonetic analysis: {pe}")
             # logging.info(f'[ChatService] Transcrição concluída: "{content[:50]}..."')
             await websocket.send_json({'type': 'transcription', 'text': content})
         elif msg_type == 'file':
@@ -326,6 +351,21 @@ class ChatService:
 
         if is_voice_mode:
             effective_prompt += '\n\nCRITICAL: Voice mode. Keep responses very short (max 2 sentences).'
+            if audio_metadata:
+                segments_summary = []
+                for seg in audio_metadata.get("segments", []):
+                    segments_summary.append(
+                        f"Segment: '{seg.get('text', '').strip()}' | Start: {seg.get('start')}s | End: {seg.get('end')}s | Avg Logprob: {seg.get('avg_logprob')}"
+                    )
+                summary_str = "\n".join(segments_summary)
+                effective_prompt += (
+                    f"\n\n--- STUDENT VOICE MESSAGE ACOUSTIC METADATA ---\n"
+                    f"Use this data to assess the student's pronunciation, smoothness, pauses, and confidence. "
+                    f"A low segment logprob (e.g. below -0.8) suggests the student struggled with pronunciation or stumbled:\n"
+                    f"{summary_str}\n"
+                )
+            if phonetic_feedback_info:
+                effective_prompt += phonetic_feedback_info
 
         effective_prompt += '\n\nCRITICAL: If the user explicitly asks you to generate a PDF or a document, your VERY FIRST characters MUST be EXACTLY the tag "[GENERATE_PDF: filename.pdf]" where filename is related to the topic. DO NOT output any greetings or conversational text before this tag. Everything after this tag will be formatted into a downloadable PDF file. The content of the PDF MUST be entirely in English.'
 
