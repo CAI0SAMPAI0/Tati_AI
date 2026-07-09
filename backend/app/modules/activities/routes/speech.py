@@ -1,5 +1,6 @@
 import base64
 import re
+import logging
 from difflib import SequenceMatcher
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -7,6 +8,8 @@ from pydantic import BaseModel
 
 from app.core.dependencies.auth import get_current_user
 from app.modules.chat.services.llm import transcribe_audio_verbose
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -105,6 +108,14 @@ async def verify_pronunciation(
     else:
         feedback = "Keep practicing! Listen to Tati's audio and try repeating again."
 
+    # Local phonetic evaluation using Wav2Vec2 and g2p-en
+    phonetic_res = {}
+    try:
+        from app.shared.services.phonetic_service import phonetic_service
+        phonetic_res = phonetic_service.evaluate_pronunciation(audio_bytes, ref_clean)
+    except Exception as pe:
+        logger.error(f"Error running local phonetic evaluation: {pe}")
+
     return {
         "score": overall_score,
         "transcription": transcription,
@@ -114,5 +125,6 @@ async def verify_pronunciation(
             "segments": trans_data.get("segments", []),
             "language": trans_data.get("language"),
             "duration": trans_data.get("duration")
-        }
+        },
+        "phonetic": phonetic_res
     }

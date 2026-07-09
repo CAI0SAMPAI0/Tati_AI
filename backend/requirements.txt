@@ -46,3 +46,8 @@ tavily
 PyMuPDF
 celery
 redis
+transformers
+torch
+librosa
+g2p-en
+soundfile
