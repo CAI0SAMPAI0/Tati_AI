@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.core.dependencies.auth import get_current_user
-from app.modules.chat.services.llm import transcribe_audio
+from app.modules.chat.services.llm import transcribe_audio_verbose
 
 router = APIRouter()
 
@@ -30,12 +30,13 @@ async def verify_pronunciation(
         )
 
     ref_clean = req.reference_text.strip()
-    transcription = await transcribe_audio(
+    trans_data = await transcribe_audio_verbose(
         audio_bytes,
         filename='temp.wav',
         prompt="Transcribe the speech verbatim. Do not normalize or correct mispronunciations."
     )
 
+    transcription = trans_data.get("text", "") if isinstance(trans_data, dict) else ""
     if not transcription or transcription.startswith("[Erro"):
         words_result = []
         for word in ref_clean.split():
@@ -47,7 +48,8 @@ async def verify_pronunciation(
         return {
             "score": 0,
             "transcription": "",
-            "words": words_result
+            "words": words_result,
+            "metadata": {}
         }
 
     ref_words = ref_clean.split()
@@ -84,7 +86,8 @@ async def verify_pronunciation(
                         best_score = sim
 
                 score = int(best_score * 100)
-                if score >= 75:
+                # Stricter threshold to detect pronunciation mistakes (90% instead of 75%)
+                if score >= 90:
                     words_result[idx_ref]["score"] = score
                     words_result[idx_ref]["accuracy"] = "correct"
                 else:
@@ -106,5 +109,10 @@ async def verify_pronunciation(
         "score": overall_score,
         "transcription": transcription,
         "words": words_result,
-        "feedback": feedback
+        "feedback": feedback,
+        "metadata": {
+            "segments": trans_data.get("segments", []),
+            "language": trans_data.get("language"),
+            "duration": trans_data.get("duration")
+        }
     }

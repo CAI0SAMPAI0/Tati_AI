@@ -74,6 +74,53 @@ async def transcribe_audio(
     return f'[Erro no STT: {last_error}]'
 
 
+async def transcribe_audio_verbose(
+    audio_bytes: bytes, filename: str = 'temp.wav', prompt: str = ''
+) -> dict:
+    """
+    Transcreve áudio para texto retornando metadados completos usando Whisper Large V3.
+    """
+    from groq import AsyncGroq
+    import json
+
+    keys = settings.groq_keys
+    if not keys:
+        return {"error": "Nenhuma GROQ_API_KEY configurada"}
+
+    last_error: Exception | None = None
+    for key in keys:
+        try:
+            client = AsyncGroq(api_key=key)
+            default_prompt = (
+                "Transcribe the speech verbatim. Do not normalize or correct mispronunciations."
+            )
+            effective_prompt = f'{default_prompt} {prompt}' if prompt else default_prompt
+
+            resp = await client.audio.transcriptions.create(
+                file=(filename, audio_bytes),
+                model='whisper-large-v3',
+                response_format='verbose_json',
+                prompt=effective_prompt,
+            )
+            if isinstance(resp, str):
+                return json.loads(resp)
+            elif hasattr(resp, "model_dump"):
+                return resp.model_dump()
+            elif hasattr(resp, "dict"):
+                return resp.dict()
+            elif hasattr(resp, "__dict__"):
+                return resp.__dict__
+            else:
+                return dict(resp)
+        except Exception as exc:
+            last_error = exc
+            if _should_try_next_key(exc):
+                continue
+            break
+
+    return {"error": f"Erro no STT: {last_error}"}
+
+
 async def text_to_speech(text: str) -> str:
     """Converte texto em áudio base64 chamando o gerador com clonagem e fallbacks."""
     from app.modules.chat.services.audio_generator import generate_teacher_audio

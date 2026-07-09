@@ -1,6 +1,6 @@
 import logging
 from typing import Dict, Any
-from app.modules.chat.services.llm import transcribe_audio
+from app.modules.chat.services.llm import transcribe_audio_verbose
 from app.core.enums import normalize_level
 
 
@@ -17,9 +17,13 @@ class PronunciationMatcher:
         Avalia o áudio do aluno comparando-o com o texto de referência.
         """
         user_level = normalize_level(user_level)
-        # 1. Transcrever com Whisper via Groq (otimizado para captura
-        # fonética no llm.py)
-        transcription = await transcribe_audio(audio_bytes, prompt="Transcribe the speech verbatim. Do not normalize or correct mispronunciations.")
+        # 1. Transcrever com Whisper via Groq (com verbose_json para capturar logprobs)
+        trans_data = await transcribe_audio_verbose(
+            audio_bytes,
+            prompt="Transcribe the speech verbatim. Do not normalize or correct mispronunciations."
+        )
+
+        transcription = trans_data.get("text", "") if isinstance(trans_data, dict) else ""
 
         if not transcription or transcription.startswith("[Erro"):
             return {
@@ -27,7 +31,12 @@ class PronunciationMatcher:
                 "feedback": "I couldn't hear your voice clearly. Please try again.",
                 "transcription": ""}
 
-        # 2. Comparar semântica e fonética via LLM
+        # Extração de métricas acústicas de logprob
+        segments = trans_data.get("segments", [])
+        avg_logprob = segments[0].get("avg_logprob", 0) if segments else 0
+        no_speech_prob = segments[0].get("no_speech_prob", 0) if segments else 0
+
+        # 2. Comparar semântica e fonética via LLM, fornecendo as métricas acústicas
         prompt = f"""
         You are Tati, a friendly English teacher.
         Compare the STUDENT'S TRANSCRIPTION with the REFERENCE TEXT.
@@ -36,9 +45,13 @@ class PronunciationMatcher:
         STUDENT'S TRANSCRIPTION: "{transcription}"
         STUDENT LEVEL: "{user_level}"
 
+        ACOUSTIC METRICS FROM SPEECH-TO-TEXT:
+        - Average Segment Logprob (Confidence): {avg_logprob} (Closer to 0 is higher confidence. E.g., -0.1 to -0.4 is excellent. Lower than -0.8 indicates poor pronunciation, hesitation, or errors.)
+        - No Speech Probability: {no_speech_prob}
+
         Calculate a pronunciation score (0-100) based on:
         1. Word accuracy (did they say the right words?)
-        2. Phonetic similarity (even if transcribed slightly wrong, did it sound like the target?)
+        2. Phonetic similarity (did the acoustic confidence score drop, or was the spelling transcribed with errors like 'arkitec' instead of 'architect'?)
 
         Provide constructive feedback IN ENGLISH directly to the student.
         IMPORTANT: Adjust your vocabulary and sentence structure to match the STUDENT LEVEL.
@@ -46,12 +59,10 @@ class PronunciationMatcher:
         Always act as Tati and be encouraging!
 
         PROMPT RULES FOR PRONUNCIATION FEEDBACK:
-        - Identify which specific words were pronounced incorrectly.
-        - Show only the correct word spelling, and encourage natural repetition of the correct word.
-        - NEVER show phonetic transcriptions (No IPA symbols, e.g., NO "/wɜːrk/", NO "/ˈwɜːrd/", NO "/ʃiː/").
-        - NEVER try to spell out or write down the phonetic sounds or approximations of the word/phrase (e.g., NO "uãrk", NO "uãrd", NO "Ah-kee-tekt", NO "Sh-she", NO sound decomposition or syllable spelling).
-        - DO NOT make this a phonetics lesson or explanation. Prioritise natural repetition.
-        - When correcting pronunciation, identify the problematic word/phrase, state that the pronunciation needs improvement, provide ONLY the correctly spelled word or phrase, and ask the student to repeat it. (e.g., "You need to improve the pronunciation of 'architect'. Listen and repeat: architect." or "Good try. Let's practice this word again: architect.").
+        - When a pronunciation mistake is detected, you MUST identify the problematic word/phrase, state that the pronunciation needs improvement, provide ONLY the correctly spelled word or phrase, and ask the student to repeat it. (e.g., "You need to improve the pronunciation of 'architect'. Listen and repeat: architect." or "Good try. Let's practice this word again: architect.").
+        - DO NOT write or use IPA symbols or phonetic transcriptions (no '/ʃiː/').
+        - DO NOT use written sound approximations, syllable spelling, or phonetic spellings (no 'Ah-kee-tekt', no 'Sh-she').
+        - DO NOT turn this into a phonetics lesson or write out sound/syllable explanations.
 
         Return ONLY valid JSON:
         {{
