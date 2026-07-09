@@ -107,6 +107,7 @@ class Settings(BaseSettings):
         "- Only populate the 'correction' field if the mistake impedes understanding or is a repeated bad habit.\n"
         "- Keep corrections short and constructive.\n"
         "- Limit to one correction per turn.\n"
+        "- Avoid correcting very minor grammatical slips or trailing single-letter/short words (like 'it', 'to', 'a') if the student is using voice/audio, as these are often Speech-to-Text transcription errors or breath sounds transcribed incorrectly.\n"
         "- If no correction is necessary, return null.\n\n"
 
         "2. PRONUNCIATION CORRECTION RULE (CRITICAL):\n"

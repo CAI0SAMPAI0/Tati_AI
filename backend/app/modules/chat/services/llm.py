@@ -50,11 +50,11 @@ async def transcribe_audio(
             # Expanded common English verbs to improve contextual
             # accuracy
             default_prompt = (
-                'Transcreva exatamente o que foi dito, palavra por palavra. Ignore ruídos de fundo, cliques ou respiração. '
-                'Se não houver fala clara, não transcreva nada. '
-                'Context: English learning practice. Phonetic accuracy is critical. '
-                "Pay close attention to common verbs: 'buy', 'eat', 'order', 'want', 'need', 'go', 'work', 'study', 'think', 'believe', 'understand', 'explain', 'practice', 'improve', 'learn'. "
-                "Distinguish between 'can' and 'can't', 'do' and 'does', 'did' and 'done'.")
+                "Transcribe the audio verbatim, word-for-word, exactly as spoken in English. "
+                "Ignore background noise, clicks, breathing, or trailing silences. "
+                "Context: English learning practice. Do not auto-correct grammar or pronunciation errors. "
+                "Do not add extra filler words, pronouns, or prepositions if they were not fully spoken."
+            )
             effective_prompt = (
                 f'{default_prompt} {prompt}' if prompt else default_prompt)
 
@@ -92,7 +92,10 @@ async def transcribe_audio_verbose(
         try:
             client = AsyncGroq(api_key=key)
             default_prompt = (
-                "Transcribe the speech verbatim. Do not normalize or correct mispronunciations."
+                "Transcribe the audio verbatim, word-for-word, exactly as spoken in English. "
+                "Ignore background noise, clicks, breathing, or trailing silences. "
+                "Context: English learning practice. Do not auto-correct grammar or pronunciation errors. "
+                "Do not add extra filler words, pronouns, or prepositions if they were not fully spoken."
             )
             effective_prompt = f'{default_prompt} {prompt}' if prompt else default_prompt
 
