@@ -208,6 +208,9 @@ class Settings(BaseSettings):
     video_limit_per_day: int = 3
     video_limit_per_week: int = 5
 
+    api_asaas: str = Field('', validation_alias='API_ASAAS')
+    asaas_environment: str = Field('sandbox', validation_alias='ASAAS_ENVIRONMENT')
+
     model_config = SettingsConfigDict(
         env_file='.env', extra='ignore', case_sensitive=False
     )
