@@ -114,3 +114,18 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute="*/10"),
     },
 }
+
+from celery.signals import after_setup_logger, after_setup_task_logger
+
+@after_setup_logger.connect
+def setup_loggers(logger, *args, **kwargs):
+    import logging
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+@after_setup_task_logger.connect
+def setup_task_loggers(logger, *args, **kwargs):
+    import logging
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+

@@ -87,6 +87,28 @@ else:
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
+    class TokenMaskFilter(logging.Filter):
+        def filter(self, record: logging.LogRecord) -> bool:
+            import re
+            if record.args:
+                args = list(record.args)
+                for i, arg in enumerate(args):
+                    if isinstance(arg, str) and "token=" in arg:
+                        args[i] = re.sub(r'token=[^&\s"]+', 'token=***', arg)
+                record.args = tuple(args)
+            if isinstance(record.msg, str) and "token=" in record.msg:
+                record.msg = re.sub(r'token=[^&\s"]+', 'token=***', record.msg)
+            return True
+
+    # Adiciona o filtro nos loggers principais e root para evitar vazamento de JWT
+    logging.getLogger().addFilter(TokenMaskFilter())
+    for logger_name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
+        logging.getLogger(logger_name).addFilter(TokenMaskFilter())
+
+    # Silenciar logs detalhados de requisições HTTP do httpx e httpcore (evita vazar URLs do Supabase, etc.)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
     print = logging.info
 
     app = FastAPI(
