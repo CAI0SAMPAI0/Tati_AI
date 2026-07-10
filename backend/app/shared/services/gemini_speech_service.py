@@ -71,27 +71,32 @@ class GeminiSpeechService:
 
         # 2. Engineering the Prompt (Pillar 4: Forneça o texto esperado e instruções fonéticas)
         prompt = f"""
-You are an expert English speech therapist and English-as-a-Second-Language (ESL) instructor.
+You are an expert English speech therapist and English-as-a-Second-Language (ESL) instructor specializing in helping Brazilian Portuguese speakers.
 Analyze the pronunciation of the speaker in the provided audio file.
 
 Expected text they were trying to read: "{reference_text}"
 
 Compare the acoustic signals of the audio against this reference text.
 Assess:
-1. Phonetic correctness of each word. Pay absolute attention to HETERONYMS (words that are spelled the same but pronounced differently depending on meaning or part of speech):
-   - Example: "live" can be /laɪv/ (as in "live transmission", "live show", "live music" - adjective/adverb) OR /lɪv/ (as in "I live here", "to live" - verb).
-   - Example: "read" can be /riːd/ (present tense) OR /red/ (past tense).
-   - Identify any heteronyms in the expected text, determine their correct expected pronunciation based on grammatical context in the sentence, and grade the speaker's pronunciation accordingly.
+1. Phonetic correctness of each word. Be strict and pay close attention to:
+   - HETERONYMS: Identify words with identical spelling but different pronunciations based on syntactic context (e.g. "live" /laɪv/ vs /lɪv/, "read" /riːd/ vs /red/).
+   - COMMON PORTUGUESE-SPEAKER (L1) ERRORS:
+     * Epenthesis: Adding an extra vowel sound at the end of words ending in consonants (e.g. pronouncing "Facebook" as "Facebook-ee", "like" as "like-ee", "school" as "school-ee", "Jack" as "Jack-ee").
+     * Vowel length and phonetic confusion: e.g. pronouncing short /ɪ/ as long /iː/ (confusing "ship" and "sheep", "live" /lɪv/ and "leave" /liːv/, "bitch" and "beach").
+     * 'TH' sound substitutions: pronouncing /θ/ or /ð/ as 'f', 't', or 'd' (e.g. "think" as "tink"/"fink", "them" as "dem", "math" as "mat" or "maf").
+     * Nasalization of final consonants: silent 'm' or 'n' replaced by nasalized vowels (e.g. pronouncing "from" as "frõ").
+     * Aspirated 'H' vs Silent 'H' or 'R' sound confusion (e.g. pronouncing "have" as "ave" or "rave").
+     * Word stress: Placing stress on the wrong syllable.
 2. Rhythm, speed, pauses, and accent.
 3. Specific errors per word:
    - "None" if correct.
-   - "Mispronunciation" if phonetically incorrect.
+   - "Mispronunciation" if phonetically incorrect or displays any of the L1 errors above.
    - "Omission" if skipped.
    - "Insertion" if extra words were spoken.
 
-CRITICAL: If the speaker mispronounces a heteronym (e.g. they say /lɪv/ instead of /laɪv/ for "live transmission", or vice-versa), you MUST mark it as "Mispronunciation" and explain the distinction in the feedback in Portuguese (e.g. explain that 'live' as transmission/show has the sound /laɪv/, while 'live' as verb has the sound /lɪv/).
-
-You must fill out the structured schema correctly. The feedback must be in Portuguese, friendly, and pedagogical.
+CRITICAL INSTRUCTIONS:
+- You must be strict. Do not let mispronunciations pass as "correct" if they change the phoneme quality (such as adding "-ee" at the end of consonants, or mispronouncing vowel lengths). Mark these words as "Mispronunciation".
+- The feedback must be in Portuguese, friendly, encouraging, and pedagogical, explaining exactly which phonetic rules or common pitfalls the speaker fell into (e.g. "Cuidado para não adicionar o som de 'ee' no final de 'Jack'", or explaining the difference between ship and sheep).
 """
 
         # 3. Requesting structured outputs (Pillar 2: Respostas estruturadas via Pydantic)
