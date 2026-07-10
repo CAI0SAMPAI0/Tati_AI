@@ -126,9 +126,10 @@ CRITICAL INSTRUCTIONS:
                 return parsed
 
             except Exception as e:
-                logger.error(f"[GeminiSpeech] Error evaluating with key: {e}")
+                logger.warning(f"[GeminiSpeech] Error evaluating with key: {e}")
                 last_err = e
 
+        logger.error(f"Failed evaluating speech through Gemini: {last_err}")
         return {"error": f"Failed evaluating speech through Gemini: {last_err}"}
 
 gemini_speech_service = GeminiSpeechService()
