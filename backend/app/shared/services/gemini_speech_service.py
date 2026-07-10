@@ -1,11 +1,27 @@
 import logging
 import json
-import re
+import io
 from typing import Dict, Any
+from pydantic import BaseModel, Field
 from app.core.config import settings
 from fastapi.concurrency import run_in_threadpool
 
 logger = logging.getLogger(__name__)
+
+# Pydantic models for structured output matching our API schema
+class WordAssessment(BaseModel):
+    word: str = Field(description="The exact expected word from the reference text.")
+    score: int = Field(description="Pronunciation accuracy score from 0 to 100.")
+    accuracy: str = Field(description="'correct' if score is 80 or above, otherwise 'incorrect'.")
+    error_type: str = Field(description="Phonetic error classification: 'None', 'Mispronunciation', 'Omission', or 'Insertion'.")
+
+class PronunciationAssessmentResponse(BaseModel):
+    score: int = Field(description="Overall pronunciation score from 0 to 100.")
+    accuracy_score: int = Field(description="Acoustic accuracy score from 0 to 100.")
+    fluency_score: int = Field(description="Fluency and rhythm score from 0 to 100.")
+    completeness_score: int = Field(description="Percentage of words correctly pronounced from 0 to 100.")
+    words: list[WordAssessment] = Field(description="Word-by-word breakdown of the evaluation.")
+    feedback: str = Field(description="Detailed pedagogical feedback in Portuguese explaining accents, pauses, and phonetic deviations.")
 
 class GeminiSpeechService:
     @property
@@ -15,8 +31,8 @@ class GeminiSpeechService:
     async def evaluate_pronunciation(self, audio_bytes: bytes, reference_text: str) -> Dict[str, Any]:
         """
         Evaluates pronunciation using Gemini 2.0 Flash Multimodal capabilities.
-        Processes audio bytes directly to detect accent, intonation, phonetic deviations,
-        and contextual words (like live /laɪv/ vs /lɪv/).
+        Preprocesses audio to 16kHz mono WAV for high precision, then uses Pydantic schema
+        to guarantee structured responses. Falls back to raw bytes if preprocessing fails.
         """
         if not self.is_configured:
             return {"error": "Gemini Speech Service is not configured."}
@@ -26,64 +42,77 @@ class GeminiSpeechService:
         keys = settings.gemini_keys
         last_err = None
 
-        # prompt specifying output structure and evaluation details
+        # 1. Preprocess audio to standard 16kHz mono WAV (Pillar 1: Formatos suportados & Isolamento de fonemas)
+        mime_type = "audio/wav"
+        data_to_send = audio_bytes
+        try:
+            import soundfile as sf
+            import librosa
+
+            audio_fp = io.BytesIO(audio_bytes)
+            speech, rate = sf.read(audio_fp)
+            
+            # If stereo, convert to mono
+            if len(speech.shape) > 1:
+                speech = speech.mean(axis=1)
+            
+            # Resample to 16kHz for better phoneme isolation
+            if rate != 16000:
+                speech = librosa.resample(speech, orig_sr=rate, target_sr=16000)
+            
+            out_fp = io.BytesIO()
+            sf.write(out_fp, speech, 16000, format='WAV', subtype='PCM_16')
+            data_to_send = out_fp.getvalue()
+        except Exception as e:
+            logger.warning(f"[GeminiSpeech] Audio preprocessing failed, falling back to raw container bytes: {e}")
+            # Fallback to webm or general audio container if we cannot parse it locally
+            mime_type = "audio/webm"
+            data_to_send = audio_bytes
+
+        # 2. Engineering the Prompt (Pillar 4: Forneça o texto esperado e instruções fonéticas)
         prompt = f"""
+You are an expert English speech therapist and English-as-a-Second-Language (ESL) instructor.
 Analyze the pronunciation of the speaker in the provided audio file.
-The expected text is: "{reference_text}"
 
-Compare the acoustics/phonetics of the spoken audio against this expected text.
-Make sure to pay attention to:
-1. Correct phonetic pronunciation (e.g. distinguishing between words like "live" as /laɪv/ vs /lɪv/ depending on sentence context).
-2. Accent, intonation, speech pace, and rhythm.
-3. Specific phonetic deviations or errors.
+Expected text they were trying to read: "{reference_text}"
 
-You MUST respond ONLY with a raw JSON object containing the evaluation scores and a word-by-word analysis. Do not include markdown code block formatting (such as ```json) or any conversational text.
+Compare the acoustic signals of the audio against this reference text.
+Assess:
+1. Phonetic correctness of each word (e.g. distinguishing contextual pronunciations like "live" as /laɪv/ vs /lɪv/).
+2. Rhythm, speed, pauses, and accent.
+3. Specific errors per word:
+   - "None" if correct.
+   - "Mispronunciation" if phonetically incorrect.
+   - "Omission" if skipped.
+   - "Insertion" if extra words were spoken.
 
-JSON format:
-{{
-  "score": <overall_score_0_to_100>,
-  "accuracy_score": <accuracy_score_0_to_100>,
-  "fluency_score": <fluency_score_0_to_100>,
-  "completeness_score": <completeness_score_0_to_100>,
-  "words": [
-    {{
-      "word": "<expected_word_1>",
-      "score": <word_score_0_to_100>,
-      "accuracy": "correct" or "incorrect",
-      "error_type": "None" or "Mispronunciation" or "Omission" or "Insertion"
-    }},
-    ...
-  ],
-  "feedback": "<detailed_feedback_explaining_errors_and_intonation_in_portuguese>"
-}}
+You must fill out the structured schema correctly. The feedback must be in Portuguese, friendly, and pedagogical.
 """
 
+        # 3. Requesting structured outputs (Pillar 2: Respostas estruturadas via Pydantic)
         for key in keys:
             try:
                 genai.configure(api_key=key)
-                # Use gemini-2.0-flash which supports audio input
                 model = genai.GenerativeModel('gemini-2.0-flash')
 
-                # We send the audio data as raw bytes with appropriate mime_type.
-                # Assuming audio is webm or wav.
                 audio_part = {
-                    "mime_type": "audio/webm",
-                    "data": audio_bytes
+                    "mime_type": mime_type,
+                    "data": data_to_send
                 }
 
                 def _generate():
-                    response = model.generate_content([prompt, audio_part])
+                    # Request structured JSON matching the Pydantic schema
+                    response = model.generate_content(
+                        [prompt, audio_part],
+                        generation_config={
+                            "response_mime_type": "application/json",
+                            "response_schema": PronunciationAssessmentResponse
+                        }
+                    )
                     return response.text
 
                 raw_response = await run_in_threadpool(_generate)
-                cleaned = raw_response.strip()
-                # Remove markdown json wrapper if present
-                if cleaned.startswith("```"):
-                    cleaned = re.sub(r"^```(?:json)?\n", "", cleaned)
-                    cleaned = re.sub(r"\n```$", "", cleaned)
-                    cleaned = cleaned.strip()
-
-                parsed = json.loads(cleaned)
+                parsed = json.loads(raw_response)
                 return parsed
 
             except Exception as e:
