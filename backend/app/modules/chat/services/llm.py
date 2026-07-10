@@ -60,7 +60,7 @@ async def transcribe_audio(
 
             resp = await client.audio.transcriptions.create(
                 file=(filename, audio_bytes),
-                model='whisper-large-v3',
+                model='whisper-large-v3-turbo',
                 response_format='text',
                 prompt=effective_prompt,
             )
@@ -101,7 +101,7 @@ async def transcribe_audio_verbose(
 
             resp = await client.audio.transcriptions.create(
                 file=(filename, audio_bytes),
-                model='whisper-large-v3',
+                model='whisper-large-v3-turbo',
                 response_format='verbose_json',
                 prompt=effective_prompt,
             )
@@ -160,8 +160,8 @@ async def _stream_groq(
     ]
     last_error: Exception | None = None
 
-    # Models to try in order: fast small model first, fallback to large if 413
-    model_queue = ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile']
+    # Models to try in order: fast large model first, fallback to stable llama3
+    model_queue = ['llama-3.3-70b-versatile', 'llama-3.2-11b-vision-preview']
     current_model_idx = 0
 
     while current_model_idx < len(model_queue):
@@ -394,7 +394,7 @@ async def search_image_on_internet(query: str) -> str:
             optimized_query = await groq_chat([
                 {"role": "system", "content": "Generate a short, 3-4 word English search query to find a clear educational image for the following term. Output ONLY the query string, no quotes or explanations."},
                 {"role": "user", "content": query}
-            ], model='llama-3.1-8b-instant', max_tokens=100)
+            ], model='llama-3.3-70b-versatile', max_tokens=100)
             optimized_query = optimized_query.strip().strip('"').strip("'")
             logging.info(
                 f"[LLM] Optimized image search query: {optimized_query}")
