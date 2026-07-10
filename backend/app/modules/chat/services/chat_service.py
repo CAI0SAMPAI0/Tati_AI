@@ -175,20 +175,37 @@ class ChatService:
                     "language": trans_data.get("language"),
                     "duration": trans_data.get("duration")
                 }
-            # Run local phonetic analysis to detect mismatch phonemes
+            # Run phonetic analysis to detect mismatch phonemes
             if content:
                 try:
-                    from app.shared.services.phonetic_service import phonetic_service
-                    phonetic_res = phonetic_service.evaluate_pronunciation(audio_bytes, content)
-                    if phonetic_res and phonetic_res.get("mismatches"):
-                        mismatches = phonetic_res.get("mismatches", [])
-                        phonetic_feedback_info = (
-                            f"\n\n--- LOCAL PHONETIC ACCURACY ANALYSIS ---\n"
-                            f"The phonetic analyzer detected mismatches in these expected phonemes (which suggests the student mispronounced them): "
-                            f"{', '.join(mismatches)}\n"
-                            f"Expected IPA sequence: {phonetic_res.get('expected_ipa')}\n"
-                            f"Spoken IPA sequence: {phonetic_res.get('spoken_ipa')}\n"
-                        )
+                    from app.shared.services.gemini_speech_service import gemini_speech_service
+                    if gemini_speech_service.is_configured:
+                        gemini_res = await gemini_speech_service.evaluate_pronunciation(audio_bytes, content)
+                        if "error" not in gemini_res:
+                            incorrect_words = [
+                                f"'{w['word']}' (score: {w['score']}, error: {w['error_type']})"
+                                for w in gemini_res.get("words", [])
+                                if w.get("accuracy") == "incorrect" or w.get("score", 100) < 80
+                            ]
+                            if incorrect_words:
+                                phonetic_feedback_info = (
+                                    f"\n\n--- GEMINI PHONETIC ACCURACY ANALYSIS ---\n"
+                                    f"The student mispronounced or had trouble with these words: {', '.join(incorrect_words)}.\n"
+                                    f"Detailed feedback on their pronunciation: {gemini_res.get('feedback')}\n"
+                                    f"Please correct the student on these specific words in your response, being encouraging and friendly.\n"
+                                )
+                    else:
+                        from app.shared.services.phonetic_service import phonetic_service
+                        phonetic_res = phonetic_service.evaluate_pronunciation(audio_bytes, content)
+                        if phonetic_res and phonetic_res.get("mismatches"):
+                            mismatches = phonetic_res.get("mismatches", [])
+                            phonetic_feedback_info = (
+                                f"\n\n--- LOCAL PHONETIC ACCURACY ANALYSIS ---\n"
+                                f"The phonetic analyzer detected mismatches in these expected phonemes (which suggests the student mispronounced them): "
+                                f"{', '.join(mismatches)}\n"
+                                f"Expected IPA sequence: {phonetic_res.get('expected_ipa')}\n"
+                                f"Spoken IPA sequence: {phonetic_res.get('spoken_ipa')}\n"
+                            )
                 except Exception as pe:
                     logging.error(f"Error in chat phonetic analysis: {pe}")
             # logging.info(f'[ChatService] Transcrição concluída: "{content[:50]}..."')
