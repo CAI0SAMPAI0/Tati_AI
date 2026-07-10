@@ -17,6 +17,21 @@ class PronunciationMatcher:
         Avalia o áudio do aluno comparando-o com o texto de referência.
         """
         user_level = normalize_level(user_level)
+
+        from app.shared.services.gemini_speech_service import gemini_speech_service
+        if gemini_speech_service.is_configured:
+            try:
+                gemini_res = await gemini_speech_service.evaluate_pronunciation(audio_bytes, reference_text)
+                if "error" not in gemini_res:
+                    return {
+                        "score": gemini_res.get("score", 0),
+                        "feedback": gemini_res.get("feedback", ""),
+                        "transcription": reference_text,
+                        "words": gemini_res.get("words", [])
+                    }
+            except Exception as e:
+                logging.info(f"[PronunciationMatcher] Gemini evaluation failed: {e}. Falling back to Whisper + LLM.")
+
         # 1. Transcrever com Whisper via Groq (com verbose_json para capturar logprobs)
         trans_data = await transcribe_audio_verbose(
             audio_bytes,

@@ -457,7 +457,7 @@ async def describe_image_with_gemini(image_bytes: bytes) -> str:
     from PIL import Image
     import io
     
-    keys = [k for k in settings.gemini_keys() if k]
+    keys = [k for k in settings.gemini_keys if k]
     if not keys:
         logging.info("[Gemini Vision] Nenhuma API Key do Gemini configurada.")
         return "[Erro: Nenhuma API Key do Gemini configurada.]"
