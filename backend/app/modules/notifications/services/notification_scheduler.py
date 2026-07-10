@@ -446,7 +446,7 @@ class NotificationScheduler:
                         'title': 'Weekly Progress Report',
                         'body': f'Your weekly progress report was processed. Status: Email: {success}, Responsible: {success_resp}',
                         'category': 'weekly_report',
-                        'status': 'read'
+                        'is_read': True
                     }).execute()
                 except Exception as e:
                     logging.error(f"[Scheduler] Erro ao registrar notificação de weekly_report para {username}: {e}")

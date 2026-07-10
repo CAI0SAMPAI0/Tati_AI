@@ -63,7 +63,41 @@ async def verify_pronunciation(
                 }
             }
         else:
-            logger.warning(f"Azure Speech evaluation error (falling back to local): {azure_res.get('error')}")
+            logger.warning(f"Azure Speech evaluation error (falling back to Gemini/local): {azure_res.get('error')}")
+
+    # 0.1 Try Gemini Speech Pronunciation Assessment if configured
+    from app.shared.services.gemini_speech_service import gemini_speech_service
+    if gemini_speech_service.is_configured:
+        gemini_res = await gemini_speech_service.evaluate_pronunciation(audio_bytes, ref_clean)
+        if "error" not in gemini_res:
+            score = gemini_res.get("score", 0)
+            feedback = gemini_res.get("feedback", "")
+            if not feedback:
+                if score >= 85:
+                    feedback = "Amazing! Your pronunciation is excellent."
+                elif score >= 60:
+                    feedback = "Good job! You had a few minor slips, but you are very clear."
+                else:
+                    feedback = "Keep practicing! Listen to Tati's audio and try repeating again."
+
+            return {
+                "score": score,
+                "transcription": ref_clean,
+                "words": gemini_res.get("words", []),
+                "feedback": feedback,
+                "metadata": {
+                    "accuracy_score": gemini_res.get("accuracy_score", score),
+                    "fluency_score": gemini_res.get("fluency_score", score),
+                    "completeness_score": gemini_res.get("completeness_score", score)
+                },
+                "phonetic": {
+                    "provider": "gemini",
+                    "raw_result": gemini_res
+                }
+            }
+        else:
+            logger.warning(f"Gemini Speech evaluation error (falling back to local): {gemini_res.get('error')}")
+
     trans_data = await transcribe_audio_verbose(
         audio_bytes,
         filename='temp.wav',
