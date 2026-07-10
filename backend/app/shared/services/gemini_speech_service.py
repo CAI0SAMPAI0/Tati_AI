@@ -78,13 +78,18 @@ Expected text they were trying to read: "{reference_text}"
 
 Compare the acoustic signals of the audio against this reference text.
 Assess:
-1. Phonetic correctness of each word (e.g. distinguishing contextual pronunciations like "live" as /laɪv/ vs /lɪv/).
+1. Phonetic correctness of each word. Pay absolute attention to HETERONYMS (words that are spelled the same but pronounced differently depending on meaning or part of speech):
+   - Example: "live" can be /laɪv/ (as in "live transmission", "live show", "live music" - adjective/adverb) OR /lɪv/ (as in "I live here", "to live" - verb).
+   - Example: "read" can be /riːd/ (present tense) OR /red/ (past tense).
+   - Identify any heteronyms in the expected text, determine their correct expected pronunciation based on grammatical context in the sentence, and grade the speaker's pronunciation accordingly.
 2. Rhythm, speed, pauses, and accent.
 3. Specific errors per word:
    - "None" if correct.
    - "Mispronunciation" if phonetically incorrect.
    - "Omission" if skipped.
    - "Insertion" if extra words were spoken.
+
+CRITICAL: If the speaker mispronounces a heteronym (e.g. they say /lɪv/ instead of /laɪv/ for "live transmission", or vice-versa), you MUST mark it as "Mispronunciation" and explain the distinction in the feedback in Portuguese (e.g. explain that 'live' as transmission/show has the sound /laɪv/, while 'live' as verb has the sound /lɪv/).
 
 You must fill out the structured schema correctly. The feedback must be in Portuguese, friendly, and pedagogical.
 """
