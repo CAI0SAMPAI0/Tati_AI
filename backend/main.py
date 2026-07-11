@@ -165,10 +165,27 @@ else:
     setup_rate_limiting(app)
     register_all_routers(app)
 
-    # Instrumentação do Prometheus
+    # Instrumentação do Prometheus com autenticação Bearer Token para segurança
     try:
         from prometheus_fastapi_instrumentator import Instrumentator
-        Instrumentator().instrument(app).expose(app)
+        from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+        from fastapi import Depends, HTTPException, status
+        from fastapi.responses import Response
+        from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+
+        security = HTTPBearer(auto_error=False)
+        Instrumentator().instrument(app)
+
+        @app.get('/metrics')
+        async def metrics(credentials: HTTPAuthorizationCredentials = Depends(security)):
+            token = os.getenv("METRICS_TOKEN", "tati-ai-metrics-token-secure-2026")
+            if not credentials or credentials.credentials != token:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Unauthorized metrics access",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
     except Exception as e:
         logging.info(f'[Startup] Erro ao iniciar Instrumentator do Prometheus: {e}')
 
