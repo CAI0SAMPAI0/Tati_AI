@@ -43,7 +43,9 @@ class EmailSender:
                 prefs = profile.get('notification_preferences')
                 if prefs:
                     s_lower = subject.lower()
-                    if 'streak' in s_lower or 'ofensiva' in s_lower or 'broken' in s_lower or 'alive' in s_lower:
+                    if 'teacher tati' in s_lower or 'nudge' in s_lower or 'aviso' in s_lower:
+                        category = 'direct_message'
+                    elif 'streak' in s_lower or 'ofensiva' in s_lower or 'broken' in s_lower or 'alive' in s_lower:
                         category = 'streaks'
                     elif 'desafio' in s_lower or 'challenge' in s_lower or 'activity' in s_lower or 'submission' in s_lower:
                         category = 'challenges'

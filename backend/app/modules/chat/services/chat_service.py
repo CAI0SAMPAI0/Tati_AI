@@ -196,7 +196,8 @@ class ChatService:
                                 )
                     else:
                         from app.shared.services.phonetic_service import phonetic_service
-                        phonetic_res = phonetic_service.evaluate_pronunciation(audio_bytes, content)
+                        from fastapi.concurrency import run_in_threadpool
+                        phonetic_res = await run_in_threadpool(phonetic_service.evaluate_pronunciation, audio_bytes, content)
                         if phonetic_res and phonetic_res.get("mismatches"):
                             mismatches = phonetic_res.get("mismatches", [])
                             phonetic_feedback_info = (
