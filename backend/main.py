@@ -165,6 +165,13 @@ else:
     setup_rate_limiting(app)
     register_all_routers(app)
 
+    # Instrumentação do Prometheus
+    try:
+        from prometheus_fastapi_instrumentator import Instrumentator
+        Instrumentator().instrument(app).expose(app)
+    except Exception as e:
+        logging.info(f'[Startup] Erro ao iniciar Instrumentator do Prometheus: {e}')
+
     @app.on_event('startup')
     async def startup_event() -> None:
         # Inicia o Celery Worker de forma programática se USE_CELERY for true
@@ -246,15 +253,12 @@ else:
 
     @app.get('/health')
     async def health():
-        from app.shared.services.history import update_message
-        msg_id = 'c5c0b412-6314-418d-9416-b8a7292d5cb4'
-        username = 'programador'
-        conversation_id = '20260616_114636_progra'
-        content = "Create a pdf for me with 10 exercises about the Present Perfect, 10 exercises about Verb to be and Must be [EDITED]"
-        
         db_status = "ok"
         try:
-            res_msg = await update_message(msg_id, username, content, conversation_id=conversation_id)
+            from app.core.database import get_client
+            # Apenas verifica conectividade fazendo um read leve e rápido
+            get_client().table('users').select('username').limit(1).execute()
+            res_msg = "Database connection verified successfully"
         except Exception as e:
             res_msg = f"TEST_FAILED: {e}"
             db_status = "error"
@@ -264,7 +268,7 @@ else:
             'database': db_status,
             "service": "Teacher Tati API",
             "version": "2.1.6",
-            "db_update_check": res_msg
+            "db_check": res_msg
         }
 
 if __name__ == '__main__':
