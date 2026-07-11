@@ -132,6 +132,23 @@ async def admin_reprocess_content(
     }
 
 
+import time
+import asyncio
+
+_USER_PURCHASE_CACHE = {}  # {username: (timestamp, purchased_ids_set)}
+
+def get_cached_purchases(username: str) -> Optional[set]:
+    now = time.time()
+    if username in _USER_PURCHASE_CACHE:
+        ts, p_ids = _USER_PURCHASE_CACHE[username]
+        if now - ts < 60:  # 60 seconds cache TTL
+            return p_ids
+    return None
+
+def set_cached_purchases(username: str, p_ids: set):
+    _USER_PURCHASE_CACHE[username] = (time.time(), p_ids)
+
+
 @router.get("", response_model=List[PremiumContent])
 async def list_premium_content(
         user: Optional[dict] = Depends(get_current_user_optional)):
@@ -150,38 +167,43 @@ async def list_premium_content(
         contents = contents_res.data or []
         await cache_set(cache_key, contents, ttl=300)
 
-    # 2. Busca compras do usuário (sempre live — não cachear dados de acesso)
-    purchased_ids = set()
+    # 2. Busca compras do usuário (com cache em memória de 60s e busca paralela)
+    purchased_ids = None
     if username:
-        purchases_res = db.table('premium_purchases').select(
-            'content_id, status').eq('username', username).execute()
-        for p in (purchases_res.data or []):
-            if p['status'] == 'confirmed':
-                purchased_ids.add(p['content_id'])
-
-        # Fallback: verifica nas tabelas orders + order_items (fluxo hub-site público)
-        try:
-            orders_res = db.table('orders')\
-                .select('id')\
-                .eq('username', username)\
-                .eq('status', 'confirmed')\
-                .execute()
+        purchased_ids = get_cached_purchases(username)
+        if purchased_ids is None:
+            purchased_ids = set()
             
-            order_ids = [o['id'] for o in (orders_res.data or [])]
-            if order_ids:
-                items_res = db.table('order_items')\
-                    .select('content_id')\
-                    .in_('order_id', order_ids)\
-                    .execute()
-                for item in (items_res.data or []):
-                    purchased_ids.add(item['content_id'])
-        except Exception as e:
-            _hub_log(f"Error fetching orders fallback for listing: {e}")
+            async def fetch_purchases():
+                try:
+                    res = db.table('premium_purchases').select('content_id, status').eq('username', username).execute()
+                    return [p['content_id'] for p in (res.data or []) if p['status'] == 'confirmed']
+                except Exception as e:
+                    _hub_log(f"Error fetching purchases: {e}")
+                    return []
+
+            async def fetch_orders():
+                try:
+                    orders_res = db.table('orders').select('id').eq('username', username).eq('status', 'confirmed').execute()
+                    order_ids = [o['id'] for o in (orders_res.data or [])]
+                    if not order_ids:
+                        return []
+                    items_res = db.table('order_items').select('content_id').in_('order_id', order_ids).execute()
+                    return [item['content_id'] for item in (items_res.data or [])]
+                except Exception as e:
+                    _hub_log(f"Error fetching orders fallback: {e}")
+                    return []
+
+            # Executa buscas concorrentemente para máxima performance
+            results = await asyncio.gather(fetch_purchases(), fetch_orders())
+            for r in results:
+                purchased_ids.update(r)
+            
+            set_cached_purchases(username, purchased_ids)
 
     # 3. Formata resposta
     result = []
     from app.core.config import settings
-
     from app.shared.services.secure_document_service import public_preview_url
 
     for c in contents:
@@ -192,7 +214,7 @@ async def list_premium_content(
         has_access = False
         if user and username:
             has_access = (
-                c['id'] in purchased_ids
+                (purchased_ids is not None and c['id'] in purchased_ids)
                 or username in SPECIAL_USERS
                 or user.get('role') == 'admin'
             )
@@ -439,9 +461,8 @@ async def get_secure_page(
         try:
             # Roda download em threadpool para não congelar o servidor
             file_data = await run_in_threadpool(db.storage.from_('hub-secure-pages').download, storage_path)
-            # Limita tamanho do cache para não estourar memória (max
-            # ~500 imagens de 500kb = 250MB)
-            if len(_RAW_IMAGE_CACHE) > 500:
+            # Limita tamanho do cache de RAM de forma muito mais generosa (5000 imagens = ~2.5GB para servidor de 16GB)
+            if len(_RAW_IMAGE_CACHE) > 5000:
                 _RAW_IMAGE_CACHE.pop(next(iter(_RAW_IMAGE_CACHE)))
             _RAW_IMAGE_CACHE[storage_path] = file_data
         except Exception as e:
@@ -450,8 +471,24 @@ async def get_secure_page(
             raise HTTPException(
                 status_code=500, detail="Erro ao processar imagem")
 
-    # 5. Aplica a marca d'água de forma assíncrona para não travar
-    # outras requisições
+    # 5. Prefetch em segundo plano (background) para carregar de 10 em 10 páginas adicionais na memória
+    async def _prefetch_next_pages(start_idx, end_idx, pages_list):
+        for idx in range(start_idx, min(end_idx, len(pages_list))):
+            next_path = pages_list[idx]
+            if next_path not in _RAW_IMAGE_CACHE:
+                try:
+                    img_bytes = await run_in_threadpool(db.storage.from_('hub-secure-pages').download, next_path)
+                    if len(_RAW_IMAGE_CACHE) > 5000:
+                        _RAW_IMAGE_CACHE.pop(next(iter(_RAW_IMAGE_CACHE)))
+                    _RAW_IMAGE_CACHE[next_path] = img_bytes
+                    _hub_log(f"Background prefetch success for page index {idx}")
+                except Exception as e:
+                    _hub_log(f"Background prefetch failed for page index {idx}: {e}")
+
+    # Dispara o prefetch assíncrono em segundo plano para as próximas 10 páginas
+    asyncio.create_task(_prefetch_next_pages(page_index + 1, page_index + 11, pages))
+
+    # 6. Aplica a marca d'água de forma assíncrona para não travar outras requisições
     from app.shared.services.secure_document_service import apply_watermark
     from fastapi.responses import Response
 
