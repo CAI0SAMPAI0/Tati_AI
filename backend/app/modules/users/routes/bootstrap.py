@@ -22,42 +22,73 @@ async def get_bootstrap(
 
     db = get_client()
 
+    import asyncio
+    from fastapi.concurrency import run_in_threadpool
     from app.modules.users.services.streaks import get_streak
-
-    streak_data = get_streak(username)
-    streak = {
-        'current_streak': streak_data.get('current_streak', 0),
-        'longest_streak': streak_data.get('longest_streak', 0),
-    }
-
-    try:
-        notif_rows = (
-            db.table('notifications')
-            .select('id', count='exact')
-            .eq('username', username)
-            .eq('read', False)
-            .execute()
-        )
-        unread_notifications = notif_rows.count or 0
-    except Exception:
-        unread_notifications = 0
-
     from app.modules.users.services.xp_system import get_xp_data
 
-    xp = get_xp_data(username)
+    # Executa as tarefas concorrentemente para máximo desempenho
+    async def fetch_streak():
+        try:
+            return await get_streak(username)
+        except Exception:
+            return {}
 
-    try:
-        earned = (
-            db.table('user_trophies')
-            .select('id', count='exact')
-            .eq('username', username)
-            .execute()
-        )
-        is_programmer = username.lower() in ['caio', 'caio007', 'caio.sampaio'] or 'caio' in username.lower()
-        trophies_earned = 50 if is_programmer else (earned.count or 0)
-    except Exception:
-        is_programmer = username.lower() in ['caio', 'caio007', 'caio.sampaio'] or 'caio' in username.lower()
-        trophies_earned = 50 if is_programmer else 0
+    async def fetch_notifications():
+        try:
+            def _fetch():
+                return (
+                    db.table('notifications')
+                    .select('id', count='exact')
+                    .eq('username', username)
+                    .eq('read', False)
+                    .execute()
+                )
+            res = await run_in_threadpool(_fetch)
+            return res.count or 0
+        except Exception:
+            return 0
+
+    async def fetch_xp():
+        try:
+            return await run_in_threadpool(get_xp_data, username)
+        except Exception:
+            return {
+                'xp': 0,
+                'level': 'A1',
+                'level_progress': 0,
+                'xp_to_next': 500,
+                'milestones': [],
+                'total_xp_earned': 0,
+            }
+
+    async def fetch_trophies():
+        try:
+            def _fetch():
+                return (
+                    db.table('user_trophies')
+                    .select('id', count='exact')
+                    .eq('username', username)
+                    .execute()
+                )
+            res = await run_in_threadpool(_fetch)
+            is_programmer = username.lower() in ['caio', 'caio007', 'caio.sampaio'] or 'caio' in username.lower()
+            return 50 if is_programmer else (res.count or 0)
+        except Exception:
+            is_programmer = username.lower() in ['caio', 'caio007', 'caio.sampaio'] or 'caio' in username.lower()
+            return 50 if is_programmer else 0
+
+    streak_data, unread_notifications, xp, trophies_earned = await asyncio.gather(
+        fetch_streak(),
+        fetch_notifications(),
+        fetch_xp(),
+        fetch_trophies()
+    )
+
+    streak = {
+        'current_streak': streak_data.get('current_streak', 0) if streak_data else 0,
+        'longest_streak': streak_data.get('longest_streak', 0) if streak_data else 0,
+    }
 
     result = {
         'streak': streak,
@@ -68,6 +99,7 @@ async def get_bootstrap(
 
     await cache_set(cache_key, result, ttl=120)
     return result
+
 
 
 class NotificationPrefsItem(BaseModel):
