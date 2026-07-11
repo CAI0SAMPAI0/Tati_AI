@@ -165,6 +165,13 @@ else:
     setup_rate_limiting(app)
     register_all_routers(app)
 
+    # Instrumentação do Prometheus
+    try:
+        from prometheus_fastapi_instrumentator import Instrumentator
+        Instrumentator().instrument(app).expose(app)
+    except Exception as e:
+        logging.info(f'[Startup] Erro ao iniciar Instrumentator do Prometheus: {e}')
+
     @app.on_event('startup')
     async def startup_event() -> None:
         # Inicia o Celery Worker de forma programática se USE_CELERY for true
