@@ -27,59 +27,17 @@ def waha_keepalive():
 @celery_app.task(name="app.core.tasks.send_email_task", bind=True, max_retries=3)
 def send_email_task(self, to_email: str, subject: str, html: str, attachments: list | None = None):
     """
-    Envia e-mail via SMTP Gmail a partir do Celery worker (Amazon Linux).
-    Usado pelo FastAPI no HF Space, que não consegue abrir conexões SMTP diretamente.
-    Recebe: to_email, subject, html (e opcionalmente attachments).
+    Envia e-mail a partir do Celery worker utilizando o EmailSender.
+    Evita bloqueios de portas SMTP usando os fallbacks HTTP (Brevo/Resend).
     """
-    import smtplib
-    import os
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
-    from email.mime.application import MIMEApplication
-    from app.core.config import settings
-
-    smtp_host = getattr(settings, 'smtp_host', 'smtp.gmail.com')
-    smtp_port = int(getattr(settings, 'smtp_port', 465))
-    smtp_user = getattr(settings, 'smtp_user', '')
-    smtp_pass = getattr(settings, 'smtp_password', '')
-    smtp_from = getattr(settings, 'smtp_from', '') or smtp_user
-
-    if not (smtp_host and smtp_user and smtp_pass):
-        logging.warning("[send_email_task] SMTP not configured, skipping.")
-        return False
-
+    from app.shared.services.email import EmailSender
     try:
-        from email.utils import make_msgid, formatdate
-        msg = MIMEMultipart()
-        msg["From"] = f"Teacher Tati <{smtp_from}>"
-        msg["To"] = to_email
-        msg["Subject"] = subject
-        msg["Message-ID"] = make_msgid(domain=smtp_host.replace("smtp.", ""))
-        msg["Date"] = formatdate(localtime=True)
-        msg.attach(MIMEText(html, "html"))
-
-        if attachments:
-            for file_path in (attachments or []):
-                if file_path and os.path.exists(file_path):
-                    with open(file_path, "rb") as f:
-                        part = MIMEApplication(f.read(), Name=os.path.basename(file_path))
-                        part["Content-Disposition"] = f'attachment; filename="{os.path.basename(file_path)}"'
-                        msg.attach(part)
-
-        if smtp_port == 465:
-            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=20) as server:
-                server.login(smtp_user, smtp_pass)
-                server.send_message(msg)
-        else:
-            with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
-                server.ehlo()
-                server.starttls()
-                server.ehlo()
-                server.login(smtp_user, smtp_pass)
-                server.send_message(msg)
-
-        logging.info(f"[send_email_task] Email sent via SMTP to {to_email}: {subject}")
+        sender = EmailSender()
+        # Executa o envio completo que tenta SMTP e depois Brevo/Resend HTTP API
+        success = sender._send(to_email, subject, html, attachments)
+        if not success:
+            raise Exception("EmailSender failed to send email via SMTP and all fallbacks.")
         return True
     except Exception as exc:
-        logging.error(f"[send_email_task] SMTP failed for {to_email}: {exc}")
+        logging.error(f"[send_email_task] Email sending failed: {exc}")
         raise self.retry(exc=exc, countdown=60)
