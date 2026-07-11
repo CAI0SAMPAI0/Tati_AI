@@ -46,6 +46,7 @@ services:
     image: prom/prometheus:latest
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus/grafana_token:/etc/prometheus/grafana_token:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
