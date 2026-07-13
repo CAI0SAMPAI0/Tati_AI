@@ -64,7 +64,7 @@ services:
       # Forçamos a usar o redis local do docker se estiver rodando via compose
       UPSTASH_REDIS_URL: "redis://redis"
       UPSTASH_REDIS_TOKEN: ""
-    command: ["celery", "-A", "app.core.celery_app", "worker", "--loglevel=info"]
+    command: ["celery", "-A", "app.core.celery_app", "worker", "--loglevel=info", "--without-gossip", "--without-mingle", "--without-heartbeat"]
     depends_on:
       backend:
         condition: service_healthy
