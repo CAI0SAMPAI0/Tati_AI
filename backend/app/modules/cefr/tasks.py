@@ -13,25 +13,14 @@ def cefr_weekly_gen():
 def generate_cefr_flashcards_task(level: str, topic: str, count: int, username: str = None, custom_title: str = None, reference_ids: list[str] = None):
     from app.modules.cefr.services.generator import CEFRGeneratorService
     from app.core.database import get_client
-    from app.modules.chat.services.llm import search_image_on_internet
 
     async def _run():
         flashcards = await CEFRGeneratorService.generate_flashcards(level=level, topic=topic, count=count, reference_ids=reference_ids)
         if not flashcards:
             return {"success": False, "error": "Could not generate flashcards"}
 
-        # Fetch images in parallel
-        async def _add_image(card):
-            term = card.get('front', '')
-            if term:
-                try:
-                    img_url = await search_image_on_internet(term)
-                    if img_url:
-                        card['image_url'] = img_url
-                except Exception:
-                    pass
-
-        await asyncio.gather(*[_add_image(c) for c in flashcards])
+        # Busca imagens relacionadas a front, back e explanation
+        await CEFRGeneratorService.add_images_to_flashcards(flashcards)
 
         client = get_client()
         display_title = custom_title if custom_title else topic

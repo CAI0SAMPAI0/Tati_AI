@@ -292,10 +292,12 @@ async def get_recommendations(
 
 @router.get('/simulations')
 async def list_simulations(
+        limit: int = Query(default=200, ge=1, le=1000),
+        offset: int = Query(default=0, ge=0),
         service: DashboardService = Depends(),
         user=Depends(require_staff)) -> list:
-    """Lista todas as simulações registradas."""
-    normal_sims = await service.get_all_simulations()
+    """Lista as simulações registradas com paginação e limite para evitar timeout."""
+    normal_sims = await service.get_all_simulations(limit=limit, offset=offset)
 
     # Map is_published/is_active
     for sim in normal_sims:
@@ -306,7 +308,14 @@ async def list_simulations(
     import logging
     db = get_client()
     try:
-        cefr_res = db.table('cefr_simulations').select('*').order('created_at', desc=True).execute()
+        # Busca apenas campos necessários e limita resultados para evitar Network Error
+        cefr_res = (
+            db.table('cefr_simulations')
+            .select('id, level, topic, scenario, roles, goal, is_published, created_at')
+            .order('created_at', desc=True)
+            .range(offset, offset + limit - 1)
+            .execute()
+        )
         cefr_data = cefr_res.data or []
         for sim in cefr_data:
             roles = sim.get('roles') or {}
@@ -330,7 +339,7 @@ async def list_simulations(
         logging.error(f"[DashboardRouter] Erro ao buscar cefr_simulations para admin: {e}")
 
     normal_sims.sort(key=lambda x: x.get('created_at') or '', reverse=True)
-    return normal_sims
+    return normal_sims[:limit]
 
 
 @router.get('/simulations/{simulation_id}')

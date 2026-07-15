@@ -1,12 +1,52 @@
+import asyncio
 import logging
 from typing import Dict, Any, List, Optional
-from app.modules.chat.services.llm import groq_chat_json
+from app.modules.chat.services.llm import groq_chat_json, search_image_on_internet
 from app.core.enums import CEFR_LABELS as _CEFR_LABEL_MAP, normalize_level
 from .embeddings import EmbeddingsService
 
 
 class CEFRGeneratorService:
     CEFR_LABELS = _CEFR_LABEL_MAP
+
+    @staticmethod
+    def _build_image_search_query(card: Dict[str, Any]) -> str:
+        """Monta uma query de busca curta e em inglês a partir do flashcard."""
+        front = (card.get('front') or '').strip()
+        back = (card.get('back') or '').strip()
+        explanation = (card.get('explanation') or '').strip()
+
+        # Prioriza a resposta e o front; pega um fragmento curto da explicação
+        parts = [p for p in (front, back) if p]
+        if explanation:
+            parts.append(explanation.split('.')[0][:80])
+
+        query = ' '.join(parts)
+        # Limita tamanho para não poluir a busca
+        return query[:200]
+
+    @staticmethod
+    async def _add_image_to_card(card: Dict[str, Any]) -> None:
+        """Busca uma imagem relacionada ao flashcard e insere image_url no dict (in-place)."""
+        query = CEFRGeneratorService._build_image_search_query(card)
+        if not query:
+            return
+        try:
+            img_url = await search_image_on_internet(query)
+            if img_url:
+                card['image_url'] = img_url
+        except Exception as e:
+            logging.info(f"[CEFRGenerator] Falha ao buscar imagem para flashcard: {e}")
+
+    @staticmethod
+    async def add_images_to_flashcards(flashcards: List[Dict[str, Any]]) -> None:
+        """Busca imagens para todos os flashcards em paralelo."""
+        if not flashcards:
+            return
+        await asyncio.gather(*[
+            CEFRGeneratorService._add_image_to_card(card)
+            for card in flashcards
+        ])
 
     @staticmethod
     async def generate_flashcards(

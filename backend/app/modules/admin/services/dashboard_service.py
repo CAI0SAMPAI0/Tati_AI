@@ -416,12 +416,17 @@ class DashboardService:
             'alerts': alerts,
         }
 
-    async def get_all_simulations(self) -> List[Dict[str, Any]]:
-        """Lista todas as simulações cadastradas."""
+    async def get_all_simulations(self, limit: int = 200, offset: int = 0) -> List[Dict[str, Any]]:
+        """Lista as simulações cadastradas com paginação para evitar grandes payloads."""
         def _fetch():
             try:
-                res = self.db.table('simulations').select(
-                    '*').order('created_at', desc=True).execute()
+                res = (
+                    self.db.table('simulations')
+                    .select('id, name, description, difficulty, system_prompt, emoji, is_active, created_at')
+                    .order('created_at', desc=True)
+                    .range(offset, offset + limit - 1)
+                    .execute()
+                )
                 return res.data or []
             except Exception as e:
                 logging.info(

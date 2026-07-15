@@ -97,17 +97,46 @@ async def create_conversation(
 
 async def list_conversations(username: str, limit: int = 20, offset: int = 0) -> list[dict]:
     db = get_client()
-    # Apply pagination: limit and offset (if supported by Supabase client)
-    result = (
-        db.table('conversations')
-        .select('id, title, model, created_at, updated_at')
-        .eq('username', username)
-        .eq('is_simulation', False)
-        .order('updated_at', desc=True)
-        .range(offset, offset + limit - 1)
-        .execute()
-    )
-    return result.data
+
+    def _fetch():
+        try:
+            # Query principal: filtra conversas normais (não simulações)
+            return (
+                db.table('conversations')
+                .select('id, title, model, created_at, updated_at')
+                .eq('username', username)
+                .eq('is_simulation', False)
+                .order('updated_at', desc=True)
+                .range(offset, offset + limit - 1)
+                .execute()
+            )
+        except Exception as e:
+            err_msg = str(e).lower()
+            if 'is_simulation' in err_msg or 'column' in err_msg:
+                logging.info(
+                    "[History] Coluna is_simulation ausente ou falha. Usando fallback sem filtro de simulação.")
+                try:
+                    return (
+                        db.table('conversations')
+                        .select('id, title, model, created_at, updated_at')
+                        .eq('username', username)
+                        .order('updated_at', desc=True)
+                        .range(offset, offset + limit - 1)
+                        .execute()
+                    )
+                except Exception as fallback_err:
+                    logging.info(
+                        f"[History] Fallback de list_conversations falhou: {fallback_err}")
+                    return None
+            logging.info(f"[History] Erro ao listar conversas: {e}")
+            return None
+
+    try:
+        result = await _execute_db(_fetch)
+        return result.data if result and result.data else []
+    except Exception as e:
+        logging.info(f"[History] Erro inesperado em list_conversations: {e}")
+        return []
 
 
 async def delete_conversation(

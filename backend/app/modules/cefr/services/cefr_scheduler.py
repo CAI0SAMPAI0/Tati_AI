@@ -93,6 +93,37 @@ class CEFRScheduler:
         except Exception as e:
             logging.error(f"[CEFR Scheduler] Error checking schedules: {e}")
 
+    async def backfill_missing_images(self, max_cards: int = 50) -> int:
+        """
+        Busca imagens para flashcards existentes que ainda não possuem image_url.
+        Retorna a quantidade de flashcards atualizados.
+        """
+        try:
+            res = (
+                self.client.table("cefr_flashcards")
+                .select("id, front, back, explanation, image_url")
+                .is_("image_url", None)
+                .limit(max_cards)
+                .execute()
+            )
+            rows = [r for r in (res.data or []) if not r.get("image_url")]
+            if not rows:
+                return 0
+
+            logging.info(f"[CEFR Scheduler] Backfill: {len(rows)} flashcards sem imagem encontrados.")
+            await CEFRGeneratorService.add_images_to_flashcards(rows)
+
+            updated = 0
+            for row in rows:
+                if row.get("image_url"):
+                    self.client.table("cefr_flashcards").update({"image_url": row["image_url"]}).eq("id", row["id"]).execute()
+                    updated += 1
+            logging.info(f"[CEFR Scheduler] Backfill: {updated} imagens adicionadas.")
+            return updated
+        except Exception as e:
+            logging.error(f"[CEFR Scheduler] Erro no backfill de imagens: {e}")
+            return 0
+
     async def run_generation_with_limit(self, limit: int, selected_types: List[str] = None):
         """
         Generates flashcards, exercises, and simulations automatically for each available level, up to the level limit.
@@ -102,6 +133,9 @@ class CEFRScheduler:
         
         types = [t.lower() for t in selected_types]
         logging.info(f"[CEFR Scheduler] Starting autonomous generation (level limit: {limit}, types: {types})...")
+
+        # Garante que flashcards antigos sem imagem também sejam preenchidos
+        await self.backfill_missing_images(max_cards=50)
 
         try:
             # 1. Discover which levels have indexed materials
@@ -141,6 +175,8 @@ class CEFRScheduler:
                 if "flashcards" in types:
                     flashcards = await CEFRGeneratorService.generate_flashcards(level=level, topic=topic, count=5)
                     if flashcards:
+                        # Busca imagens relacionadas à resposta/dica para cada flashcard
+                        await CEFRGeneratorService.add_images_to_flashcards(flashcards)
                         saved_cards = []
                         for card in flashcards:
                             data = {
@@ -148,6 +184,7 @@ class CEFRScheduler:
                                 "front": card.get("front"),
                                 "back": card.get("back"),
                                 "explanation": card.get("explanation"),
+                                "image_url": card.get("image_url"),
                                 "topic": topic,
                                 "is_published": False
                             }
