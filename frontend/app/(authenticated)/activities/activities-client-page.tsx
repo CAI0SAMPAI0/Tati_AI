@@ -25,6 +25,7 @@ import { ENDPOINTS } from '@/lib/api/endpoints';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { normalizeLevel } from '@/lib/constants/levels';
 
 type TabType = 'quiz' | 'flashcards' | 'simulations' | 'podcasts' | 'exercises' | 'materials';
 
@@ -224,19 +225,31 @@ export default function ActivitiesClientPage() {
 
   const flashcards = useMemo(() => {
     if (!flashcardsRaw) return [];
-    const filtered = flashcardsRaw.filter(
+    let filtered = flashcardsRaw.filter(
       (f) => f.title !== 'Vocabulary Review' && f.title !== 'Revisão de Vocabulário',
     );
+    if (filterLevel !== 'All') {
+      const target = normalizeLevel(filterLevel);
+      filtered = filtered.filter(
+        (f) => !f.level || normalizeLevel(f.level) === target || f.level.toLowerCase() === 'all'
+      );
+    }
     if (!searchQuery) return filtered;
     return filtered.filter((f) => f.title.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [flashcardsRaw, searchQuery]);
+  }, [flashcardsRaw, searchQuery, filterLevel]);
 
   const simulations = useMemo(() => {
     if (!simulationsRaw) return [];
     let filtered = simulationsRaw;
+    if (filterLevel !== 'All') {
+      const target = normalizeLevel(filterLevel);
+      filtered = filtered.filter(
+        (s) => !s.difficulty || normalizeLevel(s.difficulty) === target || s.difficulty.toLowerCase() === 'all'
+      );
+    }
     if (!searchQuery) return filtered;
     return filtered.filter((s) => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [simulationsRaw, searchQuery]);
+  }, [simulationsRaw, searchQuery, filterLevel]);
 
   const podcasts = useMemo(() => {
     if (!podcastsRaw) return [];

@@ -89,6 +89,8 @@ export function CefrSection() {
   const [editingItemType, setEditingItemType] = useState<'flashcard' | 'exercise' | 'simulation' | null>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [savingEdit, setSavingEdit] = useState(false);
+  const [generatingCardImages, setGeneratingCardImages] = useState<Record<number, boolean>>({});
+  const [uploadingCardImages, setUploadingCardImages] = useState<Record<number, boolean>>({});
 
   const fetchGeneratedContent = async (silent = false) => {
     if (!silent) setLoadingGenerated(true);
@@ -266,6 +268,52 @@ export function CefrSection() {
       toast.error(err.message || 'Error updating material.');
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const updateCefrCardImageUrl = (idx: number, url: string) => {
+    const newCards = [...(editForm.flashcards || [])];
+    newCards[idx] = { ...newCards[idx], image_url: url };
+    setEditForm({ ...editForm, flashcards: newCards });
+  };
+
+  const generateCefrCardImage = async (idx: number) => {
+    const card = editForm.flashcards?.[idx];
+    const prompt = card?.front || card?.back;
+    if (!prompt) return toast.error('Front or Back required for AI image');
+    setGeneratingCardImages(prev => ({ ...prev, [idx]: true }));
+    try {
+      const res = await apiPost<{ url: string }>('/flashcard-assets/ai-image', { prompt });
+      if (res.ok && res.data?.url) {
+        updateCefrCardImageUrl(idx, res.data.url);
+        toast.success('Image generated!');
+      } else {
+        toast.error((res.data as any)?.detail || 'Failed to generate image');
+      }
+    } catch (err) {
+      toast.error('Error generating image');
+    } finally {
+      setGeneratingCardImages(prev => ({ ...prev, [idx]: false }));
+    }
+  };
+
+  const uploadCefrCardImage = async (idx: number, file: File) => {
+    if (!file) return;
+    setUploadingCardImages(prev => ({ ...prev, [idx]: true }));
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await apiUpload<{ url: string }>('/flashcard-assets/upload-image', formData);
+      if (res.ok && res.data?.url) {
+        updateCefrCardImageUrl(idx, res.data.url);
+        toast.success('Image uploaded!');
+      } else {
+        toast.error((res.data as any)?.detail || 'Upload failed');
+      }
+    } catch (err) {
+      toast.error('Upload error');
+    } finally {
+      setUploadingCardImages(prev => ({ ...prev, [idx]: false }));
     }
   };
 
@@ -1752,6 +1800,60 @@ export function CefrSection() {
                         }}
                         className="w-full bg-bg border border-border rounded-lg px-3 py-1 text-xs text-text focus:ring-1 focus:ring-primary/20 outline-none resize-none min-h-[50px]"
                       />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-[10px] font-bold text-text-subtle uppercase mb-1">Image</label>
+                      {card.image_url && (
+                        <div className="relative w-full h-24 rounded-lg overflow-hidden border border-border bg-bg">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={card.image_url} alt="Flashcard" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => updateCefrCardImageUrl(idx, '')}
+                            className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full hover:bg-black/70"
+                            title="Remove image"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="Image URL"
+                          value={card.image_url || ''}
+                          onChange={(e) => updateCefrCardImageUrl(idx, e.target.value)}
+                          className="flex-1 min-w-[120px] bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text focus:ring-1 focus:ring-primary/20 outline-none"
+                        />
+                        <label className="cursor-pointer px-2 py-1.5 bg-surface border border-border rounded-lg text-xs font-bold text-text-subtle hover:text-primary hover:border-primary/30 transition-all flex items-center gap-1">
+                          <Upload size={12} />
+                          {uploadingCardImages[idx] ? '...' : 'Upload'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) uploadCefrCardImage(idx, file);
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => generateCefrCardImage(idx)}
+                          disabled={generatingCardImages[idx] || (!card.front && !card.back)}
+                          className="px-2 py-1.5 bg-surface border border-border rounded-lg text-xs font-bold text-primary hover:bg-primary/10 disabled:opacity-50 transition-all flex items-center gap-1"
+                        >
+                          {generatingCardImages[idx] ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <PenTool size={12} />
+                          )}
+                          AI
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

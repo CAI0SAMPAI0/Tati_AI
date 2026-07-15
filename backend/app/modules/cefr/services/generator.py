@@ -70,30 +70,52 @@ class CEFRGeneratorService:
             context_text = "\n\n".join(
                 [f"Trecho:\n{d.get('content', '')}" for d in context_docs])
 
+        # Define regras específicas por nível para garantir nexo entre imagem e resposta
+        if level in ('A1', 'A2'):
+            level_rules = """
+        LEVEL-SPECIFIC RULES FOR A1/A2:
+        - The flashcard MUST be based on a single, concrete object, person, place, action, or common everyday word.
+        - front MUST be the target English word or a very short phrase (1-3 words) that can be clearly illustrated with one image.
+        - back MUST be a simple definition or description using only basic English words. Avoid questions on the front.
+        - explanation MUST be one simple sentence explaining what the word is or where you see it.
+        - Example of a GOOD card: front="milk", back="A white drink from cows.", explanation="You buy milk in the supermarket."
+        - Example of a BAD card (NEVER do this): front="In the dairy section", back="Where do I find milk?" — this is illogical because an image cannot represent a question.
+"""
+        else:
+            level_rules = f"""
+        LEVEL-SPECIFIC RULES FOR {level}:
+        - front can be a phrase, collocation, or short sentence describing a concrete situation that can be illustrated.
+        - back MUST clearly answer or explain the front.
+        - If the front is a question, the back MUST be its answer, and the front must still be illustrated by an image of the answer.
+        - Avoid ambiguous cards where the image would not relate to the back.
+"""
+
         prompt = f"""
-        You are an experienced English language teacher creating educational materials for CEFR level {level} ({level_label}).
+        You are an experienced English language teacher creating educational flashcards with images for CEFR level {level} ({level_label}).
 
         Based on the following reference material about the topic '{topic}':
 
         {context_text}
 
-        Your task: Generate exactly {count} practical educational flashcards about the topic '{topic}' suitable for level {level} ({level_label}).
+        Your task: Generate exactly {count} practical educational flashcards about the topic '{topic}' suitable for level {level} ({level_label}). Each flashcard will be shown to the student together with an image, so the front and back must make visual sense.
 
         CRITICAL CONSTRAINTS:
         1. All fields, texts, titles, descriptions, front, back, and explanation MUST be entirely in English.
         2. NEVER use Portuguese anywhere in the response.
-        3. The front (front) must contain a word, phrase, or practical situation in English.
-        4. The back (back) must contain the definition or answer in English.
-        5. The explanation (explanation) must be entirely in English, explaining the usage, grammar, or context of the expression in a simple way for a {level} level student.
-        6. Return ONLY a valid JSON object matching the format below, without any markdown formatting or extra text.
+        3. The front (front) MUST be clear enough that an internet image search for the front/back text returns a relevant picture.
+        4. The back (back) MUST contain the definition or answer in English and MUST relate directly to the front.
+        5. The explanation (explanation) must be entirely in English, explaining the usage, grammar, or context in a simple way for a {level} level student.
+        6. NEVER create cards where the front is an answer and the back is a question. The image should illustrate the meaning, not a question.
+        {level_rules}
+        7. Return ONLY a valid JSON object matching the format below, without any markdown formatting or extra text.
 
         Expected Output Format (Strict JSON):
         {{
             "flashcards": [
                 {{
-                    "front": "term or practical situation (English)",
-                    "back": "definition or answer (English)",
-                    "explanation": "detailed explanation of usage (English)"
+                    "front": "clear English word or phrase that can be illustrated",
+                    "back": "simple definition or answer in English",
+                    "explanation": "simple explanation of usage (English)"
                 }}
             ]
         }}
