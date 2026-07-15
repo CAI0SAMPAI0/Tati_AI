@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, File, UploadFile, Form
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, File, UploadFile, Form, Query
 from app.core.task_manager import run_task_in_background, delegate_to_worker_if_needed
 from app.core.exceptions import ContentNotFoundError, BusinessLogicError
 from pydantic import BaseModel
