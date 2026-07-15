@@ -120,8 +120,12 @@ export default function ActivitiesClientPage() {
   });
 
   const { data: simulationsRaw = [] } = useQuery<SimulationItem[]>({
-    queryKey: ['activities-simulations'],
-    queryFn: () => apiGet<SimulationItem[]>('/simulation/scenarios'),
+    queryKey: ['activities-simulations', filterLevel],
+    queryFn: () => apiGet<SimulationItem[]>(
+      filterLevel === 'All'
+        ? '/simulation/scenarios'
+        : `/simulation/scenarios?level=${filterLevel}`
+    ),
   });
   const { data: podcastsRaw = [] } = useQuery<PodcastItem[]>({
     queryKey: ['activities-podcasts', filterLevel],
@@ -132,8 +136,12 @@ export default function ActivitiesClientPage() {
     ),
   });
   const { data: flashcardsRaw = [] } = useQuery<FlashcardDeck[]>({
-    queryKey: ['activities-flashcards'],
-    queryFn: () => apiGet<FlashcardDeck[]>('/activities/flashcards/my'),
+    queryKey: ['activities-flashcards', filterLevel],
+    queryFn: () => apiGet<FlashcardDeck[]>(
+      filterLevel === 'All'
+        ? '/activities/flashcards/my'
+        : `/activities/flashcards/my?level=${filterLevel}`
+    ),
   });
   const { data: podcastProgress } = useQuery({
     queryKey: ['activities-podcasts-progress'],
@@ -169,6 +177,7 @@ export default function ActivitiesClientPage() {
   const quizzes = useMemo(() => {
     if (!modules) return [];
     const list: Array<QuizItem & { module_title: string; is_published?: boolean; level?: string }> = [];
+    const targetLevel = filterLevel === 'All' ? null : normalizeLevel(filterLevel);
     modules.forEach((m) => {
       if (m.id === PERSONALIZED_MODULE_ID) return;
       (m.quizzes || []).forEach((q) => {
@@ -177,13 +186,21 @@ export default function ActivitiesClientPage() {
           q.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
           m.title.toLowerCase().includes(searchQuery.toLowerCase())
         ) {
+          // Resolve nível do quiz: próprio ou do módulo
+          const quizLevel = q.level || m.level;
+          if (targetLevel && quizLevel) {
+            const quizLevelNorm = normalizeLevel(quizLevel);
+            if (quizLevelNorm !== targetLevel && quizLevel.toLowerCase() !== 'all') {
+              return;
+            }
+          }
           list.push({
             ...q,
             module_title: m.title,
             // Use per-quiz user_status if available, fall back to module status
             user_status: q.user_status ?? m.user_status,
             is_published: (m as any).is_published,
-            level: m.level,
+            level: quizLevel,
           });
         }
       });
@@ -214,7 +231,7 @@ export default function ActivitiesClientPage() {
     }
 
     return list;
-  }, [modules, masterModule, searchQuery]);
+  }, [modules, masterModule, searchQuery, filterLevel]);
 
   const exercises = useMemo(() => {
     if (!masterModule || !masterModule.quizzes) return [];

@@ -1,6 +1,7 @@
 import logging
-from fastapi import APIRouter, Depends, Body
+from fastapi import APIRouter, Depends, Body, Query
 from pydantic import BaseModel
+from typing import Optional
 from app.core.dependencies.auth import get_current_user
 from app.core.database import get_client
 from app.core.utils.level_utils import matches_level
@@ -16,10 +17,14 @@ class FlashcardProgressPayload(BaseModel):
 
 
 @router.get('/my')
-async def get_my_flashcards(user=Depends(get_current_user)):
+async def get_my_flashcards(
+    level: Optional[str] = Query(None),
+    user=Depends(get_current_user)
+):
     """Retorna flashcards do usuário filtrados por nível."""
     db = get_client()
-    user_level = user.get('level')
+    # Se um level for passado (ex: filtro do dashboard), usa-o; senão usa o nível do usuário
+    user_level = level if level else user.get('level')
 
     try:
         res = (
