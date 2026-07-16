@@ -37,6 +37,7 @@ interface QuizItem {
   description?: string;
   attempts?: number;
   status?: string;
+  level?: string;
   user_status?: { is_done: boolean; score?: number };
 }
 interface ModuleItem {
