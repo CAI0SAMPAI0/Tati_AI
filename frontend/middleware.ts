@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 
 const AUTH_TOKEN_COOKIE = 'auth_token';
 
-const publicRoutes = ['/login', '/hub'];
+const publicRoutes = ['/login', '/hub', '/reset-password'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
