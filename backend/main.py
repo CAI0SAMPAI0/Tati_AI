@@ -290,9 +290,12 @@ else:
 
     @app.get('/app/version')
     async def app_version():
+        download_url = os.getenv('APP_DOWNLOAD_URL', '')
+        if not download_url:
+            download_url = 'https://tati-ai.vercel.app/downloads/tati-ai.apk'
         return {
             "android": os.getenv("APP_VERSION_ANDROID", "1.0.0"),
-            "download_url": os.getenv("APP_DOWNLOAD_URL", ""),
+            "download_url": download_url,
         }
 
 if __name__ == '__main__':

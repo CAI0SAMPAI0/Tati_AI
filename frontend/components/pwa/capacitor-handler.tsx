@@ -32,6 +32,26 @@ export function CapacitorHandler() {
         urlListener = await App.addListener('appUrlOpen', (event: { url: string }) => {
           const url = event.url;
 
+          // Handle auth callback: com.tati.ai://auth?jwt=xxx
+          if (url.includes('auth?jwt=') || url.includes('auth&jwt=')) {
+            try {
+              const parsed = new URL(url);
+              const jwt = parsed.searchParams.get('jwt');
+              if (jwt) {
+                localStorage.setItem('token', jwt);
+                router.push('/chat');
+              }
+            } catch {
+              const match = url.match(/jwt=([^&]+)/);
+              if (match) {
+                localStorage.setItem('token', decodeURIComponent(match[1]));
+                router.push('/chat');
+              }
+            }
+            return;
+          }
+
+          // Handle reset password: com.tati.ai://reset-password?token=xxx
           if (url.includes('reset-password')) {
             try {
               const parsed = new URL(url);

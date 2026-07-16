@@ -51,7 +51,13 @@ export function useAppUpdate() {
 
   const downloadUpdate = useCallback(() => {
     if (downloadUrl) {
-      window.open(downloadUrl, '_blank');
+      const isCapacitor = (window as any).Capacitor?.isNativePlatform?.();
+      if (isCapacitor) {
+        // In Capacitor, open in system browser so user can download APK
+        window.open(downloadUrl, '_system');
+      } else {
+        window.open(downloadUrl, '_blank');
+      }
     }
   }, [downloadUrl]);
 

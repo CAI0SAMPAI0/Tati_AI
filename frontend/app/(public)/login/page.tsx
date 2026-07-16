@@ -70,6 +70,9 @@ export default function LoginPage() {
       document.referrer.includes('android-app://')
     );
 
+    // In Capacitor: skip GIS, use system browser via backend endpoint
+    if (isCapacitor) return;
+
     const initGoogle = (retries = 0) => {
       if (typeof window === 'undefined') return;
       const g = (window as any).google;
@@ -78,21 +81,13 @@ export default function LoginPage() {
         return;
       }
 
-      const config: any = {
+      g.accounts.id.initialize({
         client_id: clientId,
         callback: handleGoogleCredential,
         auto_select: false,
         cancel_on_tap_outside: true,
-      };
-
-      if (isCapacitor) {
-        config.ux_mode = 'redirect';
-        config.login_uri = `${process.env.NEXT_PUBLIC_API_BASE_URL || ''}/auth/google`;
-      } else {
-        config.ux_mode = 'popup';
-      }
-
-      g.accounts.id.initialize(config);
+        ux_mode: 'popup',
+      });
 
       if (googleBtnRef.current) {
         g.accounts.id.renderButton(googleBtnRef.current, {
@@ -134,6 +129,25 @@ export default function LoginPage() {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleGoogleLoginCapacitor = useCallback(async () => {
+    clearMessages();
+    setLoading(true);
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const res = await fetch(`${apiBase}/auth/google/url`);
+      const data = await res.json();
+      if (data.url) {
+        window.open(data.url, '_system');
+      } else {
+        setError('Google login not configured.');
+      }
+    } catch {
+      setError('Connection error. Check if the server is running.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const isHubAccess = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('access') === 'hub';
@@ -293,7 +307,19 @@ export default function LoginPage() {
             {activeTab !== 'forgot' && (
               <>
                 <div className="relative w-full mb-4">
-                  <button className="w-full py-2.5 bg-input text-text border border-border rounded-[9px] text-sm font-medium flex items-center justify-center gap-2.5 pointer-events-none" tabIndex={-1}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const isCapacitor = (window as any).Capacitor?.isNativePlatform?.();
+                      if (isCapacitor) {
+                        handleGoogleLoginCapacitor();
+                      } else {
+                        // Trigger the hidden GIS button
+                        googleBtnRef.current?.querySelector('div[role="button"]')?.click();
+                      }
+                    }}
+                    className="w-full py-2.5 bg-input text-text border border-border rounded-[9px] text-sm font-medium flex items-center justify-center gap-2.5 hover:bg-bg-secondary transition-colors cursor-pointer"
+                  >
                     <svg width="18" height="18" viewBox="0 0 24 24">
                       <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                       <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />

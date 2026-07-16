@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 21600
 
     google_client_id: str = ''
+    google_client_secret: str = ''
 
     supabase_url: str = ''
     supabase_key: str = ''

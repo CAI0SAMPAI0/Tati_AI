@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
@@ -145,6 +146,146 @@ async def google_login(
         )
 
     return await AuthService.google_login(db, credential, is_hub_only)
+
+
+#  Google OAuth via system browser (for Capacitor/Android)
+
+
+@router.get('/google/url')
+async def google_auth_url(request: Request):
+    """Returns Google OAuth URL for system browser flow (Capacitor/Android)."""
+    from app.core.config import settings
+    if not settings.google_client_id or not settings.google_client_secret:
+        raise HTTPException(status_code=503, detail='Google OAuth not configured')
+
+    # Use the backend's own URL as redirect target
+    backend_url = os.getenv('WORKER_API_URL', '') or str(request.base_url).rstrip('/')
+    redirect_uri = f'{backend_url}/auth/google/callback'
+    scopes = 'openid email profile'
+    url = (
+        f'https://accounts.google.com/o/oauth2/v2/auth'
+        f'?client_id={settings.google_client_id}'
+        f'&redirect_uri={redirect_uri}'
+        f'&response_type=code'
+        f'&scope={scopes}'
+        f'&access_type=offline'
+        f'&prompt=consent'
+    )
+    return {'url': url}
+
+
+from fastapi.responses import HTMLResponse
+
+
+@router.get('/google/callback')
+async def google_callback(code: str = '', db: Client = Depends(get_db)):
+    """Handles Google OAuth callback, exchanges code for tokens, returns JWT via deep link."""
+    from app.core.config import settings
+    from app.core.security import create_access_token
+    from app.core.enums import normalize_level
+
+    if not code:
+        return HTMLResponse('<html><body><h2>Authentication failed</h2><p>No code received.</p></body></html>', status_code=400)
+
+    if not settings.google_client_secret:
+        return HTMLResponse('<html><body><h2>Server error</h2><p>Google OAuth not configured.</p></body></html>', status_code=500)
+
+    # Exchange authorization code for tokens
+    import httpx
+    backend_url = os.getenv('WORKER_API_URL', '') or 'https://tatiai-production.up.railway.app'
+    redirect_uri = f'{backend_url.rstrip("/")}/auth/google/callback'
+    token_data = {
+        'code': code,
+        'client_id': settings.google_client_id,
+        'client_secret': settings.google_client_secret,
+        'redirect_uri': redirect_uri,
+        'grant_type': 'authorization_code',
+    }
+
+    async with httpx.AsyncClient() as client:
+        token_resp = await client.post('https://oauth2.googleapis.com/token', data=token_data, timeout=15)
+
+    if token_resp.status_code != 200:
+        return HTMLResponse('<html><body><h2>Authentication failed</h2><p>Could not exchange code for tokens.</p></body></html>', status_code=400)
+
+    tokens = token_resp.json()
+    id_token_str = tokens.get('id_token')
+
+    if not id_token_str:
+        return HTMLResponse('<html><body><h2>Authentication failed</h2><p>No ID token received.</p></body></html>', status_code=400)
+
+    # Verify ID token
+    try:
+        from google.auth.transport import requests as google_requests
+        from google.oauth2 import id_token
+        info = id_token.verify_oauth2_token(
+            id_token_str, google_requests.Request(), settings.google_client_id, clock_skew_in_seconds=60
+        )
+    except Exception:
+        return HTMLResponse('<html><body><h2>Authentication failed</h2><p>Invalid Google token.</p></body></html>', status_code=400)
+
+    email = info.get('email', '').lower()
+    name = info.get('name', email.split('@')[0])
+    base_username = email.split('@')[0].replace('.', '_').lower()
+
+    # Find or create user
+    from app.modules.users.repositories.user_repository import UserRepository
+    existing_user = await UserRepository.find_by_email(db, email)
+    if existing_user:
+        user = existing_user
+    else:
+        username = base_username
+        suffix = 1
+        while await UserRepository.find_by_username(db, username):
+            username = f'{base_username}{suffix}'
+            suffix += 1
+
+        new_user = {
+            'username': username,
+            'name': name,
+            'email': email,
+            'password': 'google_authenticated',
+            'role': 'student',
+            'level': 'A1',
+            'focus': 'General Conversation',
+        }
+        await UserRepository.insert_user(db, new_user)
+        user = new_user
+
+    # Build JWT
+    token_payload = {
+        'sub': user['username'],
+        'role': user.get('role', 'student'),
+        'level': normalize_level(user.get('level')),
+    }
+    jwt_token = create_access_token(token_payload)
+
+    # Return HTML that redirects to app via deep link
+    return HTMLResponse(f'''<!DOCTYPE html>
+<html>
+<head><title>Login successful</title></head>
+<body style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;margin:0;background:#0a0a0c;color:#fff;">
+<div style="text-align:center;">
+<h2>Login successful!</h2>
+<p>Redirecting to app...</p>
+<script>
+(function() {{
+  var jwt = "{jwt_token}";
+  var user = {user};
+  // Store for web fallback
+  localStorage.setItem("token", jwt);
+  localStorage.setItem("user", JSON.stringify(user));
+  // Redirect to app via deep link
+  window.location.href = "com.tati.ai://auth?jwt=" + encodeURIComponent(jwt);
+  // Fallback: if deep link doesn't work, show message
+  setTimeout(function() {{
+    document.body.innerHTML = '<div style="text-align:center;"><h2>Login successful!</h2><p>Close this page and open the Tati AI app.</p></div>';
+  }}, 3000);
+}})();
+</script>
+</div>
+</body>
+</html>''')
 
 
 #  Forgot password ─
