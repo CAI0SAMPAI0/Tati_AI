@@ -25,11 +25,6 @@ export function CapacitorHandler() {
     const initCapacitor = async () => {
       try {
         const { App } = await import('@capacitor/app');
-        const { SplashScreen } = await import('@capacitor/splash-screen');
-
-        // Hide splash screen as soon as the JS is ready
-        // This helps prevent some "App not responding" errors during slow loads
-        await SplashScreen.hide().catch(() => null);
 
         // Back button handler — uses ref to always have fresh pathname
         backListener = await App.addListener('backButton', ({ canGoBack }) => {
