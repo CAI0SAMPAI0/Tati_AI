@@ -315,7 +315,7 @@ export default function LoginPage() {
                         handleGoogleLoginCapacitor();
                       } else {
                         // Trigger the hidden GIS button
-                        googleBtnRef.current?.querySelector('div[role="button"]')?.click();
+                        (googleBtnRef.current?.querySelector('div[role="button"]') as HTMLElement)?.click();
                       }
                     }}
                     className="w-full py-2.5 bg-input text-text border border-border rounded-[9px] text-sm font-medium flex items-center justify-center gap-2.5 hover:bg-bg-secondary transition-colors cursor-pointer"
