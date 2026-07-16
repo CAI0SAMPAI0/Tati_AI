@@ -16,6 +16,11 @@ const CapacitorHandler = dynamic(
   { ssr: false }
 );
 
+const UpdateBanner = dynamic(
+  () => import('@/components/update-banner').then(m => m.UpdateBanner as any),
+  { ssr: false }
+);
+
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
@@ -39,6 +44,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
           />
           <RegisterServiceWorker />
           <CapacitorHandler />
+          <UpdateBanner />
         </AuthProvider>
       </QueryProvider>
     </ThemeProvider>
