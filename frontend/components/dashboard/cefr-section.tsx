@@ -801,7 +801,7 @@ export function CefrSection() {
   };
 
   return (
-    <div className="space-y-8 max-w-5xl">
+    <div className="space-y-8 max-w-7xl">
       {/* ─── MAIN LEVEL TABS ─── */}
       <div className="flex border-b border-border gap-6 mb-6">
         <button
