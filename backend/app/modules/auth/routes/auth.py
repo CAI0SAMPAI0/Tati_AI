@@ -158,8 +158,8 @@ async def google_auth_url(request: Request):
     if not settings.google_client_id or not settings.google_client_secret:
         raise HTTPException(status_code=503, detail='Google OAuth not configured')
 
-    # Use the backend's own URL as redirect target
-    backend_url = os.getenv('WORKER_API_URL', '') or str(request.base_url).rstrip('/')
+    # Use the backend's own URL as redirect target (never WORKER_API_URL for OAuth)
+    backend_url = str(request.base_url).rstrip('/')
     redirect_uri = f'{backend_url}/auth/google/callback'
     scopes = 'openid email profile'
     url = (
@@ -178,7 +178,7 @@ from fastapi.responses import HTMLResponse
 
 
 @router.get('/google/callback')
-async def google_callback(code: str = '', db: Client = Depends(get_db)):
+async def google_callback(request: Request, code: str = '', db: Client = Depends(get_db)):
     """Handles Google OAuth callback, exchanges code for tokens, returns JWT via deep link."""
     from app.core.config import settings
     from app.core.security import create_access_token
@@ -192,8 +192,8 @@ async def google_callback(code: str = '', db: Client = Depends(get_db)):
 
     # Exchange authorization code for tokens
     import httpx
-    backend_url = os.getenv('WORKER_API_URL', '') or 'https://tatiai-production.up.railway.app'
-    redirect_uri = f'{backend_url.rstrip("/")}/auth/google/callback'
+    backend_url = str(request.base_url).rstrip('/')
+    redirect_uri = f'{backend_url}/auth/google/callback'
     token_data = {
         'code': code,
         'client_id': settings.google_client_id,
