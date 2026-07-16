@@ -166,4 +166,6 @@ logs-11607679-1783432695499.csv
 logs-11607679-1783456267879.csv
 
 # Monitoring credentials
-monitoring/prometheus/grafana_token
+monitoring/prometheus/grafana_token
+
+tati-ai1.apk
