@@ -45,19 +45,23 @@ export function useAppUpdate() {
 
   const dismissUpdate = useCallback(() => {
     setUpdateAvailable(false);
-    // Remember this version so we don't nag again until next version
     if (latestVersion) setCurrentVersion(latestVersion);
   }, [latestVersion]);
 
-  const downloadUpdate = useCallback(() => {
-    if (downloadUrl) {
-      const isCapacitor = (window as any).Capacitor?.isNativePlatform?.();
-      if (isCapacitor) {
-        // In Capacitor, open in system browser so user can download APK
-        window.open(downloadUrl, '_system');
-      } else {
-        window.open(downloadUrl, '_blank');
+  const downloadUpdate = useCallback(async () => {
+    if (!downloadUrl) return;
+
+    const isCapacitor = (window as any).Capacitor?.isNativePlatform?.();
+    if (isCapacitor) {
+      try {
+        const { Browser } = await import('@capacitor/browser');
+        await Browser.open({ url: downloadUrl });
+      } catch {
+        // Fallback: try opening in the WebView itself
+        window.location.href = downloadUrl;
       }
+    } else {
+      window.open(downloadUrl, '_blank');
     }
   }, [downloadUrl]);
 
@@ -67,7 +71,6 @@ export function useAppUpdate() {
     return () => clearInterval(interval);
   }, [checkForUpdate]);
 
-  // Mark current version on first load so we can detect changes
   useEffect(() => {
     const current = getCurrentVersion();
     if (!current || current === '1.0.0') {
