@@ -114,17 +114,19 @@ data/chroma_db/
  
 # Arquivos de autenticação Google (SENSÍVEL)
 token.json
-*.json
- 
+credentials.json
+
+# Chaves de serviço (NUNCA versionar)
+service-account.json
+*service_account*.json
+tatichatbot-*.json
+credentials*.json
+google-services.json
+
 # Arquivos temporários gerados pela API
 temp/
 backend/assets/reports/
 /tmp/tati_files/
- 
-# Chaves de serviço (NUNCA versionar)
-*service_account*.json
-tatichatbot-*.json
-credentials*.json
  
 # Cache Python
 __pycache__/
