@@ -4,6 +4,10 @@ import { useEffect } from 'react';
 
 export function RegisterServiceWorker() {
   useEffect(() => {
+    // Never register service worker in Capacitor — causes reload loops and crashes
+    const w = window as any;
+    if (w.Capacitor?.isNativePlatform?.()) return;
+
     if (!('serviceWorker' in navigator)) return;
     if (
       process.env.NODE_ENV !== 'production' &&
@@ -13,9 +17,6 @@ export function RegisterServiceWorker() {
       return;
     }
 
-
-    // Escuta mudanças de controle para recarregar a página automaticamente
-    // Isso garante que o usuário obtenha a versão mais recente sem precisar fechar e reabrir o app
     let refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (refreshing) return;
@@ -23,11 +24,8 @@ export function RegisterServiceWorker() {
       window.location.reload();
     });
 
-    navigator.serviceWorker.register('/sw.js').catch(() => {
-      // Falha silenciosa para não impactar o fluxo principal.
-    });
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
   }, []);
 
   return null;
 }
-

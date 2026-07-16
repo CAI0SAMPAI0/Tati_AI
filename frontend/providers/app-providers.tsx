@@ -21,6 +21,11 @@ const UpdateBanner = dynamic(
   { ssr: false }
 );
 
+const GlobalErrorHandler = dynamic(
+  () => import('@/components/global-error-handler').then(m => m.GlobalErrorHandler as any),
+  { ssr: false }
+);
+
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
@@ -45,6 +50,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
           <RegisterServiceWorker />
           <CapacitorHandler />
           <UpdateBanner />
+          <GlobalErrorHandler />
         </AuthProvider>
       </QueryProvider>
     </ThemeProvider>
