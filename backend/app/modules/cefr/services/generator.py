@@ -36,7 +36,7 @@ class CEFRGeneratorService:
             if img_url:
                 card['image_url'] = img_url
         except Exception as e:
-            logging.info(f"[CEFRGenerator] Falha ao buscar imagem para flashcard: {e}")
+            logging.error(f"[CEFRGenerator] Falha ao buscar imagem para flashcard: {e}")
 
     @staticmethod
     async def add_images_to_flashcards(flashcards: List[Dict[str, Any]]) -> None:
@@ -131,7 +131,7 @@ class CEFRGeneratorService:
             flashcards = data.get('flashcards', [])
             return flashcards
         except Exception as e:
-            logging.info(
+            logging.error(
                 f"[CEFRGenerator] Erro ao gerar flashcards: {e}")
             return None
 
@@ -194,7 +194,7 @@ class CEFRGeneratorService:
 
             return data.get('exercises', [])
         except Exception as e:
-            logging.info(
+            logging.error(
                 f"[CEFRGenerator] Erro ao gerar exercícios: {e}")
             return None
 
@@ -256,6 +256,6 @@ class CEFRGeneratorService:
 
             return data.get('simulations', [])
         except Exception as e:
-            logging.info(
+            logging.error(
                 f"[CEFRGenerator] Erro ao gerar simulações: {e}")
             return None

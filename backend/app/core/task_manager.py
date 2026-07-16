@@ -1,5 +1,6 @@
 import uuid
 import logging
+import asyncio
 import httpx
 from typing import Callable, Any, Dict
 from fastapi import BackgroundTasks, Request, HTTPException
@@ -37,17 +38,19 @@ def run_task_in_background(
     task_id = f"local_{uuid.uuid4()}"
     local_tasks_status[task_id] = {"status": "processing", "result": None}
     
-    def wrapper():
+    async def async_wrapper():
         try:
             logging.info(f"[TaskManager] Running local background task {task_id}")
-            result = task_func(*args, **kwargs)
+            # Use to_thread so sync Celery tasks (which call asyncio.run())
+            # can create their own event loop without conflicting
+            result = await asyncio.to_thread(task_func, *args, **kwargs)
             set_local_task_status(task_id, "success", result=result)
             logging.info(f"[TaskManager] Local background task {task_id} succeeded")
         except Exception as e:
             logging.error(f"[TaskManager] Local background task {task_id} failed: {e}", exc_info=True)
             set_local_task_status(task_id, "failed", error=str(e))
             
-    background_tasks.add_task(wrapper)
+    background_tasks.add_task(async_wrapper)
     return task_id
 
 

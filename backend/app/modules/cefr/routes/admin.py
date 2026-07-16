@@ -217,7 +217,7 @@ async def generate_flashcards(
             "success": True,
             "task_id": task_id}
     except Exception as e:
-        logging.info(f"[AdminRoute] Error triggering flashcard generation: {e}")
+        logging.error(f"[AdminRoute] Error triggering flashcard generation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -249,7 +249,7 @@ async def generate_exercises(
             "success": True,
             "task_id": task_id}
     except Exception as e:
-        logging.info(f"[AdminRoute] Error triggering exercises generation: {e}")
+        logging.error(f"[AdminRoute] Error triggering exercises generation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -281,7 +281,7 @@ async def generate_simulations(
             "success": True,
             "task_id": task_id}
     except Exception as e:
-        logging.info(f"[AdminRoute] Error triggering simulations generation: {e}")
+        logging.error(f"[AdminRoute] Error triggering simulations generation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -356,7 +356,7 @@ async def get_all_content():
             "simulations": simulations
         }
     except Exception as e:
-        logging.info(f"[AdminRoute] Error fetching content: {e}")
+        logging.error(f"[AdminRoute] Error fetching content: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -521,7 +521,7 @@ async def update_cefr_exercise(
                 status_code=404, detail="Exercise not found")
         return {"success": True, "data": res.data[0]}
     except Exception as e:
-        logging.info(f"[AdminRoute] Error updating exercise: {e}")
+        logging.error(f"[AdminRoute] Error updating exercise: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -538,7 +538,7 @@ async def delete_cefr_exercise(exercise_id: str):
             "success": True,
             "message": "Exercise deleted successfully."}
     except Exception as e:
-        logging.info(f"[AdminRoute] Error deleting exercise: {e}")
+        logging.error(f"[AdminRoute] Error deleting exercise: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -562,7 +562,7 @@ async def update_cefr_flashcard(
                 status_code=404, detail="Flashcard not found")
         return {"success": True, "data": res.data[0]}
     except Exception as e:
-        logging.info(f"[AdminRoute] Error updating flashcard: {e}")
+        logging.error(f"[AdminRoute] Error updating flashcard: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -579,7 +579,7 @@ async def delete_cefr_flashcard(flashcard_id: str):
             "success": True,
             "message": "Flashcard deleted successfully."}
     except Exception as e:
-        logging.info(f"[AdminRoute] Error deleting flashcard: {e}")
+        logging.error(f"[AdminRoute] Error deleting flashcard: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -603,7 +603,7 @@ async def update_cefr_simulation(
                 status_code=404, detail="Simulation not found")
         return {"success": True, "data": res.data[0]}
     except Exception as e:
-        logging.info(f"[AdminRoute] Error updating simulation: {e}")
+        logging.error(f"[AdminRoute] Error updating simulation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -620,7 +620,7 @@ async def delete_cefr_simulation(simulation_id: str):
             "success": True,
             "message": "Simulation deleted successfully."}
     except Exception as e:
-        logging.info(f"[AdminRoute] Error deleting simulation: {e}")
+        logging.error(f"[AdminRoute] Error deleting simulation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -630,6 +630,7 @@ class CEFRScheduleCreate(BaseModel):
     execution_time: str  # e.g., "03:00"
     weekly_frequency: Optional[int] = 1
     materials_per_execution: Optional[int] = 5
+    selected_types: Optional[List[str]] = None  # e.g., ["flashcards", "exercises"]
 
 
 class CEFRScheduleUpdate(BaseModel):
@@ -638,6 +639,7 @@ class CEFRScheduleUpdate(BaseModel):
     execution_time: Optional[str] = None
     weekly_frequency: Optional[int] = None
     materials_per_execution: Optional[int] = None
+    selected_types: Optional[List[str]] = None
 
 
 @router.get("/schedules")

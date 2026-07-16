@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { loginWithCredentials, loginWithGoogle, registerUser, requestPasswordReset } from '@/lib/api/auth';
 import { LEVEL_OPTIONS } from '@/lib/constants/levels';
+import { Capacitor } from '@capacitor/core';
 
 type Tab = 'login' | 'register' | 'forgot';
 
@@ -64,14 +65,8 @@ export default function LoginPage() {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     if (!clientId) return;
 
-    const isCapacitor = typeof window !== 'undefined' && (
-      (window as any).location?.protocol === 'capacitor:' ||
-      (window as any).Capacitor?.isNativePlatform?.() ||
-      document.referrer.includes('android-app://')
-    );
-
     // In Capacitor: skip GIS, use system browser via backend endpoint
-    if (isCapacitor) return;
+    if (Capacitor.isNativePlatform()) return;
 
     const initGoogle = (retries = 0) => {
       if (typeof window === 'undefined') return;
@@ -139,12 +134,8 @@ export default function LoginPage() {
       const res = await fetch(`${apiBase}/auth/google/url`);
       const data = await res.json();
       if (data.url) {
-        const w = window as any;
-        if (w.Capacitor?.Plugins?.ExternalBrowser) {
-          await w.Capacitor.Plugins.ExternalBrowser.open({ url: data.url });
-        } else {
-          window.open(data.url, '_blank');
-        }
+        const { Browser } = await import('@capacitor/browser');
+        await Browser.open({ url: data.url });
       } else {
         setError('Google login not configured.');
       }
@@ -315,8 +306,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      const isCapacitor = (window as any).Capacitor?.isNativePlatform?.();
-                      if (isCapacitor) {
+                      if (Capacitor.isNativePlatform()) {
                         handleGoogleLoginCapacitor();
                       } else {
                         // Trigger the hidden GIS button
@@ -333,7 +323,9 @@ export default function LoginPage() {
                     </svg>
                     <span>{'Continue with Google'}</span>
                   </button>
-                  <div ref={googleBtnRef} className="absolute inset-0 overflow-hidden rounded-[9px] opacity-[0.001] cursor-pointer flex items-center justify-center" />
+                  {!Capacitor.isNativePlatform() && (
+                    <div ref={googleBtnRef} className="absolute inset-0 overflow-hidden rounded-[9px] opacity-[0.001] cursor-pointer flex items-center justify-center" />
+                  )}
                 </div>
                 <div className="flex items-center gap-3 mb-4 text-text-subtle text-[0.73rem] tracking-wider">
                   <span className="flex-1 h-px bg-border" />

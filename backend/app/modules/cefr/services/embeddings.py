@@ -49,7 +49,7 @@ class EmbeddingsService:
                 if res.data:
                     saved_count += 1
             except Exception as e:
-                logging.info(f"[EmbeddingsService] Error saving chunk {i} of file {source_file}: {e}")
+                logging.error(f"[EmbeddingsService] Error saving chunk {i} of file {source_file}: {e}")
 
         return saved_count
 
@@ -98,5 +98,5 @@ class EmbeddingsService:
             res = client.rpc('match_cefr_documents', params).execute()
             return res.data
         except Exception as e:
-            logging.info(f"[EmbeddingsService] Error searching similarity: {e}")
+            logging.error(f"[EmbeddingsService] Error searching similarity: {e}")
             return []
