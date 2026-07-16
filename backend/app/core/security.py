@@ -62,3 +62,7 @@ _SAFE_ALPHABET = ''.join(
 def generate_temp_password(length: int = 12) -> str:
     return ''.join(secrets.choice(_SAFE_ALPHABET)
                    for _ in range(length))
+
+
+def generate_reset_token() -> str:
+    return secrets.token_urlsafe(32)

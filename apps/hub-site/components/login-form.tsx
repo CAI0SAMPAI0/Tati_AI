@@ -53,6 +53,12 @@ export function LoginForm() {
 
     let cancelled = false;
 
+    const isCapacitor = typeof window !== 'undefined' && (
+      (window as any).location?.protocol === 'capacitor:' ||
+      (window as any).Capacitor?.isNativePlatform?.() ||
+      document.referrer.includes('android-app://')
+    );
+
     const initGoogle = (retries = 0) => {
       if (cancelled) return;
 
@@ -74,13 +80,21 @@ export function LoginForm() {
         return;
       }
 
-      google.accounts.id.initialize({
+      const config: Record<string, unknown> = {
         client_id: clientId,
         callback: handleGoogleCredential,
         auto_select: false,
         cancel_on_tap_outside: true,
-        ux_mode: 'popup',
-      });
+      };
+
+      if (isCapacitor) {
+        config.ux_mode = 'redirect';
+        config.login_uri = `${process.env.NEXT_PUBLIC_API_BASE_URL || ''}/auth/google`;
+      } else {
+        config.ux_mode = 'popup';
+      }
+
+      google.accounts.id.initialize(config);
 
       if (googleBtnRef.current) {
         google.accounts.id.renderButton(googleBtnRef.current, {
@@ -111,6 +125,18 @@ export function LoginForm() {
     setError('');
     setSuccess('');
   }
+
+  // Handle Google OAuth redirect callback (used in Capacitor/Android)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const credential = params.get('credential');
+    if (credential) {
+      handleGoogleCredential({ credential });
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handleAuthSuccess(accessToken: string, nextUser: Parameters<typeof saveSession>[1]) {
     saveSession(accessToken, nextUser);

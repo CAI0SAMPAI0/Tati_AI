@@ -36,6 +36,14 @@ class ForgotPasswordBody(BaseModel):
     """Identificador para recuperação de senha."""
 
     identifier: str
+    base_url: str = ''
+
+
+class ResetPasswordBody(BaseModel):
+    """Dados para redefinição de senha via token."""
+
+    token: str
+    new_password: str
 
 
 class ChangePasswordBody(BaseModel):
@@ -105,10 +113,37 @@ async def register(
 
 @router.post('/google')
 async def google_login(
-        body: GoogleBody,
+        request: Request,
         db: Client = Depends(get_db)) -> dict:
-    """Authenticates via Google OAuth2. Creates account if needed."""
-    return await AuthService.google_login(db, body.credential, body.is_hub_only)
+    """Authenticates via Google OAuth2. Creates account if needed.
+    Handles both JSON body (web popup) and form-data (redirect callback)."""
+    credential = None
+    is_hub_only = False
+
+    # Try form-data (redirect callback from Google)
+    try:
+        form_data = await request.form()
+        credential = form_data.get('credential')
+        is_hub_only = form_data.get('is_hub_only', 'false') == 'true'
+    except Exception:
+        pass
+
+    # Fallback: JSON body (web popup)
+    if not credential:
+        try:
+            json_data = await request.json()
+            credential = json_data.get('credential')
+            is_hub_only = json_data.get('is_hub_only', False)
+        except Exception:
+            pass
+
+    if not credential:
+        raise HTTPException(
+            status_code=422,
+            detail='Google credential not provided.',
+        )
+
+    return await AuthService.google_login(db, credential, is_hub_only)
 
 
 #  Forgot password ─
@@ -118,8 +153,16 @@ async def google_login(
 async def forgot_password(
         body: ForgotPasswordBody,
         db: Client = Depends(get_db)) -> dict:
-    """Envia senha temporária por e-mail."""
-    return await AuthService.process_forgot_password(db, body.identifier)
+    """Envia link de redefinição de senha por e-mail."""
+    return await AuthService.process_forgot_password(db, body.identifier, body.base_url)
+
+
+@router.post('/reset-password')
+async def reset_password(
+        body: ResetPasswordBody,
+        db: Client = Depends(get_db)) -> dict:
+    """Redefine a senha usando token recebido por e-mail."""
+    return await AuthService.reset_password_with_token(db, body.token, body.new_password)
 
 
 #  Change password (autenticado) ─

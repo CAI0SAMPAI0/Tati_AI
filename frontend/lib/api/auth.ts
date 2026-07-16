@@ -31,8 +31,16 @@ export async function registerUser(payload: {
 
 export async function requestPasswordReset(
   identifier: string,
+): Promise<{ ok: boolean; status: number; data: { message?: string; detail?: string; dev_mode?: boolean; reset_token?: string } }> {
+  const base_url = typeof window !== 'undefined' ? window.location.origin : '';
+  return apiPost('/auth/forgot-password', { identifier, base_url });
+}
+
+export async function resetPasswordWithToken(
+  token: string,
+  newPassword: string,
 ): Promise<{ ok: boolean; status: number; data: { message?: string; detail?: string } }> {
-  return apiPost('/auth/forgot-password', { identifier });
+  return apiPost('/auth/reset-password', { token, new_password: newPassword });
 }
 
 const TOKEN_KEY = 'token';

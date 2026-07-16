@@ -289,22 +289,26 @@ class EmailSender:
             self,
             to_email: str,
             name: str,
-            temp_password: str) -> bool:
-        subject = "Teacher Tati — Your temporary password"
-        html = self._build_email_html(name, temp_password)
+            reset_url: str) -> bool:
+        subject = "Teacher Tati — Reset your password"
+        html = self._build_reset_email_html(name, reset_url)
         return self._send(to_email, subject, html)
 
-    def _build_email_html(self, name: str, temp_password: str) -> str:
+    def _build_reset_email_html(self, name: str, reset_url: str) -> str:
+        button_html = ''
+        if reset_url:
+            button_html = f'''
+<div style="text-align:center;margin:25px 0;">
+<a href="{reset_url}" style="display:inline-block;background:#6366f1;color:#fff;padding:14px 32px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:16px;">Reset My Password</a>
+</div>
+<p style="font-size:13px;color:#666;text-align:center;">Or copy this link: <a href="{reset_url}" style="color:#6366f1;">{reset_url}</a></p>'''
         return f"""
 <div style="font-family:Arial,sans-serif;max-width:600px;color:#333;">
-<h2 style="color:#6366f1;">Your Temporary Password</h2>
+<h2 style="color:#6366f1;">Reset Your Password</h2>
 <p>Hi <strong>{name}</strong>,</p>
-<p>You requested a new password for your Teacher Tati account.</p>
-<div style="background:#f3f4f6;padding:20px;text-align:center;border-radius:8px;margin:20px 0;">
-<p style="margin:0;font-size:14px;color:#666;">Use the password below to log in:</p>
-<p style="margin:10px 0 0;font-size:24px;font-weight:bold;color:#1f2937;">{temp_password}</p>
-</div>
-<p>We recommend changing your password in your profile settings after logging in.</p>
+<p>You requested a password reset for your Teacher Tati account.</p>
+<p>Click the button below to set a new password. This link expires in 30 minutes.</p>
+{button_html}
 <p style="color:#ef4444;font-size:13px;">If you didn't request this change, please ignore this email.</p>
 <hr style="border:0;border-top:1px solid #eee;margin:20px 0;">
 <p style="font-size:12px;color:#999;">Teacher Tati Team</p>

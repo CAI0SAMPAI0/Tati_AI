@@ -10,6 +10,7 @@ from google.oauth2 import id_token
 from app.core.config import settings
 from app.core.security import (
     create_access_token,
+    generate_reset_token,
     generate_temp_password,
     hash_password,
     verify_password,
@@ -167,7 +168,7 @@ class AuthService:
 
     @staticmethod
     async def process_forgot_password(
-            db: Client, identifier: str) -> Dict[str, Any]:
+            db: Client, identifier: str, base_url: str = '') -> Dict[str, Any]:
         user = await UserRepository.find_by_identifier(
             db, identifier, 'username, name, email, password'
         )
@@ -183,26 +184,32 @@ class AuthService:
                 'message': 'Se o usuário existir, um e-mail será enviado.',
             }
 
-        temp_password = generate_temp_password()
+        reset_token = generate_reset_token()
+        from datetime import datetime, timedelta, timezone
+        expires_at = (datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat()
         await UserRepository.update_user(
             db, user['username'], {
-                'temp_password': hash_password(temp_password)}
+                'reset_token': reset_token,
+                'reset_token_expires': expires_at,
+            }
         )
+
+        reset_url = f"{base_url}/reset-password?token={reset_token}" if base_url else ''
 
         email_sender = EmailSender()
         email_sent = await run_in_threadpool(
             email_sender.send_reset_email,
             user['email'],
             user.get('name') or user['username'],
-            temp_password,
+            reset_url,
         )
 
         if not email_sent and not settings.smtp_user:
             return {
                 'ok': True,
                 'dev_mode': True,
-                'message': f'SMTP não configurado. Senha temporária (apenas em dev): {temp_password}',
-                'temp_password': temp_password,
+                'message': f'SMTP não configurado. Token (apenas em dev): {reset_token}',
+                'reset_token': reset_token,
             }
         if not email_sent:
             raise HTTPException(
@@ -213,6 +220,41 @@ class AuthService:
             'ok': True,
             'message': 'E-mail enviado! Verifique sua caixa de entrada.',
         }
+
+    @staticmethod
+    async def reset_password_with_token(
+            db: Client, token: str, new_password: str) -> Dict[str, Any]:
+        from datetime import datetime, timezone
+        user = await UserRepository.find_by_reset_token(db, token)
+        if not user:
+            raise HTTPException(
+                status_code=400,
+                detail='Token inválido ou expirado.')
+
+        expires_str = user.get('reset_token_expires')
+        if expires_str:
+            try:
+                expires = datetime.fromisoformat(expires_str.replace('Z', '+00:00'))
+                if datetime.now(timezone.utc) > expires:
+                    raise HTTPException(
+                        status_code=400,
+                        detail='Token inválido ou expirado.')
+            except (ValueError, TypeError):
+                pass
+
+        if len(new_password) < 6:
+            raise BusinessLogicError(
+                'Nova senha deve ter pelo menos 6 caracteres')
+
+        await UserRepository.update_user(
+            db, user['username'], {
+                'password': hash_password(new_password),
+                'reset_token': None,
+                'reset_token_expires': None,
+                'temp_password': None,
+            }
+        )
+        return {'ok': True, 'message': 'Senha alterada com sucesso.'}
 
     @staticmethod
     async def change_password(

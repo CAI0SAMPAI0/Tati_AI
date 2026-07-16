@@ -131,3 +131,20 @@ class UserRepository:
                 'username', username).execute()
 
         await run_in_threadpool(_update)
+
+    @staticmethod
+    async def find_by_reset_token(
+        db: Client, token: str
+    ) -> Optional[Dict[str, Any]]:
+        def _fetch():
+            rows = (
+                db.table('users')
+                .select('username, name, email, reset_token_expires')
+                .eq('reset_token', token)
+                .limit(1)
+                .execute()
+                .data
+            )
+            return rows[0] if rows else None
+
+        return await run_in_threadpool(_fetch)

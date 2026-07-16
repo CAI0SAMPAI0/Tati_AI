@@ -46,10 +46,29 @@ export default function LoginPage() {
     clearMessages();
   };
 
+  // Handle Google OAuth redirect callback (used in Capacitor/Android)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const credential = params.get('credential');
+    if (credential) {
+      handleGoogleCredential({ credential });
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Google OAuth
   useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     if (!clientId) return;
+
+    const isCapacitor = typeof window !== 'undefined' && (
+      (window as any).location?.protocol === 'capacitor:' ||
+      (window as any).Capacitor?.isNativePlatform?.() ||
+      document.referrer.includes('android-app://')
+    );
 
     const initGoogle = (retries = 0) => {
       if (typeof window === 'undefined') return;
@@ -59,13 +78,21 @@ export default function LoginPage() {
         return;
       }
 
-      g.accounts.id.initialize({
+      const config: any = {
         client_id: clientId,
         callback: handleGoogleCredential,
         auto_select: false,
         cancel_on_tap_outside: true,
-        ux_mode: 'popup',
-      });
+      };
+
+      if (isCapacitor) {
+        config.ux_mode = 'redirect';
+        config.login_uri = `${process.env.NEXT_PUBLIC_API_BASE_URL || ''}/auth/google`;
+      } else {
+        config.ux_mode = 'popup';
+      }
+
+      g.accounts.id.initialize(config);
 
       if (googleBtnRef.current) {
         g.accounts.id.renderButton(googleBtnRef.current, {
@@ -79,13 +106,9 @@ export default function LoginPage() {
       }
     };
 
-    // We rely on next/script for loading GIS.
-    // Ensure it initializes if already loaded.
     if ((window as any).google?.accounts?.id) {
       initGoogle();
     } else {
-      // It will initialize once the script loads and window.onload is called,
-      // but we also have an interval just in case.
       initGoogle();
     }
 
@@ -177,9 +200,10 @@ export default function LoginPage() {
       if (!res.ok) { setError((res.data as any).detail || 'Error requesting password reset.'); return; }
       const data = res.data as any;
       if (data.dev_mode) {
-        setForgotResult({ type: 'dev', html: `Temporary Password: ${data.temp_password}` });
+        const resetLink = `${window.location.origin}/reset-password?token=${data.reset_token}`;
+        setForgotResult({ type: 'dev', html: `Reset link (dev mode): ${resetLink}` });
       } else {
-        setForgotResult({ type: 'success', html: 'Check your email for instructions.' });
+        setForgotResult({ type: 'success', html: 'Check your email for the reset link.' });
       }
     } catch {
       setError('Connection error. Check if the server is running.');
