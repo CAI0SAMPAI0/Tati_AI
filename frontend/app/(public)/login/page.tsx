@@ -139,7 +139,12 @@ export default function LoginPage() {
       const res = await fetch(`${apiBase}/auth/google/url`);
       const data = await res.json();
       if (data.url) {
-        window.open(data.url, '_system');
+        const w = window as any;
+        if (w.Capacitor?.Plugins?.ExternalBrowser) {
+          await w.Capacitor.Plugins.ExternalBrowser.open({ url: data.url });
+        } else {
+          window.open(data.url, '_blank');
+        }
       } else {
         setError('Google login not configured.');
       }

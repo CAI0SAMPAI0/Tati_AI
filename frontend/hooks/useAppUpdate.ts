@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 const LAST_VERSION_KEY = 'tati_app_version';
-const CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30 min
+const CHECK_INTERVAL_MS = 30 * 60 * 1000;
 
 interface AppVersion {
   android: string;
@@ -51,13 +51,13 @@ export function useAppUpdate() {
   const downloadUpdate = useCallback(async () => {
     if (!downloadUrl) return;
 
-    const isCapacitor = (window as any).Capacitor?.isNativePlatform?.();
-    if (isCapacitor) {
+    const w = window as any;
+    const isCapacitor = w.Capacitor?.isNativePlatform?.();
+
+    if (isCapacitor && w.Capacitor?.Plugins?.ExternalBrowser) {
       try {
-        const { Browser } = await import('@capacitor/browser');
-        await Browser.open({ url: downloadUrl });
+        await w.Capacitor.Plugins.ExternalBrowser.open({ url: downloadUrl });
       } catch {
-        // Fallback: try opening in the WebView itself
         window.location.href = downloadUrl;
       }
     } else {
