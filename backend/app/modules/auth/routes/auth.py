@@ -37,6 +37,7 @@ class ForgotPasswordBody(BaseModel):
 
     identifier: str
     base_url: str = ''
+    is_app: bool = False
 
 
 class ResetPasswordBody(BaseModel):
@@ -154,7 +155,7 @@ async def forgot_password(
         body: ForgotPasswordBody,
         db: Client = Depends(get_db)) -> dict:
     """Envia link de redefinição de senha por e-mail."""
-    return await AuthService.process_forgot_password(db, body.identifier, body.base_url)
+    return await AuthService.process_forgot_password(db, body.identifier, body.base_url, body.is_app)
 
 
 @router.post('/reset-password')

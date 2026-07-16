@@ -24,7 +24,10 @@ export function middleware(request: NextRequest) {
     (route) => pathname === route || pathname.startsWith(route + '/')
   );
 
-  if (token && isPublicRoute) {
+  // Allow /reset-password even when logged in (user clicked email link)
+  const isResetWithToken = pathname === '/reset-password' && request.nextUrl.searchParams.has('token');
+
+  if (token && isPublicRoute && !isResetWithToken) {
     const url = request.nextUrl.clone();
     url.pathname = '/chat';
     return NextResponse.redirect(url);

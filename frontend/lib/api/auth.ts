@@ -33,7 +33,8 @@ export async function requestPasswordReset(
   identifier: string,
 ): Promise<{ ok: boolean; status: number; data: { message?: string; detail?: string; dev_mode?: boolean; reset_token?: string } }> {
   const base_url = typeof window !== 'undefined' ? window.location.origin : '';
-  return apiPost('/auth/forgot-password', { identifier, base_url });
+  const is_app = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
+  return apiPost('/auth/forgot-password', { identifier, base_url, is_app });
 }
 
 export async function resetPasswordWithToken(

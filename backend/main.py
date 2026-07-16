@@ -288,6 +288,13 @@ else:
             "db_check": res_msg
         }
 
+    @app.get('/app/version')
+    async def app_version():
+        return {
+            "android": os.getenv("APP_VERSION_ANDROID", "1.0.0"),
+            "download_url": os.getenv("APP_DOWNLOAD_URL", ""),
+        }
+
 if __name__ == '__main__':
     import uvicorn
     if os.getenv("RUN_AS_PROXY") == "true":

@@ -9,25 +9,46 @@ export function CapacitorHandler() {
 
   useEffect(() => {
     let appPlugin: any = null;
+    let backListener: any = null;
+    let urlListener: any = null;
 
     const initCapacitor = async () => {
       try {
         const { App } = await import('@capacitor/app');
         appPlugin = App;
-        
-        const listener = await App.addListener('backButton', ({ canGoBack }) => {
-          // Se estivermos em uma página raiz ou não houver histórico, sai do app
+
+        // Back button handler
+        backListener = await App.addListener('backButton', ({ canGoBack }) => {
           const isRootPage = ['/dashboard', '/login', '/'].includes(pathname);
-          
+
           if (isRootPage || !canGoBack) {
             App.exitApp();
           } else {
-            // Usa o router do Next.js para garantir que o estado da SPA seja atualizado
             router.back();
           }
         });
 
-        return listener;
+        // Deep link handler (com.tati.ai://...)
+        urlListener = await App.addListener('appUrlOpen', (event: { url: string }) => {
+          const url = event.url;
+
+          if (url.includes('reset-password')) {
+            try {
+              const parsed = new URL(url);
+              const token = parsed.searchParams.get('token');
+              if (token) {
+                router.push(`/reset-password?token=${token}`);
+              }
+            } catch {
+              const match = url.match(/token=([^&]+)/);
+              if (match) {
+                router.push(`/reset-password?token=${match[1]}`);
+              }
+            }
+          }
+        });
+
+        return { backListener, urlListener };
       } catch (e) {
         // Not running in Capacitor
       }
@@ -36,8 +57,9 @@ export function CapacitorHandler() {
     const promise = initCapacitor();
 
     return () => {
-      promise.then(listener => {
-        if (listener) listener.remove();
+      promise.then(listeners => {
+        listeners?.backListener?.remove();
+        listeners?.urlListener?.remove();
       });
     };
   }, [router, pathname]);

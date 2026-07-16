@@ -168,7 +168,7 @@ class AuthService:
 
     @staticmethod
     async def process_forgot_password(
-            db: Client, identifier: str, base_url: str = '') -> Dict[str, Any]:
+            db: Client, identifier: str, base_url: str = '', is_app: bool = False) -> Dict[str, Any]:
         user = await UserRepository.find_by_identifier(
             db, identifier, 'username, name, email, password'
         )
@@ -194,7 +194,12 @@ class AuthService:
             }
         )
 
-        reset_url = f"{base_url}/reset-password?token={reset_token}" if base_url else ''
+        if is_app:
+            reset_url = f"com.tati.ai://reset-password?token={reset_token}"
+        elif base_url:
+            reset_url = f"{base_url}/reset-password?token={reset_token}"
+        else:
+            reset_url = ''
 
         email_sender = EmailSender()
         email_sent = await run_in_threadpool(
