@@ -46,11 +46,17 @@ export function useAppUpdate() {
   const downloadUpdate = useCallback(async () => {
     if (!downloadUrl) return;
 
-    try {
-      const { Browser } = await import('@capacitor/browser');
-      await Browser.open({ url: downloadUrl });
-    } catch {
-      window.location.href = downloadUrl;
+    const w = window as any;
+    const isCapacitor = w.Capacitor?.isNativePlatform?.();
+
+    if (isCapacitor && w.Capacitor?.Plugins?.ExternalBrowser) {
+      try {
+        await w.Capacitor.Plugins.ExternalBrowser.open({ url: downloadUrl });
+      } catch {
+        window.location.href = downloadUrl;
+      }
+    } else {
+      window.open(downloadUrl, '_blank');
     }
   }, [downloadUrl]);
 
