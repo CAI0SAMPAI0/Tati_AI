@@ -10,7 +10,7 @@ export function useGoogleAuth() {
     try {
       const { GoogleAuth } = await import('@southdevs/capacitor-google-auth');
       await GoogleAuth.initialize();
-      const user = await GoogleAuth.signIn();
+      const user = await GoogleAuth.signIn({ scopes: ['profile', 'email', 'openid'] });
       if (user?.authentication?.idToken) {
         return { idToken: user.authentication.idToken };
       }
