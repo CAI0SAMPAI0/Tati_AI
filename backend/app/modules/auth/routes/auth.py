@@ -269,6 +269,8 @@ async def google_callback(request: Request, code: str = '', db: Client = Depends
     jwt_token = create_access_token(token_payload)
 
     # Return HTML that redirects to app via deep link
+    import json
+    user_json = json.dumps(user)
     deep_link = f"com.tati.ai://auth?jwt={jwt_token}"
     intent_link = f"intent://auth?jwt={jwt_token}#Intent;scheme=com.tati.ai;package=com.tati.ai;end"
     return HTMLResponse(f'''<!DOCTYPE html>
@@ -292,7 +294,7 @@ async def google_callback(request: Request, code: str = '', db: Client = Depends
   <script>
     (function() {{
       var jwt = "{jwt_token}";
-      var user = {user};
+      var user = {user_json};
       localStorage.setItem("token", jwt);
       localStorage.setItem("user", JSON.stringify(user));
 
@@ -318,7 +320,6 @@ async def google_callback(request: Request, code: str = '', db: Client = Depends
       }}
 
       btn.addEventListener("click", openApp);
-      // Auto-try once after a short delay
       setTimeout(openApp, 800);
     }})();
   </script>

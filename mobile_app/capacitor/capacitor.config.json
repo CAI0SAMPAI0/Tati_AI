@@ -6,5 +6,12 @@
   "server": {
     "url": "https://tati-ai.vercel.app",
     "cleartext": true
+  },
+  "plugins": {
+    "GoogleAuth": {
+      "scopes": ["profile", "email", "openid"],
+      "serverClientId": "237918390149-kh6ta3o2d011ehkqn2s3iept839asarl.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": true
+    }
   }
 }

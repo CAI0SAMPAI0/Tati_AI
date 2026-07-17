@@ -221,6 +221,14 @@ class AuthService:
                 status_code=500,
                 detail='Erro ao enviar e-mail. Tente novamente.')
 
+        if is_app:
+            return {
+                'ok': True,
+                'is_app': True,
+                'message': 'Código enviado! Verifique seu e-mail.',
+                'reset_token': reset_token,
+            }
+
         return {
             'ok': True,
             'message': 'E-mail enviado! Verifique sua caixa de entrada.',

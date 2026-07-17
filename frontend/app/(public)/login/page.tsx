@@ -13,7 +13,7 @@ import { loginWithCredentials, loginWithGoogle, registerUser, requestPasswordRes
 import { LEVEL_OPTIONS } from '@/lib/constants/levels';
 import { Capacitor } from '@capacitor/core';
 
-type Tab = 'login' | 'register' | 'forgot';
+type Tab = 'login' | 'register' | 'forgot' | 'reset';
 
 export default function LoginPage() {
   const [activeTab, setActiveTab] = useState<Tab>('login');
@@ -130,25 +130,40 @@ export default function LoginPage() {
     clearMessages();
     setLoading(true);
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const res = await fetch(`${apiBase}/auth/google/url`);
-      const data = await res.json();
-      if (data.url) {
-        try {
-          const { Browser } = await import('@capacitor/browser');
-          await Browser.open({ url: data.url });
-        } catch {
-          window.open(data.url, '_blank');
-        }
+      const w = window as any;
+      const isNative = w.Capacitor?.isNativePlatform?.();
+
+      if (isNative) {
+        const { GoogleAuth } = await import('@southdevs/capacitor-google-auth');
+        await GoogleAuth.initialize();
+        const user = await GoogleAuth.signIn();
+        const idToken = user?.authentication?.idToken;
+        if (!idToken) { setError('Google sign-in failed.'); return; }
+        const res = await loginWithGoogle(idToken);
+        if (!res.ok) { setError('Google login failed.'); return; }
+        await saveSession(res.data.access_token, res.data.user);
+        router.push('/chat');
       } else {
-        setError('Google login not configured.');
+        const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+        const res = await fetch(`${apiBase}/auth/google/url`);
+        const data = await res.json();
+        if (data.url) {
+          try {
+            const { Browser } = await import('@capacitor/browser');
+            await Browser.open({ url: data.url });
+          } catch {
+            window.open(data.url, '_blank');
+          }
+        } else {
+          setError('Google login not configured.');
+        }
       }
     } catch {
       setError('Connection error. Check if the server is running.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [router, saveSession]);
 
   const isHubAccess = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('access') === 'hub';
 
@@ -204,6 +219,11 @@ export default function LoginPage() {
   };
 
   // Forgot password
+  const [resetToken, setResetToken] = useState('');
+  const [resetPw, setResetPw] = useState('');
+  const [resetConfirmPw, setResetConfirmPw] = useState('');
+  const [resetDone, setResetDone] = useState(false);
+
   const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault();
     clearMessages();
@@ -213,12 +233,37 @@ export default function LoginPage() {
       const res = await requestPasswordReset(forgotId);
       if (!res.ok) { setError((res.data as any).detail || 'Error requesting password reset.'); return; }
       const data = res.data as any;
-      if (data.dev_mode) {
-        const resetLink = `${window.location.origin}/reset-password?token=${data.reset_token}`;
-        setForgotResult({ type: 'dev', html: `Reset link (dev mode): ${resetLink}` });
+      if (data.is_app && data.reset_token) {
+        setResetToken(data.reset_token);
+        setForgotResult({ type: 'success', html: 'Code sent to your email. Enter the code below and choose a new password.' });
+        setActiveTab('reset');
+      } else if (data.dev_mode) {
+        setResetToken(data.reset_token);
+        setForgotResult({ type: 'success', html: 'Dev mode — enter a new password below.' });
+        setActiveTab('reset');
       } else {
         setForgotResult({ type: 'success', html: 'Check your email for the reset link.' });
       }
+    } catch {
+      setError('Connection error. Check if the server is running.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    clearMessages();
+    if (!resetToken) { setError('No reset token.'); return; }
+    if (resetPw.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (resetPw !== resetConfirmPw) { setError('Passwords do not match.'); return; }
+    setLoading(true);
+    try {
+      const res = await resetPasswordWithToken(resetToken, resetPw);
+      if (!res.ok) { setError((res.data as any).detail || 'Error resetting password.'); return; }
+      setResetDone(true);
+      setForgotResult({ type: 'success', html: 'Password reset successfully! Redirecting to login...' });
+      setTimeout(() => { switchTab('login'); setResetDone(false); setResetToken(''); setResetPw(''); setResetConfirmPw(''); }, 2000);
     } catch {
       setError('Connection error. Check if the server is running.');
     } finally {
@@ -389,13 +434,35 @@ export default function LoginPage() {
                   {'← Back to login'}
                 </button>
                 <p className="text-base font-bold text-text mb-1">{'🔒 Forgot my password'}</p>
-                <p className="text-[0.82rem] text-text-muted mb-5 leading-relaxed">{'Enter your username or email. We\'ll generate a temporary password and send it to you.'}</p>
+                <p className="text-[0.82rem] text-text-muted mb-5 leading-relaxed">{'Enter your username or email.'}</p>
                 <Input label={'Username or Email'} placeholder={'Username or Email'} autoComplete="username" value={forgotId} onChange={(e) => setForgotId(e.target.value)} />
+                <Button type="submit" fullWidth loading={loading}>
+                  {'Send Reset Code'}
+                </Button>
+                {forgotResult && (
+                  <div className={`mt-4 p-3.5 rounded-md text-[0.83rem] leading-relaxed ${forgotResult.type === 'success' ? 'bg-success/10 border border-success/30 text-success' : forgotResult.type === 'dev' ? 'bg-primary/10 border border-primary/35 text-text text-center' : 'bg-danger/10 border border-danger/30 text-danger'}`}>
+                    {forgotResult.html}
+                  </div>
+                )}
+              </form>
+            )}
+
+            {/* Reset Password Form (in-app) */}
+            {activeTab === 'reset' && (
+              <form onSubmit={handleResetSubmit}>
+                <button type="button" onClick={() => switchTab('forgot')} className="flex items-center gap-1.5 text-text-muted text-[0.82rem] font-medium mb-5 hover:text-primary transition-colors">
+                  {'← Back'}
+                </button>
+                <p className="text-base font-bold text-text mb-1">{'🔐 Reset your password'}</p>
+                <p className="text-[0.82rem] text-text-muted mb-5 leading-relaxed">{'Enter the code from your email and choose a new password.'}</p>
+                <Input label={'Reset Code'} placeholder={'Paste the code from your email'} value={resetToken} onChange={(e) => setResetToken(e.target.value)} />
+                <Input label={'New Password'} type="password" placeholder={'At least 6 characters'} value={resetPw} onChange={(e) => setResetPw(e.target.value)} />
+                <Input label={'Confirm Password'} type="password" placeholder={'Repeat your new password'} value={resetConfirmPw} onChange={(e) => setResetConfirmPw(e.target.value)} />
                 <Button type="submit" fullWidth loading={loading}>
                   {'Reset Password'}
                 </Button>
                 {forgotResult && (
-                  <div className={`mt-4 p-3.5 rounded-md text-[0.83rem] leading-relaxed ${forgotResult.type === 'success' ? 'bg-success/10 border border-success/30 text-success' : forgotResult.type === 'dev' ? 'bg-primary/10 border border-primary/35 text-text text-center' : 'bg-danger/10 border border-danger/30 text-danger'}`}>
+                  <div className={`mt-4 p-3.5 rounded-md text-[0.83rem] leading-relaxed ${forgotResult.type === 'success' ? 'bg-success/10 border border-success/30 text-success' : 'bg-danger/10 border border-danger/30 text-danger'}`}>
                     {forgotResult.html}
                   </div>
                 )}
