@@ -139,17 +139,23 @@ export default function LoginPage() {
       if (!url) { setError('Google login not configured.'); return; }
 
       const { Browser } = await import('@capacitor/browser');
+
+      let finished = false;
+      Browser.addListener('browserFinished', () => {
+        finished = true;
+      });
+
       await Browser.open({ url });
 
       let attempts = 0;
       const poll = async (): Promise<void> => {
-        if (attempts > 30) { setError('Login timed out. Try again.'); return; }
+        if (attempts > 60) { setError('Login timed out. Try again.'); return; }
         attempts++;
         try {
           const pollRes = await fetch(`${apiBase}/auth/google/poll/${state}`);
           const data = await pollRes.json();
           if (data.ready) {
-            await Browser.close();
+            try { await Browser.close(); } catch {}
             await saveSession(data.jwt, data.user);
             router.push('/chat');
             return;
@@ -157,7 +163,6 @@ export default function LoginPage() {
         } catch {}
         setTimeout(poll, 2000);
       };
-      // Wait a moment before starting to poll (browser needs to open first)
       setTimeout(poll, 3000);
     } catch {
       setError('Connection error. Check if the server is running.');

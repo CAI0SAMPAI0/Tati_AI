@@ -271,17 +271,26 @@ async def google_callback(request: Request, code: str = '', state: str = '', db:
     if state and state in _oauth_results:
         _oauth_results[state] = {'jwt': jwt_token, 'user': user}
 
-    return HTMLResponse('''<!DOCTYPE html>
+    # Redirect to a page that tries to close the tab, with the JWT as hash
+    close_html = f'''<!DOCTYPE html>
 <html>
 <head><title>Login successful</title></head>
-<body style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;margin:0;background:#0a0a0c;color:#fff;">
+<body style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;margin:0;background:#0a0a0c;color:#fff;" onload="window.close()">
 <div style="text-align:center;">
   <h2>Login successful!</h2>
   <p style="margin-bottom:24px;">You can close this tab and return to the app.</p>
-  <p style="font-size:13px;color:#666;">The app will detect the login automatically.</p>
+  <p style="font-size:13px;color:#666;">If the tab does not close, just close it manually.</p>
 </div>
+<script>
+  try {{ window.close(); }} catch(e) {{}}
+  // Some browsers block window.close(), redirect to about:blank as fallback
+  setTimeout(function() {{
+    try {{ window.location.href = 'about:blank'; }} catch(e) {{}}
+  }}, 500);
+</script>
 </body>
-</html>''')
+</html>'''
+    return HTMLResponse(close_html)
 
 
 @router.get('/google/poll/{state:str}')
