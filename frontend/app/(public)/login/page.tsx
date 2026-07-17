@@ -133,19 +133,15 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     let done = false;
-    let state = '';
     try {
       const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       const urlRes = await fetch(`${apiBase}/auth/google/url`);
       const data = await urlRes.json();
       if (!data.url) { setError('Google login not configured.'); return; }
-      state = data.state;
 
       const { Browser } = await import('@capacitor/browser');
 
-      // Poll once (immediate)
-      const pollOnce = async (): Promise<boolean> => {
-        if (done) return true;
+      const pollOnce = async (state: string): Promise<boolean> => {
         try {
           const r = await fetch(`${apiBase}/auth/google/poll/${state}`);
           const j = await r.json();
@@ -160,23 +156,21 @@ export default function LoginPage() {
         return false;
       };
 
-      // browserPageLoaded fires on every page load via native bridge
+      // browserPageLoaded fires via native bridge when ANY page loads
       Browser.addListener('browserPageLoaded', async () => {
         if (done) return;
-        // Give the backend a moment to finish processing
-        await new Promise(r => setTimeout(r, 2000));
-        await pollOnce();
+        await pollOnce(data.state);
       });
 
       // browserFinished fires when user closes the Custom Tab manually
       Browser.addListener('browserFinished', async () => {
         if (done) return;
-        await pollOnce();
+        await pollOnce(data.state);
       });
 
       await Browser.open({ url: data.url });
     } catch {
-      if (!state) setError('Connection error. Check if the server is running.');
+      if (!done) setError('Connection error. Check if the server is running.');
     } finally {
       setLoading(false);
     }
