@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { loginWithCredentials, loginWithGoogle, registerUser, requestPasswordReset } from '@/lib/api/auth';
+import { loginWithCredentials, loginWithGoogle, registerUser, requestPasswordReset, resetPasswordWithToken } from '@/lib/api/auth';
 import { LEVEL_OPTIONS } from '@/lib/constants/levels';
 import { Capacitor } from '@capacitor/core';
 
