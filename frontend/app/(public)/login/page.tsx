@@ -132,26 +132,43 @@ export default function LoginPage() {
     clearMessages();
     setLoading(true);
     setError('');
+    let state = '';
     try {
       const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       const urlRes = await fetch(`${apiBase}/auth/google/url`);
-      const { url, state } = await urlRes.json();
-      if (!url) { setError('Google login not configured.'); return; }
+      const data = await urlRes.json();
+      if (!data.url) { setError('Google login not configured.'); return; }
+      state = data.state;
 
       const { Browser } = await import('@capacitor/browser');
-      await Browser.open({ url });
 
-      let attempts = 0;
-      const poll = async (): Promise<void> => {
-        if (attempts > 30) { setError('Login timed out. Try again.'); return; }
-        attempts++;
+      let done = false;
+      const finish = async () => {
+        if (done) return;
+        done = true;
+        try { await Browser.close(); } catch {}
+        const pollRes = await fetch(`${apiBase}/auth/google/poll/${state}`);
+        const result = await pollRes.json();
+        if (result.ready) {
+          await saveSession(result.jwt, result.user);
+          router.push('/chat');
+        } else {
+          setError('Login not detected. Try again.');
+        }
+      };
+
+      Browser.addListener('browserFinished', finish);
+
+      await Browser.open({ url: data.url });
+
+      // Poll while browser is open (may be throttled, but browserFinished catches it)
+      const poll = async () => {
+        if (done) return;
         try {
           const pollRes = await fetch(`${apiBase}/auth/google/poll/${state}`);
-          const data = await pollRes.json();
-          if (data.ready) {
-            try { await Browser.close(); } catch {}
-            await saveSession(data.jwt, data.user);
-            router.push('/chat');
+          const result = await pollRes.json();
+          if (result.ready) {
+            await finish();
             return;
           }
         } catch {}
@@ -159,7 +176,7 @@ export default function LoginPage() {
       };
       setTimeout(poll, 1000);
     } catch {
-      setError('Connection error. Check if the server is running.');
+      if (!state) setError('Connection error. Check if the server is running.');
     } finally {
       setLoading(false);
     }
