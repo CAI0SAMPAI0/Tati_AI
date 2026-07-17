@@ -271,10 +271,17 @@ async def google_callback(request: Request, code: str = '', state: str = '', db:
     if state and state in _oauth_results:
         _oauth_results[state] = {'jwt': jwt_token, 'user': user}
 
-    # Redirect browser to the app so Capacitor detects browserPageLoaded
-    from fastapi.responses import RedirectResponse
-    redirect_url = f"https://tati-ai.vercel.app?login_state={state}"
-    return RedirectResponse(url=redirect_url)
+    return HTMLResponse('''<!DOCTYPE html>
+<html>
+<head><title>Login successful</title></head>
+<body style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;margin:0;background:#0a0a0c;color:#fff;">
+<div style="text-align:center;">
+  <h2>Login successful!</h2>
+  <p style="margin-bottom:24px;">You can close this tab and return to the app.</p>
+  <p style="font-size:13px;color:#666;">The app will detect the login automatically.</p>
+</div>
+</body>
+</html>''')
 
 
 @router.get('/google/poll/{state:str}')
