@@ -15,7 +15,6 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
-from app.shared.services.email import EmailSender
 from app.modules.users.repositories.user_repository import UserRepository
 from app.core.enums import normalize_level
 from supabase import Client
@@ -194,44 +193,11 @@ class AuthService:
             }
         )
 
-        if is_app:
-            reset_url = f"com.tati.ai://reset-password?token={reset_token}"
-        elif base_url:
-            reset_url = f"{base_url}/reset-password?token={reset_token}"
-        else:
-            reset_url = ''
-
-        email_sender = EmailSender()
-        email_sent = await run_in_threadpool(
-            email_sender.send_reset_email,
-            user['email'],
-            user.get('name') or user['username'],
-            reset_url,
-        )
-
-        if not email_sent and not settings.smtp_user:
-            return {
-                'ok': True,
-                'dev_mode': True,
-                'message': f'SMTP não configurado. Token (apenas em dev): {reset_token}',
-                'reset_token': reset_token,
-            }
-        if not email_sent:
-            raise HTTPException(
-                status_code=500,
-                detail='Erro ao enviar e-mail. Tente novamente.')
-
-        if is_app:
-            return {
-                'ok': True,
-                'is_app': True,
-                'message': 'Código enviado! Verifique seu e-mail.',
-                'reset_token': reset_token,
-            }
-
         return {
             'ok': True,
-            'message': 'E-mail enviado! Verifique sua caixa de entrada.',
+            'is_app': True,
+            'message': 'Informe sua nova senha abaixo.',
+            'reset_token': reset_token,
         }
 
     @staticmethod

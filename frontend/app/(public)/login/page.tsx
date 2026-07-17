@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { loginWithCredentials, loginWithGoogle, registerUser, requestPasswordReset, resetPasswordWithToken } from '@/lib/api/auth';
 import { LEVEL_OPTIONS } from '@/lib/constants/levels';
-import { Capacitor } from '@capacitor/core';
+
 
 type Tab = 'login' | 'register' | 'forgot' | 'reset';
 
@@ -64,9 +64,6 @@ export default function LoginPage() {
   useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     if (!clientId) return;
-
-    // In Capacitor: skip GIS, use system browser via backend endpoint
-    if (Capacitor.isNativePlatform()) return;
 
     const initGoogle = (retries = 0) => {
       if (typeof window === 'undefined') return;
@@ -125,50 +122,6 @@ export default function LoginPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const handleGoogleLoginCapacitor = useCallback(async () => {
-    clearMessages();
-    setLoading(true);
-    try {
-      const w = window as any;
-      const isNative = w.Capacitor?.isNativePlatform?.();
-
-      if (isNative) {
-        try {
-          const { GoogleAuth } = await import('@southdevs/capacitor-google-auth');
-          await GoogleAuth.initialize();
-          const user = await GoogleAuth.signIn({ scopes: ['profile', 'email', 'openid'] });
-          const idToken = user?.authentication?.idToken;
-          if (!idToken) { setError('Google sign-in failed.'); return; }
-          const res = await loginWithGoogle(idToken);
-          if (!res.ok) { setError('Google login failed.'); return; }
-          await saveSession(res.data.access_token, res.data.user);
-          router.push('/chat');
-          return;
-        } catch (e) {
-          console.error('[GoogleLogin] Native auth failed, falling back to browser:', e);
-        }
-      }
-
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const res = await fetch(`${apiBase}/auth/google/url`);
-      const data = await res.json();
-      if (data.url) {
-        try {
-          const { Browser } = await import('@capacitor/browser');
-          await Browser.open({ url: data.url });
-        } catch {
-          window.open(data.url, '_blank');
-        }
-      } else {
-        setError('Google login not configured.');
-      }
-    } catch {
-      setError('Connection error. Check if the server is running.');
-    } finally {
-      setLoading(false);
-    }
-  }, [router, saveSession]);
 
   const isHubAccess = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('access') === 'hub';
 
@@ -238,16 +191,12 @@ export default function LoginPage() {
       const res = await requestPasswordReset(forgotId);
       if (!res.ok) { setError((res.data as any).detail || 'Error requesting password reset.'); return; }
       const data = res.data as any;
-      if (data.is_app && data.reset_token) {
+      if (data.reset_token) {
         setResetToken(data.reset_token);
-        setForgotResult({ type: 'success', html: 'Code sent to your email. Enter the code below and choose a new password.' });
-        setActiveTab('reset');
-      } else if (data.dev_mode) {
-        setResetToken(data.reset_token);
-        setForgotResult({ type: 'success', html: 'Dev mode — enter a new password below.' });
+        setForgotResult({ type: 'success', html: 'Enter your new password below.' });
         setActiveTab('reset');
       } else {
-        setForgotResult({ type: 'success', html: 'Check your email for the reset link.' });
+        setForgotResult({ type: 'success', html: data.message || 'Check your email for the reset link.' });
       }
     } catch {
       setError('Connection error. Check if the server is running.');
@@ -360,12 +309,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (Capacitor.isNativePlatform()) {
-                        handleGoogleLoginCapacitor();
-                      } else {
-                        // Trigger the hidden GIS button
-                        (googleBtnRef.current?.querySelector('div[role="button"]') as HTMLElement)?.click();
-                      }
+                      (googleBtnRef.current?.querySelector('div[role="button"]') as HTMLElement)?.click();
                     }}
                     className="w-full py-2.5 bg-input text-text border border-border rounded-[9px] text-sm font-medium flex items-center justify-center gap-2.5 hover:bg-bg-secondary transition-colors cursor-pointer"
                   >
@@ -377,9 +321,7 @@ export default function LoginPage() {
                     </svg>
                     <span>{'Continue with Google'}</span>
                   </button>
-                  {!Capacitor.isNativePlatform() && (
-                    <div ref={googleBtnRef} className="absolute inset-0 overflow-hidden rounded-[9px] opacity-[0.001] cursor-pointer flex items-center justify-center" />
-                  )}
+                  <div ref={googleBtnRef} className="absolute inset-0 overflow-hidden rounded-[9px] opacity-[0.001] cursor-pointer flex items-center justify-center" />
                 </div>
                 <div className="flex items-center gap-3 mb-4 text-text-subtle text-[0.73rem] tracking-wider">
                   <span className="flex-1 h-px bg-border" />
@@ -445,7 +387,7 @@ export default function LoginPage() {
                   {'Send Reset Code'}
                 </Button>
                 {forgotResult && (
-                  <div className={`mt-4 p-3.5 rounded-md text-[0.83rem] leading-relaxed ${forgotResult.type === 'success' ? 'bg-success/10 border border-success/30 text-success' : forgotResult.type === 'dev' ? 'bg-primary/10 border border-primary/35 text-text text-center' : 'bg-danger/10 border border-danger/30 text-danger'}`}>
+                  <div className={`mt-4 p-3.5 rounded-md text-[0.83rem] leading-relaxed ${forgotResult.type === 'success' ? 'bg-success/10 border border-success/30 text-success' : 'bg-danger/10 border border-danger/30 text-danger'}`}>
                     {forgotResult.html}
                   </div>
                 )}
@@ -459,8 +401,7 @@ export default function LoginPage() {
                   {'← Back'}
                 </button>
                 <p className="text-base font-bold text-text mb-1">{'🔐 Reset your password'}</p>
-                <p className="text-[0.82rem] text-text-muted mb-5 leading-relaxed">{'Enter the code from your email and choose a new password.'}</p>
-                <Input label={'Reset Code'} placeholder={'Paste the code from your email'} value={resetToken} onChange={(e) => setResetToken(e.target.value)} />
+                <p className="text-[0.82rem] text-text-muted mb-5 leading-relaxed">{'Choose your new password.'}</p>
                 <Input label={'New Password'} type="password" placeholder={'At least 6 characters'} value={resetPw} onChange={(e) => setResetPw(e.target.value)} />
                 <Input label={'Confirm Password'} type="password" placeholder={'Repeat your new password'} value={resetConfirmPw} onChange={(e) => setResetConfirmPw(e.target.value)} />
                 <Button type="submit" fullWidth loading={loading}>
