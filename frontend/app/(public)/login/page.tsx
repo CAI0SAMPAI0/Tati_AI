@@ -140,30 +140,28 @@ export default function LoginPage() {
 
       const { Browser } = await import('@capacitor/browser');
 
-      let finished = false;
-      Browser.addListener('browserFinished', () => {
-        finished = true;
-      });
-
-      await Browser.open({ url });
-
-      let attempts = 0;
-      const poll = async (): Promise<void> => {
-        if (attempts > 60) { setError('Login timed out. Try again.'); return; }
-        attempts++;
-        try {
+      let browserOpen = true;
+      Browser.addListener('browserPageLoaded', async (info: { url: string }) => {
+        if (!browserOpen) return;
+        if (info.url.includes('login_state=')) {
+          try { await Browser.close(); } catch {}
+          browserOpen = false;
           const pollRes = await fetch(`${apiBase}/auth/google/poll/${state}`);
           const data = await pollRes.json();
           if (data.ready) {
-            try { await Browser.close(); } catch {}
             await saveSession(data.jwt, data.user);
             router.push('/chat');
-            return;
+          } else {
+            setError('Login failed. Try again.');
           }
-        } catch {}
-        setTimeout(poll, 2000);
-      };
-      setTimeout(poll, 3000);
+        }
+      });
+
+      Browser.addListener('browserFinished', () => {
+        browserOpen = false;
+      });
+
+      await Browser.open({ url });
     } catch {
       setError('Connection error. Check if the server is running.');
     } finally {
