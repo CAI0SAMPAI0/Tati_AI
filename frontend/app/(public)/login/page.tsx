@@ -136,7 +136,7 @@ export default function LoginPage() {
       if (isNative) {
         const { GoogleAuth } = await import('@southdevs/capacitor-google-auth');
         await GoogleAuth.initialize();
-        const user = await GoogleAuth.signIn();
+        const user = await GoogleAuth.signIn({ scopes: ['profile', 'email', 'openid'] });
         const idToken = user?.authentication?.idToken;
         if (!idToken) { setError('Google sign-in failed.'); return; }
         const res = await loginWithGoogle(idToken);
