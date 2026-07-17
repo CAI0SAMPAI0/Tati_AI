@@ -134,10 +134,10 @@ export default function LoginPage() {
       const res = await fetch(`${apiBase}/auth/google/url`);
       const data = await res.json();
       if (data.url) {
-        const w = window as any;
-        if (w.Capacitor?.Plugins?.ExternalBrowser) {
-          await w.Capacitor.Plugins.ExternalBrowser.open({ url: data.url });
-        } else {
+        try {
+          const { Browser } = await import('@capacitor/browser');
+          await Browser.open({ url: data.url });
+        } catch {
           window.open(data.url, '_blank');
         }
       } else {

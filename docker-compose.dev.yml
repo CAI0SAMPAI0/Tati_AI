@@ -1,15 +1,3 @@
-# ─── docker-compose.dev.yml ────────────────────────────────────────────────────
-# Ambiente de DESENVOLVIMENTO local — com hot-reload em todos os serviços.
-#
-# Uso rápido:
-#   docker compose -f docker-compose.dev.yml up --build
-#
-# Serviços individuais:
-#   docker compose -f docker-compose.dev.yml up backend
-#   docker compose -f docker-compose.dev.yml up frontend
-#   docker compose -f docker-compose.dev.yml up hub
-# ────────────────────────────────────────────────────────────────────────────────
-
 services:
 
   # ─── Backend (FastAPI + uvicorn --reload) ──────────────────────────────────

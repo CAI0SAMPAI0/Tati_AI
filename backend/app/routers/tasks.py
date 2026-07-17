@@ -79,7 +79,7 @@ async def smtp_debug(token: str = Query(None)):
 async def send_inactivity_report(token: str = Query(None)):
     """
     Busca todas as notificações de retenção enviadas hoje e envia um relatório detalhado
-    para o e-mail do programador (cmsampaio135@gmail.com) direto do Hugging Face.
+    para o e-mail do programador direto do Hugging Face.
     Use: GET /tasks/send-inactivity-report?token=cai0_based
     """
     import os

@@ -70,16 +70,16 @@ function resolvePath(path: string): string {
     
   if (isRailwayOperation) {
     const railwayBase = 'https://tatiai-production.up.railway.app';
-    return `${railwayBase}${path.startsWith('/') ? path : `/${path}`}`;
+    return `${railwayBase.replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
   }
 
   // Se estiver rodando no servidor (SSR) dentro do Docker, usa o DNS interno
   if (typeof window === 'undefined' && process.env.INTERNAL_API_URL) {
-    const base = process.env.INTERNAL_API_URL;
+    const base = process.env.INTERNAL_API_URL.replace(/\/$/, '');
     return `${base}${path.startsWith('/') ? path : `/${path}`}`;
   }
 
-  return `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`;
+  return `${API_BASE.replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
 function getToken(): string | null {

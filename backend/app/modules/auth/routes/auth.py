@@ -158,9 +158,10 @@ async def google_auth_url(request: Request):
     if not settings.google_client_id or not settings.google_client_secret:
         raise HTTPException(status_code=503, detail='Google OAuth not configured')
 
-    # Use the backend's own URL as redirect target (never WORKER_API_URL for OAuth)
-    backend_url = str(request.base_url).rstrip('/')
-    redirect_uri = f'{backend_url}/auth/google/callback'
+    # Use the actual request URL (not base_url) for redirect_uri — more reliable behind proxies
+    redirect_uri = str(request.url).split('?')[0].rsplit('/', 1)[0] + '/callback'
+    # Force https
+    redirect_uri = redirect_uri.replace('http://', 'https://')
     scopes = 'openid email profile'
     url = (
         f'https://accounts.google.com/o/oauth2/v2/auth'
@@ -192,8 +193,9 @@ async def google_callback(request: Request, code: str = '', db: Client = Depends
 
     # Exchange authorization code for tokens
     import httpx
-    backend_url = str(request.base_url).rstrip('/')
-    redirect_uri = f'{backend_url}/auth/google/callback'
+    # Use the actual callback URL (minus query params) as redirect_uri — more reliable than request.base_url behind proxies
+    redirect_uri = str(request.url).split('?')[0]
+    redirect_uri = redirect_uri.replace('http://', 'https://')
     token_data = {
         'code': code,
         'client_id': settings.google_client_id,
@@ -206,7 +208,13 @@ async def google_callback(request: Request, code: str = '', db: Client = Depends
         token_resp = await client.post('https://oauth2.googleapis.com/token', data=token_data, timeout=15)
 
     if token_resp.status_code != 200:
-        return HTMLResponse('<html><body><h2>Authentication failed</h2><p>Could not exchange code for tokens.</p></body></html>', status_code=400)
+        import logging
+        try:
+            error_body = token_resp.text
+        except Exception:
+            error_body = '(could not read body)'
+        logging.error(f'[GoogleCallback] Token exchange failed: status={token_resp.status_code}, body={error_body}, redirect_uri={redirect_uri}')
+        return HTMLResponse(f'<html><body><h2>Authentication failed</h2><p>Could not exchange code for tokens.</p><pre style="font-size:12px;color:#999;">{error_body}</pre></body></html>', status_code=400)
 
     tokens = token_resp.json()
     id_token_str = tokens.get('id_token')
@@ -261,28 +269,59 @@ async def google_callback(request: Request, code: str = '', db: Client = Depends
     jwt_token = create_access_token(token_payload)
 
     # Return HTML that redirects to app via deep link
+    deep_link = f"com.tati.ai://auth?jwt={jwt_token}"
+    intent_link = f"intent://auth?jwt={jwt_token}#Intent;scheme=com.tati.ai;package=com.tati.ai;end"
     return HTMLResponse(f'''<!DOCTYPE html>
 <html>
-<head><title>Login successful</title></head>
+<head>
+  <title>Login successful</title>
+</head>
 <body style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;margin:0;background:#0a0a0c;color:#fff;">
 <div style="text-align:center;">
-<h2>Login successful!</h2>
-<p>Redirecting to app...</p>
-<script>
-(function() {{
-  var jwt = "{jwt_token}";
-  var user = {user};
-  // Store for web fallback
-  localStorage.setItem("token", jwt);
-  localStorage.setItem("user", JSON.stringify(user));
-  // Redirect to app via deep link
-  window.location.href = "com.tati.ai://auth?jwt=" + encodeURIComponent(jwt);
-  // Fallback: if deep link doesn't work, show message
-  setTimeout(function() {{
-    document.body.innerHTML = '<div style="text-align:center;"><h2>Login successful!</h2><p>Close this page and open the Tati AI app.</p></div>';
-  }}, 3000);
-}})();
-</script>
+  <h2>Login successful!</h2>
+  <p id="status" style="margin-bottom:24px;">Redirecting to app...</p>
+  <button id="openBtn" style="padding:14px 32px;font-size:18px;border:none;border-radius:12px;background:#7c3aed;color:#fff;cursor:pointer;font-weight:600;box-shadow:0 4px 16px rgba(124,58,237,0.4);">
+    Open Tati AI App
+  </button>
+  <p style="margin-top:24px;font-size:13px;color:#888;">
+    <a href="{intent_link}" style="color:#7c3aed;">Open via Chrome</a>
+    &middot;
+    <a href="{deep_link}" style="color:#7c3aed;">Deep link</a>
+  </p>
+  <p style="font-size:13px;color:#666;">Then close this tab.</p>
+  <script>
+    (function() {{
+      var jwt = "{jwt_token}";
+      var user = {user};
+      localStorage.setItem("token", jwt);
+      localStorage.setItem("user", JSON.stringify(user));
+
+      var btn = document.getElementById("openBtn");
+      var status = document.getElementById("status");
+
+      function tryDeepLink() {{
+        var url = "com.tati.ai://auth?jwt=" + encodeURIComponent(jwt);
+        var win = window.open(url, "_self");
+        if (win) {{ win.location.href = url; }}
+        window.location.href = url;
+      }}
+
+      function tryIntent() {{
+        var url = "intent://auth?jwt=" + encodeURIComponent(jwt) + "#Intent;scheme=com.tati.ai;package=com.tati.ai;end";
+        window.location.href = url;
+      }}
+
+      function openApp() {{
+        status.textContent = "Opening app...";
+        tryIntent();
+        setTimeout(tryDeepLink, 300);
+      }}
+
+      btn.addEventListener("click", openApp);
+      // Auto-try once after a short delay
+      setTimeout(openApp, 800);
+    }})();
+  </script>
 </div>
 </body>
 </html>''')
