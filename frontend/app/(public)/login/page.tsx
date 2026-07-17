@@ -132,6 +132,7 @@ export default function LoginPage() {
     clearMessages();
     setLoading(true);
     setError('');
+    let done = false;
     let state = '';
     try {
       const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '';
@@ -142,39 +143,38 @@ export default function LoginPage() {
 
       const { Browser } = await import('@capacitor/browser');
 
-      let done = false;
-      const finish = async () => {
-        if (done) return;
-        done = true;
-        try { await Browser.close(); } catch {}
-        const pollRes = await fetch(`${apiBase}/auth/google/poll/${state}`);
-        const result = await pollRes.json();
-        if (result.ready) {
-          await saveSession(result.jwt, result.user);
-          router.push('/chat');
-        } else {
-          setError('Login not detected. Try again.');
-        }
-      };
-
-      Browser.addListener('browserFinished', finish);
-
-      await Browser.open({ url: data.url });
-
-      // Poll while browser is open (may be throttled, but browserFinished catches it)
-      const poll = async () => {
-        if (done) return;
+      // Poll once (immediate)
+      const pollOnce = async (): Promise<boolean> => {
+        if (done) return true;
         try {
-          const pollRes = await fetch(`${apiBase}/auth/google/poll/${state}`);
-          const result = await pollRes.json();
-          if (result.ready) {
-            await finish();
-            return;
+          const r = await fetch(`${apiBase}/auth/google/poll/${state}`);
+          const j = await r.json();
+          if (j.ready) {
+            done = true;
+            try { await Browser.close(); } catch {}
+            await saveSession(j.jwt, j.user);
+            router.push('/chat');
+            return true;
           }
         } catch {}
-        setTimeout(poll, 1000);
+        return false;
       };
-      setTimeout(poll, 1000);
+
+      // browserPageLoaded fires on every page load via native bridge
+      Browser.addListener('browserPageLoaded', async () => {
+        if (done) return;
+        // Give the backend a moment to finish processing
+        await new Promise(r => setTimeout(r, 2000));
+        await pollOnce();
+      });
+
+      // browserFinished fires when user closes the Custom Tab manually
+      Browser.addListener('browserFinished', async () => {
+        if (done) return;
+        await pollOnce();
+      });
+
+      await Browser.open({ url: data.url });
     } catch {
       if (!state) setError('Connection error. Check if the server is running.');
     } finally {
