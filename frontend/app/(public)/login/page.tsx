@@ -134,29 +134,34 @@ export default function LoginPage() {
       const isNative = w.Capacitor?.isNativePlatform?.();
 
       if (isNative) {
-        const { GoogleAuth } = await import('@southdevs/capacitor-google-auth');
-        await GoogleAuth.initialize();
-        const user = await GoogleAuth.signIn({ scopes: ['profile', 'email', 'openid'] });
-        const idToken = user?.authentication?.idToken;
-        if (!idToken) { setError('Google sign-in failed.'); return; }
-        const res = await loginWithGoogle(idToken);
-        if (!res.ok) { setError('Google login failed.'); return; }
-        await saveSession(res.data.access_token, res.data.user);
-        router.push('/chat');
-      } else {
-        const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-        const res = await fetch(`${apiBase}/auth/google/url`);
-        const data = await res.json();
-        if (data.url) {
-          try {
-            const { Browser } = await import('@capacitor/browser');
-            await Browser.open({ url: data.url });
-          } catch {
-            window.open(data.url, '_blank');
-          }
-        } else {
-          setError('Google login not configured.');
+        try {
+          const { GoogleAuth } = await import('@southdevs/capacitor-google-auth');
+          await GoogleAuth.initialize();
+          const user = await GoogleAuth.signIn({ scopes: ['profile', 'email', 'openid'] });
+          const idToken = user?.authentication?.idToken;
+          if (!idToken) { setError('Google sign-in failed.'); return; }
+          const res = await loginWithGoogle(idToken);
+          if (!res.ok) { setError('Google login failed.'); return; }
+          await saveSession(res.data.access_token, res.data.user);
+          router.push('/chat');
+          return;
+        } catch (e) {
+          console.error('[GoogleLogin] Native auth failed, falling back to browser:', e);
         }
+      }
+
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const res = await fetch(`${apiBase}/auth/google/url`);
+      const data = await res.json();
+      if (data.url) {
+        try {
+          const { Browser } = await import('@capacitor/browser');
+          await Browser.open({ url: data.url });
+        } catch {
+          window.open(data.url, '_blank');
+        }
+      } else {
+        setError('Google login not configured.');
       }
     } catch {
       setError('Connection error. Check if the server is running.');
