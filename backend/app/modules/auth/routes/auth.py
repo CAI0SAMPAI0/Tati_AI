@@ -1,5 +1,7 @@
 from __future__ import annotations
 import os
+import uuid
+from typing import Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
@@ -10,6 +12,10 @@ from supabase import Client
 from app.modules.auth.services.auth_service import AuthService
 
 router = APIRouter()
+
+# In-memory store for Capacitor OAuth polling results.
+# State → { 'jwt': str, 'user': dict } | None
+_oauth_results: Dict[str, dict] = {}
 
 
 #  Models 
@@ -152,15 +158,17 @@ async def google_login(
 
 
 @router.get('/google/url')
-async def google_auth_url(request: Request):
+async def google_auth_url(request: Request, state: str = ''):
     """Returns Google OAuth URL for system browser flow (Capacitor/Android)."""
     from app.core.config import settings
     if not settings.google_client_id or not settings.google_client_secret:
         raise HTTPException(status_code=503, detail='Google OAuth not configured')
 
-    # Use the actual request URL (not base_url) for redirect_uri — more reliable behind proxies
+    if not state:
+        state = uuid.uuid4().hex[:16]
+    _oauth_results[state] = None  # placeholder
+
     redirect_uri = str(request.url).split('?')[0].rsplit('/', 1)[0] + '/callback'
-    # Force https
     redirect_uri = redirect_uri.replace('http://', 'https://')
     scopes = 'openid email profile'
     url = (
@@ -169,18 +177,19 @@ async def google_auth_url(request: Request):
         f'&redirect_uri={redirect_uri}'
         f'&response_type=code'
         f'&scope={scopes}'
+        f'&state={state}'
         f'&access_type=offline'
         f'&prompt=consent'
     )
-    return {'url': url}
+    return {'url': url, 'state': state}
 
 
 from fastapi.responses import HTMLResponse
 
 
 @router.get('/google/callback')
-async def google_callback(request: Request, code: str = '', db: Client = Depends(get_db)):
-    """Handles Google OAuth callback, exchanges code for tokens, returns JWT via deep link."""
+async def google_callback(request: Request, code: str = '', state: str = '', db: Client = Depends(get_db)):
+    """Handles Google OAuth callback, exchanges code for tokens, stores result for polling."""
     from app.core.config import settings
     from app.core.security import create_access_token
     from app.core.enums import normalize_level
@@ -191,9 +200,7 @@ async def google_callback(request: Request, code: str = '', db: Client = Depends
     if not settings.google_client_secret:
         return HTMLResponse('<html><body><h2>Server error</h2><p>Google OAuth not configured.</p></body></html>', status_code=500)
 
-    # Exchange authorization code for tokens
     import httpx
-    # Use the actual callback URL (minus query params) as redirect_uri — more reliable than request.base_url behind proxies
     redirect_uri = str(request.url).split('?')[0]
     redirect_uri = redirect_uri.replace('http://', 'https://')
     token_data = {
@@ -222,7 +229,6 @@ async def google_callback(request: Request, code: str = '', db: Client = Depends
     if not id_token_str:
         return HTMLResponse('<html><body><h2>Authentication failed</h2><p>No ID token received.</p></body></html>', status_code=400)
 
-    # Verify ID token
     try:
         from google.auth.transport import requests as google_requests
         from google.oauth2 import id_token
@@ -236,7 +242,6 @@ async def google_callback(request: Request, code: str = '', db: Client = Depends
     name = info.get('name', email.split('@')[0])
     base_username = email.split('@')[0].replace('.', '_').lower()
 
-    # Find or create user
     from app.modules.users.repositories.user_repository import UserRepository
     existing_user = await UserRepository.find_by_email(db, email)
     if existing_user:
@@ -247,20 +252,14 @@ async def google_callback(request: Request, code: str = '', db: Client = Depends
         while await UserRepository.find_by_username(db, username):
             username = f'{base_username}{suffix}'
             suffix += 1
-
         new_user = {
-            'username': username,
-            'name': name,
-            'email': email,
-            'password': 'google_authenticated',
-            'role': 'student',
-            'level': 'A1',
-            'focus': 'General Conversation',
+            'username': username, 'name': name, 'email': email,
+            'password': 'google_authenticated', 'role': 'student',
+            'level': 'A1', 'focus': 'General Conversation',
         }
         await UserRepository.insert_user(db, new_user)
         user = new_user
 
-    # Build JWT
     token_payload = {
         'sub': user['username'],
         'role': user.get('role', 'student'),
@@ -268,64 +267,32 @@ async def google_callback(request: Request, code: str = '', db: Client = Depends
     }
     jwt_token = create_access_token(token_payload)
 
-    # Return HTML that redirects to app via deep link
-    import json
-    user_json = json.dumps(user)
-    deep_link = f"com.tati.ai://auth?jwt={jwt_token}"
-    intent_link = f"intent://auth?jwt={jwt_token}#Intent;scheme=com.tati.ai;package=com.tati.ai;end"
-    return HTMLResponse(f'''<!DOCTYPE html>
+    # Store result for polling (Capacitor app polls this)
+    if state and state in _oauth_results:
+        _oauth_results[state] = {'jwt': jwt_token, 'user': user}
+
+    return HTMLResponse('''<!DOCTYPE html>
 <html>
-<head>
-  <title>Login successful</title>
-</head>
+<head><title>Login successful</title></head>
 <body style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;margin:0;background:#0a0a0c;color:#fff;">
 <div style="text-align:center;">
   <h2>Login successful!</h2>
-  <p id="status" style="margin-bottom:24px;">Redirecting to app...</p>
-  <button id="openBtn" style="padding:14px 32px;font-size:18px;border:none;border-radius:12px;background:#7c3aed;color:#fff;cursor:pointer;font-weight:600;box-shadow:0 4px 16px rgba(124,58,237,0.4);">
-    Open Tati AI App
-  </button>
-  <p style="margin-top:24px;font-size:13px;color:#888;">
-    <a href="{intent_link}" style="color:#7c3aed;">Open via Chrome</a>
-    &middot;
-    <a href="{deep_link}" style="color:#7c3aed;">Deep link</a>
-  </p>
-  <p style="font-size:13px;color:#666;">Then close this tab.</p>
-  <script>
-    (function() {{
-      var jwt = "{jwt_token}";
-      var user = {user_json};
-      localStorage.setItem("token", jwt);
-      localStorage.setItem("user", JSON.stringify(user));
-
-      var btn = document.getElementById("openBtn");
-      var status = document.getElementById("status");
-
-      function tryDeepLink() {{
-        var url = "com.tati.ai://auth?jwt=" + encodeURIComponent(jwt);
-        var win = window.open(url, "_self");
-        if (win) {{ win.location.href = url; }}
-        window.location.href = url;
-      }}
-
-      function tryIntent() {{
-        var url = "intent://auth?jwt=" + encodeURIComponent(jwt) + "#Intent;scheme=com.tati.ai;package=com.tati.ai;end";
-        window.location.href = url;
-      }}
-
-      function openApp() {{
-        status.textContent = "Opening app...";
-        tryIntent();
-        setTimeout(tryDeepLink, 300);
-      }}
-
-      btn.addEventListener("click", openApp);
-      setTimeout(openApp, 800);
-    }})();
-  </script>
+  <p style="margin-bottom:24px;">You can close this tab and return to the app.</p>
+  <p style="font-size:13px;color:#666;">The app will detect the login automatically.</p>
 </div>
 </body>
 </html>''')
+
+
+@router.get('/google/poll/{state:str}')
+async def google_poll(state: str):
+    """Polled by Capacitor app to retrieve OAuth result."""
+    result = _oauth_results.get(state)
+    if result is None:
+        return {'ready': False}
+    # Clean up after first read
+    del _oauth_results[state]
+    return {'ready': True, 'jwt': result['jwt'], 'user': result['user']}
 
 
 #  Forgot password ─

@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { loginWithCredentials, loginWithGoogle, registerUser, requestPasswordReset, resetPasswordWithToken } from '@/lib/api/auth';
 import { LEVEL_OPTIONS } from '@/lib/constants/levels';
+import { Capacitor } from '@capacitor/core';
 
 
 type Tab = 'login' | 'register' | 'forgot' | 'reset';
@@ -64,6 +65,8 @@ export default function LoginPage() {
   useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     if (!clientId) return;
+
+    if (Capacitor.isNativePlatform()) return;
 
     const initGoogle = (retries = 0) => {
       if (typeof window === 'undefined') return;
@@ -124,6 +127,44 @@ export default function LoginPage() {
   }, []);
 
   const isHubAccess = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('access') === 'hub';
+
+  const handleGoogleLoginCapacitor = useCallback(async () => {
+    clearMessages();
+    setLoading(true);
+    setError('');
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const urlRes = await fetch(`${apiBase}/auth/google/url`);
+      const { url, state } = await urlRes.json();
+      if (!url) { setError('Google login not configured.'); return; }
+
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({ url });
+
+      let attempts = 0;
+      const poll = async (): Promise<void> => {
+        if (attempts > 30) { setError('Login timed out. Try again.'); return; }
+        attempts++;
+        try {
+          const pollRes = await fetch(`${apiBase}/auth/google/poll/${state}`);
+          const data = await pollRes.json();
+          if (data.ready) {
+            await Browser.close();
+            await saveSession(data.jwt, data.user);
+            router.push('/chat');
+            return;
+          }
+        } catch {}
+        setTimeout(poll, 2000);
+      };
+      // Wait a moment before starting to poll (browser needs to open first)
+      setTimeout(poll, 3000);
+    } catch {
+      setError('Connection error. Check if the server is running.');
+    } finally {
+      setLoading(false);
+    }
+  }, [router, saveSession]);
 
   // Login
   const handleLogin = async (e: React.FormEvent) => {
@@ -309,7 +350,11 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      (googleBtnRef.current?.querySelector('div[role="button"]') as HTMLElement)?.click();
+                      if (Capacitor.isNativePlatform()) {
+                        handleGoogleLoginCapacitor();
+                      } else {
+                        (googleBtnRef.current?.querySelector('div[role="button"]') as HTMLElement)?.click();
+                      }
                     }}
                     className="w-full py-2.5 bg-input text-text border border-border rounded-[9px] text-sm font-medium flex items-center justify-center gap-2.5 hover:bg-bg-secondary transition-colors cursor-pointer"
                   >
@@ -321,7 +366,9 @@ export default function LoginPage() {
                     </svg>
                     <span>{'Continue with Google'}</span>
                   </button>
-                  <div ref={googleBtnRef} className="absolute inset-0 overflow-hidden rounded-[9px] opacity-[0.001] cursor-pointer flex items-center justify-center" />
+                  {!Capacitor.isNativePlatform() && (
+                    <div ref={googleBtnRef} className="absolute inset-0 overflow-hidden rounded-[9px] opacity-[0.001] cursor-pointer flex items-center justify-center" />
+                  )}
                 </div>
                 <div className="flex items-center gap-3 mb-4 text-text-subtle text-[0.73rem] tracking-wider">
                   <span className="flex-1 h-px bg-border" />
