@@ -23,56 +23,45 @@ def _remote_embeddings_model():
     )
 
 
-def _is_auth_error(exc: Exception) -> bool:
-    msg = str(exc).lower()
-    return '401' in msg or 'unauthorized' in msg or 'forbidden' in msg or '403' in msg
-
-
 class EmbeddingsService:
     @staticmethod
     def get_embeddings_model():
-        """Initializes and returns the HuggingFace embeddings model.
+        """Returns the embeddings model.
 
-        Uses the remote HF Inference endpoint when a valid token is present;
-        otherwise falls back to a local sentence-transformers model so that
-        generation tasks do not fail with 401 Unauthorized (e.g. expired token
-        or missing credentials on the worker).
+        Uses the LOCAL sentence-transformers model by default (reliable, no
+        network/auth dependency). The remote HF Inference endpoint is only
+        used when HUGGING_FACE_PREFER_REMOTE='true' is set, with automatic
+        fallback to local on any failure.
         """
-        token = os.getenv('HUGGING_FACE_KEY', '')
-        if not token:
-            logger.warning(
-                "[EmbeddingsService] HUGGING_FACE_KEY not set; using local embeddings model."
-            )
-            return _local_embeddings_model()
-        return _remote_embeddings_model()
+        prefer_remote = os.getenv('HUGGING_FACE_PREFER_REMOTE', '').lower() == 'true'
+        if prefer_remote:
+            logger.info("[EmbeddingsService] Using remote HF endpoint (prefer_remote=true).")
+            return _remote_embeddings_model()
+        return _local_embeddings_model()
 
     @staticmethod
     def _embed_documents_safe(texts: List[str]) -> List[List[float]]:
-        """Embeds documents with fallback to local model on remote auth failure."""
+        """Embeds documents with fallback to local model on remote failure."""
         try:
             return EmbeddingsService.get_embeddings_model().embed_documents(texts)
         except Exception as e:
-            if _is_auth_error(e):
-                logger.error(
-                    "[EmbeddingsService] Remote embeddings failed with auth error (%s). "
-                    "Falling back to local embeddings model.", e
-                )
-                return _local_embeddings_model().embed_documents(texts)
-            raise
+            logger.error(
+                "[EmbeddingsService] Primary embeddings failed (%s). "
+                "Falling back to local embeddings model.", e
+            )
+            return _local_embeddings_model().embed_documents(texts)
 
     @staticmethod
     def _embed_query_safe(query: str) -> List[float]:
-        """Embeds query with fallback to local model on remote auth failure."""
+        """Embeds query with fallback to local model on remote failure."""
         try:
             return EmbeddingsService.get_embeddings_model().embed_query(query)
         except Exception as e:
-            if _is_auth_error(e):
-                logger.error(
-                    "[EmbeddingsService] Remote embeddings failed with auth error (%s). "
-                    "Falling back to local embeddings model.", e
-                )
-                return _local_embeddings_model().embed_query(query)
-            raise
+            logger.error(
+                "[EmbeddingsService] Primary embeddings failed (%s). "
+                "Falling back to local embeddings model.", e
+            )
+            return _local_embeddings_model().embed_query(query)
 
     @staticmethod
     def generate_and_save_embeddings(

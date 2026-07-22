@@ -33,11 +33,10 @@ def _get_vectorstore():
 
     try:
         from langchain_chroma import Chroma
-        from langchain_huggingface import HuggingFaceEndpointEmbeddings
+        from langchain_huggingface import HuggingFaceEmbeddings
 
-        _embeddings = HuggingFaceEndpointEmbeddings(
-            model='sentence-transformers/all-MiniLM-L6-v2',
-            huggingfacehub_api_token=os.getenv('HUGGING_FACE_KEY', ''),
+        _embeddings = HuggingFaceEmbeddings(
+            model_name='sentence-transformers/all-MiniLM-L6-v2',
         )
         _vectorstore = Chroma(
             persist_directory=_CHROMA_PATH,
