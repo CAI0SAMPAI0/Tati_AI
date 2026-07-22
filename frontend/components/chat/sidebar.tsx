@@ -20,7 +20,7 @@ import { usePrefetch } from '@/hooks/usePrefetch';
 import { cn, isStaff, canAccessDashboard } from '@/lib/utils';
 import { levelLabel } from '@/lib/constants/levels';
 import { ConversationList } from './conversation-list';
-import { WeeklyPlan } from './weekly-plan';
+
 import { apiGet, apiDelete } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -168,12 +168,6 @@ export function Sidebar({
 
         {/* Scrollable middle section */}
         <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col min-h-0">
-          {/* Weekly Plan */}
-          <div className="px-3 py-1">
-            <WeeklyPlan />
-          </div>
-
-
           <div className="flex-1">
             <ConversationList currentId={currentConvId} onSelect={onSelectConv} />
           </div>

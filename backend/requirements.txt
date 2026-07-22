@@ -13,6 +13,7 @@ langchain-chroma
 langchain-groq
 langchain-google-community
 langchain-huggingface
+sentence-transformers
 google-auth-oauthlib
 gTTS
 httpx

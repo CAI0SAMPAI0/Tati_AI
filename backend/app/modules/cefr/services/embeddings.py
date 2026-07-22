@@ -1,18 +1,78 @@
 import logging
 import os
 from typing import List, Dict, Any
+from functools import lru_cache
 from app.core.database import get_client
-from langchain_huggingface import HuggingFaceEndpointEmbeddings
+from langchain_huggingface import HuggingFaceEndpointEmbeddings, HuggingFaceEmbeddings
+
+logger = logging.getLogger(__name__)
+
+EMBEDDINGS_MODEL = 'sentence-transformers/all-MiniLM-L6-v2'
+
+
+@lru_cache(maxsize=1)
+def _local_embeddings_model():
+    return HuggingFaceEmbeddings(model_name=EMBEDDINGS_MODEL)
+
+
+@lru_cache(maxsize=1)
+def _remote_embeddings_model():
+    return HuggingFaceEndpointEmbeddings(
+        model=EMBEDDINGS_MODEL,
+        huggingfacehub_api_token=os.getenv('HUGGING_FACE_KEY', ''),
+    )
+
+
+def _is_auth_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return '401' in msg or 'unauthorized' in msg or 'forbidden' in msg or '403' in msg
 
 
 class EmbeddingsService:
     @staticmethod
     def get_embeddings_model():
-        """Initializes and returns the HuggingFace embeddings model."""
-        return HuggingFaceEndpointEmbeddings(
-            model='sentence-transformers/all-MiniLM-L6-v2',
-            huggingfacehub_api_token=os.getenv('HUGGING_FACE_KEY', ''),
-        )
+        """Initializes and returns the HuggingFace embeddings model.
+
+        Uses the remote HF Inference endpoint when a valid token is present;
+        otherwise falls back to a local sentence-transformers model so that
+        generation tasks do not fail with 401 Unauthorized (e.g. expired token
+        or missing credentials on the worker).
+        """
+        token = os.getenv('HUGGING_FACE_KEY', '')
+        if not token:
+            logger.warning(
+                "[EmbeddingsService] HUGGING_FACE_KEY not set; using local embeddings model."
+            )
+            return _local_embeddings_model()
+        return _remote_embeddings_model()
+
+    @staticmethod
+    def _embed_documents_safe(texts: List[str]) -> List[List[float]]:
+        """Embeds documents with fallback to local model on remote auth failure."""
+        try:
+            return EmbeddingsService.get_embeddings_model().embed_documents(texts)
+        except Exception as e:
+            if _is_auth_error(e):
+                logger.error(
+                    "[EmbeddingsService] Remote embeddings failed with auth error (%s). "
+                    "Falling back to local embeddings model.", e
+                )
+                return _local_embeddings_model().embed_documents(texts)
+            raise
+
+    @staticmethod
+    def _embed_query_safe(query: str) -> List[float]:
+        """Embeds query with fallback to local model on remote auth failure."""
+        try:
+            return EmbeddingsService.get_embeddings_model().embed_query(query)
+        except Exception as e:
+            if _is_auth_error(e):
+                logger.error(
+                    "[EmbeddingsService] Remote embeddings failed with auth error (%s). "
+                    "Falling back to local embeddings model.", e
+                )
+                return _local_embeddings_model().embed_query(query)
+            raise
 
     @staticmethod
     def generate_and_save_embeddings(
@@ -25,12 +85,11 @@ class EmbeddingsService:
             return 0
 
         client = get_client()
-        embeddings_model = EmbeddingsService.get_embeddings_model()
 
         logging.info(f"Generating embeddings for {len(chunks)} chunks of file {source_file}...")
 
-        # Generates vectors using the HuggingFace endpoint
-        vectors = embeddings_model.embed_documents(chunks)
+        # Generates vectors using the HuggingFace endpoint (with local fallback on auth failure)
+        vectors = EmbeddingsService._embed_documents_safe(chunks)
 
         logging.info(f"Saving {len(vectors)} vectors to Supabase (cefr_documents)...")
         saved_count = 0
@@ -61,9 +120,8 @@ class EmbeddingsService:
         Supports level filtering and reference files filtering.
         """
         client = get_client()
-        embeddings_model = EmbeddingsService.get_embeddings_model()
 
-        query_embedding = embeddings_model.embed_query(query)
+        query_embedding = EmbeddingsService._embed_query_safe(query)
 
         # Parameters for the Supabase RPC function making similarity search
         params = {
