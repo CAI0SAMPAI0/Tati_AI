@@ -166,7 +166,7 @@ export const ConversationList = memo(function ConversationList({ currentId, onSe
             disabled={isFetchingNextPage}
             className="px-4 py-2 bg-primary/20 text-primary rounded hover:bg-primary/30 transition"
           >
-            {isFetchingNextPage ? 'Carregando...' : 'Carregar mais'}
+            {isFetchingNextPage ? 'Loading...' : 'Load more'}
           </button>
         </div>
       )}

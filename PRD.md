@@ -948,15 +948,110 @@ erDiagram
 - [X] **Dashboard Docente Avançado: Métricas & Nudges (Backend & Frontend)**
   - [X] Implementar endpoints de analíticas detalhadas do aluno e envio de nudges multicanal (e-mail + push) em [dashboard_service.py](file:///C:/Users/caio/Documents/GitHub/Tati_AI/backend/app/modules/admin/services/dashboard_service.py).
   - [X] Criar aba "Analytics" no frontend dentro do modal do aluno em [student-modal.tsx](file:///C:/Users/caio/Documents/GitHub/Tati_AI/frontend/components/dashboard/student-modal.tsx) com gráficos de engajamento semanal baseados em `study_sessions` e controle de envio de mensagens de incentivo.
-  - [ ] Delegação em massa de exercícios para turmas específicas.
-- [ ] **Digest de Dificuldades - AI Digest (Backend)**
-  - [ ] Relatórios automáticos para a Tatiana listando as matérias que a turma mais tem dificuldades.
-- [ ] **Sistema de Tags de Alunos (Backend & Frontend)**
-  - [ ] Identificadores e filtros para segmentar alunos por tipo de interesse ou foco profissional.
-- [ ] **Biblioteca de Prompts Globais (Backend & Frontend)**
-  - [ ] Modelos de prompts criados por Tatiana prontificados para associação com alunos.
-- [ ] **Exportador de Relatório PDF Escolar (Backend & Frontend)**
-  - [ ] Relatório acadêmico assinado para compartilhamento com pais ou empresas patrocinadoras.
-- [ ] **Editor de Simulações CEFR Avançado (Backend & Frontend)**
-  - [ ] Painel para cadastrar cenários complexos com listas de vocabulário e gramática mandatórios.
 
+---
+
+### Sprint 20 – Substituição da aba "AI Exercises" por "Grammar"
+
+**Objetivo:** Remover a aba de "AI Exercises" (incluindo todo o código/backend que gera exercícios automáticos a partir da detecção de erros pelo LLM) e substituí-la por uma aba "Grammar", responsável por buscar a gramática e sua explicação a partir das fontes definidas na Feature 3 (DW, BBC Learning English, test-english.com).
+**Agentes alocados:** [frontend-expert](file:///C:/Users/caio/Documents/GitHub/Tati_AI/agents/frontend-expert.md), [backend-expert](file:///C:/Users/caio/Documents/GitHub/Tati_AI/agents/backend-expert.md)
+
+- [ ] **Backend: Remoção do gerador de AI Exercises**
+  - [ ] Remover rotas, serviços e prompts do LLM responsáveis por detectar erros do aluno e gerar "AI Exercises" automáticos. Critério de conclusão: nenhum endpoint/serviço referente a AI Exercises permanece ativo no backend; dependências órfãs limpas.
+- [ ] **Backend: Serviço de busca de Grammar**
+  - [ ] Criar serviço (e respectivo endpoint `/api/grammar`) que consulta/busca gramática e sua explicação nas fontes definidas na Feature 3 (DW, BBC Learning English, test-english.com), com cache e normalização do conteúdo retornado. Critério de conclusão: endpoint retorna explicação gramatical válida por tópico/nível consultado.
+- [ ] **Frontend: Substituição da aba**
+  - [ ] Localizar o elemento de aba com `class="flex items-center gap-2.5 px-5 py-3 rounded-xl sm:rounded-t-xl sm:rounded-b-none text-sm font-bold transition-all whitespace-nowrap w-full sm:w-auto text-text-muted hover:text-text border border-transparent"` correspondente a "AI Exercises" e substituí-lo pela aba "Grammar". Critério de conclusão: aba "AI Exercises" removida; nova aba "Grammar" renderiza o conteúdo buscado do serviço de Grammar.
+- [ ] **Testes e Validação**
+  - [ ] Validar que a nova aba abre corretamente, exibe a explicação gramatical e nenhum resquício de "AI Exercises" aparece na UI/roteamento.
+
+---
+
+### Sprint 21 – Pills funcionais na tela inicial + Modalidade de Pronúncia dedicada
+
+**Objetivo:** Tornar funcionais os elementos "pills" da tela inicial (classe `px-3 py-1.5 bg-surface border border-border rounded-full text-[0.8rem] text-text-muted hover:bg-primary-dim hover:text-primary hover:border-primary/50 transition-all`), que hoje não fazem nada. Uma dessas ações abre uma modalidade dedicada à PRONÚNCIA (leitura + correção), distinta do Voice Mode (bate-papo). Melhorar a capacidade da IA de entender a PRONÚNCIA REAL do aluno nessa modalidade.
+
+- [ ] **Frontend: Pills funcionais na home**
+  - [ ] Mapear todas as pills da tela inicial e ligar cada uma a uma ação/navegação real (ex: filtrar conteúdo, abrir modo de prática específico). Critério de conclusão: cada pill navegável dispara uma rota/ação residual; nenhuma pill fica morta.
+- [ ] **Frontend: Nova modalidade "Pronunciation Reader"**
+  - [ ] Criar uma rota/tela dedicada à leitura e correção de pronúncia (diferente do voice mode de bate-papo). O aluno lê frases/texto e a IA foca exclusivamente em avaliar PRONÚNCIA. Critério de conclusão: tela acessível a partir de uma pill da home; UI distinta do voice mode.
+- [ ] **Backend: Melhoria da análise de pronúncia REAL**
+  - [ ] Aprimorar o pipeline de análise de pronúncia (alinhamento fonético, scoring por fonema, normalização de ruído) para essa modalidade, com retorno granular por palavra/fonema. Critério de conclusão: endpoint de pronúncia retorna scoring detalhado e feedback de correção específico à fala real do aluno.
+- [ ] **Testes e Validação**
+  - [ ] Validar que a pill de pronúncia abre a nova modalidade e que o feedback reflete corretamente a pronúncia real do aluno em gravações de teste.
+
+---
+
+### Sprint 22 – Renomear "Podcasts" para "Listenings" e novas fontes de conteúdo
+
+**Objetivo:** Transformar o módulo de "Podcasts" em "Listenings", utilizando novas fontes de conteúdo (notícias do DW, conversações/grammar/pronunciation/vocab do BBC Learning English, e test-english.com já dividido por níveis). Remover os vídeos/podcasts existentes no banco de dados.
+
+- [ ] **Backend: Limpeza do conteúdo legado**
+  - [ ] Remover vídeos/podcasts atuais da base de dados (e dependências relacionadas). Critério de conclusão: tabelas de conteúdo de podcasts/vídeos esvaziadas ou substituídas sem órfãos.
+- [ ] **Backend: Ingestores das novas fontes**
+  - [ ] Criar ingestores/scrapers para DW (`https://www.dw.com/pt-br/noticias/s-7111`), BBC Learning English (`https://www.bbc.co.uk/learningenglish/features/easy_english_conversations`) e test-english.com (já por níveis). Critério de conclusão: conteúdo disponível no banco categorizado por fonte, nível CEFR e tipo (listening/reading/grammar/pronunciation/vocabulary).
+- [ ] **Frontend: Renomeação para "Listenings"**
+  - [ ] Ajustar labels, rotas, menus e ícones de "Podcasts" para "Listenings" em todo o frontend. Critério de conclusão: nenhum rótulo "Podcasts" visível ao usuário; nova nomenclatura aplicada.
+- [ ] **Testes e Validação**
+  - [ ] Validar ingestão periódica das fontes e exibição correta ao aluno por nível/tipo.
+
+---
+
+### Sprint 23 – Novo formato de JSON para Flashcards (Unsplash/Pexels via `image_search_term`)
+
+**Objetivo:** Adotar o novo esquema de JSON das Unidades/Flashcards enviado pela Teacher Tati, substituindo o armazenamento manual de imagens por integração com APIs de banco de imagens gratuito (Unsplash, Pexels ou Pixabay) via `image_search_term`. Inclui `grammar_explanation` e `exercises` (múltipla escolha + fill-in-the-blanks) por unidade.
+
+- [ ] **Backend: Novo schema de Unidade**
+  - [ ] Criar/atualizar modelos e validação para o novo JSON:
+    ```json
+    {
+      "unit_id": "auto_generated_unique_id",
+      "cefr_level": "[NÍVEL]",
+      "topic": "[TÓPICO]",
+      "target_audience": "[INTERESSE]",
+      "grammar_explanation": {
+        "title": "Título Curto e Chamativo",
+        "rule_summary": "Explicação em no máximo 3 frases com foco em uso prático.",
+        "key_structure": "Ex: Sujeito + verb in past / Subject + have/has + Participle",
+        "tip_teacher_tati": "Uma dica rápida de memorização ou pronúncia."
+      },
+      "flashcards": [
+        {
+          "id": 1,
+          "word_or_phrase": "Palavra ou Expressão",
+          "phonetic": "/pronúncia/",
+          "translation": "Tradução em Português",
+          "example_sentence": "Frase de exemplo realista no contexto.",
+          "image_search_term": "palavras-chave em inglês para busca no Unsplash"
+        }
+      ],
+      "exercises": [
+        {
+          "id": 1,
+          "type": "multiple_choice",
+          "question": "Frase com lacuna __ para preencher.",
+          "options": ["Opção A", "Opção B", "Opção C", "Opção D"],
+          "correct_answer": "Opção A",
+          "explanation_feedback": "Por que esta resposta está correta."
+        },
+        {
+          "id": 2,
+          "type": "fill_in_the_blanks",
+          "question": "Frase onde o aluno precisa digitar a forma correta do verbo.",
+          "correct_answer": "ate",
+          "explanation_feedback": "Explicação curta."
+        }
+      ]
+    }
+    ```
+    Critério de conclusão: backend aceita, valida e persiste unidades neste formato.
+- [ ] **Backend: Integração com API de imagens (Unsplash/Pexels)**
+  - [ ] Implementar serviço que recebe `image_search_term` e busca/resolve uma imagem de alta qualidade via API (Unsplash, Pexels ou Pixabay), com cache para não repetir buscas. Critério de conclusão: endpoint retorna URL de imagem válida por termo de busca; sem armazenamento manual de milhares de fotos no banco.
+- [ ] **Backend: Migração dos flashcards existentes**
+  - [ ] Migrar/atualizar flashcards legados para o novo formato (quando aplicável), preenchendo `image_search_term` a partir da palavra/phrase. Critério de conclusão: base existente compatível com o novo schema.
+- [ ] **Frontend: Renderização dos flashcards/unidades**
+  - [ ] Atualizar componentes de flashcards para consumir o novo JSON (phonetic, translation, example_sentence, imagem resolvida via `image_search_term`). Critério de conclusão: flashcards renderizam com imagem dinâmica da API de banco de imagens.
+- [ ] **Frontend: Exibição de grammar explanation + exercises**
+  - [ ] Renderizar `grammar_explanation` (title, rule_summary, key_structure, tip_teacher_tati) e os `exercises` (multiple_choice e fill_in_the_blanks) com feedback (`explanation_feedback`). Critério de conclusão: aluno visualiza a unidade completa conforme o novo JSON.
+- [ ] **Testes e Validação**
+  - [ ] Validar ingestão de uma unidade de exemplo (ex: A2 – "Ordering Food at a Cafe") e o funcionamento ponta-a-ponta (flashcard com imagem via API + exercícios com feedback).

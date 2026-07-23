@@ -1,7 +1,9 @@
 import logging
 """
-Captura, organiza e prioriza erros gramaticais e de vocabulário detectados no chat,
-com foco em geração de exercícios baseada em padrões reais de erro.
+Captura, organiza e prioriza erros gramaticais e de vocabulário detectados no chat.
+A geração automática de "AI Exercises" a partir desses erros foi removida (Sprint 20),
+substituída pela aba "Grammar" com explicações das fontes DW / BBC / test-english.com.
+Os erros continuam sendo persistidos e sincronizados com o SRS de vocabulário.
 """
 
 import re
