@@ -971,14 +971,14 @@ erDiagram
 
 **Objetivo:** Tornar funcionais os elementos "pills" da tela inicial (classe `px-3 py-1.5 bg-surface border border-border rounded-full text-[0.8rem] text-text-muted hover:bg-primary-dim hover:text-primary hover:border-primary/50 transition-all`), que hoje não fazem nada. Uma dessas ações abre uma modalidade dedicada à PRONÚNCIA (leitura + correção), distinta do Voice Mode (bate-papo). Melhorar a capacidade da IA de entender a PRONÚNCIA REAL do aluno nessa modalidade.
 
-- [ ] **Frontend: Pills funcionais na home**
-  - [ ] Mapear todas as pills da tela inicial e ligar cada uma a uma ação/navegação real (ex: filtrar conteúdo, abrir modo de prática específico). Critério de conclusão: cada pill navegável dispara uma rota/ação residual; nenhuma pill fica morta.
-- [ ] **Frontend: Nova modalidade "Pronunciation Reader"**
-  - [ ] Criar uma rota/tela dedicada à leitura e correção de pronúncia (diferente do voice mode de bate-papo). O aluno lê frases/texto e a IA foca exclusivamente em avaliar PRONÚNCIA. Critério de conclusão: tela acessível a partir de uma pill da home; UI distinta do voice mode.
-- [ ] **Backend: Melhoria da análise de pronúncia REAL**
-  - [ ] Aprimorar o pipeline de análise de pronúncia (alinhamento fonético, scoring por fonema, normalização de ruído) para essa modalidade, com retorno granular por palavra/fonema. Critério de conclusão: endpoint de pronúncia retorna scoring detalhado e feedback de correção específico à fala real do aluno.
-- [ ] **Testes e Validação**
-  - [ ] Validar que a pill de pronúncia abre a nova modalidade e que o feedback reflete corretamente a pronúncia real do aluno em gravações de teste.
+- [X] **Frontend: Pills funcionais na home**
+  - [X] Mapear todas as pills da tela inicial e ligar cada uma a uma ação/navegação real (ex: filtrar conteúdo, abrir modo de prática específico). Critério de conclusão: cada pill navegável dispara uma rota/ação residual; nenhuma pill fica morta.
+- [X] **Frontend: Nova modalidade "Pronunciation Reader"**
+  - [X] Criar uma rota/tela dedicada à leitura e correção de pronúncia (diferente do voice mode de bate-papo). O aluno lê frases/texto e a IA foca exclusivamente em avaliar PRONÚNCIA. Critério de conclusão: tela acessível a partir de uma pill da home; UI distinta do voice mode.
+- [X] **Backend: Melhoria da análise de pronúncia REAL**
+  - [X] Aprimorar o pipeline de análise de pronúncia (alinhamento fonético, scoring por fonema, normalização de ruído) para essa modalidade, com retorno granular por palavra/fonema. Critério de conclusão: endpoint de pronúncia retorna scoring detalhado e feedback de correção específico à fala real do aluno.
+- [X] **Testes e Validação**
+  - [X] Validar que a pill de pronúncia abre a nova modalidade e que o feedback reflete corretamente a pronúncia real do aluno em gravações de teste.
 
 ---
 
@@ -986,14 +986,14 @@ erDiagram
 
 **Objetivo:** Transformar o módulo de "Podcasts" em "Listenings", utilizando novas fontes de conteúdo (notícias do DW, conversações/grammar/pronunciation/vocab do BBC Learning English, e test-english.com já dividido por níveis). Remover os vídeos/podcasts existentes no banco de dados.
 
-- [ ] **Backend: Limpeza do conteúdo legado**
-  - [ ] Remover vídeos/podcasts atuais da base de dados (e dependências relacionadas). Critério de conclusão: tabelas de conteúdo de podcasts/vídeos esvaziadas ou substituídas sem órfãos.
-- [ ] **Backend: Ingestores das novas fontes**
-  - [ ] Criar ingestores/scrapers para DW (`https://www.dw.com/pt-br/noticias/s-7111`), BBC Learning English (`https://www.bbc.co.uk/learningenglish/features/easy_english_conversations`) e test-english.com (já por níveis). Critério de conclusão: conteúdo disponível no banco categorizado por fonte, nível CEFR e tipo (listening/reading/grammar/pronunciation/vocabulary).
-- [ ] **Frontend: Renomeação para "Listenings"**
-  - [ ] Ajustar labels, rotas, menus e ícones de "Podcasts" para "Listenings" em todo o frontend. Critério de conclusão: nenhum rótulo "Podcasts" visível ao usuário; nova nomenclatura aplicada.
-- [ ] **Testes e Validação**
-  - [ ] Validar ingestão periódica das fontes e exibição correta ao aluno por nível/tipo.
+- [X] **Backend: Limpeza do conteúdo legado**
+  - [X] Remover vídeos/podcasts atuais da base de dados (e dependências relacionadas). Critério de conclusão: tabelas de conteúdo de podcasts/vídeos esvaziadas ou substituídas sem órfãos.
+- [X] **Backend: Ingestores das novas fontes**
+  - [X] Criar ingestores/scrapers para DW (`https://www.dw.com/pt-br/noticias/s-7111`), BBC Learning English (`https://www.bbc.co.uk/learningenglish/features/easy_english_conversations`) e test-english.com (já por níveis). Critério de conclusão: conteúdo disponível no banco categorizado por fonte, nível CEFR e tipo (listening/reading/grammar/pronunciation/vocabulary).
+- [X] **Frontend: Renomeação para "Listenings"**
+  - [X] Ajustar labels, rotas, menus e ícones de "Podcasts" para "Listenings" em todo o frontend. Critério de conclusão: nenhum rótulo "Podcasts" visível ao usuário; nova nomenclatura aplicada.
+- [X] **Testes e Validação**
+  - [X] Validar ingestão periódica das fontes e exibição correta ao aluno por nível/tipo.
 
 ---
 
@@ -1001,8 +1001,8 @@ erDiagram
 
 **Objetivo:** Adotar o novo esquema de JSON das Unidades/Flashcards enviado pela Teacher Tati, substituindo o armazenamento manual de imagens por integração com APIs de banco de imagens gratuito (Unsplash, Pexels ou Pixabay) via `image_search_term`. Inclui `grammar_explanation` e `exercises` (múltipla escolha + fill-in-the-blanks) por unidade.
 
-- [ ] **Backend: Novo schema de Unidade**
-  - [ ] Criar/atualizar modelos e validação para o novo JSON:
+- [X] **Backend: Novo schema de Unidade**
+  - [X] Criar/atualizar modelos e validação para o novo JSON:
     ```json
     {
       "unit_id": "auto_generated_unique_id",
@@ -1045,13 +1045,13 @@ erDiagram
     }
     ```
     Critério de conclusão: backend aceita, valida e persiste unidades neste formato.
-- [ ] **Backend: Integração com API de imagens (Unsplash/Pexels)**
-  - [ ] Implementar serviço que recebe `image_search_term` e busca/resolve uma imagem de alta qualidade via API (Unsplash, Pexels ou Pixabay), com cache para não repetir buscas. Critério de conclusão: endpoint retorna URL de imagem válida por termo de busca; sem armazenamento manual de milhares de fotos no banco.
-- [ ] **Backend: Migração dos flashcards existentes**
-  - [ ] Migrar/atualizar flashcards legados para o novo formato (quando aplicável), preenchendo `image_search_term` a partir da palavra/phrase. Critério de conclusão: base existente compatível com o novo schema.
-- [ ] **Frontend: Renderização dos flashcards/unidades**
-  - [ ] Atualizar componentes de flashcards para consumir o novo JSON (phonetic, translation, example_sentence, imagem resolvida via `image_search_term`). Critério de conclusão: flashcards renderizam com imagem dinâmica da API de banco de imagens.
-- [ ] **Frontend: Exibição de grammar explanation + exercises**
-  - [ ] Renderizar `grammar_explanation` (title, rule_summary, key_structure, tip_teacher_tati) e os `exercises` (multiple_choice e fill_in_the_blanks) com feedback (`explanation_feedback`). Critério de conclusão: aluno visualiza a unidade completa conforme o novo JSON.
-- [ ] **Testes e Validação**
-  - [ ] Validar ingestão de uma unidade de exemplo (ex: A2 – "Ordering Food at a Cafe") e o funcionamento ponta-a-ponta (flashcard com imagem via API + exercícios com feedback).
+- [X] **Backend: Integração com API de imagens (Unsplash/Pexels)**
+  - [X] Implementar serviço que recebe `image_search_term` e busca/resolve uma imagem de alta qualidade via API (Unsplash, Pexels ou Pixabay), com cache para não repetir buscas. Critério de conclusão: endpoint retorna URL de imagem válida por termo de busca; sem armazenamento manual de milhares de fotos no banco.
+- [X] **Backend: Migração dos flashcards existentes**
+  - [X] Migrar/atualizar flashcards legados para o novo formato (quando aplicável), preenchendo `image_search_term` a partir da palavra/phrase. Critério de conclusão: base existente compatível com o novo schema.
+- [X] **Frontend: Renderização dos flashcards/unidades**
+  - [X] Atualizar componentes de flashcards para consumir o novo JSON (phonetic, translation, example_sentence, imagem resolvida via `image_search_term`). Critério de conclusão: flashcards renderizam com imagem dinâmica da API de banco de imagens.
+- [X] **Frontend: Exibição de grammar explanation + exercises**
+  - [X] Renderizar `grammar_explanation` (title, rule_summary, key_structure, tip_teacher_tati) e os `exercises` (multiple_choice e fill_in_the_blanks) com feedback (`explanation_feedback`). Critério de conclusão: aluno visualiza a unidade completa conforme o novo JSON.
+- [X] **Testes e Validação**
+  - [X] Validar ingestão de uma unidade de exemplo (ex: A2 – "Ordering Food at a Cafe") e o funcionamento ponta-a-ponta (flashcard com imagem via API + exercícios com feedback).

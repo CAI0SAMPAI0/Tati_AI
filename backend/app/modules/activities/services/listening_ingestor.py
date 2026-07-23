@@ -10,7 +10,6 @@ from datetime import datetime, timezone
 from typing import List, Dict, Optional
 
 import httpx
-from bs4 import BeautifulSoup
 
 from app.core.config import settings
 from app.core.database import get_client
@@ -65,6 +64,7 @@ BBC_SECTIONS = [
 
 
 async def ingest_bbc_learning_english() -> List[Dict]:
+    from bs4 import BeautifulSoup
     items = []
     async with httpx.AsyncClient() as client:
         for url in BBC_BASE + "/features/6-minute-english",:
@@ -130,6 +130,7 @@ DW_BASES = [
 
 
 async def ingest_dw_content() -> List[Dict]:
+    from bs4 import BeautifulSoup
     items = []
     async with httpx.AsyncClient() as client:
         for url, level, desc in DW_BASES:
@@ -200,6 +201,7 @@ TEST_ENGLISH_CATEGORIES = {
 
 
 async def ingest_test_english() -> List[Dict]:
+    from bs4 import BeautifulSoup
     items = []
     async with httpx.AsyncClient() as client:
         for level in TEST_ENGLISH_LEVELS:
