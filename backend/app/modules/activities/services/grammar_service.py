@@ -59,7 +59,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="Subject + am/is/are + verb-ing",
         tip_teacher_tati="Use 'now', 'at the moment' to make it clear the action is happening right now.",
         source_name="BBC Learning English",
-        source_url="https://www.bbc.co.uk/learningenglish/english/grammar",
+        source_url="https://www.bbc.co.uk/learningenglish/english/features/6-minute-english/ep-240125",
     ),
     GrammarEntry(
         topic="articles",
@@ -152,7 +152,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="Subject + modal + base verb",
         tip_teacher_tati="I must study (strong obligation). I should study (advice). I can study (ability).",
         source_name="BBC Learning English",
-        source_url="https://www.bbc.co.uk/learningenglish/english/grammar",
+        source_url="https://www.bbc.co.uk/learningenglish/english/features/6-minute-english/ep-230727",
     ),
     GrammarEntry(
         topic="countable_uncountable",
@@ -180,7 +180,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="Subject + have/has + past participle",
         tip_teacher_tati="Key signals: ever, never, already, yet, just, since, for.",
         source_name="test-english.com",
-        source_url="https://test-english.com/grammar-points/b1/",
+        source_url="https://test-english.com/grammar-points/b1/present-perfect/",
     ),
     GrammarEntry(
         topic="past_simple_vs_present_perfect",
@@ -196,7 +196,7 @@ _CATALOG: list[GrammarEntry] = [
         ),
         tip_teacher_tati="If there's a specific time (yesterday, in 2019), use Past Simple. Otherwise, prefer Present Perfect.",
         source_name="BBC Learning English",
-        source_url="https://www.bbc.co.uk/learningenglish/english/grammar",
+        source_url="https://www.bbc.co.uk/learningenglish/english/features/the-english-we-speak/ep-230309",
     ),
     GrammarEntry(
         topic="conditionals_zero_first",
@@ -209,7 +209,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="Zero: If + present, present | First: If + present, will + verb",
         tip_teacher_tati="In the if-clause, NEVER use 'will'. Use the present tense.",
         source_name="BBC Learning English",
-        source_url="https://www.bbc.co.uk/learningenglish/english/grammar",
+        source_url="https://www.bbc.co.uk/learningenglish/english/features/6-minute-english/ep-231012",
     ),
     GrammarEntry(
         topic="used_to",
@@ -275,7 +275,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="noun + who/which/that/whose + clause",
         tip_teacher_tati="'That' is very flexible — it can replace 'who' and 'which' in most cases.",
         source_name="BBC Learning English",
-        source_url="https://www.bbc.co.uk/learningenglish/english/grammar",
+        source_url="https://www.bbc.co.uk/learningenglish/english/features/6-minute-english/ep-240118",
     ),
     GrammarEntry(
         topic="third_conditional",
@@ -312,7 +312,7 @@ class GrammarService:
         topic_key = _normalize_topic(topic)
         level_key = (level or "").strip().upper()
 
-        cache_key = f"grammar:{level_key}:{topic_key}" if topic_key else "grammar:index"
+        cache_key = f"grammar:{level_key}:{topic_key}" if topic_key else f"grammar:index:{level_key}"
         cached = await cache_get(cache_key)
         if cached:
             return cached
@@ -364,7 +364,7 @@ class GrammarService:
                 ),
                 "sources": [
                     {"name": "DW News", "url": "https://www.dw.com/en/top-stories/s-9097"},
-                    {"name": "BBC Learning English", "url": "https://www.bbc.co.uk/learningenglish/english/grammar"},
+                    {"name": "BBC Learning English", "url": "https://www.bbc.co.uk/learningenglish/english/features/6-minute-english"},
                     {"name": "test-english.com", "url": f"https://test-english.com/?s={topic.replace('_', '+')}"},
                 ],
             }
