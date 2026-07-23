@@ -180,7 +180,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="Subject + have/has + past participle",
         tip_teacher_tati="Key signals: ever, never, already, yet, just, since, for.",
         source_name="test-english.com",
-        source_url="https://test-english.com/grammar-points/b1/present-perfect/",
+        source_url="https://test-english.com/grammar-points/b1/",
     ),
     GrammarEntry(
         topic="past_simple_vs_present_perfect",
