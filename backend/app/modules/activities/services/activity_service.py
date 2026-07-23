@@ -281,7 +281,7 @@ class ActivityService:
             from app.core.utils.level_utils import matches_level
             user_level_norm = normalize_level(user_level)
 
-            # 1. Quizzes e AI Exercises concluídos
+            # 1. Quizzes concluídos
             done_rows = self.db.table('activity_submissions').select('metadata, activity_type').eq(
                 'username', username).execute().data or []
             
@@ -318,11 +318,7 @@ class ActivityService:
                         'module_id': q.get('module_id')
                     })
 
-            # 3. Exercícios IA (personalized_quiz) pendentes
-            attempts = self.db.table('user_exercise_attempts').select('exercise_id').eq(
-                'username', username).eq('status', 'pending').execute().data or []
-
-            # 4. Simulações pendentes do nível do usuário
+            # 3. Simulações pendentes do nível do usuário
             all_simulations = self.db.table('simulations').select('id, name, description, difficulty').eq('is_active', True).execute().data or []
             pending_simulations = []
             for s in all_simulations:
@@ -337,7 +333,6 @@ class ActivityService:
 
             return {
                 'quizzes': pending_quizzes,
-                'ai_exercises': attempts,
                 'simulations': pending_simulations
             }
         return await run_in_threadpool(_fetch)

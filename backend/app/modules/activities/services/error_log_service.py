@@ -196,7 +196,6 @@ Return ONLY a JSON object:
         2. normaliza
         3. persiste
         4. sincroniza com SRS
-        5. decide se gera exercício
         """
         raw_errors = await self.extract_errors_list(student_msg, teacher_msg)
         if not raw_errors:
@@ -209,13 +208,6 @@ Return ONLY a JSON object:
         try:
             await self._persist_errors(username, normalized_errors)
             await self._sync_errors_with_srs(username, normalized_errors)
-
-            training_targets = await self._get_training_targets(username)
-
-            if await self._should_generate_exercises(username, training_targets):
-                from app.modules.activities.services.exercise_generator import generate_exercises_from_targets
-                await generate_exercises_from_targets(username, training_targets)
-
             return True
         except Exception as e:
             logging.info(
@@ -349,49 +341,6 @@ Return ONLY a JSON object:
 
         targets.sort(key=lambda x: x["score"], reverse=True)
         return targets[:limit]
-
-    async def _should_generate_exercises(
-            self, username: str, training_targets: List[Dict[str, Any]]) -> bool:
-        """
-        Decide se vale gerar exercício agora para evitar spam.
-        """
-        if not training_targets:
-            return False
-
-        # 1. Pelo menos 2 padrões de erro para justificar um quiz novo
-        if len(training_targets) < 2:
-            return False
-
-        # 2. Cooldown de 4 horas para não gerar exercícios em toda
-        # mensagem
-        try:
-            from datetime import datetime, timedelta, timezone
-            four_hours_ago = (datetime.now(timezone.utc) -
-                              timedelta(hours=4)).isoformat()
-
-            def _check_recent():
-                # Verifica se há qualquer exercício (pendente ou
-                # concluído) nas últimas 4 horas
-                return (
-                    self.db.table("user_exercise_attempts")
-                    .select("id, status")
-                    .eq("username", username)
-                    .gte("created_at", four_hours_ago)
-                    .execute()
-                )
-
-            res = await run_in_threadpool(_check_recent)
-            if res.data:
-                # Já existe um exercício pendente ou gerado recentemente
-                logging.info(
-                    f"[ErrorLogService] Pulando geração para {username}: cooldown ativo.")
-                return False
-        except Exception as e:
-            logging.info(
-                f"[ErrorLogService] Erro no check de cooldown: {e}")
-            return False
-
-        return True
 
     async def mark_errors_resolved(
             self,

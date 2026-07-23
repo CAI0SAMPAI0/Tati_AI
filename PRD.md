@@ -956,14 +956,14 @@ erDiagram
 **Objetivo:** Remover a aba de "AI Exercises" (incluindo todo o código/backend que gera exercícios automáticos a partir da detecção de erros pelo LLM) e substituí-la por uma aba "Grammar", responsável por buscar a gramática e sua explicação a partir das fontes definidas na Feature 3 (DW, BBC Learning English, test-english.com).
 **Agentes alocados:** [frontend-expert](file:///C:/Users/caio/Documents/GitHub/Tati_AI/agents/frontend-expert.md), [backend-expert](file:///C:/Users/caio/Documents/GitHub/Tati_AI/agents/backend-expert.md)
 
-- [ ] **Backend: Remoção do gerador de AI Exercises**
-  - [ ] Remover rotas, serviços e prompts do LLM responsáveis por detectar erros do aluno e gerar "AI Exercises" automáticos. Critério de conclusão: nenhum endpoint/serviço referente a AI Exercises permanece ativo no backend; dependências órfãs limpas.
-- [ ] **Backend: Serviço de busca de Grammar**
-  - [ ] Criar serviço (e respectivo endpoint `/api/grammar`) que consulta/busca gramática e sua explicação nas fontes definidas na Feature 3 (DW, BBC Learning English, test-english.com), com cache e normalização do conteúdo retornado. Critério de conclusão: endpoint retorna explicação gramatical válida por tópico/nível consultado.
-- [ ] **Frontend: Substituição da aba**
-  - [ ] Localizar o elemento de aba com `class="flex items-center gap-2.5 px-5 py-3 rounded-xl sm:rounded-t-xl sm:rounded-b-none text-sm font-bold transition-all whitespace-nowrap w-full sm:w-auto text-text-muted hover:text-text border border-transparent"` correspondente a "AI Exercises" e substituí-lo pela aba "Grammar". Critério de conclusão: aba "AI Exercises" removida; nova aba "Grammar" renderiza o conteúdo buscado do serviço de Grammar.
-- [ ] **Testes e Validação**
-  - [ ] Validar que a nova aba abre corretamente, exibe a explicação gramatical e nenhum resquício de "AI Exercises" aparece na UI/roteamento.
+- [X] **Backend: Remoção do gerador de AI Exercises**
+  - [X] Remover rotas, serviços e prompts do LLM responsáveis por detectar erros do aluno e gerar "AI Exercises" automáticos. Critério de conclusão: nenhum endpoint/serviço referente a AI Exercises permanece ativo no backend; dependências órfãs limpas.
+- [X] **Backend: Serviço de busca de Grammar**
+  - [X] Criar serviço (e respectivo endpoint `/api/grammar`) que consulta/busca gramática e sua explicação nas fontes definidas na Feature 3 (DW, BBC Learning English, test-english.com), com cache e normalização do conteúdo retornado. Critério de conclusão: endpoint retorna explicação gramatical válida por tópico/nível consultado.
+- [X] **Frontend: Substituição da aba**
+  - [X] Localizar o elemento de aba com `class="flex items-center gap-2.5 px-5 py-3 rounded-xl sm:rounded-t-xl sm:rounded-b-none text-sm font-bold transition-all whitespace-nowrap w-full sm:w-auto text-text-muted hover:text-text border border-transparent"` correspondente a "AI Exercises" e substituí-lo pela aba "Grammar". Critério de conclusão: aba "AI Exercises" removida; nova aba "Grammar" renderiza o conteúdo buscado do serviço de Grammar.
+- [X] **Testes e Validação**
+  - [X] Validar que a nova aba abre corretamente, exibe a explicação gramatical e nenhum resquício de "AI Exercises" aparece na UI/roteamento.
 
 ---
 

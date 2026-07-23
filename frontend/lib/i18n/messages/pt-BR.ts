@@ -634,7 +634,7 @@ export const ptBR = {
     restricted_activities: 'Atividades disponíveis apenas para plano Full a partir de 01/07/2026.',
     tab_quiz: 'Quizzes',
     tab_flashcards: 'Flashcards',
-    tab_exercises: 'Exercícios IA',
+    tab_exercises: 'Grammar',
     tab_simulations: 'Simulações',
     tab_podcasts: 'Podcasts',
     no_exercises: 'Nenhum exercício gerado ainda. Continue conversando com a Tati para ela identificar onde você pode melhorar!',

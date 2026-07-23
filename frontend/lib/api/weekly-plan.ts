@@ -15,7 +15,7 @@ export type WeeklyPlan = {
 
 /**
  * Busca o plano semanal unificado.
- * O backend agora retorna todos os pendentes (podcasts, simulations, ai-exercises).
+ * O backend agora retorna todos os pendentes (podcasts, simulations).
  */
 export function normalizeWeeklyPlanData(data: unknown): WeeklyPlan {
   const payload = (data && typeof data === 'object' ? data : {}) as {

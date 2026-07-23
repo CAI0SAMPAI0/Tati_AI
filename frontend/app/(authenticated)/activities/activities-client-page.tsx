@@ -9,9 +9,10 @@ import {
   Podcast,
   Play,
   FileBox,
-  History,
   Search,
-  Sparkles,
+  BookOpen,
+  Lightbulb,
+  GraduationCap,
   FileText,
   Download,
 } from 'lucide-react';
@@ -27,7 +28,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { normalizeLevel } from '@/lib/constants/levels';
 
-type TabType = 'quiz' | 'flashcards' | 'simulations' | 'podcasts' | 'exercises' | 'materials';
+type TabType = 'quiz' | 'flashcards' | 'simulations' | 'podcasts' | 'grammar' | 'materials';
 
 const PERSONALIZED_MODULE_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -71,13 +72,21 @@ interface FlashcardDeck {
   card_count?: number;
   level?: string;
 }
-interface UserError {
-  id: string;
-  incorrect_text: string;
-  correct_text: string;
-  explanation?: string;
-  category?: string;
-  created_at: string;
+interface GrammarTopicIndex {
+  topic: string;
+  level: string;
+  title: string;
+  source_name: string;
+  source_url: string;
+}
+interface GrammarDetail {
+  topic: string;
+  level: string;
+  title: string;
+  rule_summary: string;
+  key_structure: string;
+  tip_teacher_tati: string;
+  sources: Array<{ name: string; url: string }>;
 }
 
 export default function ActivitiesClientPage() {
@@ -94,7 +103,7 @@ export default function ActivitiesClientPage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('tati_last_activity_tab') as TabType;
-      if (saved && ['quiz', 'flashcards', 'simulations', 'podcasts', 'exercises', 'materials'].includes(saved)) {
+      if (saved && ['quiz', 'flashcards', 'simulations', 'podcasts', 'grammar', 'materials'].includes(saved)) {
         setActiveTab(saved);
       }
     }
@@ -152,9 +161,21 @@ export default function ActivitiesClientPage() {
     queryKey: ['activities-simulations-progress'],
     queryFn: () => apiGet<{ completed: string[] }>('/simulation/progress'),
   });
-  const { data: userErrors = [] } = useQuery<UserError[]>({
-    queryKey: ['activities-user-errors'],
-    queryFn: () => apiGet<UserError[]>('/users/progress/errors/recent'),
+  const { data: grammarIndex } = useQuery<{ topics: GrammarTopicIndex[]; sources: Array<{ name: string; url: string }> }>({
+    queryKey: ['grammar-index', filterLevel],
+    queryFn: () => apiGet<{ topics: GrammarTopicIndex[]; sources: Array<{ name: string; url: string }> }>(
+      filterLevel === 'All'
+        ? ENDPOINTS.GRAMMAR
+        : `${ENDPOINTS.GRAMMAR}?level=${filterLevel}`
+    ),
+    staleTime: 30 * 60 * 1000,
+  });
+  const [selectedGrammarTopic, setSelectedGrammarTopic] = useState<string | null>(null);
+  const { data: grammarDetail } = useQuery<GrammarDetail>({
+    queryKey: ['grammar-detail', selectedGrammarTopic],
+    queryFn: () => apiGet<GrammarDetail>(`${ENDPOINTS.GRAMMAR}?topic=${selectedGrammarTopic}`),
+    enabled: !!selectedGrammarTopic,
+    staleTime: 30 * 60 * 1000,
   });
 
   const { data: userProfile } = useQuery({
@@ -234,13 +255,6 @@ export default function ActivitiesClientPage() {
     return list;
   }, [modules, masterModule, searchQuery, filterLevel]);
 
-  const exercises = useMemo(() => {
-    if (!masterModule || !masterModule.quizzes) return [];
-    return masterModule.quizzes.filter(
-      (q: any) => q.id && !q.id.startsWith('cefr_') && (!searchQuery || q.title.toLowerCase().includes(searchQuery.toLowerCase())),
-    );
-  }, [masterModule, searchQuery]);
-
   const flashcards = useMemo(() => {
     if (!flashcardsRaw) return [];
     let filtered = flashcardsRaw.filter(
@@ -278,7 +292,7 @@ export default function ActivitiesClientPage() {
 
   const tabs: Array<{ id: TabType; icon: React.ReactNode; label: string; count?: number }> = [
     { id: 'quiz', icon: <HelpCircle size={18} />, label: 'Quizzes', count: quizzes.length },
-    { id: 'exercises', icon: <Sparkles size={18} />, label: 'AI Exercises', count: exercises.length },
+    { id: 'grammar', icon: <BookOpen size={18} />, label: 'Grammar', count: grammarIndex?.topics?.length },
     { id: 'flashcards', icon: <Layers size={18} />, label: 'Flashcards', count: flashcards.length },
     { id: 'simulations', icon: <Drama size={18} />, label: 'Simulations', count: simulations.length },
     { id: 'podcasts', icon: <Podcast size={18} />, label: 'Podcasts', count: podcasts.length },
@@ -389,67 +403,116 @@ export default function ActivitiesClientPage() {
               </div>
             )}
 
-            {activeTab === 'exercises' && (
-              <div className="space-y-12">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {exercises.length > 0 ? (
-                    exercises.map((q: any) => (
-                      <ActivityCard
-                        key={q.id}
-                        title={q.title}
-                        description={q.description || 'Personalized practice based on your mistakes.'}
-                        type="quiz"
-                        status={q.status === 'done' ? 'done' : 'new'}
-                        onClick={() => router.push(`/quiz/${q.id}`)}
-                      />
-                    ))
-                  ) : (
-                    <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30 px-8">
-                      <Sparkles size={40} className="mx-auto mb-4 opacity-20" />
-                      <p className="max-w-md mx-auto">
-                        No exercises generated yet. Keep chatting with Tati so she can identify areas for improvement!
-                      </p>
-                    </div>
-                  )}
-                </div>
+            {activeTab === 'grammar' && (
+              <div className="space-y-8">
+                {selectedGrammarTopic ? (
+                  <div className="space-y-4 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <button
+                      onClick={() => setSelectedGrammarTopic(null)}
+                      className="text-sm font-bold text-primary hover:underline flex items-center gap-1"
+                    >
+                      ← Voltar para tópicos
+                    </button>
 
-                {userErrors.length > 0 && (
-                  <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    <h4 className="text-lg font-bold flex items-center gap-2 mb-6">
-                      <History size={20} className="text-primary" />
-                      Your recent mistakes
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {userErrors.slice(0, 10).map((err) => (
-                        <div
-                          key={err.id}
-                          className="bg-surface border border-border p-5 rounded-2xl space-y-3 hover:border-primary/20 transition-colors"
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="space-y-1">
-                              <p className="text-[0.65rem] font-bold text-danger uppercase tracking-wider">Mistake</p>
-                              <p className="text-sm font-medium line-through opacity-50 italic">
-                                &quot;{err.incorrect_text}&quot;
-                              </p>
-                            </div>
-                            <span className="bg-primary/10 text-primary text-[0.6rem] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shrink-0">
-                              {err.category || 'grammar'}
+                    {grammarDetail ? (
+                      <div className="bg-surface border border-border rounded-3xl p-6 md:p-8 space-y-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                            <GraduationCap size={24} />
+                          </div>
+                          <div>
+                            <span className="text-[0.65rem] font-bold uppercase tracking-wider text-primary">
+                              CEFR {grammarDetail.level}
                             </span>
+                            <h3 className="text-xl md:text-2xl font-display font-bold text-text">
+                              {grammarDetail.title}
+                            </h3>
                           </div>
-                          <div className="space-y-1">
-                            <p className="text-[0.65rem] font-bold text-success uppercase tracking-wider">
-                              The correct form is:
-                            </p>
-                            <p className="text-sm font-bold text-text">&quot;{err.correct_text}&quot;</p>
-                          </div>
-                          {err.explanation && (
-                            <p className="text-[0.7rem] text-text-muted bg-bg-secondary/50 p-2 rounded-lg italic">
-                              {err.explanation}
-                            </p>
-                          )}
                         </div>
-                      ))}
+
+                        <p className="text-text text-sm md:text-base leading-relaxed">
+                          {grammarDetail.rule_summary}
+                        </p>
+
+                        <div className="bg-bg-secondary/50 border border-border rounded-2xl p-4">
+                          <p className="text-[0.65rem] font-bold uppercase tracking-wider text-text-muted mb-1">
+                            Estrutura-chave
+                          </p>
+                          <p className="text-text text-sm font-medium">
+                            {grammarDetail.key_structure}
+                          </p>
+                        </div>
+
+                        <div className="flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-2xl p-4">
+                          <Lightbulb size={20} className="text-primary shrink-0 mt-0.5" />
+                          <p className="text-sm text-text">
+                            <span className="font-bold text-primary">Dica da Teacher Tati: </span>
+                            {grammarDetail.tip_teacher_tati}
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <p className="text-[0.65rem] font-bold uppercase tracking-wider text-text-muted">
+                            Fontes de referência
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {grammarDetail.sources?.map((src) => (
+                              <a
+                                key={src.url}
+                                href={src.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-1.5 bg-surface border border-border rounded-full text-[0.8rem] font-semibold text-text-muted hover:bg-primary-dim hover:text-primary hover:border-primary/50 transition-all"
+                              >
+                                {src.name}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="py-20 text-center text-text-muted">
+                        Carregando explicação...
+                      </div>
+                    )}
+                  </div>
+                ) : grammarIndex?.topics?.length ? (
+                  <div>
+                    <p className="text-text-muted text-sm mb-5 max-w-2xl">
+                      Explore os tópicos de gramática com a explicação da Teacher Tati e links das
+                      fontes DW, BBC Learning English e test-english.com.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {grammarIndex.topics
+                        .filter(
+                          (t) =>
+                            !searchQuery ||
+                            t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            t.topic.toLowerCase().includes(searchQuery.toLowerCase()),
+                        )
+                        .map((t) => (
+                          <button
+                            key={t.topic}
+                            onClick={() => setSelectedGrammarTopic(t.topic)}
+                            className="text-left bg-surface border border-border rounded-2xl p-5 space-y-3 hover:border-primary/40 hover:-translate-y-0.5 transition-all"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                                <BookOpen size={20} />
+                              </div>
+                              <span className="text-[0.6rem] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase">
+                                CEFR {t.level}
+                              </span>
+                            </div>
+                            <h4 className="text-base font-bold text-text">{t.title}</h4>
+                            <p className="text-[0.7rem] text-text-muted">Fonte: {t.source_name}</p>
+                          </button>
+                        ))}
                     </div>
+                  </div>
+                ) : (
+                  <div className="py-20 text-center text-text-muted">
+                    Nenhum tópico de gramática disponível para este nível.
                   </div>
                 )}
               </div>

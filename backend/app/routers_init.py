@@ -143,6 +143,7 @@ def register_all_routers(app: FastAPI) -> None:
 
     from app.modules.activities.routes.personalized import router as personalized_router
     from app.modules.activities.routes.hub import router as hub_router
+    from app.modules.activities.routes.grammar import router as grammar_router
 
     app.include_router(
         personalized_router,
@@ -153,6 +154,11 @@ def register_all_routers(app: FastAPI) -> None:
         hub_router,
         prefix='/activities/hub',
         tags=['activities'],
+    )
+    app.include_router(
+        grammar_router,
+        prefix='/grammar',
+        tags=['grammar'],
     )
 
     from app.modules.payments.routes.mercadopago import router as mp_payments_router

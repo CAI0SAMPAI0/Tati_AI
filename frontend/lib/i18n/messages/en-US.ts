@@ -630,7 +630,7 @@ export const enUS = {
     restricted_activities: 'Activities are available only for Full plan users starting on July 1, 2026.',
     tab_quiz: 'Quizzes',
     tab_flashcards: 'Flashcards',
-    tab_exercises: 'AI Exercises',
+    tab_exercises: 'Grammar',
     tab_simulations: 'Simulations',
     tab_podcasts: 'Podcasts',
     no_exercises: 'No exercises generated yet. Keep chatting with Tati so she can identify areas for improvement!',

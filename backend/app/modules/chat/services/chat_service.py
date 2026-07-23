@@ -588,15 +588,10 @@ class ChatService:
 
             await run_in_threadpool(check_chat_trophies, username)
 
-            # 3. AutoExercise, Error Logging e Weekly Plan Tracking
-            from app.modules.activities.services.error_log_service import error_log_service
+            # 3. Weekly Plan Tracking (Sprint 20: AI error detection + AI Exercises removed)
             from app.modules.chat.services.semantic_judge import semantic_judge
 
             # Executa tarefas de background de forma assíncrona
-            # AGORA PASSANDO O CONTEÚDO DO USUÁRIO CORRETAMENTE
-            asyncio.create_task(
-                error_log_service.extract_and_log_errors(
-                    username, user_content, full_response))
             asyncio.create_task(semantic_judge.check_topics_completion(
                 username, f"User: {user_content}\nTati: {full_response}"))
 

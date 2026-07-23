@@ -125,37 +125,6 @@ def _build_quiz_topics(
         return []
 
 
-def _build_ai_exercise_topics(
-        db,
-        username: str,
-        completed_ids: set[str]) -> list[dict]:
-    try:
-        rows = (
-            db.table("quizzes")
-            .select("id, title, description, generated_from_patterns")
-            .eq("username", username)
-            .eq("is_active", True)
-            .execute()
-            .data
-        )
-        topics = []
-        for row in rows:
-            patterns = row.get("generated_from_patterns") or []
-            if not patterns:
-                continue  # é quiz normal
-            is_done = str(row["id"]) in completed_ids
-            topics.append({
-                "id": f"aiex-{row['id']}",
-                "title": f"✨ {row.get('title') or 'AI Exercise'}",
-                "description": row.get("description") or "AI-generated exercise based on your errors.",
-                "status": "completed" if is_done else "pending",
-                "redirect_url": f"/quiz/{row['id']}",
-            })
-        return topics
-    except Exception:
-        return []
-
-
 def _build_simulation_topics(
         db,
         username: str,
@@ -255,13 +224,8 @@ async def get_weekly_plan(
     # Monta topics por categoria
     topics: list[dict] = []
 
-    # 1. Quizzes e AI Exercises
+    # 1. Quizzes (Sprint 20: AI Exercises removed)
     topics.extend(_build_quiz_topics(db, username, completed_exercises))
-    topics.extend(
-        _build_ai_exercise_topics(
-            db,
-            username,
-            completed_exercises))
 
     # 2. Simulations
     topics.extend(_build_simulation_topics(

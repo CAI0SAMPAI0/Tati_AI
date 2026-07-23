@@ -59,6 +59,9 @@ export const ENDPOINTS = {
   // Validation
   VALIDATE_DOCUMENT: (doc: string) => `/validation/validate-document/${doc}`,
 
+  // Grammar (Sprint 20 — substitui AI Exercises)
+  GRAMMAR: '/grammar',
+
   // Activities
   ACTIVITIES_MODULES: '/activities/modules',
   ACTIVITIES_QUIZZES: '/activities/quizzes',

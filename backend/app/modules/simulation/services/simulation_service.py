@@ -186,15 +186,7 @@ class SimulationService:
             conv_id, username, 'assistant', reply_text, audio_b64=tts_b64
         )
 
-        # 🏆 Error Logging e Atividade em Background
-        try:
-            from app.modules.activities.services.error_log_service import error_log_service
-            import asyncio
-            asyncio.create_task(
-                error_log_service.extract_and_log_errors(
-                    username, content, reply_text))
-        except BaseException:
-            pass
+        # Sprint 20: AI error detection + AI Exercises removed (no background task here anymore)
 
         # Obter todas as falas do usuário nesta conversa para checar objetivos concluídos
         completed_objectives = []
