@@ -411,7 +411,7 @@ export default function ActivitiesClientPage() {
                       onClick={() => setSelectedGrammarTopic(null)}
                       className="text-sm font-bold text-primary hover:underline flex items-center gap-1"
                     >
-                      ← Voltar para tópicos
+                      ← Back to topics
                     </button>
 
                     {grammarDetail ? (
@@ -436,7 +436,7 @@ export default function ActivitiesClientPage() {
 
                         <div className="bg-bg-secondary/50 border border-border rounded-2xl p-4">
                           <p className="text-[0.65rem] font-bold uppercase tracking-wider text-text-muted mb-1">
-                            Estrutura-chave
+                            Key Structure
                           </p>
                           <p className="text-text text-sm font-medium">
                             {grammarDetail.key_structure}
@@ -446,14 +446,14 @@ export default function ActivitiesClientPage() {
                         <div className="flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-2xl p-4">
                           <Lightbulb size={20} className="text-primary shrink-0 mt-0.5" />
                           <p className="text-sm text-text">
-                            <span className="font-bold text-primary">Dica da Teacher Tati: </span>
+                            <span className="font-bold text-primary">Teacher Tati Tip: </span>
                             {grammarDetail.tip_teacher_tati}
                           </p>
                         </div>
 
                         <div className="space-y-2">
                           <p className="text-[0.65rem] font-bold uppercase tracking-wider text-text-muted">
-                            Fontes de referência
+                            Reference Sources
                           </p>
                           <div className="flex flex-wrap gap-2">
                             {grammarDetail.sources?.map((src) => (
@@ -472,15 +472,15 @@ export default function ActivitiesClientPage() {
                       </div>
                     ) : (
                       <div className="py-20 text-center text-text-muted">
-                        Carregando explicação...
+                        Loading explanation...
                       </div>
                     )}
                   </div>
                 ) : grammarIndex?.topics?.length ? (
                   <div>
                     <p className="text-text-muted text-sm mb-5 max-w-2xl">
-                      Explore os tópicos de gramática com a explicação da Teacher Tati e links das
-                      fontes DW, BBC Learning English e test-english.com.
+                      Explore grammar topics with Teacher Tati's explanations and links to
+                      DW, BBC Learning English and test-english.com.
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {grammarIndex.topics
@@ -505,14 +505,14 @@ export default function ActivitiesClientPage() {
                               </span>
                             </div>
                             <h4 className="text-base font-bold text-text">{t.title}</h4>
-                            <p className="text-[0.7rem] text-text-muted">Fonte: {t.source_name}</p>
+                            <p className="text-[0.7rem] text-text-muted">Source: {t.source_name}</p>
                           </button>
                         ))}
                     </div>
                   </div>
                 ) : (
                   <div className="py-20 text-center text-text-muted">
-                    Nenhum tópico de gramática disponível para este nível.
+                    No grammar topics available for this level.
                   </div>
                 )}
               </div>

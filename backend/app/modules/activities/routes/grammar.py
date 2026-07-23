@@ -1,13 +1,13 @@
 """
-Sprint 20 – Rota de Grammar.
+Sprint 20 – Grammar route.
 
 GET /grammar
   ?topic=past_simple
   ?level=B1
-Retorna a explicação gramatical curada (regra, estrutura, dica da Teacher Tati)
-e fontes de referência (DW, BBC Learning English, test-english.com).
+Returns grammar explanation (rule, key structure, Teacher Tati tip) and
+source links (DW, BBC Learning English, test-english.com).
 
-GET /grammar (sem parâmetros) -> índice de tópicos disponíveis.
+GET /grammar (no params) -> topic index.
 """
 from fastapi import APIRouter, Depends, Query
 
@@ -19,9 +19,10 @@ router = APIRouter()
 
 @router.get("")
 async def get_grammar(
-    topic: str | None = Query(default=None, description="Tópico de gramática (ex: past_simple)"),
-    level: str | None = Query(default=None, description="Nível CEFR (A1..C2)"),
+    topic: str | None = Query(default=None, description="Grammar topic (e.g. past_simple)"),
+    level: str | None = Query(default=None, description="CEFR level (A1..C2)"),
     current_user: dict = Depends(get_current_user),
 ):
-    """Busca a explicação gramatical + fontes de referência."""
-    return await grammar_service.get_grammar(topic=topic, level=current_user.get("level") if not level else level)
+    """Fetch grammar explanation + source links."""
+    effective_level = level or current_user.get("level", "A1")
+    return await grammar_service.get_grammar(topic=topic, level=effective_level)
