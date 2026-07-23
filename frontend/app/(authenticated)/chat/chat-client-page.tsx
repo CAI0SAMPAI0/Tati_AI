@@ -301,6 +301,7 @@ export default function ChatClientPage() {
             streamingContent={streamingContent}
             onEdit={handleEditMessage}
             onResend={handleResend}
+            onSendMessage={handleSend}
           />
         </div>
         <div className="p-2 md:p-6 bg-gradient-to-t from-bg via-bg/80 to-transparent">

@@ -28,7 +28,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { normalizeLevel } from '@/lib/constants/levels';
 
-type TabType = 'quiz' | 'flashcards' | 'simulations' | 'podcasts' | 'grammar' | 'materials';
+type TabType = 'quiz' | 'flashcards' | 'simulations' | 'listenings' | 'grammar' | 'materials';
 
 const PERSONALIZED_MODULE_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -103,7 +103,7 @@ export default function ActivitiesClientPage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('tati_last_activity_tab') as TabType;
-      if (saved && ['quiz', 'flashcards', 'simulations', 'podcasts', 'grammar', 'materials'].includes(saved)) {
+      if (saved && ['quiz', 'flashcards', 'simulations', 'listenings', 'grammar', 'materials'].includes(saved)) {
         setActiveTab(saved);
       }
     }
@@ -295,7 +295,7 @@ export default function ActivitiesClientPage() {
     { id: 'grammar', icon: <BookOpen size={18} />, label: 'Grammar', count: grammarIndex?.topics?.length },
     { id: 'flashcards', icon: <Layers size={18} />, label: 'Flashcards', count: flashcards.length },
     { id: 'simulations', icon: <Drama size={18} />, label: 'Simulations', count: simulations.length },
-    { id: 'podcasts', icon: <Podcast size={18} />, label: 'Podcasts', count: podcasts.length },
+    { id: 'listenings', icon: <Podcast size={18} />, label: 'Listenings', count: podcasts.length },
     { id: 'materials', icon: <FileBox size={18} />, label: 'Study Materials', count: studyMaterials.length },
   ];
 
@@ -518,7 +518,7 @@ export default function ActivitiesClientPage() {
               </div>
             )}
 
-            {activeTab === 'podcasts' && (
+            {activeTab === 'listenings' && (
               <div className="space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {podcasts.length > 0 ? (
@@ -530,7 +530,7 @@ export default function ActivitiesClientPage() {
                         imageUrl={p.thumbnail}
                         type="podcast"
                         status={podcastProgress?.completed?.includes(p.id) ? 'done' : 'new'}
-                        onClick={() => router.push(`/podcasts/${p.id}`)}
+                        onClick={() => router.push(`/listenings/${p.id}`)}
                         actionLabel="Play"
                         meta={[
                           {
@@ -542,7 +542,7 @@ export default function ActivitiesClientPage() {
                     ))
                   ) : (
                     <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
-                      No podcasts available.
+                      No listenings available.
                     </div>
                   )}
                 </div>

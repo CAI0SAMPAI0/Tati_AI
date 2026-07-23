@@ -337,7 +337,7 @@ export default function ProfileClientPage() {
                     <p className="text-sm text-text-muted">
                       {isGracePeriod
                         ? "You are enjoying courtesy access to the FULL Plan! All features are unlocked until your next payment."
-                        : "Full access to all features: unlimited AI, simulations, podcasts and more."}
+                        : "Full access to all features: unlimited AI, simulations, listenings and more."} 
                     </p>
                     {daysLeft > 0 && (
                       <div className="flex items-center gap-2 mt-2">
@@ -382,7 +382,7 @@ export default function ProfileClientPage() {
                 { icon: '🤖', label: 'Unlimited AI' },
                 { icon: '🎙️', label: 'Voice & Pronunciation' },
                 { icon: '🎭', label: 'Simulations' },
-                { icon: '🎧', label: 'Podcasts' },
+                { icon: '🎧', label: 'Listenings' },
               ].map((f) => (
                 <div key={f.label} className={cn(
                   "flex items-center gap-2 p-3 rounded-xl border text-xs font-bold",

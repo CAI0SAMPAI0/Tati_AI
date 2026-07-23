@@ -48,7 +48,7 @@ export function WeeklyPlan() {
     { id: 'quiz', label: 'Quizzes', icon: <FileText size={12} />, prefix: 'quiz-' },
     { id: 'aiex', label: 'AI', icon: <Sparkles size={12} />, prefix: 'aiex-' },
     { id: 'sim', label: 'Sims', icon: <Play size={12} />, prefix: 'sim-' },
-    { id: 'pod', label: 'Pods', icon: <Podcast size={12} />, prefix: 'pod-' },
+    { id: 'pod', label: 'Listen', icon: <Podcast size={12} />, prefix: 'pod-' },
   ];
 
   const filteredTopics = activeCategory === 'all' 

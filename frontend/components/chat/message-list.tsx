@@ -1,5 +1,7 @@
 import Image from 'next/image';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { BookOpen } from 'lucide-react';
 import type { Message } from '@/lib/api/types';
 import { MessageBubble } from './message-bubble';
 
@@ -11,9 +13,11 @@ interface MessageListProps {
   streamingContent: string;
   onEdit?: (messageId: string, newContent: string) => Promise<void>;
   onResend?: (content: string) => void;
+  onSendMessage?: (text: string) => void;
 }
 
-export function MessageList({ messages, isStreaming, streamingContent, onEdit, onResend }: MessageListProps) {
+export function MessageList({ messages, isStreaming, streamingContent, onEdit, onResend, onSendMessage }: MessageListProps) {
+  const router = useRouter();
   
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -95,12 +99,20 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit, o
             ].map((sugg) => (
               <button
                 key={sugg.key}
-                className="px-3 py-1.5 bg-surface border border-border rounded-full text-[0.8rem] text-text-muted hover:bg-primary-dim hover:text-primary hover:border-primary/50 transition-all"
+                onClick={() => onSendMessage?.(sugg.label)}
+                className="px-3 py-1.5 bg-surface border border-border rounded-full text-[0.8rem] text-text-muted hover:bg-primary-dim hover:text-primary hover:border-primary/50 transition-all cursor-pointer"
               >
                 {sugg.label}
               </button>
             ))}
           </div>
+          <button
+            onClick={() => router.push('/pronunciation-reader')}
+            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-dim border border-primary/30 rounded-full text-[0.8rem] text-primary font-semibold hover:bg-primary hover:text-white transition-all cursor-pointer"
+          >
+            <BookOpen size={14} />
+            Pronunciation Practice
+          </button>
         </div>
       )}
 

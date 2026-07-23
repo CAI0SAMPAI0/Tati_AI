@@ -636,7 +636,7 @@ export const ptBR = {
     tab_flashcards: 'Flashcards',
     tab_exercises: 'Grammar',
     tab_simulations: 'Simulações',
-    tab_podcasts: 'Podcasts',
+    tab_podcasts: 'Listenings',
     no_exercises: 'Nenhum exercício gerado ainda. Continue conversando com a Tati para ela identificar onde você pode melhorar!',
     exercise_desc_fallback: 'Prática personalizada baseada em seus erros.',
     recent_mistakes: 'Seus erros recentes',

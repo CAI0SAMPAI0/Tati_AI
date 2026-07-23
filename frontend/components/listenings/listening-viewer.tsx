@@ -21,11 +21,11 @@ import { cn } from '@/lib/utils';
 import { apiGet, apiPost } from '@/lib/api/client';
 import { normalizeLevel, levelLabel } from '@/lib/constants/levels';
 
-interface PodcastViewerProps {
+interface ListeningViewerProps {
   podcast: Podcast;
 }
 
-export function PodcastViewer({ podcast }: PodcastViewerProps) {
+export function ListeningViewer({ podcast }: ListeningViewerProps) {
   const router = useRouter();
   const [practicePhrase, setPracticePhrase] = useState<string | null>(null);
   const [exerciseIndex, setExerciseIndex] = useState(0);

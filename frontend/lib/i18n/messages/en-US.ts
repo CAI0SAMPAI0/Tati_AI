@@ -632,7 +632,7 @@ export const enUS = {
     tab_flashcards: 'Flashcards',
     tab_exercises: 'Grammar',
     tab_simulations: 'Simulations',
-    tab_podcasts: 'Podcasts',
+    tab_podcasts: 'Listenings',
     no_exercises: 'No exercises generated yet. Keep chatting with Tati so she can identify areas for improvement!',
     exercise_desc_fallback: 'Personalized practice based on your mistakes.',
     recent_mistakes: 'Your recent mistakes',

@@ -62,6 +62,17 @@ export const ENDPOINTS = {
   // Grammar (Sprint 20 — substitui AI Exercises)
   GRAMMAR: '/grammar',
 
+  // Speech
+  SPEECH_VERIFY_PRONUNCIATION: '/speech/verify-pronunciation',
+
+  // Listening content ingestion
+  LISTENINGS_INGEST: '/activities/listenings/ingest',
+  LISTENINGS_CLEANUP: '/activities/listenings/cleanup-legacy',
+
+  // CEFR Images
+  CEFR_IMAGE_RESOLVE: '/cefr/images/resolve',
+  CEFR_IMAGE_RESOLVE_BATCH: '/cefr/images/resolve-batch',
+
   // Activities
   ACTIVITIES_MODULES: '/activities/modules',
   ACTIVITIES_QUIZZES: '/activities/quizzes',

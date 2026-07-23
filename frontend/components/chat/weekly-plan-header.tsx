@@ -29,7 +29,7 @@ export function WeeklyPlanHeader({ topics }: WeeklyPlanHeaderProps) {
     { id: 'quiz', label: 'Quizzes', icon: <FileText size={14} />, prefix: 'quiz-' },
     { id: 'aiex', label: 'AI', icon: <Sparkles size={14} />, prefix: 'aiex-' },
     { id: 'sim', label: 'Sims', icon: <Play size={14} />, prefix: 'sim-' },
-    { id: 'pod', label: 'Pods', icon: <Podcast size={14} />, prefix: 'pod-' },
+    { id: 'pod', label: 'Listen', icon: <Podcast size={14} />, prefix: 'pod-' },
   ];
 
   const filteredTopics = activeCategory === 'all' 

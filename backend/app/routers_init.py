@@ -56,8 +56,10 @@ def register_all_routers(app: FastAPI) -> None:
     )
 
     from app.modules.cefr.routes.admin import router as cefr_admin_router
+    from app.modules.cefr.routes.images import router as cefr_images_router
 
     app.include_router(cefr_admin_router, tags=['admin'])
+    app.include_router(cefr_images_router, prefix='/cefr/images', tags=['cefr'])
 
     from app.modules.chat.routes.chat import router as chat_router
     from app.modules.simulation.routes.avatar import router as avatar_router
@@ -81,6 +83,7 @@ def register_all_routers(app: FastAPI) -> None:
     from app.modules.activities.routes.modules import router as modules_router
     from app.modules.activities.routes.quizzes import router as quizzes_router
     from app.modules.activities.routes.podcasts import router as podcasts_router
+    from app.modules.activities.routes.listening_ingestion import router as listening_ingestion_router
     from app.modules.activities.routes.trophies import router as trophies_router
     from app.modules.activities.routes.submissions import router as submissions_router
     from app.modules.activities.routes.ranking import router as ranking_router
@@ -109,6 +112,11 @@ def register_all_routers(app: FastAPI) -> None:
         podcasts_router,
         prefix='/activities/podcasts',
         tags=['activities'],
+    )
+    app.include_router(
+        listening_ingestion_router,
+        prefix='/activities/listenings',
+        tags=['listening-content'],
     )
     app.include_router(
         trophies_router, prefix='/users/trophies', tags=['trophies']

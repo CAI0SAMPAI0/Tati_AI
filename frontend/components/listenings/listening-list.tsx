@@ -11,12 +11,12 @@ import { type Podcast } from '@/lib/api/types/podcast';
 import { useRouter } from 'next/navigation';
 import { Clock, Tag } from 'lucide-react';
 
-export function PodcastList() {
+export function ListeningList() {
   const router = useRouter();
   const [visibleCount, setVisibleCount] = useState(10);
 
-  const { data: podcasts, isLoading, error } = useQuery<Podcast[]>({
-    queryKey: ['podcasts-recommendations'],
+  const { data: listenings, isLoading, error } = useQuery<Podcast[]>({
+    queryKey: ['listenings-recommendations'],
     queryFn: () => apiGet<Podcast[]>(`${ENDPOINTS.ACTIVITIES_PODCASTS_RECOMMENDATIONS}?lang=${'en-US'}`),
   });
 
@@ -32,10 +32,10 @@ export function PodcastList() {
     </div>
   );
 
-  if (!podcasts || podcasts.length === 0) {
+  if (!listenings || listenings.length === 0) {
     return (
       <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
-        {'No podcasts available.'}
+        {'No listenings available.'}
       </div>
     );
   }
@@ -43,17 +43,17 @@ export function PodcastList() {
   return (
     <div className="space-y-6">
       <div className="text-sm text-text-subtle font-semibold px-1">
-        Showing {Math.min(visibleCount, podcasts.length)} of {podcasts.length} podcasts
+        Showing {Math.min(visibleCount, listenings.length)} of {listenings.length} listenings
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
-        {podcasts.slice(0, visibleCount).map((p) => (
+        {listenings.slice(0, visibleCount).map((p) => (
           <ActivityCard
             key={p.id}
             title={p.title}
             description={p.description || 'Get ready to listen and practice.'}
             imageUrl={p.thumbnail}
             type="podcast"
-            onClick={() => router.push(`/podcasts/${p.id}`)}
+            onClick={() => router.push(`/listenings/${p.id}`)}
             actionLabel={'▶ Play'}
             meta={[
               { icon: <Tag size={12} />, label: p.level }
@@ -61,7 +61,7 @@ export function PodcastList() {
           />
         ))}
       </div>
-      {visibleCount < podcasts.length && (
+      {visibleCount < listenings.length && (
         <div className="flex justify-center mt-8">
           <button
             onClick={() => setVisibleCount(prev => prev + 10)}

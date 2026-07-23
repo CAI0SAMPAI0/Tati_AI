@@ -8,19 +8,19 @@ import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
 import { useSidebarState } from '@/hooks/useSidebarState';
 import { cn } from '@/lib/utils';
-import { PodcastViewer } from '@/components/podcasts/podcast-viewer';
+import { ListeningViewer } from '@/components/listenings/listening-viewer';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { type Podcast } from '@/lib/api/types/podcast';
 
-export default function PodcastDetailClientPage() {
+export default function ListeningDetailClientPage() {
   const { id } = useParams();
   const router = useRouter();
   const { sidebarOpen, toggleSidebar: handleToggleSidebar, closeSidebar: handleCloseSidebar } = useSidebarState();
 
-  const { data: podcast, isLoading, error } = useQuery<Podcast>({
-    queryKey: ['podcast', id],
+  const { data: listening, isLoading, error } = useQuery<Podcast>({
+    queryKey: ['listening', id],
     queryFn: () => apiGet<Podcast>(ENDPOINTS.ACTIVITIES_PODCAST_DETAIL(id as string)),
     enabled: !!id,
   });
@@ -31,10 +31,10 @@ export default function PodcastDetailClientPage() {
     </div>
   );
 
-  if (error || !podcast) return (
+  if (error || !listening) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-bg p-4 text-center">
-      <h1 className="text-xl font-bold text-danger mb-2">Podcast não encontrado</h1>
-      <Button onClick={() => router.push('/activities')}>Voltar às Atividades</Button>
+      <h1 className="text-xl font-bold text-danger mb-2">Listening not found</h1>
+      <Button onClick={() => router.push('/activities')}>Back to Activities</Button>
     </div>
   );
 
@@ -55,7 +55,7 @@ export default function PodcastDetailClientPage() {
               Back
             </button>
 
-            <PodcastViewer podcast={podcast} />
+            <ListeningViewer podcast={listening} />
           </div>
         </main>
       </div>

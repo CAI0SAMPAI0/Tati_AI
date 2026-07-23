@@ -41,7 +41,7 @@ export const TOUR_STEPS: TourStep[] = [
     targetId: 'tour-activities',
     title: 'Activities & Exercises',
     description:
-      'Access quizzes, flashcards, AI exercises, simulations, and podcasts. All organized by type to help you practice different skills.',
+      'Access quizzes, flashcards, grammar, simulations, and listenings. All organized by type to help you practice different skills.',
     icon: <BookOpen size={28} className="text-primary" />,
     route: '/activities',
   },
