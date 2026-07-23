@@ -24,5 +24,7 @@ async def get_grammar(
     current_user: dict = Depends(get_current_user),
 ):
     """Fetch grammar explanation + source links."""
-    effective_level = level or current_user.get("level", "A1")
+    effective_level = level or "ALL"
+    if topic:
+        effective_level = level or current_user.get("level", "A1")
     return await grammar_service.get_grammar(topic=topic, level=effective_level)
