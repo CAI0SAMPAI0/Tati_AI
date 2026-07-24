@@ -10,6 +10,101 @@ from app.core.dependencies.auth import get_current_user
 from app.modules.chat.services.audio_generator import generate_teacher_audio
 from app.modules.chat.services.llm import transcribe_audio_verbose
 
+# Contraction mapping for pronunciation evaluation
+# Maps contractions to their expanded forms
+CONTRACTIONS_MAP = {
+    "ain't": "am not",
+    "aren't": "are not",
+    "can't": "cannot",
+    "could've": "could have",
+    "couldn't": "could not",
+    "didn't": "did not",
+    "doesn't": "does not",
+    "don't": "do not",
+    "hadn't": "had not",
+    "hasn't": "has not",
+    "haven't": "have not",
+    "he'd": "he would",
+    "he'll": "he will",
+    "he's": "he is",
+    "i'd": "i would",
+    "i'll": "i will",
+    "i'm": "i am",
+    "i've": "i have",
+    "isn't": "is not",
+    "it's": "it is",
+    "let's": "let us",
+    "might've": "might have",
+    "mustn't": "must not",
+    "shan't": "shall not",
+    "she'd": "she would",
+    "she'll": "she will",
+    "she's": "she is",
+    "should've": "should have",
+    "shouldn't": "should not",
+    "that's": "that is",
+    "there's": "there is",
+    "they'd": "they would",
+    "they'll": "they will",
+    "they're": "they are",
+    "they've": "they have",
+    "wasn't": "was not",
+    "we'd": "we would",
+    "we'll": "we will",
+    "we're": "we are",
+    "we've": "we have",
+    "weren't": "were not",
+    "what's": "what is",
+    "where's": "where is",
+    "who'd": "who would",
+    "who'll": "who will",
+    "who's": "who is",
+    "won't": "will not",
+    "would've": "would have",
+    "wouldn't": "would not",
+    "you'd": "you would",
+    "you'll": "you will",
+    "you're": "you are",
+    "you've": "you have",
+}
+
+# Reverse map: expanded forms keyed by first+second word for matching
+EXPANDED_TO_CONTRACTION: dict[str, str] = {}
+for contr, expanded in CONTRACTIONS_MAP.items():
+    EXPANDED_TO_CONTRACTION[expanded] = contr
+
+
+def expand_contractions(text: str) -> str:
+    """Expand English contractions to full forms for consistent comparison."""
+    words = text.lower().split()
+    expanded = []
+    for w in words:
+        w_clean = w.strip(".,!?;:'\"")
+        if w_clean in CONTRACTIONS_MAP:
+            expanded.append(CONTRACTIONS_MAP[w_clean])
+        else:
+            expanded.append(w_clean)
+    return " ".join(expanded)
+
+
+def get_contraction_alternatives(text: str) -> list[list[str]]:
+    """Return list of word alternatives considering contractions.
+    
+    e.g. "i would" -> [["i", "would"], ["i'd"]]
+         "i'd"     -> [["i'd"], ["i", "would"]]
+    """
+    words = text.lower().split()
+    alternatives = []
+    for w in words:
+        w_clean = w.strip(".,!?;:'\"")
+        if w_clean in CONTRACTIONS_MAP:
+            alternatives.append([w_clean] + CONTRACTIONS_MAP[w_clean].split())
+        elif w_clean in EXPANDED_TO_CONTRACTION:
+            alternatives.append([w_clean, EXPANDED_TO_CONTRACTION[w_clean]])
+        else:
+            alternatives.append([w_clean])
+    return alternatives
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -45,51 +140,77 @@ def word_conf_to_score(conf: float) -> int:
 
 
 def compute_local_evaluation(ref_words, transcript_words, word_conf_scores):
-    """Improved local pronunciation evaluation.
+    """Evaluate pronunciation with contraction handling.
     
-    Uses three signals:
-    1. Exact word match between reference and transcription.
-    2. Sequence-based close-matching for near-miss words.
-    3. Word-level confidence from Whisper (if available).
+    Expands contractions (I'd → I would, don't → do not) before comparing
+    so the user gets credit for using either form.
     """
     def clean_word(w):
         return re.sub(r"[^\w\s]", "", w).lower()
 
-    clean_ref = [clean_word(w) for w in ref_words]
-    clean_trans = [clean_word(w) for w in transcript_words]
+    # Expand reference words, tracking which original word each expanded part maps to
+    expanded_ref = []
+    ref_map = []
+    for i, w in enumerate(ref_words):
+        wc = clean_word(w)
+        if wc in CONTRACTIONS_MAP:
+            parts = CONTRACTIONS_MAP[wc].split()
+            expanded_ref.extend(parts)
+            ref_map.extend([i] * len(parts))
+        else:
+            expanded_ref.append(wc)
+            ref_map.append(i)
 
-    matcher = SequenceMatcher(None, clean_ref, clean_trans)
+    # Expand transcription words
+    expanded_trans = []
+    for w in transcript_words:
+        wc = clean_word(w)
+        if wc in CONTRACTIONS_MAP:
+            expanded_trans.extend(CONTRACTIONS_MAP[wc].split())
+        else:
+            expanded_trans.append(wc)
 
-    words_result = []
-    for word in ref_words:
-        words_result.append({"word": word, "score": 0, "accuracy": "incorrect", "confidence": 0})
+    # Compare expanded sequences
+    matcher = SequenceMatcher(None, expanded_ref, expanded_trans)
+
+    # Accumulate scores per original reference word
+    acc = {i: {"total": 0, "count": 0} for i in range(len(ref_words))}
 
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
         if tag == "equal":
-            for i in range(i1, i2):
-                w = clean_ref[i]
-                conf = word_conf_scores.get(w, 1.0)
-                s = int(conf * 100)
-                words_result[i]["score"] = s
-                words_result[i]["accuracy"] = "correct" if conf >= 0.7 else "incorrect"
-                words_result[i]["confidence"] = conf
+            for ei in range(i1, i2):
+                oi = ref_map[ei]
+                acc[oi]["total"] += 100
+                acc[oi]["count"] += 1
         elif tag == "replace":
-            for idx_ref in range(i1, i2):
-                best_score = 0
-                best_conf = 0
-                ref_w = clean_ref[idx_ref]
-                for idx_trans in range(j1, j2):
-                    trans_w = clean_trans[idx_trans]
-                    sim = SequenceMatcher(None, ref_w, trans_w).ratio()
-                    conf = word_conf_scores.get(trans_w, sim)
-                    if sim > best_score:
-                        best_score = sim
-                        best_conf = conf
-                # Blended score: 70% char match + 30% confidence
-                s = int((best_score * 0.7 + best_conf * 0.3) * 100)
-                words_result[idx_ref]["score"] = s
-                words_result[idx_ref]["accuracy"] = "correct" if s >= 80 else "incorrect"
-                words_result[idx_ref]["confidence"] = best_conf
+            for ei in range(i1, i2):
+                oi = ref_map[ei]
+                best_sim = 0
+                for tj in range(j1, j2):
+                    sim = SequenceMatcher(None, expanded_ref[ei], expanded_trans[tj]).ratio()
+                    best_sim = max(best_sim, sim)
+                acc[oi]["total"] += int(best_sim * 100)
+                acc[oi]["count"] += 1
+
+    words_result = []
+    for i, word in enumerate(ref_words):
+        if acc[i]["count"] > 0:
+            s = acc[i]["total"] // acc[i]["count"]
+        else:
+            s = 0
+        wc = clean_word(word)
+        conf = word_conf_scores.get(wc, 0)
+        if wc in CONTRACTIONS_MAP:
+            for part in CONTRACTIONS_MAP[wc].split():
+                conf = max(conf, word_conf_scores.get(part, 0))
+        if conf > 0:
+            s = max(s, int(conf * 100))
+        words_result.append({
+            "word": word,
+            "score": s,
+            "accuracy": "correct" if s >= 80 else "incorrect",
+            "confidence": conf,
+        })
 
     return words_result
 
