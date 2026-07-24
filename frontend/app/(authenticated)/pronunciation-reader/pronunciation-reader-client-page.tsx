@@ -74,6 +74,14 @@ const PRACTICE_SENTENCES: PracticeSentence[] = [
   { text: "If I were you, I would reconsider the entire approach.", level: "B2", tip: "Subjunctive 'were' — don't skip it." },
   { text: "The committee has decided to postpone the project indefinitely.", level: "B2", tip: "Multi-syllable words: give each syllable space." },
   { text: "Notwithstanding the evidence, the jury reached an unanimous verdict.", level: "B2", tip: "Focus on consonant clusters: 'stand', 'ver-dict'." },
+  { text: "The pharmaceutical industry has undergone substantial regulatory reforms.", level: "C1", tip: "Focus on word stress: 'phar-ma-CEU-ti-cal', 're-GU-la-to-ry'." },
+  { text: "Nevertheless, the implications of this socioeconomic phenomenon remain contentious.", level: "C1", tip: "Long words: break them into syllables and maintain rhythm." },
+  { text: "The government's austerity measures have precipitated widespread public dissent.", level: "C1", tip: "Pay attention to consonant clusters: 'stri-ty', 'pre-CI-pi-ta-ted'." },
+  { text: "From a pedagogical standpoint, the curriculum requires a more nuanced approach.", level: "C1", tip: "Stress the right syllables: 'pe-da-GO-gi-cal', 'NU-an-ced'." },
+  { text: "The epistemological foundations of postmodernist discourse are inherently paradoxical.", level: "C2", tip: "Master complex word stress: 'e-pis-te-MO-lo-gi-cal', 'pos-TMO-dern-ist'." },
+  { text: "Notwithstanding the aforementioned caveats, the extrapolation of these findings remains justifiable.", level: "C2", tip: "Smooth linking between long words — don't pause between them." },
+  { text: "The phenomenological approach to qualitative research elucidates subjective experiential realities.", level: "C2", tip: "Focus on natural rhythm: 'phe-no-me-no-LO-gi-cal', 'e-LU-ci-dates'." },
+  { text: "A multidisciplinary synthesis of contemporaneous socio-linguistic paradigms proves indispensable.", level: "C2", tip: "Intonation patterns in very long sentences — use pitch variation." },
 ];
 
 type InputMode = 'preset' | 'custom' | 'free';
@@ -145,7 +153,20 @@ export default function PronunciationReaderClientPage() {
 
   const currentSentence = PRACTICE_SENTENCES[currentIndex];
 
-  const filteredSentences = PRACTICE_SENTENCES;
+  const levelOrder = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+  const userIdx = levelOrder.indexOf(userLevel);
+
+  const filteredSentences = PRACTICE_SENTENCES.filter(s => {
+    const sIdx = levelOrder.indexOf(s.level);
+    return Math.abs(sIdx - userIdx) <= 1;
+  }).sort((a, b) => {
+    const aIdx = levelOrder.indexOf(a.level);
+    const bIdx = levelOrder.indexOf(b.level);
+    const aDist = Math.abs(aIdx - userIdx);
+    const bDist = Math.abs(bIdx - userIdx);
+    if (aDist !== bDist) return aDist - bDist;
+    return aIdx - bIdx;
+  });
 
   const displaySentence = filteredSentences[currentIndex % filteredSentences.length] || PRACTICE_SENTENCES[0];
 
