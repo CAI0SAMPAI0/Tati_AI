@@ -152,6 +152,9 @@ def compute_local_evaluation(ref_words, transcript_words, word_conf_scores):
     def strip_punct(w):
         return re.sub(r"[.,!?;:'\"]+$", "", w).strip()
 
+    def normalize_for_contraction(w):
+        return re.sub(r"[.,!?;\"]+", "", w).strip().lower()
+
     # Clean ref words for display (strip trailing punctuation)
     display_words = [strip_punct(w) for w in ref_words]
 
@@ -159,9 +162,10 @@ def compute_local_evaluation(ref_words, transcript_words, word_conf_scores):
     expanded_ref = []
     ref_map = []
     for i, w in enumerate(ref_words):
+        norm = normalize_for_contraction(w)
         wc = clean_word(w)
-        if wc in CONTRACTIONS_MAP:
-            parts = CONTRACTIONS_MAP[wc].split()
+        if norm in CONTRACTIONS_MAP:
+            parts = CONTRACTIONS_MAP[norm].split()
             expanded_ref.extend(parts)
             ref_map.extend([i] * len(parts))
         else:
@@ -171,9 +175,10 @@ def compute_local_evaluation(ref_words, transcript_words, word_conf_scores):
     # Expand transcription words
     expanded_trans = []
     for w in transcript_words:
+        norm = normalize_for_contraction(w)
         wc = clean_word(w)
-        if wc in CONTRACTIONS_MAP:
-            expanded_trans.extend(CONTRACTIONS_MAP[wc].split())
+        if norm in CONTRACTIONS_MAP:
+            expanded_trans.extend(CONTRACTIONS_MAP[norm].split())
         else:
             expanded_trans.append(wc)
 
@@ -205,11 +210,14 @@ def compute_local_evaluation(ref_words, transcript_words, word_conf_scores):
             s = acc[i]["total"] // acc[i]["count"]
         else:
             s = 0
+        norm = normalize_for_contraction(word)
         wc = clean_word(word)
-        conf = word_conf_scores.get(wc, 0)
-        if wc in CONTRACTIONS_MAP:
-            for part in CONTRACTIONS_MAP[wc].split():
+        conf = word_conf_scores.get(norm, 0) or word_conf_scores.get(wc, 0)
+        if norm in CONTRACTIONS_MAP:
+            for part in CONTRACTIONS_MAP[norm].split():
                 conf = max(conf, word_conf_scores.get(part, 0))
+        else:
+            conf = max(conf, word_conf_scores.get(norm, 0), word_conf_scores.get(wc, 0))
         if conf > 0:
             s = max(s, int(conf * 100))
         words_result.append({
