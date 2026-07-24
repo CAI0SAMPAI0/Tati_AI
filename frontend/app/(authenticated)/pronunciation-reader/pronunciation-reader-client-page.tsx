@@ -145,12 +145,7 @@ export default function PronunciationReaderClientPage() {
 
   const currentSentence = PRACTICE_SENTENCES[currentIndex];
 
-  const filteredSentences = PRACTICE_SENTENCES.filter(s => {
-    const levels = ['A1', 'A2', 'B1', 'B2'];
-    const idx = levels.indexOf(userLevel);
-    const allowed = levels.slice(Math.max(0, idx - 1), idx + 2);
-    return allowed.includes(s.level);
-  });
+  const filteredSentences = PRACTICE_SENTENCES;
 
   const displaySentence = filteredSentences[currentIndex % filteredSentences.length] || PRACTICE_SENTENCES[0];
 

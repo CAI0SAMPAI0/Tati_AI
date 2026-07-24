@@ -144,9 +144,16 @@ def compute_local_evaluation(ref_words, transcript_words, word_conf_scores):
     
     Expands contractions (I'd → I would, don't → do not) before comparing
     so the user gets credit for using either form.
+    Strips trailing punctuation from words for clean display.
     """
     def clean_word(w):
         return re.sub(r"[^\w\s]", "", w).lower()
+
+    def strip_punct(w):
+        return re.sub(r"[.,!?;:'\"]+$", "", w).strip()
+
+    # Clean ref words for display (strip trailing punctuation)
+    display_words = [strip_punct(w) for w in ref_words]
 
     # Expand reference words, tracking which original word each expanded part maps to
     expanded_ref = []
@@ -206,7 +213,7 @@ def compute_local_evaluation(ref_words, transcript_words, word_conf_scores):
         if conf > 0:
             s = max(s, int(conf * 100))
         words_result.append({
-            "word": word,
+            "word": display_words[i],
             "score": s,
             "accuracy": "correct" if s >= 80 else "incorrect",
             "confidence": conf,
@@ -316,11 +323,44 @@ async def verify_pronunciation(
     if not transcription or transcription.startswith("[Erro"):
         words_result = [{"word": w, "score": 0, "accuracy": "incorrect"} for w in ref_raw.split()] if ref_raw else []
         feedback = get_conversational_feedback(0, words_result, "", ref_raw, is_free_speech)
+        correct_audio = ""
+        if ref_raw:
+            try:
+                correct_audio = await generate_teacher_audio(ref_raw) or ""
+            except Exception:
+                pass
         return {
             "score": 0,
             "transcription": "",
             "words": words_result,
-            "feedback": feedback,
+            "feedback": "I couldn't hear you clearly. Please try recording again in a quiet environment.",
+            "correct_audio": correct_audio,
+            "metadata": {
+                "segments": trans_data.get("segments", []),
+                "language": trans_data.get("language"),
+                "duration": trans_data.get("duration"),
+                "free_speech": is_free_speech,
+            },
+        }
+
+    # Detect very short transcription compared to reference (bad recording)
+    trans_word_count = len(transcription.split())
+    ref_word_count = len(ref_raw.split()) if ref_raw else 0
+    if ref_raw and trans_word_count > 0 and ref_word_count >= 5 and trans_word_count <= 2:
+        logger.warning(f"Very short transcription ({transcription}) vs reference ({ref_raw}) — likely bad recording")
+        words_result = [{"word": w, "score": 0, "accuracy": "incorrect"} for w in ref_raw.split()]
+        correct_audio = ""
+        if ref_raw:
+            try:
+                correct_audio = await generate_teacher_audio(ref_raw) or ""
+            except Exception:
+                pass
+        return {
+            "score": 0,
+            "transcription": transcription,
+            "words": words_result,
+            "feedback": "The recording was too short or unclear. Please hold the button and speak the full sentence clearly.",
+            "correct_audio": correct_audio,
             "metadata": {
                 "segments": trans_data.get("segments", []),
                 "language": trans_data.get("language"),
