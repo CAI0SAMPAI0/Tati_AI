@@ -5,12 +5,12 @@ Router para submissões de atividades e correções.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-from typing import Any, Dict, Optional
+from typing import Any
 
 from app.core.dependencies.auth import get_current_user, require_staff
 from app.modules.activities.services.activity_service import ActivityService
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -24,7 +24,7 @@ class SubmissionBody(BaseModel):
     activity_id: str
     activity_type: str
     score: int
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
 
 class CorrectionBody(BaseModel):
@@ -37,7 +37,7 @@ class CorrectionBody(BaseModel):
 # ── Aluno ─────────────────────────────────────────────────────────────
 
 
-@router.post('/')
+@router.post("/")
 async def record_submission(
     body: SubmissionBody,
     user=Depends(get_current_user),
@@ -45,27 +45,27 @@ async def record_submission(
 ) -> dict:
     """Registra uma submissão de atividade."""
     result = await service.record_submission(
-        user['username'],
+        user["username"],
         body.activity_id,
         body.activity_type,
         body.score,
         body.metadata,
     )
-    return result if result else {'success': True}
+    return result if result else {"success": True}
 
 
-@router.get('/my')
+@router.get("/my")
 async def list_my_submissions(
     user=Depends(get_current_user), service: ActivityService = Depends()
 ) -> list:
     """Lista submissões do usuário logado."""
-    return await service.get_user_submissions(user['username'])
+    return await service.get_user_submissions(user["username"])
 
 
 # ── Admin ─────────────────────────────────────────────────────────────
 
 
-@router.get('/admin/submissions')
+@router.get("/admin/submissions")
 async def list_all_submissions(
     _user=Depends(require_staff), service: ActivityService = Depends()
 ) -> list:
@@ -73,7 +73,7 @@ async def list_all_submissions(
     return await service.get_all_submissions()
 
 
-@router.post('/admin/submissions/{submission_id}/correct')
+@router.post("/admin/submissions/{submission_id}/correct")
 async def correct_submission(
     submission_id: str,
     body: CorrectionBody,
@@ -81,13 +81,15 @@ async def correct_submission(
     service: ActivityService = Depends(),
 ) -> dict:
     """Salva correção manual do professor em uma submissão."""
-    return await service.save_correction(submission_id, body.teacher_feedback, body.score)
+    return await service.save_correction(
+        submission_id, body.teacher_feedback, body.score
+    )
 
 
-@router.post('/admin/submissions/{submission_id}/ai-correct')
+@router.post("/admin/submissions/{submission_id}/ai-correct")
 async def ai_correct_submission(
     submission_id: str,
-    lang: str = 'pt-BR',
+    lang: str = "pt-BR",
     _user=Depends(require_staff),
     service: ActivityService = Depends(),
 ) -> dict:

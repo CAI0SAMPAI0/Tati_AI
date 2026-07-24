@@ -1,5 +1,5 @@
-from supabase import Client
 from app.core.database import get_client
+from supabase import Client
 
 
 def get_db() -> Client:

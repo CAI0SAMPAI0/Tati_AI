@@ -11,6 +11,7 @@ class CEFRLevel(str, Enum):
     Padrão CEFR oficial de níveis de proficiência em inglês.
     Todos os módulos devem usar este enum para garantir consistência.
     """
+
     A1 = "A1"
     A2 = "A2"
     B1 = "B1"

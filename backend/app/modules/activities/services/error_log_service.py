@@ -1,4 +1,5 @@
 import logging
+
 """
 Captura, organiza e prioriza erros gramaticais e de vocabulário detectados no chat.
 A geração automática de "AI Exercises" a partir desses erros foi removida (Sprint 20),
@@ -8,24 +9,25 @@ Os erros continuam sendo persistidos e sincronizados com o SRS de vocabulário.
 
 import re
 from collections import defaultdict
-from typing import Dict, Any, List, Optional
+from typing import Any
 
-from fastapi.concurrency import run_in_threadpool
-
-from fastapi import Depends
 from app.core.dependencies.db import get_db
+from fastapi import Depends
+from fastapi.concurrency import run_in_threadpool
 
 
 class ErrorLogService:
     def __init__(self, db: Any = Depends(get_db)) -> None:
-        if db is None or str(type(db)).find('Depends') != -1:
+        if db is None or str(type(db)).find("Depends") != -1:
             from app.core.database import get_client
+
             self.db = get_client()
         else:
             self.db = db
 
     async def extract_errors_list(
-            self, student_msg: str, teacher_msg: str) -> List[Dict[str, Any]]:
+        self, student_msg: str, teacher_msg: str
+    ) -> list[dict[str, Any]]:
         """
         Extrai erros específicos da conversa e devolve uma lista estruturada.
         O modelo deve retornar apenas erros realmente relevantes para treino.
@@ -62,7 +64,10 @@ Return ONLY a JSON object:
 """
         try:
             from app.modules.chat.services.llm import groq_chat_json
-            data = await groq_chat_json([{"role": "user", "content": prompt}], temperature=0.1)
+
+            data = await groq_chat_json(
+                [{"role": "user", "content": prompt}], temperature=0.1
+            )
 
             if not data:
                 return []
@@ -74,11 +79,10 @@ Return ONLY a JSON object:
 
             return [err for err in errors if isinstance(err, dict)]
         except Exception as e:
-            logging.info(
-                f"[ErrorLogService] Error extracting errors: {e}")
+            logging.info(f"[ErrorLogService] Error extracting errors: {e}")
             return []
 
-    def _normalize_error(self, err: Dict[str, Any]) -> Dict[str, Any]:
+    def _normalize_error(self, err: dict[str, Any]) -> dict[str, Any]:
         """
         Normaliza campos para facilitar persistência, agrupamento e geração de exercícios.
         """
@@ -87,16 +91,14 @@ Return ONLY a JSON object:
         category = (err.get("category") or "grammar").strip().lower()
         explanation = (err.get("explanation") or "").strip()
         severity = self._safe_int(
-            err.get("severity"), default=1, min_value=1, max_value=3)
+            err.get("severity"), default=1, min_value=1, max_value=3
+        )
         confidence = self._safe_float(
-            err.get("confidence"),
-            default=0.5,
-            min_value=0.0,
-            max_value=1.0)
+            err.get("confidence"), default=0.5, min_value=0.0, max_value=1.0
+        )
         should_practice = bool(err.get("should_practice", True))
 
-        pattern_key = self._build_pattern_key(
-            category, incorrect, correct)
+        pattern_key = self._build_pattern_key(category, incorrect, correct)
 
         return {
             "incorrect": incorrect,
@@ -109,11 +111,7 @@ Return ONLY a JSON object:
             "pattern_key": pattern_key,
         }
 
-    def _build_pattern_key(
-            self,
-            category: str,
-            incorrect: str,
-            correct: str) -> str:
+    def _build_pattern_key(self, category: str, incorrect: str, correct: str) -> str:
         """
         Cria uma assinatura simples do erro para agrupar padrões recorrentes.
         """
@@ -131,11 +129,8 @@ Return ONLY a JSON object:
         return text
 
     def _safe_int(
-            self,
-            value: Any,
-            default: int = 1,
-            min_value: int = 1,
-            max_value: int = 3) -> int:
+        self, value: Any, default: int = 1, min_value: int = 1, max_value: int = 3
+    ) -> int:
         try:
             value = int(value)
             return max(min_value, min(max_value, value))
@@ -143,19 +138,19 @@ Return ONLY a JSON object:
             return default
 
     def _safe_float(
-            self,
-            value: Any,
-            default: float = 0.5,
-            min_value: float = 0.0,
-            max_value: float = 1.0) -> float:
+        self,
+        value: Any,
+        default: float = 0.5,
+        min_value: float = 0.0,
+        max_value: float = 1.0,
+    ) -> float:
         try:
             value = float(value)
             return max(min_value, min(max_value, value))
         except Exception:
             return default
 
-    def _deduplicate_errors(
-            self, errors: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _deduplicate_errors(self, errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Remove duplicados com base em pattern_key.
         """
@@ -171,7 +166,7 @@ Return ONLY a JSON object:
 
         return unique_errors
 
-    def _score_error(self, err: Dict[str, Any]) -> float:
+    def _score_error(self, err: dict[str, Any]) -> float:
         """
         Pontua o erro para priorização de treino.
         """
@@ -186,10 +181,8 @@ Return ONLY a JSON object:
         return score
 
     async def extract_and_log_errors(
-            self,
-            username: str,
-            student_msg: str,
-            teacher_msg: str) -> bool:
+        self, username: str, student_msg: str, teacher_msg: str
+    ) -> bool:
         """
         Fluxo principal:
         1. extrai erros
@@ -201,8 +194,7 @@ Return ONLY a JSON object:
         if not raw_errors:
             return False
 
-        normalized_errors = [
-            self._normalize_error(err) for err in raw_errors]
+        normalized_errors = [self._normalize_error(err) for err in raw_errors]
         normalized_errors = self._deduplicate_errors(normalized_errors)
 
         try:
@@ -210,41 +202,43 @@ Return ONLY a JSON object:
             await self._sync_errors_with_srs(username, normalized_errors)
             return True
         except Exception as e:
-            logging.info(
-                f"[ErrorLogService] Erro ao processar erros: {e}")
+            logging.info(f"[ErrorLogService] Erro ao processar erros: {e}")
             return False
 
-    async def _persist_errors(
-            self, username: str, errors: List[Dict[str, Any]]):
+    async def _persist_errors(self, username: str, errors: list[dict[str, Any]]):
         """
         Persiste os erros em lote.
         """
+
         def _save():
             payloads = []
             for err in errors:
-                payloads.append({
-                    "username": username,
-                    "incorrect_text": err["incorrect"],
-                    "correct_text": err["correct"],
-                    "category": err["category"],
-                    "explanation": err["explanation"],
-                    "severity": err["severity"],
-                    "confidence": err["confidence"],
-                    "pattern_key": err["pattern_key"],
-                    "is_resolved": False,
-                })
+                payloads.append(
+                    {
+                        "username": username,
+                        "incorrect_text": err["incorrect"],
+                        "correct_text": err["correct"],
+                        "category": err["category"],
+                        "explanation": err["explanation"],
+                        "severity": err["severity"],
+                        "confidence": err["confidence"],
+                        "pattern_key": err["pattern_key"],
+                        "is_resolved": False,
+                    }
+                )
 
             if payloads:
                 self.db.table("user_errors").insert(payloads).execute()
 
         await run_in_threadpool(_save)
 
-    async def _sync_errors_with_srs(
-            self, username: str, errors: List[Dict[str, Any]]):
+    async def _sync_errors_with_srs(self, username: str, errors: list[dict[str, Any]]):
         """
         Atualiza o SRS com os erros que realmente merecem treino.
         """
-        from app.modules.activities.services.vocabulary_srs import vocabulary_srs_service
+        from app.modules.activities.services.vocabulary_srs import (
+            vocabulary_srs_service,
+        )
 
         for err in errors:
             if not err.get("should_practice", True):
@@ -254,14 +248,16 @@ Return ONLY a JSON object:
                 username,
                 err.get("correct"),
                 definition=err.get("explanation", ""),
-                example=f"Incorrect: {err.get('incorrect')} -> Correct: {err.get('correct')}"
+                example=f"Incorrect: {err.get('incorrect')} -> Correct: {err.get('correct')}",
             )
 
     async def _get_training_targets(
-            self, username: str, limit: int = 10) -> List[Dict[str, Any]]:
+        self, username: str, limit: int = 10
+    ) -> list[dict[str, Any]]:
         """
         Agrupa erros não resolvidos por padrão e calcula prioridade.
         """
+
         def _fetch():
             return (
                 self.db.table("user_errors")
@@ -277,22 +273,24 @@ Return ONLY a JSON object:
         grouped = defaultdict(list)
         for row in rows:
             pattern_key = row.get("pattern_key") or self._build_pattern_key(
-                row.get(
-                    "category", "grammar"), row.get(
-                    "incorrect_text", ""), row.get(
-                    "correct_text", ""))
+                row.get("category", "grammar"),
+                row.get("incorrect_text", ""),
+                row.get("correct_text", ""),
+            )
             grouped[pattern_key].append(row)
 
         from datetime import datetime, timezone
+
         now = datetime.now(timezone.utc)
 
         targets = []
         for pattern_key, items in grouped.items():
             # Calcula recência (usamos o erro mais recente do grupo)
             most_recent_date = max(
-                datetime.fromisoformat(
-                    i.get("created_at").replace(
-                        'Z', '+00:00')) for i in items if i.get("created_at"))
+                datetime.fromisoformat(i.get("created_at").replace("Z", "+00:00"))
+                for i in items
+                if i.get("created_at")
+            )
             days_ago = (now - most_recent_date).days
 
             # Penalidade de tempo (decay): erros muito antigos perdem
@@ -303,56 +301,60 @@ Return ONLY a JSON object:
             if days_ago > 30:
                 recency_multiplier = 0.1
 
-            total_severity = sum(
-                int(i.get("severity", 1) or 1) for i in items)
-            avg_confidence = sum(float(i.get("confidence", 0.5) or 0.5)
-                                 for i in items) / len(items)
+            total_severity = sum(int(i.get("severity", 1) or 1) for i in items)
+            avg_confidence = sum(
+                float(i.get("confidence", 0.5) or 0.5) for i in items
+            ) / len(items)
             frequency = len(items)
 
             # Score balanceado: Prioridade MÁXIMA para Gravidade (erros gramaticais como 'I are')
             # Frequência conta, mas um erro grave deve aparecer mesmo se
             # ocorreu poucas vezes.
-            score = (frequency * 2.0) + (total_severity * 6.0) + \
-                (avg_confidence * 1.5)
+            score = (frequency * 2.0) + (total_severity * 6.0) + (avg_confidence * 1.5)
             score *= recency_multiplier
 
             best_item = sorted(
                 items,
                 key=lambda x: (
                     int(x.get("severity", 1) or 1),
-                    float(x.get("confidence", 0.5) or 0.5)
+                    float(x.get("confidence", 0.5) or 0.5),
                 ),
-                reverse=True
+                reverse=True,
             )[0]
 
-            targets.append({
-                "pattern_key": pattern_key,
-                "category": best_item.get("category", "grammar"),
-                "incorrect_text": best_item.get("incorrect_text", ""),
-                "correct_text": best_item.get("correct_text", ""),
-                "explanation": best_item.get("explanation", ""),
-                "frequency": frequency,
-                "total_severity": total_severity,
-                "avg_confidence": round(avg_confidence, 2),
-                "score": round(score, 2),
-                "examples": items[:3],
-                "last_seen": most_recent_date.isoformat(),
-            })
+            targets.append(
+                {
+                    "pattern_key": pattern_key,
+                    "category": best_item.get("category", "grammar"),
+                    "incorrect_text": best_item.get("incorrect_text", ""),
+                    "correct_text": best_item.get("correct_text", ""),
+                    "explanation": best_item.get("explanation", ""),
+                    "frequency": frequency,
+                    "total_severity": total_severity,
+                    "avg_confidence": round(avg_confidence, 2),
+                    "score": round(score, 2),
+                    "examples": items[:3],
+                    "last_seen": most_recent_date.isoformat(),
+                }
+            )
 
         targets.sort(key=lambda x: x["score"], reverse=True)
         return targets[:limit]
 
     async def mark_errors_resolved(
-            self,
-            username: str,
-            pattern_key: Optional[str] = None):
+        self, username: str, pattern_key: str | None = None
+    ):
         """
         Marca erros como resolvidos.
         Se pattern_key vier vazio, marca todos do usuário.
         """
+
         def _update():
-            query = self.db.table("user_errors").update(
-                {"is_resolved": True}).eq("username", username)
+            query = (
+                self.db.table("user_errors")
+                .update({"is_resolved": True})
+                .eq("username", username)
+            )
 
             if pattern_key:
                 query = query.eq("pattern_key", pattern_key)
@@ -361,11 +363,11 @@ Return ONLY a JSON object:
 
         await run_in_threadpool(_update)
 
-    async def get_user_error_summary(
-            self, username: str) -> Dict[str, Any]:
+    async def get_user_error_summary(self, username: str) -> dict[str, Any]:
         """
         Retorna um resumo simples dos padrões de erro do usuário.
         """
+
         def _fetch():
             return (
                 self.db.table("user_errors")
@@ -377,35 +379,35 @@ Return ONLY a JSON object:
         res = await run_in_threadpool(_fetch)
         rows = res.data or []
 
-        summary = defaultdict(lambda: {
-            "frequency": 0,
-            "severity_sum": 0,
-            "confidence_sum": 0.0
-        })
+        summary = defaultdict(
+            lambda: {"frequency": 0, "severity_sum": 0, "confidence_sum": 0.0}
+        )
 
         for row in rows:
             pattern_key = row.get("pattern_key") or "unknown"
             summary[pattern_key]["frequency"] += 1
-            summary[pattern_key]["severity_sum"] += int(
-                row.get("severity", 1) or 1)
+            summary[pattern_key]["severity_sum"] += int(row.get("severity", 1) or 1)
             summary[pattern_key]["confidence_sum"] += float(
-                row.get("confidence", 0.5) or 0.5)
+                row.get("confidence", 0.5) or 0.5
+            )
 
         result = []
         for pattern_key, data in summary.items():
-            result.append({
-                "pattern_key": pattern_key,
-                "frequency": data["frequency"],
-                "avg_severity": round(data["severity_sum"] / data["frequency"], 2),
-                "avg_confidence": round(data["confidence_sum"] / data["frequency"], 2),
-            })
+            result.append(
+                {
+                    "pattern_key": pattern_key,
+                    "frequency": data["frequency"],
+                    "avg_severity": round(data["severity_sum"] / data["frequency"], 2),
+                    "avg_confidence": round(
+                        data["confidence_sum"] / data["frequency"], 2
+                    ),
+                }
+            )
 
         return {
             "username": username,
-            "patterns": sorted(
-                result,
-                key=lambda x: x["frequency"],
-                reverse=True)}
+            "patterns": sorted(result, key=lambda x: x["frequency"], reverse=True),
+        }
 
 
 error_log_service = ErrorLogService()

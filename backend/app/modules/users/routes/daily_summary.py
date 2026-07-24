@@ -8,23 +8,23 @@ Endpoints:
 """
 
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Depends
-from app.core.dependencies.auth import get_current_user
+
 from app.core.database import get_client
+from app.core.dependencies.auth import get_current_user
 from app.shared.services.upstash import cache_get, cache_set
+from fastapi import APIRouter, Depends
 
 router = APIRouter()
 
 
-@router.get('/users/progress/daily-summary')
-async def get_daily_summary(
-        current_user: dict = Depends(get_current_user)):
+@router.get("/users/progress/daily-summary")
+async def get_daily_summary(current_user: dict = Depends(get_current_user)):
     """
     Resumo leve de progresso diário/semanal para o badge flutuante.
     Cache curto (2 min) para parecer quase real-time sem sobrecarregar o banco.
     """
-    username = current_user['username']
-    cache_key = f'daily_summary:{username}'
+    username = current_user["username"]
+    cache_key = f"daily_summary:{username}"
 
     cached = await cache_get(cache_key)
     if cached:
@@ -38,11 +38,11 @@ async def get_daily_summary(
     # ── Mensagens da semana ───────────────────────────────────────────
     try:
         msgs = (
-            db.table('messages')
-            .select('id')
-            .eq('username', username)
-            .eq('role', 'user')
-            .gte('created_at', week_ago.isoformat())
+            db.table("messages")
+            .select("id")
+            .eq("username", username)
+            .eq("role", "user")
+            .gte("created_at", week_ago.isoformat())
             .execute()
             .data
         )
@@ -55,26 +55,25 @@ async def get_daily_summary(
     words_today = 0
     try:
         vocab = (
-            db.table('user_vocabulary')
-            .select('word')
-            .eq('username', username)
-            .gte('created_at', today_start.isoformat())
+            db.table("user_vocabulary")
+            .select("word")
+            .eq("username", username)
+            .gte("created_at", today_start.isoformat())
             .execute()
             .data
         )
         if vocab:
-            words_today = len({row['word'].lower()
-                              for row in vocab if row.get('word')})
+            words_today = len({row["word"].lower() for row in vocab if row.get("word")})
     except Exception:
         # Fallback: conta palavras únicas das mensagens de hoje do
         # assistente
         try:
             bot_msgs = (
-                db.table('messages')
-                .select('content')
-                .eq('username', username)
-                .eq('role', 'assistant')
-                .gte('created_at', today_start.isoformat())
+                db.table("messages")
+                .select("content")
+                .eq("username", username)
+                .eq("role", "assistant")
+                .gte("created_at", today_start.isoformat())
                 .execute()
                 .data
             )
@@ -83,9 +82,9 @@ async def get_daily_summary(
             if bot_msgs:
                 all_words: set[str] = set()
                 for msg in bot_msgs:
-                    content = msg.get('content', '') or ''
+                    content = msg.get("content", "") or ""
                     for w in content.split():
-                        clean = w.strip('.,!?;:"\'()[]').lower()
+                        clean = w.strip(".,!?;:\"'()[]").lower()
                         if len(clean) > 3:  # ignora palavras muito curtas
                             all_words.add(clean)
                 words_today = max(0, len(all_words) // 10)
@@ -93,8 +92,8 @@ async def get_daily_summary(
             words_today = 0
 
     result = {
-        'words_today': words_today,
-        'messages_week': messages_week,
+        "words_today": words_today,
+        "messages_week": messages_week,
     }
 
     await cache_set(cache_key, result, ttl=120)  # 2 minutos

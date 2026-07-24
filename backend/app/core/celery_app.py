@@ -1,4 +1,5 @@
 import os
+
 from celery import Celery
 from celery.schedules import crontab
 from dotenv import load_dotenv
@@ -7,37 +8,45 @@ load_dotenv()
 
 USE_CELERY = os.getenv("USE_CELERY", "false").lower() == "true"
 
+
 # Função auxiliar para gerar dinamicamente as URLs do broker e backend
 def get_celery_configurations():
     # Força recarregamento do dotenv
     load_dotenv(override=True)
-    
+
     amqp_url = os.getenv("CLOUD_AMQP_URL")
     upstash_url = os.getenv("UPSTASH_REDIS_URL")
     upstash_token = os.getenv("UPSTASH_REDIS_TOKEN")
-    
+
     redis_backend_url = None
     if upstash_url and upstash_token:
-        clean_url = upstash_url.replace("redis://", "").replace("https://", "").replace("http://", "")
+        clean_url = (
+            upstash_url.replace("redis://", "")
+            .replace("https://", "")
+            .replace("http://", "")
+        )
         if ":" not in clean_url:
             clean_url = f"{clean_url}:6379"
-        redis_backend_url = f"rediss://:{upstash_token}@{clean_url}?ssl_cert_reqs=CERT_NONE"
-        
+        redis_backend_url = (
+            f"rediss://:{upstash_token}@{clean_url}?ssl_cert_reqs=CERT_NONE"
+        )
+
     if amqp_url:
         broker_url = amqp_url
     elif redis_backend_url:
         broker_url = redis_backend_url
     else:
         broker_url = "redis://localhost:6379/0"
-        
+
     if redis_backend_url:
         backend_url = redis_backend_url
     elif amqp_url:
         backend_url = "rpc://"
     else:
         backend_url = "redis://localhost:6379/0"
-        
+
     return broker_url, backend_url
+
 
 # Obtém dinamicamente
 broker_url, backend_url = get_celery_configurations()
@@ -117,15 +126,18 @@ celery_app.conf.beat_schedule = {
 
 from celery.signals import after_setup_logger, after_setup_task_logger
 
+
 @after_setup_logger.connect
 def setup_loggers(logger, *args, **kwargs):
     import logging
+
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 
 @after_setup_task_logger.connect
 def setup_task_loggers(logger, *args, **kwargs):
     import logging
+
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
-

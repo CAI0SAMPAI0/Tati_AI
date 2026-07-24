@@ -14,7 +14,6 @@ When a topic is not in the catalog, a deterministic fallback is returned.
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 from app.shared.services.upstash import cache_get, cache_set
 
@@ -53,8 +52,7 @@ _CATALOG: list[GrammarEntry] = [
         level="A1",
         title="Present Continuous",
         rule_summary=(
-            "We use it for actions happening now. "
-            "Structure: verb to be + verb-ing."
+            "We use it for actions happening now. " "Structure: verb to be + verb-ing."
         ),
         key_structure="Subject + am/is/are + verb-ing",
         tip_teacher_tati="Use 'now', 'at the moment' to make it clear the action is happening right now.",
@@ -293,7 +291,7 @@ _CATALOG: list[GrammarEntry] = [
 ]
 
 
-def _normalize_topic(topic: Optional[str]) -> str:
+def _normalize_topic(topic: str | None) -> str:
     return (topic or "").strip().lower().replace(" ", "_").replace("-", "_")
 
 
@@ -302,8 +300,8 @@ class GrammarService:
 
     async def get_grammar(
         self,
-        topic: Optional[str] = None,
-        level: Optional[str] = None,
+        topic: str | None = None,
+        level: str | None = None,
     ) -> dict:
         """Return grammar explanation for the requested topic/level.
 
@@ -312,7 +310,11 @@ class GrammarService:
         topic_key = _normalize_topic(topic)
         level_key = (level or "").strip().upper()
 
-        cache_key = f"grammar:{level_key}:{topic_key}" if topic_key else f"grammar:index:{level_key}"
+        cache_key = (
+            f"grammar:{level_key}:{topic_key}"
+            if topic_key
+            else f"grammar:index:{level_key}"
+        )
         cached = await cache_get(cache_key)
         if cached:
             return cached
@@ -327,7 +329,7 @@ class GrammarService:
         return result
 
     # ── Helpers ─────────────────────────────────────────────────────
-    def _find_entry(self, topic: str, level: str) -> Optional[GrammarEntry]:
+    def _find_entry(self, topic: str, level: str) -> GrammarEntry | None:
         # 1) exact match (topic + level)
         for e in _CATALOG:
             if e.topic == topic and (not level or e.level == level):
@@ -344,7 +346,7 @@ class GrammarService:
 
     def _serialize(
         self,
-        entry: Optional[GrammarEntry],
+        entry: GrammarEntry | None,
         topic: str,
         level: str,
     ) -> dict:
@@ -363,9 +365,18 @@ class GrammarService:
                     "Practice with Teacher Tati in the chat and she will show you real examples of this topic!"
                 ),
                 "sources": [
-                    {"name": "DW News", "url": "https://www.dw.com/en/top-stories/s-9097"},
-                    {"name": "BBC Learning English", "url": "https://www.bbc.co.uk/learningenglish/english/features/6-minute-english"},
-                    {"name": "test-english.com", "url": f"https://test-english.com/?s={topic.replace('_', '+')}"},
+                    {
+                        "name": "DW News",
+                        "url": "https://www.dw.com/en/top-stories/s-9097",
+                    },
+                    {
+                        "name": "BBC Learning English",
+                        "url": "https://www.bbc.co.uk/learningenglish/english/features/6-minute-english",
+                    },
+                    {
+                        "name": "test-english.com",
+                        "url": f"https://test-english.com/?s={topic.replace('_', '+')}",
+                    },
                 ],
             }
 
@@ -379,7 +390,10 @@ class GrammarService:
             "sources": [
                 {"name": entry.source_name, "url": entry.source_url},
                 {"name": "DW News", "url": "https://www.dw.com/en/top-stories/s-9097"},
-                {"name": "BBC Learning English", "url": "https://www.bbc.co.uk/learningenglish/english/grammar"},
+                {
+                    "name": "BBC Learning English",
+                    "url": "https://www.bbc.co.uk/learningenglish/english/grammar",
+                },
                 {"name": "test-english.com", "url": "https://test-english.com/"},
             ],
         }
@@ -403,8 +417,14 @@ class GrammarService:
             ],
             "sources": [
                 {"name": "DW News", "url": "https://www.dw.com/en/top-stories/s-9097"},
-                {"name": "BBC Learning English", "url": "https://www.bbc.co.uk/learningenglish/english/grammar"},
-                {"name": "test-english.com (by level)", "url": "https://test-english.com/"},
+                {
+                    "name": "BBC Learning English",
+                    "url": "https://www.bbc.co.uk/learningenglish/english/grammar",
+                },
+                {
+                    "name": "test-english.com (by level)",
+                    "url": "https://test-english.com/",
+                },
             ],
         }
 

@@ -11,23 +11,21 @@ Contém:
 
 from __future__ import annotations
 
+from app.core.database import get_client
+from app.core.security import decode_token
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
-from app.core.security import decode_token
-from app.core.database import get_client
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl='auth/login')
-oauth2_scheme_optional = OAuth2PasswordBearer(
-    tokenUrl='auth/login', auto_error=False)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
 # Colunas necessárias para autenticação — evita SELECT * que puxa
 # campos pesados como ``vocabulary`` (JSON potencialmente enorme).
 _USER_AUTH_FIELDS = (
-    'username, name, email, role, level, focus, '
-    'is_exempt, is_premium_active, plan_type, '
-    'free_messages_used, created_at, profile, '
-    'preferred_due_day'
+    "username, name, email, role, level, focus, "
+    "is_exempt, is_premium_active, plan_type, "
+    "free_messages_used, created_at, profile, "
+    "preferred_due_day"
 )
 
 
@@ -42,29 +40,32 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail='Token inválido ou expirado',
+            detail="Token inválido ou expirado",
         )
 
-    username = payload['sub']
+    username = payload["sub"]
     db = get_client()
     try:
         rows = (
-            db.table('users')
+            db.table("users")
             .select(_USER_AUTH_FIELDS)
-            .eq('username', username)
+            .eq("username", username)
             .limit(1)
             .execute()
             .data
         )
     except Exception as e:
         import logging
-        logging.warning(f"[Auth] Falha ao ler colunas completas do usuário: {e}. Tentando colunas básicas.")
-        basic_fields = 'username, name, email, role, level, focus, created_at'
+
+        logging.warning(
+            f"[Auth] Falha ao ler colunas completas do usuário: {e}. Tentando colunas básicas."
+        )
+        basic_fields = "username, name, email, role, level, focus, created_at"
         try:
             rows = (
-                db.table('users')
+                db.table("users")
                 .select(basic_fields)
-                .eq('username', username)
+                .eq("username", username)
                 .limit(1)
                 .execute()
                 .data
@@ -73,24 +74,24 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
             logging.error(f"[Auth] Falha crítica ao ler usuário básico: {e_inner}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail='Erro de comunicação com o banco de dados',
+                detail="Erro de comunicação com o banco de dados",
             )
 
     if not rows:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail='Usuário não encontrado',
+            detail="Usuário não encontrado",
         )
 
     user = rows[0]
     # Injeta valores padrão caso colunas tenham falhado na consulta
     default_values = {
-        'is_exempt': False,
-        'is_premium_active': False,
-        'plan_type': None,
-        'free_messages_used': 0,
-        'profile': None,
-        'preferred_due_day': None
+        "is_exempt": False,
+        "is_premium_active": False,
+        "plan_type": None,
+        "free_messages_used": 0,
+        "profile": None,
+        "preferred_due_day": None,
     }
     for k, v in default_values.items():
         if k not in user:
@@ -98,7 +99,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
 
     from app.core.config import settings
 
-    user['is_staff'] = user.get('role') in settings.staff_roles
+    user["is_staff"] = user.get("role") in settings.staff_roles
     return user
 
 
@@ -112,29 +113,32 @@ def get_current_user_optional(
     if not payload:
         return None
 
-    username = payload.get('sub')
+    username = payload.get("sub")
     if not username:
         return None
 
     db = get_client()
     try:
         rows = (
-            db.table('users')
+            db.table("users")
             .select(_USER_AUTH_FIELDS)
-            .eq('username', username)
+            .eq("username", username)
             .limit(1)
             .execute()
             .data
         )
     except Exception as e:
         import logging
-        logging.warning(f"[Auth] Falha no get_current_user_optional com colunas completas: {e}. Tentando colunas básicas.")
-        basic_fields = 'username, name, email, role, level, focus, created_at'
+
+        logging.warning(
+            f"[Auth] Falha no get_current_user_optional com colunas completas: {e}. Tentando colunas básicas."
+        )
+        basic_fields = "username, name, email, role, level, focus, created_at"
         try:
             rows = (
-                db.table('users')
+                db.table("users")
                 .select(basic_fields)
-                .eq('username', username)
+                .eq("username", username)
                 .limit(1)
                 .execute()
                 .data
@@ -147,12 +151,12 @@ def get_current_user_optional(
 
     user = rows[0]
     default_values = {
-        'is_exempt': False,
-        'is_premium_active': False,
-        'plan_type': None,
-        'free_messages_used': 0,
-        'profile': None,
-        'preferred_due_day': None
+        "is_exempt": False,
+        "is_premium_active": False,
+        "plan_type": None,
+        "free_messages_used": 0,
+        "profile": None,
+        "preferred_due_day": None,
     }
     for k, v in default_values.items():
         if k not in user:
@@ -160,7 +164,7 @@ def get_current_user_optional(
 
     from app.core.config import settings
 
-    user['is_staff'] = user.get('role') in settings.staff_roles
+    user["is_staff"] = user.get("role") in settings.staff_roles
     return user
 
 
@@ -170,12 +174,12 @@ def check_access(user: dict = Depends(get_current_user)) -> dict:
     Raises:
         HTTPException 403: Acesso premium necessário.
     """
-    if user.get('is_exempt') or user.get('is_premium_active'):
+    if user.get("is_exempt") or user.get("is_premium_active"):
         return user
 
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail='Acesso premium necessário. Escolha um plano em seu perfil.',
+        detail="Acesso premium necessário. Escolha um plano em seu perfil.",
     )
 
 
@@ -194,22 +198,22 @@ class RoleChecker:
         self.allowed_roles = set(allowed_roles)
 
     def __call__(self, user: dict = Depends(get_current_user)) -> dict:
-        if user['role'] not in self.allowed_roles:
+        if user["role"] not in self.allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail='Acesso negado: permissão insuficiente',
+                detail="Acesso negado: permissão insuficiente",
             )
         return user
 
 
 require_staff = RoleChecker(
-    'professor',
-    'professora',
-    'programador',
-    'Tatiana',
-    'Tati',
-    'Professora',
-    'Programador',
-    'admin',
-    'Admin',
+    "professor",
+    "professora",
+    "programador",
+    "Tatiana",
+    "Tati",
+    "Professora",
+    "Programador",
+    "admin",
+    "Admin",
 )

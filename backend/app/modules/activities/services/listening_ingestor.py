@@ -4,24 +4,29 @@ Fetches content from external sources and stores in Supabase podcasts table.
 """
 
 import logging
-import asyncio
-import re
 from datetime import datetime, timezone
-from typing import List, Dict, Optional
 
 import httpx
-
-from app.core.config import settings
 from app.core.database import get_client
 
 logger = logging.getLogger(__name__)
 
 # CEFR level classification based on source URL patterns
 LEVEL_MAP = {
-    'a1': 'A1', 'a2': 'A2', 'b1': 'B1', 'b2': 'B2', 'c1': 'C1', 'c2': 'C2',
-    'beginner': 'A1', 'elementary': 'A2', 'intermediate': 'B1',
-    'upper-intermediate': 'B2', 'advanced': 'C1',
-    'easy': 'A2', 'medium': 'B1', 'hard': 'B2',
+    "a1": "A1",
+    "a2": "A2",
+    "b1": "B1",
+    "b2": "B2",
+    "c1": "C1",
+    "c2": "C2",
+    "beginner": "A1",
+    "elementary": "A2",
+    "intermediate": "B1",
+    "upper-intermediate": "B2",
+    "advanced": "C1",
+    "easy": "A2",
+    "medium": "B1",
+    "hard": "B2",
 }
 
 
@@ -30,10 +35,10 @@ def _classify_level(text: str) -> str:
     for key, level in LEVEL_MAP.items():
         if key in text_lower:
             return level
-    return 'A2'
+    return "A2"
 
 
-async def _fetch_url(client: httpx.AsyncClient, url: str) -> Optional[str]:
+async def _fetch_url(client: httpx.AsyncClient, url: str) -> str | None:
     try:
         resp = await client.get(url, timeout=15, follow_redirects=True)
         resp.raise_for_status()
@@ -63,56 +68,63 @@ BBC_SECTIONS = [
 ]
 
 
-async def ingest_bbc_learning_english() -> List[Dict]:
+async def ingest_bbc_learning_english() -> list[dict]:
     from bs4 import BeautifulSoup
+
     items = []
     async with httpx.AsyncClient() as client:
-        for url in BBC_BASE + "/features/6-minute-english",:
+        for url in (BBC_BASE + "/features/6-minute-english",):
             html = await _fetch_url(client, url)
             if not html:
                 continue
-            soup = BeautifulSoup(html, 'html.parser')
+            soup = BeautifulSoup(html, "html.parser")
             links = soup.select('a[href*="/learningenglish/"]')
             for link in links[:15]:
-                href = link.get('href', '')
+                href = link.get("href", "")
                 title = link.get_text(strip=True)
                 if not title or len(title) < 5:
                     continue
-                full_url = href if href.startswith('http') else f"https://www.bbc.co.uk{href}"
-                level = _classify_level(title + ' ' + full_url)
-                items.append({
-                    'title': title,
-                    'description': f"BBC Learning English: {title}",
-                    'level': level,
-                    'category': 'listening',
-                    'source_name': 'BBC Learning English',
-                    'source_type': 'bbc',
-                    'media_type': 'audio',
-                    'external_url': full_url,
-                    'embed_url': '',
-                    'thumbnail': '',
-                    'has_full_transcript': False,
-                    'transcript_segments': [],
-                    'translation_language': 'en',
-                })
+                full_url = (
+                    href if href.startswith("http") else f"https://www.bbc.co.uk{href}"
+                )
+                level = _classify_level(title + " " + full_url)
+                items.append(
+                    {
+                        "title": title,
+                        "description": f"BBC Learning English: {title}",
+                        "level": level,
+                        "category": "listening",
+                        "source_name": "BBC Learning English",
+                        "source_type": "bbc",
+                        "media_type": "audio",
+                        "external_url": full_url,
+                        "embed_url": "",
+                        "thumbnail": "",
+                        "has_full_transcript": False,
+                        "transcript_segments": [],
+                        "translation_language": "en",
+                    }
+                )
 
     if not items:
         for name, level, desc in BBC_SECTIONS:
-            items.append({
-                'title': name,
-                'description': desc,
-                'level': level,
-                'category': 'listening',
-                'source_name': 'BBC Learning English',
-                'source_type': 'bbc',
-                'media_type': 'audio',
-                'external_url': BBC_BASE,
-                'embed_url': '',
-                'thumbnail': '',
-                'has_full_transcript': False,
-                'transcript_segments': [],
-                'translation_language': 'en',
-            })
+            items.append(
+                {
+                    "title": name,
+                    "description": desc,
+                    "level": level,
+                    "category": "listening",
+                    "source_name": "BBC Learning English",
+                    "source_type": "bbc",
+                    "media_type": "audio",
+                    "external_url": BBC_BASE,
+                    "embed_url": "",
+                    "thumbnail": "",
+                    "has_full_transcript": False,
+                    "transcript_segments": [],
+                    "translation_language": "en",
+                }
+            )
 
     logger.info(f"[BBC] Ingested {len(items)} items")
     return items
@@ -123,64 +135,75 @@ async def ingest_bbc_learning_english() -> List[Dict]:
 # ============================================================
 
 DW_BASES = [
-    ("https://www.dw.com/en/top-stories/s-9097", "A2", "DW English News - everyday topics"),
+    (
+        "https://www.dw.com/en/top-stories/s-9097",
+        "A2",
+        "DW English News - everyday topics",
+    ),
     ("https://www.dw.com/pt-br/noticias/s-7111", "A2", "DW Noticias em Português"),
     ("https://www.dw.com/learn-english/s-2297", "B1", "DW Learn English"),
 ]
 
 
-async def ingest_dw_content() -> List[Dict]:
+async def ingest_dw_content() -> list[dict]:
     from bs4 import BeautifulSoup
+
     items = []
     async with httpx.AsyncClient() as client:
         for url, level, desc in DW_BASES:
             html = await _fetch_url(client, url)
             if not html:
                 continue
-            soup = BeautifulSoup(html, 'html.parser')
-            articles = soup.select('a[href*="/a-"]') or soup.select('h3 a, h2 a')
+            soup = BeautifulSoup(html, "html.parser")
+            articles = soup.select('a[href*="/a-"]') or soup.select("h3 a, h2 a")
             for article in articles[:10]:
-                href = article.get('href', '')
+                href = article.get("href", "")
                 title = article.get_text(strip=True)
                 if not title or len(title) < 5:
                     continue
-                full_url = href if href.startswith('http') else f"https://www.dw.com{href}"
-                article_level = _classify_level(title + ' ' + full_url)
-                if article_level == 'A1':
+                full_url = (
+                    href if href.startswith("http") else f"https://www.dw.com{href}"
+                )
+                article_level = _classify_level(title + " " + full_url)
+                if article_level == "A1":
                     article_level = level
-                items.append({
-                    'title': title,
-                    'description': desc,
-                    'level': article_level,
-                    'category': 'reading',
-                    'source_name': 'DW News',
-                    'source_type': 'dw',
-                    'media_type': 'text',
-                    'external_url': full_url,
-                    'embed_url': '',
-                    'thumbnail': '',
-                    'has_full_transcript': False,
-                    'transcript_segments': [],
-                    'translation_language': 'en',
-                })
+                items.append(
+                    {
+                        "title": title,
+                        "description": desc,
+                        "level": article_level,
+                        "category": "reading",
+                        "source_name": "DW News",
+                        "source_type": "dw",
+                        "media_type": "text",
+                        "external_url": full_url,
+                        "embed_url": "",
+                        "thumbnail": "",
+                        "has_full_transcript": False,
+                        "transcript_segments": [],
+                        "translation_language": "en",
+                    }
+                )
 
     if not items:
         for _, level, desc in DW_BASES:
-            items.append({
-                'title': desc,
-                'description': desc,
-                'level': level,
-                'category': 'reading',
-                'source_name': 'DW News',
-                'source_type': 'dw',
-                'media_type': 'text',
-                'external_url': 'https://www.dw.com/en/top-stories/s-9097',
-                'embed_url': '',
-                'thumbnail': '',
-                'has_full_transcript': False,
-                'transcript_segments': [],
-                'translation_language': 'en',
-            })
+            items.append(
+                {
+                    "title": desc,
+                    "description": desc,
+                    "level": level,
+                    "category": "reading",
+                    "source_name": "DW News",
+                    "source_type": "dw",
+                    "media_type": "text",
+                    "external_url": "https://www.dw.com/en/top-stories/s-9097",
+                    "embed_url": "",
+                    "thumbnail": "",
+                    "has_full_transcript": False,
+                    "transcript_segments": [],
+                    "translation_language": "en",
+                }
+            )
 
     logger.info(f"[DW] Ingested {len(items)} items")
     return items
@@ -190,18 +213,19 @@ async def ingest_dw_content() -> List[Dict]:
 # test-english.com
 # ============================================================
 
-TEST_ENGLISH_LEVELS = ['a1', 'a2', 'b1', 'b2']
+TEST_ENGLISH_LEVELS = ["a1", "a2", "b1", "b2"]
 TEST_ENGLISH_CATEGORIES = {
-    'grammar': 'grammar',
-    'vocabulary': 'vocabulary',
-    'listening': 'listening',
-    'reading': 'reading',
-    'pronunciation': 'pronunciation',
+    "grammar": "grammar",
+    "vocabulary": "vocabulary",
+    "listening": "listening",
+    "reading": "reading",
+    "pronunciation": "pronunciation",
 }
 
 
-async def ingest_test_english() -> List[Dict]:
+async def ingest_test_english() -> list[dict]:
     from bs4 import BeautifulSoup
+
     items = []
     async with httpx.AsyncClient() as client:
         for level in TEST_ENGLISH_LEVELS:
@@ -210,48 +234,56 @@ async def ingest_test_english() -> List[Dict]:
                 html = await _fetch_url(client, url)
                 if not html:
                     continue
-                soup = BeautifulSoup(html, 'html.parser')
+                soup = BeautifulSoup(html, "html.parser")
                 links = soup.select('a[href*="test-english.com"]')
                 for link in links[:8]:
-                    href = link.get('href', '')
+                    href = link.get("href", "")
                     title = link.get_text(strip=True)
                     if not title or len(title) < 5:
                         continue
-                    full_url = href if href.startswith('http') else f"https://test-english.com{href}"
-                    items.append({
-                        'title': title,
-                        'description': f"test-english.com - {level.upper()} {category}",
-                        'level': level.upper(),
-                        'category': category,
-                        'source_name': 'test-english.com',
-                        'source_type': 'test_english',
-                        'media_type': 'text',
-                        'external_url': full_url,
-                        'embed_url': '',
-                        'thumbnail': '',
-                        'has_full_transcript': False,
-                        'transcript_segments': [],
-                        'translation_language': 'en',
-                    })
+                    full_url = (
+                        href
+                        if href.startswith("http")
+                        else f"https://test-english.com{href}"
+                    )
+                    items.append(
+                        {
+                            "title": title,
+                            "description": f"test-english.com - {level.upper()} {category}",
+                            "level": level.upper(),
+                            "category": category,
+                            "source_name": "test-english.com",
+                            "source_type": "test_english",
+                            "media_type": "text",
+                            "external_url": full_url,
+                            "embed_url": "",
+                            "thumbnail": "",
+                            "has_full_transcript": False,
+                            "transcript_segments": [],
+                            "translation_language": "en",
+                        }
+                    )
 
     if not items:
         for level in TEST_ENGLISH_LEVELS:
             for cat_name, cat_type in TEST_ENGLISH_CATEGORIES.items():
-                items.append({
-                    'title': f"{level.upper()} {cat_name.title()} Practice",
-                    'description': f"test-english.com - {level.upper()} {cat_name}",
-                    'level': level.upper(),
-                    'category': cat_type,
-                    'source_name': 'test-english.com',
-                    'source_type': 'test_english',
-                    'media_type': 'text',
-                    'external_url': f"https://test-english.com/{cat_name}/{level}/",
-                    'embed_url': '',
-                    'thumbnail': '',
-                    'has_full_transcript': False,
-                    'transcript_segments': [],
-                    'translation_language': 'en',
-                })
+                items.append(
+                    {
+                        "title": f"{level.upper()} {cat_name.title()} Practice",
+                        "description": f"test-english.com - {level.upper()} {cat_name}",
+                        "level": level.upper(),
+                        "category": cat_type,
+                        "source_name": "test-english.com",
+                        "source_type": "test_english",
+                        "media_type": "text",
+                        "external_url": f"https://test-english.com/{cat_name}/{level}/",
+                        "embed_url": "",
+                        "thumbnail": "",
+                        "has_full_transcript": False,
+                        "transcript_segments": [],
+                        "translation_language": "en",
+                    }
+                )
 
     logger.info(f"[test-english] Ingested {len(items)} items")
     return items
@@ -261,21 +293,25 @@ async def ingest_test_english() -> List[Dict]:
 # Save to Supabase
 # ============================================================
 
-async def save_listening_items(items: List[Dict]) -> int:
+
+async def save_listening_items(items: list[dict]) -> int:
     client = get_client()
     saved = 0
     for item in items:
         try:
-            existing = client.table('podcasts').select('id').eq(
-                'external_url', item['external_url']
-            ).execute()
+            existing = (
+                client.table("podcasts")
+                .select("id")
+                .eq("external_url", item["external_url"])
+                .execute()
+            )
             if existing.data:
                 continue
-            item['created_at'] = datetime.now(timezone.utc).isoformat()
-            item['user_id'] = None
-            item['easy_words'] = []
-            item['theme_tags'] = []
-            client.table('podcasts').insert(item).execute()
+            item["created_at"] = datetime.now(timezone.utc).isoformat()
+            item["user_id"] = None
+            item["easy_words"] = []
+            item["theme_tags"] = []
+            client.table("podcasts").insert(item).execute()
             saved += 1
         except Exception as e:
             logger.error(f"Error saving item: {e}")
@@ -286,28 +322,29 @@ async def save_listening_items(items: List[Dict]) -> int:
 # Main entry point
 # ============================================================
 
-async def run_listening_ingestion() -> Dict[str, int]:
+
+async def run_listening_ingestion() -> dict[str, int]:
     results = {}
     try:
         bbc_items = await ingest_bbc_learning_english()
-        results['bbc'] = await save_listening_items(bbc_items)
+        results["bbc"] = await save_listening_items(bbc_items)
     except Exception as e:
         logger.error(f"BBC ingestion error: {e}")
-        results['bbc'] = 0
+        results["bbc"] = 0
 
     try:
         dw_items = await ingest_dw_content()
-        results['dw'] = await save_listening_items(dw_items)
+        results["dw"] = await save_listening_items(dw_items)
     except Exception as e:
         logger.error(f"DW ingestion error: {e}")
-        results['dw'] = 0
+        results["dw"] = 0
 
     try:
         te_items = await ingest_test_english()
-        results['test_english'] = await save_listening_items(te_items)
+        results["test_english"] = await save_listening_items(te_items)
     except Exception as e:
         logger.error(f"test-english ingestion error: {e}")
-        results['test_english'] = 0
+        results["test_english"] = 0
 
     total = sum(results.values())
     logger.info(f"[Listening Ingestion] Total saved: {total} items from {results}")

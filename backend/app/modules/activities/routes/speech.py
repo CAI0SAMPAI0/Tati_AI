@@ -1,6 +1,6 @@
 import base64
-import re
 import logging
+import re
 from difflib import SequenceMatcher
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,7 +19,97 @@ class VerifyPronunciationRequest(BaseModel):
     reference_text: str = ""
 
 
-@router.post('/verify-pronunciation')
+def extract_segment_word_scores(trans_data) -> dict[str, float]:
+    """Extract per-word confidence from Whisper segments if available."""
+    scores = {}
+    if not isinstance(trans_data, dict):
+        return scores
+    for seg in trans_data.get("segments", []):
+        if "words" in seg:
+            for word in seg["words"]:
+                w = word.get("word", "").strip()
+                conf = word.get("confidence") or word.get("probability")
+                if w and conf is not None:
+                    scores[w.lower()] = max(scores.get(w.lower(), 0), conf)
+    return scores
+
+
+def word_conf_to_score(conf: float) -> int:
+    """Map confidence value (0-1) to score percentage (0-100)."""
+    if conf >= 0.95:
+        return int(conf * 100)
+    if conf >= 0.8:
+        return int(conf * 100)
+    return int(conf * 100)
+
+
+def compute_local_evaluation(ref_words, transcript_words, word_conf_scores):
+    """Improved local pronunciation evaluation.
+    
+    Uses three signals:
+    1. Exact word match between reference and transcription.
+    2. Sequence-based close-matching for near-miss words.
+    3. Word-level confidence from Whisper (if available).
+    """
+    def clean_word(w):
+        return re.sub(r"[^\w\s]", "", w).lower()
+
+    clean_ref = [clean_word(w) for w in ref_words]
+    clean_trans = [clean_word(w) for w in transcript_words]
+
+    matcher = SequenceMatcher(None, clean_ref, clean_trans)
+
+    words_result = []
+    for word in ref_words:
+        words_result.append({"word": word, "score": 0, "accuracy": "incorrect", "confidence": 0})
+
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "equal":
+            for i in range(i1, i2):
+                w = clean_ref[i]
+                conf = word_conf_scores.get(w, 1.0)
+                s = int(conf * 100)
+                words_result[i]["score"] = s
+                words_result[i]["accuracy"] = "correct" if conf >= 0.7 else "incorrect"
+                words_result[i]["confidence"] = conf
+        elif tag == "replace":
+            for idx_ref in range(i1, i2):
+                best_score = 0
+                best_conf = 0
+                ref_w = clean_ref[idx_ref]
+                for idx_trans in range(j1, j2):
+                    trans_w = clean_trans[idx_trans]
+                    sim = SequenceMatcher(None, ref_w, trans_w).ratio()
+                    conf = word_conf_scores.get(trans_w, sim)
+                    if sim > best_score:
+                        best_score = sim
+                        best_conf = conf
+                # Blended score: 70% char match + 30% confidence
+                s = int((best_score * 0.7 + best_conf * 0.3) * 100)
+                words_result[idx_ref]["score"] = s
+                words_result[idx_ref]["accuracy"] = "correct" if s >= 80 else "incorrect"
+                words_result[idx_ref]["confidence"] = best_conf
+
+    return words_result
+
+
+def get_feedback(score: int, free_speech: bool = False) -> str:
+    if free_speech:
+        if score >= 85:
+            return "Excellent clarity! You spoke very clearly."
+        elif score >= 60:
+            return "Good clarity! Try to enunciate more."
+        else:
+            return "Keep practicing! Focus on speaking more slowly and clearly."
+    if score >= 85:
+        return "Amazing! Your pronunciation is excellent."
+    elif score >= 60:
+        return "Good job! You had a few minor slips, but you are very clear."
+    else:
+        return "Keep practicing! Listen to Tati and try repeating again."
+
+
+@router.post("/verify-pronunciation")
 async def verify_pronunciation(
     req: VerifyPronunciationRequest,
     user=Depends(get_current_user),
@@ -28,8 +118,7 @@ async def verify_pronunciation(
         audio_bytes = base64.b64decode(req.audio)
     except Exception:
         raise HTTPException(
-            status_code=400,
-            detail="Invalid audio format (base64 expected)"
+            status_code=400, detail="Invalid audio format (base64 expected)"
         )
 
     audio_size_kb = len(audio_bytes) / 1024
@@ -37,199 +126,118 @@ async def verify_pronunciation(
     if audio_size_kb < 5:
         raise HTTPException(
             status_code=400,
-            detail="Audio too short or empty. Please record for at least 2 seconds."
+            detail="Audio too short or empty. Please record for at least 2 seconds.",
         )
 
-    ref_clean = (req.reference_text or "").strip()
+    ref_raw = (req.reference_text or "").strip()
+    is_free_speech = not ref_raw
 
-    # Free speech mode: just transcribe and return
-    if not ref_clean:
-        trans_data = await transcribe_audio_verbose(
-            audio_bytes,
-            filename='temp.wav',
-            prompt=""
-        )
-        transcription = trans_data.get("text", "") if isinstance(trans_data, dict) else ""
-        return {
-            "score": 0,
-            "transcription": transcription,
-            "words": [],
-            "feedback": "Free speech mode — only transcription, no scoring.",
-            "metadata": {
-                "segments": trans_data.get("segments", []),
-                "language": trans_data.get("language"),
-                "duration": trans_data.get("duration")
-            },
-            "phonetic": {}
-        }
-
-    # 0. Try Azure Speech Pronunciation Assessment if configured
-    from app.shared.services.azure_speech_service import azure_speech_service
-    if azure_speech_service.is_configured:
-        azure_res = azure_speech_service.evaluate_pronunciation(audio_bytes, ref_clean)
-        if "error" not in azure_res:
-            score = azure_res["score"]
-            if score >= 85:
-                feedback = "Amazing! Your pronunciation is excellent."
-            elif score >= 60:
-                feedback = "Good job! You had a few minor slips, but you are very clear."
-            else:
-                feedback = "Keep practicing! Listen to Tati's audio and try repeating again."
-
-            return {
-                "score": score,
-                "transcription": ref_clean,
-                "words": azure_res["words"],
-                "feedback": feedback,
-                "metadata": {
-                    "accuracy_score": azure_res["accuracy_score"],
-                    "fluency_score": azure_res["fluency_score"],
-                    "completeness_score": azure_res["completeness_score"]
-                },
-                "phonetic": {
-                    "provider": "azure",
-                    "raw_result": azure_res["raw_json"]
-                }
-            }
-        else:
-            logger.warning(f"Azure Speech evaluation error (falling back to Gemini/local): {azure_res.get('error')}")
-
-    # 0.1 Try Gemini Speech Pronunciation Assessment if configured
-    from app.shared.services.gemini_speech_service import gemini_speech_service
-    if gemini_speech_service.is_configured:
-        gemini_res = await gemini_speech_service.evaluate_pronunciation(audio_bytes, ref_clean)
-        if "error" not in gemini_res:
-            score = gemini_res.get("score", 0)
-            feedback = gemini_res.get("feedback", "")
-            if not feedback:
-                if score >= 85:
-                    feedback = "Amazing! Your pronunciation is excellent."
-                elif score >= 60:
-                    feedback = "Good job! You had a few minor slips, but you are very clear."
-                else:
-                    feedback = "Keep practicing! Listen to Tati's audio and try repeating again."
-
-            return {
-                "score": score,
-                "transcription": ref_clean,
-                "words": gemini_res.get("words", []),
-                "feedback": feedback,
-                "metadata": {
-                    "accuracy_score": gemini_res.get("accuracy_score", score),
-                    "fluency_score": gemini_res.get("fluency_score", score),
-                    "completeness_score": gemini_res.get("completeness_score", score)
-                },
-                "phonetic": {
-                    "provider": "gemini",
-                    "raw_result": gemini_res
-                }
-            }
-        else:
-            logger.warning(f"Gemini Speech evaluation error (falling back to local): {gemini_res.get('error')}")
-
+    # Step 1: Always transcribe
+    prompt = "" if is_free_speech else f"The target phrase is: {ref_raw}"
     trans_data = await transcribe_audio_verbose(
-        audio_bytes,
-        filename='temp.wav',
-        prompt=f"The target phrase is: {ref_clean}"
+        audio_bytes, filename="temp.wav", prompt=prompt
     )
 
     transcription = trans_data.get("text", "") if isinstance(trans_data, dict) else ""
-    
-    # Detect Whisper returning the prompt as transcription (happens with bad audio)
+
     prompt_texts = [
         "Transcribe the speech verbatim",
         "Do not normalize or correct",
-        "transcribe their English words accurately"
+        "transcribe their English words accurately",
     ]
     if any(pt in transcription for pt in prompt_texts):
-        logger.warning(f"Whisper returned prompt text as transcription: {transcription[:100]}")
+        logger.warning(
+            f"Whisper returned prompt text as transcription: {transcription[:100]}"
+        )
         transcription = ""
-    
+
     if not transcription or transcription.startswith("[Erro"):
-        words_result = []
-        for word in ref_clean.split():
-            words_result.append({
-                "word": word,
-                "score": 0,
-                "accuracy": "incorrect"
-            })
+        words_result = [{"word": w, "score": 0, "accuracy": "incorrect"} for w in ref_raw.split()] if ref_raw else []
         return {
             "score": 0,
             "transcription": "",
             "words": words_result,
-            "metadata": {}
+            "feedback": get_feedback(0, is_free_speech),
+            "metadata": {
+                "segments": trans_data.get("segments", []),
+                "language": trans_data.get("language"),
+                "duration": trans_data.get("duration"),
+                "free_speech": is_free_speech,
+            },
         }
 
-    ref_words = ref_clean.split()
+    # Determine the actual reference text we will evaluate against
+    # For free speech, the transcription itself becomes the reference
+    actual_ref = ref_raw if ref_raw else transcription
 
-    def clean_word(w):
-        return re.sub(r'[^\w\s]', '', w).lower()
+    # Step 2: Try Azure (only if reference available)
+    if actual_ref:
+        from app.shared.services.azure_speech_service import azure_speech_service
 
-    clean_ref = [clean_word(w) for w in ref_words]
-    clean_trans = [clean_word(w) for w in transcription.split()]
+        if azure_speech_service.is_configured:
+            azure_res = azure_speech_service.evaluate_pronunciation(audio_bytes, actual_ref)
+            if "error" not in azure_res:
+                score = azure_res["score"]
+                return {
+                    "score": score,
+                    "transcription": actual_ref if not is_free_speech else transcription,
+                    "words": azure_res["words"],
+                    "feedback": get_feedback(score, is_free_speech),
+                    "metadata": {
+                        "accuracy_score": azure_res["accuracy_score"],
+                        "fluency_score": azure_res["fluency_score"],
+                        "completeness_score": azure_res["completeness_score"],
+                        "free_speech": is_free_speech,
+                    },
+                    "phonetic": {"provider": "azure", "raw_result": azure_res["raw_json"]},
+                }
+            logger.warning(f"Azure Speech error (fallback): {azure_res.get('error')}")
 
-    matcher = SequenceMatcher(None, clean_ref, clean_trans)
+    # Step 3: Try Gemini (only if reference availabe)
+    if actual_ref:
+        from app.shared.services.gemini_speech_service import gemini_speech_service
 
-    words_result = []
-    for word in ref_words:
-        words_result.append({
-            "word": word,
-            "score": 0,
-            "accuracy": "incorrect"
-        })
+        if gemini_speech_service.is_configured:
+            gemini_res = await gemini_speech_service.evaluate_pronunciation(
+                audio_bytes, actual_ref
+            )
+            if "error" not in gemini_res:
+                score = gemini_res.get("score", 0)
+                feedback = gemini_res.get("feedback", "") or get_feedback(score, is_free_speech)
+                return {
+                    "score": score,
+                    "transcription": actual_ref if not is_free_speech else transcription,
+                    "words": gemini_res.get("words", []),
+                    "feedback": feedback,
+                    "metadata": {
+                        "accuracy_score": gemini_res.get("accuracy_score", score),
+                        "fluency_score": gemini_res.get("fluency_score", score),
+                        "completeness_score": gemini_res.get("completeness_score", score),
+                        "free_speech": is_free_speech,
+                    },
+                    "phonetic": {"provider": "gemini", "raw_result": gemini_res},
+                }
+            logger.warning(f"Gemini Speech error (fallback): {gemini_res.get('error')}")
 
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag == 'equal':
-            for i in range(i1, i2):
-                words_result[i]["score"] = 100
-                words_result[i]["accuracy"] = "correct"
-        elif tag == 'replace':
-            for idx_ref in range(i1, i2):
-                best_score = 0
-                ref_w = clean_ref[idx_ref]
-                for idx_trans in range(j1, j2):
-                    trans_w = clean_trans[idx_trans]
-                    sim = SequenceMatcher(None, ref_w, trans_w).ratio()
-                    if sim > best_score:
-                        best_score = sim
-
-                score = int(best_score * 100)
-                # Stricter threshold to detect pronunciation mistakes (90% instead of 75%)
-                if score >= 90:
-                    words_result[idx_ref]["score"] = score
-                    words_result[idx_ref]["accuracy"] = "correct"
-                else:
-                    words_result[idx_ref]["score"] = score
-                    words_result[idx_ref]["accuracy"] = "incorrect"
+    # Step 4: Local evaluation
+    word_conf_scores = extract_segment_word_scores(trans_data)
+    ref_words = actual_ref.split()
+    trans_words = transcription.split()
+    words_result = compute_local_evaluation(ref_words, trans_words, word_conf_scores)
 
     correct_count = sum(1 for w in words_result if w["accuracy"] == "correct")
     total_words = len(words_result)
     overall_score = int((correct_count / total_words) * 100) if total_words > 0 else 0
 
-    if overall_score >= 85:
-        feedback = "Amazing! Your pronunciation is excellent."
-    elif overall_score >= 60:
-        feedback = "Good job! You had a few minor slips, but you are very clear."
-    else:
-        feedback = "Keep practicing! Listen to Tati's audio and try repeating again."
-
-    # Local phonetic evaluation using Wav2Vec2 and g2p-en
-    phonetic_res = {}
-    try:
-        from app.shared.services.phonetic_service import phonetic_service
-        phonetic_res = phonetic_service.evaluate_pronunciation(audio_bytes, ref_clean)
-    except Exception as pe:
-        logger.error(f"Error running local phonetic evaluation: {pe}")
-
     return {
         "score": overall_score,
         "transcription": transcription,
         "words": words_result,
-        "feedback": feedback,
+        "feedback": get_feedback(overall_score, is_free_speech),
         "metadata": {
             "segments": trans_data.get("segments", []),
             "language": trans_data.get("language"),
-            "duration": trans_data.get("duration")
+            "duration": trans_data.get("duration"),
+            "free_speech": is_free_speech,
         },
-        "phonetic": phonetic_res
     }

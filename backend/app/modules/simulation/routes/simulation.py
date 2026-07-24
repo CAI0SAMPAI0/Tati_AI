@@ -5,19 +5,17 @@ Refatorado para usar SimulationService e padrão async.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-from typing import List, Dict
-
 from app.core.dependencies.auth import get_current_user
 from app.modules.simulation.services.simulation_service import SimulationService
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 
 router = APIRouter()
 
 
 class SimMessageRequest(BaseModel):
     content: str
-    conversation_id: str = ''
+    conversation_id: str = ""
     scenario: str
 
 
@@ -30,42 +28,44 @@ class SimAudioRequest(BaseModel):
 
 
 class SimEvaluateRequest(BaseModel):
-    messages: List[Dict]
+    messages: list[dict]
 
 
-@router.get('/simulation/scenarios')
+@router.get("/simulation/scenarios")
 async def list_scenarios(
     level: str | None = None,
     user: dict = Depends(get_current_user),
-    service: SimulationService = Depends()
+    service: SimulationService = Depends(),
 ) -> list:
     """Lista todos os cenários disponíveis, opcionalmente filtrados por nível."""
-    effective_level = level or user.get('level')
+    effective_level = level or user.get("level")
     return await service.list_scenarios(effective_level)
 
 
-@router.get('/simulation/scenarios/{scenario_id}')
+@router.get("/simulation/scenarios/{scenario_id}")
 async def get_scenario_details(
     scenario_id: str, service: SimulationService = Depends()
 ) -> dict:
     """Retorna detalhes de um cenário."""
     scenario = await service.get_scenario_details(scenario_id)
     if not scenario:
-        return {'error': 'Scenario not found'}
+        return {"error": "Scenario not found"}
     return scenario
 
 
-@router.post('/simulation/start')
+@router.post("/simulation/start")
 async def start_simulation(
     body: SimStartRequest,
     current_user: dict = Depends(get_current_user),
     service: SimulationService = Depends(),
 ) -> dict:
     """Inicia uma nova sessão de simulação."""
-    return await service.start_session(current_user['username'], body.scenario_id, current_user.get('level', 'A1'))
+    return await service.start_session(
+        current_user["username"], body.scenario_id, current_user.get("level", "A1")
+    )
 
 
-@router.post('/simulation/transcribe')
+@router.post("/simulation/transcribe")
 async def transcribe_simulation_audio(
     body: SimAudioRequest,
     current_user: dict = Depends(get_current_user),
@@ -73,10 +73,10 @@ async def transcribe_simulation_audio(
 ) -> dict:
     """Transcreve áudio enviado na simulação."""
     text = await service.transcribe_audio(body.audio, current_user)
-    return {'text': text}
+    return {"text": text}
 
 
-@router.post('/simulation/message')
+@router.post("/simulation/message")
 async def send_simulation_message(
     body: SimMessageRequest,
     current_user: dict = Depends(get_current_user),
@@ -84,25 +84,28 @@ async def send_simulation_message(
 ) -> dict:
     """Envia mensagem para simulação e recebe resposta da IA."""
     return await service.process_message(
-        current_user['username'], body.content, body.scenario, body.conversation_id, current_user.get(
-            'level', 'A1')
+        current_user["username"],
+        body.content,
+        body.scenario,
+        body.conversation_id,
+        current_user.get("level", "A1"),
     )
 
 
-@router.post('/simulation/evaluate')
+@router.post("/simulation/evaluate")
 async def evaluate(
     body: SimEvaluateRequest,
     current_user: dict = Depends(get_current_user),
     service: SimulationService = Depends(),
 ) -> dict:
     """Avalia performance na simulação."""
-    return await service.evaluate(body.messages, current_user['username'])
+    return await service.evaluate(body.messages, current_user["username"])
 
 
 # ── Progresso de simulações ───────────────────────────────────────────
 
 
-@router.get('/simulation/progress')
+@router.get("/simulation/progress")
 async def get_simulation_progress(
     current_user: dict = Depends(get_current_user),
 ) -> dict:
@@ -110,24 +113,24 @@ async def get_simulation_progress(
     from app.core.database import get_client
     from fastapi.concurrency import run_in_threadpool
 
-    username = current_user['username']
+    username = current_user["username"]
 
     def _fetch() -> list:
         db = get_client()
         try:
             rows = (
-                db.table('activity_submissions')
-                .select('metadata')
-                .eq('username', username)
-                .eq('activity_type', 'simulation')
+                db.table("activity_submissions")
+                .select("metadata")
+                .eq("username", username)
+                .eq("activity_type", "simulation")
                 .execute()
                 .data
                 or []
             )
             completed = []
             for r in rows:
-                meta = r.get('metadata') or {}
-                sid = meta.get('simulation_id') or meta.get('item_id')
+                meta = r.get("metadata") or {}
+                sid = meta.get("simulation_id") or meta.get("item_id")
                 if sid:
                     completed.append(str(sid))
             return completed
@@ -135,40 +138,42 @@ async def get_simulation_progress(
             return []
 
     completed = await run_in_threadpool(_fetch)
-    return {'completed': completed}
+    return {"completed": completed}
 
 
-@router.post('/simulation/complete/{scenario_id}')
+@router.post("/simulation/complete/{scenario_id}")
 async def mark_simulation_complete(
     scenario_id: str,
     current_user: dict = Depends(get_current_user),
 ) -> dict:
     """Marca um cenário de simulação como concluído pelo usuário."""
-    from app.core.database import get_client
-    from fastapi.concurrency import run_in_threadpool
     from datetime import datetime, timezone
 
-    username = current_user['username']
+    from app.core.database import get_client
+    from fastapi.concurrency import run_in_threadpool
+
+    username = current_user["username"]
 
     def _save() -> None:
         db = get_client()
         try:
             payload = {
-                'username': username,
-                'activity_type': 'simulation',
-                'module_id': None,
-                'score': 100,
-                'metadata': {
-                    'simulation_id': scenario_id,
-                    'item_id': scenario_id,
-                    'completed_at': datetime.now(timezone.utc).isoformat()
+                "username": username,
+                "activity_type": "simulation",
+                "module_id": None,
+                "score": 100,
+                "metadata": {
+                    "simulation_id": scenario_id,
+                    "item_id": scenario_id,
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
                 },
-                'created_at': datetime.now(timezone.utc).isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat(),
             }
-            db.table('activity_submissions').insert(payload).execute()
+            db.table("activity_submissions").insert(payload).execute()
         except Exception as exc:
             import logging
-            logging.info(f'[Simulation] Erro ao salvar conclusão: {exc}')
+
+            logging.info(f"[Simulation] Erro ao salvar conclusão: {exc}")
 
     await run_in_threadpool(_save)
-    return {'success': True, 'scenario_id': scenario_id}
+    return {"success": True, "scenario_id": scenario_id}

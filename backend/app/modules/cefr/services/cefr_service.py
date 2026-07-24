@@ -1,8 +1,9 @@
 import logging
 import re
-from typing import Dict, Any, Optional
-from .file_extractor import FileExtractorService
+from typing import Any
+
 from .embeddings import EmbeddingsService
+from .file_extractor import FileExtractorService
 
 
 class CEFRService:
@@ -12,7 +13,7 @@ class CEFRService:
         Classifies the CEFR level (A1, A2, B1, B2, C1, C2) of a text using LLM.
         """
         if not text or not text.strip():
-            return 'A1'
+            return "A1"
 
         words = text.split()
         sample = " ".join(words[:1500])
@@ -41,27 +42,28 @@ class CEFRService:
         """
         try:
             from app.modules.chat.services.llm import groq_chat_json
+
             data = await groq_chat_json(
-                messages=[{'role': 'user', 'content': prompt}],
+                messages=[{"role": "user", "content": prompt}],
                 max_tokens=200,
                 temperature=0.1,
-                model='llama-3.1-8b-instant'
+                model="llama-3.1-8b-instant",
             )
-            level = data.get('cefr_level', 'A1').upper().strip()
-            if level in ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']:
+            level = data.get("cefr_level", "A1").upper().strip()
+            if level in ["A1", "A2", "B1", "B2", "C1", "C2"]:
                 return level
-            return 'A1'
+            return "A1"
         except Exception as e:
             logging.error(f"[CEFR Classifier] Error classifying text: {e}")
-            return 'A1'
+            return "A1"
 
     @staticmethod
     async def process_and_index_file(
         bucket_name: str,
         file_path: str,
         file_type: str,
-        level: Optional[str] = None,
-        metadata: Dict[str, Any] = None
+        level: str | None = None,
+        metadata: dict[str, Any] = None,
     ) -> tuple[int, str]:
         """
         Orchestrates the full pipeline:
@@ -86,11 +88,13 @@ class CEFRService:
         if not final_level:
             # Try to extract from the filename
             filename = metadata.get("original_name", "") if metadata else file_path
-            match = re.search(r'(?i)\b(a1|a2|b1|b2|c1|c2)\b', filename)
+            match = re.search(r"(?i)\b(a1|a2|b1|b2|c1|c2)\b", filename)
             if match:
                 final_level = match.group(1).upper()
             else:
-                match = re.search(r'(?i)(?:^|[_.\-\s])(a1|a2|b1|b2|c1|c2)(?:$|[_.\-\s])', filename)
+                match = re.search(
+                    r"(?i)(?:^|[_.\-\s])(a1|a2|b1|b2|c1|c2)(?:$|[_.\-\s])", filename
+                )
                 if match:
                     final_level = match.group(1).upper()
 
@@ -100,7 +104,9 @@ class CEFRService:
 
         # 3. Text chunking
         chunks = FileExtractorService.chunk_text(text)
-        logging.info(f"[{final_level}] File {file_path} extracted and divided into {len(chunks)} chunks.")
+        logging.info(
+            f"[{final_level}] File {file_path} extracted and divided into {len(chunks)} chunks."
+        )
 
         if not chunks:
             logging.info(f"[{final_level}] No text extracted from file {file_path}.")
@@ -111,8 +117,10 @@ class CEFRService:
             chunks=chunks,
             level=final_level,
             source_file=file_path,
-            file_metadata=metadata
+            file_metadata=metadata,
         )
 
-        logging.info(f"[{final_level}] Processing complete. {saved_count} chunks indexed in the database.")
+        logging.info(
+            f"[{final_level}] Processing complete. {saved_count} chunks indexed in the database."
+        )
         return saved_count, final_level

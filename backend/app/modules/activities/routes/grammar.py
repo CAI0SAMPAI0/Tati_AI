@@ -12,18 +12,20 @@ GET /grammar (no params) -> topic index.
 POST /grammar/cache-clear
   Clear all grammar cache entries (admin use).
 """
-from fastapi import APIRouter, Depends, Query
 
 from app.core.dependencies.auth import get_current_user
 from app.modules.activities.services.grammar_service import grammar_service
 from app.shared.services.upstash import cache_delete
+from fastapi import APIRouter, Depends, Query
 
 router = APIRouter()
 
 
 @router.get("")
 async def get_grammar(
-    topic: str | None = Query(default=None, description="Grammar topic (e.g. past_simple)"),
+    topic: str | None = Query(
+        default=None, description="Grammar topic (e.g. past_simple)"
+    ),
     level: str | None = Query(default=None, description="CEFR level (A1..C2)"),
     current_user: dict = Depends(get_current_user),
 ):

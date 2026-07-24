@@ -1,9 +1,10 @@
-import logging
-from fastapi.concurrency import run_in_threadpool
 import asyncio
+import logging
 from datetime import datetime, timezone
-from fastapi import HTTPException
+
 from app.core.database import get_client
+from fastapi import HTTPException
+from fastapi.concurrency import run_in_threadpool
 
 # Simple in-memory cache for conversation summaries
 SUMMARY_CACHE: dict[str, dict] = {}
@@ -16,8 +17,7 @@ def _now() -> str:
 
 def _make_conv_id(username: str) -> str:
     """Gera id no mesmo padrão do banco: YYYYMMDD_HHMMSS."""
-    return datetime.now(timezone.utc).strftime(
-        '%Y%m%d_%H%M%S') + f'_{username[:6]}'
+    return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S") + f"_{username[:6]}"
 
 
 # ─── Conversations ────────────────────────────────────────────────────
@@ -25,40 +25,40 @@ def _make_conv_id(username: str) -> str:
 
 async def create_conversation(
     username: str,
-    title: str = 'Nova conversa',
-    model: str = 'groq',
+    title: str = "Nova conversa",
+    model: str = "groq",
     is_simulation: bool = False,
     simulation_id: str | None = None,
 ) -> dict:
     db = get_client()
     new_id = _make_conv_id(username)
     data = {
-        'id': new_id,
-        'username': username,
-        'title': title,
-        'model': model,
-        'is_simulation': is_simulation,
-        'created_at': _now(),
-        'updated_at': _now(),
+        "id": new_id,
+        "username": username,
+        "title": title,
+        "model": model,
+        "is_simulation": is_simulation,
+        "created_at": _now(),
+        "updated_at": _now(),
     }
 
     try:
         # Tenta inserir com simulation_id se disponível
         payload = {**data}
         if simulation_id:
-            payload['simulation_id'] = simulation_id
+            payload["simulation_id"] = simulation_id
 
-        result = db.table('conversations').insert(payload).execute()
+        result = db.table("conversations").insert(payload).execute()
     except Exception as e:
         err_msg = str(e).lower()
-        if 'simulation_id' in err_msg or 'column' in err_msg:
+        if "simulation_id" in err_msg or "column" in err_msg:
             logging.info(
-                f"[History] Coluna simulation_id falhou ou não existe. Tentando fallback...")
+                "[History] Coluna simulation_id falhou ou não existe. Tentando fallback..."
+            )
             # Fallback: remove simulation_id e tenta de novo
-            result = db.table('conversations').insert(data).execute()
+            result = db.table("conversations").insert(data).execute()
         else:
-            logging.info(
-                f"[History] Erro inesperado ao criar conversa: {e}")
+            logging.info(f"[History] Erro inesperado ao criar conversa: {e}")
             raise e
 
     conv = result.data[0]
@@ -67,66 +67,83 @@ async def create_conversation(
     if is_simulation and simulation_id:
         try:
             logging.info(f"[History] Injetando saudação para {new_id}")
-            sim_data = db.table('simulations').select('greeting, system_prompt').eq(
-                'id', simulation_id).limit(1).execute().data
+            sim_data = (
+                db.table("simulations")
+                .select("greeting, system_prompt")
+                .eq("id", simulation_id)
+                .limit(1)
+                .execute()
+                .data
+            )
 
             greeting = None
             if sim_data:
-                greeting = sim_data[0].get('greeting')
-                if not greeting and sim_data[0].get('system_prompt'):
+                greeting = sim_data[0].get("greeting")
+                if not greeting and sim_data[0].get("system_prompt"):
                     from app.modules.chat.services.llm import groq_chat
+
                     prompt = [
-                        {'role': 'system',
-                            'content': f"You are a character in this scenario: {sim_data[0]['system_prompt']}"},
-                        {'role': 'user',
-                            'content': "Generate a very short greeting (max 10 words) to start the conversation. English only."}
+                        {
+                            "role": "system",
+                            "content": f"You are a character in this scenario: {sim_data[0]['system_prompt']}",
+                        },
+                        {
+                            "role": "user",
+                            "content": "Generate a very short greeting (max 10 words) to start the conversation. English only.",
+                        },
                     ]
                     greeting = await groq_chat(prompt, max_tokens=30)
 
             if greeting:
                 from app.modules.chat.services.llm import text_to_speech
+
                 audio_b64 = await text_to_speech(greeting)
-                await save_message(new_id, username, 'assistant', greeting, audio_b64=audio_b64)
-                logging.info(
-                    f"[History] Saudação injetada com sucesso.")
+                await save_message(
+                    new_id, username, "assistant", greeting, audio_b64=audio_b64
+                )
+                logging.info("[History] Saudação injetada com sucesso.")
         except Exception as e:
             logging.info(f"[History] Erro ao injetar saudação: {e}")
 
     return conv
 
 
-async def list_conversations(username: str, limit: int = 20, offset: int = 0) -> list[dict]:
+async def list_conversations(
+    username: str, limit: int = 20, offset: int = 0
+) -> list[dict]:
     db = get_client()
 
     def _fetch():
         try:
             # Query principal: filtra conversas normais (não simulações)
             return (
-                db.table('conversations')
-                .select('id, title, model, created_at, updated_at')
-                .eq('username', username)
-                .eq('is_simulation', False)
-                .order('updated_at', desc=True)
+                db.table("conversations")
+                .select("id, title, model, created_at, updated_at")
+                .eq("username", username)
+                .eq("is_simulation", False)
+                .order("updated_at", desc=True)
                 .range(offset, offset + limit - 1)
                 .execute()
             )
         except Exception as e:
             err_msg = str(e).lower()
-            if 'is_simulation' in err_msg or 'column' in err_msg:
+            if "is_simulation" in err_msg or "column" in err_msg:
                 logging.info(
-                    "[History] Coluna is_simulation ausente ou falha. Usando fallback sem filtro de simulação.")
+                    "[History] Coluna is_simulation ausente ou falha. Usando fallback sem filtro de simulação."
+                )
                 try:
                     return (
-                        db.table('conversations')
-                        .select('id, title, model, created_at, updated_at')
-                        .eq('username', username)
-                        .order('updated_at', desc=True)
+                        db.table("conversations")
+                        .select("id, title, model, created_at, updated_at")
+                        .eq("username", username)
+                        .order("updated_at", desc=True)
                         .range(offset, offset + limit - 1)
                         .execute()
                     )
                 except Exception as fallback_err:
                     logging.info(
-                        f"[History] Fallback de list_conversations falhou: {fallback_err}")
+                        f"[History] Fallback de list_conversations falhou: {fallback_err}"
+                    )
                     return None
             logging.info(f"[History] Erro ao listar conversas: {e}")
             return None
@@ -139,22 +156,19 @@ async def list_conversations(username: str, limit: int = 20, offset: int = 0) ->
         return []
 
 
-async def delete_conversation(
-        conversation_id: str,
-        username: str) -> bool:
+async def delete_conversation(conversation_id: str, username: str) -> bool:
     db = get_client()
     # Tenta deletar mensagens primeiro
     try:
-        db.table('messages').delete().eq(
-            'session_id', conversation_id).execute()
+        db.table("messages").delete().eq("session_id", conversation_id).execute()
     except Exception:
         pass
 
     result = (
-        db.table('conversations')
+        db.table("conversations")
         .delete()
-        .eq('id', conversation_id)
-        .eq('username', username)
+        .eq("id", conversation_id)
+        .eq("username", username)
         .execute()
     )
     return len(result.data) > 0
@@ -165,10 +179,10 @@ async def rename_conversation(
 ) -> dict | None:
     db = get_client()
     result = (
-        db.table('conversations')
-        .update({'title': new_title, 'updated_at': _now()})
-        .eq('id', conversation_id)
-        .eq('username', username)
+        db.table("conversations")
+        .update({"title": new_title, "updated_at": _now()})
+        .eq("id", conversation_id)
+        .eq("username", username)
         .execute()
     )
     return result.data[0] if result.data else None
@@ -181,26 +195,31 @@ async def _execute_db(func, retries=3):
             return await run_in_threadpool(func)
         except Exception as e:
             err_str = str(e).lower()
-            if ('disconnected' in err_str or 'connection' in err_str or 'protocol' in err_str) and attempt < retries - 1:
-                logging.info(
-                    f'[History DB] Connection issue, retrying ({
-                        attempt + 1}/{retries})...')
+            if (
+                "disconnected" in err_str
+                or "connection" in err_str
+                or "protocol" in err_str
+            ) and attempt < retries - 1:
+                logging.info(f"[History DB] Connection issue, retrying ({
+                        attempt + 1}/{retries})...")
                 await asyncio.sleep(0.5 * (attempt + 1))
                 continue
             raise e
+
 
 # ─── Messages ─────────────────────────────────────────────────────────
 
 
 async def load_history(conversation_id: str) -> list[dict]:
     """Carrega o histórico completo das mensagens para o frontend."""
+
     def _fetch():
         db = get_client()
         return (
-            db.table('messages')
-            .select('id, role, content, audio_b64, created_at')
-            .eq('session_id', conversation_id)
-            .order('created_at', desc=True)
+            db.table("messages")
+            .select("id, role, content, audio_b64, created_at")
+            .eq("session_id", conversation_id)
+            .order("created_at", desc=True)
             .limit(100)
             .execute()
         )
@@ -212,35 +231,46 @@ async def load_history(conversation_id: str) -> list[dict]:
 
         # Regenera PDFs sob demanda se a mensagem contiver a tag de PDF
         for msg in messages:
-            content = msg.get('content') or ''
-            if msg.get('role') == 'assistant' and '[GENERATE_PDF:' in content:
+            content = msg.get("content") or ""
+            if msg.get("role") == "assistant" and "[GENERATE_PDF:" in content:
                 try:
                     import base64
                     import os
-                    from app.shared.services.pdf_generator import generate_report_pdf, extract_pdf_and_clean
+
+                    from app.shared.services.pdf_generator import (
+                        extract_pdf_and_clean,
+                        generate_report_pdf,
+                    )
 
                     # Usa o extrator robusto para limpar qualquer sujeira de JSON
                     pre_tag, pdf_filename, pdf_content = extract_pdf_and_clean(content)
                     if pdf_filename:
                         # Se o arquivo já existe no temp, apenas usa, senão gera
                         import tempfile
+
                         pdf_path = os.path.join(tempfile.gettempdir(), pdf_filename)
                         if not os.path.exists(pdf_path):
-                            pdf_path = generate_report_pdf(pdf_content, filename=pdf_filename)
+                            pdf_path = generate_report_pdf(
+                                pdf_content, filename=pdf_filename
+                            )
 
                         if os.path.exists(pdf_path):
-                            with open(pdf_path, 'rb') as f:
-                                pdf_b64 = base64.b64encode(f.read()).decode('utf-8')
-                            msg['pdf_b64'] = pdf_b64
-                            msg['pdf_filename'] = pdf_filename
+                            with open(pdf_path, "rb") as f:
+                                pdf_b64 = base64.b64encode(f.read()).decode("utf-8")
+                            msg["pdf_b64"] = pdf_b64
+                            msg["pdf_filename"] = pdf_filename
                             # Mostra apenas o pre-tag de introdução ou um texto padrão na bolha
-                            msg['content'] = pre_tag or '📄 Document created successfully!'
+                            msg["content"] = (
+                                pre_tag or "📄 Document created successfully!"
+                            )
                 except Exception as ex:
-                    logging.info(f"[History Load] Falha ao processar/regenerar PDF: {ex}")
+                    logging.info(
+                        f"[History Load] Falha ao processar/regenerar PDF: {ex}"
+                    )
 
         return messages
     except Exception as e:
-        logging.info(f'ERROR [load_history]: {e}')
+        logging.info(f"ERROR [load_history]: {e}")
         return []
 
 
@@ -251,16 +281,17 @@ async def get_summary(conversation_id: str) -> dict:
 
     try:
         from app.modules.chat.services.llm import groq_chat
+
         history = await load_llm_history(conversation_id)
         prompt = f"Summarize this conversation: {history}"
-        res = await groq_chat([{'role': 'user', 'content': prompt}])
-        summary_result = {'summary': res}
+        res = await groq_chat([{"role": "user", "content": prompt}])
+        summary_result = {"summary": res}
         # Store in cache
         SUMMARY_CACHE[conversation_id] = summary_result
         return summary_result
     except Exception as e:
         logging.info(f"Error in summary: {e}")
-        raise HTTPException(500, 'Erro ao gerar resumo')
+        raise HTTPException(500, "Erro ao gerar resumo")
 
 
 async def load_llm_history(conversation_id: str) -> list[dict]:
@@ -279,50 +310,46 @@ async def load_llm_history(conversation_id: str) -> list[dict]:
 
     history = []
     for msg in messages:
-        content = msg.get('content') or ''
+        content = msg.get("content") or ""
         # Truncar conteúdo muito longo para não estourar o contexto da LLM
         if len(content) > 1500:
-            content = content[:1500] + \
-                '\n\n[Texto truncado devido ao limite de tamanho]'
-        history.append(
-            {'role': msg.get('role', 'user'), 'content': content})
+            content = (
+                content[:1500] + "\n\n[Texto truncado devido ao limite de tamanho]"
+            )
+        history.append({"role": msg.get("role", "user"), "content": content})
 
     return history
 
 
 async def save_message(
-        conversation_id: str,
-        username: str,
-        role: str,
-        content: str,
-        audio_b64: str = None) -> dict:
+    conversation_id: str, username: str, role: str, content: str, audio_b64: str = None
+) -> dict:
     if not conversation_id:
         logging.info(
-            f'WARNING [save_message]: Skipping save as conversation_id is null for user {username}')
+            f"WARNING [save_message]: Skipping save as conversation_id is null for user {username}"
+        )
         return {}
 
     def _save():
         db = get_client()
         now = datetime.now(timezone.utc)
-        clean_content = content.replace(
-            '\x00', '').replace(
-            '\u0000', '')
+        clean_content = content.replace("\x00", "").replace("\u0000", "")
         msg = {
-            'session_id': conversation_id,
-            'username': username,
-            'role': role,
-            'content': clean_content,
-            'date': now.strftime('%Y-%m-%d'),
+            "session_id": conversation_id,
+            "username": username,
+            "role": role,
+            "content": clean_content,
+            "date": now.strftime("%Y-%m-%d"),
         }
 
         if audio_b64:
-            msg['audio_b64'] = audio_b64
+            msg["audio_b64"] = audio_b64
 
-        res = db.table('messages').insert(msg).execute()
+        res = db.table("messages").insert(msg).execute()
 
         # Atualiza updated_at da conversa
-        db.table('conversations').update({'updated_at': _now()}).eq(
-            'id', conversation_id
+        db.table("conversations").update({"updated_at": _now()}).eq(
+            "id", conversation_id
         ).execute()
 
         return res.data[0] if res.data else {}
@@ -330,22 +357,26 @@ async def save_message(
     try:
         return await _execute_db(_save)
     except Exception as e:
-        logging.info(f'ERROR [save_message]: {e}')
+        logging.info(f"ERROR [save_message]: {e}")
         raise e
 
 
 async def update_message(
-    message_id: str | int, username: str, content: str, audio_b64: str = None, conversation_id: str | None = None
+    message_id: str | int,
+    username: str,
+    content: str,
+    audio_b64: str = None,
+    conversation_id: str | None = None,
 ) -> dict | None:
     def _update():
         db = get_client()
-        clean_content = content.replace('\x00', '').replace('\u0000', '')
+        clean_content = content.replace("\x00", "").replace("\u0000", "")
         update_data = {
-            'content': clean_content,
-            'updated_at': _now(),
+            "content": clean_content,
+            "updated_at": _now(),
         }
         if audio_b64:
-            update_data['audio_b64'] = audio_b64
+            update_data["audio_b64"] = audio_b64
 
         try:
             db_id = int(message_id)
@@ -353,27 +384,34 @@ async def update_message(
             db_id = message_id
 
         import logging
-        logging.info(f"[DB Update message debug] message_id={message_id}, db_id={db_id}, username={username}, conversation_id={conversation_id}")
 
-        query = db.table('messages').update(update_data).eq('id', db_id).eq('username', username)
+        logging.info(
+            f"[DB Update message debug] message_id={message_id}, db_id={db_id}, username={username}, conversation_id={conversation_id}"
+        )
+
+        query = (
+            db.table("messages")
+            .update(update_data)
+            .eq("id", db_id)
+            .eq("username", username)
+        )
         if conversation_id:
-            query = query.eq('session_id', conversation_id)
+            query = query.eq("session_id", conversation_id)
         res = query.execute()
         logging.info(f"[DB Update message debug] Query result data: {res.data}")
         return res.data[0] if res.data else None
+
     try:
         return await _execute_db(_update)
     except Exception as e:
         import logging
-        logging.info(f'ERROR [update_message]: {e}')
+
+        logging.info(f"ERROR [update_message]: {e}")
         return None
 
 
-async def auto_title(
-        conversation_id: str,
-        username: str,
-        first_message: str) -> None:
+async def auto_title(conversation_id: str, username: str, first_message: str) -> None:
     title = first_message.strip()[:60]
     if len(first_message.strip()) > 60:
-        title += '…'
+        title += "…"
     await rename_conversation(conversation_id, username, title)

@@ -1,4 +1,5 @@
 import logging
+
 import cloudinary
 import cloudinary.uploader
 from app.core.config import settings
@@ -20,22 +21,22 @@ def upload_profile_image(file_bytes: bytes, username: str) -> str:
     """
     try:
         if not settings.cloudinary_cloud_name:
-            logging.info('[Cloudinary] Configuração ausente!')
-            return ''
+            logging.info("[Cloudinary] Configuração ausente!")
+            return ""
 
         result = cloudinary.uploader.upload(
             file_bytes,
-            public_id=f'tati_ai/profiles/{username}',
+            public_id=f"tati_ai/profiles/{username}",
             overwrite=True,
-            folder='tati_ai/profiles',
+            folder="tati_ai/profiles",
             transformation=[
-                {'width': 400, 'height': 400, 'crop': 'fill', 'gravity': 'face'}
+                {"width": 400, "height": 400, "crop": "fill", "gravity": "face"}
             ],
         )
-        return result.get('secure_url', '')
+        return result.get("secure_url", "")
     except Exception as e:
-        logging.info(f'[Cloudinary] Erro no upload: {e}')
-        return ''
+        logging.info(f"[Cloudinary] Erro no upload: {e}")
+        return ""
 
 
 def upload_audio_to_cloudinary(
@@ -46,31 +47,29 @@ def upload_audio_to_cloudinary(
     """
     try:
         if not settings.cloudinary_cloud_name:
-            logging.info('[Cloudinary] Configuração ausente!')
-            return ''
+            logging.info("[Cloudinary] Configuração ausente!")
+            return ""
 
         result = cloudinary.uploader.upload(
             file_bytes,
-            public_id=f'tati_ai/audio/{conversation_id}/{message_id}',
-            resource_type='video',  # Cloudinary usa 'video' para áudio
-            folder='tati_ai/audio',
+            public_id=f"tati_ai/audio/{conversation_id}/{message_id}",
+            resource_type="video",  # Cloudinary usa 'video' para áudio
+            folder="tati_ai/audio",
             overwrite=True,
         )
-        return result.get('secure_url', '')
+        return result.get("secure_url", "")
     except Exception as e:
-        logging.info(f'[Cloudinary] Erro no upload de áudio: {e}')
-        return ''
+        logging.info(f"[Cloudinary] Erro no upload de áudio: {e}")
+        return ""
 
 
-def upload_image_from_url(
-        url: str,
-        folder: str = 'tati_ai/flashcards') -> str:
+def upload_image_from_url(url: str, folder: str = "tati_ai/flashcards") -> str:
     """
     Faz upload de uma imagem a partir de uma URL para o Cloudinary.
     """
     try:
         if not settings.cloudinary_cloud_name:
-            logging.info('[Cloudinary] Configuração ausente!')
+            logging.info("[Cloudinary] Configuração ausente!")
             return url  # Fallback para a URL original
 
         result = cloudinary.uploader.upload(
@@ -78,34 +77,30 @@ def upload_image_from_url(
             folder=folder,
             overwrite=True,
         )
-        return result.get('secure_url', '')
+        return result.get("secure_url", "")
     except Exception as e:
-        logging.info(f'[Cloudinary] Erro no upload por URL: {e}')
+        logging.info(f"[Cloudinary] Erro no upload por URL: {e}")
         return url
 
 
 def upload_image_file(
-        file_bytes: bytes,
-        filename: str,
-        folder: str = 'tati_ai/flashcards') -> str:
+    file_bytes: bytes, filename: str, folder: str = "tati_ai/flashcards"
+) -> str:
     """
     Faz upload de uma imagem (bytes) para o Cloudinary.
     """
     try:
         if not settings.cloudinary_cloud_name:
-            logging.info('[Cloudinary] Configuração ausente!')
-            return ''
+            logging.info("[Cloudinary] Configuração ausente!")
+            return ""
 
         result = cloudinary.uploader.upload(
-            file_bytes,
-            folder=folder,
-            overwrite=True,
-            resource_type='image'
+            file_bytes, folder=folder, overwrite=True, resource_type="image"
         )
-        return result.get('secure_url', '')
+        return result.get("secure_url", "")
     except Exception as e:
-        logging.info(f'[Cloudinary] Erro no upload de arquivo: {e}')
-        return ''
+        logging.info(f"[Cloudinary] Erro no upload de arquivo: {e}")
+        return ""
 
 
 def upload_raw_file(file_bytes: bytes, filename: str) -> str:
@@ -114,17 +109,16 @@ def upload_raw_file(file_bytes: bytes, filename: str) -> str:
     """
     try:
         if not settings.cloudinary_cloud_name:
-            logging.info('[Cloudinary] Configuração ausente!')
-            return ''
+            logging.info("[Cloudinary] Configuração ausente!")
+            return ""
 
         result = cloudinary.uploader.upload(
             file_bytes,
-            public_id=f'tati_ai/materials/{filename}',
-            resource_type='raw',
+            public_id=f"tati_ai/materials/{filename}",
+            resource_type="raw",
             overwrite=True,
         )
-        return result.get('secure_url', '')
+        return result.get("secure_url", "")
     except Exception as e:
-        logging.info(f'[Cloudinary] Erro no upload de arquivo raw: {e}')
-        return ''
-
+        logging.info(f"[Cloudinary] Erro no upload de arquivo raw: {e}")
+        return ""

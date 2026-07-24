@@ -1,9 +1,9 @@
 import logging
 import random
-from typing import List
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
 from app.core.database import get_client
 from app.modules.cefr.services.generator import CEFRGeneratorService
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # List of everyday topics for autonomous generation
 EVERYDAY_TOPICS = [
@@ -21,7 +21,7 @@ EVERYDAY_TOPICS = [
     "Renting an apartment",
     "Talking about the weather",
     "Planning a trip",
-    "At the bank"
+    "At the bank",
 ]
 
 
@@ -35,7 +35,9 @@ class CEFRScheduler:
         Kept for compatibility if initialized at app startup.
         No longer registers static weekly cron job since it's managed dynamically via Celery Beat.
         """
-        logging.info("[CEFR Scheduler] Initialized. Dynamic scheduling managed via Celery Beat.")
+        logging.info(
+            "[CEFR Scheduler] Initialized. Dynamic scheduling managed via Celery Beat."
+        )
 
     async def check_and_run_schedules(self):
         """
@@ -46,7 +48,12 @@ class CEFRScheduler:
         import zoneinfo
 
         try:
-            res = self.client.table("cefr_schedules").select("*").eq("active", True).execute()
+            res = (
+                self.client.table("cefr_schedules")
+                .select("*")
+                .eq("active", True)
+                .execute()
+            )
             if not res.data:
                 logging.info("[CEFR Scheduler] No active schedules found.")
                 return
@@ -54,11 +61,21 @@ class CEFRScheduler:
             tz = zoneinfo.ZoneInfo("America/Sao_Paulo")
             now = datetime.datetime.now(tz)
 
-            weekday_map = {0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri", 5: "sat", 6: "sun"}
+            weekday_map = {
+                0: "mon",
+                1: "tue",
+                2: "wed",
+                3: "thu",
+                4: "fri",
+                5: "sat",
+                6: "sun",
+            }
             current_weekday = weekday_map[now.weekday()]
             current_hour = now.hour
 
-            logging.info(f"[CEFR Scheduler] Checking {len(res.data)} active schedule(s). Day: {current_weekday}, Hour: {current_hour}")
+            logging.info(
+                f"[CEFR Scheduler] Checking {len(res.data)} active schedule(s). Day: {current_weekday}, Hour: {current_hour}"
+            )
 
             for schedule in res.data:
                 weekdays = schedule.get("weekdays") or []
@@ -79,16 +96,23 @@ class CEFRScheduler:
                         exec_hour = exec_time_val.hour
                         exec_minute = exec_time_val.minute
                 except Exception as parse_err:
-                    logging.error(f"[CEFR Scheduler] Error parsing execution time {exec_time_val}: {parse_err}")
+                    logging.error(
+                        f"[CEFR Scheduler] Error parsing execution time {exec_time_val}: {parse_err}"
+                    )
                     continue
 
                 # Comparação por dia da semana e hora (ignora o minuto exato para funcionar perfeitamente com crons horários)
                 if current_weekday in weekdays and current_hour == exec_hour:
-                    logging.info(f"[CEFR Scheduler] Schedule {schedule['id']} matches current weekday and hour. Running generation...")
+                    logging.info(
+                        f"[CEFR Scheduler] Schedule {schedule['id']} matches current weekday and hour. Running generation..."
+                    )
                     limit = schedule.get("materials_per_execution", 5)
-                    selected_types = schedule.get("selected_types") or ["flashcards", "exercises", "simulations"]
+                    selected_types = schedule.get("selected_types") or [
+                        "flashcards",
+                        "exercises",
+                        "simulations",
+                    ]
                     await self.run_generation_with_limit(limit, selected_types)
-
 
         except Exception as e:
             logging.error(f"[CEFR Scheduler] Error checking schedules: {e}")
@@ -110,13 +134,17 @@ class CEFRScheduler:
             if not rows:
                 return 0
 
-            logging.info(f"[CEFR Scheduler] Backfill: {len(rows)} flashcards sem imagem encontrados.")
+            logging.info(
+                f"[CEFR Scheduler] Backfill: {len(rows)} flashcards sem imagem encontrados."
+            )
             await CEFRGeneratorService.add_images_to_flashcards(rows)
 
             updated = 0
             for row in rows:
                 if row.get("image_url"):
-                    self.client.table("cefr_flashcards").update({"image_url": row["image_url"]}).eq("id", row["id"]).execute()
+                    self.client.table("cefr_flashcards").update(
+                        {"image_url": row["image_url"]}
+                    ).eq("id", row["id"]).execute()
                     updated += 1
             logging.info(f"[CEFR Scheduler] Backfill: {updated} imagens adicionadas.")
             return updated
@@ -124,56 +152,77 @@ class CEFRScheduler:
             logging.error(f"[CEFR Scheduler] Erro no backfill de imagens: {e}")
             return 0
 
-    async def run_generation_with_limit(self, limit: int, selected_types: List[str] = None):
+    async def run_generation_with_limit(
+        self, limit: int, selected_types: list[str] = None
+    ):
         """
         Generates flashcards, exercises, and simulations automatically for each available level, up to the level limit.
         """
         if not selected_types:
             selected_types = ["flashcards", "exercises", "simulations"]
-        
+
         types = [t.lower() for t in selected_types]
-        logging.info(f"[CEFR Scheduler] Starting autonomous generation (level limit: {limit}, types: {types})...")
+        logging.info(
+            f"[CEFR Scheduler] Starting autonomous generation (level limit: {limit}, types: {types})..."
+        )
 
         # Garante que flashcards antigos sem imagem também sejam preenchidos
         await self.backfill_missing_images(max_cards=50)
 
         try:
             # 1. Discover which levels have indexed materials
-            res = self.client.table('cefr_documents').select('level').execute()
+            res = self.client.table("cefr_documents").select("level").execute()
             if not res.data:
-                logging.info("[CEFR Scheduler] No CEFR materials indexed. Aborting generation.")
+                logging.info(
+                    "[CEFR Scheduler] No CEFR materials indexed. Aborting generation."
+                )
                 return
 
             # Extract unique levels (A1, A2, etc)
-            available_levels = list(set([doc['level'] for doc in res.data if doc.get('level')]))
+            available_levels = list(
+                set([doc["level"] for doc in res.data if doc.get("level")])
+            )
             logging.info(f"[CEFR Scheduler] Levels found: {available_levels}")
 
             # Limit levels to process
             selected_levels = available_levels[:limit]
-            logging.info(f"[CEFR Scheduler] Levels selected for this run: {selected_levels}")
+            logging.info(
+                f"[CEFR Scheduler] Levels selected for this run: {selected_levels}"
+            )
 
             for level in selected_levels:
                 # 1. Filter topics that have already been generated for this level to avoid redundancy and excessive generation
                 available_topics = list(EVERYDAY_TOPICS)
                 random.shuffle(available_topics)
-                
+
                 topic = None
                 for t in available_topics:
                     # Check if content has already been generated for this topic and level
-                    exists_res = self.client.table("cefr_flashcards").select("id").eq("level", level).eq("topic", t).limit(1).execute()
+                    exists_res = (
+                        self.client.table("cefr_flashcards")
+                        .select("id")
+                        .eq("level", level)
+                        .eq("topic", t)
+                        .limit(1)
+                        .execute()
+                    )
                     if not exists_res.data:
                         topic = t
                         break
-                
+
                 # If all topics already have content, choose a random one to avoid blocking
                 if not topic:
                     topic = random.choice(EVERYDAY_TOPICS)
 
-                logging.info(f"[CEFR Scheduler] Generating content for {level} on topic '{topic}'...")
+                logging.info(
+                    f"[CEFR Scheduler] Generating content for {level} on topic '{topic}'..."
+                )
 
                 # Generate Flashcards (5)
                 if "flashcards" in types:
-                    flashcards = await CEFRGeneratorService.generate_flashcards(level=level, topic=topic, count=5)
+                    flashcards = await CEFRGeneratorService.generate_flashcards(
+                        level=level, topic=topic, count=5
+                    )
                     if flashcards:
                         # Busca imagens relacionadas à resposta/dica para cada flashcard
                         await CEFRGeneratorService.add_images_to_flashcards(flashcards)
@@ -186,16 +235,24 @@ class CEFRScheduler:
                                 "explanation": card.get("explanation"),
                                 "image_url": card.get("image_url"),
                                 "topic": topic,
-                                "is_published": False
+                                "is_published": False,
                             }
-                            insert_res = self.client.table("cefr_flashcards").insert(data).execute()
+                            insert_res = (
+                                self.client.table("cefr_flashcards")
+                                .insert(data)
+                                .execute()
+                            )
                             if insert_res.data:
                                 saved_cards.extend(insert_res.data)
-                        logging.info(f"[CEFR Scheduler] Saved {len(saved_cards)} flashcards for {level}.")
+                        logging.info(
+                            f"[CEFR Scheduler] Saved {len(saved_cards)} flashcards for {level}."
+                        )
 
                 # Generate Exercises (5)
                 if "exercises" in types:
-                    exercises = await CEFRGeneratorService.generate_exercises(level=level, topic=topic, count=5)
+                    exercises = await CEFRGeneratorService.generate_exercises(
+                        level=level, topic=topic, count=5
+                    )
                     if exercises:
                         saved_exercises = []
                         for ex in exercises:
@@ -207,16 +264,24 @@ class CEFRScheduler:
                                 "correct_index": ex.get("correct_index"),
                                 "explanation": ex.get("explanation"),
                                 "topic": topic,
-                                "is_published": False
+                                "is_published": False,
                             }
-                            insert_res = self.client.table("cefr_exercises").insert(data).execute()
+                            insert_res = (
+                                self.client.table("cefr_exercises")
+                                .insert(data)
+                                .execute()
+                            )
                             if insert_res.data:
                                 saved_exercises.extend(insert_res.data)
-                        logging.info(f"[CEFR Scheduler] Saved {len(saved_exercises)} exercises for {level}.")
+                        logging.info(
+                            f"[CEFR Scheduler] Saved {len(saved_exercises)} exercises for {level}."
+                        )
 
                 # Generate Simulations (1)
                 if "simulations" in types:
-                    simulations = await CEFRGeneratorService.generate_simulations(level=level, topic=topic, count=1)
+                    simulations = await CEFRGeneratorService.generate_simulations(
+                        level=level, topic=topic, count=1
+                    )
                     if simulations:
                         saved_simulations = []
                         for sim in simulations:
@@ -226,20 +291,29 @@ class CEFRScheduler:
                                 "scenario": sim.get("scenario"),
                                 "roles": sim.get("roles"),
                                 "goal": sim.get("goal"),
-                                "is_published": False
+                                "is_published": False,
                             }
-                            insert_res = self.client.table("cefr_simulations").insert(data).execute()
+                            insert_res = (
+                                self.client.table("cefr_simulations")
+                                .insert(data)
+                                .execute()
+                            )
                             if insert_res.data:
                                 saved_simulations.extend(insert_res.data)
-                        logging.info(f"[CEFR Scheduler] Saved {len(saved_simulations)} simulations for {level}.")
+                        logging.info(
+                            f"[CEFR Scheduler] Saved {len(saved_simulations)} simulations for {level}."
+                        )
 
-            logging.info("[CEFR Scheduler] Autonomous generation finished successfully!")
-            
+            logging.info(
+                "[CEFR Scheduler] Autonomous generation finished successfully!"
+            )
+
             # Notifica a Tatiana (little.tathy@gmail.com) por e-mail
             try:
                 from app.shared.services.email import EmailSender
+
                 email_sender = EmailSender()
-                
+
                 email_subject = "✨ New CEFR Materials Generated Automatically"
                 email_html = f"""
                 <div style="font-family: sans-serif; max-width: 600px; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
@@ -265,10 +339,18 @@ class CEFRScheduler:
                     <p>Best regards,<br/><b>Teacher Tati AI System</b></p>
                 </div>
                 """
-                email_sender.send_email(to_email="little.tathy@gmail.com", subject=email_subject, html=email_html)
-                logging.info("[CEFR Scheduler] Sent generation report email to Tatiana.")
+                email_sender.send_email(
+                    to_email="little.tathy@gmail.com",
+                    subject=email_subject,
+                    html=email_html,
+                )
+                logging.info(
+                    "[CEFR Scheduler] Sent generation report email to Tatiana."
+                )
             except Exception as mail_err:
-                logging.error(f"[CEFR Scheduler] Error sending report email to Tatiana: {mail_err}")
+                logging.error(
+                    f"[CEFR Scheduler] Error sending report email to Tatiana: {mail_err}"
+                )
 
         except Exception as e:
             logging.error(f"[CEFR Scheduler] Error during autonomous generation: {e}")
@@ -277,4 +359,6 @@ class CEFRScheduler:
         """
         Kept for compatibility if triggered manually / legacy.
         """
-        await self.run_generation_with_limit(6, ["flashcards", "exercises", "simulations"])
+        await self.run_generation_with_limit(
+            6, ["flashcards", "exercises", "simulations"]
+        )

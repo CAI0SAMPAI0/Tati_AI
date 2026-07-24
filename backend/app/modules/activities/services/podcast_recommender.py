@@ -4,124 +4,122 @@ Serviço para rankeamento, filtragem e recomendação de podcasts.
 """
 
 import re
-from typing import List, Dict, Any, Optional, Tuple
 from collections import Counter
 from datetime import datetime, timezone
-from fastapi.concurrency import run_in_threadpool
+from typing import Any
 
 from app.core.database import get_client
 from app.core.enums import normalize_level
+from fastapi.concurrency import run_in_threadpool
 
 
 class PodcastRecommender:
-    AUTO_RECO_PROFILE_KEY = 'podcast_recommendations_v3'
+    AUTO_RECO_PROFILE_KEY = "podcast_recommendations_v3"
     MAX_RECOMMENDATIONS = 6
-    DEFAULT_CEFR_LEVEL = 'A1'
-    BEGINNER_LEVEL_CODES = {'A1', 'A2'}
+    DEFAULT_CEFR_LEVEL = "A1"
+    BEGINNER_LEVEL_CODES = {"A1", "A2"}
 
-    LEVEL_ALIASES = {}  # Mantido por compatibilidade – lógica delegada a core.enums.normalize_level
+    LEVEL_ALIASES = (
+        {}
+    )  # Mantido por compatibilidade – lógica delegada a core.enums.normalize_level
 
     FOCUS_TERM_MAP = {
-        'general conversation': ['conversation', 'speaking', 'listening', 'lifestyle'],
-        'business english': ['business', 'news', 'speaking', 'career', 'work'],
-        'travel english': ['travel', 'lifestyle', 'listening', 'conversation'],
-        'academic english': ['education', 'study', 'news', 'academic'],
-        'job interviews': ['interview', 'career', 'speaking', 'psychology'],
+        "general conversation": ["conversation", "speaking", "listening", "lifestyle"],
+        "business english": ["business", "news", "speaking", "career", "work"],
+        "travel english": ["travel", "lifestyle", "listening", "conversation"],
+        "academic english": ["education", "study", "news", "academic"],
+        "job interviews": ["interview", "career", "speaking", "psychology"],
     }
 
     THEME_HINTS = {
-        'business': [
-            'career',
-            'work',
-            'meetings',
-            'interview',
-            'negotiation',
-            'empresa',
-            'trabalho',
+        "business": [
+            "career",
+            "work",
+            "meetings",
+            "interview",
+            "negotiation",
+            "empresa",
+            "trabalho",
         ],
-        'education': [
-            'study',
-            'school',
-            'learning',
-            'vocabulary',
-            'estudo',
-            'educacao',
+        "education": [
+            "study",
+            "school",
+            "learning",
+            "vocabulary",
+            "estudo",
+            "educacao",
         ],
-        'health': [
-            'sleep',
-            'food',
-            'wellbeing',
-            'fitness',
-            'saude',
-            'sono',
-            'alimentacao',
+        "health": [
+            "sleep",
+            "food",
+            "wellbeing",
+            "fitness",
+            "saude",
+            "sono",
+            "alimentacao",
         ],
-        'travel': ['trip', 'airport', 'hotel', 'tourism', 'viagem', 'turismo'],
-        'technology': ['tech', 'software', 'ai', 'digital', 'tecnologia'],
-        'news': ['current affairs', 'headlines', 'politics', 'economy', 'noticias'],
-        'speaking': [
-            'conversation',
-            'pronunciation',
-            'fluency',
-            'small talk',
-            'fala',
-            'conversa',
+        "travel": ["trip", "airport", "hotel", "tourism", "viagem", "turismo"],
+        "technology": ["tech", "software", "ai", "digital", "tecnologia"],
+        "news": ["current affairs", "headlines", "politics", "economy", "noticias"],
+        "speaking": [
+            "conversation",
+            "pronunciation",
+            "fluency",
+            "small talk",
+            "fala",
+            "conversa",
         ],
-        'lifestyle': [
-            'daily routine',
-            'habits',
-            'culture',
-            'routine',
-            'rotina',
-            'estilo',
+        "lifestyle": [
+            "daily routine",
+            "habits",
+            "culture",
+            "routine",
+            "rotina",
+            "estilo",
         ],
-        'psychology': [
-            'confidence',
-            'mindset',
-            'behavior',
-            'emocional',
-            'comportamento',
+        "psychology": [
+            "confidence",
+            "mindset",
+            "behavior",
+            "emocional",
+            "comportamento",
         ],
     }
 
     @staticmethod
     def _extract_json_blob(raw_text: str) -> str:
         clean_text = raw_text.strip()
-        if '```json' in clean_text:
-            return clean_text.split(
-                '```json', 1)[1].split(
-                '```', 1)[0].strip()
-        first_brace, last_brace = clean_text.find(
-            '{'), clean_text.rfind('}')
+        if "```json" in clean_text:
+            return clean_text.split("```json", 1)[1].split("```", 1)[0].strip()
+        first_brace, last_brace = clean_text.find("{"), clean_text.rfind("}")
         return (
-            clean_text[first_brace: last_brace + 1]
+            clean_text[first_brace : last_brace + 1]
             if (first_brace >= 0 and last_brace > first_brace)
             else clean_text
         )
 
     @staticmethod
     def _pick_lang(pt_text: str, en_text: str, ui_lang: str) -> str:
-        return en_text if str(ui_lang).lower(
-        ).startswith('en') else pt_text
+        return en_text if str(ui_lang).lower().startswith("en") else pt_text
 
     @staticmethod
     def _compose_recommendation_reason(
-        podcast: Dict[str, Any],
-        matched_interests: List[str],
+        podcast: dict[str, Any],
+        matched_interests: list[str],
         user_level: str,
         ui_lang: str,
     ) -> str:
         if matched_interests:
-            terms = ', '.join(matched_interests[:2])
+            terms = ", ".join(matched_interests[:2])
             return PodcastRecommender._pick_lang(
-                f'Combina com seus temas recentes ({terms}) e está adequado ao nível {user_level}.',
-                f'It matches your recent topics ({terms}) and fits your {user_level} level.',
+                f"Combina com seus temas recentes ({terms}) e está adequado ao nível {user_level}.",
+                f"It matches your recent topics ({terms}) and fits your {user_level} level.",
                 ui_lang,
             )
-        category = str(podcast.get('category', 'General')).lower()
+        category = str(podcast.get("category", "General")).lower()
         return PodcastRecommender._pick_lang(
-            f'Conteúdo de {category} recomendado para reforçar escuta no nível {user_level}.',
-            f'{category.title()} content recommended to reinforce listening at level {user_level}.',
+            f"Conteúdo de {category} recomendado para reforçar escuta no nível {user_level}.",
+            f"{category.title()} content recommended to reinforce listening at level {user_level}.",
             ui_lang,
         )
 
@@ -130,17 +128,16 @@ class PodcastRecommender:
         """Delega para core.enums.normalize_level (fonte única de verdade)."""
         return normalize_level(user_level, default=cls.DEFAULT_CEFR_LEVEL)
 
-
     @classmethod
-    async def get_recent_messages(cls, username: str) -> List[str]:
+    async def get_recent_messages(cls, username: str) -> list[str]:
         def _fetch():
             db = get_client()
             return (
-                db.table('messages')
-                .select('content')
-                .eq('username', username)
-                .eq('role', 'user')
-                .order('created_at', desc=True)
+                db.table("messages")
+                .select("content")
+                .eq("username", username)
+                .eq("role", "user")
+                .order("created_at", desc=True)
                 .limit(30)
                 .execute()
                 .data
@@ -148,85 +145,87 @@ class PodcastRecommender:
             )
 
         rows = await run_in_threadpool(_fetch)
-        return [str(row.get('content', '')).strip()
-                for row in rows if row.get('content')]
+        return [
+            str(row.get("content", "")).strip() for row in rows if row.get("content")
+        ]
 
     async def extract_interest_keywords(
-        self, messages: List[str]
-    ) -> Tuple[List[str], str]:
+        self, messages: list[str]
+    ) -> tuple[list[str], str]:
         if not messages:
-            return [], 'none'
-        history_text = '\n'.join(messages[:20])
+            return [], "none"
+        history_text = "\n".join(messages[:20])
         prompt = (
-            'You are an English learning assistant. '
-            'Extract up to 5 student interests from the messages below.\n'
+            "You are an English learning assistant. "
+            "Extract up to 5 student interests from the messages below.\n"
             'Return strict JSON only: {"interests": ["word1", "word2"]}.\n'
-            f'Messages:\n{history_text}\n'
+            f"Messages:\n{history_text}\n"
         )
         try:
             from app.modules.chat.services.llm import groq_chat_json
+
             payload = await groq_chat_json([{"role": "user", "content": prompt}])
-            interests = payload.get('interests', []) if payload else []
-            return [str(i).strip().lower()
-                    for i in interests if i][:5], 'llm'
+            interests = payload.get("interests", []) if payload else []
+            return [str(i).strip().lower() for i in interests if i][:5], "llm"
         except Exception:
             pass
-        return self._tokenize_interest_keywords(messages), 'heuristic'
+        return self._tokenize_interest_keywords(messages), "heuristic"
 
-    def _tokenize_interest_keywords(
-            self, messages: List[str]) -> List[str]:
+    def _tokenize_interest_keywords(self, messages: list[str]) -> list[str]:
         words = []
         for msg in messages:
-            words.extend(re.findall(r'[a-zA-Z]{4,}', msg.lower()))
+            words.extend(re.findall(r"[a-zA-Z]{4,}", msg.lower()))
         freq = Counter(words)
         return [word for word, _ in freq.most_common(6)]
 
     def rank_recommendations(
         self,
-        catalog: List[Dict[str, Any]],
+        catalog: list[dict[str, Any]],
         user_level: str,
-        interests: List[str],
+        interests: list[str],
         ui_lang: str,
-        display_level: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        display_level: str | None = None,
+    ) -> list[dict[str, Any]]:
         level_label = str(display_level or user_level)
         ranked = []
         for podcast in catalog:
             # Simplificado para evitar circulares
             score = 50  # Placeholder para score real
             enriched = dict(podcast)
-            enriched['recommendation_score'] = score
-            enriched['recommendation_reason'] = self._compose_recommendation_reason(
-                podcast, [], level_label, ui_lang)
+            enriched["recommendation_score"] = score
+            enriched["recommendation_reason"] = self._compose_recommendation_reason(
+                podcast, [], level_label, ui_lang
+            )
             ranked.append(enriched)
         return ranked
 
     async def save_recommendations_cache(
         self,
         username: str,
-        profile: Dict[str, Any],
+        profile: dict[str, Any],
         user_level: str,
         ui_lang: str,
         user_focus: str,
-        interests: List[str],
+        interests: list[str],
         analysis_source: str,
-        recommendations: List[Dict[str, Any]],
+        recommendations: list[dict[str, Any]],
     ) -> None:
         if not username:
             return
         updated_profile = dict(profile or {})
         items = [
-            {'id': r['id'], 'score': r.get('recommendation_score')}
+            {"id": r["id"], "score": r.get("recommendation_score")}
             for r in recommendations[:6]
         ]
         updated_profile[self.AUTO_RECO_PROFILE_KEY] = {
-            'generated_at': datetime.now(timezone.utc).isoformat(),
-            'user_level': user_level,
-            'items': items,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "user_level": user_level,
+            "items": items,
         }
 
         def _update():
-            get_client().table('users').update({'profile': updated_profile}).eq(
-                'username', username).execute()
+            get_client().table("users").update({"profile": updated_profile}).eq(
+                "username", username
+            ).execute()
 
         await run_in_threadpool(_update)

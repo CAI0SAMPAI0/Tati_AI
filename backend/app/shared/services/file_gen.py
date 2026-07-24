@@ -13,10 +13,12 @@ FILES_DIR.mkdir(exist_ok=True)
 
 # caminho da logo
 _LOGO_CANDIDATES = [
-    Path(__file__).parent.parent.parent.parent /
-    "assets" / "images" / "tati_logo.jpg",
-    Path(__file__).parent.parent.parent.parent.parent /
-    "frontend" / "public" / "images" / "tati_logo.jpg",
+    Path(__file__).parent.parent.parent.parent / "assets" / "images" / "tati_logo.jpg",
+    Path(__file__).parent.parent.parent.parent.parent
+    / "frontend"
+    / "public"
+    / "images"
+    / "tati_logo.jpg",
 ]
 LOGO_PATH = next((p for p in _LOGO_CANDIDATES if p.exists()), None)
 
@@ -36,8 +38,8 @@ def detect_file_request(text: str) -> dict | None:
     <<<END_FILE>>>
     """
     pattern = re.compile(
-        r'<<<FILE:(pdf|word|excel):([^>]+)>>>\n(.*?)<<<END_FILE>>>',
-        re.DOTALL | re.IGNORECASE
+        r"<<<FILE:(pdf|word|excel):([^>]+)>>>\n(.*?)<<<END_FILE>>>",
+        re.DOTALL | re.IGNORECASE,
     )
     match = pattern.search(text)
     if not match:
@@ -52,13 +54,11 @@ def detect_file_request(text: str) -> dict | None:
 
 def clean_response_text(text: str) -> str:
     """Remove o bloco FILE da resposta antes de exibir ao usuário."""
-    pattern = re.compile(r'<<<FILE:.*?<<<END_FILE>>>',
-                         re.DOTALL | re.IGNORECASE)
-    return pattern.sub('', text).strip()
+    pattern = re.compile(r"<<<FILE:.*?<<<END_FILE>>>", re.DOTALL | re.IGNORECASE)
+    return pattern.sub("", text).strip()
 
 
-def generate_file(fmt: str, title: str,
-                  content: str) -> tuple[str, str, str]:
+def generate_file(fmt: str, title: str, content: str) -> tuple[str, str, str]:
     """
     Gera o arquivo e salva em FILES_DIR.
     Retorna (file_id, filename, filepath).
@@ -77,14 +77,20 @@ def generate_file(fmt: str, title: str,
 
 # ── PDF ───────────────────────────────────────────────────────────────
 
-def _gen_pdf(file_id: str, title: str,
-             content: str) -> tuple[str, Path]:
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.units import cm
+
+def _gen_pdf(file_id: str, title: str, content: str) -> tuple[str, Path]:
     from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, HRFlowable
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import cm
+    from reportlab.platypus import (
+        HRFlowable,
+        Image,
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+    )
 
     filename = f"{_slugify(title)}.pdf"
     path = FILES_DIR / f"{file_id}_{filename}"
@@ -92,31 +98,46 @@ def _gen_pdf(file_id: str, title: str,
     doc = SimpleDocTemplate(
         str(path),
         pagesize=A4,
-        rightMargin=2 * cm, leftMargin=2 * cm,
-        topMargin=2 * cm, bottomMargin=2 * cm,
+        rightMargin=2 * cm,
+        leftMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm,
     )
 
     styles = getSampleStyleSheet()
     primary = colors.HexColor("#7c3aed")  # roxo da Tati
 
     style_title = ParagraphStyle(
-        "TatiTitle", parent=styles["Title"],
-        textColor=primary, fontSize=20, spaceAfter=6,
+        "TatiTitle",
+        parent=styles["Title"],
+        textColor=primary,
+        fontSize=20,
+        spaceAfter=6,
         fontName="Helvetica-Bold",
     )
     style_subtitle = ParagraphStyle(
-        "TatiSub", parent=styles["Normal"],
-        textColor=colors.HexColor("#6b7280"), fontSize=9,
-        spaceAfter=12, alignment=TA_CENTER,
+        "TatiSub",
+        parent=styles["Normal"],
+        textColor=colors.HexColor("#6b7280"),
+        fontSize=9,
+        spaceAfter=12,
+        alignment=TA_CENTER,
     )
     style_body = ParagraphStyle(
-        "TatiBody", parent=styles["Normal"],
-        fontSize=11, leading=16, spaceAfter=8,
+        "TatiBody",
+        parent=styles["Normal"],
+        fontSize=11,
+        leading=16,
+        spaceAfter=8,
         fontName="Helvetica",
     )
     style_h2 = ParagraphStyle(
-        "TatiH2", parent=styles["Heading2"],
-        textColor=primary, fontSize=13, spaceBefore=12, spaceAfter=4,
+        "TatiH2",
+        parent=styles["Heading2"],
+        textColor=primary,
+        fontSize=13,
+        spaceBefore=12,
+        spaceAfter=4,
         fontName="Helvetica-Bold",
     )
 
@@ -133,12 +154,13 @@ def _gen_pdf(file_id: str, title: str,
             pass
 
     story.append(Paragraph(title, style_title))
-    story.append(Paragraph(
-        f"Teacher Tati AI · {datetime.now().strftime('%d/%m/%Y')}",
-        style_subtitle,
-    ))
-    story.append(HRFlowable(width="100%", thickness=1,
-                 color=primary, spaceAfter=12))
+    story.append(
+        Paragraph(
+            f"Teacher Tati AI · {datetime.now().strftime('%d/%m/%Y')}",
+            style_subtitle,
+        )
+    )
+    story.append(HRFlowable(width="100%", thickness=1, color=primary, spaceAfter=12))
 
     # Conteúdo — parse básico de markdown
     for line in content.split("\n"):
@@ -152,23 +174,31 @@ def _gen_pdf(file_id: str, title: str,
             story.append(Paragraph(line[2:], style_h2))
         elif line.startswith("- ") or line.startswith("• "):
             story.append(Paragraph(f"• {line[2:]}", style_body))
-        elif re.match(r'^\d+\.', line):
+        elif re.match(r"^\d+\.", line):
             story.append(Paragraph(line, style_body))
         else:
             # Bold **texto**
-            line = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', line)
+            line = re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", line)
             story.append(Paragraph(line, style_body))
 
     # Rodapé
     story.append(Spacer(1, 0.5 * cm))
-    story.append(HRFlowable(width="100%", thickness=0.5,
-                 color=colors.HexColor("#e5e7eb")))
-    story.append(Paragraph(
-        "Gerado por Teacher Tati AI · tatiai.com.br",
-        ParagraphStyle("footer", parent=styles["Normal"],
-                       fontSize=8, textColor=colors.HexColor("#9ca3af"),
-                       alignment=TA_CENTER, spaceBefore=4),
-    ))
+    story.append(
+        HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#e5e7eb"))
+    )
+    story.append(
+        Paragraph(
+            "Gerado por Teacher Tati AI · tatiai.com.br",
+            ParagraphStyle(
+                "footer",
+                parent=styles["Normal"],
+                fontSize=8,
+                textColor=colors.HexColor("#9ca3af"),
+                alignment=TA_CENTER,
+                spaceBefore=4,
+            ),
+        )
+    )
 
     doc.build(story)
     return filename, path
@@ -176,11 +206,11 @@ def _gen_pdf(file_id: str, title: str,
 
 # ── Word ──────────────────────────────────────────────────────────────
 
-def _gen_word(file_id: str, title: str,
-              content: str) -> tuple[str, Path]:
+
+def _gen_word(file_id: str, title: str, content: str) -> tuple[str, Path]:
     from docx import Document
-    from docx.shared import Pt, Cm, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Cm, Pt, RGBColor
 
     filename = f"{_slugify(title)}.docx"
     path = FILES_DIR / f"{file_id}_{filename}"
@@ -194,7 +224,7 @@ def _gen_word(file_id: str, title: str,
         section.left_margin = Cm(2.5)
         section.right_margin = Cm(2.5)
 
-    purple = RGBColor(0x7c, 0x3a, 0xed)
+    purple = RGBColor(0x7C, 0x3A, 0xED)
 
     # Logo
     if LOGO_PATH:
@@ -214,11 +244,10 @@ def _gen_word(file_id: str, title: str,
         run.font.size = Pt(20)
 
     # Subtítulo
-    sub = doc.add_paragraph(
-        f"Teacher Tati AI · {datetime.now().strftime('%d/%m/%Y')}")
+    sub = doc.add_paragraph(f"Teacher Tati AI · {datetime.now().strftime('%d/%m/%Y')}")
     sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
     sub.runs[0].font.size = Pt(9)
-    sub.runs[0].font.color.rgb = RGBColor(0x6b, 0x72, 0x80)
+    sub.runs[0].font.color.rgb = RGBColor(0x6B, 0x72, 0x80)
 
     doc.add_paragraph()  # espaço
 
@@ -234,12 +263,12 @@ def _gen_word(file_id: str, title: str,
                 run.font.color.rgb = purple
         elif line_s.startswith("- ") or line_s.startswith("• "):
             p = doc.add_paragraph(line_s[2:], style="List Bullet")
-        elif re.match(r'^\d+\.', line_s):
+        elif re.match(r"^\d+\.", line_s):
             p = doc.add_paragraph(line_s, style="List Number")
         else:
             p = doc.add_paragraph()
             # Bold **texto**
-            parts = re.split(r'(\*\*.*?\*\*)', line_s)
+            parts = re.split(r"(\*\*.*?\*\*)", line_s)
             for part in parts:
                 if part.startswith("**") and part.endswith("**"):
                     run = p.add_run(part[2:-2])
@@ -249,11 +278,10 @@ def _gen_word(file_id: str, title: str,
 
     # Rodapé
     doc.add_paragraph()
-    footer_p = doc.add_paragraph(
-        "Gerado por Teacher Tati AI · tatiai.com.br")
+    footer_p = doc.add_paragraph("Gerado por Teacher Tati AI · tatiai.com.br")
     footer_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     footer_p.runs[0].font.size = Pt(8)
-    footer_p.runs[0].font.color.rgb = RGBColor(0x9c, 0xa3, 0xaf)
+    footer_p.runs[0].font.color.rgb = RGBColor(0x9C, 0xA3, 0xAF)
 
     doc.save(str(path))
     return filename, path
@@ -261,11 +289,11 @@ def _gen_word(file_id: str, title: str,
 
 # ── Excel ─────────────────────────────────────────────────────────────
 
-def _gen_excel(file_id: str, title: str,
-               content: str) -> tuple[str, Path]:
+
+def _gen_excel(file_id: str, title: str, content: str) -> tuple[str, Path]:
     from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.drawing.image import Image as XLImage
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
 
     filename = f"{_slugify(title)}.xlsx"
@@ -279,11 +307,7 @@ def _gen_excel(file_id: str, title: str,
     light_purple = "EDE9FE"
     gray = "6B7280"
 
-    header_font = Font(
-        name="Calibri",
-        bold=True,
-        color="FFFFFF",
-        size=12)
+    header_font = Font(name="Calibri", bold=True, color="FFFFFF", size=12)
     header_fill = PatternFill("solid", fgColor=purple)
     header_align = Alignment(horizontal="center", vertical="center")
 
@@ -310,22 +334,13 @@ def _gen_excel(file_id: str, title: str,
     # Título
     ws.cell(row=row, column=1, value=title).font = title_font
     ws.merge_cells(f"A{row}:F{row}")
-    ws.cell(
-        row=row,
-        column=1).alignment = Alignment(
-        horizontal="center")
+    ws.cell(row=row, column=1).alignment = Alignment(horizontal="center")
     row += 1
 
-    ws.cell(
-        row=row,
-        column=1,
-        value=f"Teacher Tati AI · {
+    ws.cell(row=row, column=1, value=f"Teacher Tati AI · {
             datetime.now().strftime('%d/%m/%Y')}").font = sub_font
     ws.merge_cells(f"A{row}:F{row}")
-    ws.cell(
-        row=row,
-        column=1).alignment = Alignment(
-        horizontal="center")
+    ws.cell(row=row, column=1).alignment = Alignment(horizontal="center")
     row += 2
 
     # Conteúdo — detecta tabelas markdown e listas
@@ -342,20 +357,17 @@ def _gen_excel(file_id: str, title: str,
         # Tabela markdown: | col1 | col2 |
         if line.startswith("|"):
             cells = [c.strip() for c in line.strip("|").split("|")]
-            is_header = i + \
-                1 < len(lines) and re.match(r'[\|\-\s]+', lines[i + 1])
+            is_header = i + 1 < len(lines) and re.match(r"[\|\-\s]+", lines[i + 1])
             for col_idx, cell_val in enumerate(cells, 1):
                 cell = ws.cell(row=row, column=col_idx, value=cell_val)
                 cell.border = border
-                cell.alignment = Alignment(
-                    horizontal="center", wrap_text=True)
+                cell.alignment = Alignment(horizontal="center", wrap_text=True)
                 if is_header:
                     cell.font = header_font
                     cell.fill = header_fill
                 else:
                     if row % 2 == 0:
-                        cell.fill = PatternFill(
-                            "solid", fgColor=light_purple)
+                        cell.fill = PatternFill("solid", fgColor=light_purple)
             row += 1
             if is_header:
                 i += 2  # pula linha de separação
@@ -363,11 +375,7 @@ def _gen_excel(file_id: str, title: str,
 
         elif line.startswith("## ") or line.startswith("# "):
             cell = ws.cell(row=row, column=1, value=line.lstrip("# "))
-            cell.font = Font(
-                name="Calibri",
-                bold=True,
-                color=purple,
-                size=12)
+            cell.font = Font(name="Calibri", bold=True, color=purple, size=12)
             ws.merge_cells(f"A{row}:F{row}")
             row += 1
 
@@ -376,16 +384,16 @@ def _gen_excel(file_id: str, title: str,
             ws.cell(row=row, column=2, value=line[2:])
             row += 1
 
-        elif re.match(r'^\d+\.', line):
+        elif re.match(r"^\d+\.", line):
             parts = line.split(".", 1)
             ws.cell(row=row, column=1, value=parts[0] + ".")
-            ws.cell(row=row, column=2,
-                    value=parts[1].strip() if len(parts) > 1 else "")
+            ws.cell(row=row, column=2, value=parts[1].strip() if len(parts) > 1 else "")
             row += 1
 
         else:
-            cell = ws.cell(row=row, column=1, value=re.sub(
-                r'\*\*(.*?)\*\*', r'\1', line))
+            cell = ws.cell(
+                row=row, column=1, value=re.sub(r"\*\*(.*?)\*\*", r"\1", line)
+            )
             ws.merge_cells(f"A{row}:F{row}")
             row += 1
 
@@ -409,21 +417,23 @@ def _gen_excel(file_id: str, title: str,
 
 # ── Helpers ───────────────────────────────────────────────────────────
 
+
 def _slugify(text: str) -> str:
     text = text.lower()
-    text = re.sub(r'[áàâã]', 'a', text)
-    text = re.sub(r'[éê]', 'e', text)
-    text = re.sub(r'[íî]', 'i', text)
-    text = re.sub(r'[óôõ]', 'o', text)
-    text = re.sub(r'[úû]', 'u', text)
-    text = re.sub(r'ç', 'c', text)
-    text = re.sub(r'[^a-z0-9]+', '_', text)
-    return text.strip('_')[:50]
+    text = re.sub(r"[áàâã]", "a", text)
+    text = re.sub(r"[éê]", "e", text)
+    text = re.sub(r"[íî]", "i", text)
+    text = re.sub(r"[óôõ]", "o", text)
+    text = re.sub(r"[úû]", "u", text)
+    text = re.sub(r"ç", "c", text)
+    text = re.sub(r"[^a-z0-9]+", "_", text)
+    return text.strip("_")[:50]
 
 
 def cleanup_old_files(max_age_hours: int = 2) -> None:
     """Remove arquivos gerados há mais de max_age_hours horas."""
     import time
+
     now = time.time()
     for f in FILES_DIR.glob("*"):
         if now - f.stat().st_mtime > max_age_hours * 3600:

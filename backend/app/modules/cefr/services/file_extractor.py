@@ -1,8 +1,7 @@
 import io
-import pypdf
+
 import docx
-import logging
-from typing import List
+import pypdf
 from app.core.database import get_client
 
 
@@ -46,28 +45,25 @@ class FileExtractorService:
         res = client.storage.from_(bucket_name).download(file_path)
 
         try:
-            return res.decode('utf-8')
+            return res.decode("utf-8")
         except UnicodeDecodeError:
-            return res.decode('latin-1')
+            return res.decode("latin-1")
 
     @staticmethod
     def extract_text(bucket_name: str, file_path: str, file_type: str) -> str:
         """Extracts text depending on the file format type."""
-        ftype = file_type.lower().strip('.')
-        if ftype == 'pdf':
+        ftype = file_type.lower().strip(".")
+        if ftype == "pdf":
             return FileExtractorService.extract_text_from_pdf(bucket_name, file_path)
-        elif ftype == 'docx':
+        elif ftype == "docx":
             return FileExtractorService.extract_text_from_docx(bucket_name, file_path)
-        elif ftype in ('txt', 'text'):
+        elif ftype in ("txt", "text"):
             return FileExtractorService.extract_text_from_txt(bucket_name, file_path)
         else:
             raise ValueError(f"Unsupported file format: {file_type}")
 
     @staticmethod
-    def chunk_text(
-            text: str,
-            max_words: int = 400,
-            overlap: int = 50) -> List[str]:
+    def chunk_text(text: str, max_words: int = 400, overlap: int = 50) -> list[str]:
         """
         Splits the text into smaller word-based chunks.
         Adds overlap to preserve semantic context across divisions.
@@ -81,17 +77,17 @@ class FileExtractorService:
         i = 0
         while i < len(words):
             # Take max_words
-            chunk_words = words[i:i + max_words]
+            chunk_words = words[i : i + max_words]
             chunk_text = " ".join(chunk_words)
             chunks.append(chunk_text)
 
             # Move forward by (max_words - overlap)
-            i += (max_words - overlap)
+            i += max_words - overlap
 
         return chunks
 
     @staticmethod
-    def process_file(bucket_name: str, file_path: str, file_type: str) -> List[str]:
+    def process_file(bucket_name: str, file_path: str, file_type: str) -> list[str]:
         """Full pipeline: downloads, extracts, and chunks the file."""
         text = FileExtractorService.extract_text(bucket_name, file_path, file_type)
         chunks = FileExtractorService.chunk_text(text)

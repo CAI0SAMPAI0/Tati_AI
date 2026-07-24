@@ -1,12 +1,14 @@
 import io
 import json
-import tempfile
 import logging
 import os
-from typing import Dict, Any
+import tempfile
+from typing import Any
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
 
 class AzureSpeechService:
     def __init__(self):
@@ -17,7 +19,9 @@ class AzureSpeechService:
     def is_configured(self) -> bool:
         return bool(self.speech_key and self.speech_region)
 
-    def evaluate_pronunciation(self, audio_bytes: bytes, reference_text: str) -> Dict[str, Any]:
+    def evaluate_pronunciation(
+        self, audio_bytes: bytes, reference_text: str
+    ) -> dict[str, Any]:
         """
         Evaluates the pronunciation of the audio bytes against reference_text using Azure Pronunciation Assessment.
         """
@@ -26,8 +30,8 @@ class AzureSpeechService:
 
         try:
             import azure.cognitiveservices.speech as speechsdk
-            import soundfile as sf
             import librosa
+            import soundfile as sf
 
             temp_audio_path = None
             # 1. Convert input audio bytes to standard 16kHz mono WAV for Azure Speech SDK
@@ -44,18 +48,22 @@ class AzureSpeechService:
                 temp_audio_path = f.name
 
             # 2. Configure Azure Speech SDK
-            speech_config = speechsdk.SpeechConfig(subscription=self.speech_key, region=self.speech_region)
+            speech_config = speechsdk.SpeechConfig(
+                subscription=self.speech_key, region=self.speech_region
+            )
             audio_config = speechsdk.audio.AudioConfig(filename=temp_audio_path)
 
             pron_config = speechsdk.PronunciationAssessmentConfig(
                 reference_text=reference_text,
                 grading_system=speechsdk.PronunciationAssessmentGradingSystem.HundredMark,
                 granularity=speechsdk.PronunciationAssessmentGranularity.Phoneme,
-                enable_miscue=True
+                enable_miscue=True,
             )
 
             # 3. Create Speech Recognizer
-            recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
+            recognizer = speechsdk.SpeechRecognizer(
+                speech_config=speech_config, audio_config=audio_config
+            )
             pron_config.apply_to(recognizer)
 
             # 4. Perform Recognition
@@ -63,22 +71,32 @@ class AzureSpeechService:
 
             if result.reason == speechsdk.ResultReason.RecognizedSpeech:
                 pron_result = speechsdk.PronunciationAssessmentResult(result)
-                json_res_str = result.properties.get(speechsdk.PropertyId.SpeechServiceResponse_JsonResult)
+                json_res_str = result.properties.get(
+                    speechsdk.PropertyId.SpeechServiceResponse_JsonResult
+                )
                 json_data = json.loads(json_res_str) if json_res_str else {}
 
                 # Map words and errors
                 words_list = []
-                best_match = json_data.get('NBest', [{}])[0]
-                words_data = best_match.get('Words', [])
+                best_match = json_data.get("NBest", [{}])[0]
+                words_data = best_match.get("Words", [])
 
                 for w in words_data:
-                    error_type = w.get('PronunciationAssessment', {}).get('ErrorType', 'None')
-                    words_list.append({
-                        "word": w.get('Word', ''),
-                        "score": w.get('PronunciationAssessment', {}).get('AccuracyScore', 0),
-                        "accuracy": "correct" if error_type == "None" else "incorrect",
-                        "error_type": error_type
-                    })
+                    error_type = w.get("PronunciationAssessment", {}).get(
+                        "ErrorType", "None"
+                    )
+                    words_list.append(
+                        {
+                            "word": w.get("Word", ""),
+                            "score": w.get("PronunciationAssessment", {}).get(
+                                "AccuracyScore", 0
+                            ),
+                            "accuracy": (
+                                "correct" if error_type == "None" else "incorrect"
+                            ),
+                            "error_type": error_type,
+                        }
+                    )
 
                 return {
                     "score": int(pron_result.pronunciation_score),
@@ -86,7 +104,7 @@ class AzureSpeechService:
                     "fluency_score": int(pron_result.fluency_score),
                     "completeness_score": int(pron_result.completeness_score),
                     "words": words_list,
-                    "raw_json": json_data
+                    "raw_json": json_data,
                 }
             else:
                 return {"error": f"Recognition failed: {result.reason}"}
@@ -100,5 +118,6 @@ class AzureSpeechService:
                     os.unlink(temp_audio_path)
                 except Exception:
                     pass
+
 
 azure_speech_service = AzureSpeechService()

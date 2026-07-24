@@ -4,27 +4,18 @@ import string
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-from jose import jwt
-
 from app.core.config import settings
+from jose import jwt
 
 # jwt
 
 
-def create_access_token(
-        data: dict,
-        expires_minutes: int | None = None) -> str:
+def create_access_token(data: dict, expires_minutes: int | None = None) -> str:
     expires = expires_minutes or settings.access_token_expire_minutes
-    payload = {
-        **data,
-        'exp': datetime.now(
-            timezone.utc) +
-        timedelta(
-            minutes=expires)}
+    payload = {**data, "exp": datetime.now(timezone.utc) + timedelta(minutes=expires)}
     return jwt.encode(
-        payload,
-        settings.jwt_secret_key,
-        algorithm=settings.jwt_algorithm)
+        payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
+    )
 
 
 def decode_token(token: str) -> dict | None:
@@ -32,8 +23,8 @@ def decode_token(token: str) -> dict | None:
 
     try:
         return jwt.decode(
-            token, settings.jwt_secret_key, algorithms=[
-                settings.jwt_algorithm])
+            token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
+        )
     except JWTError:
         return None
 
@@ -44,9 +35,9 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, stored: str) -> bool:
-    if stored == 'google_authenticated':
+    if stored == "google_authenticated":
         return False
-    if stored.startswith('$2'):
+    if stored.startswith("$2"):
         return bcrypt.checkpw(password.encode(), stored.encode())
     # sha256 fallback (legacy)
     return hashlib.sha256(password.encode()).hexdigest() == stored
@@ -54,14 +45,13 @@ def verify_password(password: str, stored: str) -> bool:
 
 # Temporary password
 
-_SAFE_ALPHABET = ''.join(
-    c for c in string.ascii_letters + string.digits if c not in '0OlI1'
+_SAFE_ALPHABET = "".join(
+    c for c in string.ascii_letters + string.digits if c not in "0OlI1"
 )
 
 
 def generate_temp_password(length: int = 12) -> str:
-    return ''.join(secrets.choice(_SAFE_ALPHABET)
-                   for _ in range(length))
+    return "".join(secrets.choice(_SAFE_ALPHABET) for _ in range(length))
 
 
 def generate_reset_token() -> str:

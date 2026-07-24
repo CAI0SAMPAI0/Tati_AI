@@ -3,9 +3,9 @@ from __future__ import annotations
 import logging
 import os
 import smtplib
+from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.application import MIMEApplication
 
 from app.core.config import settings
 
@@ -13,6 +13,7 @@ resend = None
 if getattr(settings, "resend_api_key", ""):
     try:
         import resend
+
         resend.api_key = settings.resend_api_key
     except Exception as e:
         logging.info(f"[EmailSender] Failed to import real resend: {e}")
@@ -21,130 +22,197 @@ if getattr(settings, "resend_api_key", ""):
 
 class EmailSender:
     def __init__(self) -> None:
-        self.smtp_host = getattr(
-            settings, "smtp_host", "smtp.gmail.com")
+        self.smtp_host = getattr(settings, "smtp_host", "smtp.gmail.com")
         self.smtp_port = int(getattr(settings, "smtp_port", 465))
         self.smtp_user = getattr(settings, "smtp_user", "")
         self.smtp_password = getattr(settings, "smtp_password", "")
         self.smtp_from = getattr(settings, "smtp_from", "") or self.smtp_user
         self._FROM = f"Teacher Tati <{self.smtp_from}>"
-        
+
         self.brevo_key = os.getenv("BREVO_API_KEY")
         if not self.brevo_key:
-            self.brevo_key = self.smtp_password if "xsmtpsib" in str(self.smtp_password) else os.getenv("SMTP_PASSWORD")
+            self.brevo_key = (
+                self.smtp_password
+                if "xsmtpsib" in str(self.smtp_password)
+                else os.getenv("SMTP_PASSWORD")
+            )
         if not self.brevo_key:
             cand = os.getenv("RESEND_API_KEY")
             if cand and "xsmtpsib" in cand:
                 self.brevo_key = cand
 
-        self.smtp_configured = bool(self.smtp_host and self.smtp_user and self.smtp_password)
-        self._ready = self.smtp_configured or bool(self.brevo_key) or bool(getattr(settings, "resend_api_key", ""))
+        self.smtp_configured = bool(
+            self.smtp_host and self.smtp_user and self.smtp_password
+        )
+        self._ready = (
+            self.smtp_configured
+            or bool(self.brevo_key)
+            or bool(getattr(settings, "resend_api_key", ""))
+        )
 
-    def _send(self, to_email: str, subject: str, html: str,
-              attachments: list | None = None) -> bool:
+    def _send(
+        self, to_email: str, subject: str, html: str, attachments: list | None = None
+    ) -> bool:
         try:
             from app.core.database import get_client
+
             db = get_client()
-            res = db.table('users').select('username, profile').eq('email', to_email).limit(1).execute()
+            res = (
+                db.table("users")
+                .select("username, profile")
+                .eq("email", to_email)
+                .limit(1)
+                .execute()
+            )
             if res.data:
-                profile = res.data[0].get('profile') or {}
-                prefs = profile.get('notification_preferences')
+                profile = res.data[0].get("profile") or {}
+                prefs = profile.get("notification_preferences")
                 if prefs:
                     s_lower = subject.lower()
-                    if 'teacher tati' in s_lower or 'nudge' in s_lower or 'aviso' in s_lower:
-                        category = 'direct_message'
-                    elif 'streak' in s_lower or 'ofensiva' in s_lower or 'broken' in s_lower or 'alive' in s_lower:
-                        category = 'streaks'
-                    elif 'desafio' in s_lower or 'challenge' in s_lower or 'activity' in s_lower or 'submission' in s_lower:
-                        category = 'challenges'
-                    elif 'cefr' in s_lower or 'nível' in s_lower or 'level' in s_lower or 'report' in s_lower:
-                        category = 'cefr'
+                    if (
+                        "teacher tati" in s_lower
+                        or "nudge" in s_lower
+                        or "aviso" in s_lower
+                    ):
+                        category = "direct_message"
+                    elif (
+                        "streak" in s_lower
+                        or "ofensiva" in s_lower
+                        or "broken" in s_lower
+                        or "alive" in s_lower
+                    ):
+                        category = "streaks"
+                    elif (
+                        "desafio" in s_lower
+                        or "challenge" in s_lower
+                        or "activity" in s_lower
+                        or "submission" in s_lower
+                    ):
+                        category = "challenges"
+                    elif (
+                        "cefr" in s_lower
+                        or "nível" in s_lower
+                        or "level" in s_lower
+                        or "report" in s_lower
+                    ):
+                        category = "cefr"
                     else:
-                        category = 'challenges'
+                        category = "challenges"
 
-                    if not prefs.get(category, {}).get('email', True):
-                        logging.info(f"[EmailSender] Suppressed email to {to_email} due to preferences (category: {category})")
+                    if not prefs.get(category, {}).get("email", True):
+                        logging.info(
+                            f"[EmailSender] Suppressed email to {to_email} due to preferences (category: {category})"
+                        )
                         return False
         except Exception as e:
             logging.info(f"[EmailSender] Failed to check email preferences: {e}")
 
         if not self._ready:
             logging.info(
-                f"[EmailSender] SMTP/Brevo/Resend not configured (Simulating Success). Email to {to_email}: {subject}")
+                f"[EmailSender] SMTP/Brevo/Resend not configured (Simulating Success). Email to {to_email}: {subject}"
+            )
             return True
 
         # Detecta se estamos dentro de um worker Celery ou no processo FastAPI
         _in_celery_worker = False
         try:
             from celery._state import get_current_task
+
             _in_celery_worker = get_current_task() is not None
         except Exception:
             pass
 
         # Detecta se estamos rodando no Hugging Face (onde as portas SMTP são bloqueadas)
-        _running_on_hf = bool(os.getenv("SPACE_ID") or os.getenv("HF_SPACE_ID") or os.getenv("SYSTEM") == "spaces")
+        _running_on_hf = bool(
+            os.getenv("SPACE_ID")
+            or os.getenv("HF_SPACE_ID")
+            or os.getenv("SYSTEM") == "spaces"
+        )
 
         if _running_on_hf and not _in_celery_worker:
             # Estamos no FastAPI na Hugging Face — delegar ao Celery worker (que roda na nuvem liberada)
             try:
                 from app.core.celery_app import celery_app
+
                 celery_app.send_task(
                     "app.core.tasks.send_email_task",
-                    args=[to_email, subject, html, attachments]
+                    args=[to_email, subject, html, attachments],
                 )
-                logging.info(f"[EmailSender] 📧 Email enfileirado via Celery (send_task) para {to_email}: {subject}")
+                logging.info(
+                    f"[EmailSender] 📧 Email enfileirado via Celery (send_task) para {to_email}: {subject}"
+                )
                 return True
             except Exception as e:
-                logging.warning(f"[EmailSender] Celery send_task delegation falhou ({e}), tentando envio direto...")
+                logging.warning(
+                    f"[EmailSender] Celery send_task delegation falhou ({e}), tentando envio direto..."
+                )
 
         # 1. Prioridade Máxima: Brevo HTTP API (Porta 443 liberada em todas as nuvens)
         if self.brevo_key:
             try:
                 import requests
+
                 headers = {
                     "accept": "application/json",
                     "content-type": "application/json",
-                    "api-key": self.brevo_key
+                    "api-key": self.brevo_key,
                 }
-                sender_email = os.getenv("SMTP_FROM") or self.smtp_from or self.smtp_user or "tatyssystem@gmail.com"
+                sender_email = (
+                    os.getenv("SMTP_FROM")
+                    or self.smtp_from
+                    or self.smtp_user
+                    or "tatyssystem@gmail.com"
+                )
                 payload = {
                     "sender": {"name": "Teacher Tati", "email": sender_email},
                     "to": [{"email": to_email}],
                     "subject": subject,
-                    "htmlContent": html
+                    "htmlContent": html,
                 }
                 if attachments:
                     import base64
+
                     payload_attachments = []
                     for path in attachments:
                         if os.path.exists(path):
                             with open(path, "rb") as f:
                                 encoded = base64.b64encode(f.read()).decode("utf-8")
-                                payload_attachments.append({
-                                    "content": encoded,
-                                    "name": os.path.basename(path)
-                                })
+                                payload_attachments.append(
+                                    {"content": encoded, "name": os.path.basename(path)}
+                                )
                     if payload_attachments:
                         payload["attachment"] = payload_attachments
 
-                resp = requests.post("https://api.brevo.com/v3/smtp/email", json=payload, headers=headers, timeout=15)
+                resp = requests.post(
+                    "https://api.brevo.com/v3/smtp/email",
+                    json=payload,
+                    headers=headers,
+                    timeout=15,
+                )
                 if resp.status_code in [200, 201, 202]:
-                    logging.info(f"[EmailSender] Email sent via Brevo HTTP API to {to_email}")
+                    logging.info(
+                        f"[EmailSender] Email sent via Brevo HTTP API to {to_email}"
+                    )
                     return True
                 else:
-                    logging.error(f"[EmailSender] Brevo API failed with status {resp.status_code}: {resp.text}")
+                    logging.error(
+                        f"[EmailSender] Brevo API failed with status {resp.status_code}: {resp.text}"
+                    )
             except Exception as exc:
                 logging.error(f"[EmailSender] Brevo API exception: {exc}")
 
         # 2. Segunda opção: SMTP Gmail/outro normalmente
         if self.smtp_configured:
             try:
-                from email.utils import make_msgid, formatdate
+                from email.utils import formatdate, make_msgid
+
                 msg = MIMEMultipart()
                 msg["From"] = self._FROM
                 msg["To"] = to_email
                 msg["Subject"] = subject
-                msg["Message-ID"] = make_msgid(domain=self.smtp_host.replace("smtp.", ""))
+                msg["Message-ID"] = make_msgid(
+                    domain=self.smtp_host.replace("smtp.", "")
+                )
                 msg["Date"] = formatdate(localtime=True)
                 msg.attach(MIMEText(html, "html"))
 
@@ -153,16 +221,23 @@ class EmailSender:
                         if os.path.exists(file_path):
                             with open(file_path, "rb") as f:
                                 part = MIMEApplication(
-                                    f.read(), Name=os.path.basename(file_path))
-                                part["Content-Disposition"] = f'attachment; filename="{os.path.basename(file_path)}"'
+                                    f.read(), Name=os.path.basename(file_path)
+                                )
+                                part["Content-Disposition"] = (
+                                    f'attachment; filename="{os.path.basename(file_path)}"'
+                                )
                                 msg.attach(part)
 
                 if self.smtp_port == 465:
-                    with smtplib.SMTP_SSL(self.smtp_host, self.smtp_port, timeout=15) as server:
+                    with smtplib.SMTP_SSL(
+                        self.smtp_host, self.smtp_port, timeout=15
+                    ) as server:
                         server.login(self.smtp_user, self.smtp_password)
                         server.send_message(msg)
                 else:
-                    with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=15) as server:
+                    with smtplib.SMTP(
+                        self.smtp_host, self.smtp_port, timeout=15
+                    ) as server:
                         server.ehlo()
                         server.starttls()
                         server.ehlo()
@@ -178,17 +253,19 @@ class EmailSender:
         try:
             resend_key = os.getenv("RESEND_API_KEY")
             if resend_key:
-                import requests
                 import base64
+
+                import requests
+
                 headers = {
                     "Authorization": f"Bearer {resend_key}",
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
                 }
                 payload = {
                     "from": "Teacher Tati <onboarding@resend.dev>",
                     "to": [to_email],
                     "subject": subject,
-                    "html": html
+                    "html": html,
                 }
                 if attachments:
                     payload_attachments = []
@@ -196,31 +273,38 @@ class EmailSender:
                         if os.path.exists(path):
                             with open(path, "rb") as f:
                                 encoded = base64.b64encode(f.read()).decode("utf-8")
-                                payload_attachments.append({
-                                    "content": encoded,
-                                    "filename": os.path.basename(path)
-                                })
+                                payload_attachments.append(
+                                    {
+                                        "content": encoded,
+                                        "filename": os.path.basename(path),
+                                    }
+                                )
                     if payload_attachments:
                         payload["attachments"] = payload_attachments
 
-                resp = requests.post("https://api.resend.com/emails", json=payload, headers=headers, timeout=15)
+                resp = requests.post(
+                    "https://api.resend.com/emails",
+                    json=payload,
+                    headers=headers,
+                    timeout=15,
+                )
                 if resp.status_code in [200, 201, 202]:
-                    logging.info(f"[EmailSender] Email sent via Resend HTTP API to {to_email}")
+                    logging.info(
+                        f"[EmailSender] Email sent via Resend HTTP API to {to_email}"
+                    )
                     return True
                 else:
-                    logging.error(f"[EmailSender] Resend API failed with status {resp.status_code}: {resp.text}")
+                    logging.error(
+                        f"[EmailSender] Resend API failed with status {resp.status_code}: {resp.text}"
+                    )
         except Exception as exc:
             logging.error(f"[EmailSender] Resend API exception: {exc}")
 
         return False
 
-
     def send_report_email(
-            self,
-            to_email: str,
-            name: str,
-            pdf_path: str,
-            lang: str = "en-US") -> bool:
+        self, to_email: str, name: str, pdf_path: str, lang: str = "en-US"
+    ) -> bool:
         t = {
             "subject": "📊 Your Weekly Progress Report - Teacher Tati AI",
             "title": "Your Evolution Report is Here!",
@@ -236,18 +320,11 @@ class EmailSender:
 <p style="font-size:12px;color:#999;">{t['footer']}</p>
 </div>
 """
-        return self._send(
-            to_email,
-            t["subject"],
-            html,
-            attachments=[pdf_path])
+        return self._send(to_email, t["subject"], html, attachments=[pdf_path])
 
     def send_responsible_report_email(
-            self,
-            to_email: str,
-            student_name: str,
-            pdf_path: str,
-            lang: str = "pt-BR") -> bool:
+        self, to_email: str, student_name: str, pdf_path: str, lang: str = "pt-BR"
+    ) -> bool:
         t = {
             "subject": f"📊 Relatório de Progresso de {student_name} - Tati AI",
             "title": f"Acompanhe a evolução de {student_name}!",
@@ -263,45 +340,31 @@ class EmailSender:
 <p style="font-size:12px;color:#999;">{t['footer']}</p>
 </div>
 """
-        return self._send(
-            to_email,
-            t["subject"],
-            html,
-            attachments=[pdf_path])
+        return self._send(to_email, t["subject"], html, attachments=[pdf_path])
 
     def send_email(
-            self,
-            to_email: str,
-            subject: str,
-            html: str,
-            fromemail: str | None = None) -> bool:
+        self, to_email: str, subject: str, html: str, fromemail: str | None = None
+    ) -> bool:
         return self._send(to_email, subject, html)
 
     def _send_smtp_email(
-            self,
-            to_email: str,
-            subject: str,
-            html: str,
-            fromemail: str | None = None) -> bool:
+        self, to_email: str, subject: str, html: str, fromemail: str | None = None
+    ) -> bool:
         return self._send(to_email, subject, html)
 
-    def send_reset_email(
-            self,
-            to_email: str,
-            name: str,
-            reset_url: str) -> bool:
+    def send_reset_email(self, to_email: str, name: str, reset_url: str) -> bool:
         subject = "Teacher Tati — Reset your password"
         html = self._build_reset_email_html(name, reset_url)
         return self._send(to_email, subject, html)
 
     def _build_reset_email_html(self, name: str, reset_url: str) -> str:
-        button_html = ''
+        button_html = ""
         if reset_url:
-            button_html = f'''
+            button_html = f"""
 <div style="text-align:center;margin:25px 0;">
 <a href="{reset_url}" style="display:inline-block;background:#6366f1;color:#fff;padding:14px 32px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:16px;">Reset My Password</a>
 </div>
-<p style="font-size:13px;color:#666;text-align:center;">Or copy this link: <a href="{reset_url}" style="color:#6366f1;">{reset_url}</a></p>'''
+<p style="font-size:13px;color:#666;text-align:center;">Or copy this link: <a href="{reset_url}" style="color:#6366f1;">{reset_url}</a></p>"""
         return f"""
 <div style="font-family:Arial,sans-serif;max-width:600px;color:#333;">
 <h2 style="color:#6366f1;">Reset Your Password</h2>
@@ -316,9 +379,8 @@ class EmailSender:
 """
 
     def send_submission_notification(
-            self,
-            student_name: str,
-            activity_title: str) -> bool:
+        self, student_name: str, activity_title: str
+    ) -> bool:
         subject = f"New submission: {activity_title}"
         html = f"""
 <div style="font-family:Arial,sans-serif;max-width:600px;">
@@ -331,11 +393,8 @@ class EmailSender:
         return self._send(admin_email, subject, html)
 
     def send_feedback_notification(
-            self,
-            student_name: str,
-            student_email: str,
-            category: str,
-            message: str) -> bool:
+        self, student_name: str, student_email: str, category: str, message: str
+    ) -> bool:
         category_labels = {
             "bug": "🐛 Bug",
             "feature": "💡 Feature Request",
@@ -357,12 +416,13 @@ class EmailSender:
         return self._send(admin_email, subject, html)
 
     def send_correction_notification(
-            self,
-            student_name: str,
-            student_email: str,
-            activity_title: str,
-            score: int,
-            feedback: str) -> bool:
+        self,
+        student_name: str,
+        student_email: str,
+        activity_title: str,
+        score: int,
+        feedback: str,
+    ) -> bool:
         subject = f"Activity Graded: {activity_title}"
         if score >= 90:
             score_message = "Excellent work! 🎉"
@@ -392,11 +452,8 @@ class EmailSender:
         return self._send(student_email, subject, html)
 
     def send_streak_email(
-            self,
-            to_email: str,
-            name: str,
-            streak_days: int,
-            mode: str = "reminder") -> bool:
+        self, to_email: str, name: str, streak_days: int, mode: str = "reminder"
+    ) -> bool:
         if mode == "broken":
             subject = "⚠️ Your streak was broken — Teacher Tati"
             body_html = f"""
@@ -424,11 +481,8 @@ class EmailSender:
         return self._send(to_email, subject, html)
 
     def send_trophy_email(
-            self,
-            to_email: str,
-            name: str,
-            trophy_name: str,
-            trophy_icon: str = "🏆") -> bool:
+        self, to_email: str, name: str, trophy_name: str, trophy_icon: str = "🏆"
+    ) -> bool:
         subject = f"🏆 New trophy unlocked: {trophy_name} — Teacher Tati"
         html = f"""
 <div style="font-family:Arial,sans-serif;max-width:600px;text-align:center;">
@@ -444,11 +498,12 @@ class EmailSender:
         return self._send(to_email, subject, html)
 
     def send_new_activity_email(
-            self,
-            to_email: str,
-            name: str,
-            activity_title: str,
-            activity_url: str = "https://tati-ai.vercel.app/activities") -> bool:
+        self,
+        to_email: str,
+        name: str,
+        activity_title: str,
+        activity_url: str = "https://tati-ai.vercel.app/activities",
+    ) -> bool:
         subject = f"📚 New activity available: {activity_title} — Teacher Tati"
         html = f"""
 <div style="font-family:Arial,sans-serif;max-width:600px;">
@@ -463,11 +518,8 @@ class EmailSender:
         return self._send(to_email, subject, html)
 
     def send_welcome_hub_email(
-            self,
-            to_email: str,
-            name: str,
-            username: str,
-            password: str) -> bool:
+        self, to_email: str, name: str, username: str, password: str
+    ) -> bool:
         subject = "Boas-vindas ao Tati AI Hub! Suas credenciais de acesso"
         html = f"""
 <div style="font-family:Arial,sans-serif;max-width:600px;background:#0a0a0c;padding:30px;border-radius:24px;color:#ffffff;border:1px solid #222">
@@ -495,11 +547,8 @@ class EmailSender:
         return self._send(to_email, subject, html)
 
     def send_purchase_confirmation(
-            self,
-            to_email: str,
-            name: str,
-            item_title: str,
-            download_url: str) -> bool:
+        self, to_email: str, name: str, item_title: str, download_url: str
+    ) -> bool:
         subject = f"✅ Compra confirmada: {item_title} — Teacher Tati"
         html = f"""
 <div style="font-family:Arial,sans-serif;max-width:600px;background:#f8fafc;padding:20px;border-radius:16px;color:#334155;">
@@ -519,11 +568,12 @@ class EmailSender:
         return self._send(to_email, subject, html)
 
     def send_payment_refused(
-            self,
-            to_email: str,
-            name: str,
-            payment_method: str,
-            reason: str = "Não foi possível processar seu pagamento.") -> bool:
+        self,
+        to_email: str,
+        name: str,
+        payment_method: str,
+        reason: str = "Não foi possível processar seu pagamento.",
+    ) -> bool:
         subject = "❌ Pagamento não aprovado — Teacher Tati"
         html = f"""
 <div style="font-family:Arial,sans-serif;max-width:600px;background:#fef2f2;padding:20px;border-radius:16px;color:#334155;">
@@ -543,10 +593,8 @@ class EmailSender:
         return self._send(to_email, subject, html)
 
     def send_offensive_notification(
-            self,
-            user_email: str,
-            user_name: str,
-            offensive_message: str) -> bool:
+        self, user_email: str, user_name: str, offensive_message: str
+    ) -> bool:
         subject = "Notificação de Ofensiva"
         html = f"""
         <div style="font-family:Arial,sans-serif;max-width:600px;">
@@ -560,11 +608,8 @@ class EmailSender:
         return self._send(user_email, subject, html)
 
     def send_dispatched_file_email(
-            self,
-            to_email: str,
-            name: str,
-            file_name: str,
-            file_path: str) -> bool:
+        self, to_email: str, name: str, file_name: str, file_path: str
+    ) -> bool:
         subject = f"📚 New Study Material: {file_name} — Teacher Tati"
         html = f"""
 <div style="font-family:Arial,sans-serif;max-width:600px;color:#333;line-height:1.6;">
@@ -576,19 +621,16 @@ class EmailSender:
 <p style="font-size:12px;color:#999;">Teacher Tati Team</p>
 </div>
 """
-        return self._send(
-            to_email,
-            subject,
-            html,
-            attachments=[file_path])
+        return self._send(to_email, subject, html, attachments=[file_path])
 
     def send_dispatched_files_email(
-            self,
-            to_email: str,
-            name: str,
-            file_names: list[str],
-            file_paths: list[str],
-            custom_message: str | None = None) -> bool:
+        self,
+        to_email: str,
+        name: str,
+        file_names: list[str],
+        file_paths: list[str],
+        custom_message: str | None = None,
+    ) -> bool:
         if custom_message:
             subject = "New message from Teacher Tati 📚"
             html = f"""
@@ -614,18 +656,15 @@ class EmailSender:
 <p style="font-size:12px;color:#999;">Teacher Tati Team</p>
 </div>
 """
-        return self._send(
-            to_email,
-            subject,
-            html,
-            attachments=file_paths)
+        return self._send(to_email, subject, html, attachments=file_paths)
 
     def send_dispatched_quiz_email(
-            self,
-            to_email: str,
-            name: str,
-            quiz_title: str,
-            quiz_url: str = "https://tati-ai.vercel.app/activities") -> bool:
+        self,
+        to_email: str,
+        name: str,
+        quiz_title: str,
+        quiz_url: str = "https://tati-ai.vercel.app/activities",
+    ) -> bool:
         subject = f"📝 New Quiz available: {quiz_title} — Teacher Tati"
         html = f"""
 <div style="font-family:Arial,sans-serif;max-width:600px;color:#333;line-height:1.6;">

@@ -1,21 +1,32 @@
-from app.core.celery_app import celery_app
 import asyncio
+
+from app.core.celery_app import celery_app
 
 
 @celery_app.task(name="app.modules.cefr.tasks.cefr_weekly_gen")
 def cefr_weekly_gen():
     from app.modules.cefr.services.cefr_scheduler import CEFRScheduler
+
     scheduler = CEFRScheduler(None)
     asyncio.run(scheduler.check_and_run_schedules())
 
 
 @celery_app.task(name="app.modules.cefr.tasks.generate_cefr_flashcards_task")
-def generate_cefr_flashcards_task(level: str, topic: str, count: int, username: str = None, custom_title: str = None, reference_ids: list[str] = None):
-    from app.modules.cefr.services.generator import CEFRGeneratorService
+def generate_cefr_flashcards_task(
+    level: str,
+    topic: str,
+    count: int,
+    username: str = None,
+    custom_title: str = None,
+    reference_ids: list[str] = None,
+):
     from app.core.database import get_client
+    from app.modules.cefr.services.generator import CEFRGeneratorService
 
     async def _run():
-        flashcards = await CEFRGeneratorService.generate_flashcards(level=level, topic=topic, count=count, reference_ids=reference_ids)
+        flashcards = await CEFRGeneratorService.generate_flashcards(
+            level=level, topic=topic, count=count, reference_ids=reference_ids
+        )
         if not flashcards:
             return {"success": False, "error": "Could not generate flashcards"}
 
@@ -33,33 +44,45 @@ def generate_cefr_flashcards_task(level: str, topic: str, count: int, username: 
                 "explanation": card.get("explanation"),
                 "image_url": card.get("image_url"),
                 "topic": display_title,
-                "is_published": False
+                "is_published": False,
             }
             insert_res = client.table("cefr_flashcards").insert(data).execute()
             if insert_res.data:
                 saved_cards.extend(insert_res.data)
-        
+
         if username and saved_cards:
-            from app.modules.notifications.services.notifications import notify_ai_generation
+            from app.modules.notifications.services.notifications import (
+                notify_ai_generation,
+            )
+
             notify_ai_generation(
                 username=username,
                 title="✨ Flashcards Generated",
                 message=f"Generated {len(saved_cards)} flashcards for '{display_title}'.",
-                url="/admin"
+                url="/admin",
             )
-            
+
         return {"success": True, "generated": len(saved_cards), "data": saved_cards}
 
     return asyncio.run(_run())
 
 
 @celery_app.task(name="app.modules.cefr.tasks.generate_cefr_exercises_task")
-def generate_cefr_exercises_task(level: str, topic: str, count: int, username: str = None, custom_title: str = None, reference_ids: list[str] = None):
-    from app.modules.cefr.services.generator import CEFRGeneratorService
+def generate_cefr_exercises_task(
+    level: str,
+    topic: str,
+    count: int,
+    username: str = None,
+    custom_title: str = None,
+    reference_ids: list[str] = None,
+):
     from app.core.database import get_client
+    from app.modules.cefr.services.generator import CEFRGeneratorService
 
     async def _run():
-        exercises = await CEFRGeneratorService.generate_exercises(level=level, topic=topic, count=count, reference_ids=reference_ids)
+        exercises = await CEFRGeneratorService.generate_exercises(
+            level=level, topic=topic, count=count, reference_ids=reference_ids
+        )
         if not exercises:
             return {"success": False, "error": "Could not generate exercises"}
 
@@ -75,33 +98,49 @@ def generate_cefr_exercises_task(level: str, topic: str, count: int, username: s
                 "correct_index": ex.get("correct_index"),
                 "explanation": ex.get("explanation"),
                 "topic": display_title,
-                "is_published": False
+                "is_published": False,
             }
             insert_res = client.table("cefr_exercises").insert(data).execute()
             if insert_res.data:
                 saved_exercises.extend(insert_res.data)
 
         if username and saved_exercises:
-            from app.modules.notifications.services.notifications import notify_ai_generation
+            from app.modules.notifications.services.notifications import (
+                notify_ai_generation,
+            )
+
             notify_ai_generation(
                 username=username,
                 title="✨ Quiz Generated",
                 message=f"Quiz about '{display_title}' with {len(saved_exercises)} questions is ready.",
-                url="/admin"
+                url="/admin",
             )
 
-        return {"success": True, "generated": len(saved_exercises), "data": saved_exercises}
+        return {
+            "success": True,
+            "generated": len(saved_exercises),
+            "data": saved_exercises,
+        }
 
     return asyncio.run(_run())
 
 
 @celery_app.task(name="app.modules.cefr.tasks.generate_cefr_simulations_task")
-def generate_cefr_simulations_task(level: str, topic: str, count: int, username: str = None, custom_title: str = None, reference_ids: list[str] = None):
-    from app.modules.cefr.services.generator import CEFRGeneratorService
+def generate_cefr_simulations_task(
+    level: str,
+    topic: str,
+    count: int,
+    username: str = None,
+    custom_title: str = None,
+    reference_ids: list[str] = None,
+):
     from app.core.database import get_client
+    from app.modules.cefr.services.generator import CEFRGeneratorService
 
     async def _run():
-        simulations = await CEFRGeneratorService.generate_simulations(level=level, topic=topic, count=count, reference_ids=reference_ids)
+        simulations = await CEFRGeneratorService.generate_simulations(
+            level=level, topic=topic, count=count, reference_ids=reference_ids
+        )
         if not simulations:
             return {"success": False, "error": "Could not generate simulations"}
 
@@ -116,21 +155,28 @@ def generate_cefr_simulations_task(level: str, topic: str, count: int, username:
                 "scenario": sim.get("scenario"),
                 "roles": roles,
                 "goal": sim.get("goal"),
-                "is_published": False
+                "is_published": False,
             }
             res = client.table("cefr_simulations").insert(data).execute()
             if res.data:
                 saved_simulations.extend(res.data)
 
         if username and saved_simulations:
-            from app.modules.notifications.services.notifications import notify_ai_generation
+            from app.modules.notifications.services.notifications import (
+                notify_ai_generation,
+            )
+
             notify_ai_generation(
                 username=username,
                 title="✨ Simulations Generated",
                 message=f"{len(saved_simulations)} simulations about '{display_title}' are ready.",
-                url="/admin"
+                url="/admin",
             )
 
-        return {"success": True, "generated": len(saved_simulations), "data": saved_simulations}
+        return {
+            "success": True,
+            "generated": len(saved_simulations),
+            "data": saved_simulations,
+        }
 
     return asyncio.run(_run())

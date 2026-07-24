@@ -12,22 +12,21 @@ Endpoints:
 """
 
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends
-from app.core.dependencies.auth import get_current_user
-from app.core.database import get_client
 
+from app.core.database import get_client
+from app.core.dependencies.auth import get_current_user
+from fastapi import APIRouter, Depends
 
 router = APIRouter()
 
 
 @router.get("/activities/weekly-goal")
-async def get_activities_weekly_goal(
-    user: dict = Depends(get_current_user)
-):
+async def get_activities_weekly_goal(user: dict = Depends(get_current_user)):
     """Retorna as tarefas pendentes para o Weekly Goal do aluno (compatibilidade frontend)."""
     from app.modules.activities.services.activity_service import ActivityService
+
     service = ActivityService()
-    return await service.get_weekly_tasks(user['username'])
+    return await service.get_weekly_tasks(user["username"])
 
 
 def _completed_exercise_ids(db, username: str) -> set[str]:
@@ -42,12 +41,18 @@ def _completed_exercise_ids(db, username: str) -> set[str]:
             .execute()
             .data
         )
-        completed = {str(r["exercise_id"])
-                     for r in rows if r.get("exercise_id")}
+        completed = {str(r["exercise_id"]) for r in rows if r.get("exercise_id")}
 
         # Check submissions (Novo)
-        rows_sub = db.table("activity_submissions").select("metadata").eq(
-            "username", username).eq("activity_type", "quiz").execute().data or []
+        rows_sub = (
+            db.table("activity_submissions")
+            .select("metadata")
+            .eq("username", username)
+            .eq("activity_type", "quiz")
+            .execute()
+            .data
+            or []
+        )
         for r in rows_sub:
             meta = r.get("metadata") or {}
             qid = meta.get("quiz_id")
@@ -62,8 +67,15 @@ def _completed_exercise_ids(db, username: str) -> set[str]:
 def _completed_podcasts_ids(db, username: str) -> set[str]:
     try:
         completed = set()
-        rows_sub = db.table("activity_submissions").select("metadata").eq(
-            "username", username).eq("activity_type", "podcast").execute().data or []
+        rows_sub = (
+            db.table("activity_submissions")
+            .select("metadata")
+            .eq("username", username)
+            .eq("activity_type", "podcast")
+            .execute()
+            .data
+            or []
+        )
         for r in rows_sub:
             meta = r.get("metadata") or {}
             pid = meta.get("podcast_id") or meta.get("item_id")
@@ -77,9 +89,15 @@ def _completed_podcasts_ids(db, username: str) -> set[str]:
 def _completed_simulation_ids(db, username: str) -> set[str]:
     try:
         prog = set()
-        rows_sub = db.table("activity_submissions").select("metadata").eq(
-            "username", username).eq(
-            "activity_type", "simulation").execute().data or []
+        rows_sub = (
+            db.table("activity_submissions")
+            .select("metadata")
+            .eq("username", username)
+            .eq("activity_type", "simulation")
+            .execute()
+            .data
+            or []
+        )
         for r in rows_sub:
             meta = r.get("metadata") or {}
             sid = meta.get("simulation_id") or meta.get("item_id")
@@ -94,10 +112,8 @@ def _completed_simulation_ids(db, username: str) -> set[str]:
 # Builders de topics por categoria
 # ─────────────────────────────────────────────
 
-def _build_quiz_topics(
-        db,
-        username: str,
-        completed_ids: set[str]) -> list[dict]:
+
+def _build_quiz_topics(db, username: str, completed_ids: set[str]) -> list[dict]:
     try:
         rows = (
             db.table("quizzes")
@@ -113,26 +129,28 @@ def _build_quiz_topics(
             if patterns:
                 continue  # é ai_exercise, não quiz normal
             is_done = str(row["id"]) in completed_ids
-            topics.append({
-                "id": f"quiz-{row['id']}",
-                "title": f"📝 {row.get('title') or 'Quiz'}",
-                "description": row.get("description") or "Complete this quiz to progress.",
-                "status": "completed" if is_done else "pending",
-                "redirect_url": f"/quiz/{row['id']}",
-            })
+            topics.append(
+                {
+                    "id": f"quiz-{row['id']}",
+                    "title": f"📝 {row.get('title') or 'Quiz'}",
+                    "description": row.get("description")
+                    or "Complete this quiz to progress.",
+                    "status": "completed" if is_done else "pending",
+                    "redirect_url": f"/quiz/{row['id']}",
+                }
+            )
         return topics
     except Exception:
         return []
 
 
 def _build_simulation_topics(
-        db,
-        username: str,
-        completed_ids: set[str],
-        user_level: str) -> list[dict]:
+    db, username: str, completed_ids: set[str], user_level: str
+) -> list[dict]:
     try:
-        from app.core.utils.level_utils import matches_level
         from app.core.enums import normalize_level
+        from app.core.utils.level_utils import matches_level
+
         user_level_norm = normalize_level(user_level)
 
         # Simulations are global or user-owned? Usually global catalog.
@@ -151,26 +169,28 @@ def _build_simulation_topics(
             emoji = row.get("emoji") or "🎯"
             name = row.get("name") or "Simulation"
             is_done = str(row["id"]) in completed_ids
-            topics.append({
-                "id": f"sim-{row['id']}",
-                "title": f"{emoji} {name}",
-                "description": row.get("description") or "Practice with this simulation.",
-                "status": "completed" if is_done else "pending",
-                "redirect_url": f"/voice?simulation_id={row['id']}",
-            })
+            topics.append(
+                {
+                    "id": f"sim-{row['id']}",
+                    "title": f"{emoji} {name}",
+                    "description": row.get("description")
+                    or "Practice with this simulation.",
+                    "status": "completed" if is_done else "pending",
+                    "redirect_url": f"/voice?simulation_id={row['id']}",
+                }
+            )
         return topics
     except Exception:
         return []
 
 
 def _build_podcast_topics(
-        db,
-        username: str,
-        completed_ids: set[str],
-        user_level: str) -> list[dict]:
+    db, username: str, completed_ids: set[str], user_level: str
+) -> list[dict]:
     try:
-        from app.core.utils.level_utils import matches_level
         from app.core.enums import normalize_level
+        from app.core.utils.level_utils import matches_level
+
         user_level_norm = normalize_level(user_level)
 
         # Podcasts of THIS user
@@ -188,16 +208,18 @@ def _build_podcast_topics(
             if not matches_level(user_level_norm, level):
                 continue
             is_done = str(row["id"]) in completed_ids
-            topics.append({
-                "id": f"pod-{row['id']}",
-                "title": f"🎙 {row.get('title') or 'Podcast'}",
-                "description": (
-                    row.get("description")
-                    or f"Watch this {level} podcast ({duration})."
-                ),
-                "status": "completed" if is_done else "pending",
-                "redirect_url": f"/podcasts/{row['id']}",
-            })
+            topics.append(
+                {
+                    "id": f"pod-{row['id']}",
+                    "title": f"🎙 {row.get('title') or 'Podcast'}",
+                    "description": (
+                        row.get("description")
+                        or f"Watch this {level} podcast ({duration})."
+                    ),
+                    "status": "completed" if is_done else "pending",
+                    "redirect_url": f"/podcasts/{row['id']}",
+                }
+            )
         return topics
     except Exception:
         return []
@@ -207,9 +229,9 @@ def _build_podcast_topics(
 # Endpoint principal
 # ─────────────────────────────────────────────
 
+
 @router.get("/users/progress/weekly-plan")
-async def get_weekly_plan(
-        current_user: dict = Depends(get_current_user)):
+async def get_weekly_plan(current_user: dict = Depends(get_current_user)):
     """
     Retorna o Weekly Goal do usuário com todos os pendentes e concluídos.
     """
@@ -228,16 +250,18 @@ async def get_weekly_plan(
     topics.extend(_build_quiz_topics(db, username, completed_exercises))
 
     # 2. Simulations
-    topics.extend(_build_simulation_topics(
-        db, username, completed_simulations, current_user.get('level', 'A1')))
+    topics.extend(
+        _build_simulation_topics(
+            db, username, completed_simulations, current_user.get("level", "A1")
+        )
+    )
 
     # 3. Podcasts
     topics.extend(
         _build_podcast_topics(
-            db,
-            username,
-            completed_podcasts,
-            current_user.get('level', 'A1')))
+            db, username, completed_podcasts, current_user.get("level", "A1")
+        )
+    )
 
     # Ordenação: pendentes primeiro
     topics.sort(key=lambda x: 0 if x["status"] == "pending" else 1)

@@ -1,7 +1,6 @@
-import logging
 #!/usr/bin/env python3
-
 import json
+import logging
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -17,8 +16,11 @@ def test_pwa_files() -> bool:
         PUBLIC_DIR / "pwa-installer.js",
     ]
 
-    missing = [str(path.relative_to(PROJECT_ROOT))
-               for path in required_files if not path.exists()]
+    missing = [
+        str(path.relative_to(PROJECT_ROOT))
+        for path in required_files
+        if not path.exists()
+    ]
     for path in required_files:
         rel = path.relative_to(PROJECT_ROOT)
         if path.exists():
@@ -44,13 +46,17 @@ def test_manifest() -> bool:
         logging.info(f"ERROR: invalid manifest.json: {error}")
         return False
 
-    required_fields = ["name", "short_name", "start_url",
-                       "display", "background_color", "theme_color"]
-    missing_fields = [
-        field for field in required_fields if field not in manifest]
+    required_fields = [
+        "name",
+        "short_name",
+        "start_url",
+        "display",
+        "background_color",
+        "theme_color",
+    ]
+    missing_fields = [field for field in required_fields if field not in manifest]
     if missing_fields:
-        logging.info(
-            f"ERROR: missing fields in manifest.json: {missing_fields}")
+        logging.info(f"ERROR: missing fields in manifest.json: {missing_fields}")
         return False
 
     if not manifest.get("icons"):
@@ -69,8 +75,7 @@ def test_service_worker() -> bool:
 
     content = sw_path.read_text(encoding="utf-8")
     if "addEventListener" not in content:
-        logging.info(
-            "ERROR: invalid service worker (missing addEventListener)")
+        logging.info("ERROR: invalid service worker (missing addEventListener)")
         return False
 
     logging.info("OK: service worker syntax looks valid")
@@ -84,8 +89,7 @@ def main() -> int:
     logging.info("\n" + "=" * 50)
     if success:
         logging.info("SUCCESS: PWA checks passed")
-        logging.info(
-            "INFO: run local server and test installation in Chrome/Edge")
+        logging.info("INFO: run local server and test installation in Chrome/Edge")
         return 0
 
     logging.info("ERROR: PWA checks failed")

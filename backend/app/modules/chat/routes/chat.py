@@ -1,9 +1,21 @@
 from __future__ import annotations
 
+import json
 import logging
 
-import json
+from app.core.config import settings
+from app.core.dependencies.auth import get_current_user
 from app.core.exceptions import ContentNotFoundError
+from app.modules.chat.services.chat_service import ChatService
+from app.modules.chat.services.llm import text_to_speech
+from app.shared.services.history import (
+    create_conversation,
+    delete_conversation,
+    list_conversations,
+    load_history,
+    rename_conversation,
+    update_message,
+)
 from fastapi import (
     APIRouter,
     Depends,
@@ -14,19 +26,6 @@ from fastapi import (
     status,
 )
 from pydantic import BaseModel
-
-from app.core.dependencies.auth import get_current_user
-from app.modules.chat.services.chat_service import ChatService
-from app.shared.services.history import (
-    create_conversation,
-    delete_conversation,
-    list_conversations,
-    load_history,
-    rename_conversation,
-    update_message,
-)
-from app.modules.chat.services.llm import text_to_speech, groq_chat
-from app.core.config import settings
 
 router = APIRouter()
 
@@ -45,7 +44,7 @@ class TTSRequest(BaseModel):
 
 
 class CreateConversationBody(BaseModel):
-    title: str = 'Nova conversa'
+    title: str = "Nova conversa"
     is_simulation: bool = False
     simulation_id: str | None = None
 
@@ -53,13 +52,13 @@ class CreateConversationBody(BaseModel):
 # ── REST endpoints ────────────────────────────────────────────────────
 
 
-@router.post('/conversations', status_code=status.HTTP_201_CREATED)
+@router.post("/conversations", status_code=status.HTTP_201_CREATED)
 async def new_conversation(
     body: CreateConversationBody = CreateConversationBody(),
     current_user: dict = Depends(get_current_user),
 ):
     return await create_conversation(
-        username=current_user['username'],
+        username=current_user["username"],
         title=body.title,
         model=settings.llm_provider,
         is_simulation=body.is_simulation,
@@ -67,74 +66,84 @@ async def new_conversation(
     )
 
 
-@router.get('/conversations')
+@router.get("/conversations")
 async def get_conversations(
-        current_user: dict = Depends(get_current_user),
-        limit: int = Query(default=20, ge=1),
-        offset: int = Query(default=0, ge=0),
-    ):
-    return await list_conversations(current_user['username'], limit=limit, offset=offset)
+    current_user: dict = Depends(get_current_user),
+    limit: int = Query(default=20, ge=1),
+    offset: int = Query(default=0, ge=0),
+):
+    return await list_conversations(
+        current_user["username"], limit=limit, offset=offset
+    )
 
 
-@router.delete('/conversations/{conversation_id}',
-               status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 async def remove_conversation(
     conversation_id: str, current_user: dict = Depends(get_current_user)
 ):
-    if not await delete_conversation(conversation_id, current_user['username']):
-        raise ContentNotFoundError(detail='Conversa não encontrada')
+    if not await delete_conversation(conversation_id, current_user["username"]):
+        raise ContentNotFoundError(detail="Conversa não encontrada")
 
 
-@router.patch('/conversations/{conversation_id}/title')
+@router.patch("/conversations/{conversation_id}/title")
 async def update_title(
     conversation_id: str,
     body: RenameConversationBody,
     current_user: dict = Depends(get_current_user),
 ):
     conv = await rename_conversation(
-        conversation_id, current_user['username'], body.title
+        conversation_id, current_user["username"], body.title
     )
     if not conv:
-        raise ContentNotFoundError(detail='Conversa não encontrada')
+        raise ContentNotFoundError(detail="Conversa não encontrada")
     return conv
 
 
-@router.get('/conversations/{conversation_id}/messages')
+@router.get("/conversations/{conversation_id}/messages")
 async def get_history(
     conversation_id: str, current_user: dict = Depends(get_current_user)
 ):
     from app.core.database import get_client
+
     db = get_client()
     # Verifica se a conversa pertence ao usuário
-    conv = db.table('conversations').select(
-        'username').eq('id', conversation_id).execute()
-    if not conv.data or conv.data[0]['username'] != current_user['username']:
-        raise ContentNotFoundError(detail='Conversa não encontrada')
+    conv = (
+        db.table("conversations").select("username").eq("id", conversation_id).execute()
+    )
+    if not conv.data or conv.data[0]["username"] != current_user["username"]:
+        raise ContentNotFoundError(detail="Conversa não encontrada")
 
     messages = await load_history(conversation_id)
     return [
         m
         for m in messages
         if not (
-            m.get('role') == 'system'
-            and m.get('content', '').startswith('SUMMARY_CACHE_')
+            m.get("role") == "system"
+            and m.get("content", "").startswith("SUMMARY_CACHE_")
         )
     ]
 
 
-@router.patch('/conversations/{conversation_id}/messages/{message_id}')
+@router.patch("/conversations/{conversation_id}/messages/{message_id}")
 async def edit_message(
     conversation_id: str,
     message_id: str,
     body: EditMessageBody,
     current_user: dict = Depends(get_current_user),
 ):
-    msg = await update_message(message_id, current_user['username'], body.content, conversation_id=conversation_id)
+    msg = await update_message(
+        message_id,
+        current_user["username"],
+        body.content,
+        conversation_id=conversation_id,
+    )
     if not msg:
-        raise ContentNotFoundError(detail='Mensagem não encontrada')
+        raise ContentNotFoundError(detail="Mensagem não encontrada")
     return msg
 
-    @router.post('/conversations/{conversation_id}/messages/{message_id}')
+    @router.post("/conversations/{conversation_id}/messages/{message_id}")
     async def edit_message_post(
         conversation_id: str,
         message_id: str,
@@ -142,65 +151,69 @@ async def edit_message(
         current_user: dict = Depends(get_current_user),
     ):
         # Reuse same logic as PATCH endpoint
-        msg = await update_message(message_id, current_user['username'], body.content, conversation_id=conversation_id)
+        msg = await update_message(
+            message_id,
+            current_user["username"],
+            body.content,
+            conversation_id=conversation_id,
+        )
         if not msg:
-            raise ContentNotFoundError(detail='Mensagem não encontrada')
+            raise ContentNotFoundError(detail="Mensagem não encontrada")
         return msg
 
 
-@router.get('/conversations/{conversation_id}/summary')
+@router.get("/conversations/{conversation_id}/summary")
 async def get_summary(
     conversation_id: str,
-    lang: str = Query(default='pt'),
+    lang: str = Query(default="pt"),
     current_user: dict = Depends(get_current_user),
 ):
     from app.shared.services.history import get_summary as get_cached_summary
+
     summary = await get_cached_summary(conversation_id)
     # TODO: Add language translation based on 'lang' if needed
     return summary
 
 
-@router.post('/tts')
-async def tts_word(
-        body: TTSRequest,
-        current_user: dict = Depends(get_current_user)):
+@router.post("/tts")
+async def tts_word(body: TTSRequest, current_user: dict = Depends(get_current_user)):
     audio_b64 = await text_to_speech(body.text)
     if not audio_b64:
-        raise HTTPException(status_code=503, detail='TTS indisponível')
-    return {'audio': audio_b64}
+        raise HTTPException(status_code=503, detail="TTS indisponível")
+    return {"audio": audio_b64}
 
 
 # ── WebSocket ─────────────────────────────────────────────────────────
 
 
-@router.websocket('/ws')
+@router.websocket("/ws")
 async def chat_ws(
     websocket: WebSocket,
     token: str | None = Query(None),
     simulation_id: str | None = Query(None),
     service: ChatService = Depends(),
 ):
-    '''logging.info(f'--- [WS DEBUG START] ---')
+    """logging.info(f'--- [WS DEBUG START] ---')
     logging.info(f'[WS] Query Token: {token[:10] if token else "None"}')
-    logging.info(f'[WS] Headers: {dict(websocket.headers)}')'''
+    logging.info(f'[WS] Headers: {dict(websocket.headers)}')"""
 
     from app.core.security import decode_token
 
     # Restaurar suporte a Sec-WebSocket-Protocol (comum em SPAs)
     ws_token = token
     subprotocol = None
-    header_protocols = websocket.headers.get(
-        'sec-websocket-protocol', '')
+    header_protocols = websocket.headers.get("sec-websocket-protocol", "")
     # logging.info(f'[WS] Sec-WebSocket-Protocol Header: {header_protocols}')
 
     if header_protocols:
-        protocols = [p.strip() for p in header_protocols.split(',')]
+        protocols = [p.strip() for p in header_protocols.split(",")]
         for p in protocols:
-            if p != 'access_token' and not ws_token:
+            if p != "access_token" and not ws_token:
                 ws_token = p
-                subprotocol = 'access_token'
+                subprotocol = "access_token"
                 logging.info(
-                    f'[WS] Extracted token from subprotocol: {ws_token[:10]}...')
+                    f"[WS] Extracted token from subprotocol: {ws_token[:10]}..."
+                )
 
     # logging.info(f'[WS] Final ws_token: {ws_token[:10] if ws_token else "None"}')
     payload = decode_token(ws_token) if ws_token else None
@@ -210,12 +223,12 @@ async def chat_ws(
     await websocket.accept(subprotocol=subprotocol)
 
     if not payload:
-        logging.info('[WS] Rejeitando: Payload nulo')
-        await websocket.close(code=4001, reason='Token inválido')
+        logging.info("[WS] Rejeitando: Payload nulo")
+        await websocket.close(code=4001, reason="Token inválido")
         return
 
     # logging.info(f'[WS] ConexÃ£o aceita para: {payload.get("sub")}')
-    username = payload['sub']
+    username = payload["sub"]
     pending_drill_target = None
 
     # Se for simulação e não tiver mensagens, envia saudação inicial
@@ -232,27 +245,34 @@ async def chat_ws(
             try:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
-                logging.info(f'[WS] Erro de JSON: {raw}')
+                logging.info(f"[WS] Erro de JSON: {raw}")
                 continue
 
-            if msg.get('type') == 'ping':
-                await websocket.send_json({'type': 'pong'})
+            if msg.get("type") == "ping":
+                await websocket.send_json({"type": "pong"})
                 continue
 
             # logging.info(f'[WS] Processando: {msg.get("type")}')
             try:
                 pending_drill_target = await service.process_chat_message(
-                    websocket, msg, username, pending_drill_target, simulation_id=simulation_id
+                    websocket,
+                    msg,
+                    username,
+                    pending_drill_target,
+                    simulation_id=simulation_id,
                 )
             except Exception as e:
-                logging.info(f'[WS] Erro ao processar mensagem: {e}')
+                logging.info(f"[WS] Erro ao processar mensagem: {e}")
                 import traceback
+
                 traceback.print_exc()
                 try:
-                    await websocket.send_json({
-                        'type': 'error',
-                        'message': 'Desculpe, tive um problema de conexão. Por favor, tente novamente.'
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "error",
+                            "message": "Desculpe, tive um problema de conexão. Por favor, tente novamente.",
+                        }
+                    )
                 except BaseException:
                     pass
             # logging.info(f'[WS] Processamento finalizado')
@@ -261,6 +281,7 @@ async def chat_ws(
         pass
     except Exception:
         import traceback
+
         traceback.print_exc()
 
 
@@ -275,21 +296,23 @@ LIVE_SYSTEM_PROMPT = (
     "}\n"
 )
 
+
 def clean_and_parse_json(text: str) -> tuple[str, str | None]:
-    import re
     import json
+    import re
+
     clean = text.strip()
-    if clean.startswith('```'):
-        clean = re.sub(r'^```[\w]*\n?', '', clean)
-        clean = re.sub(r'\n?```$', '', clean.strip())
+    if clean.startswith("```"):
+        clean = re.sub(r"^```[\w]*\n?", "", clean)
+        clean = re.sub(r"\n?```$", "", clean.strip())
     try:
         # Tenta extrair qualquer coisa entre as chaves principais
-        match = re.search(r'\{.*\}', clean, re.DOTALL)
+        match = re.search(r"\{.*\}", clean, re.DOTALL)
         if match:
             clean = match.group(0)
         data = json.loads(clean)
-        reply = data.get('reply') or ''
-        correction = data.get('correction')
+        reply = data.get("reply") or ""
+        correction = data.get("correction")
         return reply.strip(), correction
     except Exception:
         # Fallback se falhar
@@ -302,18 +325,20 @@ def clean_and_parse_json(text: str) -> tuple[str, str | None]:
         return text, None
 
 
-@router.websocket('/live')
+@router.websocket("/live")
 async def voice_live_ws(
     websocket: WebSocket,
     token: str | None = Query(None),
 ):
-    import json
     import base64
+    import json
+
     from app.core.security import decode_token
     from app.modules.chat.services.llm import transcribe_audio
+
     payload = decode_token(token) if token else None
     if not payload:
-        await websocket.close(code=4001, reason='Token inválido')
+        await websocket.close(code=4001, reason="Token inválido")
         return
 
     await websocket.accept()
@@ -326,92 +351,100 @@ async def voice_live_ws(
                 raw_text = message["text"]
                 msg_data = json.loads(raw_text)
 
-                if msg_data.get('type') == 'ping':
-                    await websocket.send_json({'type': 'pong'})
+                if msg_data.get("type") == "ping":
+                    await websocket.send_json({"type": "pong"})
                     continue
 
-                if msg_data.get('type') == 'audio' and msg_data.get('audio'):
-                    audio_bytes = base64.b64decode(msg_data['audio'])
+                if msg_data.get("type") == "audio" and msg_data.get("audio"):
+                    audio_bytes = base64.b64decode(msg_data["audio"])
 
                     transcription = await transcribe_audio(
-                        audio_bytes,
-                        prompt="Phonetic practice live stream."
+                        audio_bytes, prompt="Phonetic practice live stream."
                     )
 
                     if transcription and not transcription.startswith("[Erro"):
-                        from app.modules.users.services.streaks import record_study_day
                         import asyncio
-                        asyncio.create_task(record_study_day(username, is_activity=True))
 
-                        await websocket.send_json({
-                            'type': 'transcription',
-                            'text': transcription
-                        })
+                        from app.modules.users.services.streaks import record_study_day
+
+                        asyncio.create_task(
+                            record_study_day(username, is_activity=True)
+                        )
+
+                        await websocket.send_json(
+                            {"type": "transcription", "text": transcription}
+                        )
 
                         from app.modules.chat.services.llm import groq_chat
+
                         messages = [
                             {"role": "system", "content": LIVE_SYSTEM_PROMPT},
-                            {"role": "user", "content": transcription}
+                            {"role": "user", "content": transcription},
                         ]
                         response_text = await groq_chat(messages)
                         reply, correction = clean_and_parse_json(response_text)
-                        final_json = json.dumps({"reply": reply, "correction": correction})
+                        final_json = json.dumps(
+                            {"reply": reply, "correction": correction}
+                        )
 
-                        await websocket.send_json({
-                            'type': 'stream_token',
-                            'content': final_json
-                        })
+                        await websocket.send_json(
+                            {"type": "stream_token", "content": final_json}
+                        )
 
                         audio_b64 = await text_to_speech(reply)
                         if audio_b64:
-                            await websocket.send_json({
-                                'type': 'audio_response',
-                                'audio': audio_b64,
-                                'content': final_json
-                            })
+                            await websocket.send_json(
+                                {
+                                    "type": "audio_response",
+                                    "audio": audio_b64,
+                                    "content": final_json,
+                                }
+                            )
 
-                        await websocket.send_json({'type': 'stream_end'})
+                        await websocket.send_json({"type": "stream_end"})
 
             elif "bytes" in message:
                 audio_bytes = message["bytes"]
                 transcription = await transcribe_audio(
-                    audio_bytes,
-                    prompt="Live audio chunk."
+                    audio_bytes, prompt="Live audio chunk."
                 )
                 if transcription and not transcription.startswith("[Erro"):
-                    from app.modules.users.services.streaks import record_study_day
                     import asyncio
+
+                    from app.modules.users.services.streaks import record_study_day
+
                     asyncio.create_task(record_study_day(username, is_activity=True))
 
-                    await websocket.send_json({
-                        'type': 'transcription',
-                        'text': transcription
-                    })
+                    await websocket.send_json(
+                        {"type": "transcription", "text": transcription}
+                    )
 
                     from app.modules.chat.services.llm import groq_chat
+
                     messages = [
                         {"role": "system", "content": LIVE_SYSTEM_PROMPT},
-                        {"role": "user", "content": transcription}
+                        {"role": "user", "content": transcription},
                     ]
                     response_text = await groq_chat(messages)
                     reply, correction = clean_and_parse_json(response_text)
                     final_json = json.dumps({"reply": reply, "correction": correction})
 
-                    await websocket.send_json({
-                        'type': 'stream_token',
-                        'content': final_json
-                    })
+                    await websocket.send_json(
+                        {"type": "stream_token", "content": final_json}
+                    )
 
                     audio_b64 = await text_to_speech(reply)
                     if audio_b64:
-                        await websocket.send_json({
-                            'type': 'audio_response',
-                            'audio': audio_b64,
-                            'content': final_json
-                        })
-                    await websocket.send_json({'type': 'stream_end'})
+                        await websocket.send_json(
+                            {
+                                "type": "audio_response",
+                                "audio": audio_b64,
+                                "content": final_json,
+                            }
+                        )
+                    await websocket.send_json({"type": "stream_end"})
 
     except WebSocketDisconnect:
         pass
     except Exception as exc:
-        logging.info(f'[LiveWS] Error: {exc}')
+        logging.info(f"[LiveWS] Error: {exc}")

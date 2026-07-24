@@ -1,8 +1,11 @@
 import asyncio
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Any
+
+from app.core.enums import CEFR_LABELS as _CEFR_LABEL_MAP
+from app.core.enums import normalize_level
 from app.modules.chat.services.llm import groq_chat_json, search_image_on_internet
-from app.core.enums import CEFR_LABELS as _CEFR_LABEL_MAP, normalize_level
+
 from .embeddings import EmbeddingsService
 
 
@@ -10,23 +13,23 @@ class CEFRGeneratorService:
     CEFR_LABELS = _CEFR_LABEL_MAP
 
     @staticmethod
-    def _build_image_search_query(card: Dict[str, Any]) -> str:
+    def _build_image_search_query(card: dict[str, Any]) -> str:
         """Monta uma query de busca curta e em inglês a partir do flashcard."""
-        front = (card.get('front') or '').strip()
-        back = (card.get('back') or '').strip()
-        explanation = (card.get('explanation') or '').strip()
+        front = (card.get("front") or "").strip()
+        back = (card.get("back") or "").strip()
+        explanation = (card.get("explanation") or "").strip()
 
         # Prioriza a resposta e o front; pega um fragmento curto da explicação
         parts = [p for p in (front, back) if p]
         if explanation:
-            parts.append(explanation.split('.')[0][:80])
+            parts.append(explanation.split(".")[0][:80])
 
-        query = ' '.join(parts)
+        query = " ".join(parts)
         # Limita tamanho para não poluir a busca
         return query[:200]
 
     @staticmethod
-    async def _add_image_to_card(card: Dict[str, Any]) -> None:
+    async def _add_image_to_card(card: dict[str, Any]) -> None:
         """Busca uma imagem relacionada ao flashcard e insere image_url no dict (in-place)."""
         query = CEFRGeneratorService._build_image_search_query(card)
         if not query:
@@ -34,23 +37,23 @@ class CEFRGeneratorService:
         try:
             img_url = await search_image_on_internet(query)
             if img_url:
-                card['image_url'] = img_url
+                card["image_url"] = img_url
         except Exception as e:
             logging.error(f"[CEFRGenerator] Falha ao buscar imagem para flashcard: {e}")
 
     @staticmethod
-    async def add_images_to_flashcards(flashcards: List[Dict[str, Any]]) -> None:
+    async def add_images_to_flashcards(flashcards: list[dict[str, Any]]) -> None:
         """Busca imagens para todos os flashcards em paralelo."""
         if not flashcards:
             return
-        await asyncio.gather(*[
-            CEFRGeneratorService._add_image_to_card(card)
-            for card in flashcards
-        ])
+        await asyncio.gather(
+            *[CEFRGeneratorService._add_image_to_card(card) for card in flashcards]
+        )
 
     @staticmethod
     async def generate_flashcards(
-            level: str, topic: str, count: int = 5, reference_ids: List[str] = None) -> Optional[List[Dict[str, Any]]]:
+        level: str, topic: str, count: int = 5, reference_ids: list[str] = None
+    ) -> list[dict[str, Any]] | None:
         """
         Gera flashcards baseados no material do nível CEFR usando o LLM.
         """
@@ -59,19 +62,22 @@ class CEFRGeneratorService:
 
         # Busca contexto relevante no pgvector
         context_docs = EmbeddingsService.search_similar_documents(
-            query=topic, level=level, top_k=5, reference_ids=reference_ids)
+            query=topic, level=level, top_k=5, reference_ids=reference_ids
+        )
 
         # Se não encontrou contexto, avisa
         if not context_docs:
             logging.info(
-                f"[CEFRGenerator] Aviso: Nenhum contexto encontrado para nível {level} e tópico '{topic}'")
+                f"[CEFRGenerator] Aviso: Nenhum contexto encontrado para nível {level} e tópico '{topic}'"
+            )
             context_text = "Nenhum material de referência específico encontrado. Use seu conhecimento geral para o nível CEFR."
         else:
             context_text = "\n\n".join(
-                [f"Trecho:\n{d.get('content', '')}" for d in context_docs])
+                [f"Trecho:\n{d.get('content', '')}" for d in context_docs]
+            )
 
         # Define regras específicas por nível para garantir nexo entre imagem e resposta
-        if level in ('A1', 'A2'):
+        if level in ("A1", "A2"):
             level_rules = """
         LEVEL-SPECIFIC RULES FOR A1/A2:
         - The flashcard MUST be based on a single, concrete object, person, place, action, or common everyday word.
@@ -123,21 +129,21 @@ class CEFRGeneratorService:
 
         try:
             data = await groq_chat_json(
-                messages=[{'role': 'user', 'content': prompt}],
+                messages=[{"role": "user", "content": prompt}],
                 max_tokens=2000,
                 temperature=0.3,
             )
 
-            flashcards = data.get('flashcards', [])
+            flashcards = data.get("flashcards", [])
             return flashcards
         except Exception as e:
-            logging.error(
-                f"[CEFRGenerator] Erro ao gerar flashcards: {e}")
+            logging.error(f"[CEFRGenerator] Erro ao gerar flashcards: {e}")
             return None
 
     @staticmethod
     async def generate_exercises(
-            level: str, topic: str, count: int = 3, reference_ids: List[str] = None) -> Optional[List[Dict[str, Any]]]:
+        level: str, topic: str, count: int = 3, reference_ids: list[str] = None
+    ) -> list[dict[str, Any]] | None:
         """
         Gera exercícios de múltipla escolha baseados no material.
         """
@@ -145,13 +151,15 @@ class CEFRGeneratorService:
         level_label = CEFRGeneratorService.CEFR_LABELS.get(level, level)
 
         context_docs = EmbeddingsService.search_similar_documents(
-            query=topic, level=level, top_k=5, reference_ids=reference_ids)
+            query=topic, level=level, top_k=5, reference_ids=reference_ids
+        )
 
         if not context_docs:
             context_text = "Nenhum material de referência específico encontrado."
         else:
             context_text = "\n\n".join(
-                [f"Trecho:\n{d.get('content', '')}" for d in context_docs])
+                [f"Trecho:\n{d.get('content', '')}" for d in context_docs]
+            )
 
         prompt = f"""
         You are a native English teacher creating practical exercises for students at CEFR level {level} ({level_label}).
@@ -187,20 +195,20 @@ class CEFRGeneratorService:
 
         try:
             data = await groq_chat_json(
-                messages=[{'role': 'user', 'content': prompt}],
+                messages=[{"role": "user", "content": prompt}],
                 max_tokens=2000,
                 temperature=0.3,
             )
 
-            return data.get('exercises', [])
+            return data.get("exercises", [])
         except Exception as e:
-            logging.error(
-                f"[CEFRGenerator] Erro ao gerar exercícios: {e}")
+            logging.error(f"[CEFRGenerator] Erro ao gerar exercícios: {e}")
             return None
 
     @staticmethod
     async def generate_simulations(
-            level: str, topic: str, count: int = 1, reference_ids: List[str] = None) -> Optional[List[Dict[str, Any]]]:
+        level: str, topic: str, count: int = 1, reference_ids: list[str] = None
+    ) -> list[dict[str, Any]] | None:
         """
         Gera simulações/cenários de roleplay baseados no material.
         Sempre gera exatamente 1 simulação por requisição (regra de negócio).
@@ -211,13 +219,15 @@ class CEFRGeneratorService:
         level_label = CEFRGeneratorService.CEFR_LABELS.get(level, level)
 
         context_docs = EmbeddingsService.search_similar_documents(
-            query=topic, level=level, top_k=5, reference_ids=reference_ids)
+            query=topic, level=level, top_k=5, reference_ids=reference_ids
+        )
 
         if not context_docs:
             context_text = "Nenhum material de referência específico encontrado."
         else:
             context_text = "\n\n".join(
-                [f"Trecho:\n{d.get('content', '')}" for d in context_docs])
+                [f"Trecho:\n{d.get('content', '')}" for d in context_docs]
+            )
 
         prompt = f"""
         You are a native English teacher creating roleplay scenarios (simulations) for students at CEFR level {level} ({level_label}).
@@ -249,13 +259,12 @@ class CEFRGeneratorService:
 
         try:
             data = await groq_chat_json(
-                messages=[{'role': 'user', 'content': prompt}],
+                messages=[{"role": "user", "content": prompt}],
                 max_tokens=2000,
                 temperature=0.3,
             )
 
-            return data.get('simulations', [])
+            return data.get("simulations", [])
         except Exception as e:
-            logging.error(
-                f"[CEFRGenerator] Erro ao gerar simulações: {e}")
+            logging.error(f"[CEFRGenerator] Erro ao gerar simulações: {e}")
             return None

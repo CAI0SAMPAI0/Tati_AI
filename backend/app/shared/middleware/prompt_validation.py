@@ -1,5 +1,6 @@
 import re
-from fastapi import Request, HTTPException
+
+from fastapi import HTTPException, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 # Simple list of known jailbreak patterns (can be extended)
@@ -13,6 +14,7 @@ JAILBREAK_PATTERNS = [
 ]
 
 compiled_patterns = [re.compile(p, re.IGNORECASE) for p in JAILBREAK_PATTERNS]
+
 
 class PromptValidationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -29,6 +31,9 @@ class PromptValidationMiddleware(BaseHTTPMiddleware):
             if isinstance(prompt, str):
                 for pattern in compiled_patterns:
                     if pattern.search(prompt):
-                        raise HTTPException(status_code=400, detail="Prompt contains prohibited content.")
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Prompt contains prohibited content.",
+                        )
         response = await call_next(request)
         return response

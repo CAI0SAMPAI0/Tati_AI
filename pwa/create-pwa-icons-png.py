@@ -3,7 +3,6 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ICONS_DIR = PROJECT_ROOT / "public" / "icons"
 ICONS_DIR.mkdir(parents=True, exist_ok=True)
@@ -29,9 +28,7 @@ def create_icon(size: int) -> Image.Image:
     text_x = (size - text_width) // 2
     text_y = (size - text_height) // 2 + size // 8
 
-    draw.text(
-        (text_x, text_y), text, fill=(
-            255, 255, 255, 255), font=font)
+    draw.text((text_x, text_y), text, fill=(255, 255, 255, 255), font=font)
     return img
 
 

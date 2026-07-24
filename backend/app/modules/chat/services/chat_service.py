@@ -1,32 +1,35 @@
-import logging
 import asyncio
 import base64
-import json
-import re
 import io
+import json
+import logging
+import re
+from datetime import date
+from typing import Any
+
 import docx
 import pypdf
-from typing import Dict, List, Any, Optional
-from datetime import date
-
-from fastapi import WebSocket
-from fastapi.concurrency import run_in_threadpool
-
 from app.core.config import settings
-from app.modules.chat.services.llm import stream_llm, text_to_speech, transcribe_audio, transcribe_audio_verbose
-from app.shared.services.history import save_message, load_llm_history, auto_title
-from app.core.enums import normalize_level
-from app.modules.chat.services.prompt_builder import UserProfile, build_effective_prompt
-from app.modules.chat.services.rag_search import obter_contexto_rag, RAGResult
-from app.modules.activities.services.pronunciation_matcher import match_pronunciation
 from app.core.dependencies.db import get_db
-from fastapi import Depends
+from app.core.enums import normalize_level
+from app.modules.activities.services.pronunciation_matcher import match_pronunciation
+from app.modules.chat.services.llm import (
+    stream_llm,
+    text_to_speech,
+    transcribe_audio_verbose,
+)
+from app.modules.chat.services.prompt_builder import UserProfile, build_effective_prompt
+from app.modules.chat.services.rag_search import RAGResult, obter_contexto_rag
+from app.shared.services.history import auto_title, load_llm_history, save_message
+from fastapi import Depends, WebSocket
+from fastapi.concurrency import run_in_threadpool
 
 
 class ChatService:
     def __init__(self, db: Any = Depends(get_db)) -> None:
-        if db is None or str(type(db)).find('Depends') != -1:
+        if db is None or str(type(db)).find("Depends") != -1:
             from app.core.database import get_client
+
             self.db = get_client()
         else:
             self.db = db
@@ -38,10 +41,13 @@ class ChatService:
                 return await run_in_threadpool(func)
             except Exception as e:
                 err_str = str(e).lower()
-                if ('disconnected' in err_str or 'connection' in err_str or 'protocol' in err_str) and attempt < retries - 1:
-                    logging.info(
-                        f'[ChatService] DB connection issue, retrying ({
-                            attempt + 1}/{retries})...')
+                if (
+                    "disconnected" in err_str
+                    or "connection" in err_str
+                    or "protocol" in err_str
+                ) and attempt < retries - 1:
+                    logging.info(f"[ChatService] DB connection issue, retrying ({
+                            attempt + 1}/{retries})...")
                     await asyncio.sleep(0.5 * (attempt + 1))
                     continue
                 raise e
@@ -49,9 +55,9 @@ class ChatService:
     async def get_user_profile(self, username: str) -> UserProfile:
         def _fetch():
             return (
-                self.db.table('users')
-                .select('name, custom_prompt, level, focus')
-                .eq('username', username)
+                self.db.table("users")
+                .select("name, custom_prompt, level, focus")
+                .eq("username", username)
                 .limit(1)
                 .execute()
                 .data
@@ -60,20 +66,19 @@ class ChatService:
         try:
             rows = await self._execute_db(_fetch)
         except Exception as e:
-            logging.info(
-                f'[ChatService] Error fetching user profile: {e}')
+            logging.info(f"[ChatService] Error fetching user profile: {e}")
             rows = []
 
         data = rows[0] if rows else {}
         return UserProfile(
             username=username,
-            name=data.get('name') or username,
-            level=normalize_level(data.get('level'), default='B1'),
-            focus=data.get('focus') or 'General Conversation',
-            custom_prompt=(data.get('custom_prompt') or '').strip(),
+            name=data.get("name") or username,
+            level=normalize_level(data.get("level"), default="B1"),
+            focus=data.get("focus") or "General Conversation",
+            custom_prompt=(data.get("custom_prompt") or "").strip(),
         )
 
-    async def check_access(self, username: str) -> Dict[str, Any]:
+    async def check_access(self, username: str) -> dict[str, Any]:
         """Verifica se o usuário pode enviar mensagens."""
         today = date.today()
         PAID_START = date(2026, 6, 30)
@@ -81,11 +86,11 @@ class ChatService:
 
         def _fetch_user():
             return (
-                self.db.table('users')
+                self.db.table("users")
                 .select(
-                    'username, role, is_exempt, is_premium_active, created_at, free_messages_used'
+                    "username, role, is_exempt, is_premium_active, created_at, free_messages_used"
                 )
-                .eq('username', username)
+                .eq("username", username)
                 .limit(1)
                 .execute()
                 .data
@@ -94,98 +99,108 @@ class ChatService:
         try:
             user_rows = await self._execute_db(_fetch_user)
         except Exception as e:
-            logging.info(f'[ChatService] Error checking access: {e}')
-            return {
-                'allowed': True,
-                'reason': None,
-                'free_messages_remaining': None}
+            logging.info(f"[ChatService] Error checking access: {e}")
+            return {"allowed": True, "reason": None, "free_messages_remaining": None}
 
         user = user_rows[0] if user_rows else {}
 
-        is_admin = user.get('role') in settings.staff_roles
-        is_exempt = user.get('is_exempt', False)
+        is_admin = user.get("role") in settings.staff_roles
+        is_exempt = user.get("is_exempt", False)
 
-        if is_admin or is_exempt or user.get('is_premium_active'):
-            return {
-                'allowed': True,
-                'reason': None,
-                'free_messages_remaining': None}
+        if is_admin or is_exempt or user.get("is_premium_active"):
+            return {"allowed": True, "reason": None, "free_messages_remaining": None}
 
         if today < PAID_START:
-            user_created = date.fromisoformat(user['created_at'][:10])
+            user_created = date.fromisoformat(user["created_at"][:10])
             if user_created < PAID_START:
                 return {
-                    'allowed': True,
-                    'reason': None,
-                    'free_messages_remaining': None,
+                    "allowed": True,
+                    "reason": None,
+                    "free_messages_remaining": None,
                 }
 
-        used = user.get('free_messages_used') or 0
+        used = user.get("free_messages_used") or 0
         remaining = max(0, FREE_MSG_LIMIT - used)
 
         if remaining <= 0:
             return {
-                'allowed': False,
-                'reason': 'free_limit_reached',
-                'free_messages_remaining': 0,
+                "allowed": False,
+                "reason": "free_limit_reached",
+                "free_messages_remaining": 0,
             }
 
-        return {'allowed': True, 'reason': None,
-                'free_messages_remaining': remaining}
+        return {"allowed": True, "reason": None, "free_messages_remaining": remaining}
 
     async def process_chat_message(
         self,
         websocket: WebSocket,
-        msg: Dict[str, Any],
+        msg: dict[str, Any],
         username: str,
-        pending_drill_target: Optional[str],
-        simulation_id: Optional[str] = None,
-    ) -> Optional[str]:
-        content = msg.get('content', '').strip()
-        conv_id = msg.get('conversation_id')
+        pending_drill_target: str | None,
+        simulation_id: str | None = None,
+    ) -> str | None:
+        content = msg.get("content", "").strip()
+        conv_id = msg.get("conversation_id")
 
         # 0. Segurança: Valida se a conversa pertence ao usuário
         if conv_id:
+
             def _check_conv():
-                return self.db.table('conversations').select(
-                    'username').eq('id', conv_id).execute().data
+                return (
+                    self.db.table("conversations")
+                    .select("username")
+                    .eq("id", conv_id)
+                    .execute()
+                    .data
+                )
 
             conv_rows = await self._execute_db(_check_conv)
-            if conv_rows and conv_rows[0]['username'] != username:
+            if conv_rows and conv_rows[0]["username"] != username:
                 logging.info(
                     f"[ChatSecurity] Alerta: Usuário {username} tentou acessar conversa {conv_id} de {
-                        conv_rows[0]['username']}")
-                await websocket.send_json({'type': 'error', 'message': 'Acesso negado à conversa.'})
+                        conv_rows[0]['username']}"
+                )
+                await websocket.send_json(
+                    {"type": "error", "message": "Acesso negado à conversa."}
+                )
                 return pending_drill_target
 
-        is_voice_mode = msg.get('origin') == 'voice'
-        msg_type = msg.get('type')
+        is_voice_mode = msg.get("origin") == "voice"
+        msg_type = msg.get("type")
 
         # 1. Transcrição ou Extração de Arquivo
         audio_metadata = {}
         phonetic_feedback_info = ""
-        if msg_type == 'audio':
+        if msg_type == "audio":
             # logging.info(f'[ChatService] Transcrevendo áudio para {username}...')
-            audio_bytes = base64.b64decode(msg.get('audio', ''))
-            trans_data = await transcribe_audio_verbose(audio_bytes, filename='input.webm')
+            audio_bytes = base64.b64decode(msg.get("audio", ""))
+            trans_data = await transcribe_audio_verbose(
+                audio_bytes, filename="input.webm"
+            )
             content = trans_data.get("text", "") if isinstance(trans_data, dict) else ""
             if isinstance(trans_data, dict) and "segments" in trans_data:
                 audio_metadata = {
                     "segments": trans_data["segments"],
                     "language": trans_data.get("language"),
-                    "duration": trans_data.get("duration")
+                    "duration": trans_data.get("duration"),
                 }
             # Run phonetic analysis to detect mismatch phonemes
             if content:
                 try:
-                    from app.shared.services.gemini_speech_service import gemini_speech_service
+                    from app.shared.services.gemini_speech_service import (
+                        gemini_speech_service,
+                    )
+
                     if gemini_speech_service.is_configured:
-                        gemini_res = await gemini_speech_service.evaluate_pronunciation(audio_bytes, content)
+                        gemini_res = await gemini_speech_service.evaluate_pronunciation(
+                            audio_bytes, content
+                        )
                         if "error" not in gemini_res:
                             incorrect_words = [
                                 f"'{w['word']}' (score: {w['score']}, error: {w['error_type']})"
                                 for w in gemini_res.get("words", [])
-                                if w.get("accuracy") == "incorrect" or w.get("score", 100) < 80
+                                if w.get("accuracy") == "incorrect"
+                                or w.get("score", 100) < 80
                             ]
                             if incorrect_words:
                                 phonetic_feedback_info = (
@@ -195,8 +210,15 @@ class ChatService:
                                     f"Please correct the student on these specific words in your response, being encouraging and friendly.\n"
                                 )
                     else:
-                        from app.shared.services.phonetic_service import phonetic_service
-                        phonetic_res = await run_in_threadpool(phonetic_service.evaluate_pronunciation, audio_bytes, content)
+                        from app.shared.services.phonetic_service import (
+                            phonetic_service,
+                        )
+
+                        phonetic_res = await run_in_threadpool(
+                            phonetic_service.evaluate_pronunciation,
+                            audio_bytes,
+                            content,
+                        )
                         if phonetic_res and phonetic_res.get("mismatches"):
                             mismatches = phonetic_res.get("mismatches", [])
                             phonetic_feedback_info = (
@@ -209,20 +231,20 @@ class ChatService:
                 except Exception as pe:
                     logging.error(f"Error in chat phonetic analysis: {pe}")
             # logging.info(f'[ChatService] Transcrição concluída: "{content[:50]}..."')
-            await websocket.send_json({'type': 'transcription', 'text': content})
-        elif msg_type == 'file':
-            filename = msg.get('filename', 'file.txt')
+            await websocket.send_json({"type": "transcription", "text": content})
+        elif msg_type == "file":
+            filename = msg.get("filename", "file.txt")
             extracted = await self.extract_text_from_file(
-                filename, msg.get('content', '')
+                filename, msg.get("content", "")
             )
-            caption = msg.get('caption', '').strip()
+            caption = msg.get("caption", "").strip()
             content = (
-                f'{caption}\n\n[Arquivo: {filename}]\n{extracted}'
+                f"{caption}\n\n[Arquivo: {filename}]\n{extracted}"
                 if caption
-                else f'[Arquivo: {filename}]\n{extracted}'
+                else f"[Arquivo: {filename}]\n{extracted}"
             )
             await websocket.send_json(
-                {'type': 'status', 'text': f'Arquivo {filename} lido.'}
+                {"type": "status", "text": f"Arquivo {filename} lido."}
             )
 
         if not content:
@@ -233,18 +255,18 @@ class ChatService:
             result = match_pronunciation(pending_drill_target, content)
             await websocket.send_json(
                 {
-                    'type': 'drill_result',
-                    'result': result,
-                    'target': pending_drill_target,
+                    "type": "drill_result",
+                    "result": result,
+                    "target": pending_drill_target,
                 }
             )
             pending_drill_target = None
 
         # 3. Access check
         access = await self.check_access(username)
-        if not access['allowed']:
+        if not access["allowed"]:
             await websocket.send_json(
-                {'type': 'error', 'code': 402, 'detail': 'Limit reached'}
+                {"type": "error", "code": 402, "detail": "Limit reached"}
             )
             return pending_drill_target
 
@@ -253,19 +275,23 @@ class ChatService:
         if not history:
             await auto_title(conv_id, username, content[:50])
 
-        user_audio_b64 = msg.get(
-            'audio') if msg_type == 'audio' else None
-        saved_user_msg = await save_message(conv_id, username, 'user', content, audio_b64=user_audio_b64)
-        if saved_user_msg and 'id' in saved_user_msg:
-            await websocket.send_json({
-                'type': 'message_id_update',
-                'role': 'user',
-                'real_id': saved_user_msg['id']
-            })
-        history.append({'role': 'user', 'content': content})
+        user_audio_b64 = msg.get("audio") if msg_type == "audio" else None
+        saved_user_msg = await save_message(
+            conv_id, username, "user", content, audio_b64=user_audio_b64
+        )
+        if saved_user_msg and "id" in saved_user_msg:
+            await websocket.send_json(
+                {
+                    "type": "message_id_update",
+                    "role": "user",
+                    "real_id": saved_user_msg["id"],
+                }
+            )
+        history.append({"role": "user", "content": content})
 
         # Streak e metadados (rápido)
         from app.modules.users.services.streaks import record_study_day
+
         asyncio.create_task(record_study_day(username))
 
         # 5. LLM Response - OTIMIZAÇÃO: Busca RAG, Perfil e Sentimento em PARALELO
@@ -279,45 +305,75 @@ class ChatService:
         if use_rag:
             tasks.append(run_in_threadpool(obter_contexto_rag, content))
         else:
-            async def _dummy_rag(): return RAGResult(contexto='', fontes='')
+
+            async def _dummy_rag():
+                return RAGResult(contexto="", fontes="")
+
             tasks.append(_dummy_rag())
 
         # Podcasts reais (busca rápida)
         def _fetch_pods():
             return (
-                self.db.table('podcasts').select('title, category').eq(
-                    'user_id',
-                    username).order(
-                    'created_at',
-                    desc=True).limit(5).execute().data)
+                self.db.table("podcasts")
+                .select("title, category")
+                .eq("user_id", username)
+                .order("created_at", desc=True)
+                .limit(5)
+                .execute()
+                .data
+            )
+
         tasks.append(self._execute_db(_fetch_pods))
 
         # Busca prompt de simulação em paralelo se houver
         if simulation_id:
+
             def _fetch_sim():
-                res = self.db.table('simulations').select('system_prompt').eq(
-                    'id', simulation_id).limit(1).execute().data
+                res = (
+                    self.db.table("simulations")
+                    .select("system_prompt")
+                    .eq("id", simulation_id)
+                    .limit(1)
+                    .execute()
+                    .data
+                )
                 if res:
                     return res
                 # Se não encontrar, tenta na tabela 'cefr_simulations'
-                res_cefr = self.db.table('cefr_simulations').select('scenario').eq(
-                    'id', simulation_id).limit(1).execute().data
+                res_cefr = (
+                    self.db.table("cefr_simulations")
+                    .select("scenario")
+                    .eq("id", simulation_id)
+                    .limit(1)
+                    .execute()
+                    .data
+                )
                 if res_cefr:
-                    return [{'system_prompt': res_cefr[0]['scenario']}]
+                    return [{"system_prompt": res_cefr[0]["scenario"]}]
                 return []
+
             tasks.append(self._execute_db(_fetch_sim))
         else:
-            async def _dummy_sim(): return []
+
+            async def _dummy_sim():
+                return []
+
             tasks.append(_dummy_sim())
 
         # --- Sprint 5: Análise de Sentimento (PARALELIZADA) ---
         async def _detect_sentiment_task(text: str) -> str:
             from app.modules.chat.services.llm import groq_chat
+
             prompt = f"Analyze student message and return ONLY ONE word representing their sentiment: FRUSTRATED, EXCITED, CONFUSED, NEUTRAL, or TIRED.\n\nMessage: {text}"
             try:
                 # Usa groq_chat diretamente (já é async) e especifica
                 # modelo ultra-rápido
-                res = await groq_chat([{"role": "user", "content": prompt}], max_tokens=10, temperature=0.1, model='llama-3.1-8b-instant')
+                res = await groq_chat(
+                    [{"role": "user", "content": prompt}],
+                    max_tokens=10,
+                    temperature=0.1,
+                    model="llama-3.1-8b-instant",
+                )
                 return res.strip().upper()
             except BaseException:
                 return "NEUTRAL"
@@ -334,15 +390,15 @@ class ChatService:
         sim_rows = results[3]
         sentiment = results[4]
 
-        sim_prompt = sim_rows[0].get(
-            'system_prompt') if sim_rows else None
+        sim_prompt = sim_rows[0].get("system_prompt") if sim_rows else None
 
         sentiment_map = {
             "FRUSTRATED": "Student feels FRUSTRATED. Be extremely patient, empathetic, and encouraging. Use simple words.",
             "EXCITED": "Student is EXCITED! Be very enthusiastic and celebrate their energy.",
             "CONFUSED": "Student is CONFUSED. Explain concepts slowly and clearly. Ask if they need an example.",
             "TIRED": "Student seems TIRED. Keep the conversation light, easy, and supportive.",
-            "NEUTRAL": ""}
+            "NEUTRAL": "",
+        }
         sentiment_instruction = sentiment_map.get(sentiment, "")
 
         effective_prompt = build_effective_prompt(
@@ -367,7 +423,9 @@ class ChatService:
             )
 
         if is_voice_mode:
-            effective_prompt += '\n\nCRITICAL: Voice mode. Keep responses very short (max 2 sentences).'
+            effective_prompt += (
+                "\n\nCRITICAL: Voice mode. Keep responses very short (max 2 sentences)."
+            )
             if audio_metadata:
                 segments_summary = []
                 for seg in audio_metadata.get("segments", []):
@@ -386,84 +444,99 @@ class ChatService:
 
         effective_prompt += '\n\nCRITICAL: If the user explicitly asks you to generate a PDF or a document, your VERY FIRST characters MUST be EXACTLY the tag "[GENERATE_PDF: filename.pdf]" where filename is related to the topic. DO NOT output any greetings or conversational text before this tag. Everything after this tag will be formatted into a downloadable PDF file. The content of the PDF MUST be entirely in English.'
 
-        await websocket.send_json({'type': 'stream_start', 'conversation_id': conv_id})
-        full_response = ''
+        await websocket.send_json({"type": "stream_start", "conversation_id": conv_id})
+        full_response = ""
         # Limite de tokens para velocidade
         max_tokens = 1000 if is_voice_mode else 1500
 
         is_pdf_generation = False
         pdf_filename = f"tati_doc_{conv_id}.pdf"
         pre_tag_text = ""
-        buffer = ''
+        buffer = ""
 
         async for token in stream_llm(effective_prompt, history, max_tokens=max_tokens):
             if not is_pdf_generation and len(buffer) < 500:
                 buffer += token
-                if '[GENERATE_PDF' in buffer and ']' in buffer:
+                if "[GENERATE_PDF" in buffer and "]" in buffer:
                     is_pdf_generation = True
-                    start_idx = buffer.find('[GENERATE_PDF')
-                    end_idx = buffer.find(']', start_idx)
-                    tag_content = buffer[start_idx:end_idx + 1]
+                    start_idx = buffer.find("[GENERATE_PDF")
+                    end_idx = buffer.find("]", start_idx)
+                    tag_content = buffer[start_idx : end_idx + 1]
 
-                    if ':' in tag_content:
-                        pdf_filename = tag_content.split(':', 1)[
-                            1].strip(' ]')
-                        if not pdf_filename.endswith('.pdf'):
-                            pdf_filename += '.pdf'
+                    if ":" in tag_content:
+                        pdf_filename = tag_content.split(":", 1)[1].strip(" ]")
+                        if not pdf_filename.endswith(".pdf"):
+                            pdf_filename += ".pdf"
 
                     # Extract pre-tag text and stream it immediately
                     pre_tag_text = buffer[:start_idx].strip()
                     if pre_tag_text:
-                        await websocket.send_json({'type': 'stream_token', 'content': pre_tag_text})
+                        await websocket.send_json(
+                            {"type": "stream_token", "content": pre_tag_text}
+                        )
 
                     # Get everything after the tag as PDF content
-                    full_response = buffer[end_idx + 1:].lstrip()
-                elif len(buffer) >= 500 and '[GENERATE_PDF' not in buffer:
+                    full_response = buffer[end_idx + 1 :].lstrip()
+                elif len(buffer) >= 500 and "[GENERATE_PDF" not in buffer:
                     # Flush buffer as normal text
                     full_response += buffer
-                    await websocket.send_json({'type': 'stream_token', 'content': buffer})
+                    await websocket.send_json(
+                        {"type": "stream_token", "content": buffer}
+                    )
             else:
                 if is_pdf_generation:
                     full_response += token
                 else:
                     full_response += token
-                    await websocket.send_json({'type': 'stream_token', 'content': token})
+                    await websocket.send_json(
+                        {"type": "stream_token", "content": token}
+                    )
 
         # Se terminou e buffer era menor que 500 e não era PDF
         if not is_pdf_generation and len(buffer) < 500 and buffer:
-            if '[GENERATE_PDF' not in buffer:
+            if "[GENERATE_PDF" not in buffer:
                 full_response += buffer
-                await websocket.send_json({'type': 'stream_token', 'content': buffer})
+                await websocket.send_json({"type": "stream_token", "content": buffer})
 
         if is_pdf_generation:
             try:
-                from app.shared.services.pdf_generator import generate_report_pdf, extract_pdf_and_clean
-                
+                from app.shared.services.pdf_generator import (
+                    extract_pdf_and_clean,
+                    generate_report_pdf,
+                )
+
                 # Reconstruct full LLM response to clean it from JSON delimiters
                 entire_response = buffer[:start_idx] + tag_content + full_response
-                pre_tag_extracted, pdf_filename_extracted, pdf_content = extract_pdf_and_clean(entire_response)
-                
+                pre_tag_extracted, pdf_filename_extracted, pdf_content = (
+                    extract_pdf_and_clean(entire_response)
+                )
+
                 if pdf_filename_extracted:
                     pdf_filename = pdf_filename_extracted
-                
+
                 pre_tag_text = pre_tag_extracted or pre_tag_text
                 full_response = pdf_content
 
                 pdf_path = generate_report_pdf(
-                    full_response.strip(), filename=pdf_filename)
-                with open(pdf_path, 'rb') as f:
-                    pdf_b64 = base64.b64encode(f.read()).decode('utf-8')
-                await websocket.send_json({
-                    'type': 'pdf_generated',
-                    'pdf_b64': pdf_b64,
-                    'filename': pdf_filename,
-                    'text': pre_tag_text or '📄 Document created successfully!'
-                })
+                    full_response.strip(), filename=pdf_filename
+                )
+                with open(pdf_path, "rb") as f:
+                    pdf_b64 = base64.b64encode(f.read()).decode("utf-8")
+                await websocket.send_json(
+                    {
+                        "type": "pdf_generated",
+                        "pdf_b64": pdf_b64,
+                        "filename": pdf_filename,
+                        "text": pre_tag_text or "📄 Document created successfully!",
+                    }
+                )
             except Exception as e:
                 logging.info(f"Error generating PDF: {e}")
-                await websocket.send_json({'type': 'stream_token', 'content': '\n[Error generating PDF]'})
+                await websocket.send_json(
+                    {"type": "stream_token", "content": "\n[Error generating PDF]"}
+                )
 
-        await websocket.send_json({'type': 'stream_end'})
+        await websocket.send_json({"type": "stream_end"})
 
         # 6. Finaliza em Background para não travar o socket
         asyncio.create_task(
@@ -476,48 +549,55 @@ class ChatService:
                 is_pdf_generation=is_pdf_generation,
                 pdf_filename=pdf_filename,
                 pre_tag=pre_tag_text,
-                simulation_id=simulation_id))
+                simulation_id=simulation_id,
+            )
+        )
 
         return pending_drill_target
 
     async def _run_background_tasks(
-        self, username: str, content: str, history: List[Dict[str, Any]]
+        self, username: str, content: str, history: list[dict[str, Any]]
     ):
         """Executa tarefas pesadas fora do fluxo principal do chat."""
         try:
             # 1. Podcast Discovery
-            from app.modules.activities.services.podcast_discovery import discover_personalized_podcasts
+            from app.modules.activities.services.podcast_discovery import (
+                discover_personalized_podcasts,
+            )
 
             profile = await self.get_user_profile(username)
             await discover_personalized_podcasts(username, username, profile.level)
 
             # 2. Record Streak
             from app.modules.users.services.streaks import record_study_day
+
             await record_study_day(username)
         except Exception as e:
-            logging.info(f'[Chat Background] Erro: {e}')
+            logging.info(f"[Chat Background] Erro: {e}")
 
     async def _post_response_tasks(
-            self,
-            username: str,
-            user_content: str,
-            full_response: str,
-            websocket: WebSocket,
-            conv_id: str,
-            is_pdf_generation: bool = False,
-            pdf_filename: str = None,
-            pre_tag: str = "",
-            simulation_id: Optional[str] = None):
+        self,
+        username: str,
+        user_content: str,
+        full_response: str,
+        websocket: WebSocket,
+        conv_id: str,
+        is_pdf_generation: bool = False,
+        pdf_filename: str = None,
+        pre_tag: str = "",
+        simulation_id: str | None = None,
+    ):
         """Tarefas após o streaming terminar."""
         try:
             # 0. XP (Gamification) - Recompensa por mensagem enviada
-            from app.modules.activities.services.gamification_service import GamificationService
+            from app.modules.activities.services.gamification_service import (
+                GamificationService,
+            )
+
             gs = GamificationService()
             asyncio.create_task(
-                gs.award_xp(
-                    username,
-                    gs.XP_REWARDS['message_sent'],
-                    'Chat activity'))
+                gs.award_xp(username, gs.XP_REWARDS["message_sent"], "Chat activity")
+            )
 
             # 1. TTS e Salvar (PRIORIDADE)
             audio_b64 = None
@@ -537,54 +617,78 @@ class ChatService:
                 db_content = "\n".join(parts)
 
             saved_assistant_msg = await save_message(
-                conv_id, username, 'assistant', db_content, audio_b64=audio_b64
+                conv_id, username, "assistant", db_content, audio_b64=audio_b64
             )
-            if saved_assistant_msg and 'id' in saved_assistant_msg:
+            if saved_assistant_msg and "id" in saved_assistant_msg:
                 try:
-                    await websocket.send_json({
-                        'type': 'message_id_update',
-                        'role': 'assistant',
-                        'real_id': saved_assistant_msg['id']
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "message_id_update",
+                            "role": "assistant",
+                            "real_id": saved_assistant_msg["id"],
+                        }
+                    )
                 except Exception as ws_err:
                     logging.info(f"Error sending assistant message ID update: {ws_err}")
 
             # Envia áudio imediatamente se for modo voz (opcional, já
             # vai via WS se for o caso)
             if audio_b64 and not is_pdf_generation:
-                await websocket.send_json({'type': 'audio_response', 'audio': audio_b64, 'content': full_response})
+                await websocket.send_json(
+                    {
+                        "type": "audio_response",
+                        "audio": audio_b64,
+                        "content": full_response,
+                    }
+                )
 
             if simulation_id:
                 try:
-                    from app.modules.simulation.services.simulation import check_objectives_completion
-                    res_msgs = self.db.table('messages')\
-                        .select('content')\
-                        .eq('session_id', conv_id)\
-                        .eq('role', 'user')\
+                    from app.modules.simulation.services.simulation import (
+                        check_objectives_completion,
+                    )
+
+                    res_msgs = (
+                        self.db.table("messages")
+                        .select("content")
+                        .eq("session_id", conv_id)
+                        .eq("role", "user")
                         .execute()
-                    user_texts = [r.get('content', '') for r in (res_msgs.data or [])]
+                    )
+                    user_texts = [r.get("content", "") for r in (res_msgs.data or [])]
                     if user_content not in user_texts:
                         user_texts.append(user_content)
-                    completed_objectives = check_objectives_completion(simulation_id, user_texts)
-                    await websocket.send_json({
-                        'type': 'simulation_state',
-                        'completed_objectives': completed_objectives
-                    })
+                    completed_objectives = check_objectives_completion(
+                        simulation_id, user_texts
+                    )
+                    await websocket.send_json(
+                        {
+                            "type": "simulation_state",
+                            "completed_objectives": completed_objectives,
+                        }
+                    )
                 except Exception as e:
-                    logging.info(f'[Chat Post-Response] Erro ao enviar simulation_state: {e}')
+                    logging.info(
+                        f"[Chat Post-Response] Erro ao enviar simulation_state: {e}"
+                    )
 
             # 1. Podcast Discovery (Atraso de 2s para não impactar a
             # resposta imediata)
             async def _delayed_discovery():
                 await asyncio.sleep(2)
-                from app.modules.activities.services.podcast_discovery import discover_personalized_podcasts
+                from app.modules.activities.services.podcast_discovery import (
+                    discover_personalized_podcasts,
+                )
+
                 profile = await self.get_user_profile(username)
                 await discover_personalized_podcasts(username, username, profile.level)
 
             asyncio.create_task(_delayed_discovery())
 
             # 2. Trophies
-            from app.modules.activities.services.trophy_service import check_chat_trophies
+            from app.modules.activities.services.trophy_service import (
+                check_chat_trophies,
+            )
 
             await run_in_threadpool(check_chat_trophies, username)
 
@@ -592,82 +696,81 @@ class ChatService:
             from app.modules.chat.services.semantic_judge import semantic_judge
 
             # Executa tarefas de background de forma assíncrona
-            asyncio.create_task(semantic_judge.check_topics_completion(
-                username, f"User: {user_content}\nTati: {full_response}"))
+            asyncio.create_task(
+                semantic_judge.check_topics_completion(
+                    username, f"User: {user_content}\nTati: {full_response}"
+                )
+            )
 
         except Exception as e:
-            logging.info(f'[Chat Post-Response] Erro: {e}')
+            logging.info(f"[Chat Post-Response] Erro: {e}")
 
-    async def extract_text_from_file(
-            self, filename: str, content_b64: str) -> str:
-        ext = filename.lower().rsplit(
-            '.', 1)[-1] if '.' in filename else ''
+    async def extract_text_from_file(self, filename: str, content_b64: str) -> str:
+        ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
 
         # Apenas permite extração de texto de arquivos suportados
-        text_exts = {
-            'txt',
-            'md',
-            'csv',
-            'json',
-            'py',
-            'js',
-            'html',
-            'css'}
+        text_exts = {"txt", "md", "csv", "json", "py", "js", "html", "css"}
 
-        image_exts = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'}
+        image_exts = {"png", "jpg", "jpeg", "gif", "bmp", "webp", "svg"}
 
         try:
             file_bytes = base64.b64decode(content_b64)
             if ext in image_exts:
-                from app.modules.chat.services.llm import preprocess_image_with_opencv, describe_image_with_gemini
+                from app.modules.chat.services.llm import (
+                    describe_image_with_gemini,
+                    preprocess_image_with_opencv,
+                )
+
                 # Preprocess with OpenCV
                 processed_bytes = preprocess_image_with_opencv(file_bytes)
                 # Describe with Gemini
                 description = await describe_image_with_gemini(processed_bytes)
-                return f"[Imagem anexada: {filename}]\nDescrição da imagem:\n{description}"
-            if ext == 'pdf':
+                return (
+                    f"[Imagem anexada: {filename}]\nDescrição da imagem:\n{description}"
+                )
+            if ext == "pdf":
                 reader = pypdf.PdfReader(io.BytesIO(file_bytes))
-                return '\n'.join(
-                    p.extract_text() for p in reader.pages if p.extract_text()).replace(
-                    '\x00', '')
-            if ext == 'docx':
+                return "\n".join(
+                    p.extract_text() for p in reader.pages if p.extract_text()
+                ).replace("\x00", "")
+            if ext == "docx":
                 doc = docx.Document(io.BytesIO(file_bytes))
-                return '\n'.join(
-                    p.text for p in doc.paragraphs).replace(
-                    '\x00', '')
-            if ext == 'pptx':
+                return "\n".join(p.text for p in doc.paragraphs).replace("\x00", "")
+            if ext == "pptx":
                 from pptx import Presentation
+
                 prs = Presentation(io.BytesIO(file_bytes))
                 text_runs = []
                 for slide in prs.slides:
                     for shape in slide.shapes:
                         if hasattr(shape, "text"):
                             text_runs.append(shape.text)
-                return '\n'.join(text_runs).replace('\x00', '')
-            if ext == 'xlsx':
+                return "\n".join(text_runs).replace("\x00", "")
+            if ext == "xlsx":
                 import openpyxl
-                wb = openpyxl.load_workbook(
-                    io.BytesIO(file_bytes), data_only=True)
+
+                wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
                 lines = []
                 for sheet in wb.worksheets:
                     for row in sheet.iter_rows(values_only=True):
-                        row_text = ' | '.join(
-                            [str(cell) for cell in row if cell is not None])
+                        row_text = " | ".join(
+                            [str(cell) for cell in row if cell is not None]
+                        )
                         if row_text:
                             lines.append(row_text)
-                return '\n'.join(lines).replace('\x00', '')
+                return "\n".join(lines).replace("\x00", "")
 
             if ext in text_exts:
-                text_content = file_bytes.decode(
-                    'utf-8', errors='ignore').replace('\x00', '')
+                text_content = file_bytes.decode("utf-8", errors="ignore").replace(
+                    "\x00", ""
+                )
                 if len(text_content) > 50000:
-                    return text_content[:50000] + \
-                        '\n\n[Texto truncado (muito grande)]'
+                    return text_content[:50000] + "\n\n[Texto truncado (muito grande)]"
                 return text_content
 
-            return f'[Arquivo anexado: {filename}. O conteúdo deste formato não pode ser lido diretamente pelo chat no momento.]'
+            return f"[Arquivo anexado: {filename}. O conteúdo deste formato não pode ser lido diretamente pelo chat no momento.]"
         except Exception as e:
-            return f'[Erro ao ler arquivo: {e}]'
+            return f"[Erro ao ler arquivo: {e}]"
 
     def _clean_tts_text(self, text: str) -> str:
         """Extrai apenas o campo 'reply' do JSON da IA para o TTS.
@@ -677,29 +780,17 @@ class ChatService:
             # Remove possíveis blocos de código markdown ao redor do
             # JSON
             clean = text.strip()
-            if clean.startswith('```'):
-                clean = re.sub(r'^```[\w]*\n?', '', clean)
-                clean = re.sub(r'\n?```$', '', clean.strip())
+            if clean.startswith("```"):
+                clean = re.sub(r"^```[\w]*\n?", "", clean)
+                clean = re.sub(r"\n?```$", "", clean.strip())
             data = json.loads(clean)
             # Usa apenas o campo 'reply' para o áudio — drill e
             # correction ficam silenciosos
-            reply = data.get('reply') or ''
-            reply = reply.replace(
-                '*',
-                '').replace(
-                '#',
-                '').replace(
-                '_',
-                '')
-            return reply.strip() or 'Please, repeat.'
+            reply = data.get("reply") or ""
+            reply = reply.replace("*", "").replace("#", "").replace("_", "")
+            return reply.strip() or "Please, repeat."
         except Exception:
             # Fallback: remove markdown e tags de drill
-            fallback = text.replace(
-                '*',
-                '').replace(
-                '#',
-                '').replace(
-                '_',
-                '')
-            fallback = re.sub(r'\[DRILL:.*?\]', '', fallback)
-            return fallback.strip() or 'Please, repeat.'
+            fallback = text.replace("*", "").replace("#", "").replace("_", "")
+            fallback = re.sub(r"\[DRILL:.*?\]", "", fallback)
+            return fallback.strip() or "Please, repeat."

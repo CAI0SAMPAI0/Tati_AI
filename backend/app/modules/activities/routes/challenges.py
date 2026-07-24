@@ -2,14 +2,14 @@
 Router de Challenge Semanal de Pronúncia.
 """
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 from app.core.dependencies.auth import get_current_user
 from app.modules.activities.services.pronunciation_challenge import (
     get_current_week_challenge,
-    submit_attempt,
     get_user_attempts,
+    submit_attempt,
 )
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -17,29 +17,26 @@ router = APIRouter()
 class PronunciationSubmission(BaseModel):
     challenge_id: str
     score: int
-    audio_b64: str = ''
+    audio_b64: str = ""
 
 
-@router.get('/challenges/current')
+@router.get("/challenges/current")
 async def get_current_challenge():
     """Challenge da semana atual."""
     return get_current_week_challenge()
 
 
-@router.post('/challenges/submit')
+@router.post("/challenges/submit")
 async def submit_pronunciation(
-        body: PronunciationSubmission,
-        current_user: dict = Depends(get_current_user)):
+    body: PronunciationSubmission, current_user: dict = Depends(get_current_user)
+):
     """Envia tentativa de pronúncia."""
     return submit_attempt(
-        current_user['username'],
-        body.challenge_id,
-        body.score,
-        body.audio_b64)
+        current_user["username"], body.challenge_id, body.score, body.audio_b64
+    )
 
 
-@router.get('/challenges/attempts')
-async def get_my_attempts(
-        current_user: dict = Depends(get_current_user)):
+@router.get("/challenges/attempts")
+async def get_my_attempts(current_user: dict = Depends(get_current_user)):
     """Retorna tentativas do usuário."""
-    return {'attempts': get_user_attempts(current_user['username'])}
+    return {"attempts": get_user_attempts(current_user["username"])}

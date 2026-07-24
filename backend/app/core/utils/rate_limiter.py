@@ -1,16 +1,16 @@
 import logging
+
 """
 Middleware de Rate Limiting para FastAPI.
 Usa Upstash Redis para controlar limites de requisições.
 """
 
-from fastapi import Request
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
-
 # Importa o serviço mas NÃO importa a função rate_limit_check globalmente
 # para evitar qualquer conflito com async
 import app.shared.services.upstash as upstash_mod
+from fastapi import Request
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -20,40 +20,38 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     """
 
     def __init__(
-            self,
-            app,
-            default_max_requests: int = 1000,
-            default_window: int = 3600):
+        self, app, default_max_requests: int = 1000, default_window: int = 3600
+    ):
         super().__init__(app)
         self.default_max_requests = default_max_requests
         self.default_window = default_window
 
         # Regras específicas por rota
         self.routes_config = {
-            '/auth/login': {
-                'max_requests': 50,
-                'window': 60,
+            "/auth/login": {
+                "max_requests": 50,
+                "window": 60,
             },
-            '/auth/login_form': {'max_requests': 50, 'window': 60},
-            '/auth/forgot-password': {'max_requests': 30, 'window': 3600},
-            '/validation/validate-document': {'max_requests': 20, 'window': 60},
-            '/chat': {'max_requests': 1000, 'window': 60},
-            '/api/chat': {'max_requests': 1000, 'window': 60},
-            '/users/permissions/access': {'max_requests': 200, 'window': 60},
+            "/auth/login_form": {"max_requests": 50, "window": 60},
+            "/auth/forgot-password": {"max_requests": 30, "window": 3600},
+            "/validation/validate-document": {"max_requests": 20, "window": 60},
+            "/chat": {"max_requests": 1000, "window": 60},
+            "/api/chat": {"max_requests": 1000, "window": 60},
+            "/users/permissions/access": {"max_requests": 200, "window": 60},
         }
 
     async def dispatch(self, request: Request, call_next):
         # Ignora rate limiting para WebSockets
-        if request.scope.get('type') == 'websocket':
+        if request.scope.get("type") == "websocket":
             return await call_next(request)
 
         # Ignora rate limiting para rotas de health check e estáticos
         if request.url.path in (
-            '/health',
-            '/cors-test',
-            '/docs',
-            '/openapi.json',
-            '/redoc',
+            "/health",
+            "/cors-test",
+            "/docs",
+            "/openapi.json",
+            "/redoc",
         ):
             response = await call_next(request)
             return response
@@ -64,40 +62,38 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # Verifica rate limit SOMENTE se Redis está disponível e
         # habilitado
         svc = upstash_mod.upstash_service
-        use_redis = svc and svc.enabled and getattr(
-            svc, '_redis', None) is not None
-        result = {'allowed': True}
+        use_redis = svc and svc.enabled and getattr(svc, "_redis", None) is not None
+        result = {"allowed": True}
 
         if use_redis:
             try:
-                limit_key = svc.rate_limit_key(
-                    identifier, request.url.path)
+                limit_key = svc.rate_limit_key(identifier, request.url.path)
                 result = await svc.rate_limit_check(
                     limit_key,
-                    max_requests=route_config['max_requests'],
-                    window_seconds=route_config['window'],
+                    max_requests=route_config["max_requests"],
+                    window_seconds=route_config["window"],
                 )
 
-                if not result.get('allowed', True):
-                    reset_at = result.get('reset_at', 60)
+                if not result.get("allowed", True):
+                    reset_at = result.get("reset_at", 60)
                     return JSONResponse(
                         status_code=429,
                         content={
-                            'detail': 'Rate limit exceeded',
-                            'retry_after': reset_at,
+                            "detail": "Rate limit exceeded",
+                            "retry_after": reset_at,
                         },
                         headers={
-                            'Retry-After': str(reset_at),
-                            'X-RateLimit-Remaining': '0',
-                            'X-RateLimit-Reset': str(reset_at),
-                            'Access-Control-Allow-Origin': request.headers.get(
-                                'Origin',
-                                '*'),
-                            'Access-Control-Allow-Credentials': 'true',
+                            "Retry-After": str(reset_at),
+                            "X-RateLimit-Remaining": "0",
+                            "X-RateLimit-Reset": str(reset_at),
+                            "Access-Control-Allow-Origin": request.headers.get(
+                                "Origin", "*"
+                            ),
+                            "Access-Control-Allow-Credentials": "true",
                         },
                     )
             except Exception as e:
-                logging.info(f'[RateLimiter] Erro no Redis: {e}')
+                logging.info(f"[RateLimiter] Erro no Redis: {e}")
                 svc._enabled = False
                 svc._redis = None
 
@@ -105,32 +101,30 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
 
         # Adiciona headers se o Redis foi usado com sucesso
-        if use_redis and result.get('allowed'):
-            response.headers['X-RateLimit-Remaining'] = str(
-                result.get('remaining', -1))
-            response.headers['X-RateLimit-Reset'] = str(
-                result.get('reset_at', 0))
+        if use_redis and result.get("allowed"):
+            response.headers["X-RateLimit-Remaining"] = str(result.get("remaining", -1))
+            response.headers["X-RateLimit-Reset"] = str(result.get("reset_at", 0))
 
         return response
 
     def _get_identifier(self, request: Request) -> str:
         """Obtém o identificador do usuário (IP ou username via sub do token)."""
-        auth_header = request.headers.get('Authorization', '')
-        if auth_header.startswith('Bearer '):
-            token = auth_header.split(' ')[1]
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
             from app.core.security import decode_token
 
             payload = decode_token(token)
-            if payload and 'sub' in payload:
+            if payload and "sub" in payload:
                 return f'user:{payload["sub"]}'
 
         # Caso contrário, usa o IP
-        client_ip = request.client.host if request.client else 'unknown'
-        forwarded = request.headers.get('X-Forwarded-For')
+        client_ip = request.client.host if request.client else "unknown"
+        forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
-            client_ip = forwarded.split(',')[0].strip()
+            client_ip = forwarded.split(",")[0].strip()
 
-        return f'ip:{client_ip}'
+        return f"ip:{client_ip}"
 
     def _get_route_config(self, path: str) -> dict:
         """Obtém configuração de rate limit para uma rota."""
@@ -145,8 +139,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         # Retorna padrão
         return {
-            'max_requests': self.default_max_requests,
-            'window': self.default_window,
+            "max_requests": self.default_max_requests,
+            "window": self.default_window,
         }
 
 

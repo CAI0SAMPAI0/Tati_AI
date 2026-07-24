@@ -1,8 +1,22 @@
 import os
-from fastapi import APIRouter, Depends, HTTPException, Header, Query, BackgroundTasks, Request
+
 from app.core.celery_app import celery_app
 from app.core.dependencies.auth import get_current_user
-from app.core.task_manager import run_task_in_background, get_local_task_status, local_tasks_status, delegate_to_worker_if_needed
+from app.core.task_manager import (
+    delegate_to_worker_if_needed,
+    get_local_task_status,
+    local_tasks_status,
+    run_task_in_background,
+)
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+)
 
 router = APIRouter(tags=["Tasks"])
 
@@ -13,22 +27,24 @@ async def smtp_probe(token: str = Query(None)):
     Testa quais portas SMTP são acessíveis de dentro do HF Space.
     Use: GET /tasks/smtp-probe?token=cai0_based
     """
-    import socket, time
+    import socket
+    import time
+
     cron_token = os.getenv("CRON_TOKEN", "cai0_based")
     if token != cron_token:
         raise HTTPException(status_code=403, detail="Invalid token.")
 
     HOSTS = [
-        ("smtp.gmail.com",                        465,  "Gmail SSL"),
-        ("smtp.gmail.com",                        587,  "Gmail TLS"),
-        ("smtp.sendgrid.net",                     587,  "SendGrid TLS"),
-        ("smtp.sendgrid.net",                     2525, "SendGrid 2525"),
-        ("in-v3.mailjet.com",                     587,  "Mailjet TLS"),
-        ("in-v3.mailjet.com",                     443,  "Mailjet 443"),
-        ("smtp-relay.brevo.com",                  587,  "Brevo TLS"),
-        ("smtp-relay.brevo.com",                  2525, "Brevo 2525"),
-        ("smtp.postmarkapp.com",                  587,  "Postmark TLS"),
-        ("smtp.postmarkapp.com",                  2525, "Postmark 2525"),
+        ("smtp.gmail.com", 465, "Gmail SSL"),
+        ("smtp.gmail.com", 587, "Gmail TLS"),
+        ("smtp.sendgrid.net", 587, "SendGrid TLS"),
+        ("smtp.sendgrid.net", 2525, "SendGrid 2525"),
+        ("in-v3.mailjet.com", 587, "Mailjet TLS"),
+        ("in-v3.mailjet.com", 443, "Mailjet 443"),
+        ("smtp-relay.brevo.com", 587, "Brevo TLS"),
+        ("smtp-relay.brevo.com", 2525, "Brevo 2525"),
+        ("smtp.postmarkapp.com", 587, "Postmark TLS"),
+        ("smtp.postmarkapp.com", 2525, "Postmark 2525"),
     ]
     results = []
     for host, port, desc in HOSTS:
@@ -37,9 +53,13 @@ async def smtp_probe(token: str = Query(None)):
             s = socket.create_connection((host, port), timeout=1.0)
             s.close()
             ms = round((time.time() - t0) * 1000)
-            results.append({"desc": desc, "host": host, "port": port, "ok": True, "ms": ms})
+            results.append(
+                {"desc": desc, "host": host, "port": port, "ok": True, "ms": ms}
+            )
         except Exception as e:
-            results.append({"desc": desc, "host": host, "port": port, "ok": False, "error": str(e)})
+            results.append(
+                {"desc": desc, "host": host, "port": port, "ok": False, "error": str(e)}
+            )
 
     working = [r for r in results if r["ok"]]
     return {
@@ -47,6 +67,8 @@ async def smtp_probe(token: str = Query(None)):
         "all": results,
         "recommendation": working[0] if working else None,
     }
+
+
 @router.get("/smtp-debug")
 async def smtp_debug(token: str = Query(None)):
     """
@@ -54,6 +76,7 @@ async def smtp_debug(token: str = Query(None)):
     Use: GET /tasks/smtp-debug?token=cai0_based
     """
     import os
+
     cron_token = os.getenv("CRON_TOKEN", "cai0_based")
     if token != cron_token:
         raise HTTPException(status_code=403, detail="Invalid token.")
@@ -71,7 +94,7 @@ async def smtp_debug(token: str = Query(None)):
         "has_cloud_amqp": bool(os.getenv("CLOUD_AMQP_URL")),
         "has_upstash_redis_url": bool(os.getenv("UPSTASH_REDIS_URL")),
         "has_upstash_redis_token": bool(os.getenv("UPSTASH_REDIS_TOKEN")),
-        "env_keys_list": list(os.environ.keys())
+        "env_keys_list": list(os.environ.keys()),
     }
 
 
@@ -83,7 +106,8 @@ async def send_inactivity_report(token: str = Query(None)):
     Use: GET /tasks/send-inactivity-report?token=cai0_based
     """
     import os
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta, timezone
+
     from app.core.database import get_client
     from app.shared.services.email import EmailSender
 
@@ -93,28 +117,46 @@ async def send_inactivity_report(token: str = Query(None)):
 
     db = get_client()
     now = datetime.now(timezone.utc)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat().replace("+00:00", "Z")
-    tomorrow_start = (now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)).isoformat().replace("+00:00", "Z")
+    today_start = (
+        now.replace(hour=0, minute=0, second=0, microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+    tomorrow_start = (
+        (now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1))
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
     try:
         # Busca notificações
-        notifs = db.table('notifications').select(
-            'username, title, body, created_at'
-        ).eq('category', 'retention').gte('created_at', today_start).lt('created_at', tomorrow_start).execute().data or []
+        notifs = (
+            db.table("notifications")
+            .select("username, title, body, created_at")
+            .eq("category", "retention")
+            .gte("created_at", today_start)
+            .lt("created_at", tomorrow_start)
+            .execute()
+            .data
+            or []
+        )
 
         # Busca dados adicionais de e-mail dos usuários
-        users = db.table('users').select('username, email, name').execute().data or []
-        user_map = {u['username']: u for u in users}
+        users = db.table("users").select("username, email, name").execute().data or []
+        user_map = {u["username"]: u for u in users}
     except Exception as e:
         import logging
+
         logging.error(f"[send-inactivity-report] Database query failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Erro ao consultar banco de dados: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Erro ao consultar banco de dados: {e}"
+        )
 
     sent_rows = ""
     for n in notifs:
-        username = n['username']
+        username = n["username"]
         # Ignora administradores no relatório de inatividade
-        if username in ('programador', 'professor'):
+        if username in ("programador", "professor"):
             continue
         u_info = user_map.get(username, {"email": "N/A", "name": username})
         sent_rows += f"""
@@ -155,15 +197,16 @@ async def send_inactivity_report(token: str = Query(None)):
             "smtp_port": email_sender.smtp_port,
             "smtp_user": email_sender.smtp_user,
             "smtp_from": email_sender.smtp_from,
-            "smtp_configured": email_sender.smtp_configured
+            "smtp_configured": email_sender.smtp_configured,
         }
         success = email_sender.send_email(
             to_email="cmsampaio71@gmail.com",
             subject=f"📊 Relatório Detalhado de Notificações - {now.strftime('%d/%m/%Y')}",
-            html=html
+            html=html,
         )
     except Exception as e:
         import logging
+
         logging.error(f"[send-inactivity-report] EmailSender call failed: {e}")
         error_detail = str(e)
         success = False
@@ -173,21 +216,21 @@ async def send_inactivity_report(token: str = Query(None)):
         "notifs_count": len(notifs),
         "recipient": "cmsampaio135@gmail.com",
         "smtp_info": smtp_info,
-        "error_detail": error_detail
+        "error_detail": error_detail,
     }
 
 
 @router.get("/health")
-
 async def celery_health(token: str = Query(None)):
     """
     Verifica se o Celery Beat está ativo e mostra o status de cada task agendada.
     Use: GET /tasks/health?token=cai0_based
     """
     import os
-    import httpx
     from datetime import datetime, timezone
-    from app.core.celery_app import celery_app, USE_CELERY
+
+    import httpx
+    from app.core.celery_app import USE_CELERY, celery_app
 
     cron_token = os.getenv("CRON_TOKEN", "cai0_based")
     if token != cron_token:
@@ -207,6 +250,7 @@ async def celery_health(token: str = Query(None)):
     waha_error = None
     try:
         from app.core.config import settings
+
         waha_url = f"{settings.waha_api_url}/api/server/status"
         waha_headers = {"X-Api-Key": settings.waha_api_key}
         async with httpx.AsyncClient(timeout=8.0) as client:
@@ -218,7 +262,10 @@ async def celery_health(token: str = Query(None)):
         waha_error = str(e)
 
     # Lista as tasks agendadas
-    schedule = {name: str(conf["schedule"]) for name, conf in celery_app.conf.beat_schedule.items()}
+    schedule = {
+        name: str(conf["schedule"])
+        for name, conf in celery_app.conf.beat_schedule.items()
+    }
 
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -236,8 +283,7 @@ async def celery_health(token: str = Query(None)):
 
 
 async def verify_cron_token(
-    x_cron_token: str = Header(None, alias="X-Cron-Token"),
-    token: str = Query(None)
+    x_cron_token: str = Header(None, alias="X-Cron-Token"), token: str = Query(None)
 ):
     cron_token = os.getenv("CRON_TOKEN")
     if not cron_token:
@@ -248,7 +294,9 @@ async def verify_cron_token(
 
 
 @router.get("/status/{task_id}")
-async def get_task_status(task_id: str, request: Request, current_user: dict = Depends(get_current_user)):
+async def get_task_status(
+    task_id: str, request: Request, current_user: dict = Depends(get_current_user)
+):
     """
     Rota para o front-end monitorar o progresso de PDFs ou Relatorios pesados.
     """
@@ -259,17 +307,17 @@ async def get_task_status(task_id: str, request: Request, current_user: dict = D
         return get_local_task_status(task_id)
 
     task_result = celery_app.AsyncResult(task_id)
-    
+
     if task_result.state == "PENDING":
         return {"status": "processing", "result": None}
-        
+
     elif task_result.state == "SUCCESS":
         # Retorna o valor de retorno da sua funcao do celery (ex: a URL do PDF no Supabase Storage)
         return {"status": "success", "result": task_result.result}
-        
+
     elif task_result.state == "FAILURE":
         return {"status": "failed", "error": str(task_result.info)}
-        
+
     return {"status": task_result.state.lower(), "result": None}
 
 
@@ -278,7 +326,7 @@ async def trigger_task(
     task_name: str,
     request: Request,
     background_tasks: BackgroundTasks,
-    verified: bool = Depends(verify_cron_token)
+    verified: bool = Depends(verify_cron_token),
 ):
     """
     Triggers a background Celery task securely. Used to support sleep mode on Railway by delegating cron schedules.
@@ -288,55 +336,87 @@ async def trigger_task(
         return delegate_res
     if task_name == "streak_reminders":
         from app.modules.notifications.tasks import streak_reminders
+
         task_id = run_task_in_background(background_tasks, streak_reminders)
     elif task_name == "broken_streaks":
         from app.modules.notifications.tasks import broken_streaks
+
         task_id = run_task_in_background(background_tasks, broken_streaks)
     elif task_name == "check_inactivity":
         from app.modules.notifications.tasks import check_inactivity
+
         task_id = run_task_in_background(background_tasks, check_inactivity)
     elif task_name == "weekly_reports":
         from app.modules.notifications.tasks import weekly_reports
+
         task_id = run_task_in_background(background_tasks, weekly_reports)
     elif task_name == "trigger-all-inactivity-nudges":
         # Dispara nudges para todos os alunos classificados como inativos (warning ou critical)
         from app.core.database import get_client
-        from app.modules.notifications.services.notification_dispatcher import dispatch_universal_notification
+        from app.modules.notifications.services.notification_dispatcher import (
+            dispatch_universal_notification,
+        )
+
         db = get_client()
-        
+
         # Busca usuários
-        users = db.table('users').select('username, name, email, role, streak_data, created_at').execute().data or []
-        
+        users = (
+            db.table("users")
+            .select("username, name, email, role, streak_data, created_at")
+            .execute()
+            .data
+            or []
+        )
+
         from datetime import datetime, timezone
+
         from dateutil.parser import parse as parse_dt
-        
+
         count = 0
         for u in users:
-            username = u.get('username')
-            role = u.get('role')
-            email = u.get('email')
-            
+            username = u.get("username")
+            role = u.get("role")
+            email = u.get("email")
+
             # Pula staff e usuários sem e-mail
-            if not username or role in ['programador', 'professor', 'admin'] or not email:
+            if (
+                not username
+                or role in ["programador", "professor", "admin"]
+                or not email
+            ):
                 continue
-                
+
             # Busca a última mensagem enviada por esse usuário de forma precisa
-            last_msg = db.table('messages').select('created_at').eq('username', username).eq('role', 'user').order('created_at', desc=True).limit(1).execute().data or []
-            
+            last_msg = (
+                db.table("messages")
+                .select("created_at")
+                .eq("username", username)
+                .eq("role", "user")
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+                .data
+                or []
+            )
+
             if last_msg:
-                last_active_str = last_msg[0].get('created_at')
+                last_active_str = last_msg[0].get("created_at")
             else:
-                last_active_str = u.get('created_at') or ''
+                last_active_str = u.get("created_at") or ""
 
             days_inactive = 0
             if last_active_str:
                 try:
                     last_active_dt = parse_dt(last_active_str)
-                    now = datetime.now(timezone.utc) if last_active_dt.tzinfo else datetime.now()
+                    now = (
+                        datetime.now(timezone.utc)
+                        if last_active_dt.tzinfo
+                        else datetime.now()
+                    )
                     days_inactive = (now - last_active_dt).days
                 except Exception:
                     pass
-            
+
             if days_inactive > 7:
                 # Aluno inativo! Disparar Nudge
                 count += 1
@@ -346,31 +426,37 @@ async def trigger_task(
                     title="Teacher Tati 👩‍🏫",
                     body=f"Hi {u.get('name', username)}! We missed you. You haven't practiced English in {days_inactive} days. Let's do a quick exercise today? 🚀",
                     url="/chat",
-                    sender_username="programador"
+                    sender_username="programador",
                 )
-        
-        return {"success": True, "message": f"Nudges enfileirados para {count} alunos inativos."}
+
+        return {
+            "success": True,
+            "message": f"Nudges enfileirados para {count} alunos inativos.",
+        }
     elif task_name == "cefr_weekly_gen":
         from app.modules.cefr.tasks import cefr_weekly_gen
+
         task_id = run_task_in_background(background_tasks, cefr_weekly_gen)
     elif task_name == "trigger-test-notif":
         # Dispara todas as notificações de teste para caio.sampaio
-        from app.modules.notifications.services.notification_dispatcher import dispatch_universal_notification
+        from app.modules.notifications.services.notification_dispatcher import (
+            dispatch_universal_notification,
+        )
+
         # Dispara
         await dispatch_universal_notification(
             username="caio.sampaio",
             title="Teacher Tati 👩‍🏫",
             body="Hey Caio! This is a test notification. It should arrive on WhatsApp, Email and App without Spam! 🚀",
             url="/chat",
-            sender_username="programador"
+            sender_username="programador",
         )
         task_id = "test_run_success"
     else:
         raise HTTPException(status_code=400, detail=f"Unknown cron task: {task_name}")
-        
-    return {
-        "success": True, 
-        "message": f"Task '{task_name}' triggered in background.", 
-        "task_id": task_id
-    }
 
+    return {
+        "success": True,
+        "message": f"Task '{task_name}' triggered in background.",
+        "task_id": task_id,
+    }

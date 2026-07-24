@@ -1,9 +1,10 @@
 from __future__ import annotations
+
 import logging
-from supabase import Client, create_client, ClientOptions
+
 import httpx
 from app.core.config import settings
-
+from supabase import Client, ClientOptions, create_client
 
 # acessa o supabase e evita bug de reconexão
 _client: Client | None = None
@@ -40,9 +41,9 @@ async def keep_alive_ping() -> bool:
     Retorna True se a conexão está saudável.
     """
     try:
-        get_client().table('users').select('username').limit(1).execute()
+        get_client().table("users").select("username").limit(1).execute()
         return True
     except Exception as exc:
-        logging.info(f'[DB Keepalive] Falha, resetando cliente: {exc}')
+        logging.info(f"[DB Keepalive] Falha, resetando cliente: {exc}")
         reset_client()
         return False

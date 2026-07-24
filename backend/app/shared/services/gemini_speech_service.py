@@ -1,34 +1,50 @@
-import logging
-import json
 import io
-from typing import Dict, Any
-from pydantic import BaseModel, Field
+import json
+import logging
+from typing import Any
+
 from app.core.config import settings
 from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
 
 # Pydantic models for structured output matching our API schema
 class WordAssessment(BaseModel):
     word: str = Field(description="The exact expected word from the reference text.")
     score: int = Field(description="Pronunciation accuracy score from 0 to 100.")
-    accuracy: str = Field(description="'correct' if score is 80 or above, otherwise 'incorrect'.")
-    error_type: str = Field(description="Phonetic error classification: 'None', 'Mispronunciation', 'Omission', or 'Insertion'.")
+    accuracy: str = Field(
+        description="'correct' if score is 80 or above, otherwise 'incorrect'."
+    )
+    error_type: str = Field(
+        description="Phonetic error classification: 'None', 'Mispronunciation', 'Omission', or 'Insertion'."
+    )
+
 
 class PronunciationAssessmentResponse(BaseModel):
     score: int = Field(description="Overall pronunciation score from 0 to 100.")
     accuracy_score: int = Field(description="Acoustic accuracy score from 0 to 100.")
     fluency_score: int = Field(description="Fluency and rhythm score from 0 to 100.")
-    completeness_score: int = Field(description="Percentage of words correctly pronounced from 0 to 100.")
-    words: list[WordAssessment] = Field(description="Word-by-word breakdown of the evaluation.")
-    feedback: str = Field(description="Detailed pedagogical feedback in Portuguese explaining accents, pauses, and phonetic deviations.")
+    completeness_score: int = Field(
+        description="Percentage of words correctly pronounced from 0 to 100."
+    )
+    words: list[WordAssessment] = Field(
+        description="Word-by-word breakdown of the evaluation."
+    )
+    feedback: str = Field(
+        description="Conversational, friendly feedback in Portuguese correcting pronunciation naturally, as if Tati were speaking to the student in person."
+    )
+
 
 class GeminiSpeechService:
     @property
     def is_configured(self) -> bool:
         return len(settings.gemini_keys) > 0
 
-    async def evaluate_pronunciation(self, audio_bytes: bytes, reference_text: str) -> Dict[str, Any]:
+    async def evaluate_pronunciation(
+        self, audio_bytes: bytes, reference_text: str
+    ) -> dict[str, Any]:
         """
         Evaluates pronunciation using Gemini 2.0 Flash Multimodal capabilities.
         Preprocesses audio to 16kHz mono WAV for high precision, then uses Pydantic schema
@@ -37,87 +53,79 @@ class GeminiSpeechService:
         if not self.is_configured:
             return {"error": "Gemini Speech Service is not configured."}
 
-        import google.generativeai as genai
-
         keys = settings.gemini_keys
         last_err = None
 
-        # 1. Preprocess audio to standard 16kHz mono WAV (Pillar 1: Formatos suportados & Isolamento de fonemas)
+        # 1. Preprocess audio to standard 16kHz mono WAV
         mime_type = "audio/wav"
         data_to_send = audio_bytes
         try:
-            import soundfile as sf
             import librosa
+            import soundfile as sf
 
             audio_fp = io.BytesIO(audio_bytes)
             speech, rate = sf.read(audio_fp)
-            
-            # If stereo, convert to mono
+
             if len(speech.shape) > 1:
                 speech = speech.mean(axis=1)
-            
-            # Resample to 16kHz for better phoneme isolation
+
             if rate != 16000:
                 speech = librosa.resample(speech, orig_sr=rate, target_sr=16000)
-            
+
             out_fp = io.BytesIO()
-            sf.write(out_fp, speech, 16000, format='WAV', subtype='PCM_16')
+            sf.write(out_fp, speech, 16000, format="WAV", subtype="PCM_16")
             data_to_send = out_fp.getvalue()
         except Exception as e:
-            logger.warning(f"[GeminiSpeech] Audio preprocessing failed, falling back to raw container bytes: {e}")
-            # Fallback to webm or general audio container if we cannot parse it locally
+            logger.warning(
+                f"[GeminiSpeech] Audio preprocessing failed, falling back to raw container bytes: {e}"
+            )
             mime_type = "audio/webm"
             data_to_send = audio_bytes
 
-        # 2. Engineering the Prompt (Pillar 4: Forneça o texto esperado e instruções fonéticas)
+        # 2. Conversational pronunciation correction prompt
         prompt = f"""
-You are an expert English speech therapist and English-as-a-Second-Language (ESL) instructor specializing in helping Brazilian Portuguese speakers.
-Analyze the pronunciation of the speaker in the provided audio file.
+You are Tati, a warm, friendly English teacher helping a Brazilian Portuguese speaker improve their pronunciation. You speak naturally, like a real conversation — NOT like a list or report.
 
-Expected text they were trying to read: "{reference_text}"
+Expected text: "{reference_text}"
 
-Compare the acoustic signals of the audio against this reference text.
-Assess:
-1. Phonetic correctness of each word. Be strict and pay close attention to:
-   - HETERONYMS: Identify words with identical spelling but different pronunciations based on syntactic context (e.g. "live" /laɪv/ vs /lɪv/, "read" /riːd/ vs /red/).
-   - COMMON PORTUGUESE-SPEAKER (L1) ERRORS:
-     * Epenthesis: Adding an extra vowel sound at the end of words ending in consonants (e.g. pronouncing "Facebook" as "Facebook-ee", "like" as "like-ee", "school" as "school-ee", "Jack" as "Jack-ee").
-     * Vowel length and phonetic confusion: e.g. pronouncing short /ɪ/ as long /iː/ (confusing "ship" and "sheep", "live" /lɪv/ and "leave" /liːv/, "bitch" and "beach").
-     * 'TH' sound substitutions: pronouncing /θ/ or /ð/ as 'f', 't', or 'd' (e.g. "think" as "tink"/"fink", "them" as "dem", "math" as "mat" or "maf").
-     * Nasalization of final consonants: silent 'm' or 'n' replaced by nasalized vowels (e.g. pronouncing "from" as "frõ").
-     * Aspirated 'H' vs Silent 'H' or 'R' sound confusion (e.g. pronouncing "have" as "ave" or "rave").
-     * Word stress: Placing stress on the wrong syllable.
-2. Rhythm, speed, pauses, and accent.
-3. Specific errors per word:
-   - "None" if correct.
-   - "Mispronunciation" if phonetically incorrect or displays any of the L1 errors above.
-   - "Omission" if skipped.
-   - "Insertion" if extra words were spoken.
+Listen to the audio and compare it to the expected text. Then respond as Tati would in a real tutoring session:
 
-CRITICAL INSTRUCTIONS:
-- You must be strict. Do not let mispronunciations pass as "correct" if they change the phoneme quality (such as adding "-ee" at the end of consonants, or mispronouncing vowel lengths). Mark these words as "Mispronunciation".
-- The feedback must be in Portuguese, friendly, encouraging, and pedagogical, explaining exactly which phonetic rules or common pitfalls the speaker fell into (e.g. "Cuidado para não adicionar o som de 'ee' no final de 'Jack'", or explaining the difference between ship and sheep).
+1. First, acknowledge what they said well (be genuine, not generic).
+2. Point out specific pronunciation issues in a conversational way:
+   - For epenthesis (extra "-ee" sounds): "Hey, I noticed you added an 'ee' sound at the end of 'Jack' — in English, we don't do that. Try saying just 'Jack', clean at the end."
+   - For vowel confusion (ship/sheep): "Careful with the vowel in 'ship' — it's short, like /ɪ/. The long version /iː/ would be 'sheep'. You said something closer to 'sheep'."
+   - For TH sounds: "The 'th' in 'think' is tricky! It's not 'tink' or 'fink' — try putting your tongue between your teeth."
+3. Give them the correct pronunciation with a simple tip they can remember.
+4. Encourage them warmly.
+
+CRITICAL RULES:
+- Your feedback MUST be conversational, like a real teacher talking to a student in a voice call.
+- Do NOT output a list or table. Talk naturally in Portuguese.
+- Be strict about mispronunciations but kind in your delivery.
+- Only mark words as "incorrect" if there's a real pronunciation issue, not minor accent differences.
+- The overall feedback should feel like Tati is having a friendly chat, not giving a report.
 """
 
-        # 3. Requesting structured outputs (Pillar 2: Respostas estruturadas via Pydantic)
+        # 3. Request structured outputs using the new google.genai client
         for key in keys:
             try:
-                genai.configure(api_key=key)
-                model = genai.GenerativeModel('gemini-2.0-flash')
+                from google import genai
+                from google.genai import types
 
-                audio_part = {
-                    "mime_type": mime_type,
-                    "data": data_to_send
-                }
+                client = genai.Client(api_key=key)
+
+                audio_part = types.Part.from_bytes(
+                    data=data_to_send, mime_type=mime_type
+                )
 
                 def _generate():
-                    # Request structured JSON matching the Pydantic schema
-                    response = model.generate_content(
-                        [prompt, audio_part],
-                        generation_config={
-                            "response_mime_type": "application/json",
-                            "response_schema": PronunciationAssessmentResponse
-                        }
+                    response = client.models.generate_content(
+                        model="gemini-2.0-flash",
+                        contents=[prompt, audio_part],
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_schema=PronunciationAssessmentResponse,
+                        ),
                     )
                     return response.text
 
@@ -131,5 +139,6 @@ CRITICAL INSTRUCTIONS:
 
         logger.error(f"Failed evaluating speech through Gemini: {last_err}")
         return {"error": f"Failed evaluating speech through Gemini: {last_err}"}
+
 
 gemini_speech_service = GeminiSpeechService()

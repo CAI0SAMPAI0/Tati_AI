@@ -1,24 +1,22 @@
 from __future__ import annotations
-import os
-import uuid
-from typing import Dict
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel
+import uuid
 
 from app.core.dependencies.auth import get_current_user
 from app.core.dependencies.db import get_db
-from supabase import Client
 from app.modules.auth.services.auth_service import AuthService
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel
+from supabase import Client
 
 router = APIRouter()
 
 # In-memory store for Capacitor OAuth polling results.
 # State → { 'jwt': str, 'user': dict } | None
-_oauth_results: Dict[str, dict] = {}
+_oauth_results: dict[str, dict] = {}
 
 
-#  Models 
+#  Models
 
 
 class RegisterBody(BaseModel):
@@ -28,7 +26,7 @@ class RegisterBody(BaseModel):
     email: str
     username: str
     password: str
-    level: str = 'A1'
+    level: str = "A1"
     is_hub_only: bool = False
 
 
@@ -43,7 +41,7 @@ class ForgotPasswordBody(BaseModel):
     """Identificador para recuperação de senha."""
 
     identifier: str
-    base_url: str = ''
+    base_url: str = ""
     is_app: bool = False
 
 
@@ -64,8 +62,8 @@ class ChangePasswordBody(BaseModel):
 #  Login ─
 
 
-@router.post('/login')
-@router.post('/login_form')
+@router.post("/login")
+@router.post("/login_form")
 async def login(
     request: Request,
     db: Client = Depends(get_db),
@@ -81,8 +79,8 @@ async def login(
     # Tenta ler como form-data (OAuth2PasswordRequestForm)
     try:
         form_data = await request.form()
-        username = form_data.get('username')
-        password = form_data.get('password')
+        username = form_data.get("username")
+        password = form_data.get("password")
     except Exception:
         pass
 
@@ -90,39 +88,34 @@ async def login(
     if not username or not password:
         try:
             json_data = await request.json()
-            username = json_data.get(
-                'username') or json_data.get('identifier')
-            password = json_data.get('password')
+            username = json_data.get("username") or json_data.get("identifier")
+            password = json_data.get("password")
         except Exception:
             pass
 
     if not username or not password:
         raise HTTPException(
             status_code=422,
-            detail='Credenciais não fornecidas ou formato inválido.',
+            detail="Credenciais não fornecidas ou formato inválido.",
         )
 
     return await AuthService.authenticate_user(db, username, password)
 
 
-#  Register 
+#  Register
 
 
-@router.post('/register', status_code=status.HTTP_201_CREATED)
-async def register(
-        body: RegisterBody,
-        db: Client = Depends(get_db)) -> dict:
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+async def register(body: RegisterBody, db: Client = Depends(get_db)) -> dict:
     """Cria nova conta de estudante."""
     return await AuthService.register_student(db, body)
 
 
-#  Google OAuth 
+#  Google OAuth
 
 
-@router.post('/google')
-async def google_login(
-        request: Request,
-        db: Client = Depends(get_db)) -> dict:
+@router.post("/google")
+async def google_login(request: Request, db: Client = Depends(get_db)) -> dict:
     """Authenticates via Google OAuth2. Creates account if needed.
     Handles both JSON body (web popup) and form-data (redirect callback)."""
     credential = None
@@ -131,8 +124,8 @@ async def google_login(
     # Try form-data (redirect callback from Google)
     try:
         form_data = await request.form()
-        credential = form_data.get('credential')
-        is_hub_only = form_data.get('is_hub_only', 'false') == 'true'
+        credential = form_data.get("credential")
+        is_hub_only = form_data.get("is_hub_only", "false") == "true"
     except Exception:
         pass
 
@@ -140,15 +133,15 @@ async def google_login(
     if not credential:
         try:
             json_data = await request.json()
-            credential = json_data.get('credential')
-            is_hub_only = json_data.get('is_hub_only', False)
+            credential = json_data.get("credential")
+            is_hub_only = json_data.get("is_hub_only", False)
         except Exception:
             pass
 
     if not credential:
         raise HTTPException(
             status_code=422,
-            detail='Google credential not provided.',
+            detail="Google credential not provided.",
         )
 
     return await AuthService.google_login(db, credential, is_hub_only)
@@ -157,92 +150,121 @@ async def google_login(
 #  Google OAuth via system browser (for Capacitor/Android)
 
 
-@router.get('/google/url')
-async def google_auth_url(request: Request, state: str = ''):
+@router.get("/google/url")
+async def google_auth_url(request: Request, state: str = ""):
     """Returns Google OAuth URL for system browser flow (Capacitor/Android)."""
     from app.core.config import settings
+
     if not settings.google_client_id or not settings.google_client_secret:
-        raise HTTPException(status_code=503, detail='Google OAuth not configured')
+        raise HTTPException(status_code=503, detail="Google OAuth not configured")
 
     if not state:
         state = uuid.uuid4().hex[:16]
     _oauth_results[state] = None  # placeholder
 
-    redirect_uri = str(request.url).split('?')[0].rsplit('/', 1)[0] + '/callback'
-    redirect_uri = redirect_uri.replace('http://', 'https://')
-    scopes = 'openid email profile'
+    redirect_uri = str(request.url).split("?")[0].rsplit("/", 1)[0] + "/callback"
+    redirect_uri = redirect_uri.replace("http://", "https://")
+    scopes = "openid email profile"
     url = (
-        f'https://accounts.google.com/o/oauth2/v2/auth'
-        f'?client_id={settings.google_client_id}'
-        f'&redirect_uri={redirect_uri}'
-        f'&response_type=code'
-        f'&scope={scopes}'
-        f'&state={state}'
-        f'&access_type=offline'
-        f'&prompt=consent'
+        f"https://accounts.google.com/o/oauth2/v2/auth"
+        f"?client_id={settings.google_client_id}"
+        f"&redirect_uri={redirect_uri}"
+        f"&response_type=code"
+        f"&scope={scopes}"
+        f"&state={state}"
+        f"&access_type=offline"
+        f"&prompt=consent"
     )
-    return {'url': url, 'state': state}
+    return {"url": url, "state": state}
 
 
 from fastapi.responses import HTMLResponse
 
 
-@router.get('/google/callback')
-async def google_callback(request: Request, code: str = '', state: str = '', db: Client = Depends(get_db)):
+@router.get("/google/callback")
+async def google_callback(
+    request: Request, code: str = "", state: str = "", db: Client = Depends(get_db)
+):
     """Handles Google OAuth callback, exchanges code for tokens, stores result for polling."""
     from app.core.config import settings
-    from app.core.security import create_access_token
     from app.core.enums import normalize_level
+    from app.core.security import create_access_token
 
     if not code:
-        return HTMLResponse('<html><body><h2>Authentication failed</h2><p>No code received.</p></body></html>', status_code=400)
+        return HTMLResponse(
+            "<html><body><h2>Authentication failed</h2><p>No code received.</p></body></html>",
+            status_code=400,
+        )
 
     if not settings.google_client_secret:
-        return HTMLResponse('<html><body><h2>Server error</h2><p>Google OAuth not configured.</p></body></html>', status_code=500)
+        return HTMLResponse(
+            "<html><body><h2>Server error</h2><p>Google OAuth not configured.</p></body></html>",
+            status_code=500,
+        )
 
     import httpx
-    redirect_uri = str(request.url).split('?')[0]
-    redirect_uri = redirect_uri.replace('http://', 'https://')
+
+    redirect_uri = str(request.url).split("?")[0]
+    redirect_uri = redirect_uri.replace("http://", "https://")
     token_data = {
-        'code': code,
-        'client_id': settings.google_client_id,
-        'client_secret': settings.google_client_secret,
-        'redirect_uri': redirect_uri,
-        'grant_type': 'authorization_code',
+        "code": code,
+        "client_id": settings.google_client_id,
+        "client_secret": settings.google_client_secret,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code",
     }
 
     async with httpx.AsyncClient() as client:
-        token_resp = await client.post('https://oauth2.googleapis.com/token', data=token_data, timeout=15)
+        token_resp = await client.post(
+            "https://oauth2.googleapis.com/token", data=token_data, timeout=15
+        )
 
     if token_resp.status_code != 200:
         import logging
+
         try:
             error_body = token_resp.text
         except Exception:
-            error_body = '(could not read body)'
-        logging.error(f'[GoogleCallback] Token exchange failed: status={token_resp.status_code}, body={error_body}, redirect_uri={redirect_uri}')
-        return HTMLResponse(f'<html><body><h2>Authentication failed</h2><p>Could not exchange code for tokens.</p><pre style="font-size:12px;color:#999;">{error_body}</pre></body></html>', status_code=400)
+            error_body = "(could not read body)"
+        logging.error(
+            f"[GoogleCallback] Token exchange failed: status={token_resp.status_code}, body={error_body}, redirect_uri={redirect_uri}"
+        )
+        return HTMLResponse(
+            f'<html><body><h2>Authentication failed</h2><p>Could not exchange code for tokens.</p><pre style="font-size:12px;color:#999;">{error_body}</pre></body></html>',
+            status_code=400,
+        )
 
     tokens = token_resp.json()
-    id_token_str = tokens.get('id_token')
+    id_token_str = tokens.get("id_token")
 
     if not id_token_str:
-        return HTMLResponse('<html><body><h2>Authentication failed</h2><p>No ID token received.</p></body></html>', status_code=400)
+        return HTMLResponse(
+            "<html><body><h2>Authentication failed</h2><p>No ID token received.</p></body></html>",
+            status_code=400,
+        )
 
     try:
         from google.auth.transport import requests as google_requests
         from google.oauth2 import id_token
+
         info = id_token.verify_oauth2_token(
-            id_token_str, google_requests.Request(), settings.google_client_id, clock_skew_in_seconds=60
+            id_token_str,
+            google_requests.Request(),
+            settings.google_client_id,
+            clock_skew_in_seconds=60,
         )
     except Exception:
-        return HTMLResponse('<html><body><h2>Authentication failed</h2><p>Invalid Google token.</p></body></html>', status_code=400)
+        return HTMLResponse(
+            "<html><body><h2>Authentication failed</h2><p>Invalid Google token.</p></body></html>",
+            status_code=400,
+        )
 
-    email = info.get('email', '').lower()
-    name = info.get('name', email.split('@')[0])
-    base_username = email.split('@')[0].replace('.', '_').lower()
+    email = info.get("email", "").lower()
+    name = info.get("name", email.split("@")[0])
+    base_username = email.split("@")[0].replace(".", "_").lower()
 
     from app.modules.users.repositories.user_repository import UserRepository
+
     existing_user = await UserRepository.find_by_email(db, email)
     if existing_user:
         user = existing_user
@@ -250,28 +272,32 @@ async def google_callback(request: Request, code: str = '', state: str = '', db:
         username = base_username
         suffix = 1
         while await UserRepository.find_by_username(db, username):
-            username = f'{base_username}{suffix}'
+            username = f"{base_username}{suffix}"
             suffix += 1
         new_user = {
-            'username': username, 'name': name, 'email': email,
-            'password': 'google_authenticated', 'role': 'student',
-            'level': 'A1', 'focus': 'General Conversation',
+            "username": username,
+            "name": name,
+            "email": email,
+            "password": "google_authenticated",
+            "role": "student",
+            "level": "A1",
+            "focus": "General Conversation",
         }
         await UserRepository.insert_user(db, new_user)
         user = new_user
 
     token_payload = {
-        'sub': user['username'],
-        'role': user.get('role', 'student'),
-        'level': normalize_level(user.get('level')),
+        "sub": user["username"],
+        "role": user.get("role", "student"),
+        "level": normalize_level(user.get("level")),
     }
     jwt_token = create_access_token(token_payload)
 
     # Store result for polling (Capacitor app polls this)
     if state and state in _oauth_results:
-        _oauth_results[state] = {'jwt': jwt_token, 'user': user}
+        _oauth_results[state] = {"jwt": jwt_token, "user": user}
 
-    return HTMLResponse('''<!DOCTYPE html>
+    return HTMLResponse("""<!DOCTYPE html>
 <html>
 <head><title>Login successful</title></head>
 <body style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;margin:0;background:#0a0a0c;color:#fff;">
@@ -281,47 +307,49 @@ async def google_callback(request: Request, code: str = '', state: str = '', db:
   <p style="font-size:13px;color:#666;">The app will detect the login automatically.</p>
 </div>
 </body>
-</html>''')
+</html>""")
 
 
-@router.get('/google/poll/{state:str}')
+@router.get("/google/poll/{state:str}")
 async def google_poll(state: str):
     """Polled by Capacitor app to retrieve OAuth result."""
     result = _oauth_results.get(state)
     if result is None:
-        return {'ready': False}
+        return {"ready": False}
     # Clean up after first read
     del _oauth_results[state]
-    return {'ready': True, 'jwt': result['jwt'], 'user': result['user']}
+    return {"ready": True, "jwt": result["jwt"], "user": result["user"]}
 
 
 #  Forgot password ─
 
 
-@router.post('/forgot-password')
+@router.post("/forgot-password")
 async def forgot_password(
-        body: ForgotPasswordBody,
-        db: Client = Depends(get_db)) -> dict:
+    body: ForgotPasswordBody, db: Client = Depends(get_db)
+) -> dict:
     """Envia link de redefinição de senha por e-mail."""
-    return await AuthService.process_forgot_password(db, body.identifier, body.base_url, body.is_app)
+    return await AuthService.process_forgot_password(
+        db, body.identifier, body.base_url, body.is_app
+    )
 
 
-@router.post('/reset-password')
-async def reset_password(
-        body: ResetPasswordBody,
-        db: Client = Depends(get_db)) -> dict:
+@router.post("/reset-password")
+async def reset_password(body: ResetPasswordBody, db: Client = Depends(get_db)) -> dict:
     """Redefine a senha usando token recebido por e-mail."""
-    return await AuthService.reset_password_with_token(db, body.token, body.new_password)
+    return await AuthService.reset_password_with_token(
+        db, body.token, body.new_password
+    )
 
 
 #  Change password (autenticado) ─
 
 
-@router.put('/password')
+@router.put("/password")
 async def change_password(
     body: ChangePasswordBody,
     current_user: dict = Depends(get_current_user),
-    db: Client = Depends(get_db)
+    db: Client = Depends(get_db),
 ) -> dict:
     """Troca a senha do usuário autenticado."""
     return await AuthService.change_password(db, current_user, body)

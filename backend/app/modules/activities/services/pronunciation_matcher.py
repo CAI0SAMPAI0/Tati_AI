@@ -1,50 +1,57 @@
 import logging
-from typing import Dict, Any
-from app.modules.chat.services.llm import transcribe_audio_verbose
+from typing import Any
+
 from app.core.enums import normalize_level
+from app.modules.chat.services.llm import transcribe_audio_verbose
 
 
 class PronunciationMatcher:
     def __init__(self):
         pass
 
-    async def evaluate(self,
-                       audio_bytes: bytes,
-                       reference_text: str,
-                       user_level: str = "A1") -> Dict[str,
-                                                             Any]:
+    async def evaluate(
+        self, audio_bytes: bytes, reference_text: str, user_level: str = "A1"
+    ) -> dict[str, Any]:
         """
         Avalia o áudio do aluno comparando-o com o texto de referência.
         """
         user_level = normalize_level(user_level)
 
         from app.shared.services.gemini_speech_service import gemini_speech_service
+
         if gemini_speech_service.is_configured:
             try:
-                gemini_res = await gemini_speech_service.evaluate_pronunciation(audio_bytes, reference_text)
+                gemini_res = await gemini_speech_service.evaluate_pronunciation(
+                    audio_bytes, reference_text
+                )
                 if "error" not in gemini_res:
                     return {
                         "score": gemini_res.get("score", 0),
                         "feedback": gemini_res.get("feedback", ""),
                         "transcription": reference_text,
-                        "words": gemini_res.get("words", [])
+                        "words": gemini_res.get("words", []),
                     }
             except Exception as e:
-                logging.info(f"[PronunciationMatcher] Gemini evaluation failed: {e}. Falling back to Whisper + LLM.")
+                logging.info(
+                    f"[PronunciationMatcher] Gemini evaluation failed: {e}. Falling back to Whisper + LLM."
+                )
 
         # 1. Transcrever com Whisper via Groq (com verbose_json para capturar logprobs)
         trans_data = await transcribe_audio_verbose(
             audio_bytes,
-            prompt="Transcribe the speech verbatim. Do not normalize or correct mispronunciations."
+            prompt="Transcribe the speech verbatim. Do not normalize or correct mispronunciations.",
         )
 
-        transcription = trans_data.get("text", "") if isinstance(trans_data, dict) else ""
+        transcription = (
+            trans_data.get("text", "") if isinstance(trans_data, dict) else ""
+        )
 
         if not transcription or transcription.startswith("[Erro"):
             return {
                 "score": 0,
                 "feedback": "I couldn't hear your voice clearly. Please try again.",
-                "transcription": ""}
+                "transcription": "",
+            }
 
         # Extração de métricas acústicas de logprob
         segments = trans_data.get("segments", [])
@@ -89,28 +96,30 @@ class PronunciationMatcher:
 
         try:
             from app.modules.chat.services.llm import groq_chat_json
-            data = await groq_chat_json([{"role": "user", "content": prompt}], temperature=0.2)
+
+            data = await groq_chat_json(
+                [{"role": "user", "content": prompt}], temperature=0.2
+            )
 
             if not data:
                 return {
                     "score": 50,
                     "feedback": "Tati heard you, but couldn't generate an accurate score right now.",
-                    "transcription": transcription}
+                    "transcription": transcription,
+                }
 
             return {
-                "score": data.get(
-                    "score",
-                    0),
-                "feedback": data.get(
-                    "feedback",
-                    "Good effort! Keep practicing."),
-                "transcription": transcription}
+                "score": data.get("score", 0),
+                "feedback": data.get("feedback", "Good effort! Keep practicing."),
+                "transcription": transcription,
+            }
         except Exception as e:
             logging.info(f"[PronunciationMatcher] Erro: {e}")
             return {
                 "score": 50,
                 "feedback": "Tati heard you, but couldn't generate an accurate score right now.",
-                "transcription": transcription}
+                "transcription": transcription,
+            }
 
 
 def match_pronunciation(target: str, student_text: str) -> dict:
@@ -119,15 +128,13 @@ def match_pronunciation(target: str, student_text: str) -> dict:
     Em uma refatoração futura, o chat deve usar o evaluate (async).
     """
     from difflib import SequenceMatcher
-    ratio = SequenceMatcher(
-        None,
-        target.lower(),
-        student_text.lower()).ratio()
+
+    ratio = SequenceMatcher(None, target.lower(), student_text.lower()).ratio()
     score = int(ratio * 100)
     return {
         "score": score,
         "is_perfect": score >= 95,
-        "feedback": "Good effort!" if score > 70 else "Keep practicing."
+        "feedback": "Good effort!" if score > 70 else "Keep practicing.",
     }
 
 

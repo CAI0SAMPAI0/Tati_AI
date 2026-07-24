@@ -2,16 +2,19 @@
 services/submission_service.py
 Serviço para submissão e correção de atividades abertas.
 """
+
+from typing import Any
+
 from app.core.dependencies.db import get_db
 from fastapi import Depends
-from typing import List, Dict, Any, Optional
 from fastapi.concurrency import run_in_threadpool
 
 
 class SubmissionService:
     def __init__(self, db: Any = Depends(get_db)) -> None:
-        if db is None or str(type(db)).find('Depends') != -1:
+        if db is None or str(type(db)).find("Depends") != -1:
             from app.core.database import get_client
+
             self.db = get_client()
         else:
             self.db = db
@@ -21,14 +24,14 @@ class SubmissionService:
 
         def _insert():
             res = (
-                self.db.table('activity_submissions')
+                self.db.table("activity_submissions")
                 .insert(
                     {
-                        'username': username,
-                        'module_id': payload.module_id,
-                        'activity_type': payload.activity_type,
-                        'student_answer': payload.student_answer,
-                        'status': 'pending',
+                        "username": username,
+                        "module_id": payload.module_id,
+                        "activity_type": payload.activity_type,
+                        "student_answer": payload.student_answer,
+                        "status": "pending",
                     }
                 )
                 .execute()
@@ -36,39 +39,41 @@ class SubmissionService:
 
             # Registra para ranking
             try:
-                self.db.table('study_sessions').insert(
+                self.db.table("study_sessions").insert(
                     {
-                        'username': username,
-                        'activity_type': payload.activity_type or 'exercise',
-                        'duration_minutes': 3,
-                    }).execute()
+                        "username": username,
+                        "activity_type": payload.activity_type or "exercise",
+                        "duration_minutes": 3,
+                    }
+                ).execute()
             except Exception:
                 pass
 
-            return res.data[0]['id']
+            return res.data[0]["id"]
 
         sub_id = await run_in_threadpool(_insert)
 
         # Registra a ofensiva (streak)
         try:
-            from app.modules.users.services.streaks import record_study_day
             import asyncio
+
+            from app.modules.users.services.streaks import record_study_day
+
             asyncio.create_task(record_study_day(username, is_activity=True))
         except Exception:
             pass
 
         return sub_id
 
-    async def get_my_submissions(
-            self, username: str) -> List[Dict[str, Any]]:
+    async def get_my_submissions(self, username: str) -> list[dict[str, Any]]:
         """Busca submissões do aluno."""
 
         def _fetch():
             return (
-                self.db.table('activity_submissions')
-                .select('*, modules(title)')
-                .eq('username', username)
-                .order('created_at', desc=True)
+                self.db.table("activity_submissions")
+                .select("*, modules(title)")
+                .eq("username", username)
+                .order("created_at", desc=True)
                 .execute()
                 .data
                 or []
@@ -77,48 +82,47 @@ class SubmissionService:
         return await run_in_threadpool(_fetch)
 
     async def list_all_admin(
-        self, status: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        self, status: str | None = None
+    ) -> list[dict[str, Any]]:
         """Admin: lista todas as submissões."""
 
         def _fetch():
             query = (
-                self.db.table('activity_submissions')
-                .select('*, users(name), modules(title)')
-                .order('created_at', desc=True)
+                self.db.table("activity_submissions")
+                .select("*, users(name), modules(title)")
+                .order("created_at", desc=True)
             )
             if status:
-                query = query.eq('status', status)
+                query = query.eq("status", status)
             return query.execute().data or []
 
         return await run_in_threadpool(_fetch)
 
     async def correct_submission(
-        self, sub_id: str, feedback: Optional[str], score: Optional[int]
+        self, sub_id: str, feedback: str | None, score: int | None
     ) -> bool:
         """Admin: corrige submissão."""
 
         def _update():
-            self.db.table('activity_submissions').update(
+            self.db.table("activity_submissions").update(
                 {
-                    'teacher_feedback': feedback,
-                    'score': score,
-                    'status': 'corrected',
+                    "teacher_feedback": feedback,
+                    "score": score,
+                    "status": "corrected",
                 }
-            ).eq('id', sub_id).execute()
+            ).eq("id", sub_id).execute()
 
         await run_in_threadpool(_update)
         return True
 
-    async def get_submission_by_id(
-            self, sub_id: str) -> Optional[Dict[str, Any]]:
+    async def get_submission_by_id(self, sub_id: str) -> dict[str, Any] | None:
         """Busca submissão por ID."""
 
         def _fetch():
             return (
-                self.db.table('activity_submissions')
-                .select('*, modules(title)')
-                .eq('id', sub_id)
+                self.db.table("activity_submissions")
+                .select("*, modules(title)")
+                .eq("id", sub_id)
                 .single()
                 .execute()
                 .data
