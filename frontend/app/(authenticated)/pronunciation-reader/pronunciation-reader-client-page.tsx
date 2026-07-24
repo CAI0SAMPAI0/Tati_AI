@@ -58,30 +58,77 @@ interface PracticeSentence {
 }
 
 const PRACTICE_SENTENCES: PracticeSentence[] = [
+  // A1 - Basic introductions, everyday objects, simple needs
   { text: "Hello, my name is Maria.", level: "A1", tip: "Focus on clear 'H' and 'L' sounds." },
-  { text: "I would like a coffee, please.", level: "A1", tip: "Stress the second syllable in 'cof-fee'." },
-  { text: "Where is the nearest train station?", level: "A1", tip: "Rising intonation at the end for questions." },
-  { text: "Can you help me find my way?", level: "A1", tip: "The 'h' in 'help' should be aspirated (breathy)." },
-  { text: "I have been learning English for three years.", level: "A2", tip: "TH sound: place tongue between teeth." },
+  { text: "I am a student from Brazil.", level: "A1", tip: "Short 'a' in 'am' — don't draw it out." },
+  { text: "I live in a small apartment.", level: "A1", tip: "The 'v' in 'live' touches your upper teeth." },
+  { text: "This is my friend, John.", level: "A1", tip: "The 'th' in 'this' — tongue between teeth." },
+  { text: "I like coffee and bread.", level: "A1", tip: "Stress 'cof-fee' on the first syllable." },
+  { text: "She goes to school by bus.", level: "A1", tip: "The 's' in 'bus' is sharp, not like 'z'." },
+  { text: "We have two cats at home.", level: "A1", tip: "Short 'a' in 'cats' — keep it quick." },
+  { text: "He works in a big hospital.", level: "A1", tip: "Stress 'HOS-pi-tal' on the first syllable." },
+  { text: "The book is on the table.", level: "A1", tip: "Clear 't' at the start of 'table'." },
+  { text: "It is a sunny day today.", level: "A1", tip: "Double 'n' in 'sunny' — one smooth sound." },
+
+  // A2 - Daily routines, travel, personal experiences
+  { text: "I usually wake up at seven o'clock.", level: "A2", tip: "The 's' in 'usually' sounds like 'zh'." },
   { text: "She doesn't like to wake up early.", level: "A2", tip: "The 'ea' in 'early' is one long sound." },
-  { text: "We are planning to travel next summer.", level: "A2", tip: "Stress 'trav-el' on the first syllable." },
+  { text: "I have been learning English for three years.", level: "A2", tip: "TH sound: place tongue between teeth." },
+  { text: "We went to the beach last weekend.", level: "A2", tip: "The 'ch' in 'beach' is a soft sound." },
   { text: "Could you repeat that, please?", level: "A2", tip: "Rising intonation on 'please' sounds polite." },
+  { text: "I need to buy some milk and eggs.", level: "A2", tip: "Link words: 'milk and eggs' flows together." },
+  { text: "The restaurant serves delicious Italian food.", level: "A2", tip: "Stress 'res-tau-rant' — three clear syllables." },
+  { text: "My brother is taller than me.", level: "A2", tip: "The 'th' in 'than' — tongue between teeth." },
+  { text: "It rained a lot during our vacation.", level: "A2", tip: "The 'ai' in 'rained' is a long sound." },
+  { text: "Can you tell me where the station is?", level: "A2", tip: "The 's' in 'station' sounds like 'sh'." },
+
+  // B1 - Opinions, experiences, work, future plans
+  { text: "I think we should take a break now.", level: "B1", tip: "The 'th' in 'think' is unvoiced — tongue out." },
   { text: "I would have gone if I had known about it.", level: "B1", tip: "Past conditionals: rhythm matters more than speed." },
   { text: "The weather has been particularly warm this month.", level: "B1", tip: "Link words smoothly: 'has been', 'this month'." },
   { text: "She is considering applying for a promotion.", level: "B1", tip: "The 'ing' ending should be clear, not 'in'." },
   { text: "Despite the difficulties, we managed to finish on time.", level: "B1", tip: "Emphasize 'de-SPITE' and 'MA-naged'." },
+  { text: "I enjoy reading books about history and science.", level: "B1", tip: "The 'j' in 'enjoy' — push air through." },
+  { text: "They moved to a new city because of his job.", level: "B1", tip: "The 'c' in 'city' is soft like 's'." },
+  { text: "We are looking forward to the weekend trip.", level: "B1", tip: "Phrasal verb stress: 'LOOK-ing for-WARD'." },
+  { text: "He apologized for arriving late to the meeting.", level: "B1", tip: "Stress 'a-PO-lo-gized' on the second syllable." },
+  { text: "The movie was not as good as I expected.", level: "B1", tip: "The 'x' in 'expected' sounds like 'ks'." },
+
+  // B2 - Abstract ideas, debates, professional topics
   { text: "The instructions were quite straightforward, weren't they?", level: "B2", tip: "Tag questions rise at the end for real questions." },
   { text: "If I were you, I would reconsider the entire approach.", level: "B2", tip: "Subjunctive 'were' — don't skip it." },
   { text: "The committee has decided to postpone the project indefinitely.", level: "B2", tip: "Multi-syllable words: give each syllable space." },
-  { text: "Notwithstanding the evidence, the jury reached an unanimous verdict.", level: "B2", tip: "Focus on consonant clusters: 'stand', 'ver-dict'." },
+  { text: "Notwithstanding the evidence, the jury reached a unanimous verdict.", level: "B2", tip: "Focus on consonant clusters: 'stand', 'ver-dict'." },
+  { text: "The government ought to invest more in renewable energy.", level: "B2", tip: "The 'gh' in 'ought' is silent." },
+  { text: "It is worth considering the long-term implications.", level: "B2", tip: "The 'th' in 'worth' — unvoiced, tongue out." },
+  { text: "Her presentation was remarkably insightful and well-structured.", level: "B2", tip: "Stress 'pre-sen-TA-tion' on the third syllable." },
+  { text: "The outbreak of the pandemic changed everything overnight.", level: "B2", tip: "The 'p' in 'pandemic' is aspirated (puff of air)." },
+  { text: "We need to foster a culture of innovation and collaboration.", level: "B2", tip: "The 't' in 'culture' sounds like 'ch'." },
+  { text: "The phenomenon is not as straightforward as it seems.", level: "B2", tip: "Stress 'phe-NO-me-non' on the second syllable." },
+
+  // C1 - Complex topics, professional discourse, nuanced expression
   { text: "The pharmaceutical industry has undergone substantial regulatory reforms.", level: "C1", tip: "Focus on word stress: 'phar-ma-CEU-ti-cal', 're-GU-la-to-ry'." },
-  { text: "Nevertheless, the implications of this socioeconomic phenomenon remain contentious.", level: "C1", tip: "Long words: break them into syllables and maintain rhythm." },
-  { text: "The government's austerity measures have precipitated widespread public dissent.", level: "C1", tip: "Pay attention to consonant clusters: 'stri-ty', 'pre-CI-pi-ta-ted'." },
-  { text: "From a pedagogical standpoint, the curriculum requires a more nuanced approach.", level: "C1", tip: "Stress the right syllables: 'pe-da-GO-gi-cal', 'NU-an-ced'." },
+  { text: "Nevertheless, the implications of this socioeconomic phenomenon remain contentious.", level: "C1", tip: "Long words: break into syllables and maintain rhythm." },
+  { text: "The government's austerity measures have precipitated widespread public dissent.", level: "C1", tip: "Consonant clusters: 'stri-ty', 'pre-CI-pi-ta-ted'." },
+  { text: "From a pedagogical standpoint, the curriculum requires a more nuanced approach.", level: "C1", tip: "Stress: 'pe-da-GO-gi-cal', 'NU-an-ced'." },
+  { text: "The discrepancy between the two reports is quite alarming.", level: "C1", tip: "Stress 'dis-CRE-pan-cy' on the second syllable." },
+  { text: "The proposed legislation would fundamentally alter the healthcare landscape.", level: "C1", tip: "The 'g' in 'legislation' sounds like 'j'." },
+  { text: "It is imperative that we address these issues without further delay.", level: "C1", tip: "Stress 'im-PE-ra-tive' on the second syllable." },
+  { text: "The correlation between diet and cognitive function is well documented.", level: "C1", tip: "Stress 'cor-re-LA-tion' and 'COG-ni-tive'." },
+  { text: "Her unequivocal stance on the matter surprised many of her colleagues.", level: "C1", tip: "The 'qu' in 'unequivocal' sounds like 'kw'." },
+  { text: "The unprecedented scale of the challenge requires a coordinated global response.", level: "C1", tip: "Stress 'un-PRE-ce-den-ted' — five clear syllables." },
+
+  // C2 - Highly abstract, specialized terminology, sophisticated structures
   { text: "The epistemological foundations of postmodernist discourse are inherently paradoxical.", level: "C2", tip: "Master complex word stress: 'e-pis-te-MO-lo-gi-cal', 'pos-TMO-dern-ist'." },
-  { text: "Notwithstanding the aforementioned caveats, the extrapolation of these findings remains justifiable.", level: "C2", tip: "Smooth linking between long words — don't pause between them." },
-  { text: "The phenomenological approach to qualitative research elucidates subjective experiential realities.", level: "C2", tip: "Focus on natural rhythm: 'phe-no-me-no-LO-gi-cal', 'e-LU-ci-dates'." },
-  { text: "A multidisciplinary synthesis of contemporaneous socio-linguistic paradigms proves indispensable.", level: "C2", tip: "Intonation patterns in very long sentences — use pitch variation." },
+  { text: "Notwithstanding the aforementioned caveats, the extrapolation remains justifiable.", level: "C2", tip: "Smooth linking between long words — don't pause between them." },
+  { text: "The phenomenological approach to research elucidates subjective experiential realities.", level: "C2", tip: "Natural rhythm: 'phe-no-me-no-LO-gi-cal', 'e-LU-ci-dates'." },
+  { text: "A multidisciplinary synthesis of contemporaneous paradigms proves indispensable.", level: "C2", tip: "Intonation patterns in very long sentences — use pitch variation." },
+  { text: "The quintessence of her argument lies in the ontological distinction she draws.", level: "C2", tip: "Stress 'quin-TES-sence' and 'on-to-LO-gi-cal'." },
+  { text: "The juxtaposition of these two ideologies creates a fascinating dialectic.", level: "C2", tip: "Stress 'jux-ta-po-SI-tion' on the fourth syllable." },
+  { text: "Her magnum opus constitutes an invaluable contribution to sociolinguistic theory.", level: "C2", tip: "Latin phrases: 'MAG-num O-pus' — maintain original pronunciation." },
+  { text: "The inscrutable nature of the data renders any definitive conclusion untenable.", level: "C2", tip: "Stress 'in-SCRU-ta-ble' and 'un-TE-na-ble'." },
+  { text: "The proliferation of disinformation necessitates a paradigm shift in media literacy.", level: "C2", tip: "Stress 'pro-li-fe-RA-tion' — six syllables with clear rhythm." },
+  { text: "His peripatetic career has encompassed a panoply of interdisciplinary endeavors.", level: "C2", tip: "Stress 'pe-ri-pa-TE-tic' and 'PAN-o-ply'." },
 ];
 
 type InputMode = 'preset' | 'custom' | 'free';
