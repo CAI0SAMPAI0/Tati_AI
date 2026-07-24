@@ -76,6 +76,16 @@ const PRACTICE_SENTENCES: PracticeSentence[] = [
 
 type InputMode = 'preset' | 'custom' | 'free';
 
+function uint8ToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
 function exportWavRaw(samples: Float32Array, sampleRate: number): ArrayBuffer {
   const buffer = new ArrayBuffer(44 + samples.length * 2);
   const view = new DataView(buffer);
@@ -267,7 +277,7 @@ export default function PronunciationReaderClientPage() {
             wavBuffer = arrayBuffer;
           }
 
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(wavBuffer)));
+          const base64 = uint8ToBase64(new Uint8Array(wavBuffer));
           const activeText = getActiveText();
           await evaluatePronunciation(base64, activeText);
         } catch (err) {
