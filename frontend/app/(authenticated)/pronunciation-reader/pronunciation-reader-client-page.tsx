@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/auth-provider';
 import { apiPost } from '@/lib/api/client';
@@ -38,6 +38,7 @@ interface PronunciationResult {
   transcription: string;
   words: WordResult[];
   feedback: string;
+  correct_audio?: string;
   metadata?: {
     accuracy_score?: number;
     fluency_score?: number;
@@ -45,6 +46,7 @@ interface PronunciationResult {
     segments?: any[];
     language?: string;
     duration?: number;
+    free_speech?: boolean;
   };
   phonetic?: any;
 }
@@ -374,6 +376,21 @@ export default function PronunciationReaderClientPage() {
     return 'text-red-400';
   };
 
+  // Auto-play correct pronunciation when result comes in
+  useEffect(() => {
+    if (result?.correct_audio) {
+      const audio = new Audio(`data:audio/mp3;base64,${result.correct_audio}`);
+      audio.play();
+    }
+  }, [result]);
+
+  const playCorrectAudio = useCallback(() => {
+    if (result?.correct_audio) {
+      const audio = new Audio(`data:audio/mp3;base64,${result.correct_audio}`);
+      audio.play();
+    }
+  }, [result]);
+
   const avgScore = history.length > 0 ? Math.round(history.reduce((a, h) => a + h.score, 0) / history.length) : 0;
 
   return (
@@ -629,8 +646,34 @@ export default function PronunciationReaderClientPage() {
                   <div className={cn('text-5xl font-black', scoreColor(result.score))}>
                     {result.score}%
                   </div>
-                  <p className="text-sm text-text-muted mt-1">{result.feedback}</p>
                 </div>
+
+                {/* Conversational feedback */}
+                {result.feedback && (
+                  <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Sparkles size={16} className="text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-text leading-relaxed">{result.feedback}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Listen to correct pronunciation */}
+                {result.correct_audio && (
+                  <div className="flex justify-center">
+                    <button
+                      onClick={playCorrectAudio}
+                      className="flex items-center gap-2 px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-full text-sm font-bold transition-all"
+                    >
+                      <Volume2 size={16} />
+                      Listen to Correct Pronunciation
+                    </button>
+                  </div>
+                )}
 
                 {/* Word-level breakdown */}
                 {result.words && result.words.length > 0 && (

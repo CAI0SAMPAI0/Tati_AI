@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.core.dependencies.auth import get_current_user
+from app.modules.chat.services.audio_generator import generate_teacher_audio
 from app.modules.chat.services.llm import transcribe_audio_verbose
 
 logger = logging.getLogger(__name__)
@@ -93,20 +94,60 @@ def compute_local_evaluation(ref_words, transcript_words, word_conf_scores):
     return words_result
 
 
-def get_feedback(score: int, free_speech: bool = False) -> str:
+def get_conversational_feedback(
+    score: int, words_result: list, transcription: str, ref_text: str, free_speech: bool = False
+) -> str:
+    incorrect = [w for w in words_result if w["accuracy"] == "incorrect"]
+    correct = [w for w in words_result if w["accuracy"] == "correct"]
+    pct = score
+
     if free_speech:
-        if score >= 85:
-            return "Excellent clarity! You spoke very clearly."
-        elif score >= 60:
-            return "Good clarity! Try to enunciate more."
+        if pct >= 85:
+            return (
+                f"Great job! I understood everything you said perfectly. "
+                f"Your clarity is excellent — keep it up!"
+            )
+        elif pct >= 60:
+            return (
+                f"Good effort! I understood most of what you said. "
+                f"Try to slow down a little and focus on each word. "
+                f"You're doing well!"
+            )
         else:
-            return "Keep practicing! Focus on speaking more slowly and clearly."
-    if score >= 85:
-        return "Amazing! Your pronunciation is excellent."
-    elif score >= 60:
-        return "Good job! You had a few minor slips, but you are very clear."
+            return (
+                f"I heard you say \"{transcription}\". "
+                f"Try to speak a bit slower and more clearly. "
+                f"Practice makes perfect!"
+            )
+
+    if pct >= 90:
+        return (
+            f"Excellent! Your pronunciation was spot on. "
+            f"Every word was clear and accurate. "
+            f"Keep practicing like this!"
+        )
+    elif pct >= 75:
+        word_list = ", ".join(f'"{w["word"]}"' for w in incorrect[:3])
+        if word_list:
+            return (
+                f"Almost perfect! I noticed a small slip on {word_list}. "
+                f"Try listening to the correct pronunciation and repeating it. "
+                f"You're very close!"
+            )
+        return "Great job! Very clear pronunciation."
+    elif pct >= 50:
+        word_list = ", ".join(f'"{w["word"]}"' for w in incorrect[:4])
+        return (
+            f"Good start! Pay extra attention to {word_list}. "
+            f"Listen to Tati's pronunciation below and try again. "
+            f"Focus on each sound — you can do it!"
+        )
     else:
-        return "Keep practicing! Listen to Tati and try repeating again."
+        return (
+            f"Let's try again! I heard \"{transcription}\" but the target was "
+            f"\"{ref_text}\". Listen carefully to Tati's pronunciation "
+            f"and repeat each word slowly."
+        )
 
 
 @router.post("/verify-pronunciation")
@@ -153,11 +194,12 @@ async def verify_pronunciation(
 
     if not transcription or transcription.startswith("[Erro"):
         words_result = [{"word": w, "score": 0, "accuracy": "incorrect"} for w in ref_raw.split()] if ref_raw else []
+        feedback = get_conversational_feedback(0, words_result, "", ref_raw, is_free_speech)
         return {
             "score": 0,
             "transcription": "",
             "words": words_result,
-            "feedback": get_feedback(0, is_free_speech),
+            "feedback": feedback,
             "metadata": {
                 "segments": trans_data.get("segments", []),
                 "language": trans_data.get("language"),
@@ -167,8 +209,15 @@ async def verify_pronunciation(
         }
 
     # Determine the actual reference text we will evaluate against
-    # For free speech, the transcription itself becomes the reference
     actual_ref = ref_raw if ref_raw else transcription
+
+    # Generate TTS audio of correct pronunciation (best effort)
+    correct_audio = ""
+    if actual_ref:
+        try:
+            correct_audio = await generate_teacher_audio(actual_ref) or ""
+        except Exception:
+            logger.warning("Failed to generate TTS for correct pronunciation")
 
     # Step 2: Try Azure (only if reference available)
     if actual_ref:
@@ -178,11 +227,16 @@ async def verify_pronunciation(
             azure_res = azure_speech_service.evaluate_pronunciation(audio_bytes, actual_ref)
             if "error" not in azure_res:
                 score = azure_res["score"]
+                words = azure_res["words"]
+                feedback = get_conversational_feedback(
+                    score, words, transcription, actual_ref, is_free_speech
+                )
                 return {
                     "score": score,
                     "transcription": actual_ref if not is_free_speech else transcription,
-                    "words": azure_res["words"],
-                    "feedback": get_feedback(score, is_free_speech),
+                    "words": words,
+                    "feedback": feedback,
+                    "correct_audio": correct_audio,
                     "metadata": {
                         "accuracy_score": azure_res["accuracy_score"],
                         "fluency_score": azure_res["fluency_score"],
@@ -203,12 +257,20 @@ async def verify_pronunciation(
             )
             if "error" not in gemini_res:
                 score = gemini_res.get("score", 0)
-                feedback = gemini_res.get("feedback", "") or get_feedback(score, is_free_speech)
+                words = gemini_res.get("words", [])
+                g_feedback = gemini_res.get("feedback", "")
+                if g_feedback:
+                    feedback = g_feedback
+                else:
+                    feedback = get_conversational_feedback(
+                        score, words, transcription, actual_ref, is_free_speech
+                    )
                 return {
                     "score": score,
                     "transcription": actual_ref if not is_free_speech else transcription,
-                    "words": gemini_res.get("words", []),
+                    "words": words,
                     "feedback": feedback,
+                    "correct_audio": correct_audio,
                     "metadata": {
                         "accuracy_score": gemini_res.get("accuracy_score", score),
                         "fluency_score": gemini_res.get("fluency_score", score),
@@ -229,11 +291,14 @@ async def verify_pronunciation(
     total_words = len(words_result)
     overall_score = int((correct_count / total_words) * 100) if total_words > 0 else 0
 
+    feedback = get_conversational_feedback(overall_score, words_result, transcription, actual_ref, is_free_speech)
+
     return {
         "score": overall_score,
         "transcription": transcription,
         "words": words_result,
-        "feedback": get_feedback(overall_score, is_free_speech),
+        "feedback": feedback,
+        "correct_audio": correct_audio,
         "metadata": {
             "segments": trans_data.get("segments", []),
             "language": trans_data.get("language"),
