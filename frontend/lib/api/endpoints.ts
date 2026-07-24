@@ -61,6 +61,7 @@ export const ENDPOINTS = {
 
   // Grammar (Sprint 20 — substitui AI Exercises)
   GRAMMAR: '/grammar',
+  GRAMMAR_CACHE_CLEAR: '/grammar/cache-clear',
 
   // Speech
   SPEECH_VERIFY_PRONUNCIATION: '/speech/verify-pronunciation',

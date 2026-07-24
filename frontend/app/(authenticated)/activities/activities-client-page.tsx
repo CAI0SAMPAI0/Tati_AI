@@ -168,14 +168,14 @@ export default function ActivitiesClientPage() {
         ? ENDPOINTS.GRAMMAR
         : `${ENDPOINTS.GRAMMAR}?level=${filterLevel}`
     ),
-    staleTime: 30 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
   });
   const [selectedGrammarTopic, setSelectedGrammarTopic] = useState<string | null>(null);
   const { data: grammarDetail } = useQuery<GrammarDetail>({
     queryKey: ['grammar-detail', selectedGrammarTopic],
     queryFn: () => apiGet<GrammarDetail>(`${ENDPOINTS.GRAMMAR}?topic=${selectedGrammarTopic}`),
     enabled: !!selectedGrammarTopic,
-    staleTime: 30 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: userProfile } = useQuery({

@@ -8,11 +8,15 @@ Returns grammar explanation (rule, key structure, Teacher Tati tip) and
 source links (DW, BBC Learning English, test-english.com).
 
 GET /grammar (no params) -> topic index.
+
+POST /grammar/cache-clear
+  Clear all grammar cache entries (admin use).
 """
 from fastapi import APIRouter, Depends, Query
 
 from app.core.dependencies.auth import get_current_user
 from app.modules.activities.services.grammar_service import grammar_service
+from app.shared.services.upstash import cache_delete
 
 router = APIRouter()
 
@@ -28,3 +32,15 @@ async def get_grammar(
     if topic:
         effective_level = level or current_user.get("level", "A1")
     return await grammar_service.get_grammar(topic=topic, level=effective_level)
+
+
+@router.post("/cache-clear")
+async def clear_grammar_cache():
+    """Clear all grammar cache entries. Admin endpoint."""
+    levels = ["", "ALL", "A1", "A2", "B1", "B2", "C1", "C2"]
+    cleared = 0
+    for level in levels:
+        key = f"grammar:index:{level}"
+        if await cache_delete(key):
+            cleared += 1
+    return {"cleared": cleared, "message": f"Cleared {cleared} grammar cache entries"}
