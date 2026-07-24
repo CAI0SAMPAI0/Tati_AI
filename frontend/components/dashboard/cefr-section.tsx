@@ -1688,7 +1688,7 @@ export function CefrSection() {
         isOpen={editingItem !== null}
         onClose={() => { setEditingItem(null); setEditingItemType(null); }}
         title={`Edit Generated ${editingItemType ? editingItemType.charAt(0).toUpperCase() + editingItemType.slice(1) : ''}`}
-        size="lg"
+        size="xl"
       >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -1805,7 +1805,7 @@ export function CefrSection() {
                     <div className="space-y-2">
                       <label className="block text-[10px] font-bold text-text-subtle uppercase mb-1">Image</label>
                       {card.image_url && (
-                        <div className="relative w-full h-24 rounded-lg overflow-hidden border border-border bg-bg">
+                        <div className="relative w-full h-36 rounded-lg overflow-hidden border border-border bg-bg">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={card.image_url} alt="Flashcard" className="w-full h-full object-cover" />
                           <button

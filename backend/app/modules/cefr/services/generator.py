@@ -135,6 +135,7 @@ class CEFRGeneratorService:
             )
 
             flashcards = data.get("flashcards", [])
+            flashcards = flashcards[:count]
             return flashcards
         except Exception as e:
             logging.error(f"[CEFRGenerator] Erro ao gerar flashcards: {e}")
