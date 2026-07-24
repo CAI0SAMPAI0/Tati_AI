@@ -139,6 +139,7 @@ export default function PronunciationReaderClientPage() {
   const animFrameRef = useRef<number>(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const recordingStartRef = useRef<number>(0);
 
   const currentSentence = PRACTICE_SENTENCES[currentIndex];
 
@@ -249,6 +250,13 @@ export default function PronunciationReaderClientPage() {
           stream.getTracks().forEach(t => t.stop());
           audioContext.close();
 
+          const elapsed = Date.now() - recordingStartRef.current;
+          if (elapsed < 1500) {
+            setRecordingError('Recording too short. Please hold the button for at least 2 seconds.');
+            setIsRecording(false);
+            return;
+          }
+
           if (audioChunksRef.current.length === 0) {
             setRecordingError('No audio data recorded. Please try again.');
             setIsRecording(false);
@@ -294,6 +302,7 @@ export default function PronunciationReaderClientPage() {
       };
 
       mediaRecorder.start(250);
+      recordingStartRef.current = Date.now();
       setIsRecording(true);
       drawWaveform();
     } catch (err: any) {

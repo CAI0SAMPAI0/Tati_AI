@@ -16,7 +16,7 @@ router = APIRouter()
 
 class VerifyPronunciationRequest(BaseModel):
     audio: str
-    reference_text: str
+    reference_text: str = ""
 
 
 @router.post('/verify-pronunciation')
@@ -32,7 +32,36 @@ async def verify_pronunciation(
             detail="Invalid audio format (base64 expected)"
         )
 
-    ref_clean = req.reference_text.strip()
+    audio_size_kb = len(audio_bytes) / 1024
+    logger.info(f"Audio received: {audio_size_kb:.1f} KB")
+    if audio_size_kb < 5:
+        raise HTTPException(
+            status_code=400,
+            detail="Audio too short or empty. Please record for at least 2 seconds."
+        )
+
+    ref_clean = (req.reference_text or "").strip()
+
+    # Free speech mode: just transcribe and return
+    if not ref_clean:
+        trans_data = await transcribe_audio_verbose(
+            audio_bytes,
+            filename='temp.wav',
+            prompt=""
+        )
+        transcription = trans_data.get("text", "") if isinstance(trans_data, dict) else ""
+        return {
+            "score": 0,
+            "transcription": transcription,
+            "words": [],
+            "feedback": "Free speech mode — only transcription, no scoring.",
+            "metadata": {
+                "segments": trans_data.get("segments", []),
+                "language": trans_data.get("language"),
+                "duration": trans_data.get("duration")
+            },
+            "phonetic": {}
+        }
 
     # 0. Try Azure Speech Pronunciation Assessment if configured
     from app.shared.services.azure_speech_service import azure_speech_service
@@ -101,10 +130,21 @@ async def verify_pronunciation(
     trans_data = await transcribe_audio_verbose(
         audio_bytes,
         filename='temp.wav',
-        prompt="Transcribe the speech verbatim. Do not normalize or correct mispronunciations."
+        prompt=f"The target phrase is: {ref_clean}"
     )
 
     transcription = trans_data.get("text", "") if isinstance(trans_data, dict) else ""
+    
+    # Detect Whisper returning the prompt as transcription (happens with bad audio)
+    prompt_texts = [
+        "Transcribe the speech verbatim",
+        "Do not normalize or correct",
+        "transcribe their English words accurately"
+    ]
+    if any(pt in transcription for pt in prompt_texts):
+        logger.warning(f"Whisper returned prompt text as transcription: {transcription[:100]}")
+        transcription = ""
+    
     if not transcription or transcription.startswith("[Erro"):
         words_result = []
         for word in ref_clean.split():

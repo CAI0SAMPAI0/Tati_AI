@@ -45,8 +45,15 @@ class PhoneticService:
             from g2p_en import G2p
 
             logger.info("Initializing local Wav2Vec2 Phonetic model (facebook/wav2vec2-lv60-espeak-cv-ft)...")
-            self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-lv60-espeak-cv-ft")
-            self.model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-lv60-espeak-cv-ft")
+            hf_token = os.getenv('HUGGING_FACE_KEY', '') or os.getenv('HF_TOKEN', '')
+            self.processor = Wav2Vec2Processor.from_pretrained(
+                "facebook/wav2vec2-lv60-espeak-cv-ft",
+                token=hf_token or None
+            )
+            self.model = Wav2Vec2ForCTC.from_pretrained(
+                "facebook/wav2vec2-lv60-espeak-cv-ft",
+                token=hf_token or None
+            )
             
             # Disable gradients to optimize memory/speed on CPU
             self.model.eval()
