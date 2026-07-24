@@ -17,6 +17,8 @@ import {
   CheckCircle2,
   XCircle,
   Sparkles,
+  PenLine,
+  MessageSquare,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
@@ -72,6 +74,8 @@ const PRACTICE_SENTENCES: PracticeSentence[] = [
   { text: "Notwithstanding the evidence, the jury reached an unanimous verdict.", level: "B2", tip: "Focus on consonant clusters: 'stand', 'ver-dict'." },
 ];
 
+type InputMode = 'preset' | 'custom' | 'free';
+
 function exportWavRaw(samples: Float32Array, sampleRate: number): ArrayBuffer {
   const buffer = new ArrayBuffer(44 + samples.length * 2);
   const view = new DataView(buffer);
@@ -114,12 +118,17 @@ export default function PronunciationReaderClientPage() {
   const [result, setResult] = useState<PronunciationResult | null>(null);
   const [history, setHistory] = useState<{ sentence: string; score: number }[]>([]);
 
+  const [inputMode, setInputMode] = useState<InputMode>('preset');
+  const [customText, setCustomText] = useState('');
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number>(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const currentSentence = PRACTICE_SENTENCES[currentIndex];
 
@@ -131,6 +140,12 @@ export default function PronunciationReaderClientPage() {
   });
 
   const displaySentence = filteredSentences[currentIndex % filteredSentences.length] || PRACTICE_SENTENCES[0];
+
+  const getActiveText = (): string => {
+    if (inputMode === 'custom') return customText.trim();
+    if (inputMode === 'free') return '';
+    return displaySentence.text;
+  };
 
   const drawWaveform = useCallback(() => {
     if (!analyserRef.current || !canvasRef.current) return;
@@ -168,10 +183,10 @@ export default function PronunciationReaderClientPage() {
   }, []);
 
   const playReference = async () => {
+    const text = getActiveText();
+    if (!text) return;
     try {
-      const res = await apiPost<{ audio: string }>(ENDPOINTS.CHAT_TTS, {
-        text: displaySentence.text,
-      });
+      const res = await apiPost<{ audio: string }>(ENDPOINTS.CHAT_TTS, { text });
       if (res.ok && res.data.audio) {
         const audio = new Audio(`data:audio/mp3;base64,${res.data.audio}`);
         audio.play();
@@ -181,10 +196,26 @@ export default function PronunciationReaderClientPage() {
     }
   };
 
+  const getSupportedMimeType = (): string => {
+    const types = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/ogg;codecs=opus',
+      'audio/mp4',
+    ];
+    for (const type of types) {
+      if (MediaRecorder.isTypeSupported(type)) return type;
+    }
+    return '';
+  };
+
   const startRecording = async () => {
     setResult(null);
+    setRecordingError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
       const audioContext = new AudioContext();
       const source = audioContext.createMediaStreamSource(stream);
       const analyser = audioContext.createAnalyser();
@@ -194,7 +225,8 @@ export default function PronunciationReaderClientPage() {
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
 
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+      const mimeType = getSupportedMimeType();
+      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -203,33 +235,66 @@ export default function PronunciationReaderClientPage() {
       };
 
       mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop());
-        audioContext.close();
+        try {
+          stream.getTracks().forEach(t => t.stop());
+          audioContext.close();
 
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const arrayBuffer = await blob.arrayBuffer();
-        const audioCtx = new AudioContext();
-        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+          if (audioChunksRef.current.length === 0) {
+            setRecordingError('No audio data recorded. Please try again.');
+            setIsRecording(false);
+            return;
+          }
 
-        const offlineCtx = new OfflineAudioContext(1, audioBuffer.length, audioBuffer.sampleRate);
-        const offlineSource = offlineCtx.createBufferSource();
-        offlineSource.buffer = audioBuffer;
-        offlineSource.connect(offlineCtx.destination);
-        offlineSource.start();
+          const blob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
+          const arrayBuffer = await blob.arrayBuffer();
 
-        const rendered = await offlineCtx.startRendering();
-        const wav = exportWavRaw(rendered.getChannelData(0), rendered.sampleRate);
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(wav)));
+          let wavBuffer: ArrayBuffer;
+          try {
+            const audioCtx = new AudioContext();
+            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
-        await evaluatePronunciation(base64);
-        audioCtx.close();
+            const offlineCtx = new OfflineAudioContext(1, audioBuffer.length, audioBuffer.sampleRate);
+            const offlineSource = offlineCtx.createBufferSource();
+            offlineSource.buffer = audioBuffer;
+            offlineSource.connect(offlineCtx.destination);
+            offlineSource.start();
+
+            const rendered = await offlineCtx.startRendering();
+            wavBuffer = exportWavRaw(rendered.getChannelData(0), rendered.sampleRate);
+            audioCtx.close();
+          } catch (decodeErr) {
+            console.error('Audio decode error, sending raw:', decodeErr);
+            wavBuffer = arrayBuffer;
+          }
+
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(wavBuffer)));
+          const activeText = getActiveText();
+          await evaluatePronunciation(base64, activeText);
+        } catch (err) {
+          console.error('Audio processing error:', err);
+          setRecordingError('Error processing audio. Please try again.');
+          setIsRecording(false);
+        }
       };
 
-      mediaRecorder.start();
+      mediaRecorder.onerror = (e) => {
+        console.error('MediaRecorder error:', e);
+        setRecordingError('Recording error. Please check your microphone.');
+        setIsRecording(false);
+      };
+
+      mediaRecorder.start(250);
       setIsRecording(true);
       drawWaveform();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Microphone access error:', err);
+      if (err.name === 'NotAllowedError') {
+        setRecordingError('Microphone access denied. Please allow microphone access in your browser settings.');
+      } else if (err.name === 'NotFoundError') {
+        setRecordingError('No microphone found. Please connect a microphone.');
+      } else {
+        setRecordingError('Could not access microphone. Please try again.');
+      }
     }
   };
 
@@ -237,23 +302,38 @@ export default function PronunciationReaderClientPage() {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
     cancelAnimationFrame(animFrameRef.current);
     setIsRecording(false);
   };
 
-  const evaluatePronunciation = async (audioBase64: string) => {
+  const evaluatePronunciation = async (audioBase64: string, referenceText: string) => {
     setIsEvaluating(true);
     try {
+      const body: Record<string, any> = { audio: audioBase64 };
+      if (referenceText) {
+        body.reference_text = referenceText;
+      }
+
       const res = await apiPost<PronunciationResult>(
         ENDPOINTS.SPEECH_VERIFY_PRONUNCIATION,
-        { audio: audioBase64, reference_text: displaySentence.text }
+        body
       );
       if (res.ok) {
         setResult(res.data);
-        setHistory(prev => [...prev, { sentence: displaySentence.text, score: res.data.score }]);
+        setHistory(prev => [...prev, {
+          sentence: referenceText || '(free speech)',
+          score: res.data.score,
+        }]);
+      } else {
+        setRecordingError('Evaluation failed. Please try again.');
       }
     } catch (err) {
       console.error('Pronunciation evaluation error:', err);
+      setRecordingError('Error evaluating pronunciation. Please try again.');
     } finally {
       setIsEvaluating(false);
     }
@@ -292,7 +372,7 @@ export default function PronunciationReaderClientPage() {
             <BookOpen size={20} className="text-primary" />
             Pronunciation Reader
           </h1>
-          <p className="text-xs text-text-muted">Read aloud and get instant feedback on your pronunciation</p>
+          <p className="text-xs text-text-muted">Read aloud, write your own text, or just speak freely</p>
         </div>
         {history.length > 0 && (
           <div className="text-right">
@@ -303,39 +383,127 @@ export default function PronunciationReaderClientPage() {
       </header>
 
       <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 max-w-2xl mx-auto w-full">
-        {/* Level badge */}
-        <div className={cn(
-          'px-3 py-1 rounded-full text-xs font-bold mb-6',
-          displaySentence.level === 'A1' ? 'bg-green-500/20 text-green-400' :
-          displaySentence.level === 'A2' ? 'bg-green-500/15 text-green-300' :
-          displaySentence.level === 'B1' ? 'bg-blue-500/20 text-blue-400' :
-          'bg-purple-500/20 text-purple-400'
-        )}>
-          {displaySentence.level}
+        {/* Input mode selector */}
+        <div className="flex gap-2 mb-6 w-full">
+          <button
+            onClick={() => setInputMode('preset')}
+            className={cn(
+              'flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all',
+              inputMode === 'preset'
+                ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                : 'bg-surface border border-border text-text-muted hover:bg-surface-hover'
+            )}
+          >
+            <BookOpen size={14} />
+            Preset Sentences
+          </button>
+          <button
+            onClick={() => setInputMode('custom')}
+            className={cn(
+              'flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all',
+              inputMode === 'custom'
+                ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                : 'bg-surface border border-border text-text-muted hover:bg-surface-hover'
+            )}
+          >
+            <PenLine size={14} />
+            Write Your Own
+          </button>
+          <button
+            onClick={() => setInputMode('free')}
+            className={cn(
+              'flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all',
+              inputMode === 'free'
+                ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                : 'bg-surface border border-border text-text-muted hover:bg-surface-hover'
+            )}
+          >
+            <MessageSquare size={14} />
+            Free Speech
+          </button>
         </div>
 
-        {/* Sentence card */}
-        <div className="w-full bg-surface border border-border rounded-2xl p-6 md:p-8 mb-6 text-center">
-          <p className="text-xl md:text-2xl font-display font-bold text-text leading-relaxed mb-4">
-            {displaySentence.text}
-          </p>
-          <p className="text-xs text-text-muted italic">
-            💡 {displaySentence.tip}
-          </p>
-        </div>
+        {/* Sentence card / Custom input */}
+        {inputMode === 'preset' ? (
+          <>
+            {/* Level badge */}
+            <div className={cn(
+              'px-3 py-1 rounded-full text-xs font-bold mb-6',
+              displaySentence.level === 'A1' ? 'bg-green-500/20 text-green-400' :
+              displaySentence.level === 'A2' ? 'bg-green-500/15 text-green-300' :
+              displaySentence.level === 'B1' ? 'bg-blue-500/20 text-blue-400' :
+              'bg-purple-500/20 text-purple-400'
+            )}>
+              {displaySentence.level}
+            </div>
+
+            <div className="w-full bg-surface border border-border rounded-2xl p-6 md:p-8 mb-6 text-center">
+              <p className="text-xl md:text-2xl font-display font-bold text-text leading-relaxed mb-4">
+                {displaySentence.text}
+              </p>
+              <p className="text-xs text-text-muted italic">
+                💡 {displaySentence.tip}
+              </p>
+            </div>
+          </>
+        ) : inputMode === 'custom' ? (
+          <div className="w-full bg-surface border border-border rounded-2xl p-6 md:p-8 mb-6">
+            <label className="text-xs font-bold text-text-subtle uppercase tracking-wider mb-2 block">
+              Type or paste the text you want to practice
+            </label>
+            <textarea
+              value={customText}
+              onChange={(e) => setCustomText(e.target.value)}
+              placeholder="e.g. The quick brown fox jumps over the lazy dog..."
+              className="w-full h-32 bg-bg border border-border rounded-xl p-4 text-text text-base resize-none outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
+              maxLength={500}
+            />
+            <div className="flex justify-between items-center mt-2">
+              <p className="text-[0.65rem] text-text-muted">
+                {customText.length}/500 characters
+              </p>
+              {customText.trim() && (
+                <button
+                  onClick={() => setCustomText('')}
+                  className="text-[0.65rem] text-primary hover:underline"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="w-full bg-surface border border-border rounded-2xl p-6 md:p-8 mb-6 text-center">
+            <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
+              <MessageSquare size={28} />
+            </div>
+            <p className="text-lg font-bold text-text mb-2">Free Speech Mode</p>
+            <p className="text-sm text-text-muted">
+              Just tap the microphone and speak naturally. Tati will transcribe and analyze your pronunciation.
+            </p>
+          </div>
+        )}
 
         {/* Controls */}
         <div className="flex items-center gap-4 mb-6">
-          <button
-            onClick={goPrev}
-            className="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors"
-          >
-            <ChevronLeft size={20} />
-          </button>
+          {inputMode === 'preset' && (
+            <>
+              <button
+                onClick={goPrev}
+                className="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors"
+              >
+                <ChevronLeft size={20} />
+              </button>
+            </>
+          )}
 
           <button
             onClick={playReference}
-            className="p-4 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-primary"
+            disabled={!getActiveText() || isRecording || isEvaluating}
+            className={cn(
+              'p-4 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-primary',
+              (!getActiveText() || isRecording || isEvaluating) && 'opacity-40 cursor-not-allowed'
+            )}
           >
             <Volume2 size={24} />
           </button>
@@ -355,18 +523,22 @@ export default function PronunciationReaderClientPage() {
           </button>
 
           <button
-            onClick={() => { setResult(null); }}
+            onClick={() => { setResult(null); setRecordingError(null); }}
             className="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors"
           >
             <RotateCcw size={20} />
           </button>
 
-          <button
-            onClick={goNext}
-            className="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors"
-          >
-            <ChevronRight size={20} />
-          </button>
+          {inputMode === 'preset' && (
+            <>
+              <button
+                onClick={goNext}
+                className="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors"
+              >
+                <ChevronRight size={20} />
+              </button>
+            </>
+          )}
         </div>
 
         {/* Recording indicator */}
@@ -388,6 +560,22 @@ export default function PronunciationReaderClientPage() {
                 height={60}
                 className="mt-2 rounded-lg"
               />
+            </MotionDiv>
+          )}
+        </AnimatePresence>
+
+        {/* Recording error */}
+        <AnimatePresence>
+          {recordingError && (
+            <MotionDiv
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="mb-4 w-full"
+            >
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-sm text-red-400 text-center">
+                {recordingError}
+              </div>
             </MotionDiv>
           )}
         </AnimatePresence>
@@ -426,33 +614,35 @@ export default function PronunciationReaderClientPage() {
                 </div>
 
                 {/* Word-level breakdown */}
-                <div>
-                  <h3 className="text-xs font-bold text-text-subtle uppercase tracking-wider mb-2">Word-by-Word</h3>
-                  <div className="flex flex-wrap gap-1.5">
-                    {result.words.map((w, i) => (
-                      <span
-                        key={i}
-                        className={cn(
-                          'px-2 py-1 rounded-lg text-sm font-mono',
-                          w.accuracy === 'correct'
-                            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                            : 'bg-red-500/20 text-red-400 border border-red-500/30 line-through'
-                        )}
-                      >
-                        {w.word}
-                        {w.accuracy === 'incorrect' && w.score > 0 && (
-                          <span className="text-[0.6rem] ml-1 opacity-60">{w.score}%</span>
-                        )}
-                      </span>
-                    ))}
+                {result.words && result.words.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-bold text-text-subtle uppercase tracking-wider mb-2">Word-by-Word</h3>
+                    <div className="flex flex-wrap gap-1.5">
+                      {result.words.map((w, i) => (
+                        <span
+                          key={i}
+                          className={cn(
+                            'px-2 py-1 rounded-lg text-sm font-mono',
+                            w.accuracy === 'correct'
+                              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                              : 'bg-red-500/20 text-red-400 border border-red-500/30 line-through'
+                          )}
+                        >
+                          {w.word}
+                          {w.accuracy === 'incorrect' && w.score > 0 && (
+                            <span className="text-[0.6rem] ml-1 opacity-60">{w.score}%</span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Transcription */}
                 {result.transcription && (
                   <div>
                     <h3 className="text-xs font-bold text-text-subtle uppercase tracking-wider mb-1">What Tati heard</h3>
-                    <p className="text-sm text-text italic">"{result.transcription}"</p>
+                    <p className="text-sm text-text italic">&quot;{result.transcription}&quot;</p>
                   </div>
                 )}
 

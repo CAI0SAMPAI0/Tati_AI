@@ -59,7 +59,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="Subject + am/is/are + verb-ing",
         tip_teacher_tati="Use 'now', 'at the moment' to make it clear the action is happening right now.",
         source_name="BBC Learning English",
-        source_url="https://www.bbc.co.uk/learningenglish/english/features/6-minute-english/ep-240125",
+        source_url="https://www.bbc.co.uk/learningenglish/english/features/tenses_with_georgie",
     ),
     GrammarEntry(
         topic="articles",
@@ -72,7 +72,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="a/an + singular countable noun | the + specific noun",
         tip_teacher_tati="It's the SOUND that matters: 'an hour' (silent h), 'a university' (sounds like 'you').",
         source_name="test-english.com",
-        source_url="https://test-english.com/grammar-points/a1/articles/",
+        source_url="https://test-english.com/grammar-points/a1/a-an-the-no-article/",
     ),
     GrammarEntry(
         topic="be_verb",
@@ -112,7 +112,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="Subject + verb (-ed) / irregular past form",
         tip_teacher_tati="Learn irregulars gradually: go-went, eat-ate, see-saw, buy-bought.",
         source_name="test-english.com",
-        source_url="https://test-english.com/grammar-points/a2/past-simple/",
+        source_url="https://test-english.com/grammar-points/a2/past-simple-form-use/",
     ),
     GrammarEntry(
         topic="comparatives_superlatives",
@@ -126,7 +126,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="Short: adj+er+than / the+adj+est | Long: more+adj / the most+adj",
         tip_teacher_tati="Good -> better -> the best (irregular — memorize it!).",
         source_name="test-english.com",
-        source_url="https://test-english.com/grammar-points/a2/comparatives-and-superlatives/",
+        source_url="https://test-english.com/grammar-points/a2/comparative-superlative-adjectives-adverbs/",
     ),
     GrammarEntry(
         topic="future_will_going_to",
@@ -139,7 +139,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="will: Subject + will + verb | going to: Subject + am/is/are + going to + verb",
         tip_teacher_tati='Look out the window: dark clouds -> "It\'s going to rain." Decision now -> "I\'ll help you."',
         source_name="test-english.com",
-        source_url="https://test-english.com/grammar-points/a2/future-forms/",
+        source_url="https://test-english.com/grammar-points/a2/will-vs-be-going-to/",
     ),
     GrammarEntry(
         topic="modal_verbs",
@@ -152,7 +152,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="Subject + modal + base verb",
         tip_teacher_tati="I must study (strong obligation). I should study (advice). I can study (ability).",
         source_name="BBC Learning English",
-        source_url="https://www.bbc.co.uk/learningenglish/english/features/6-minute-english/ep-230727",
+        source_url="https://www.bbc.co.uk/learningenglish/english/features/learning-english-grammar",
     ),
     GrammarEntry(
         topic="countable_uncountable",
@@ -166,7 +166,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="a/an + countable (singular) | some + countable (plural) / uncountable",
         tip_teacher_tati="'Information' is uncountable — never say 'an information'!",
         source_name="test-english.com",
-        source_url="https://test-english.com/grammar-points/a2/countable-and-uncountable-nouns/",
+        source_url="https://test-english.com/grammar-points/a2/much-many-little-few-some-any/",
     ),
     # ── B1 ──────────────────────────────────────────────────────────
     GrammarEntry(
@@ -180,7 +180,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="Subject + have/has + past participle",
         tip_teacher_tati="Key signals: ever, never, already, yet, just, since, for.",
         source_name="test-english.com",
-        source_url="https://test-english.com/grammar-points/b1/present-perfect/",
+        source_url="https://test-english.com/grammar-points/b1/past-simple-present-perfect/",
     ),
     GrammarEntry(
         topic="past_simple_vs_present_perfect",
@@ -196,7 +196,7 @@ _CATALOG: list[GrammarEntry] = [
         ),
         tip_teacher_tati="If there's a specific time (yesterday, in 2019), use Past Simple. Otherwise, prefer Present Perfect.",
         source_name="BBC Learning English",
-        source_url="https://www.bbc.co.uk/learningenglish/english/features/the-english-we-speak/ep-230309",
+        source_url="https://www.bbc.co.uk/learningenglish/english/basic-grammar-guide",
     ),
     GrammarEntry(
         topic="conditionals_zero_first",
@@ -209,7 +209,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="Zero: If + present, present | First: If + present, will + verb",
         tip_teacher_tati="In the if-clause, NEVER use 'will'. Use the present tense.",
         source_name="BBC Learning English",
-        source_url="https://www.bbc.co.uk/learningenglish/english/features/6-minute-english/ep-231012",
+        source_url="https://www.bbc.co.uk/learningenglish/english/features/conditionals_with_georgie/",
     ),
     GrammarEntry(
         topic="used_to",
@@ -222,7 +222,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="Subject + used to + base verb",
         tip_teacher_tati="'Used to' is about the PAST only. For current habits, use 'usually' or 'always'.",
         source_name="test-english.com",
-        source_url="https://test-english.com/grammar-points/b1/used-to/",
+        source_url="https://test-english.com/grammar-points/b1/usually-used-to-be-used-to-get-used-to/",
     ),
     GrammarEntry(
         topic="first_conditional",
@@ -235,7 +235,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="If + present tense, subject + will + base verb",
         tip_teacher_tati="Don't say 'If it will rain' — say 'If it rains' (present in the if-clause).",
         source_name="test-english.com",
-        source_url="https://test-english.com/grammar-points/b1/first-conditional/",
+        source_url="https://test-english.com/grammar-points/b1/first-conditional-future-time-clauses/",
     ),
     GrammarEntry(
         topic="second_conditional",
@@ -248,7 +248,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="If + past tense, subject + would + base verb",
         tip_teacher_tati="'If I were' (not 'was') is more formal but both are used in conversation.",
         source_name="test-english.com",
-        source_url="https://test-english.com/grammar-points/b1/second-conditional/",
+        source_url="https://test-english.com/grammar-points/b1/second-conditional-unreal-situations/",
     ),
     # ── B2 ──────────────────────────────────────────────────────────
     GrammarEntry(
@@ -262,7 +262,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="Subject + am/is/are/was/were + past participle",
         tip_teacher_tati="Passive is common in news and scientific writing: 'The man was arrested yesterday.'",
         source_name="test-english.com",
-        source_url="https://test-english.com/grammar-points/b2/passive-voice/",
+        source_url="https://test-english.com/grammar-points/b2/passive-verbs-with-two-objects/",
     ),
     GrammarEntry(
         topic="relative_clauses",
@@ -275,7 +275,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="noun + who/which/that/whose + clause",
         tip_teacher_tati="'That' is very flexible — it can replace 'who' and 'which' in most cases.",
         source_name="BBC Learning English",
-        source_url="https://www.bbc.co.uk/learningenglish/english/features/6-minute-english/ep-240118",
+        source_url="https://www.bbc.co.uk/learningenglish/english/intermediate-grammar-guide",
     ),
     GrammarEntry(
         topic="third_conditional",
@@ -288,7 +288,7 @@ _CATALOG: list[GrammarEntry] = [
         key_structure="If + had + past participle, subject + would have + past participle",
         tip_teacher_tati="Third conditional is about REGRETS: 'If I had studied harder, I would have passed.'",
         source_name="test-english.com",
-        source_url="https://test-english.com/grammar-points/b2/third-conditional/",
+        source_url="https://test-english.com/grammar-points/b1/third-conditional-past-unreal-situations/",
     ),
 ]
 
