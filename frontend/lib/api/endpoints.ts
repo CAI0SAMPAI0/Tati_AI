@@ -75,8 +75,6 @@ export const ENDPOINTS = {
   CEFR_IMAGE_RESOLVE_BATCH: '/cefr/images/resolve-batch',
 
   // Activities
-  ACTIVITIES_MODULES: '/activities/modules',
-  ACTIVITIES_QUIZZES: '/activities/quizzes',
   ACTIVITIES_RANKING: '/activities/ranking',
   ACTIVITIES_PODCASTS_WARMUP: '/activities/podcasts/warmup',
   ACTIVITIES_PODCASTS_RECOMMENDATIONS: '/activities/podcasts/recommendations',
@@ -91,10 +89,6 @@ export const ENDPOINTS = {
     `/activities/test-english/content?level=${level}&category=${category}`,
 
   // Admin
-  ADMIN_MODULES: '/activities/modules/admin',
-  ADMIN_MODULE_ALL: '/activities/modules/admin/all',
-  ADMIN_MODULE_GENERATE_QUIZ: '/activities/modules/admin/generate-quiz',
-  ADMIN_MODULE_GENERATE_FLASHCARDS: '/activities/modules/admin/generate-flashcards',
   ADMIN_SIMULATIONS: '/dashboard/simulations',
   ADMIN_SIMULATION_DETAIL: (id: string) => `/dashboard/simulations/${id}`,
   ADMIN_STUDENTS: '/dashboard/students',

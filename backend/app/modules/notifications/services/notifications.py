@@ -333,7 +333,7 @@ def notify_all_students(
     send_email: bool = False,
 ) -> None:
     """
-    Notifica todos os alunos sobre novos conteúdos (Simulações, Quizzes, etc).
+    Notifica todos os alunos sobre novos conteúdos (Simulações, etc).
     Evita duplicados baseados na mensagem e categoria.
     """
     from app.core.database import get_client

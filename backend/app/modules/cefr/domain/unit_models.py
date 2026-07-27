@@ -3,7 +3,6 @@ New flashcard unit schema for Sprint 23.
 Supports grammar_explanation, exercises, and image_search_term for Unsplash/Pexels integration.
 """
 
-
 from pydantic import BaseModel, Field
 
 

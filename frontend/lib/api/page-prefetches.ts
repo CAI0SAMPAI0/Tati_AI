@@ -109,18 +109,7 @@ export const ROUTE_PREFETCHES: Record<string, (ctx?: PrefetchContext) => Prefetc
       },
     },
   ],
-  quiz: (ctx) => [
-    {
-      queryKey: ['quiz', ctx?.id],
-      endpoint: `/activities/quizzes/${ctx?.id}`,
-    },
-  ],
-  flashcards: (ctx) => [
-    {
-      queryKey: ['deck', ctx?.id],
-      endpoint: `/activities/modules/${ctx?.id}`,
-    },
-  ],
+
   podcast: (ctx) => [
     {
       queryKey: ['podcast', ctx?.id],

@@ -137,7 +137,7 @@ def _calculate_rankings(db, start_date, end_date=None):
     excluded_users = {"programador", "professor", "admin", "caio", "tati"}
 
     sessions_data = query_sessions.execute().data or []
-    points_map = {"quiz": 7, "flashcard": 3, "simulation": 10}
+    points_map = {"flashcard": 3, "simulation": 10}
     user_scores = {}
     for s in sessions_data:
         u = s.get("username")

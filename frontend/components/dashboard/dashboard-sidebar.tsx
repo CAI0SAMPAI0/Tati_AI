@@ -22,7 +22,6 @@ const NAV_ITEMS: Array<{ id: DashSection; icon: React.ReactNode; label: string }
   { id: 'overview', icon: <PieChart size={20} />, label: 'Overview' },
   { id: 'students', icon: <Users size={20} />, label: 'Students' },
   { id: 'reports', icon: <LineChart size={20} />, label: 'Reports' },
-  { id: 'modules', icon: <BookOpen size={20} />, label: 'Modules' },
   { id: 'flashcards', icon: <Layers size={20} />, label: 'Flashcards' },
   { id: 'simulations', icon: <Drama size={20} />, label: 'Simulations' },
   { id: 'cefr', icon: <BookOpen size={20} />, label: 'CEFR Materials' },
@@ -30,7 +29,7 @@ const NAV_ITEMS: Array<{ id: DashSection; icon: React.ReactNode; label: string }
   { id: 'whatsapp', icon: <FaWhatsapp size={20} />, label: 'WhatsApp Config' },
 ];
 
-export type DashSection = 'overview' | 'students' | 'reports' | 'modules' | 'flashcards' | 'simulations' | 'premium' | 'cefr' | 'whatsapp';
+export type DashSection = 'overview' | 'students' | 'reports' | 'flashcards' | 'simulations' | 'premium' | 'cefr' | 'whatsapp';
 
 interface DashboardSidebarProps {
   activeSection: DashSection;

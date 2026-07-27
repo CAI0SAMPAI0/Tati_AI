@@ -308,7 +308,7 @@ Material:
         import re
 
         # Try to extract JSON from the response
-        json_match = re.search(r'\[.*\]', response, re.DOTALL)
+        json_match = re.search(r"\[.*\]", response, re.DOTALL)
         if json_match:
             topics = json.loads(json_match.group())
             return {"success": True, "topics": topics}

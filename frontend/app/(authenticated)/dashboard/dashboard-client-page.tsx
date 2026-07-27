@@ -18,9 +18,6 @@ const OverviewSection = dynamic(() => import('@/components/dashboard/overview-se
 const ReportsSection = dynamic(() => import('@/components/dashboard/reports-section').then(mod => mod.ReportsSection), {
   loading: () => <div className="h-48 flex items-center justify-center"><Spinner size="md" /></div>
 });
-const ModulesSection = dynamic(() => import('@/components/dashboard/modules-section').then(mod => mod.ModulesSection), {
-  loading: () => <div className="h-48 flex items-center justify-center"><Spinner size="md" /></div>
-});
 const SimulationsSection = dynamic(() => import('@/components/dashboard/simulations-section'), {
   loading: () => <div className="h-48 flex items-center justify-center"><Spinner size="md" /></div>
 });
@@ -55,12 +52,12 @@ export default function DashboardClientPage() {
   // Get tab from URL or localStorage
   const getInitialTab = (): DashSection => {
     const tabParam = searchParams.get('tab') as DashSection;
-    if (tabParam && ['overview', 'students', 'reports', 'modules', 'flashcards', 'simulations', 'premium', 'cefr', 'whatsapp'].includes(tabParam)) {
+    if (tabParam && ['overview', 'students', 'reports', 'flashcards', 'simulations', 'premium', 'cefr', 'whatsapp'].includes(tabParam)) {
       return tabParam;
     }
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('tati_last_dashboard_tab') as DashSection;
-      if (saved && ['overview', 'students', 'reports', 'modules', 'flashcards', 'simulations', 'premium', 'cefr', 'whatsapp'].includes(saved)) {
+      if (saved && ['overview', 'students', 'reports', 'flashcards', 'simulations', 'premium', 'cefr', 'whatsapp'].includes(saved)) {
         return saved;
       }
     }
@@ -97,7 +94,6 @@ export default function DashboardClientPage() {
     overview: 'Overview',
     reports: 'Reports',
     students: 'Students',
-    modules: 'Modules',
     simulations: 'Simulations',
     flashcards: 'Flashcards',
     cefr: 'CEFR Materials',
@@ -109,7 +105,6 @@ export default function DashboardClientPage() {
     overview: 'Platform summary',
     reports: 'Overview and class metrics',
     students: 'Student management',
-    modules: 'Management of modules and activities',
     simulations: 'Manage real-life conversation simulations',
     flashcards: 'Vocabulary deck management',
     cefr: 'CEFR diagnostic and RAG materials',
@@ -182,7 +177,6 @@ export default function DashboardClientPage() {
                   students: 'Students',
                   reports: 'Reports',
                   submissions: 'Corrections',
-                  modules: 'Modules',
                   flashcards: 'Flashcards',
                   simulations: 'Simulations',
                   cefr: 'CEFR Materials',
@@ -196,7 +190,6 @@ export default function DashboardClientPage() {
                   students: 'Student management',
                   reports: 'Overview and class metrics',
                   submissions: 'Student answers to review',
-                  modules: 'Educational contents',
                   flashcards: 'Study decks',
                   simulations: 'Real-world scenarios',
                   cefr: 'Diagnose and generate from PDFs',
@@ -222,7 +215,6 @@ export default function DashboardClientPage() {
           )}
 
           {activeSection === 'reports' && <ReportsSection />}
-          {activeSection === 'modules' && <ModulesSection />}
           {activeSection === 'simulations' && <SimulationsSection />}
           {activeSection === 'flashcards' && <FlashcardsSection />}
           {activeSection === 'cefr' && <CefrSection />}

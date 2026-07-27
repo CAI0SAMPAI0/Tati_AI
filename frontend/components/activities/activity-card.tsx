@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Play, CheckCircle2, CircleHelp, Headphones, FileText } from 'lucide-react';
+import { Play, CheckCircle2, Headphones, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const statusConfig = {
@@ -12,7 +12,6 @@ const statusConfig = {
 } as const;
 
 const typeIcons = {
-  quiz: <CircleHelp size={18} />,
   flashcard: <Play size={18} />,
   exercise: <FileText size={18} />,
   simulation: <Play size={18} />,
@@ -22,7 +21,7 @@ const typeIcons = {
 interface ActivityCardProps {
   title: string;
   description: string;
-  type: 'quiz' | 'flashcard' | 'exercise' | 'simulation' | 'podcast';
+  type: 'flashcard' | 'exercise' | 'simulation' | 'podcast';
   status?: 'new' | 'done' | 'corrected' | 'pending';
   meta?: Array<{ icon: React.ReactNode; label: string }>;
   onClick?: () => void;

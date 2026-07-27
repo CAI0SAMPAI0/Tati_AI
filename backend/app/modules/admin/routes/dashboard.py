@@ -1,4 +1,3 @@
-
 from app.core.dependencies.auth import get_current_user, require_staff
 from app.core.dependencies.db import get_db
 from app.core.enums import normalize_level
@@ -40,54 +39,7 @@ class StudentNudge(BaseModel):
     message: str
 
 
-class UrlGenerationRequest(BaseModel):
-    """Payload para gerar um módulo a partir de uma URL externa."""
-
-    url: str
-    level: str | None = "B1"
-
-
-class DispatchQuizRequest(BaseModel):
-    """Payload para despachar um quiz para vários alunos."""
-
-    quiz_id: str
-    student_usernames: list[str]
-
-
-class GenerateQuizAIRequest(BaseModel):
-    """Payload para gerar um quiz via IA."""
-
-    topic: str
-    num_questions: int = 5
-    level: str = "B1"
-
-
 # ── Estatísticas e visão geral ────────────────────────────────────────
-
-
-@router.post("/generate-from-url")
-async def generate_from_url_endpoint(
-    req: UrlGenerationRequest, user: dict = Depends(require_staff)
-):
-    """Gera um módulo completo a partir de uma URL externa."""
-    from app.modules.activities.services.url_to_module import url_to_module_service
-
-    result = await url_to_module_service.generate_from_url(
-        req.url, user["username"], req.level
-    )
-    if not result.get("ok"):
-        raise BusinessLogicError(detail=result.get("error"))
-
-    from app.modules.notifications.services.notifications import notify_ai_generation
-
-    notify_ai_generation(
-        username=user["username"],
-        title="✨ Módulo Gerado",
-        message="O módulo a partir da URL foi gerado com sucesso.",
-        url="/admin",
-    )
-
-    return result
 
 
 @router.get("/config-status")
@@ -528,44 +480,6 @@ def delete_simulation(
     return db.table("simulations").delete().eq("id", simulation_id).execute()
 
 
-@router.get("/modules")
-def list_all_modules(db: Client = Depends(get_db), user=Depends(require_staff)):
-    """Lista todos os módulos (quizzes e conteúdos), ignorando flashcards."""
-    from app.modules.activities.routes.personalized import PERSONALIZED_MODULE_ID
-
-    res = (
-        db.table("modules")
-        .select("*")
-        .is_("flashcards", "null")
-        .neq("id", PERSONALIZED_MODULE_ID)
-        .order("created_at", desc=True)
-        .execute()
-    )
-    return res.data or []
-
-
-@router.put("/modules/{module_id}")
-def update_module_admin(
-    module_id: str,
-    data: dict,
-    db: Client = Depends(get_db),
-    user=Depends(require_staff),
-):
-    """Atualiza metadados de um módulo."""
-    return db.table("modules").update(data).eq("id", module_id).execute()
-
-
-@router.delete("/modules/{module_id}")
-async def delete_module_admin(
-    module_id: str, service: ActivityService = Depends(), user=Depends(require_staff)
-):
-    """Remove um módulo e seus dependentes."""
-    success = await service.delete_module(module_id)
-    if not success:
-        raise BusinessLogicError(detail="Não foi possível excluir o módulo")
-    return {"ok": True}
-
-
 @router.get("/flashcards")
 def get_dashboard_flashcards(
     db: Client = Depends(get_db), user=Depends(require_staff)
@@ -718,9 +632,7 @@ def update_flashcard_deck(
                 ).execute()
 
             if "flashcards" in data and data["flashcards"] is not None:
-                db.table("cefr_flashcards").delete().in_(
-                    "id", matched_ids
-                ).execute()
+                db.table("cefr_flashcards").delete().in_("id", matched_ids).execute()
                 new_topic = update_data.get("topic", matched_rows[0].get("topic"))
                 new_level = update_data.get("level", level)
                 if new_level:
@@ -1498,295 +1410,7 @@ async def dispatch_file(
     return {"success": True, "dispatched_to": success_count}
 
 
-@router.post("/dispatch-quiz")
-async def dispatch_quiz(body: DispatchQuizRequest, user=Depends(require_staff)):
-    """Dispara uma notificação de e-mail e push celular alertando sobre um quiz pendente para os alunos selecionados."""
-    from app.core.database import get_client
-    from app.modules.notifications.services.push_notifications import send_push_to_user
-    from app.shared.services.email import EmailSender
 
-    if not body.student_usernames:
-        raise HTTPException(status_code=400, detail="Nenhum aluno selecionado.")
-
-    db = get_client()
-
-    # Busca o título do quiz para a mensagem
-    quiz_res = db.table("quizzes").select("*").eq("id", body.quiz_id).limit(1).execute()
-    if not quiz_res.data:
-        raise HTTPException(status_code=404, detail="Quiz não encontrado.")
-    orig_quiz = quiz_res.data[0]
-    quiz_title = orig_quiz.get("title") or "Novo Quiz"
-
-    # Busca os detalhes de e-mail e perfil dos alunos
-    res = (
-        db.table("users")
-        .select("username, email, profile")
-        .in_("username", body.student_usernames)
-        .execute()
-    )
-    students = res.data or []
-
-    email_sender = EmailSender()
-    success_count = 0
-
-    # Busca questões originais do quiz de template
-    orig_questions = (
-        db.table("quiz_questions")
-        .select("*")
-        .eq("quiz_id", body.quiz_id)
-        .execute()
-        .data
-        or []
-    )
-
-    for student in students:
-        email = student.get("email")
-        username = student.get("username")
-        profile = student.get("profile") or {}
-        name = profile.get("name") or username
-
-        # Cria clone do quiz associado ao usuário específico
-        PERSONALIZED_MODULE_ID = "00000000-0000-0000-0000-000000000001"
-        cloned_quiz_res = (
-            db.table("quizzes")
-            .insert(
-                {
-                    "module_id": PERSONALIZED_MODULE_ID,
-                    "title": orig_quiz.get("title"),
-                    "description": orig_quiz.get("description"),
-                    "username": username,
-                }
-            )
-            .execute()
-        )
-
-        if not cloned_quiz_res.data:
-            continue
-
-        cloned_quiz_id = cloned_quiz_res.data[0]["id"]
-
-        # Cria clones de todas as questões
-        for q in orig_questions:
-            db.table("quiz_questions").insert(
-                {
-                    "quiz_id": cloned_quiz_id,
-                    "question": q.get("question"),
-                    "options": q.get("options"),
-                    "correct_index": q.get("correct_index"),
-                    "explanation": q.get("explanation"),
-                    "order": q.get("order"),
-                }
-            ).execute()
-
-        email_sent = False
-        if email:
-            try:
-                email_sent = email_sender.send_dispatched_quiz_email(
-                    to_email=email,
-                    name=name,
-                    quiz_title=quiz_title,
-                    quiz_url=f"https://tati-ai.vercel.app/quiz/{cloned_quiz_id}",
-                )
-            except Exception as e:
-                import logging
-
-                logging.exception(
-                    f"Error sending dispatched quiz email to {email}: {e}"
-                )
-                email_sent = False
-
-        if not email_sent:
-            import logging
-
-            logging.warning(
-                f"Email dispatch failed or was skipped for quiz to {username} ({email}), proceeding with push notification."
-            )
-
-        # Always increment success count and trigger push notification
-        success_count += 1
-
-        # Cria notificação no banco de dados para aparecer no topo da tela do aluno
-        try:
-            from app.modules.notifications.services.notifications import (
-                create_notification,
-            )
-
-            create_notification(
-                username=username,
-                category="nudge",
-                title="Novo Quiz Disponível! 📝",
-                message=f"Teacher Tati liberou o quiz '{quiz_title}' para você. Acesse suas atividades!",
-                send_push=False,
-            )
-        except Exception as ne:
-            import logging
-
-            logging.exception(f"Failed to create notification for quiz dispatch: {ne}")
-
-        try:
-            send_push_to_user(
-                username=username,
-                title="Novo Quiz Disponível! 📝",
-                body=f"Teacher Tati liberou o quiz '{quiz_title}' para você. Acesse suas atividades!",
-                url="/activities",
-            )
-        except Exception as e:
-            import logging
-
-            logging.exception(
-                f"Failed to send push notification to user {username}: {e}"
-            )
-
-        # Envia via WhatsApp (se habilitado)
-        try:
-            from app.modules.notifications.services.waha_service import WahaService
-
-            title = "Novo Quiz Disponível! 📝"
-            body = f"Teacher Tati liberou o quiz '{quiz_title}' para você. Acesse suas atividades!"
-            whatsapp_text = f"*{title}*\n\n{body}\n\nAccess in the app: https://tati-ai.vercel.app/activities"
-            await WahaService.send_message(
-                recipient_username=username,
-                text=whatsapp_text,
-                sender_username=user["username"],
-                db=db,
-            )
-        except Exception as we:
-            import logging
-
-            logging.warning(
-                f"Failed to send WhatsApp notification to user {username}: {we}"
-            )
-
-    return {"success": True, "dispatched_to": success_count}
-
-
-@router.get("/quizzes")
-async def get_quizzes_admin(user=Depends(require_staff)):
-    """Lista todos os quizzes cadastrados no sistema."""
-    from app.core.database import get_client
-
-    db = get_client()
-    try:
-        res = db.table("quizzes").select("id, title, modules(level)").execute()
-        quizzes = []
-        for q in res.data or []:
-            module = q.get("modules") or {}
-            quizzes.append(
-                {
-                    "id": q.get("id"),
-                    "title": q.get("title"),
-                    "level": module.get("level") if module else None,
-                }
-            )
-        return quizzes
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao buscar quizzes: {e}")
-
-
-@router.post("/generate-quiz-ai")
-async def generate_quiz_ai(body: GenerateQuizAIRequest, user=Depends(require_staff)):
-    """Gera um quiz pedagógico via IA (Groq) com base em um tema, nível e número de questões."""
-    from app.core.database import get_client
-    from app.modules.chat.services.llm import groq_chat_json
-
-    db = get_client()
-
-    # Prompt de geração do Quiz
-    prompt = (
-        f"You are an expert English teacher. Generate a high-quality pedagogical quiz about the topic: '{body.topic}' "
-        f"for an English learner at CEFR level: '{body.level}'.\n"
-        f"Number of questions to generate: {body.num_questions}.\n"
-        "All questions and options must be in English. The quiz should test grammatical accuracy, reading comprehension, or vocabulary related to the topic.\n\n"
-        "STRICT RULES:\n"
-        "1. Do NOT include question numbers or prefix the question text (e.g., write 'What is...' instead of '1. What is...').\n"
-        "2. Do NOT use labels like 'A)', 'B)', 'a)', 'b)' in the options (e.g., write 'apple' instead of 'A) apple').\n"
-        "3. Provide exactly 4 options per question.\n"
-        "4. Set 'correct_index' as a 0-indexed integer (0, 1, 2, or 3) indicating which option is correct.\n"
-        "5. Write a helpful explanation in English for the correct answer.\n"
-        "6. Return ONLY a valid JSON object matching the schema below. Do not include markdown codeblocks like ```json.\n\n"
-        "JSON SCHEMA:\n"
-        "{\n"
-        '  "title": "A short engaging title for the quiz",\n'
-        '  "description": "A brief description explaining what this quiz covers",\n'
-        '  "exercises": [\n'
-        "    {\n"
-        '      "question": "The question text",\n'
-        '      "options": ["Correct Option", "Distractor 1", "Distractor 2", "Distractor 3"],\n'
-        '      "correct_index": 0,\n'
-        '      "explanation": "Explanation why this is correct."\n'
-        "    }\n"
-        "  ]\n"
-        "}"
-    )
-
-    try:
-        data = await groq_chat_json(
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=2000,
-            temperature=0.3,
-        )
-
-        if not data or "exercises" not in data or not data["exercises"]:
-            raise HTTPException(
-                status_code=500,
-                detail="Erro ao gerar questões via IA: a resposta do LLM está vazia ou mal formatada.",
-            )
-
-        quiz_title = data.get("title") or f"{body.topic} Quiz"
-        quiz_description = (
-            data.get("description")
-            or f"AI-generated quiz about {body.topic} at level {body.level}."
-        )
-
-        PERSONALIZED_MODULE_ID = "00000000-0000-0000-0000-000000000001"
-
-        quiz_res = (
-            db.table("quizzes")
-            .insert(
-                {
-                    "module_id": PERSONALIZED_MODULE_ID,
-                    "title": quiz_title,
-                    "description": quiz_description,
-                }
-            )
-            .execute()
-        )
-
-        if not quiz_res.data:
-            raise HTTPException(
-                status_code=500, detail="Erro ao inserir o quiz no banco de dados."
-            )
-
-        quiz_id = quiz_res.data[0]["id"]
-
-        # Insere as questões na tabela quiz_questions
-        for i, q in enumerate(data.get("exercises", [])):
-            options = q.get("options", [])
-            if not options or len(options) < 2:
-                continue
-
-            correct_index = q.get("correct_index", 0)
-            if not (0 <= correct_index < len(options)):
-                correct_index = 0
-
-            db.table("quiz_questions").insert(
-                {
-                    "quiz_id": quiz_id,
-                    "question": q.get("question", "Question"),
-                    "options": options,
-                    "correct_index": correct_index,
-                    "explanation": q.get("explanation", ""),
-                    "order": i,
-                }
-            ).execute()
-
-        return {"success": True, "quiz_id": quiz_id, "title": quiz_title}
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erro no processamento da IA ou inserção no banco: {e}",
-        )
 
 
 @router.get("/celery/health")
@@ -1878,9 +1502,7 @@ async def stop_waha_session(user=Depends(require_staff)):
 
 
 @router.get("/waha/session/qr")
-async def get_waha_session_qr(
-    session: str | None = None, user=Depends(require_staff)
-):
+async def get_waha_session_qr(session: str | None = None, user=Depends(require_staff)):
     """Proxy to return the session QR code as an image."""
     from app.modules.notifications.services.waha_service import WahaService
     from fastapi import Response

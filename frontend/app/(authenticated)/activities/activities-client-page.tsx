@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  HelpCircle,
   Layers,
   Drama,
   Podcast,
@@ -27,26 +26,20 @@ import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { normalizeLevel } from '@/lib/constants/levels';
+import { API_BASE } from '@/lib/api/client';
 
-type TabType = 'quiz' | 'grammar' | 'vocabulary' | 'listenings' | 'reading' | 'flashcards' | 'simulations';
+const teImg = (url: string) =>
+  url.includes('test-english.com')
+    ? `${API_BASE}/activities/test-english/image-proxy?url=${encodeURIComponent(url)}`
+    : url;
 
-const PERSONALIZED_MODULE_ID = '00000000-0000-0000-0000-000000000001';
+type TabType = 'grammar' | 'vocabulary' | 'listenings' | 'reading' | 'flashcards' | 'simulations';
 
-interface QuizItem {
-  id: string;
-  title: string;
-  description?: string;
-  attempts?: number;
-  status?: string;
-  level?: string;
-  user_status?: { is_done: boolean; score?: number };
-}
 interface ModuleItem {
   id: string;
   title: string;
   level?: string;
   levels?: string[];
-  quizzes?: QuizItem[];
   flashcards?: Array<{ id: string }>;
   user_status?: { is_done: boolean; score?: number };
 }
@@ -99,7 +92,7 @@ interface TestEnglishItem {
 export default function ActivitiesClientPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabType>('quiz');
+  const [activeTab, setActiveTab] = useState<TabType>('grammar');
   const [searchQuery, setSearchQuery] = useState('');
   const { sidebarOpen, toggleSidebar: handleToggleSidebar, closeSidebar: handleCloseSidebar } = useSidebarState();
   const [visiblePodcastsCount, setVisiblePodcastsCount] = useState(10);
@@ -110,7 +103,7 @@ export default function ActivitiesClientPage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('tati_last_activity_tab') as TabType;
-      if (saved && ['quiz', 'grammar', 'vocabulary', 'listenings', 'reading', 'flashcards', 'simulations'].includes(saved)) {
+      if (saved && ['grammar', 'vocabulary', 'listenings', 'reading', 'flashcards', 'simulations'].includes(saved)) {
         setActiveTab(saved);
       }
     }
@@ -119,22 +112,6 @@ export default function ActivitiesClientPage() {
   useEffect(() => {
     localStorage.setItem('tati_last_activity_tab', activeTab);
   }, [activeTab]);
-
-  const { data: modules = [] } = useQuery<ModuleItem[]>({
-    queryKey: ['activities-modules', filterLevel],
-    queryFn: () => apiGet<ModuleItem[]>(
-      filterLevel === 'All'
-        ? ENDPOINTS.ACTIVITIES_MODULES
-        : `${ENDPOINTS.ACTIVITIES_MODULES}?level=${filterLevel}`
-    ),
-    refetchInterval: 10000, // Silently fetch updates every 10 seconds
-  });
-
-  const { data: masterModule } = useQuery<any>({
-    queryKey: ['activities-master-module'],
-    queryFn: () => apiGet<any>('/admin/modules/personalized'),
-    refetchInterval: 10000, // Silently fetch updates every 10 seconds
-  });
 
   const { data: simulationsRaw = [] } = useQuery<SimulationItem[]>({
     queryKey: ['activities-simulations', filterLevel],
@@ -229,65 +206,6 @@ export default function ActivitiesClientPage() {
     return mats.filter((m: any) => m.filename.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [userProfile, searchQuery]);
 
-  const quizzes = useMemo(() => {
-    if (!modules) return [];
-    const list: Array<QuizItem & { module_title: string; is_published?: boolean; level?: string }> = [];
-    const targetLevel = filterLevel === 'All' ? null : normalizeLevel(filterLevel);
-    modules.forEach((m) => {
-      if (m.id === PERSONALIZED_MODULE_ID) return;
-      (m.quizzes || []).forEach((q) => {
-        if (
-          !searchQuery ||
-          q.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          m.title.toLowerCase().includes(searchQuery.toLowerCase())
-        ) {
-          // Resolve nível do quiz: próprio ou do módulo
-          const quizLevel = q.level || m.level;
-          if (targetLevel && quizLevel) {
-            const quizLevelNorm = normalizeLevel(quizLevel);
-            if (quizLevelNorm !== targetLevel && quizLevel.toLowerCase() !== 'all') {
-              return;
-            }
-          }
-          list.push({
-            ...q,
-            module_title: m.title,
-            // Use per-quiz user_status if available, fall back to module status
-            user_status: q.user_status ?? m.user_status,
-            is_published: (m as any).is_published,
-            level: quizLevel,
-          });
-        }
-      });
-    });
-
-    if (masterModule && masterModule.quizzes) {
-      masterModule.quizzes.forEach((q: any) => {
-        if (q.id && q.id.startsWith('cefr_')) {
-          if (!searchQuery || q.title.toLowerCase().includes(searchQuery.toLowerCase())) {
-            list.push({
-              ...q,
-              module_title: 'CEFR Exercises',
-              user_status: { is_done: q.status === 'done', score: q.score },
-            });
-          }
-        } else {
-          if (!searchQuery || q.title.toLowerCase().includes(searchQuery.toLowerCase())) {
-            list.push({
-              ...q,
-              module_title: 'Personalized Practice',
-              user_status: { is_done: q.status === 'completed' || q.status === 'done', score: q.score },
-              is_published: true,
-              level: 'All',
-            });
-          }
-        }
-      });
-    }
-
-    return list;
-  }, [modules, masterModule, searchQuery, filterLevel]);
-
   const flashcards = useMemo(() => {
     if (!flashcardsRaw) return [];
     let filtered = flashcardsRaw.filter(
@@ -324,7 +242,6 @@ export default function ActivitiesClientPage() {
   }, [podcastsRaw, searchQuery]);
 
   const tabs: Array<{ id: TabType; icon: React.ReactNode; label: string; count?: number }> = [
-    { id: 'quiz', icon: <HelpCircle size={18} />, label: 'Quizzes', count: quizzes.length },
     { id: 'grammar', icon: <BookOpen size={18} />, label: 'Grammar', count: grammarContent?.items?.length },
     { id: 'vocabulary', icon: <Lightbulb size={18} />, label: 'Vocabulary', count: vocabularyContent?.items?.length },
     { id: 'listenings', icon: <Podcast size={18} />, label: 'Listening', count: listeningContent?.items?.length || podcasts.length },
@@ -404,38 +321,6 @@ export default function ActivitiesClientPage() {
           </nav>
 
           <div className="min-h-[400px]">
-            {activeTab === 'quiz' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {quizzes.length > 0 ? (
-                  quizzes.map((q: any) => (
-                    <ActivityCard
-                      key={q.id}
-                      title={q.title}
-                      description={q.description || 'Practice your knowledge.'}
-                      type="quiz"
-                      status={q.user_status?.is_done ? 'done' : 'new'}
-                      score={q.user_status?.score}
-                      onClick={() => router.push(`/quiz/${q.id}`)}
-                      meta={[
-                        {
-                          icon: <Layers size={14} />,
-                          label: q.level || 'all',
-                        },
-                        isStaff && {
-                          icon: <Play size={14} />,
-                          label: q.is_published ? 'Published' : 'Draft',
-                        }
-                      ].filter(Boolean) as any}
-                    />
-                  ))
-                ) : (
-                  <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
-                    No quizzes available.
-                  </div>
-                )}
-              </div>
-            )}
-
             {activeTab === 'grammar' && (
               <div className="space-y-8">
                 {grammarContent?.items && grammarContent.items.length > 0 ? (
@@ -461,7 +346,7 @@ export default function ActivitiesClientPage() {
                             {item.image && (
                               <div className="h-32 overflow-hidden bg-bg-secondary">
                                 <img
-                                  src={item.image}
+                                  src={teImg(item.image)}
                                   alt={item.title}
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                   onError={(e) => {
@@ -519,7 +404,7 @@ export default function ActivitiesClientPage() {
                             {item.image && (
                               <div className="h-32 overflow-hidden bg-bg-secondary">
                                 <img
-                                  src={item.image}
+                                  src={teImg(item.image)}
                                   alt={item.title}
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                   onError={(e) => {
@@ -608,7 +493,7 @@ export default function ActivitiesClientPage() {
                             {item.image && (
                               <div className="h-32 overflow-hidden bg-bg-secondary">
                                 <img
-                                  src={item.image}
+                                  src={teImg(item.image)}
                                   alt={item.title}
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                   onError={(e) => {
@@ -666,7 +551,7 @@ export default function ActivitiesClientPage() {
                             {item.image && (
                               <div className="h-32 overflow-hidden bg-bg-secondary">
                                 <img
-                                  src={item.image}
+                                  src={teImg(item.image)}
                                   alt={item.title}
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                   onError={(e) => {

@@ -111,8 +111,8 @@ def generate_cefr_exercises_task(
 
             notify_ai_generation(
                 username=username,
-                title="✨ Quiz Generated",
-                message=f"Quiz about '{display_title}' with {len(saved_exercises)} questions is ready.",
+                title="✨ Exercises Generated",
+                message=f"Exercises about '{display_title}' with {len(saved_exercises)} questions are ready.",
                 url="/admin",
             )
 

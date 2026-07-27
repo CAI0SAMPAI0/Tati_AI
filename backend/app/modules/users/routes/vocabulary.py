@@ -3,7 +3,6 @@ Router de Caderno de Vocabulário Pessoal.
 Refatorado para usar UserService e padrão async.
 """
 
-
 from app.core.dependencies.auth import get_current_user
 from app.modules.users.services.user_service import UserService
 from fastapi import APIRouter, Depends

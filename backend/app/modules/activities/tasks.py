@@ -30,33 +30,6 @@ def generate_flashcards_task(
     return asyncio.run(_run())
 
 
-@celery_app.task(name="app.modules.activities.tasks.generate_quiz_task")
-def generate_quiz_task(
-    topic: str, level: str, num_questions: int = 5, username: str = None
-):
-    from app.modules.activities.services.quiz_service import QuizService
-
-    async def _run():
-        service = QuizService()
-        res = await service.generate_dynamic_quiz(
-            topic=topic, level=level, num_questions=num_questions
-        )
-        if res and username:
-            from app.modules.notifications.services.notifications import (
-                notify_ai_generation,
-            )
-
-            notify_ai_generation(
-                username=username,
-                title="✨ Quiz Gerado",
-                message=f"Quiz sobre '{topic}' com {num_questions} questões está pronto.",
-                url="/admin",
-            )
-        return res
-
-    return asyncio.run(_run())
-
-
 @celery_app.task(name="app.modules.activities.tasks.generate_simulation_task")
 def generate_simulation_task(
     topic: str, level: str, instructions: str, username: str = None

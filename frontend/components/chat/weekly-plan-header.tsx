@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle2, Circle, Sparkles, Target, FileText, Play, Podcast, LayoutGrid } from 'lucide-react';
+import { CheckCircle2, Circle, Sparkles, Target, Play, Podcast, LayoutGrid } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
@@ -26,7 +26,6 @@ export function WeeklyPlanHeader({ topics }: WeeklyPlanHeaderProps) {
 
   const CATEGORIES = [
     { id: 'all', label: 'All', icon: <LayoutGrid size={14} /> },
-    { id: 'quiz', label: 'Quizzes', icon: <FileText size={14} />, prefix: 'quiz-' },
     { id: 'aiex', label: 'AI', icon: <Sparkles size={14} />, prefix: 'aiex-' },
     { id: 'sim', label: 'Sims', icon: <Play size={14} />, prefix: 'sim-' },
     { id: 'pod', label: 'Listen', icon: <Podcast size={14} />, prefix: 'pod-' },

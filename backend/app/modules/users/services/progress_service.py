@@ -360,7 +360,7 @@ class ProgressService:
                             "date": day.strftime("%Y-%m-%d"),
                             "level": step_level,
                             "score": baseline_score,
-                            "type": "quiz",
+                            "type": "exercise",
                         }
                     )
 

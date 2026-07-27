@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRight, Calendar, CheckCircle2, Circle, Target, Sparkles, Podcast, Play, FileText, LayoutGrid, ChevronDown } from 'lucide-react';
+import { ChevronRight, Calendar, CheckCircle2, Circle, Target, Sparkles, Podcast, Play, LayoutGrid, ChevronDown } from 'lucide-react';
 import { fetchWeeklyPlan, WeeklyTopic } from '@/lib/api/weekly-plan';
 import { apiGet } from '@/lib/api/client';
 import { useRouter } from 'next/navigation';
@@ -45,7 +45,6 @@ export function WeeklyPlan() {
 
   const CATEGORIES = [
     { id: 'all', label: 'All', icon: <LayoutGrid size={12} /> },
-    { id: 'quiz', label: 'Quizzes', icon: <FileText size={12} />, prefix: 'quiz-' },
     { id: 'aiex', label: 'AI', icon: <Sparkles size={12} />, prefix: 'aiex-' },
     { id: 'sim', label: 'Sims', icon: <Play size={12} />, prefix: 'sim-' },
     { id: 'pod', label: 'Listen', icon: <Podcast size={12} />, prefix: 'pod-' },

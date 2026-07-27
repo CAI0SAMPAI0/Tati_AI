@@ -2,13 +2,12 @@
 
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Sparkles, HelpCircle, Drama, Target } from 'lucide-react';
+import { Sparkles, Drama, Target } from 'lucide-react';
 import { apiGet } from '@/lib/api/client';
 import { Spinner } from '@/components/ui/spinner';
 import { useRouter } from 'next/navigation';
 
 interface WeeklyGoalData {
-  quizzes: Array<{ id: string; title: string }>;
   ai_exercises: Array<{ exercise_id: string }>;
   simulations: Array<{ simulation_id: string }>;
 }
@@ -23,7 +22,7 @@ export function WeeklyGoal() {
   if (isLoading) return <div className="p-8 flex justify-center"><Spinner /></div>;
   if (!data) return null;
 
-  const totalTasks = (data.quizzes?.length || 0) + (data.simulations?.length || 0);
+  const totalTasks = (data.simulations?.length || 0);
 
   if (totalTasks === 0) return null;
 
@@ -42,13 +41,6 @@ export function WeeklyGoal() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {data.quizzes.length > 0 && (
-          <div onClick={() => router.push('/activities')} className="p-4 bg-bg-secondary rounded-2xl cursor-pointer hover:bg-primary/5 transition-all">
-            <HelpCircle className="text-warning mb-2" />
-            <p className="text-sm font-bold">{data.quizzes.length} Quizzes</p>
-          </div>
-        )}
-
         {data.simulations.length > 0 && (
           <div onClick={() => router.push('/activities')} className="p-4 bg-bg-secondary rounded-2xl cursor-pointer hover:bg-primary/5 transition-all">
             <Drama className="text-success mb-2" />

@@ -341,9 +341,7 @@ Return ONLY a JSON object:
         targets.sort(key=lambda x: x["score"], reverse=True)
         return targets[:limit]
 
-    async def mark_errors_resolved(
-        self, username: str, pattern_key: str | None = None
-    ):
+    async def mark_errors_resolved(self, username: str, pattern_key: str | None = None):
         """
         Marca erros como resolvidos.
         Se pattern_key vier vazio, marca todos do usuário.

@@ -1,4 +1,3 @@
-
 from app.core.enums import normalize_level
 
 

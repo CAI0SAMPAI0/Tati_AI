@@ -76,7 +76,7 @@ class PhoneticService:
         self._model_available = False
 
     def _lazy_init(self):
-        if self.model is not None or self._model_available is False:
+        if self.model is not None:
             return
 
         try:
@@ -132,7 +132,9 @@ class PhoneticService:
     def audio_to_ipa(self, audio_bytes: bytes) -> str:
         self._lazy_init()
         if not self._model_available or not self.model or not self.processor:
-            logger.warning("[PhoneticService] Audio-to-IPA unavailable: model not loaded")
+            logger.warning(
+                "[PhoneticService] Audio-to-IPA unavailable: model not loaded"
+            )
             return ""
 
         try:
@@ -164,6 +166,140 @@ class PhoneticService:
         except Exception as e:
             logger.error(f"Error in local phonetic STT: {e}")
             return ""
+
+    def evaluate_per_word(
+        self, audio_bytes: bytes, reference_text: str
+    ) -> dict[str, Any]:
+        """
+        Per-word pronunciation evaluation using phoneme-level comparison.
+        This is immune to ASR homophone normalization (e.g. live /lɪv/ vs /laɪv/)
+        because it compares actual phonemes from the audio against expected phonemes
+        from the reference text — not words transcribed by Whisper.
+
+        Returns:
+        {
+            "score": int (0-100 overall),
+            "words": [
+                {"word": "live", "score": 85, "accuracy": "correct",
+                 "expected_phonemes": "l ɪ v",
+                 "spoken_phonemes": "l aɪ v",
+                 "error_type": "None" or "Mispronunciation"}
+            ],
+            "spoken_ipa": "...",
+            "expected_ipa": "..."
+        }
+        """
+        spoken_ipa = self.audio_to_ipa(audio_bytes)
+        expected_full_ipa = self.text_to_ipa(reference_text)
+
+        ref_words = reference_text.split()
+
+        if not spoken_ipa or not expected_full_ipa or not ref_words:
+            return {
+                "score": 0,
+                "words": [
+                    {
+                        "word": w,
+                        "score": 0,
+                        "accuracy": "incorrect",
+                        "expected_phonemes": "",
+                        "spoken_phonemes": "",
+                        "error_type": "NoAssessment",
+                    }
+                    for w in ref_words
+                ],
+                "spoken_ipa": spoken_ipa,
+                "expected_ipa": expected_full_ipa,
+            }
+
+        spoken_phonemes = spoken_ipa.split()
+        expected_full_list = expected_full_ipa.split()
+
+        # Per-word expected phonemes
+        per_word_expected = []
+        for w in ref_words:
+            w_ipa = self.text_to_ipa(w)
+            per_word_expected.append(w_ipa.split())
+
+        # Count expected phonemes per word for tracking positions
+        phonemes_per_word = [len(p) for p in per_word_expected]
+
+        # Global alignment between expected and spoken phoneme sequences
+        from difflib import SequenceMatcher
+
+        matcher = SequenceMatcher(None, expected_full_list, spoken_phonemes)
+        match_ratio = matcher.ratio()
+
+        # Build mapping: which expected phoneme positions (flat) matched
+        matched_positions = set()
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+            if tag == "equal":
+                for ei in range(i1, i2):
+                    matched_positions.add(ei)
+
+        # Map matched positions back to words
+        word_results = []
+        pos = 0
+        for wi, word in enumerate(ref_words):
+            n_phonemes = phonemes_per_word[wi]
+            word_positions = set(range(pos, pos + n_phonemes))
+            matched_in_word = len(word_positions & matched_positions)
+            word_score = (
+                int((matched_in_word / n_phonemes) * 100) if n_phonemes > 0 else 0
+            )
+
+            # Get the spoken phonemes slice for this word (approximate)
+            # Find which spoken positions correspond to this word's expected positions
+            spoken_start = None
+            spoken_end = None
+            for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+                if range(i1, i2) and range(pos, pos + n_phonemes):
+                    overlap_start = max(i1, pos)
+                    overlap_end = min(i2, pos + n_phonemes)
+                    if overlap_start < overlap_end:
+                        ratio_start = (overlap_start - i1) / (i2 - i1) if i2 > i1 else 0
+                        ratio_end = (overlap_end - i1) / (i2 - i1) if i2 > i1 else 1
+                        word_j1 = j1 + int(ratio_start * (j2 - j1))
+                        word_j2 = j1 + int(ratio_end * (j2 - j1))
+                        if spoken_start is None or word_j1 < spoken_start:
+                            spoken_start = word_j1
+                        if spoken_end is None or word_j2 > spoken_end:
+                            spoken_end = word_j2
+
+            spoken_word_phonemes = (
+                spoken_phonemes[spoken_start:spoken_end]
+                if spoken_start is not None and spoken_end is not None
+                else []
+            )
+
+            if word_score >= 80:
+                accuracy = "correct"
+                error_type = "None"
+            else:
+                accuracy = "incorrect"
+                error_type = "Mispronunciation"
+
+            word_results.append(
+                {
+                    "word": word,
+                    "score": word_score,
+                    "accuracy": accuracy,
+                    "expected_phonemes": " ".join(per_word_expected[wi]),
+                    "spoken_phonemes": " ".join(spoken_word_phonemes),
+                    "error_type": error_type,
+                }
+            )
+
+            pos += n_phonemes
+
+        overall_score = int(match_ratio * 100)
+
+        return {
+            "score": overall_score,
+            "words": word_results,
+            "spoken_ipa": spoken_ipa,
+            "expected_ipa": expected_full_ipa,
+        }
 
     def evaluate_pronunciation(
         self, audio_bytes: bytes, reference_text: str

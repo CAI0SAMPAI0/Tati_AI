@@ -7,7 +7,6 @@ import {
   Search, 
   Send, 
   FileText, 
-  HelpCircle, 
   X, 
   Users, 
   UploadCloud,
@@ -26,15 +25,9 @@ interface Student {
   email: string;
 }
 
-interface Quiz {
-  id: string;
-  title: string;
-  level?: string;
-}
-
 export function DispatchSection() {
   // Tabs
-  const [activeTab, setActiveTab] = useState<'file' | 'quiz' | 'history'>('file');
+  const [activeTab, setActiveTab] = useState<'file' | 'history'>('file');
   const queryClient = useQueryClient();
 
   // Filters & Search
@@ -46,7 +39,7 @@ export function DispatchSection() {
 
   // Dispatch States
   const [files, setFiles] = useState<File[]>([]);
-  const [selectedQuizId, setSelectedQuizId] = useState<string>('');
+
   const [isSending, setIsSending] = useState(false);
   const [customMessage, setCustomMessage] = useState('');
   const [isDeletingFile, setIsDeletingFile] = useState<string | null>(null);
@@ -79,12 +72,6 @@ export function DispatchSection() {
     }
   };
 
-  // AI Quiz Generator States
-  const [showAiForm, setShowAiForm] = useState(false);
-  const [aiTopic, setAiTopic] = useState('');
-  const [aiLevel, setAiLevel] = useState('B1');
-  const [aiNumQuestions, setAiNumQuestions] = useState(5);
-  const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
 
   const { data: students, isLoading: loadingStudents } = useQuery<Student[]>({
     queryKey: ['admin-dispatch-students'],
@@ -92,12 +79,6 @@ export function DispatchSection() {
     refetchInterval: 10000, // Refetch silently every 10 seconds to keep emails/whatsapp numbers updated
   });
 
-  const { data: quizzes, isLoading: loadingQuizzes, refetch: refetchQuizzes } = useQuery<Quiz[]>({
-    queryKey: ['admin-dispatch-quizzes'],
-    queryFn: () => apiGet<Quiz[]>('/dashboard/quizzes'),
-    enabled: activeTab === 'quiz',
-    refetchInterval: 10000, // Refetch silently every 10 seconds
-  });
 
   const { data: dispatchedFiles = [], isLoading: loadingFiles } = useQuery<any[]>({
     queryKey: ['admin-dispatched-files'],
@@ -162,41 +143,6 @@ export function DispatchSection() {
     }
   };
 
-  const handleGenerateQuizAI = async () => {
-    if (!aiTopic.trim()) {
-      toast.error('Please enter a topic for the quiz.');
-      return;
-    }
-
-    setIsGeneratingQuiz(true);
-    const toastId = toast.loading('Generating quiz with AI...');
-
-    try {
-      const res = await apiPost<{ success: boolean; quiz_id: string; title: string; detail?: string }>(
-        '/dashboard/generate-quiz-ai',
-        {
-          topic: aiTopic,
-          num_questions: aiNumQuestions,
-          level: aiLevel,
-        }
-      );
-
-      if (res.ok && res.data.success) {
-        toast.success(`Quiz "${res.data.title}" generated successfully!`, { id: toastId });
-        await refetchQuizzes();
-        setSelectedQuizId(res.data.quiz_id);
-        setAiTopic('');
-        setShowAiForm(false);
-      } else {
-        toast.error(res.data.detail || 'Error generating quiz.', { id: toastId });
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to generate quiz.', { id: toastId });
-    } finally {
-      setIsGeneratingQuiz(false);
-    }
-  };
 
   const handleSend = async () => {
     if (selectedUsernames.length === 0) {
@@ -208,57 +154,33 @@ export function DispatchSection() {
     const toastId = toast.loading('Sending materials and notifications...');
 
     try {
-      if (activeTab === 'file') {
-        if (files.length === 0) {
-          toast.error('Please select a file to send.', { id: toastId });
-          setIsSending(false);
-          return;
-        }
+      if (files.length === 0) {
+        toast.error('Please select a file to send.', { id: toastId });
+        setIsSending(false);
+        return;
+      }
 
-        const formData = new FormData();
-        files.forEach(f => {
-          formData.append('files', f);
-        });
-        formData.append('student_usernames', JSON.stringify(selectedUsernames));
-        if (customMessage.trim()) {
-          formData.append('message', customMessage.trim());
-        }
+      const formData = new FormData();
+      files.forEach(f => {
+        formData.append('files', f);
+      });
+      formData.append('student_usernames', JSON.stringify(selectedUsernames));
+      if (customMessage.trim()) {
+        formData.append('message', customMessage.trim());
+      }
 
-        const res = await apiUpload<{ success: boolean; detail?: string; dispatched_to?: number }>(
-          '/dashboard/dispatch-file',
-          formData
-        );
+      const res = await apiUpload<{ success: boolean; detail?: string; dispatched_to?: number }>(
+        '/dashboard/dispatch-file',
+        formData
+      );
 
-        if (res.ok && res.data.success) {
-          toast.success(`Materials successfully sent to ${res.data.dispatched_to} student(s)!`, { id: toastId });
-          setFiles([]);
-          setCustomMessage('');
-          setSelectedUsernames([]);
-        } else {
-          toast.error(res.data.detail || 'Error sending materials.', { id: toastId });
-        }
+      if (res.ok && res.data.success) {
+        toast.success(`Materials successfully sent to ${res.data.dispatched_to} student(s)!`, { id: toastId });
+        setFiles([]);
+        setCustomMessage('');
+        setSelectedUsernames([]);
       } else {
-        if (!selectedQuizId) {
-          toast.error('Please select a quiz to send.', { id: toastId });
-          setIsSending(false);
-          return;
-        }
-
-        const res = await apiPost<{ success: boolean; detail?: string; dispatched_to?: number }>(
-          '/dashboard/dispatch-quiz',
-          {
-            quiz_id: selectedQuizId,
-            student_usernames: selectedUsernames,
-          }
-        );
-
-        if (res.ok && res.data.success) {
-          toast.success(`Quiz successfully dispatched to ${res.data.dispatched_to} student(s)!`, { id: toastId });
-          setSelectedQuizId('');
-          setSelectedUsernames([]);
-        } else {
-          toast.error(res.data.detail || 'Error dispatching quiz.', { id: toastId });
-        }
+        toast.error(res.data.detail || 'Error sending materials.', { id: toastId });
       }
     } catch (err) {
       console.error(err);
@@ -415,17 +337,6 @@ export function DispatchSection() {
             <span>Send Material</span>
           </button>
           <button
-            onClick={() => setActiveTab('quiz')}
-            className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all border-b-2 ${
-              activeTab === 'quiz' 
-                ? 'border-primary text-primary bg-primary/5' 
-                : 'border-transparent text-text-muted hover:text-text hover:bg-surface-hover'
-            }`}
-          >
-            <HelpCircle size={16} />
-            <span>Send Quiz</span>
-          </button>
-          <button
             onClick={() => setActiveTab('history')}
             className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all border-b-2 ${
               activeTab === 'history'
@@ -556,7 +467,7 @@ export function DispatchSection() {
                   </div>
                 )}
               </div>
-            ) : activeTab === 'file' ? (
+            ) : (
               <div className="space-y-4">
                 <div className="text-xs text-text-muted font-medium uppercase tracking-wider leading-relaxed">
                   Upload Pedagogical Files (PDF, Docs, Images)
@@ -612,109 +523,6 @@ export function DispatchSection() {
                   />
                 </div>
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-text-muted font-medium uppercase tracking-wider leading-relaxed">
-                    Select a quiz registered on the platform
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowAiForm(prev => !prev)}
-                    className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
-                  >
-                    {showAiForm ? 'Select Quiz' : '✨ Generate with AI'}
-                  </button>
-                </div>
-
-                {!showAiForm ? (
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold text-text-subtle">Available Quizzes:</label>
-                    {loadingQuizzes ? (
-                      <div className="h-10 bg-bg border border-border rounded-xl flex items-center px-3 text-xs text-text-muted gap-2">
-                        <div className="w-3.5 h-3.5 border border-primary/30 border-t-primary rounded-full animate-spin" />
-                        <span>Fetching quizzes...</span>
-                      </div>
-                    ) : (
-                      <select
-                        className="w-full px-3.5 py-2.5 bg-bg border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all font-medium text-text"
-                        value={selectedQuizId}
-                        onChange={(e) => setSelectedQuizId(e.target.value)}
-                      >
-                        <option value="">Select a quiz...</option>
-                        {quizzes?.map(q => (
-                          <option key={q.id} value={q.id}>
-                            [{q.level || '—'}] {q.title}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                ) : (
-                  <div className="bg-bg-secondary/20 border border-border p-4 rounded-2xl space-y-4 animate-fade-in">
-                    <div className="text-xs font-bold text-primary">✨ AI Quiz Generator</div>
-                    
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs font-bold text-text-subtle">Topic / Theme:</label>
-                      <input
-                        type="text"
-                        placeholder="e.g., Present Perfect vs Past Simple"
-                        className="w-full px-3.5 py-2 bg-bg border border-border rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all text-text font-medium"
-                        value={aiTopic}
-                        onChange={(e) => setAiTopic(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold text-text-subtle">Level:</label>
-                        <select
-                          className="w-full px-3 py-2 bg-bg border border-border rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all text-text font-medium"
-                          value={aiLevel}
-                          onChange={(e) => setAiLevel(e.target.value)}
-                        >
-                          <option value="A1">A1 - Beginner</option>
-                          <option value="A2">A2 - Elementary</option>
-                          <option value="B1">B1 - Intermediate</option>
-                          <option value="B2">B2 - Upper Intermediate</option>
-                          <option value="C1">C1 - Advanced</option>
-                          <option value="C2">C2 - Mastery</option>
-                        </select>
-                      </div>
-
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold text-text-subtle">Questions:</label>
-                        <select
-                          className="w-full px-3 py-2 bg-bg border border-border rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all text-text font-medium"
-                          value={aiNumQuestions}
-                          onChange={(e) => setAiNumQuestions(Number(e.target.value))}
-                        >
-                          <option value={3}>3 Questions</option>
-                          <option value={5}>5 Questions</option>
-                          <option value={10}>10 Questions</option>
-                          <option value={15}>15 Questions</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      disabled={isGeneratingQuiz || !aiTopic.trim()}
-                      onClick={handleGenerateQuizAI}
-                      className="w-full py-2 bg-primary hover:bg-primary-dark text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1 shadow-sm transition-all disabled:opacity-40"
-                    >
-                      {isGeneratingQuiz ? (
-                        <>
-                          <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          <span>Generating...</span>
-                        </>
-                      ) : (
-                        <span>Generate Quiz</span>
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
             )}
           </div>
 
@@ -726,7 +534,7 @@ export function DispatchSection() {
 
             <button
               onClick={handleSend}
-              disabled={isSending || selectedUsernames.length === 0 || (activeTab === 'file' ? files.length === 0 : !selectedQuizId)}
+              disabled={isSending || selectedUsernames.length === 0 || files.length === 0}
               className="w-full py-3 px-4 bg-primary hover:bg-primary-dark disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all active:scale-95"
             >
               {isSending ? (

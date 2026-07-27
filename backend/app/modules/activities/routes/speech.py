@@ -89,7 +89,7 @@ def expand_contractions(text: str) -> str:
 
 def get_contraction_alternatives(text: str) -> list[list[str]]:
     """Return list of word alternatives considering contractions.
-    
+
     e.g. "i would" -> [["i", "would"], ["i'd"]]
          "i'd"     -> [["i'd"], ["i", "would"]]
     """
@@ -104,6 +104,7 @@ def get_contraction_alternatives(text: str) -> list[list[str]]:
         else:
             alternatives.append([w_clean])
     return alternatives
+
 
 logger = logging.getLogger(__name__)
 
@@ -141,11 +142,12 @@ def word_conf_to_score(conf: float) -> int:
 
 def compute_local_evaluation(ref_words, transcript_words, word_conf_scores):
     """Evaluate pronunciation with contraction handling.
-    
+
     Expands contractions (I'd → I would, don't → do not) before comparing
     so the user gets credit for using either form.
     Strips trailing punctuation from words for clean display.
     """
+
     def clean_word(w):
         return re.sub(r"[^\w\s]", "", w).lower()
 
@@ -199,7 +201,9 @@ def compute_local_evaluation(ref_words, transcript_words, word_conf_scores):
                 oi = ref_map[ei]
                 best_sim = 0
                 for tj in range(j1, j2):
-                    sim = SequenceMatcher(None, expanded_ref[ei], expanded_trans[tj]).ratio()
+                    sim = SequenceMatcher(
+                        None, expanded_ref[ei], expanded_trans[tj]
+                    ).ratio()
                     best_sim = max(best_sim, sim)
                 acc[oi]["total"] += int(best_sim * 100)
                 acc[oi]["count"] += 1
@@ -220,18 +224,24 @@ def compute_local_evaluation(ref_words, transcript_words, word_conf_scores):
             conf = max(conf, word_conf_scores.get(norm, 0), word_conf_scores.get(wc, 0))
         if conf > 0:
             s = max(s, int(conf * 100))
-        words_result.append({
-            "word": display_words[i],
-            "score": s,
-            "accuracy": "correct" if s >= 80 else "incorrect",
-            "confidence": conf,
-        })
+        words_result.append(
+            {
+                "word": display_words[i],
+                "score": s,
+                "accuracy": "correct" if s >= 80 else "incorrect",
+                "confidence": conf,
+            }
+        )
 
     return words_result
 
 
 def get_conversational_feedback(
-    score: int, words_result: list, transcription: str, ref_text: str, free_speech: bool = False
+    score: int,
+    words_result: list,
+    transcription: str,
+    ref_text: str,
+    free_speech: bool = False,
 ) -> str:
     incorrect = [w for w in words_result if w["accuracy"] == "incorrect"]
     correct = [w for w in words_result if w["accuracy"] == "correct"]
@@ -251,7 +261,7 @@ def get_conversational_feedback(
             )
         else:
             return (
-                f"I heard you say \"{transcription}\". "
+                f'I heard you say "{transcription}". '
                 f"Try to speak a bit slower and more clearly. "
                 f"Practice makes perfect!"
             )
@@ -280,8 +290,8 @@ def get_conversational_feedback(
         )
     else:
         return (
-            f"Let's try again! I heard \"{transcription}\" but the target was "
-            f"\"{ref_text}\". Listen carefully to Tati's pronunciation "
+            f'Let\'s try again! I heard "{transcription}" but the target was '
+            f'"{ref_text}". Listen carefully to Tati\'s pronunciation '
             f"and repeat each word slowly."
         )
 
@@ -329,8 +339,14 @@ async def verify_pronunciation(
         transcription = ""
 
     if not transcription or transcription.startswith("[Erro"):
-        words_result = [{"word": w, "score": 0, "accuracy": "incorrect"} for w in ref_raw.split()] if ref_raw else []
-        feedback = get_conversational_feedback(0, words_result, "", ref_raw, is_free_speech)
+        words_result = (
+            [{"word": w, "score": 0, "accuracy": "incorrect"} for w in ref_raw.split()]
+            if ref_raw
+            else []
+        )
+        feedback = get_conversational_feedback(
+            0, words_result, "", ref_raw, is_free_speech
+        )
         correct_audio = ""
         if ref_raw:
             try:
@@ -354,9 +370,18 @@ async def verify_pronunciation(
     # Detect very short transcription compared to reference (bad recording)
     trans_word_count = len(transcription.split())
     ref_word_count = len(ref_raw.split()) if ref_raw else 0
-    if ref_raw and trans_word_count > 0 and ref_word_count >= 5 and trans_word_count <= 2:
-        logger.warning(f"Very short transcription ({transcription}) vs reference ({ref_raw}) — likely bad recording")
-        words_result = [{"word": w, "score": 0, "accuracy": "incorrect"} for w in ref_raw.split()]
+    if (
+        ref_raw
+        and trans_word_count > 0
+        and ref_word_count >= 5
+        and trans_word_count <= 2
+    ):
+        logger.warning(
+            f"Very short transcription ({transcription}) vs reference ({ref_raw}) — likely bad recording"
+        )
+        words_result = [
+            {"word": w, "score": 0, "accuracy": "incorrect"} for w in ref_raw.split()
+        ]
         correct_audio = ""
         if ref_raw:
             try:
@@ -393,7 +418,9 @@ async def verify_pronunciation(
         from app.shared.services.azure_speech_service import azure_speech_service
 
         if azure_speech_service.is_configured:
-            azure_res = azure_speech_service.evaluate_pronunciation(audio_bytes, actual_ref)
+            azure_res = azure_speech_service.evaluate_pronunciation(
+                audio_bytes, actual_ref
+            )
             if "error" not in azure_res:
                 score = azure_res["score"]
                 words = azure_res["words"]
@@ -402,7 +429,9 @@ async def verify_pronunciation(
                 )
                 return {
                     "score": score,
-                    "transcription": actual_ref if not is_free_speech else transcription,
+                    "transcription": (
+                        actual_ref if not is_free_speech else transcription
+                    ),
                     "words": words,
                     "feedback": feedback,
                     "correct_audio": correct_audio,
@@ -412,7 +441,10 @@ async def verify_pronunciation(
                         "completeness_score": azure_res["completeness_score"],
                         "free_speech": is_free_speech,
                     },
-                    "phonetic": {"provider": "azure", "raw_result": azure_res["raw_json"]},
+                    "phonetic": {
+                        "provider": "azure",
+                        "raw_result": azure_res["raw_json"],
+                    },
                 }
             logger.warning(f"Azure Speech error (fallback): {azure_res.get('error')}")
 
@@ -436,21 +468,82 @@ async def verify_pronunciation(
                     )
                 return {
                     "score": score,
-                    "transcription": actual_ref if not is_free_speech else transcription,
+                    "transcription": (
+                        actual_ref if not is_free_speech else transcription
+                    ),
                     "words": words,
                     "feedback": feedback,
                     "correct_audio": correct_audio,
                     "metadata": {
                         "accuracy_score": gemini_res.get("accuracy_score", score),
                         "fluency_score": gemini_res.get("fluency_score", score),
-                        "completeness_score": gemini_res.get("completeness_score", score),
+                        "completeness_score": gemini_res.get(
+                            "completeness_score", score
+                        ),
                         "free_speech": is_free_speech,
                     },
                     "phonetic": {"provider": "gemini", "raw_result": gemini_res},
                 }
             logger.warning(f"Gemini Speech error (fallback): {gemini_res.get('error')}")
 
-    # Step 4: Local evaluation
+    # Step 4: Phoneme-level evaluation (immune to ASR homophone normalization)
+    # Uses wav2vec2 phoneme recognition + g2p-en to compare actual phonemes
+    # from audio against expected phonemes — not text words.
+    if actual_ref:
+        from app.shared.services.phonetic_service import phonetic_service
+
+        phonetic_service._lazy_init()
+        if phonetic_service._model_available:
+            phonetic_result = phonetic_service.evaluate_per_word(
+                audio_bytes, actual_ref
+            )
+            if phonetic_result.get("score", 0) > 0:
+                words_result = phonetic_result.get("words", [])
+                overall_score = phonetic_result.get("score", 0)
+
+                # Blend with Whisper confidence where available
+                word_conf_scores = extract_segment_word_scores(trans_data)
+                for w in words_result:
+                    norm = w["word"].lower().strip(".,!?;:'\"")
+                    conf = word_conf_scores.get(norm, 0)
+                    if conf > 0 and w["score"] > 0:
+                        blended = int(w["score"] * 0.7 + conf * 100 * 0.3)
+                        w["score"] = blended
+                        w["accuracy"] = "correct" if blended >= 80 else "incorrect"
+                    # Carry best available IPA for frontend display
+                    w["confidence"] = conf
+
+                feedback = get_conversational_feedback(
+                    overall_score,
+                    words_result,
+                    transcription,
+                    actual_ref,
+                    is_free_speech,
+                )
+
+                return {
+                    "score": overall_score,
+                    "transcription": transcription,
+                    "words": words_result,
+                    "feedback": feedback,
+                    "correct_audio": correct_audio,
+                    "metadata": {
+                        "segments": trans_data.get("segments", []),
+                        "language": trans_data.get("language"),
+                        "duration": trans_data.get("duration"),
+                        "free_speech": is_free_speech,
+                    },
+                    "phonetic": {
+                        "provider": "wav2vec2+g2p",
+                        "spoken_ipa": phonetic_result.get("spoken_ipa", ""),
+                        "expected_ipa": phonetic_result.get("expected_ipa", ""),
+                    },
+                }
+            logger.warning(
+                f"Phonetic evaluation returned low score or empty, falling back to text comparison: {phonetic_result}"
+            )
+
+    # Step 5: Text-based fallback (only when phoneme model is unavailable)
     word_conf_scores = extract_segment_word_scores(trans_data)
     ref_words = actual_ref.split()
     trans_words = transcription.split()
@@ -460,7 +553,9 @@ async def verify_pronunciation(
     total_words = len(words_result)
     overall_score = int((correct_count / total_words) * 100) if total_words > 0 else 0
 
-    feedback = get_conversational_feedback(overall_score, words_result, transcription, actual_ref, is_free_speech)
+    feedback = get_conversational_feedback(
+        overall_score, words_result, transcription, actual_ref, is_free_speech
+    )
 
     return {
         "score": overall_score,

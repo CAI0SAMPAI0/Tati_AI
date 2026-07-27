@@ -72,28 +72,15 @@ def register_all_routers(app: FastAPI) -> None:
     from app.modules.activities.routes.listening_ingestion import (
         router as listening_ingestion_router,
     )
-    from app.modules.activities.routes.modules import router as modules_router
     from app.modules.activities.routes.podcasts import router as podcasts_router
     from app.modules.activities.routes.premium import router as student_premium_router
-    from app.modules.activities.routes.quizzes import router as quizzes_router
     from app.modules.activities.routes.ranking import router as ranking_router
     from app.modules.activities.routes.submissions import router as submissions_router
     from app.modules.activities.routes.trophies import router as trophies_router
-    from app.modules.activities.routes.test_english import (
-        router as test_english_router,
+    from app.modules.activities.routes.te_english import (
+        router as te_english_router,
     )
 
-    app.include_router(
-        modules_router,
-        prefix="/activities/modules",
-        tags=["activities"],
-    )
-
-    app.include_router(
-        quizzes_router,
-        prefix="/activities/quizzes",
-        tags=["activities"],
-    )
     app.include_router(
         flashcards_router,
         prefix="/activities/flashcards",
@@ -133,7 +120,7 @@ def register_all_routers(app: FastAPI) -> None:
         tags=["activities"],
     )
     app.include_router(
-        test_english_router,
+        te_english_router,
         prefix="/activities",
         tags=["test-english"],
     )

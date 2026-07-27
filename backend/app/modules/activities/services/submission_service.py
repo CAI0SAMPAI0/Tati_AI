@@ -81,9 +81,7 @@ class SubmissionService:
 
         return await run_in_threadpool(_fetch)
 
-    async def list_all_admin(
-        self, status: str | None = None
-    ) -> list[dict[str, Any]]:
+    async def list_all_admin(self, status: str | None = None) -> list[dict[str, Any]]:
         """Admin: lista todas as submissões."""
 
         def _fetch():
