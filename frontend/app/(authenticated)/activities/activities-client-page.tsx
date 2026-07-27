@@ -28,7 +28,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { normalizeLevel } from '@/lib/constants/levels';
 
-type TabType = 'quiz' | 'flashcards' | 'simulations' | 'listenings' | 'grammar' | 'materials';
+type TabType = 'quiz' | 'grammar' | 'vocabulary' | 'listenings' | 'reading' | 'flashcards' | 'simulations';
 
 const PERSONALIZED_MODULE_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -88,6 +88,13 @@ interface GrammarDetail {
   tip_teacher_tati: string;
   sources: Array<{ name: string; url: string }>;
 }
+interface TestEnglishItem {
+  slug: string;
+  title: string;
+  image: string;
+  url: string;
+  level: string;
+}
 
 export default function ActivitiesClientPage() {
   const router = useRouter();
@@ -103,7 +110,7 @@ export default function ActivitiesClientPage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('tati_last_activity_tab') as TabType;
-      if (saved && ['quiz', 'flashcards', 'simulations', 'listenings', 'grammar', 'materials'].includes(saved)) {
+      if (saved && ['quiz', 'grammar', 'vocabulary', 'listenings', 'reading', 'flashcards', 'simulations'].includes(saved)) {
         setActiveTab(saved);
       }
     }
@@ -181,7 +188,33 @@ export default function ActivitiesClientPage() {
   const { data: userProfile } = useQuery({
     queryKey: ['my-profile'],
     queryFn: () => apiGet<any>('/profile'),
-    refetchInterval: 10000, // Silently fetch profile updates every 10 seconds to keep study materials fresh
+    refetchInterval: 10000,
+  });
+
+  const testEnglishLevel = filterLevel === 'All' ? 'all' : filterLevel;
+
+  const { data: grammarContent } = useQuery<{ items: TestEnglishItem[] }>({
+    queryKey: ['test-english-grammar', testEnglishLevel],
+    queryFn: () => apiGet<any>(ENDPOINTS.TEST_ENGLISH_CONTENT(testEnglishLevel, 'grammar')),
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const { data: vocabularyContent } = useQuery<{ items: TestEnglishItem[] }>({
+    queryKey: ['test-english-vocabulary', testEnglishLevel],
+    queryFn: () => apiGet<any>(ENDPOINTS.TEST_ENGLISH_CONTENT(testEnglishLevel, 'vocabulary')),
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const { data: listeningContent } = useQuery<{ items: TestEnglishItem[] }>({
+    queryKey: ['test-english-listening', testEnglishLevel],
+    queryFn: () => apiGet<any>(ENDPOINTS.TEST_ENGLISH_CONTENT(testEnglishLevel, 'listening')),
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const { data: readingContent } = useQuery<{ items: TestEnglishItem[] }>({
+    queryKey: ['test-english-reading', testEnglishLevel],
+    queryFn: () => apiGet<any>(ENDPOINTS.TEST_ENGLISH_CONTENT(testEnglishLevel, 'reading')),
+    staleTime: 30 * 60 * 1000,
   });
 
   useQuery({
@@ -292,11 +325,12 @@ export default function ActivitiesClientPage() {
 
   const tabs: Array<{ id: TabType; icon: React.ReactNode; label: string; count?: number }> = [
     { id: 'quiz', icon: <HelpCircle size={18} />, label: 'Quizzes', count: quizzes.length },
-    { id: 'grammar', icon: <BookOpen size={18} />, label: 'Grammar', count: grammarIndex?.topics?.length },
+    { id: 'grammar', icon: <BookOpen size={18} />, label: 'Grammar', count: grammarContent?.items?.length },
+    { id: 'vocabulary', icon: <Lightbulb size={18} />, label: 'Vocabulary', count: vocabularyContent?.items?.length },
+    { id: 'listenings', icon: <Podcast size={18} />, label: 'Listening', count: listeningContent?.items?.length || podcasts.length },
+    { id: 'reading', icon: <FileText size={18} />, label: 'Reading', count: readingContent?.items?.length },
     { id: 'flashcards', icon: <Layers size={18} />, label: 'Flashcards', count: flashcards.length },
     { id: 'simulations', icon: <Drama size={18} />, label: 'Simulations', count: simulations.length },
-    { id: 'listenings', icon: <Podcast size={18} />, label: 'Listenings', count: podcasts.length },
-    { id: 'materials', icon: <FileBox size={18} />, label: 'Study Materials', count: studyMaterials.length },
   ];
 
   return (
@@ -330,7 +364,6 @@ export default function ActivitiesClientPage() {
                     <option value="B1">B1</option>
                     <option value="B2">B2</option>
                     <option value="C1">C1</option>
-                    <option value="C2">C2</option>
                   </select>
                 </div>
               )}
@@ -405,108 +438,51 @@ export default function ActivitiesClientPage() {
 
             {activeTab === 'grammar' && (
               <div className="space-y-8">
-                {selectedGrammarTopic ? (
-                  <div className="space-y-4 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <button
-                      onClick={() => setSelectedGrammarTopic(null)}
-                      className="text-sm font-bold text-primary hover:underline flex items-center gap-1"
-                    >
-                      ← Back to topics
-                    </button>
-
-                    {grammarDetail ? (
-                      <div className="bg-surface border border-border rounded-3xl p-6 md:p-8 space-y-5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                            <GraduationCap size={24} />
-                          </div>
-                          <div>
-                            <span className="text-[0.65rem] font-bold uppercase tracking-wider text-primary">
-                              CEFR {grammarDetail.level}
-                            </span>
-                            <h3 className="text-xl md:text-2xl font-display font-bold text-text">
-                              {grammarDetail.title}
-                            </h3>
-                          </div>
-                        </div>
-
-                        <p className="text-text text-sm md:text-base leading-relaxed">
-                          {grammarDetail.rule_summary}
-                        </p>
-
-                        <div className="bg-bg-secondary/50 border border-border rounded-2xl p-4">
-                          <p className="text-[0.65rem] font-bold uppercase tracking-wider text-text-muted mb-1">
-                            Key Structure
-                          </p>
-                          <p className="text-text text-sm font-medium">
-                            {grammarDetail.key_structure}
-                          </p>
-                        </div>
-
-                        <div className="flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-2xl p-4">
-                          <Lightbulb size={20} className="text-primary shrink-0 mt-0.5" />
-                          <p className="text-sm text-text">
-                            <span className="font-bold text-primary">Teacher Tati Tip: </span>
-                            {grammarDetail.tip_teacher_tati}
-                          </p>
-                        </div>
-
-                        <div className="space-y-2">
-                          <p className="text-[0.65rem] font-bold uppercase tracking-wider text-text-muted">
-                            Reference Sources
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            {grammarDetail.sources?.map((src) => (
-                              <a
-                                key={src.url}
-                                href={src.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-3 py-1.5 bg-surface border border-border rounded-full text-[0.8rem] font-semibold text-text-muted hover:bg-primary-dim hover:text-primary hover:border-primary/50 transition-all"
-                              >
-                                {src.name}
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="py-20 text-center text-text-muted">
-                        Loading explanation...
-                      </div>
-                    )}
-                  </div>
-                ) : grammarIndex?.topics?.length ? (
+                {grammarContent?.items && grammarContent.items.length > 0 ? (
                   <div>
                     <p className="text-text-muted text-sm mb-5 max-w-2xl">
-                      Explore grammar topics with Teacher Tati's explanations and links to
-                      DW, BBC Learning English and test-english.com.
+                      Grammar lessons and exercises from test-english.com for level {testEnglishLevel}.
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {grammarIndex.topics
+                      {grammarContent.items
                         .filter(
                           (t) =>
                             !searchQuery ||
-                            t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            t.topic.toLowerCase().includes(searchQuery.toLowerCase()),
+                            t.title.toLowerCase().includes(searchQuery.toLowerCase()),
                         )
-                        .map((t) => (
-                          <button
-                            key={t.topic}
-                            onClick={() => setSelectedGrammarTopic(t.topic)}
-                            className="text-left bg-surface border border-border rounded-2xl p-5 space-y-3 hover:border-primary/40 hover:-translate-y-0.5 transition-all"
+                        .map((item) => (
+                          <a
+                            key={item.slug}
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-left bg-surface border border-border rounded-2xl overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 transition-all group"
                           >
-                            <div className="flex items-center justify-between">
-                              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                                <BookOpen size={20} />
+                            {item.image && (
+                              <div className="h-32 overflow-hidden bg-bg-secondary">
+                                <img
+                                  src={item.image}
+                                  alt={item.title}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                  }}
+                                />
                               </div>
-                              <span className="text-[0.6rem] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase">
-                                CEFR {t.level}
-                              </span>
+                            )}
+                            <div className="p-4 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                                  <BookOpen size={16} />
+                                </div>
+                                <span className="text-[0.6rem] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase">
+                                  {testEnglishLevel}
+                                </span>
+                              </div>
+                              <h4 className="text-sm font-bold text-text line-clamp-2">{item.title}</h4>
+                              <p className="text-[0.7rem] text-text-muted">test-english.com</p>
                             </div>
-                            <h4 className="text-base font-bold text-text">{t.title}</h4>
-                            <p className="text-[0.7rem] text-text-muted">Source: {t.source_name}</p>
-                          </button>
+                          </a>
                         ))}
                     </div>
                   </div>
@@ -520,9 +496,57 @@ export default function ActivitiesClientPage() {
 
             {activeTab === 'listenings' && (
               <div className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {podcasts.length > 0 ? (
-                    podcasts.slice(0, visiblePodcastsCount).map((p) => (
+                {listeningContent?.items && listeningContent.items.length > 0 ? (
+                  <div>
+                    <p className="text-text-muted text-sm mb-5 max-w-2xl">
+                      Listening tests from test-english.com for level {testEnglishLevel}.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {listeningContent.items
+                        .filter(
+                          (t) =>
+                            !searchQuery ||
+                            t.title.toLowerCase().includes(searchQuery.toLowerCase()),
+                        )
+                        .map((item) => (
+                          <a
+                            key={item.slug}
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-left bg-surface border border-border rounded-2xl overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 transition-all group"
+                          >
+                            {item.image && (
+                              <div className="h-32 overflow-hidden bg-bg-secondary">
+                                <img
+                                  src={item.image}
+                                  alt={item.title}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                  }}
+                                />
+                              </div>
+                            )}
+                            <div className="p-4 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                                  <Podcast size={16} />
+                                </div>
+                                <span className="text-[0.6rem] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase">
+                                  {testEnglishLevel}
+                                </span>
+                              </div>
+                              <h4 className="text-sm font-bold text-text line-clamp-2">{item.title}</h4>
+                              <p className="text-[0.7rem] text-text-muted">test-english.com</p>
+                            </div>
+                          </a>
+                        ))}
+                    </div>
+                  </div>
+                ) : podcasts.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {podcasts.slice(0, visiblePodcastsCount).map((p) => (
                       <ActivityCard
                         key={p.id}
                         title={p.title}
@@ -539,13 +563,13 @@ export default function ActivitiesClientPage() {
                           }
                         ]}
                       />
-                    ))
-                  ) : (
-                    <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
-                      No listenings available.
-                    </div>
-                  )}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
+                    No listening content available.
+                  </div>
+                )}
                 {visiblePodcastsCount < podcasts.length && (
                   <div className="flex justify-center mt-6">
                     <button
@@ -554,6 +578,122 @@ export default function ActivitiesClientPage() {
                     >
                       Show More
                     </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'vocabulary' && (
+              <div className="space-y-8">
+                {vocabularyContent?.items && vocabularyContent.items.length > 0 ? (
+                  <div>
+                    <p className="text-text-muted text-sm mb-5 max-w-2xl">
+                      Vocabulary lessons from test-english.com for level {testEnglishLevel}.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {vocabularyContent.items
+                        .filter(
+                          (t) =>
+                            !searchQuery ||
+                            t.title.toLowerCase().includes(searchQuery.toLowerCase()),
+                        )
+                        .map((item) => (
+                          <a
+                            key={item.slug}
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-left bg-surface border border-border rounded-2xl overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 transition-all group"
+                          >
+                            {item.image && (
+                              <div className="h-32 overflow-hidden bg-bg-secondary">
+                                <img
+                                  src={item.image}
+                                  alt={item.title}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                  }}
+                                />
+                              </div>
+                            )}
+                            <div className="p-4 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                                  <Lightbulb size={16} />
+                                </div>
+                                <span className="text-[0.6rem] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase">
+                                  {testEnglishLevel}
+                                </span>
+                              </div>
+                              <h4 className="text-sm font-bold text-text line-clamp-2">{item.title}</h4>
+                              <p className="text-[0.7rem] text-text-muted">test-english.com</p>
+                            </div>
+                          </a>
+                        ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-20 text-center text-text-muted">
+                    No vocabulary lessons available for this level.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'reading' && (
+              <div className="space-y-8">
+                {readingContent?.items && readingContent.items.length > 0 ? (
+                  <div>
+                    <p className="text-text-muted text-sm mb-5 max-w-2xl">
+                      Reading tests from test-english.com for level {testEnglishLevel}.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {readingContent.items
+                        .filter(
+                          (t) =>
+                            !searchQuery ||
+                            t.title.toLowerCase().includes(searchQuery.toLowerCase()),
+                        )
+                        .map((item) => (
+                          <a
+                            key={item.slug}
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-left bg-surface border border-border rounded-2xl overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 transition-all group"
+                          >
+                            {item.image && (
+                              <div className="h-32 overflow-hidden bg-bg-secondary">
+                                <img
+                                  src={item.image}
+                                  alt={item.title}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                  }}
+                                />
+                              </div>
+                            )}
+                            <div className="p-4 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                                  <FileText size={16} />
+                                </div>
+                                <span className="text-[0.6rem] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase">
+                                  {testEnglishLevel}
+                                </span>
+                              </div>
+                              <h4 className="text-sm font-bold text-text line-clamp-2">{item.title}</h4>
+                              <p className="text-[0.7rem] text-text-muted">test-english.com</p>
+                            </div>
+                          </a>
+                        ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-20 text-center text-text-muted">
+                    No reading tests available for this level.
                   </div>
                 )}
               </div>
@@ -601,129 +741,6 @@ export default function ActivitiesClientPage() {
                 ) : (
                   <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
                     No simulations available.
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'materials' && (
-              <div className="space-y-6">
-                {studyMaterials.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {studyMaterials.map((mat: any, idx: number) => {
-                      const displayFname = mat.display_filename || mat.filename;
-                      const isDeleted = mat.is_deleted === true;
-                      const isEdited = mat.is_edited === true;
-                      const isPdf = displayFname.toLowerCase().endsWith('.pdf');
-                      const isImage = /\.(png|jpe?g|gif|webp)$/i.test(displayFname);
-                      const dateStr = mat.date_received 
-                        ? new Date(mat.date_received).toLocaleDateString('pt-BR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })
-                        : '';
-                        
-                      return (
-                        <div 
-                          key={idx}
-                          className={cn(
-                            "bg-surface border rounded-2xl p-5 flex flex-col justify-between hover:shadow-md transition-all hover:-translate-y-0.5",
-                            isDeleted ? "border-danger/30 opacity-75 bg-danger/5" : "border-border hover:border-primary/45"
-                          )}
-                        >
-                          <div className="space-y-4">
-                            <div className="flex items-start gap-4">
-                              <div className={cn(
-                                "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border",
-                                isDeleted ? "bg-danger/10 text-danger border-danger/20" :
-                                isPdf ? "bg-red-500/10 text-red-500 border-red-500/20" :
-                                isImage ? "bg-blue-500/10 text-blue-500 border-blue-500/20" :
-                                "bg-primary/10 text-primary border-primary/20"
-                              )}>
-                                <FileText size={24} />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <h4 className={cn("text-sm font-bold text-text truncate", isDeleted && "line-through text-text-muted")} title={displayFname}>
-                                    {displayFname}
-                                  </h4>
-                                  {isEdited && !isDeleted && (
-                                    <span className="text-[0.6rem] font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                                      Editado
-                                    </span>
-                                  )}
-                                  {isDeleted && (
-                                    <span className="text-[0.6rem] font-bold bg-danger/10 text-danger px-1.5 py-0.5 rounded">
-                                      Apagado
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-[0.7rem] text-text-muted mt-0.5">
-                                  Received on {dateStr}
-                                </p>
-                              </div>
-                            </div>
-
-                            {mat.message && (
-                              <div className="bg-bg-secondary/40 border-l-4 border-primary rounded-r-xl p-3.5 text-xs text-text-muted italic space-y-1">
-                                <span className="font-bold text-[0.65rem] text-primary uppercase tracking-wider block">
-                                  Message from Teacher Tati: {isEdited && <span className="text-[0.6rem] font-normal text-text-muted lowercase tracking-normal">(editada)</span>}
-                                </span>
-                                <span>&ldquo;{mat.message}&rdquo;</span>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="mt-5 flex gap-2">
-                            {isDeleted ? (
-                              <button
-                                disabled
-                                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-border text-text-muted cursor-not-allowed"
-                              >
-                                Indisponível (Removido)
-                              </button>
-                            ) : isPdf ? (
-                              <>
-                                <a
-                                  href={`https://docs.google.com/viewer?url=${encodeURIComponent(mat.url)}&embedded=true`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-hover transition-colors shadow-sm"
-                                >
-                                  <FileText size={14} />
-                                  Open PDF
-                                </a>
-                                <a
-                                  href={mat.url}
-                                  download
-                                  className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-surface border border-border text-text-muted hover:bg-bg-secondary transition-colors"
-                                >
-                                  <Download size={14} />
-                                </a>
-                              </>
-                            ) : (
-                              <a
-                                href={mat.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary-hover transition-colors shadow-sm"
-                              >
-                                <Download size={14} />
-                                Open File
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
-                    <FileBox size={40} className="mx-auto mb-4 opacity-20" />
-                    <p>No study materials available yet.</p>
                   </div>
                 )}
               </div>

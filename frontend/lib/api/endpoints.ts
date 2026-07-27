@@ -86,6 +86,10 @@ export const ENDPOINTS = {
   ACTIVITIES_PODCASTS_PROGRESS: '/activities/podcasts/progress',
   ACTIVITIES_PODCASTS_COMPLETE: (id: string) => `/activities/podcasts/${id}/complete`,
 
+  // Test English (external content)
+  TEST_ENGLISH_CONTENT: (level: string, category: string) =>
+    `/activities/test-english/content?level=${level}&category=${category}`,
+
   // Admin
   ADMIN_MODULES: '/activities/modules/admin',
   ADMIN_MODULE_ALL: '/activities/modules/admin/all',

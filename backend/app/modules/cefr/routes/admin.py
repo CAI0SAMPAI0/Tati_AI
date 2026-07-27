@@ -248,6 +248,78 @@ async def generate_flashcards(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/extract-topics")
+async def extract_topics_from_references(
+    reference_ids: list[str] = Query(...),
+    user=Depends(require_staff),
+):
+    """
+    Extracts topics and subtopics from indexed reference materials using AI.
+    Returns a list of topics with estimated item counts.
+    """
+    client = get_client()
+    try:
+        # Fetch the indexed documents for the given references
+        all_content = []
+        for ref_id in reference_ids:
+            res = (
+                client.table("cefr_documents")
+                .select("content, metadata")
+                .eq("reference_id", ref_id)
+                .execute()
+            )
+            if res.data:
+                for doc in res.data:
+                    content = doc.get("content", "")
+                    if content:
+                        all_content.append(content)
+
+        if not all_content:
+            return {"success": True, "topics": []}
+
+        # Combine content (limit to avoid token overflow)
+        combined_content = "\n\n".join(all_content)[:8000]
+
+        # Use AI to extract topics
+        from app.modules.chat.services.llm import groq_chat
+
+        prompt = f"""Analyze the following English learning material and extract ALL distinct topics and subtopics.
+
+For each topic, provide:
+1. The topic name (e.g., "Actions and Verbs")
+2. A list of subtopics/items (e.g., ["eat", "drink", "sleep", "run"])
+3. The total count of items in that topic
+
+IMPORTANT: Return ONLY a JSON array. No markdown, no explanation.
+
+Format:
+[
+  {{"topic": "Topic Name", "items": ["item1", "item2", ...], "count": 5}},
+  ...
+]
+
+Material:
+{combined_content}"""
+
+        response = await groq_chat([{"role": "user", "content": prompt}])
+
+        # Parse the response
+        import json
+        import re
+
+        # Try to extract JSON from the response
+        json_match = re.search(r'\[.*\]', response, re.DOTALL)
+        if json_match:
+            topics = json.loads(json_match.group())
+            return {"success": True, "topics": topics}
+        else:
+            return {"success": True, "topics": []}
+
+    except Exception as e:
+        logging.error(f"[AdminRoute] Error extracting topics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/generate-exercises")
 async def generate_exercises(
     level: str,

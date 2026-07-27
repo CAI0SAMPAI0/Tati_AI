@@ -15,7 +15,8 @@ import {
   Sparkles,
   Image as ImageIcon,
   Upload,
-  Loader2
+  Loader2,
+  X
 } from 'lucide-react';
 import { apiGet, apiDelete, apiPost, apiPut, apiUpload } from '@/lib/api/client';
 
@@ -172,6 +173,7 @@ export function FlashcardsSection() {
   const [generatingImages, setGeneratingImages] = useState<Record<number, boolean>>({});
   const [uploadingImages, setUploadingImages] = useState<Record<number, boolean>>({});
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
+  const [expandedImageUrl, setExpandedImageUrl] = useState<string | null>(null);
 
   const handleImageUpload = async (idx: number, file: File) => {
     if (!file) return;
@@ -510,19 +512,31 @@ export function FlashcardsSection() {
                         title="Click to upload image"
                       >
                         {card.image_url ? (
-                          <img 
-                            key={card.image_url}
-                            src={card.image_url} 
-                            alt="" 
-                            className="w-full h-full object-cover"
-                            onError={() => {
-                              console.error(`[Flashcards] Error loading image for card ${idx}: ${card.image_url}`);
-                              setImageErrors(prev => ({ ...prev, [idx]: true }));
-                            }}
-                            onLoad={() => {
-                              setImageErrors(prev => ({ ...prev, [idx]: false }));
-                            }}
-                          />
+                          <>
+                            <img 
+                              key={card.image_url}
+                              src={card.image_url} 
+                              alt="" 
+                              className="w-full h-full object-cover"
+                              onError={() => {
+                                console.error(`[Flashcards] Error loading image for card ${idx}: ${card.image_url}`);
+                                setImageErrors(prev => ({ ...prev, [idx]: true }));
+                              }}
+                              onLoad={() => {
+                                setImageErrors(prev => ({ ...prev, [idx]: false }));
+                              }}
+                            />
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedImageUrl(card.image_url || null);
+                              }}
+                              className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-all flex items-center justify-center"
+                              title="Expand image"
+                            >
+                              <Eye size={14} className="text-white" />
+                            </button>
+                          </>
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             <ImageIcon size={16} className="text-text-muted opacity-30" />
@@ -653,6 +667,30 @@ export function FlashcardsSection() {
             </div>
         </div>
       </DialogModal>
+
+      {/* Image Preview Modal */}
+      {expandedImageUrl && (
+        <div
+          className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setExpandedImageUrl(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] w-full">
+            <button
+              onClick={() => setExpandedImageUrl(null)}
+              className="absolute -top-3 -right-3 bg-white text-black p-2 rounded-full shadow-lg hover:bg-gray-100 z-10"
+            >
+              <X size={20} />
+            </button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={expandedImageUrl}
+              alt="Preview"
+              className="w-full h-full object-contain rounded-xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

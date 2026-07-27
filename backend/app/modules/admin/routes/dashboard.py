@@ -332,7 +332,7 @@ async def list_simulations(
             normal_sims.append(
                 {
                     "id": f"cefr_sim_{sim['id']}",
-                    "name": f"CEFR {sim['level'].upper()}: {sim['topic']}",
+                    "name": sim["topic"],
                     "description": sim.get("scenario") or "",
                     "difficulty": sim.get("level") or "A1",
                     "system_prompt": sys_prompt,
@@ -618,7 +618,7 @@ def get_dashboard_flashcards(
                 data.append(
                     {
                         "id": deck_id,
-                        "title": f"CEFR {lvl}: {topic}",
+                        "title": topic,
                         "description": f"Vocabulary deck about {topic}.",
                         "card_count": len(cards),
                         "level": lvl,
@@ -686,10 +686,10 @@ def update_flashcard_deck(
             level = parts[2].upper()
             topic_slug = "_".join(parts[3:])
 
+            import re
+
             res = db.table("cefr_flashcards").select("*").eq("level", level).execute()
             rows = res.data or []
-
-            import re
 
             matched_rows = []
             for r in rows:
@@ -698,45 +698,52 @@ def update_flashcard_deck(
                 if t_slug == topic_slug:
                     matched_rows.append(r)
 
-            if matched_rows:
-                matched_ids = [r["id"] for r in matched_rows]
-                update_data = {}
-                if "is_published" in data:
-                    update_data["is_published"] = data["is_published"]
-                if "title" in data:
-                    title = data["title"]
-                    title = re.sub(r"^CEFR\s+[A-Z0-9]+:\s*", "", title)
-                    update_data["topic"] = title
-                if "level" in data:
-                    update_data["level"] = data["level"]
+            if not matched_rows:
+                return {"success": False, "error": "No matching CEFR cards found"}
 
-                if update_data:
-                    db.table("cefr_flashcards").update(update_data).in_(
-                        "id", matched_ids
-                    ).execute()
+            matched_ids = [r["id"] for r in matched_rows]
+            update_data = {}
+            if "is_published" in data:
+                update_data["is_published"] = data["is_published"]
+            if "title" in data:
+                title = data["title"]
+                title = re.sub(r"^CEFR\s+[A-Z0-9]+:\s*", "", title)
+                update_data["topic"] = title
+            if "level" in data:
+                update_data["level"] = normalize_level(data["level"])
 
-                if "flashcards" in data and data["flashcards"] is not None:
-                    db.table("cefr_flashcards").delete().in_(
-                        "id", matched_ids
-                    ).execute()
-                    new_topic = update_data.get("topic", matched_rows[0].get("topic"))
-                    new_level = update_data.get("level", level)
-                    for c in data["flashcards"]:
-                        card_payload = {
-                            "level": new_level,
-                            "topic": new_topic,
-                            "front": c.get("front"),
-                            "back": c.get("back"),
-                            "explanation": c.get("explanation"),
-                            "image_url": c.get("image_url"),
-                            "is_published": data.get(
-                                "is_published",
-                                matched_rows[0].get("is_published", False),
-                            ),
-                        }
-                        db.table("cefr_flashcards").insert(card_payload).execute()
+            if update_data:
+                db.table("cefr_flashcards").update(update_data).in_(
+                    "id", matched_ids
+                ).execute()
 
-                return {"success": True}
+            if "flashcards" in data and data["flashcards"] is not None:
+                db.table("cefr_flashcards").delete().in_(
+                    "id", matched_ids
+                ).execute()
+                new_topic = update_data.get("topic", matched_rows[0].get("topic"))
+                new_level = update_data.get("level", level)
+                if new_level:
+                    new_level = new_level.upper()
+                else:
+                    new_level = level
+                is_pub = data.get(
+                    "is_published",
+                    matched_rows[0].get("is_published", False),
+                )
+                for c in data["flashcards"]:
+                    card_payload = {
+                        "level": new_level,
+                        "topic": new_topic,
+                        "front": c.get("front"),
+                        "back": c.get("back"),
+                        "explanation": c.get("explanation"),
+                        "image_url": c.get("image_url"),
+                        "is_published": is_pub,
+                    }
+                    db.table("cefr_flashcards").insert(card_payload).execute()
+
+            return {"success": True}
         return {"success": False, "error": "Invalid CEFR deck ID format"}
 
     payload = {

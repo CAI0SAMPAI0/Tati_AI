@@ -33,9 +33,6 @@ const PremiumSection = dynamic(() => import('@/components/dashboard/premium-sect
 const CefrSection = dynamic(() => import('@/components/dashboard/cefr-section').then(mod => mod.CefrSection), {
   loading: () => <div className="h-48 flex items-center justify-center"><Spinner size="md" /></div>
 });
-const DispatchSection = dynamic(() => import('@/components/dashboard/dispatch-section').then(mod => mod.DispatchSection), {
-  loading: () => <div className="h-48 flex items-center justify-center"><Spinner size="md" /></div>
-});
 const WhatsappSection = dynamic(() => import('@/components/dashboard/whatsapp-section').then(mod => mod.WhatsappSection), {
   loading: () => <div className="h-48 flex items-center justify-center"><Spinner size="md" /></div>
 });
@@ -58,12 +55,12 @@ export default function DashboardClientPage() {
   // Get tab from URL or localStorage
   const getInitialTab = (): DashSection => {
     const tabParam = searchParams.get('tab') as DashSection;
-    if (tabParam && ['overview', 'students', 'reports', 'modules', 'flashcards', 'simulations', 'premium', 'cefr', 'dispatch', 'whatsapp'].includes(tabParam)) {
+    if (tabParam && ['overview', 'students', 'reports', 'modules', 'flashcards', 'simulations', 'premium', 'cefr', 'whatsapp'].includes(tabParam)) {
       return tabParam;
     }
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('tati_last_dashboard_tab') as DashSection;
-      if (saved && ['overview', 'students', 'reports', 'modules', 'flashcards', 'simulations', 'premium', 'cefr', 'dispatch', 'whatsapp'].includes(saved)) {
+      if (saved && ['overview', 'students', 'reports', 'modules', 'flashcards', 'simulations', 'premium', 'cefr', 'whatsapp'].includes(saved)) {
         return saved;
       }
     }
@@ -105,7 +102,6 @@ export default function DashboardClientPage() {
     flashcards: 'Flashcards',
     cefr: 'CEFR Materials',
     submissions: 'Corrections',
-    dispatch: 'Dispatch Materials',
     whatsapp: 'WhatsApp Config'
   };
 
@@ -118,7 +114,6 @@ export default function DashboardClientPage() {
     flashcards: 'Vocabulary deck management',
     cefr: 'CEFR diagnostic and RAG materials',
     submissions: 'Student answers to review',
-    dispatch: 'Send files and quizzes to students',
     whatsapp: 'Connect and manage WhatsApp WAHA sessions'
   };
 
@@ -192,7 +187,6 @@ export default function DashboardClientPage() {
                   simulations: 'Simulations',
                   cefr: 'CEFR Materials',
                   premium: 'Premium Hub',
-                  dispatch: 'Materials Dispatch',
                   whatsapp: 'WhatsApp Connection'
                 }[activeSection] || activeSection}
               </h1>
@@ -207,7 +201,6 @@ export default function DashboardClientPage() {
                   simulations: 'Real-world scenarios',
                   cefr: 'Diagnose and generate from PDFs',
                   premium: 'Premium materials & payments',
-                  dispatch: 'Send files and quizzes to students',
                   whatsapp: 'Connect and manage WhatsApp WAHA sessions'
                 }[activeSection]}
               </p>
@@ -234,7 +227,6 @@ export default function DashboardClientPage() {
           {activeSection === 'flashcards' && <FlashcardsSection />}
           {activeSection === 'cefr' && <CefrSection />}
           {activeSection === 'premium' && <PremiumSection />}
-          {activeSection === 'dispatch' && <DispatchSection />}
           {activeSection === 'whatsapp' && <WhatsappSection />}
 
           {activeSection === 'students' && (

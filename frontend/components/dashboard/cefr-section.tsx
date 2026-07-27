@@ -24,7 +24,9 @@ import {
   Check,
   Eye,
   EyeOff,
-  Plus
+  Plus,
+  Sparkles,
+  ImageIcon
 } from 'lucide-react';
 import { apiUpload, apiPost, apiGet, apiDelete, apiPut } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
@@ -87,10 +89,14 @@ export function CefrSection() {
 
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [editingItemType, setEditingItemType] = useState<'flashcard' | 'exercise' | 'simulation' | null>(null);
+  const [expandedImageUrl, setExpandedImageUrl] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [savingEdit, setSavingEdit] = useState(false);
   const [generatingCardImages, setGeneratingCardImages] = useState<Record<number, boolean>>({});
   const [uploadingCardImages, setUploadingCardImages] = useState<Record<number, boolean>>({});
+  const [extractingTopics, setExtractingTopics] = useState(false);
+  const [extractedTopics, setExtractedTopics] = useState<any[]>([]);
+  const [showTopicSelector, setShowTopicSelector] = useState(false);
 
   const fetchGeneratedContent = async (silent = false) => {
     if (!silent) setLoadingGenerated(true);
@@ -1104,9 +1110,33 @@ export function CefrSection() {
             </div>
 
             {selectedRefIds.length > 0 && (
-              <div className="mb-6 p-3 bg-primary/5 border border-primary/20 rounded-xl text-xs font-semibold text-primary flex items-center gap-2">
-                <Info size={14} />
-                <span>Active context filter: The AI will only use the {selectedRefIds.length} selected materials.</span>
+              <div className="mb-6 space-y-3">
+                <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl text-xs font-semibold text-primary flex items-center gap-2">
+                  <Info size={14} />
+                  <span>Active context filter: The AI will only use the {selectedRefIds.length} selected materials.</span>
+                </div>
+                <button
+                  onClick={async () => {
+                    setExtractingTopics(true);
+                    try {
+                      const params = selectedRefIds.map(id => `reference_ids=${id}`).join('&');
+                      const res = await apiGet<any>(`/cefr/admin/extract-topics?${params}`);
+                      if (res && res.topics) {
+                        setExtractedTopics(res.topics);
+                        setShowTopicSelector(true);
+                      }
+                    } catch (err) {
+                      toast.error('Error extracting topics');
+                    } finally {
+                      setExtractingTopics(false);
+                    }
+                  }}
+                  disabled={extractingTopics}
+                  className="px-4 py-2 bg-surface border border-border rounded-xl text-xs font-bold text-primary hover:bg-primary/10 flex items-center gap-2 transition-all"
+                >
+                  {extractingTopics ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                  Extract Topics from Files
+                </button>
               </div>
             )}
 
@@ -1760,7 +1790,66 @@ export function CefrSection() {
                       <Trash2 size={14} />
                     </button>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-[80px,1fr,1fr] gap-3 items-start">
+                      <div
+                        className="w-[80px] h-[80px] rounded-lg bg-input border border-border overflow-hidden flex items-center justify-center relative cursor-pointer group/img"
+                        onClick={() => {
+                          const input = document.getElementById(`cefr-file-${idx}`) as HTMLInputElement;
+                          input?.click();
+                        }}
+                        title="Click to upload image"
+                      >
+                        {card.image_url ? (
+                          <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              key={card.image_url}
+                              src={card.image_url}
+                              alt=""
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedImageUrl(card.image_url);
+                              }}
+                              className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-all flex items-center justify-center"
+                              title="Expand image"
+                            >
+                              <Eye size={16} className="text-white" />
+                            </button>
+                          </>
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <ImageIcon size={20} className="text-text-muted opacity-30" />
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          id={`cefr-file-${idx}`}
+                          className="hidden"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const formDataUpload = new FormData();
+                            formDataUpload.append('file', file);
+                            const res = await apiUpload<{ url: string }>('/flashcard-assets/upload-image', formDataUpload);
+                            if (res.ok && res.data?.url) {
+                              const newCards = [...editForm.flashcards];
+                              newCards[idx] = { ...newCards[idx], image_url: res.data.url };
+                              setEditForm({ ...editForm, flashcards: newCards });
+                              toast.success('Image uploaded!');
+                            }
+                            e.target.value = '';
+                          }}
+                        />
+                      </div>
+
                       <div>
                         <label className="block text-[10px] font-bold text-text-subtle uppercase mb-1">Front (Term)</label>
                         <input
@@ -1803,56 +1892,30 @@ export function CefrSection() {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="block text-[10px] font-bold text-text-subtle uppercase mb-1">Image</label>
-                      {card.image_url && (
-                        <div className="relative w-full h-36 rounded-lg overflow-hidden border border-border bg-bg">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={card.image_url} alt="Flashcard" className="w-full h-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => updateCefrCardImageUrl(idx, '')}
-                            className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full hover:bg-black/70"
-                            title="Remove image"
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      )}
-                      <div className="flex flex-wrap items-center gap-2">
+                      <label className="block text-[10px] font-bold text-text-subtle uppercase mb-1">Image URL</label>
+                      <div className="flex items-center gap-2">
                         <input
                           type="text"
-                          placeholder="Image URL"
+                          placeholder="Paste image URL..."
                           value={card.image_url || ''}
-                          onChange={(e) => updateCefrCardImageUrl(idx, e.target.value)}
-                          className="flex-1 min-w-[120px] bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text focus:ring-1 focus:ring-primary/20 outline-none"
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const newCards = [...editForm.flashcards];
+                            newCards[idx] = { ...newCards[idx], image_url: val };
+                            setEditForm({ ...editForm, flashcards: newCards });
+                          }}
+                          className="flex-1 bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text focus:ring-1 focus:ring-primary/20 outline-none"
                         />
-                        <label className="cursor-pointer px-2 py-1.5 bg-surface border border-border rounded-lg text-xs font-bold text-text-subtle hover:text-primary hover:border-primary/30 transition-all flex items-center gap-1">
-                          <Upload size={12} />
-                          {uploadingCardImages[idx] ? '...' : 'Upload'}
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) uploadCefrCardImage(idx, file);
-                              e.target.value = '';
-                            }}
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => generateCefrCardImage(idx)}
-                          disabled={generatingCardImages[idx] || (!card.front && !card.back)}
-                          className="px-2 py-1.5 bg-surface border border-border rounded-lg text-xs font-bold text-primary hover:bg-primary/10 disabled:opacity-50 transition-all flex items-center gap-1"
-                        >
-                          {generatingCardImages[idx] ? (
-                            <Loader2 size={12} className="animate-spin" />
-                          ) : (
-                            <PenTool size={12} />
-                          )}
-                          AI
-                        </button>
+                        {card.image_url && (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedImageUrl(card.image_url)}
+                            className="p-1.5 bg-surface border border-border rounded-lg text-primary hover:bg-primary/10 transition-all"
+                            title="Expand image"
+                          >
+                            <Eye size={14} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2008,6 +2071,30 @@ export function CefrSection() {
           </div>
         </div>
       </DialogModal>
+
+      {/* Image Preview Modal */}
+      {expandedImageUrl && (
+        <div
+          className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setExpandedImageUrl(null)}
+        >
+          <div className="relative max-w-2xl max-h-[80vh] w-full">
+            <button
+              onClick={() => setExpandedImageUrl(null)}
+              className="absolute -top-3 -right-3 bg-white text-black p-2 rounded-full shadow-lg hover:bg-gray-100 z-10"
+            >
+              <X size={20} />
+            </button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={expandedImageUrl}
+              alt="Preview"
+              className="w-full h-full object-contain rounded-xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
