@@ -775,22 +775,26 @@ class ChatService:
     def _clean_tts_text(self, text: str) -> str:
         """Extrai apenas o campo 'reply' do JSON da IA para o TTS.
         O campo 'drill' e 'correction' são apenas para exibição, nunca para áudio."""
-        # Tenta parsear o JSON da resposta da IA
         try:
-            # Remove possíveis blocos de código markdown ao redor do
-            # JSON
             clean = text.strip()
             if clean.startswith("```"):
                 clean = re.sub(r"^```[\w]*\n?", "", clean)
                 clean = re.sub(r"\n?```$", "", clean.strip())
+
+            json_match = re.search(r"\{[\s\S]*\"reply\"[\s\S]*\}", clean)
+            if json_match:
+                clean = json_match.group(0)
+
             data = json.loads(clean)
-            # Usa apenas o campo 'reply' para o áudio — drill e
-            # correction ficam silenciosos
             reply = data.get("reply") or ""
             reply = reply.replace("*", "").replace("#", "").replace("_", "")
             return reply.strip() or "Please, repeat."
         except Exception:
-            # Fallback: remove markdown e tags de drill
-            fallback = text.replace("*", "").replace("#", "").replace("_", "")
+            # Fallback: remove vazamentos de JSON cru
+            fallback = re.sub(r"\{?\s*\"reply\"\s*:[\s\S]*$", "", text).strip()
+            if not fallback:
+                match = re.search(r'"reply"\s*:\s*"([^"]*)"', text)
+                fallback = match.group(1) if match else text
+            fallback = fallback.replace("*", "").replace("#", "").replace("_", "")
             fallback = re.sub(r"\[DRILL:.*?\]", "", fallback)
             return fallback.strip() or "Please, repeat."

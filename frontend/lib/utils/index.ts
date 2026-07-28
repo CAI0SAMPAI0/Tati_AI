@@ -105,40 +105,77 @@ export function canAccessDashboard(
 export function parseAIResponse(content: string): { reply: string; correction?: string | null; drill?: string | null; report?: string | null } {
   if (!content || typeof content !== 'string') return { reply: content || '' };
   
-  if (!content.trim().startsWith('{')) {
-    return { reply: content };
+  let raw = content.trim();
+
+  // 1. Remove markdown code blocks if wrapped
+  if (raw.startsWith('```')) {
+    raw = raw.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim();
   }
 
-  try {
-    const data = JSON.parse(content);
-    if (data && typeof data === 'object' && ('reply' in data)) {
-      return {
-        reply: data.reply || '',
-        correction: data.correction,
-        drill: data.drill,
-        report: data.report
-      };
-    }
-  } catch (e) {
-    // If JSON is incomplete (streaming), extract "reply"
-    const match = content.match(/"reply"\s*:\s*"([^]*)/);
-    if (match) {
-       let partial = match[1];
-       if (partial.includes('", "correction":')) {
-           partial = partial.split('", "correction":')[0];
-       } else if (partial.includes('", "drill":')) {
-           partial = partial.split('", "drill":')[0];
-       } else {
-           // Basic cleanup for end of stream
-           partial = partial.replace(/(?<!\\)"\s*}?\s*$/, '');
-           partial = partial.replace(/(?<!\\)",\s*$/, '');
-       }
-       return { reply: partial.replace(/\\"/g, '"').replace(/\\n/g, '\n') };
-    }
-    if (content.trim().startsWith('{')) {
-      return { reply: '' };
+  // 2. Try parsing complete JSON object anywhere in raw
+  const jsonMatch = raw.match(/\{[\s\S]*"reply"[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const data = JSON.parse(jsonMatch[0]);
+      if (data && typeof data === 'object' && ('reply' in data)) {
+        const preText = raw.slice(0, raw.indexOf(jsonMatch[0])).trim();
+        const postText = raw.slice(raw.indexOf(jsonMatch[0]) + jsonMatch[0].length).trim();
+        
+        let replyText = data.reply || '';
+        if (preText) {
+          if (preText.includes(replyText)) {
+            replyText = preText;
+          } else if (!replyText.includes(preText)) {
+            replyText = `${preText}\n\n${replyText}`;
+          }
+        }
+        if (postText) {
+          replyText = `${replyText}\n\n${postText}`.trim();
+        }
+
+        return {
+          reply: replyText,
+          correction: data.correction || null,
+          drill: data.drill || null,
+          report: data.report || null,
+        };
+      }
+    } catch (e) {
+      // Ignore JSON parse error, fall through to regex extraction
     }
   }
 
-  return { reply: content };
+  // 3. Handle streaming or incomplete JSON with "reply" key
+  const replyMatch = raw.match(/"reply"\s*:\s*"([^]*)/);
+  if (replyMatch) {
+    let partial = replyMatch[1];
+    if (partial.includes('", "correction":')) {
+      partial = partial.split('", "correction":')[0];
+    } else if (partial.includes('", "drill":')) {
+      partial = partial.split('", "drill":')[0];
+    } else if (partial.includes('", "report":')) {
+      partial = partial.split('", "report":')[0];
+    } else {
+      partial = partial.replace(/(?<!\\)"\s*}?\s*$/, '');
+      partial = partial.replace(/(?<!\\)",\s*$/, '');
+    }
+
+    const cleanPartial = partial.replace(/\\"/g, '"').replace(/\\n/g, '\n');
+    const preText = raw.split(/\{?\s*"reply"\s*:/)[0].replace(/^```[\w]*\n?/, '').trim();
+    
+    let finalReply = cleanPartial;
+    if (preText && !preText.startsWith('{')) {
+      if (preText.includes(cleanPartial)) {
+        finalReply = preText;
+      } else if (!cleanPartial.includes(preText)) {
+        finalReply = `${preText}\n\n${cleanPartial}`;
+      }
+    }
+
+    return { reply: finalReply };
+  }
+
+  // 4. Fallback: If text contains raw JSON leak like { "reply": ... }, strip trailing JSON
+  const cleaned = raw.replace(/\{?\s*"(reply|correction|drill|report)"\s*:[\s\S]*$/i, '').trim();
+  return { reply: cleaned || raw };
 }
