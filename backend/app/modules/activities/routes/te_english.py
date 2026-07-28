@@ -38,6 +38,18 @@ def _load_data() -> dict[str, dict[str, list[dict]]]:
         _data = {cat: {lvl: [] for lvl in LEVELS} for cat in CATEGORIES}
     return _data
 
+def _build_url(cat_slug: str, level_slug: str, item_slug: str) -> str:
+    return f"https://test-english.com/{cat_slug}/{level_slug}/{item_slug}/"
+
+def _enrich_items(items: list[dict], cat_slug: str, level_slug: str) -> list[dict]:
+    enriched = []
+    for item in items:
+        if item["slug"] == cat_slug:
+            continue
+        url = _build_url(cat_slug, level_slug, item["slug"])
+        enriched.append({**item, "url": url, "level": level_slug.upper().replace("-", "+")})
+    return enriched
+
 @router.get("/content")
 async def get_test_english_content(
     level: str = Query("A1"), category: str = Query("grammar"),
@@ -46,15 +58,20 @@ async def get_test_english_content(
         raise HTTPException(400, "Invalid category")
     data = _load_data()
     cat = category.lower()
+    cat_slug = CATEGORIES[cat]
     if level.lower() == "all":
         all_items = []
         for lvl in LEVELS:
-            all_items.extend(data.get(cat, {}).get(lvl, []))
+            level_slug = LEVEL_MAP[lvl]
+            raw = data.get(cat, {}).get(lvl, [])
+            all_items.extend(_enrich_items(raw, cat_slug, level_slug))
         return {"success": True, "level": "all", "category": cat, "items": all_items, "source": "test-english.com"}
     level_code = level.upper()
     if level_code not in LEVEL_MAP:
         raise HTTPException(400, f"Invalid level: {level}")
-    items = data.get(cat, {}).get(level_code, [])
+    level_slug = LEVEL_MAP[level_code]
+    raw = data.get(cat, {}).get(level_code, [])
+    items = _enrich_items(raw, cat_slug, level_slug)
     return {"success": True, "level": level_code, "category": cat, "items": items, "source": "test-english.com"}
 
 @router.get("/levels")
