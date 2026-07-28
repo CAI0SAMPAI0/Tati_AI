@@ -100,6 +100,8 @@ export default function ActivitiesClientPage() {
 
   const isStaff = user?.role && ['professor', 'professora', 'programador', 'Tatiana', 'Tati', 'Professora', 'Programador', 'admin', 'Admin'].includes(user.role);
 
+  const effectiveLevel = !isStaff && user?.level && ['A1','A2','B1','B2','C1'].includes(user.level) ? user.level : filterLevel;
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('tati_last_activity_tab') as TabType;
@@ -114,27 +116,27 @@ export default function ActivitiesClientPage() {
   }, [activeTab]);
 
   const { data: simulationsRaw = [] } = useQuery<SimulationItem[]>({
-    queryKey: ['activities-simulations', filterLevel],
+    queryKey: ['activities-simulations', effectiveLevel],
     queryFn: () => apiGet<SimulationItem[]>(
-      filterLevel === 'All'
+      effectiveLevel === 'All'
         ? '/simulation/scenarios'
-        : `/simulation/scenarios?level=${filterLevel}`
+        : `/simulation/scenarios?level=${effectiveLevel}`
     ),
   });
   const { data: podcastsRaw = [] } = useQuery<PodcastItem[]>({
-    queryKey: ['activities-podcasts', filterLevel],
+    queryKey: ['activities-podcasts', effectiveLevel],
     queryFn: () => apiGet<PodcastItem[]>(
-      filterLevel === 'All'
+      effectiveLevel === 'All'
         ? '/activities/podcasts/recommendations?lang=en-US'
-        : `/activities/podcasts/recommendations?lang=en-US&level=${filterLevel}`
+        : `/activities/podcasts/recommendations?lang=en-US&level=${effectiveLevel}`
     ),
   });
   const { data: flashcardsRaw = [] } = useQuery<FlashcardDeck[]>({
-    queryKey: ['activities-flashcards', filterLevel],
+    queryKey: ['activities-flashcards', effectiveLevel],
     queryFn: () => apiGet<FlashcardDeck[]>(
-      filterLevel === 'All'
+      effectiveLevel === 'All'
         ? '/activities/flashcards/my'
-        : `/activities/flashcards/my?level=${filterLevel}`
+        : `/activities/flashcards/my?level=${effectiveLevel}`
     ),
   });
   const { data: podcastProgress } = useQuery({
@@ -146,11 +148,11 @@ export default function ActivitiesClientPage() {
     queryFn: () => apiGet<{ completed: string[] }>('/simulation/progress'),
   });
   const { data: grammarIndex } = useQuery<{ topics: GrammarTopicIndex[]; sources: Array<{ name: string; url: string }> }>({
-    queryKey: ['grammar-index', filterLevel],
+    queryKey: ['grammar-index', effectiveLevel],
     queryFn: () => apiGet<{ topics: GrammarTopicIndex[]; sources: Array<{ name: string; url: string }> }>(
-      filterLevel === 'All'
+      effectiveLevel === 'All'
         ? ENDPOINTS.GRAMMAR
-        : `${ENDPOINTS.GRAMMAR}?level=${filterLevel}`
+        : `${ENDPOINTS.GRAMMAR}?level=${effectiveLevel}`
     ),
     staleTime: 5 * 60 * 1000,
   });
@@ -168,7 +170,7 @@ export default function ActivitiesClientPage() {
     refetchInterval: 10000,
   });
 
-  const testEnglishLevel = filterLevel === 'All' ? 'all' : filterLevel;
+  const testEnglishLevel = effectiveLevel === 'All' ? 'all' : effectiveLevel;
 
   const { data: grammarContent } = useQuery<{ items: TestEnglishItem[] }>({
     queryKey: ['test-english-grammar', testEnglishLevel],
@@ -211,28 +213,28 @@ export default function ActivitiesClientPage() {
     let filtered = flashcardsRaw.filter(
       (f) => f.title !== 'Vocabulary Review' && f.title !== 'Revisão de Vocabulário',
     );
-    if (filterLevel !== 'All') {
-      const target = normalizeLevel(filterLevel);
+    if (effectiveLevel !== 'All') {
+      const target = normalizeLevel(effectiveLevel);
       filtered = filtered.filter(
         (f) => !f.level || normalizeLevel(f.level) === target || f.level.toLowerCase() === 'all'
       );
     }
     if (!searchQuery) return filtered;
     return filtered.filter((f) => f.title.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [flashcardsRaw, searchQuery, filterLevel]);
+  }, [flashcardsRaw, searchQuery, effectiveLevel]);
 
   const simulations = useMemo(() => {
     if (!simulationsRaw) return [];
     let filtered = simulationsRaw;
-    if (filterLevel !== 'All') {
-      const target = normalizeLevel(filterLevel);
+    if (effectiveLevel !== 'All') {
+      const target = normalizeLevel(effectiveLevel);
       filtered = filtered.filter(
         (s) => !s.difficulty || normalizeLevel(s.difficulty) === target || s.difficulty.toLowerCase() === 'all'
       );
     }
     if (!searchQuery) return filtered;
     return filtered.filter((s) => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [simulationsRaw, searchQuery, filterLevel]);
+  }, [simulationsRaw, searchQuery, effectiveLevel]);
 
   const podcasts = useMemo(() => {
     if (!podcastsRaw) return [];
