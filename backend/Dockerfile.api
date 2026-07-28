@@ -9,7 +9,8 @@ WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir pip==24.2 \
-    && pip install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir -r requirements.txt \
+    && python -c "import nltk; nltk.download('averaged_perceptron_tagger'); nltk.download('averaged_perceptron_tagger_eng'); nltk.download('cmudict')"
 
 COPY . .
 

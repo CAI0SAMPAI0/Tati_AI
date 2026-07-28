@@ -490,57 +490,62 @@ async def verify_pronunciation(
     # Uses wav2vec2 phoneme recognition + g2p-en to compare actual phonemes
     # from audio against expected phonemes — not text words.
     if actual_ref:
-        from app.shared.services.phonetic_service import phonetic_service
+        try:
+            from app.shared.services.phonetic_service import phonetic_service
 
-        phonetic_service._lazy_init()
-        if phonetic_service._model_available:
-            phonetic_result = phonetic_service.evaluate_per_word(
-                audio_bytes, actual_ref
-            )
-            if phonetic_result.get("score", 0) > 0:
-                words_result = phonetic_result.get("words", [])
-                overall_score = phonetic_result.get("score", 0)
-
-                # Blend with Whisper confidence where available
-                word_conf_scores = extract_segment_word_scores(trans_data)
-                for w in words_result:
-                    norm = w["word"].lower().strip(".,!?;:'\"")
-                    conf = word_conf_scores.get(norm, 0)
-                    if conf > 0 and w["score"] > 0:
-                        blended = int(w["score"] * 0.7 + conf * 100 * 0.3)
-                        w["score"] = blended
-                        w["accuracy"] = "correct" if blended >= 80 else "incorrect"
-                    # Carry best available IPA for frontend display
-                    w["confidence"] = conf
-
-                feedback = get_conversational_feedback(
-                    overall_score,
-                    words_result,
-                    transcription,
-                    actual_ref,
-                    is_free_speech,
+            phonetic_service._lazy_init()
+            if phonetic_service._model_available:
+                phonetic_result = phonetic_service.evaluate_per_word(
+                    audio_bytes, actual_ref
                 )
+                if phonetic_result.get("score", 0) > 0:
+                    words_result = phonetic_result.get("words", [])
+                    overall_score = phonetic_result.get("score", 0)
 
-                return {
-                    "score": overall_score,
-                    "transcription": transcription,
-                    "words": words_result,
-                    "feedback": feedback,
-                    "correct_audio": correct_audio,
-                    "metadata": {
-                        "segments": trans_data.get("segments", []),
-                        "language": trans_data.get("language"),
-                        "duration": trans_data.get("duration"),
-                        "free_speech": is_free_speech,
-                    },
-                    "phonetic": {
-                        "provider": "wav2vec2+g2p",
-                        "spoken_ipa": phonetic_result.get("spoken_ipa", ""),
-                        "expected_ipa": phonetic_result.get("expected_ipa", ""),
-                    },
-                }
-            logger.warning(
-                f"Phonetic evaluation returned low score or empty, falling back to text comparison: {phonetic_result}"
+                    # Blend with Whisper confidence where available
+                    word_conf_scores = extract_segment_word_scores(trans_data)
+                    for w in words_result:
+                        norm = w["word"].lower().strip(".,!?;:'\"")
+                        conf = word_conf_scores.get(norm, 0)
+                        if conf > 0 and w["score"] > 0:
+                            blended = int(w["score"] * 0.7 + conf * 100 * 0.3)
+                            w["score"] = blended
+                            w["accuracy"] = "correct" if blended >= 80 else "incorrect"
+                        # Carry best available IPA for frontend display
+                        w["confidence"] = conf
+
+                    feedback = get_conversational_feedback(
+                        overall_score,
+                        words_result,
+                        transcription,
+                        actual_ref,
+                        is_free_speech,
+                    )
+
+                    return {
+                        "score": overall_score,
+                        "transcription": transcription,
+                        "words": words_result,
+                        "feedback": feedback,
+                        "correct_audio": correct_audio,
+                        "metadata": {
+                            "segments": trans_data.get("segments", []),
+                            "language": trans_data.get("language"),
+                            "duration": trans_data.get("duration"),
+                            "free_speech": is_free_speech,
+                        },
+                        "phonetic": {
+                            "provider": "wav2vec2+g2p",
+                            "spoken_ipa": phonetic_result.get("spoken_ipa", ""),
+                            "expected_ipa": phonetic_result.get("expected_ipa", ""),
+                        },
+                    }
+                logger.warning(
+                    f"Phonetic evaluation returned low score or empty, falling back to text comparison: {phonetic_result}"
+                )
+        except Exception as e:
+            logger.error(
+                f"Phonetic evaluation error, falling back to text comparison: {e}"
             )
 
     # Step 5: Text-based fallback (only when phoneme model is unavailable)
