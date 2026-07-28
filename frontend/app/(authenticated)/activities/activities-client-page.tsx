@@ -328,7 +328,7 @@ export default function ActivitiesClientPage() {
                 {grammarContent?.items && grammarContent.items.length > 0 ? (
                   <div>
                     <p className="text-text-muted text-sm mb-5 max-w-2xl">
-                      Grammar lessons and exercises from test-english.com for level {testEnglishLevel}.
+                      Grammar lessons and exercises for level {testEnglishLevel}.
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {grammarContent.items
@@ -386,7 +386,7 @@ export default function ActivitiesClientPage() {
                 {listeningContent?.items && listeningContent.items.length > 0 ? (
                   <div>
                     <p className="text-text-muted text-sm mb-5 max-w-2xl">
-                      Listening tests from test-english.com for level {testEnglishLevel}.
+                      Listening tests for level {testEnglishLevel}.
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {listeningContent.items
@@ -475,7 +475,7 @@ export default function ActivitiesClientPage() {
                 {vocabularyContent?.items && vocabularyContent.items.length > 0 ? (
                   <div>
                     <p className="text-text-muted text-sm mb-5 max-w-2xl">
-                      Vocabulary lessons from test-english.com for level {testEnglishLevel}.
+                      Vocabulary lessons for level {testEnglishLevel}.
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {vocabularyContent.items
@@ -533,7 +533,7 @@ export default function ActivitiesClientPage() {
                 {readingContent?.items && readingContent.items.length > 0 ? (
                   <div>
                     <p className="text-text-muted text-sm mb-5 max-w-2xl">
-                      Reading tests from test-english.com for level {testEnglishLevel}.
+                      Reading tests for level {testEnglishLevel}.
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {readingContent.items
