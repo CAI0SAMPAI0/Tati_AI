@@ -168,12 +168,12 @@ def get_access_info(
                 in_grace=in_grace,
             )
 
-    # Sem assinatura ativa → mensagens gratuitas
+    # Sem assinatura ativa → mensagens gratuitas, mas activities liberadas
     used = _get_free_messages_used(user["username"], db)
     remaining = max(0, FREE_MSG_LIMIT - used)
     return _access_response(
         full=False,
-        activities=False,
+        activities=True,
         can_access_dashboard=can_access_dashboard,
         free_messages_remaining=remaining,
     )

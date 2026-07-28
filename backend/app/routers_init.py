@@ -124,6 +124,13 @@ def register_all_routers(app: FastAPI) -> None:
         prefix="/activities",
         tags=["test-english"],
     )
+    from app.modules.activities.routes.minimal_modules import router as minimal_modules_router
+
+    app.include_router(
+        minimal_modules_router,
+        prefix="/activities/modules",
+        tags=["activities"],
+    )
     app.include_router(
         student_premium_router,
         prefix="/activities/premium",
