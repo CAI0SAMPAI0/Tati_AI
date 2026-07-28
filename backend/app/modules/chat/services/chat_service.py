@@ -773,28 +773,66 @@ class ChatService:
             return f"[Erro ao ler arquivo: {e}]"
 
     def _clean_tts_text(self, text: str) -> str:
-        """Extrai apenas o campo 'reply' do JSON da IA para o TTS.
-        O campo 'drill' e 'correction' são apenas para exibição, nunca para áudio."""
-        try:
-            clean = text.strip()
-            if clean.startswith("```"):
-                clean = re.sub(r"^```[\w]*\n?", "", clean)
-                clean = re.sub(r"\n?```$", "", clean.strip())
+        """Extrai apenas o texto falável em linguagem natural para o TTS,
+        garantindo que NUNCA leia chaves JSON (reply, drill, correction, null, etc)
+        e NUNCA repita o texto caso a IA tenha enviado o texto e o JSON juntos."""
+        if not text:
+            return "Please, repeat."
 
-            json_match = re.search(r"\{[\s\S]*\"reply\"[\s\S]*\}", clean)
-            if json_match:
-                clean = json_match.group(0)
+        clean = text.strip()
+        if clean.startswith("```"):
+            clean = re.sub(r"^```[\w]*\n?", "", clean)
+            clean = re.sub(r"\n?```$", "", clean.strip())
 
-            data = json.loads(clean)
-            reply = data.get("reply") or ""
-            reply = reply.replace("*", "").replace("#", "").replace("_", "")
-            return reply.strip() or "Please, repeat."
-        except Exception:
-            # Fallback: remove vazamentos de JSON cru
-            fallback = re.sub(r"\{?\s*\"reply\"\s*:[\s\S]*$", "", text).strip()
-            if not fallback:
-                match = re.search(r'"reply"\s*:\s*"([^"]*)"', text)
-                fallback = match.group(1) if match else text
-            fallback = fallback.replace("*", "").replace("#", "").replace("_", "")
-            fallback = re.sub(r"\[DRILL:.*?\]", "", fallback)
-            return fallback.strip() or "Please, repeat."
+        json_match = re.search(r"\{[\s\S]*\"reply\"[\s\S]*\}", clean)
+        reply_from_json = ""
+        pre_text = ""
+
+        if json_match:
+            json_str = json_match.group(0)
+            pre_text = clean[: clean.find(json_str)].strip()
+            try:
+                data = json.loads(json_str)
+                if isinstance(data, dict):
+                    reply_from_json = (data.get("reply") or "").strip()
+            except Exception:
+                r_match = re.search(r'"reply"\s*:\s*"([^"]*)"', json_str)
+                if r_match:
+                    reply_from_json = r_match.group(1).strip()
+
+        final_tts = ""
+        if pre_text and reply_from_json:
+            if reply_from_json in pre_text:
+                final_tts = pre_text
+            elif pre_text in reply_from_json:
+                final_tts = reply_from_json
+            else:
+                final_tts = f"{pre_text}. {reply_from_json}"
+        elif pre_text:
+            final_tts = pre_text
+        elif reply_from_json:
+            final_tts = reply_from_json
+        else:
+            cleaned = re.sub(r"\{[\s\S]*\}", "", clean).strip()
+            cleaned = re.sub(
+                r"\{?\s*\"(reply|correction|drill|report)\"\s*:[\s\S]*$", "", cleaned
+            ).strip()
+            final_tts = cleaned or clean
+
+        final_tts = re.sub(
+            r"\{?\s*\"(reply|correction|drill|report)\"\s*:[\s\S]*$", "", final_tts
+        ).strip()
+        final_tts = re.sub(
+            r"\"(reply|correction|drill|report)\"\s*:\s*(null|\"[^\"]*\")",
+            "",
+            final_tts,
+        ).strip()
+        final_tts = (
+            final_tts.replace("*", "")
+            .replace("#", "")
+            .replace("_", "")
+            .replace("{", "")
+            .replace("}", "")
+        )
+
+        return final_tts.strip() or "Please, repeat."

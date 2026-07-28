@@ -305,24 +305,51 @@ def clean_and_parse_json(text: str) -> tuple[str, str | None]:
     if clean.startswith("```"):
         clean = re.sub(r"^```[\w]*\n?", "", clean)
         clean = re.sub(r"\n?```$", "", clean.strip())
-    try:
-        # Tenta extrair qualquer coisa entre as chaves principais
-        match = re.search(r"\{.*\}", clean, re.DOTALL)
-        if match:
-            clean = match.group(0)
-        data = json.loads(clean)
-        reply = data.get("reply") or ""
-        correction = data.get("correction")
-        return reply.strip(), correction
-    except Exception:
-        # Fallback se falhar
-        match = re.search(r'"reply"\s*:\s*"([^"]*)"', clean)
-        if match:
-            reply = match.group(1)
-            correction_match = re.search(r'"correction"\s*:\s*"([^"]*)"', clean)
-            correction = correction_match.group(1) if correction_match else None
-            return reply, correction
-        return text, None
+
+    json_match = re.search(r"\{[\s\S]*\"reply\"[\s\S]*\}", clean)
+    reply_from_json = ""
+    correction = None
+    pre_text = ""
+
+    if json_match:
+        json_str = json_match.group(0)
+        pre_text = clean[: clean.find(json_str)].strip()
+        try:
+            data = json.loads(json_str)
+            if isinstance(data, dict):
+                reply_from_json = (data.get("reply") or "").strip()
+                correction = data.get("correction")
+        except Exception:
+            r_match = re.search(r'"reply"\s*:\s*"([^"]*)"', json_str)
+            if r_match:
+                reply_from_json = r_match.group(1).strip()
+            c_match = re.search(r'"correction"\s*:\s*"([^"]*)"', json_str)
+            if c_match:
+                correction = c_match.group(1).strip()
+
+    final_reply = ""
+    if pre_text and reply_from_json:
+        if reply_from_json in pre_text:
+            final_reply = pre_text
+        elif pre_text in reply_from_json:
+            final_reply = reply_from_json
+        else:
+            final_reply = f"{pre_text}\n\n{reply_from_json}"
+    elif pre_text:
+        final_reply = pre_text
+    elif reply_from_json:
+        final_reply = reply_from_json
+    else:
+        cleaned = re.sub(r"\{[\s\S]*\}", "", clean).strip()
+        cleaned = re.sub(
+            r"\{?\s*\"(reply|correction|drill|report)\"\s*:[\s\S]*$", "", cleaned
+        ).strip()
+        final_reply = cleaned or clean
+
+    final_reply = re.sub(
+        r"\{?\s*\"(reply|correction|drill|report)\"\s*:[\s\S]*$", "", final_reply
+    ).strip()
+    return final_reply.strip() or text, correction
 
 
 @router.websocket("/live")
