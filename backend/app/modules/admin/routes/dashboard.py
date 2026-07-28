@@ -564,6 +564,36 @@ def get_dashboard_flashcards(
         return []
 
 
+@router.post("/flashcards/generate")
+async def generate_flashcards_with_ai(
+    data: dict,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    user=Depends(require_staff),
+):
+    """Gera flashcards via IA em background."""
+    delegate_res = await delegate_to_worker_if_needed(request)
+    if delegate_res is not None:
+        return delegate_res
+
+    from app.modules.activities.tasks import generate_flashcards_task
+
+    theme = data.get("theme", "")
+    level = normalize_level(data.get("level") or "A1")
+    card_count = data.get("card_count", 10)
+    module_id = data.get("module_id")
+
+    task_id = run_task_in_background(
+        background_tasks,
+        generate_flashcards_task,
+        theme=theme,
+        level=level,
+        module_id=module_id,
+        username=user["username"],
+    )
+    return {"success": True, "task_id": task_id}
+
+
 @router.post("/flashcards")
 def create_flashcard_deck(
     data: dict,
