@@ -77,6 +77,7 @@ def register_all_routers(app: FastAPI) -> None:
     from app.modules.activities.routes.ranking import router as ranking_router
     from app.modules.activities.routes.submissions import router as submissions_router
     from app.modules.activities.routes.trophies import router as trophies_router
+    from app.modules.activities.routes.games import router as games_router
     from app.modules.activities.routes.te_english import (
         router as te_english_router,
     )
@@ -123,6 +124,11 @@ def register_all_routers(app: FastAPI) -> None:
         te_english_router,
         prefix="/activities",
         tags=["test-english"],
+    )
+    app.include_router(
+        games_router,
+        prefix="/activities",
+        tags=["activities"],
     )
     from app.modules.activities.routes.minimal_modules import router as minimal_modules_router
 

@@ -156,7 +156,7 @@ def _build_simulation_topics(
         # Simulations are global or user-owned? Usually global catalog.
         rows = (
             db.table("simulations")
-            .select("id, name, description, emoji, difficulty")
+            .select("id, name, description, emoji, difficulty, levels")
             .eq("is_active", True)
             .execute()
             .data
@@ -164,7 +164,8 @@ def _build_simulation_topics(
         topics = []
         for row in rows:
             diff = row.get("difficulty")
-            if not matches_level(user_level_norm, diff):
+            levels = row.get("levels")
+            if not matches_level(user_level_norm, diff, levels):
                 continue
             emoji = row.get("emoji") or "🎯"
             name = row.get("name") or "Simulation"

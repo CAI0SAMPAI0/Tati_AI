@@ -77,6 +77,7 @@ export const ENDPOINTS = {
   // Activities
   ACTIVITIES_MODULES: '/activities/flashcards/my',
   ACTIVITIES_RANKING: '/activities/ranking',
+  ACTIVITIES_GAMES: '/activities/games',
   ACTIVITIES_PODCASTS_WARMUP: '/activities/podcasts/warmup',
   ACTIVITIES_PODCASTS_RECOMMENDATIONS: '/activities/podcasts/recommendations',
   ACTIVITIES_PODCAST_DETAIL: (id: string) => `/activities/podcasts/${id}`,
@@ -93,6 +94,8 @@ export const ENDPOINTS = {
   ADMIN_MODULE_GENERATE_FLASHCARDS: '/dashboard/flashcards/generate',
   ADMIN_SIMULATIONS: '/dashboard/simulations',
   ADMIN_SIMULATION_DETAIL: (id: string) => `/dashboard/simulations/${id}`,
+  ADMIN_GAMES: '/dashboard/games',
+  ADMIN_GAME_DETAIL: (id: string) => `/dashboard/games/${id}`,
   ADMIN_STUDENTS: '/dashboard/students',
   ADMIN_BUYERS: '/dashboard/buyers',
   ADMIN_DIFFICULTIES: '/dashboard/difficulties',

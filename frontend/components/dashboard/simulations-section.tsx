@@ -31,6 +31,7 @@ interface SimulationRow {
   name: string;
   description: string;
   difficulty: string;
+  levels?: string[];
   is_published: boolean;
   system_prompt?: string;
   emoji?: string;
@@ -41,6 +42,7 @@ interface FormState {
   name: string;
   description: string;
   difficulty: string;
+  levels: string[];
   system_prompt: string;
   emoji: string;
 }
@@ -49,6 +51,7 @@ const EMPTY_FORM: FormState = {
   name: '',
   description: '',
   difficulty: 'all',
+  levels: [],
   system_prompt: '',
   emoji: '🎭',
 };
@@ -67,6 +70,23 @@ export default function SimulationsSection() {
 
   const invalidateSimulations = () => queryClient.invalidateQueries({ queryKey: ['admin-simulations'] });
 
+  const handleToggleLevel = (levelValue: string) => {
+    setFormData(prev => {
+      const current = prev.levels.map(l => l.toUpperCase());
+      const target = levelValue.toUpperCase();
+      const isCurrentlySelected = current.includes(target);
+
+      let newLevels: string[];
+      if (isCurrentlySelected) {
+        newLevels = prev.levels.filter(l => l.toUpperCase() !== target);
+      } else {
+        newLevels = [...prev.levels, levelValue];
+      }
+
+      return { ...prev, levels: newLevels };
+    });
+  };
+
 
   const [filterLevel, setFilterLevel] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -77,6 +97,10 @@ export default function SimulationsSection() {
 
   const filteredSimulations = simulations.filter((s: any) => {
     if (filterLevel === 'all') return true;
+    const simLevels = s.levels || (s.difficulty && s.difficulty !== 'all' && s.difficulty !== 'todos' ? [s.difficulty] : []);
+    if (Array.isArray(simLevels) && simLevels.length > 0) {
+      return simLevels.some((l: string) => normalizeLevel(l) === normalizeLevel(filterLevel));
+    }
     const simDiff = normalizeLevel(s.difficulty);
     const targetDiff = normalizeLevel(filterLevel);
     
@@ -108,10 +132,12 @@ export default function SimulationsSection() {
   const openModal = (sim?: SimulationRow) => {
     if (sim) {
       setEditingSim(sim);
+      const existingLevels = (sim as any).levels || (sim.difficulty && sim.difficulty !== 'all' && sim.difficulty !== 'todos' ? [sim.difficulty] : []);
       setFormData({
         name: sim.name || '',
         description: sim.description || '',
         difficulty: sim.difficulty === 'all' || sim.difficulty === 'todos' ? 'all' : normalizeLevel(sim.difficulty),
+        levels: Array.isArray(existingLevels) ? existingLevels : [],
         system_prompt: sim.system_prompt || '',
         emoji: sim.emoji || '🎭',
       });
@@ -131,7 +157,7 @@ export default function SimulationsSection() {
     try {
       const payload = {
         topic: formData.name || 'New Simulation',
-        level: formData.difficulty,
+        levels: formData.levels,
         instructions: formData.system_prompt,
         use_ai_generation: true
       };
@@ -162,10 +188,12 @@ export default function SimulationsSection() {
                 
                 const updatedSim = statusRes.result as SimulationRow;
                 if (updatedSim) {
+                  const updatedLevels = (updatedSim as any).levels || (updatedSim.difficulty && updatedSim.difficulty !== 'all' ? [updatedSim.difficulty] : []);
                   setFormData({
                     name: updatedSim.name,
                     description: updatedSim.description || '',
                     difficulty: updatedSim.difficulty || 'all',
+                    levels: Array.isArray(updatedLevels) ? updatedLevels : [],
                     system_prompt: updatedSim.system_prompt || '',
                     emoji: updatedSim.emoji || '🎭',
                   });
@@ -206,7 +234,7 @@ export default function SimulationsSection() {
       const payload = {
         name: name.trim(),
         description: (formData.description || '').trim(),
-        difficulty: formData.difficulty,
+        levels: formData.levels,
         system_prompt: formData.system_prompt,
         emoji: formData.emoji,
       };
@@ -298,7 +326,13 @@ export default function SimulationsSection() {
           <div key={s.id} className="bg-surface border border-border p-5 rounded-2xl flex flex-col gap-4 group hover:border-primary/40 transition-all">
             <div className="flex items-start justify-between">
               <div className="bg-primary/10 w-10 h-10 rounded-xl flex items-center justify-center text-primary font-black uppercase text-xs">
-                {s.difficulty === 'all' || s.difficulty === 'todos' ? 'A' : (s.difficulty?.[0] || 'B')}
+                {(() => {
+                  const simLevels = s.levels || (s.difficulty && s.difficulty !== 'all' && s.difficulty !== 'todos' ? [s.difficulty] : []);
+                  if (Array.isArray(simLevels) && simLevels.length > 0) {
+                    return simLevels[0]?.[0] || 'B';
+                  }
+                  return s.difficulty === 'all' || s.difficulty === 'todos' ? 'A' : (s.difficulty?.[0] || 'B');
+                })()}
               </div>
               <div className="flex flex-col items-end gap-1">
                 <span className={cn(
@@ -308,7 +342,13 @@ export default function SimulationsSection() {
                   {s.is_published ? 'Published' : 'Draft'}
                 </span>
                 <span className="text-[0.6rem] font-bold px-2 py-0.5 rounded-full bg-surface-hover border border-border uppercase tracking-widest text-text-subtle">
-                  {s.difficulty === 'all' || s.difficulty === 'todos' ? 'All Levels' : levelLabel(s.difficulty)}
+                  {(() => {
+                    const simLevels = s.levels || (s.difficulty && s.difficulty !== 'all' && s.difficulty !== 'todos' ? [s.difficulty] : []);
+                    if (Array.isArray(simLevels) && simLevels.length > 0) {
+                      return simLevels.map((l: string) => levelLabel(l)).join(', ');
+                    }
+                    return s.difficulty === 'all' || s.difficulty === 'todos' ? 'All Levels' : levelLabel(s.difficulty);
+                  })()}
                 </span>
               </div>
             </div>
@@ -381,17 +421,29 @@ export default function SimulationsSection() {
             </div>
           </div>
           <div className="mb-4">
-            <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">Level</label>
-            <select
-              className="w-full px-3.5 py-2.5 bg-input border border-border rounded-md text-text text-sm outline-none focus:border-border-focus transition-all"
-              value={formData.difficulty}
-              onChange={(e) => setFormData(prev => ({ ...prev, difficulty: e.target.value }))}
-            >
-              <option value="all">All Levels</option>
-              {LEVEL_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+            <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">Levels</label>
+            <div className="flex flex-wrap gap-1.5">
+              {LEVEL_OPTIONS.map(opt => {
+                const isActive = formData.levels.map((l) => l.toUpperCase()).includes(opt.value.toUpperCase());
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => handleToggleLevel(opt.value)}
+                    className={`px-2.5 py-1 rounded-lg text-[0.7rem] font-bold uppercase tracking-wider border transition-all ${
+                      isActive
+                        ? 'bg-primary/15 text-primary border-primary/30'
+                        : 'bg-surface text-text-muted border-border hover:border-border-focus'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[0.65rem] text-text-subtle mt-1.5">
+              Select which levels can see this simulation. If none selected, it shows for all.
+            </p>
           </div>
           <Input
             label={'Description'}

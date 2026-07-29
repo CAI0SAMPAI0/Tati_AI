@@ -123,7 +123,7 @@ def get_all_scenarios(level: str | None = None) -> list[dict]:
             )
 
         # Filtra usando a lógica unificada
-        filtered = [s for s in merged if matches_level(level, s.get("difficulty"))]
+        filtered = [s for s in merged if matches_level(level, s.get("difficulty"), s.get("levels"))]
         return filtered
     except Exception as e:
         logging.info(f"[Simulation Service] Erro ao buscar cenários: {e}")

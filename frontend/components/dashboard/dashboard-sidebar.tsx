@@ -13,6 +13,7 @@ import {
   Settings,
   X,
   Zap,
+  Gamepad2,
 } from 'lucide-react';
 import { FaWhatsapp } from 'react-icons/fa';
 
@@ -24,12 +25,13 @@ const NAV_ITEMS: Array<{ id: DashSection; icon: React.ReactNode; label: string }
   { id: 'reports', icon: <LineChart size={20} />, label: 'Reports' },
   { id: 'flashcards', icon: <Layers size={20} />, label: 'Flashcards' },
   { id: 'simulations', icon: <Drama size={20} />, label: 'Simulations' },
+  { id: 'games', icon: <Gamepad2 size={20} />, label: 'Games' },
   { id: 'cefr', icon: <BookOpen size={20} />, label: 'CEFR Materials' },
   { id: 'premium', icon: <Zap size={20} />, label: 'Premium Hub' },
   { id: 'whatsapp', icon: <FaWhatsapp size={20} />, label: 'WhatsApp Config' },
 ];
 
-export type DashSection = 'overview' | 'students' | 'reports' | 'flashcards' | 'simulations' | 'premium' | 'cefr' | 'whatsapp';
+export type DashSection = 'overview' | 'students' | 'reports' | 'flashcards' | 'simulations' | 'games' | 'premium' | 'cefr' | 'whatsapp';
 
 interface DashboardSidebarProps {
   activeSection: DashSection;

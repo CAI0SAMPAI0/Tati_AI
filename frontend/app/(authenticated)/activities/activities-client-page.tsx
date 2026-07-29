@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Layers,
@@ -14,6 +14,8 @@ import {
   GraduationCap,
   FileText,
   Download,
+  Gamepad2,
+  ExternalLink,
 } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
@@ -33,7 +35,7 @@ const teImg = (url: string) =>
     ? `${API_BASE}/activities/test-english/image-proxy?url=${encodeURIComponent(url)}`
     : url;
 
-type TabType = 'grammar' | 'vocabulary' | 'listenings' | 'reading' | 'flashcards' | 'simulations';
+type TabType = 'grammar' | 'vocabulary' | 'listenings' | 'reading' | 'flashcards' | 'simulations' | 'games';
 
 interface ModuleItem {
   id: string;
@@ -88,6 +90,15 @@ interface TestEnglishItem {
   url: string;
   level: string;
 }
+interface GameItem {
+  id: string;
+  title: string;
+  description?: string;
+  wordwall_url: string;
+  levels?: string[];
+  is_published?: boolean;
+  created_at?: string;
+}
 
 export default function ActivitiesClientPage() {
   const router = useRouter();
@@ -97,15 +108,38 @@ export default function ActivitiesClientPage() {
   const { sidebarOpen, toggleSidebar: handleToggleSidebar, closeSidebar: handleCloseSidebar } = useSidebarState();
   const [visiblePodcastsCount, setVisiblePodcastsCount] = useState(10);
   const [filterLevel, setFilterLevel] = useState<string>('All');
+  const [visibleCount, setVisibleCount] = useState(10);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const loadMore = useCallback(() => {
+    setVisibleCount((prev) => prev + 10);
+  }, []);
+
+  useEffect(() => {
+    if (observerRef.current) observerRef.current.disconnect();
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMore();
+      },
+      { threshold: 0.1 }
+    );
+    if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
+    return () => observerRef.current?.disconnect();
+  }, [activeTab, loadMore]);
 
   const isStaff = user?.role && ['professor', 'professora', 'programador', 'Tatiana', 'Tati', 'Professora', 'Programador', 'admin', 'Admin'].includes(user.role);
 
   const effectiveLevel = !isStaff && user?.level && ['A1','A2','B1','B2','C1'].includes(user.level) ? user.level : filterLevel;
 
   useEffect(() => {
+    setVisibleCount(10);
+  }, [activeTab, effectiveLevel, searchQuery]);
+
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('tati_last_activity_tab') as TabType;
-      if (saved && ['grammar', 'vocabulary', 'listenings', 'reading', 'flashcards', 'simulations'].includes(saved)) {
+      if (saved && ['grammar', 'vocabulary', 'listenings', 'reading', 'flashcards', 'simulations', 'games'].includes(saved)) {
         setActiveTab(saved);
       }
     }
@@ -196,6 +230,11 @@ export default function ActivitiesClientPage() {
     staleTime: 30 * 60 * 1000,
   });
 
+  const { data: gamesRaw = [] } = useQuery<GameItem[]>({
+    queryKey: ['activities-games'],
+    queryFn: () => apiGet<GameItem[]>(ENDPOINTS.ACTIVITIES_GAMES),
+  });
+
   useQuery({
     queryKey: ['weekly-plan-v2'],
     queryFn: fetchWeeklyPlan,
@@ -250,6 +289,7 @@ export default function ActivitiesClientPage() {
     { id: 'reading', icon: <FileText size={18} />, label: 'Reading', count: readingContent?.items?.length },
     { id: 'flashcards', icon: <Layers size={18} />, label: 'Flashcards', count: flashcards.length },
     { id: 'simulations', icon: <Drama size={18} />, label: 'Simulations', count: simulations.length },
+    { id: 'games', icon: <Gamepad2 size={18} />, label: 'Games', count: gamesRaw.length },
   ];
 
   return (
@@ -337,6 +377,7 @@ export default function ActivitiesClientPage() {
                             !searchQuery ||
                             t.title.toLowerCase().includes(searchQuery.toLowerCase()),
                         )
+                        .slice(0, visibleCount)
                         .map((item) => (
                           <a
                             key={item.slug}
@@ -350,6 +391,7 @@ export default function ActivitiesClientPage() {
                                 <img
                                   src={teImg(item.image)}
                                   alt={item.title}
+                                  loading="lazy"
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                   onError={(e) => {
                                     (e.target as HTMLImageElement).style.display = 'none';
@@ -372,6 +414,13 @@ export default function ActivitiesClientPage() {
                           </a>
                         ))}
                     </div>
+                    {grammarContent.items.filter(
+                      (t) =>
+                        !searchQuery ||
+                        t.title.toLowerCase().includes(searchQuery.toLowerCase()),
+                    ).length > visibleCount && (
+                      <div ref={sentinelRef} className="h-10" />
+                    )}
                   </div>
                 ) : (
                   <div className="py-20 text-center text-text-muted">
@@ -395,6 +444,7 @@ export default function ActivitiesClientPage() {
                             !searchQuery ||
                             t.title.toLowerCase().includes(searchQuery.toLowerCase()),
                         )
+                        .slice(0, visibleCount)
                         .map((item) => (
                           <a
                             key={item.slug}
@@ -408,6 +458,7 @@ export default function ActivitiesClientPage() {
                                 <img
                                   src={teImg(item.image)}
                                   alt={item.title}
+                                  loading="lazy"
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                   onError={(e) => {
                                     (e.target as HTMLImageElement).style.display = 'none';
@@ -430,6 +481,13 @@ export default function ActivitiesClientPage() {
                           </a>
                         ))}
                     </div>
+                    {listeningContent.items.filter(
+                      (t) =>
+                        !searchQuery ||
+                        t.title.toLowerCase().includes(searchQuery.toLowerCase()),
+                    ).length > visibleCount && (
+                      <div ref={sentinelRef} className="h-10" />
+                    )}
                   </div>
                 ) : podcasts.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -484,6 +542,7 @@ export default function ActivitiesClientPage() {
                             !searchQuery ||
                             t.title.toLowerCase().includes(searchQuery.toLowerCase()),
                         )
+                        .slice(0, visibleCount)
                         .map((item) => (
                           <a
                             key={item.slug}
@@ -497,6 +556,7 @@ export default function ActivitiesClientPage() {
                                 <img
                                   src={teImg(item.image)}
                                   alt={item.title}
+                                  loading="lazy"
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                   onError={(e) => {
                                     (e.target as HTMLImageElement).style.display = 'none';
@@ -519,6 +579,13 @@ export default function ActivitiesClientPage() {
                           </a>
                         ))}
                     </div>
+                    {vocabularyContent.items.filter(
+                      (t) =>
+                        !searchQuery ||
+                        t.title.toLowerCase().includes(searchQuery.toLowerCase()),
+                    ).length > visibleCount && (
+                      <div ref={sentinelRef} className="h-10" />
+                    )}
                   </div>
                 ) : (
                   <div className="py-20 text-center text-text-muted">
@@ -542,6 +609,7 @@ export default function ActivitiesClientPage() {
                             !searchQuery ||
                             t.title.toLowerCase().includes(searchQuery.toLowerCase()),
                         )
+                        .slice(0, visibleCount)
                         .map((item) => (
                           <a
                             key={item.slug}
@@ -555,6 +623,7 @@ export default function ActivitiesClientPage() {
                                 <img
                                   src={teImg(item.image)}
                                   alt={item.title}
+                                  loading="lazy"
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                   onError={(e) => {
                                     (e.target as HTMLImageElement).style.display = 'none';
@@ -577,6 +646,13 @@ export default function ActivitiesClientPage() {
                           </a>
                         ))}
                     </div>
+                    {readingContent.items.filter(
+                      (t) =>
+                        !searchQuery ||
+                        t.title.toLowerCase().includes(searchQuery.toLowerCase()),
+                    ).length > visibleCount && (
+                      <div ref={sentinelRef} className="h-10" />
+                    )}
                   </div>
                 ) : (
                   <div className="py-20 text-center text-text-muted">
@@ -589,7 +665,7 @@ export default function ActivitiesClientPage() {
             {activeTab === 'flashcards' && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {flashcards.length > 0 ? (
-                  flashcards.map((f) => (
+                  flashcards.slice(0, visibleCount).map((f) => (
                     <ActivityCard
                       key={f.id}
                       title={f.title}
@@ -605,13 +681,16 @@ export default function ActivitiesClientPage() {
                     <p>No flashcards available.</p>
                   </div>
                 )}
+                {flashcards.length > visibleCount && (
+                  <div ref={sentinelRef} className="h-10" />
+                )}
               </div>
             )}
 
             {activeTab === 'simulations' && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {simulations.length > 0 ? (
-                  simulations.map((s) => (
+                  simulations.slice(0, visibleCount).map((s) => (
                     <ActivityCard
                       key={s.id}
                       title={s.name}
@@ -628,6 +707,65 @@ export default function ActivitiesClientPage() {
                 ) : (
                   <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
                     No simulations available.
+                  </div>
+                )}
+                {simulations.length > visibleCount && (
+                  <div ref={sentinelRef} className="h-10" />
+                )}
+              </div>
+            )}
+
+            {activeTab === 'games' && (
+              <div className="space-y-8">
+                {gamesRaw.length > 0 ? (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {gamesRaw
+                        .filter((g) => !searchQuery || g.title.toLowerCase().includes(searchQuery.toLowerCase()))
+                        .slice(0, visibleCount)
+                        .map((g) => (
+                          <a
+                            key={g.id}
+                            href={g.wordwall_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-left bg-surface border border-border rounded-2xl overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 transition-all group"
+                          >
+                            <div className="p-5 flex flex-col gap-3">
+                              <div className="flex items-start justify-between">
+                                <div className="bg-primary/10 w-10 h-10 rounded-xl flex items-center justify-center text-primary">
+                                  <Gamepad2 size={20} />
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                  {(g.levels || ['all']).map((l) => (
+                                    <span key={l} className="text-[0.6rem] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase">
+                                      {l === 'all' || l === 'ALL' ? 'All' : l.toUpperCase()}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-bold text-text line-clamp-2 group-hover:text-primary transition-colors">{g.title}</h4>
+                                {g.description && (
+                                  <p className="text-[0.75rem] text-text-muted line-clamp-2 mt-1">{g.description}</p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-[0.7rem] text-text-muted mt-auto pt-2">
+                                <ExternalLink size={12} />
+                                <span>Open on WordWall</span>
+                              </div>
+                            </div>
+                          </a>
+                        ))}
+                    </div>
+                    {gamesRaw.filter((g) => !searchQuery || g.title.toLowerCase().includes(searchQuery.toLowerCase())).length > visibleCount && (
+                      <div ref={sentinelRef} className="h-10" />
+                    )}
+                  </>
+                ) : (
+                  <div className="py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
+                    <Gamepad2 size={40} className="mx-auto mb-4 opacity-20" />
+                    <p>No games available for your level.</p>
                   </div>
                 )}
               </div>

@@ -35,6 +35,7 @@ interface FlashcardDeck {
   description?: string;
   card_count?: number;
   level?: string;
+  levels?: string[];
   is_published?: boolean;
   flashcards?: Array<{ front: string; back: string; image_url?: string }>;
 }
@@ -50,6 +51,7 @@ interface FormState {
   description: string;
   card_count: number;
   level: string;
+  levels: string[];
   ai_theme: string;
   ai_with_images: boolean;
   flashcards: Array<Flashcard>;
@@ -60,6 +62,7 @@ const EMPTY_FORM: FormState = {
   description: '',
   card_count: 10,
   level: 'all',
+  levels: [],
   ai_theme: '',
   ai_with_images: false,
   flashcards: [],
@@ -88,6 +91,10 @@ export function FlashcardsSection() {
 
   const filteredDecks = (decks as FlashcardDeck[]).filter((d: FlashcardDeck) => {
     if (filterLevel === 'all') return true;
+    const deckLevels = (d as any).levels || (d.level ? [d.level] : []);
+    if (Array.isArray(deckLevels) && deckLevels.length > 0) {
+      return deckLevels.some((l: string) => normalizeLevel(l) === normalizeLevel(filterLevel));
+    }
     return normalizeLevel(d.level) === normalizeLevel(filterLevel);
   });
 
@@ -120,14 +127,15 @@ export function FlashcardsSection() {
   const openModal = async (deck?: FlashcardDeck) => {
     if (deck) {
       setEditingDeck(deck);
-      // Busca detalhes completos para pegar os cards
       try {
         const details = await apiGet<any>(`/activities/modules/${deck.id}`);
+        const existingLevels = details.levels || (details.level ? [details.level] : []);
         setFormData({
           title: details.title || deck.title,
           description: details.description || deck.description || '',
           card_count: details.flashcards?.length || deck.card_count || 10,
           level: details.level || deck.level || 'all',
+          levels: Array.isArray(existingLevels) ? existingLevels : [],
           ai_theme: '',
           ai_with_images: false,
           flashcards: details.flashcards || []
@@ -138,6 +146,7 @@ export function FlashcardsSection() {
           description: deck.description || '',
           card_count: deck.card_count || 10,
           level: deck.level || 'all',
+          levels: deck.level ? [deck.level] : [],
           ai_theme: '',
           ai_with_images: false,
           flashcards: []
@@ -155,6 +164,23 @@ export function FlashcardsSection() {
       ...prev,
       flashcards: [...prev.flashcards, { front: '', back: '', image_url: '' }]
     }));
+  };
+
+  const handleToggleLevel = (levelValue: string) => {
+    setFormData(prev => {
+      const current = prev.levels.map(l => l.toUpperCase());
+      const target = levelValue.toUpperCase();
+      const isCurrentlySelected = current.includes(target);
+
+      let newLevels: string[];
+      if (isCurrentlySelected) {
+        newLevels = prev.levels.filter(l => l.toUpperCase() !== target);
+      } else {
+        newLevels = [...prev.levels, levelValue];
+      }
+
+      return { ...prev, levels: newLevels };
+    });
   };
 
   const removeCard = (idx: number) => {
@@ -271,7 +297,7 @@ export function FlashcardsSection() {
       const res = await apiPost<{ success: boolean; task_id?: string }>(ENDPOINTS.ADMIN_MODULE_GENERATE_FLASHCARDS, {
         theme: formData.ai_with_images ? `IMG:${formData.ai_theme}` : formData.ai_theme,
         instructions: '',
-        level: formData.level,
+        levels: formData.levels,
         card_count: formData.card_count,
         module_id: editingDeck?.id
       });
@@ -331,7 +357,7 @@ export function FlashcardsSection() {
         title: formData.title.trim(),
         description: formData.description.trim(),
         card_count: formData.flashcards.length || Number(formData.card_count) || 10,
-        level: formData.level,
+        levels: formData.levels,
         flashcards: formData.flashcards
       };
 
@@ -403,7 +429,13 @@ export function FlashcardsSection() {
                   {d.is_published ? 'Published' : 'Draft'}
                 </span>
                 <span className="text-[0.55rem] font-black uppercase text-text-subtle tracking-tighter">
-                  {d.level === 'all' || d.level === 'todos' ? 'All Levels' : levelLabel(d.level)}
+                  {(() => {
+                    const deckLevels = (d as any).levels || (d.level ? [d.level] : []);
+                    if (Array.isArray(deckLevels) && deckLevels.length > 0) {
+                      return deckLevels.map((l: string) => levelLabel(l)).join(', ');
+                    }
+                    return d.level === 'all' || d.level === 'todos' ? 'All Levels' : levelLabel(d.level);
+                  })()}
                 </span>
               </div>
             </div>
@@ -460,17 +492,29 @@ export function FlashcardsSection() {
             
             <div className="grid grid-cols-2 gap-4">
               <div className="mb-4">
-                <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">Level</label>
-                <select 
-                  className="w-full px-3.5 py-2.5 bg-input border border-border rounded-md text-text text-sm outline-none focus:border-border-focus transition-all"
-                  value={formData.level}
-                  onChange={(e) => setFormData(prev => ({ ...prev, level: e.target.value }))}
-                >
-                  <option value="all">All Levels</option>
-                  {LEVEL_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+                <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">Levels</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {LEVEL_OPTIONS.map(opt => {
+                    const isActive = formData.levels.map((l) => l.toUpperCase()).includes(opt.value.toUpperCase());
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => handleToggleLevel(opt.value)}
+                        className={`px-2.5 py-1 rounded-lg text-[0.7rem] font-bold uppercase tracking-wider border transition-all ${
+                          isActive
+                            ? 'bg-primary/15 text-primary border-primary/30'
+                            : 'bg-surface text-text-muted border-border hover:border-border-focus'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[0.65rem] text-text-subtle mt-1.5">
+                  Select which levels can see this deck. If none selected, it shows for all.
+                </p>
               </div>
 
               <Input

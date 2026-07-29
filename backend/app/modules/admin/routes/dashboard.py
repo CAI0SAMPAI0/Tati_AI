@@ -354,6 +354,7 @@ async def create_simulation(
         "icon",
         "emoji",
         "difficulty",
+        "levels",
         "system_prompt",
         "is_active",
     }
@@ -450,6 +451,7 @@ def update_simulation(
         "icon",
         "emoji",
         "difficulty",
+        "levels",
         "system_prompt",
         "greeting",
         "is_active",
@@ -478,6 +480,114 @@ def delete_simulation(
         return db.table("cefr_simulations").delete().eq("id", real_id).execute()
 
     return db.table("simulations").delete().eq("id", simulation_id).execute()
+
+
+# ── Games ────────────────────────────────────────────────────────────
+
+
+@router.get("/games")
+async def list_games(
+    user=Depends(require_staff),
+) -> list:
+    """Lista todos os games (admin)."""
+    from app.core.database import get_client
+    from fastapi.concurrency import run_in_threadpool
+
+    def _fetch() -> list:
+        db = get_client()
+        try:
+            res = (
+                db.table("games")
+                .select("*")
+                .order("created_at", desc=True)
+                .execute()
+            )
+            return res.data or []
+        except Exception:
+            return []
+
+    return await run_in_threadpool(_fetch)
+
+
+@router.post("/games")
+async def create_game(
+    data: dict,
+    user=Depends(require_staff),
+):
+    """Cria um novo game."""
+    import logging
+
+    from app.core.database import get_client
+    from fastapi import HTTPException
+    from fastapi.concurrency import run_in_threadpool
+
+    title = (data.get("title") or "").strip()
+    wordwall_url = (data.get("wordwall_url") or "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Title is required")
+    if not wordwall_url:
+        raise HTTPException(status_code=400, detail="WordWall URL is required")
+
+    levels = data.get("levels") or ["all"]
+    if isinstance(levels, str):
+        levels = [lev.strip().upper() for lev in levels.split(",") if lev.strip()]
+    levels = [lev.upper() for lev in levels]
+
+    payload = {
+        "title": title,
+        "description": (data.get("description") or "").strip(),
+        "wordwall_url": wordwall_url,
+        "levels": levels,
+        "is_published": data.get("is_published", True),
+    }
+    logging.info(f"[Games] Creating game: {payload}")
+
+    def _save():
+        db = get_client()
+        return db.table("games").insert(payload).execute()
+
+    res = await run_in_threadpool(_save)
+    logging.info(f"[Games] Created game result: {res.data}")
+    return res
+
+
+@router.put("/games/{game_id}")
+async def update_game(
+    game_id: str,
+    data: dict,
+    user=Depends(require_staff),
+):
+    """Atualiza um game."""
+    from app.core.database import get_client
+    from fastapi.concurrency import run_in_threadpool
+
+    allowed_fields = {"title", "description", "wordwall_url", "levels", "is_published"}
+    filtered = {k: v for k, v in data.items() if k in allowed_fields}
+
+    if "levels" in filtered and isinstance(filtered["levels"], str):
+        filtered["levels"] = [lev.strip().upper() for lev in filtered["levels"].split(",") if lev.strip()]
+
+    def _update():
+        db = get_client()
+        return db.table("games").update(filtered).eq("id", game_id).execute()
+
+    return await run_in_threadpool(_update)
+
+
+@router.delete("/games/{game_id}")
+async def delete_game(
+    game_id: str,
+    user=Depends(require_staff),
+):
+    """Exclui um game."""
+    from app.core.database import get_client
+    from fastapi.concurrency import run_in_threadpool
+
+    def _delete():
+        db = get_client()
+        return db.table("games").delete().eq("id", game_id).execute()
+
+    return await run_in_threadpool(_delete)
 
 
 @router.get("/flashcards")
@@ -611,6 +721,7 @@ def create_flashcard_deck(
         "title": data.get("title"),
         "description": data.get("description"),
         "level": payload_level,
+        "levels": data.get("levels", []),
         "flashcards": data.get("flashcards", []),
         "is_published": data.get("is_published", True),
     }
@@ -692,6 +803,7 @@ def update_flashcard_deck(
         "title": data.get("title"),
         "description": data.get("description"),
         "level": normalize_level(data.get("level")) if data.get("level") else None,
+        "levels": data.get("levels"),
         "flashcards": data.get("flashcards"),
         "is_published": data.get("is_published"),
     }
