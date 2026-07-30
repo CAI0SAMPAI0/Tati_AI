@@ -4,7 +4,7 @@ from typing import Any
 
 from app.core.enums import CEFR_LABELS as _CEFR_LABEL_MAP
 from app.core.enums import normalize_level
-from app.modules.chat.services.llm import groq_chat_json, search_image_on_internet
+from app.modules.chat.services.llm import groq_chat_json
 
 from .embeddings import EmbeddingsService
 
@@ -31,11 +31,13 @@ class CEFRGeneratorService:
     @staticmethod
     async def _add_image_to_card(card: dict[str, Any]) -> None:
         """Busca uma imagem relacionada ao flashcard e insere image_url no dict (in-place)."""
+        from .image_service import resolve_image
+
         query = CEFRGeneratorService._build_image_search_query(card)
         if not query:
             return
         try:
-            img_url = await search_image_on_internet(query)
+            img_url = await resolve_image(query)
             if img_url:
                 card["image_url"] = img_url
         except Exception as e:
@@ -139,71 +141,6 @@ class CEFRGeneratorService:
             return flashcards
         except Exception as e:
             logging.error(f"[CEFRGenerator] Erro ao gerar flashcards: {e}")
-            return None
-
-    @staticmethod
-    async def generate_exercises(
-        level: str, topic: str, count: int = 3, reference_ids: list[str] = None
-    ) -> list[dict[str, Any]] | None:
-        """
-        Gera exercícios de múltipla escolha baseados no material.
-        """
-        level = normalize_level(level)
-        level_label = CEFRGeneratorService.CEFR_LABELS.get(level, level)
-
-        context_docs = EmbeddingsService.search_similar_documents(
-            query=topic, level=level, top_k=5, reference_ids=reference_ids
-        )
-
-        if not context_docs:
-            context_text = "Nenhum material de referência específico encontrado."
-        else:
-            context_text = "\n\n".join(
-                [f"Trecho:\n{d.get('content', '')}" for d in context_docs]
-            )
-
-        prompt = f"""
-        You are a native English teacher creating practical exercises for students at CEFR level {level} ({level_label}).
-
-        Based on the following material about the topic '{topic}':
-
-        {context_text}
-
-        Generate exactly {count} multiple-choice questions focused on the PRACTICAL USE of the language (vocabulary, grammar, or comprehension of real-life situations).
-        Do NOT ask theoretical questions about the text. Ask questions as if the student were in that situation practicing English (e.g. "You want to buy some apples. What do you say to the cashier?").
-
-        CRITICAL CONSTRAINTS:
-        1. All fields, questions, options, and explanations MUST be entirely in English. Never use Portuguese.
-        2. The question (question) must be entirely in English and focus on a situation, fill-in-the-blank, or conversation reply.
-        3. The options (options) must be entirely in English. Provide exactly 4 options.
-        4. The explanation (explanation) must be entirely in English, explaining why the correct option is right grammatically or contextually.
-        5. The correct_index must be an integer from 0 to 3 corresponding to the correct option.
-        6. Do NOT use prefixes like A), B), C) in the options, just the plain text of the option.
-        7. Return ONLY a valid JSON object matching the format below, without any markdown formatting or extra text.
-
-        Expected Output Format (Strict JSON):
-        {{
-            "exercises": [
-                {{
-                    "question": "situational question text (English)",
-                    "options": ["option 1 (English)", "option 2 (English)", "option 3 (English)", "option 4 (English)"],
-                    "correct_index": 0,
-                    "explanation": "detailed explanation (English)"
-                }}
-            ]
-        }}
-        """
-
-        try:
-            data = await groq_chat_json(
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=2000,
-                temperature=0.3,
-            )
-
-            return data.get("exercises", [])
-        except Exception as e:
-            logging.error(f"[CEFRGenerator] Erro ao gerar exercícios: {e}")
             return None
 
     @staticmethod

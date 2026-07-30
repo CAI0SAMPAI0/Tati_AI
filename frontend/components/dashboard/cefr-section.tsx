@@ -8,7 +8,6 @@ import {
   AlertCircle,
   Loader2,
   BookOpen,
-  PenTool,
   Clapperboard,
   Trash2,
   Info,
@@ -49,14 +48,12 @@ export function CefrSection() {
   const [topic, setTopic] = useState('');
   const [cefrTitle, setCefrTitle] = useState('');
   const [cardCount, setCardCount] = useState(10);
-  const [exerciseCount, setExerciseCount] = useState(10);
   const [simulationCount] = useState(1);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [references, setReferences] = useState<any[]>([]);
   const [loadingReferences, setLoadingReferences] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [generatingFlashcards, setGeneratingFlashcards] = useState(false);
-  const [generatingExercises, setGeneratingExercises] = useState(false);
   const [generatingSimulations, setGeneratingSimulations] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<{ success: boolean; message: string } | null>(null);
 
@@ -73,19 +70,18 @@ export function CefrSection() {
   const [scheduleLimit, setScheduleLimit] = useState(5);
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
-  const [scheduleTypes, setScheduleTypes] = useState<string[]>(['flashcards', 'exercises', 'simulations']);
+  const [scheduleTypes, setScheduleTypes] = useState<string[]>(['flashcards', 'simulations']);
 
   // Top-level tabs
   const [activeMainTab, setActiveMainTab] = useState<'configure' | 'curator'>('configure');
 
   // Curator Panel states
   const [generatedFlashcards, setGeneratedFlashcards] = useState<any[]>([]);
-  const [generatedExercises, setGeneratedExercises] = useState<any[]>([]);
   const [generatedSimulations, setGeneratedSimulations] = useState<any[]>([]);
   const [loadingGenerated, setLoadingGenerated] = useState(false);
   const [generatedFilterLevel, setGeneratedFilterLevel] = useState<string>('All');
   const [curatorStatusFilter, setCuratorStatusFilter] = useState<'All' | 'Drafts' | 'Published'>('Drafts');
-  const [activeCuratorTab, setActiveCuratorTab] = useState<'flashcards' | 'modules' | 'simulations'>('flashcards');
+  const [activeCuratorTab, setActiveCuratorTab] = useState<'flashcards' | 'simulations'>('flashcards');
 
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [editingItemType, setEditingItemType] = useState<'flashcard' | 'exercise' | 'simulation' | null>(null);
@@ -97,14 +93,15 @@ export function CefrSection() {
   const [extractingTopics, setExtractingTopics] = useState(false);
   const [extractedTopics, setExtractedTopics] = useState<any[]>([]);
   const [showTopicSelector, setShowTopicSelector] = useState(false);
+  const [expandedTopicIdx, setExpandedTopicIdx] = useState<number | null>(null);
+  const [selectedSubtopics, setSelectedSubtopics] = useState<string[]>([]);
 
   const fetchGeneratedContent = async (silent = false) => {
     if (!silent) setLoadingGenerated(true);
     try {
-      const res = await apiGet<{ success: boolean; flashcards?: any[]; exercises?: any[]; simulations?: any[] }>('/cefr/admin/all');
+      const res = await apiGet<{ success: boolean; flashcards?: any[]; simulations?: any[] }>('/cefr/admin/all');
       if (res) {
         setGeneratedFlashcards(res.flashcards || []);
-        setGeneratedExercises(res.exercises || []);
         setGeneratedSimulations(res.simulations || []);
       }
     } catch (err) {
@@ -140,35 +137,6 @@ export function CefrSection() {
       }
     } catch (err: any) {
       toast.error(err.message || 'Error deleting flashcard deck.');
-    }
-  };
-
-  const handleTogglePublishExerciseGroup = async (group: any) => {
-    try {
-      const res = await apiPut<any>(`/cefr/admin/exercises/group?level=${group.level}&topic=${encodeURIComponent(group.topic)}&is_published=${!group.is_published}`, null);
-      if (res.ok) {
-        toast.success(!group.is_published ? 'Quiz approved & published!' : 'Quiz returned to drafts.');
-        fetchGeneratedContent(true);
-      } else {
-        toast.error('Error updating status.');
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'Error updating status.');
-    }
-  };
-
-  const handleDeleteExerciseGroup = async (group: any) => {
-    if (!confirm(`Are you sure you want to delete quiz "${group.topic}"?`)) return;
-    try {
-      const res = await apiDelete(`/cefr/admin/exercises/group?level=${group.level}&topic=${encodeURIComponent(group.topic)}`);
-      if (res.ok) {
-        toast.success('Quiz deleted successfully.');
-        fetchGeneratedContent(true);
-      } else {
-        toast.error('Error deleting quiz.');
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'Error deleting quiz.');
     }
   };
 
@@ -218,23 +186,6 @@ export function CefrSection() {
     });
   };
 
-  const handleStartEditExerciseGroup = (group: any) => {
-    setEditingItem(group);
-    setEditingItemType('exercise');
-    setEditForm({
-      old_level: group.level,
-      old_topic: group.topic,
-      new_level: group.level,
-      new_topic: group.topic,
-      exercises: group.questions.map((q: any) => ({
-        question: q.question || '',
-        options: q.options || ['', '', '', ''],
-        correct_index: q.correct_index ?? 0,
-        explanation: q.explanation || ''
-      }))
-    });
-  };
-
   const handleStartEditItem = (item: any, type: 'flashcard' | 'exercise' | 'simulation') => {
     setEditingItem(item);
     setEditingItemType(type);
@@ -255,8 +206,6 @@ export function CefrSection() {
       let res;
       if (editingItemType === 'flashcard') {
         res = await apiPost<any>(`/cefr/admin/flashcards/group/save`, editForm);
-      } else if (editingItemType === 'exercise') {
-        res = await apiPost<any>(`/cefr/admin/exercises/group/save`, editForm);
       } else if (editingItemType === 'simulation') {
         res = await apiPut<any>(`/cefr/admin/simulations/${editingItem.id}`, editForm);
       }
@@ -344,27 +293,6 @@ export function CefrSection() {
     return Object.values(groups);
   }, [generatedFlashcards]);
 
-  const groupedExercises = useMemo(() => {
-    const groups: Record<string, { level: string; topic: string; is_published: boolean; questions: any[]; id: string }> = {};
-    generatedExercises.forEach(ex => {
-      const key = `${ex.level}_${ex.topic}`;
-      if (!groups[key]) {
-        groups[key] = {
-          id: `cefr_ex_${ex.level.toLowerCase()}_${ex.topic.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}`,
-          level: ex.level,
-          topic: ex.topic,
-          is_published: true,
-          questions: []
-        };
-      }
-      groups[key].questions.push(ex);
-      if (!ex.is_published) {
-        groups[key].is_published = false;
-      }
-    });
-    return Object.values(groups);
-  }, [generatedExercises]);
-
   const activeGroupedFlashcards = useMemo(() => {
     return groupedFlashcards.filter((group: any) => {
       const matchLevel = generatedFilterLevel === 'All' || group.level === generatedFilterLevel;
@@ -374,16 +302,6 @@ export function CefrSection() {
       return matchLevel && matchStatus;
     });
   }, [groupedFlashcards, generatedFilterLevel, curatorStatusFilter]);
-
-  const activeGroupedExercises = useMemo(() => {
-    return groupedExercises.filter((group: any) => {
-      const matchLevel = generatedFilterLevel === 'All' || group.level === generatedFilterLevel;
-      const matchStatus = curatorStatusFilter === 'All'
-        || (curatorStatusFilter === 'Drafts' && !group.is_published)
-        || (curatorStatusFilter === 'Published' && group.is_published);
-      return matchLevel && matchStatus;
-    });
-  }, [groupedExercises, generatedFilterLevel, curatorStatusFilter]);
 
   const activeSimulations = useMemo(() => {
     return generatedSimulations.filter((sim: any) => {
@@ -397,9 +315,8 @@ export function CefrSection() {
 
   const activeList = useMemo(() => {
     if (activeCuratorTab === 'flashcards') return activeGroupedFlashcards;
-    if (activeCuratorTab === 'modules') return activeGroupedExercises;
     return activeSimulations;
-  }, [activeCuratorTab, activeGroupedFlashcards, activeGroupedExercises, activeSimulations]);
+  }, [activeCuratorTab, activeGroupedFlashcards, activeSimulations]);
 
   const handlePublishAllFiltered = async () => {
     let itemsToPublish: any[] = [];
@@ -409,11 +326,6 @@ export function CefrSection() {
         itemsToPublish.push(g);
       });
       endpointPrefix = '/cefr/admin/flashcards/group';
-    } else if (activeCuratorTab === 'modules') {
-      activeGroupedExercises.filter((g: any) => !g.is_published).forEach((g: any) => {
-        itemsToPublish.push(g);
-      });
-      endpointPrefix = '/cefr/admin/exercises/group';
     } else if (activeCuratorTab === 'simulations') {
       activeSimulations.filter((s: any) => !s.is_published).forEach((s: any) => {
         itemsToPublish.push(s);
@@ -609,7 +521,7 @@ export function CefrSection() {
         setScheduleWeekdays([]);
         setScheduleTime('06:00');
         setScheduleLimit(5);
-        setScheduleTypes(['flashcards', 'exercises', 'simulations']);
+        setScheduleTypes(['flashcards', 'simulations']);
         setEditingScheduleId(null);
         setScheduleActive(true);
         fetchSchedules();
@@ -629,7 +541,7 @@ export function CefrSection() {
     setScheduleTime(sch.execution_time.slice(0, 5));
     setScheduleLimit(sch.materials_per_execution || 5);
     setScheduleActive(sch.active);
-    setScheduleTypes(sch.selected_types || ['flashcards', 'exercises', 'simulations']);
+    setScheduleTypes(sch.selected_types || ['flashcards', 'simulations']);
   };
 
   const handleCancelEditSchedule = () => {
@@ -638,7 +550,7 @@ export function CefrSection() {
     setScheduleTime('06:00');
     setScheduleLimit(5);
     setScheduleActive(true);
-    setScheduleTypes(['flashcards', 'exercises', 'simulations']);
+    setScheduleTypes(['flashcards', 'simulations']);
   };
 
   const handleToggleSchedule = async (id: string, currentActive: boolean) => {
@@ -670,20 +582,16 @@ export function CefrSection() {
     }
   };
 
-  const handleGenerate = async (type: 'flashcards' | 'exercises' | 'simulations') => {
+  const handleGenerate = async (type: 'flashcards' | 'simulations') => {
     if (!topic.trim()) return;
 
     if (type === 'flashcards') setGeneratingFlashcards(true);
-    else if (type === 'exercises') setGeneratingExercises(true);
     else if (type === 'simulations') setGeneratingSimulations(true);
 
     try {
       let endpoint = '';
       if (type === 'flashcards') {
         endpoint = `/cefr/admin/generate-flashcards?level=${level}&topic=${encodeURIComponent(topic)}&count=${cardCount}`;
-        if (cefrTitle.trim()) endpoint += `&title=${encodeURIComponent(cefrTitle.trim())}`;
-      } else if (type === 'exercises') {
-        endpoint = `/cefr/admin/generate-exercises?level=${level}&topic=${encodeURIComponent(topic)}&count=${exerciseCount}`;
         if (cefrTitle.trim()) endpoint += `&title=${encodeURIComponent(cefrTitle.trim())}`;
       } else if (type === 'simulations') {
         endpoint = `/cefr/admin/generate-simulations?level=${level}&topic=${encodeURIComponent(topic)}&count=${simulationCount}`;
@@ -711,7 +619,6 @@ export function CefrSection() {
             if (pollRetries > MAX_POLL_RETRIES) {
               clearInterval(pollInterval);
               if (type === 'flashcards') setGeneratingFlashcards(false);
-              else if (type === 'exercises') setGeneratingExercises(false);
               else if (type === 'simulations') setGeneratingSimulations(false);
               toast.error('Generation timed out. Please try again.', { id: taskId });
               return;
@@ -721,14 +628,12 @@ export function CefrSection() {
               if (statusRes.status === 'success') {
                 clearInterval(pollInterval);
                 if (type === 'flashcards') setGeneratingFlashcards(false);
-                else if (type === 'exercises') setGeneratingExercises(false);
                 else if (type === 'simulations') setGeneratingSimulations(false);
                 toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} generated successfully!`, { id: taskId });
                 fetchGeneratedContent(true);
               } else if (statusRes.status === 'failed') {
                 clearInterval(pollInterval);
                 if (type === 'flashcards') setGeneratingFlashcards(false);
-                else if (type === 'exercises') setGeneratingExercises(false);
                 else if (type === 'simulations') setGeneratingSimulations(false);
                 toast.error(`Failed to generate ${type}: ${statusRes.error || 'Unknown error'}`, { id: taskId });
               }
@@ -736,20 +641,17 @@ export function CefrSection() {
           } catch (err: any) {
             clearInterval(pollInterval);
             if (type === 'flashcards') setGeneratingFlashcards(false);
-            else if (type === 'exercises') setGeneratingExercises(false);
             else if (type === 'simulations') setGeneratingSimulations(false);
             toast.error(`Error checking status for ${type}: ${err.message}`, { id: taskId });
           }
         }, 2000);
       } else {
         if (type === 'flashcards') setGeneratingFlashcards(false);
-        else if (type === 'exercises') setGeneratingExercises(false);
         else if (type === 'simulations') setGeneratingSimulations(false);
         toast.error('Failed to initiate content generation.');
       }
     } catch (err: any) {
       if (type === 'flashcards') setGeneratingFlashcards(false);
-      else if (type === 'exercises') setGeneratingExercises(false);
       else if (type === 'simulations') setGeneratingSimulations(false);
       toast.error(err.message || 'Error generating content.');
     }
@@ -834,9 +736,8 @@ export function CefrSection() {
           {/* Badge showing count of drafts across all types */}
           {(() => {
             const draftFlashcards = generatedFlashcards.filter(f => !f.is_published).length;
-            const draftExercises = generatedExercises.filter(e => !e.is_published).length;
             const draftSimulations = generatedSimulations.filter(s => !s.is_published).length;
-            const totalDrafts = draftFlashcards + draftExercises + draftSimulations;
+            const totalDrafts = draftFlashcards + draftSimulations;
             if (totalDrafts > 0) {
               return (
                 <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold bg-amber-500 text-white rounded-full">
@@ -1117,16 +1018,25 @@ export function CefrSection() {
                 </div>
                 <button
                   onClick={async () => {
+                    console.log('[CEFR] Clicked extract topics, selectedRefIds:', selectedRefIds);
                     setExtractingTopics(true);
                     try {
                       const params = selectedRefIds.map(id => `reference_ids=${id}`).join('&');
-                      const res = await apiGet<any>(`/cefr/admin/extract-topics?${params}`);
-                      if (res && res.topics) {
+                      const url = `/cefr/admin/extract-topics?${params}`;
+                      console.log('[CEFR] Fetching:', url);
+                      const res = await apiGet<any>(url);
+                      console.log('[CEFR] Response:', JSON.stringify(res).substring(0, 500));
+                      if (res && res.topics && res.topics.length > 0) {
                         setExtractedTopics(res.topics);
                         setShowTopicSelector(true);
+                        toast.success(`Found ${res.topics.length} topics!`);
+                      } else {
+                        console.log('[CEFR] No topics in response:', res);
+                        toast.error('No topics found. Check browser console for details.');
                       }
-                    } catch (err) {
-                      toast.error('Error extracting topics');
+                    } catch (err: any) {
+                      console.error('[CEFR] Error:', err);
+                      toast.error(`Error: ${err?.message || 'Unknown error'}`);
                     } finally {
                       setExtractingTopics(false);
                     }
@@ -1140,6 +1050,88 @@ export function CefrSection() {
               </div>
             )}
 
+            {showTopicSelector && extractedTopics.length > 0 && (
+              <div className="mb-6 p-4 bg-surface border border-border rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-text flex items-center gap-2">
+                    <Sparkles size={14} className="text-primary" />
+                    Extracted Topics ({extractedTopics.length})
+                  </h3>
+                  <button
+                    onClick={() => { setShowTopicSelector(false); setExtractedTopics([]); setExpandedTopicIdx(null); setSelectedSubtopics([]); }}
+                    className="text-text-muted hover:text-text p-1 rounded-lg hover:bg-bg transition-all"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <p className="text-xs text-text-muted">Select a topic, then pick the subtopics you want to use.</p>
+                <div className="space-y-2">
+                  {extractedTopics.map((t: any, idx: number) => {
+                    const isExpanded = expandedTopicIdx === idx;
+                    const items: string[] = t.items || [];
+                    return (
+                      <div key={idx} className="border border-border rounded-xl overflow-hidden">
+                        <button
+                          onClick={() => {
+                            setExpandedTopicIdx(isExpanded ? null : idx);
+                            setSelectedSubtopics([]);
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-2.5 text-left transition-all ${
+                            isExpanded ? 'bg-primary/5' : 'bg-bg hover:bg-primary/5'
+                          }`}
+                        >
+                          <span className="text-xs font-bold text-text">{t.topic}</span>
+                          <span className="text-[10px] text-text-muted font-normal">{t.count || items.length} items</span>
+                        </button>
+                        {isExpanded && (
+                          <div className="px-3 py-2 bg-bg/50 border-t border-border space-y-2">
+                            <div className="flex flex-wrap gap-1.5">
+                              {items.map((item: string, iIdx: number) => {
+                                const isSelected = selectedSubtopics.includes(item);
+                                return (
+                                  <button
+                                    key={iIdx}
+                                    onClick={() => {
+                                      setSelectedSubtopics(prev =>
+                                        isSelected ? prev.filter(s => s !== item) : [...prev, item]
+                                      );
+                                    }}
+                                    className={`px-2 py-1 rounded-lg text-[11px] font-medium border transition-all ${
+                                      isSelected
+                                        ? 'bg-primary/10 border-primary/30 text-primary'
+                                        : 'bg-surface border-border text-text-subtle hover:border-primary/20 hover:bg-primary/5'
+                                    }`}
+                                  >
+                                    {item}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            {selectedSubtopics.length > 0 && (
+                              <button
+                                onClick={() => {
+                                  const fullTopic = `${t.topic}: ${selectedSubtopics.join(', ')}`;
+                                  setTopic(fullTopic);
+                                  setShowTopicSelector(false);
+                                  setExtractedTopics([]);
+                                  setExpandedTopicIdx(null);
+                                  setSelectedSubtopics([]);
+                                  toast.success(`Topic set with ${selectedSubtopics.length} subtopics`);
+                                }}
+                                className="px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary/90 transition-all"
+                              >
+                                Use {selectedSubtopics.length} selected
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <div className="space-y-2">
                 <label className="text-sm font-bold text-text-subtle">Quantity of Flashcards</label>
@@ -1149,18 +1141,6 @@ export function CefrSection() {
                   max="50"
                   value={cardCount}
                   onChange={e => setCardCount(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-text-subtle">Quantity of Exercises / Questions</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={exerciseCount}
-                  onChange={e => setExerciseCount(Math.max(1, parseInt(e.target.value) || 1))}
                   className="w-full bg-bg border border-border rounded-xl px-4 py-3 text-text focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                 />
               </div>
@@ -1190,15 +1170,6 @@ export function CefrSection() {
               </button>
 
               <button
-                onClick={() => handleGenerate('exercises')}
-                disabled={!topic.trim() || generatingExercises}
-                className="flex-1 min-w-[200px] px-6 py-3.5 bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 rounded-xl font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap transition-all border border-orange-500/20"
-              >
-                {generatingExercises ? <Loader2 size={16} className="animate-spin" /> : <PenTool size={16} />}
-                Generate Exercises ({exerciseCount} questions)
-              </button>
-
-              <button
                 onClick={() => handleGenerate('simulations')}
                 disabled={!topic.trim() || generatingSimulations}
                 className="flex-1 min-w-[200px] px-6 py-3.5 bg-pink-500/10 text-pink-400 hover:bg-pink-500/20 rounded-xl font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap transition-all border border-pink-500/20"
@@ -1216,7 +1187,7 @@ export function CefrSection() {
               Autonomous Scheduling (Cron)
             </h2>
             <p className="text-sm text-text-subtle mb-6">
-              Configure the AI to generate new content (flashcards and exercises) autonomously on the specified days and times.
+              Configure the AI to generate new content (flashcards and simulations) autonomously on the specified days and times.
             </p>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -1254,7 +1225,6 @@ export function CefrSection() {
                   <div className="flex flex-col gap-2">
                     {[
                       { value: 'flashcards', label: 'Flashcards (10 cards per level)' },
-                      { value: 'exercises', label: 'Exercises (10 questions per level)' },
                       { value: 'simulations', label: 'Simulations (1 roleplay per level)' }
                     ].map(type => {
                       const isChecked = scheduleTypes.includes(type.value);
@@ -1483,10 +1453,6 @@ export function CefrSection() {
                     label: `Flashcards (${activeGroupedFlashcards.length})`
                   },
                   {
-                    id: 'modules',
-                    label: `Quizzes (${activeGroupedExercises.length})`
-                  },
-                  {
                     id: 'simulations',
                     label: `Simulations (${activeSimulations.length})`
                   }
@@ -1575,68 +1541,6 @@ export function CefrSection() {
                              </button>
                              <button
                                 onClick={() => handleDeleteFlashcardGroup(group)}
-                                className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle border border-border"
-                                title="Delete"
-                             >
-                                <Trash2 size={16} />
-                             </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()
-              )}
-
-              {activeCuratorTab === 'modules' && (
-                (() => {
-                  if (activeGroupedExercises.length === 0) {
-                    return (
-                      <div className="text-center py-10 text-text-muted border border-dashed border-border rounded-xl">
-                        <p className="text-sm">No exercise quizzes found for the selected level and status.</p>
-                      </div>
-                    );
-                  }
-                  return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-150">
-                      {activeGroupedExercises.map((group) => (
-                        <div key={group.id} className="bg-surface border border-border rounded-2xl p-5 flex flex-col gap-4 group hover:border-primary/40 transition-all">
-                          <div className="flex items-start justify-between">
-                            <div className="bg-orange-500/10 w-10 h-10 rounded-xl flex items-center justify-center text-orange-400">
-                               <BookOpen size={20} />
-                            </div>
-                            <div className="flex flex-col items-end gap-1">
-                              <span className="text-[0.65rem] font-bold px-2 py-0.5 rounded-full bg-orange-500/5 border border-orange-500/20 text-orange-400">
-                                {group.questions.length} questions
-                              </span>
-                              <span className={cn(
-                                "text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider",
-                                group.is_published ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'
-                              )}>
-                                {group.is_published ? 'Published' : 'Draft'}
-                              </span>
-                              <span className="text-[0.55rem] font-black uppercase text-text-subtle tracking-tighter">
-                                {group.level}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div>
-                            <h4 className="font-bold text-text mb-1 truncate">{group.topic}</h4>
-                            <p className="text-xs text-text-muted line-clamp-2 leading-relaxed h-8">
-                              Exercise module about {group.topic}.
-                            </p>
-                          </div>
-
-                          <div className="grid grid-cols-3 gap-2 mt-auto pt-2">
-                             <button onClick={() => handleStartEditExerciseGroup(group)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title="Edit">
-                                <Pencil size={16} />
-                             </button>
-                             <button onClick={() => handleTogglePublishExerciseGroup(group)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title={group.is_published ? "Unpublish (Draft)" : "Publish"}>
-                                {group.is_published ? <EyeOff size={16} /> : <Eye size={16} />}
-                             </button>
-                             <button
-                                onClick={() => handleDeleteExerciseGroup(group)}
                                 className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle border border-border"
                                 title="Delete"
                              >
@@ -1917,115 +1821,6 @@ export function CefrSection() {
                           </button>
                         )}
                       </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {editingItemType === 'exercise' && (
-            <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-bold text-primary flex items-center gap-2">
-                  <BookOpen size={16} /> Questions ({(editForm.exercises || []).length})
-                </h4>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const current = editForm.exercises || [];
-                    setEditForm({
-                      ...editForm,
-                      exercises: [...current, { question: '', options: ['', '', '', ''], correct_index: 0, explanation: '' }]
-                    });
-                  }}
-                  className="px-3 py-1 bg-surface border border-border rounded-lg text-xs font-bold text-primary hover:bg-surface-hover flex items-center gap-1"
-                >
-                  <Plus size={12} /> Add Question
-                </button>
-              </div>
-
-              <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
-                {(editForm.exercises || []).map((ex: any, idx: number) => (
-                  <div key={idx} className="p-4 bg-surface border border-border rounded-xl space-y-3 relative group">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const current = editForm.exercises || [];
-                        setEditForm({
-                          ...editForm,
-                          exercises: current.filter((_: any, i: number) => i !== idx)
-                        });
-                      }}
-                      className="absolute top-2 right-2 p-1 text-text-subtle hover:text-danger opacity-0 group-hover:opacity-100 transition-all"
-                      title="Remove Question"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-
-                    <div className="flex gap-2">
-                      <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[10px] shrink-0 mt-1">
-                        {idx + 1}
-                      </span>
-                      <textarea
-                        placeholder="Question text..."
-                        value={ex.question || ''}
-                        onChange={(e) => {
-                          const newExs = [...editForm.exercises];
-                          newExs[idx] = { ...newExs[idx], question: e.target.value };
-                          setEditForm({ ...editForm, exercises: newExs });
-                        }}
-                        className="flex-1 bg-transparent border-b border-border text-xs py-1 outline-none focus:border-primary transition-all resize-none min-h-[40px]"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 pl-7">
-                      {(ex.options || ['', '', '', '']).map((opt: string, oIdx: number) => {
-                        const isCorrect = ex.correct_index === oIdx;
-                        return (
-                          <div key={oIdx} className="relative">
-                            <input
-                              className={cn(
-                                "w-full pl-2 pr-6 py-1.5 bg-bg/50 border rounded-lg text-xs outline-none transition-all",
-                                isCorrect ? "border-success bg-success/5" : "border-border"
-                              )}
-                              placeholder={`Option ${oIdx + 1}`}
-                              value={opt}
-                              onChange={(e) => {
-                                const newOpts = [...ex.options];
-                                newOpts[oIdx] = e.target.value;
-                                const newExs = [...editForm.exercises];
-                                newExs[idx] = { ...newExs[idx], options: newOpts };
-                                setEditForm({ ...editForm, exercises: newExs });
-                              }}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newExs = [...editForm.exercises];
-                                newExs[idx] = { ...newExs[idx], correct_index: oIdx };
-                                setEditForm({ ...editForm, exercises: newExs });
-                              }}
-                              className={cn("absolute right-1.5 top-1/2 -translate-y-1/2", isCorrect ? "text-success" : "text-text-subtle")}
-                            >
-                              <CheckCircle2 size={12} />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    <div className="pl-7">
-                      <label className="block text-[10px] font-bold text-text-subtle uppercase mb-1">Explanation</label>
-                      <textarea
-                        value={ex.explanation || ''}
-                        onChange={(e) => {
-                          const newExs = [...editForm.exercises];
-                          newExs[idx] = { ...newExs[idx], explanation: e.target.value };
-                          setEditForm({ ...editForm, exercises: newExs });
-                        }}
-                        className="w-full bg-bg border border-border rounded-lg px-3 py-1 text-xs text-text focus:ring-1 focus:ring-primary/20 outline-none resize-none min-h-[40px]"
-                      />
                     </div>
                   </div>
                 ))}

@@ -259,26 +259,79 @@ async def extract_topics_from_references(
     """
     client = get_client()
     try:
-        # Fetch the indexed documents for the given references
+        logging.info(f"[AdminRoute] extract-topics: reference_ids={reference_ids}")
+
+        # Resolve reference IDs to source_file paths via cefr_references
+        ref_res = (
+            client.table("cefr_references")
+            .select("id, storage_url, filename, cefr_level")
+            .in_("id", reference_ids)
+            .execute()
+        )
+        logging.info(f"[AdminRoute] extract-topics: cefr_references rows: {len(ref_res.data or [])} | data: {ref_res.data}")
+
+        source_files = []
+        for row in (ref_res.data or []):
+            url = row.get("storage_url", "")
+            prefix = "public/cefr-materials/"
+            if prefix in url:
+                source_files.append(url.split(prefix)[-1])
+            else:
+                source_files.append(url)
+
+        logging.info(f"[AdminRoute] extract-topics: resolved source_files: {source_files}")
+
+        # Fetch the indexed documents matching those source files
         all_content = []
-        for ref_id in reference_ids:
+        if source_files:
             res = (
                 client.table("cefr_documents")
-                .select("content, metadata")
-                .eq("reference_id", ref_id)
+                .select("content, metadata, source_file")
+                .in_("source_file", source_files)
                 .execute()
             )
+            logging.info(f"[AdminRoute] extract-topics: cefr_documents by source_file: {len(res.data or [])} rows")
             if res.data:
                 for doc in res.data:
                     content = doc.get("content", "")
                     if content:
                         all_content.append(content)
 
+        # Fallback: if no content found by source_file, fetch ALL documents for the levels of these references
         if not all_content:
+            level_res = (
+                client.table("cefr_references")
+                .select("cefr_level")
+                .in_("id", reference_ids)
+                .execute()
+            )
+            levels = list(set(r["cefr_level"] for r in (level_res.data or []) if r.get("cefr_level")))
+            if levels:
+                res = (
+                    client.table("cefr_documents")
+                    .select("content")
+                    .in_("level", levels)
+                    .execute()
+                )
+                if res.data:
+                    for doc in res.data:
+                        content = doc.get("content", "")
+                        if content:
+                            all_content.append(content)
+                    logging.info(
+                        f"[AdminRoute] extract-topics fallback: fetched {len(all_content)} chunks by level {levels}"
+                    )
+
+        if not all_content:
+            logging.warning(f"[AdminRoute] extract-topics: NO content found for source_files={source_files} and levels={levels if 'levels' in dir() else 'N/A'}")
             return {"success": True, "topics": []}
 
-        # Combine content (limit to avoid token overflow)
-        combined_content = "\n\n".join(all_content)[:8000]
+        # Combine content (limit to avoid token overflow - ~25k chars ≈ 6k tokens)
+        combined_content = "\n\n".join(all_content)[:25000]
+        logging.info(
+            f"[AdminRoute] extract-topics: {len(all_content)} chunks, "
+            f"{len(combined_content)} chars sent to AI"
+        )
 
         # Use AI to extract topics
         from app.modules.chat.services.llm import groq_chat
@@ -286,11 +339,13 @@ async def extract_topics_from_references(
         prompt = f"""Analyze the following English learning material and extract ALL distinct topics and subtopics.
 
 For each topic, provide:
-1. The topic name (e.g., "Actions and Verbs")
-2. A list of subtopics/items (e.g., ["eat", "drink", "sleep", "run"])
+1. The topic name (e.g., "Family and Relationships", "Hobbies and Free Time")
+2. A list of ALL subtopics/items (vocabulary words, phrases, collocations, etc.)
 3. The total count of items in that topic
 
-IMPORTANT: Return ONLY a JSON array. No markdown, no explanation.
+CRITICAL: You MUST extract EVERY topic present in the material. Do NOT skip any section, chapter, or unit. Go through the ENTIRE text carefully.
+
+Return ONLY a valid JSON array. No markdown, no explanation, no code blocks.
 
 Format:
 [
@@ -301,58 +356,67 @@ Format:
 Material:
 {combined_content}"""
 
-        response = await groq_chat([{"role": "user", "content": prompt}])
+        logging.info("[AdminRoute] extract-topics: calling Groq AI...")
+        raw_response = await groq_chat(
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=4000,
+            temperature=0.2,
+        )
+        logging.info(f"[AdminRoute] extract-topics: raw response (first 800 chars): {raw_response[:800]}")
 
-        # Parse the response
+        # Parse JSON from response with multiple strategies
         import json
         import re
 
-        # Try to extract JSON from the response
-        json_match = re.search(r"\[.*\]", response, re.DOTALL)
-        if json_match:
-            topics = json.loads(json_match.group())
-            return {"success": True, "topics": topics}
-        else:
-            return {"success": True, "topics": []}
+        topics = []
+        clean = raw_response.strip()
+
+        # Strategy 1: try parsing directly
+        try:
+            parsed = json.loads(clean)
+            if isinstance(parsed, list):
+                topics = parsed
+            elif isinstance(parsed, dict) and "topics" in parsed:
+                topics = parsed["topics"]
+        except json.JSONDecodeError:
+            pass
+
+        # Strategy 2: extract from markdown code block
+        if not topics:
+            match = re.search(r"```(?:json)?\s*(.*?)\s*```", clean, re.DOTALL)
+            if match:
+                try:
+                    parsed = json.loads(match.group(1))
+                    if isinstance(parsed, list):
+                        topics = parsed
+                    elif isinstance(parsed, dict) and "topics" in parsed:
+                        topics = parsed["topics"]
+                except json.JSONDecodeError:
+                    pass
+
+        # Strategy 3: find array or object in the text
+        if not topics:
+            match = re.search(r"\[.*\]", clean, re.DOTALL)
+            if match:
+                try:
+                    topics = json.loads(match.group(0))
+                except json.JSONDecodeError:
+                    pass
+        if not topics:
+            match = re.search(r"\{.*\}", clean, re.DOTALL)
+            if match:
+                try:
+                    parsed = json.loads(match.group(0))
+                    if isinstance(parsed, dict) and "topics" in parsed:
+                        topics = parsed["topics"]
+                except json.JSONDecodeError:
+                    pass
+
+        logging.info(f"[AdminRoute] extract-topics: {len(topics)} topics parsed")
+        return {"success": True, "topics": topics}
 
     except Exception as e:
         logging.error(f"[AdminRoute] Error extracting topics: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/generate-exercises")
-async def generate_exercises(
-    level: str,
-    topic: str,
-    background_tasks: BackgroundTasks,
-    request: Request,
-    count: int = 3,
-    title: str | None = None,
-    reference_ids: list[str] | None = Query(None),
-    user=Depends(require_staff),
-):
-    """
-    Generates exercises from indexed material using RAG in the background.
-    """
-    delegate_res = await delegate_to_worker_if_needed(request)
-    if delegate_res is not None:
-        return delegate_res
-    try:
-        from app.modules.cefr.tasks import generate_cefr_exercises_task
-
-        task_id = run_task_in_background(
-            background_tasks,
-            generate_cefr_exercises_task,
-            level,
-            topic,
-            count,
-            username=user["username"],
-            custom_title=title,
-            reference_ids=reference_ids,
-        )
-        return {"success": True, "task_id": task_id}
-    except Exception as e:
-        logging.error(f"[AdminRoute] Error triggering exercises generation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -415,16 +479,6 @@ async def trigger_scheduler():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-class CEFRExerciseUpdate(BaseModel):
-    level: str | None = None
-    question: str | None = None
-    options: list[str] | None = None
-    correct_index: int | None = None
-    explanation: str | None = None
-    topic: str | None = None
-    is_published: bool | None = None
-
-
 class CEFRFlashcardUpdate(BaseModel):
     level: str | None = None
     front: str | None = None
@@ -446,15 +500,12 @@ class CEFRSimulationUpdate(BaseModel):
 @router.get("/all")
 async def get_all_content():
     """
-    Returns all generated content (flashcards, exercises, simulations).
+    Returns all generated content (flashcards, simulations).
     """
     client = get_client()
     try:
         fc_res = client.table("cefr_flashcards").select("*").execute()
         flashcards = fc_res.data or []
-
-        ex_res = client.table("cefr_exercises").select("*").execute()
-        exercises = ex_res.data or []
 
         sim_res = client.table("cefr_simulations").select("*").execute()
         simulations = sim_res.data or []
@@ -462,7 +513,6 @@ async def get_all_content():
         return {
             "success": True,
             "flashcards": flashcards,
-            "exercises": exercises,
             "simulations": simulations,
         }
     except Exception as e:
@@ -476,14 +526,6 @@ class CEFRFlashcardGroupSave(BaseModel):
     new_level: str
     new_topic: str
     flashcards: list[dict]
-
-
-class CEFRExerciseGroupSave(BaseModel):
-    old_level: str
-    old_topic: str
-    new_level: str
-    new_topic: str
-    exercises: list[dict]
 
 
 @router.put("/flashcards/group")
@@ -553,112 +595,6 @@ async def save_flashcard_group(
         return {"success": True, "inserted": len(inserted)}
     except Exception as e:
         logging.error(f"[AdminRoute] Error saving flashcard group: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.put("/exercises/group")
-async def toggle_publish_exercise_group(
-    level: str = Query(...),
-    topic: str = Query(...),
-    is_published: bool = Query(...),
-    user=Depends(require_staff),
-):
-    client = get_client()
-    try:
-        res = (
-            client.table("cefr_exercises")
-            .update({"is_published": is_published})
-            .eq("level", level)
-            .eq("topic", topic)
-            .execute()
-        )
-        return {"success": True, "updated": len(res.data or [])}
-    except Exception as e:
-        logging.error(f"[AdminRoute] Error toggling exercise group: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.delete("/exercises/group")
-async def delete_exercise_group(level: str, topic: str, user=Depends(require_staff)):
-    client = get_client()
-    try:
-        client.table("cefr_exercises").delete().eq("level", level).eq(
-            "topic", topic
-        ).execute()
-        return {
-            "success": True,
-            "message": f"Deleted exercise group '{topic}' for level '{level}'",
-        }
-    except Exception as e:
-        logging.error(f"[AdminRoute] Error deleting exercise group: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/exercises/group/save")
-async def save_exercise_group(body: CEFRExerciseGroupSave, user=Depends(require_staff)):
-    client = get_client()
-    try:
-        # Delete old
-        client.table("cefr_exercises").delete().eq("level", body.old_level).eq(
-            "topic", body.old_topic
-        ).execute()
-
-        # Insert new
-        inserted = []
-        for ex in body.exercises:
-            data = {
-                "level": body.new_level,
-                "topic": body.new_topic,
-                "type": "multiple_choice",
-                "question": ex.get("question"),
-                "options": ex.get("options"),
-                "correct_index": ex.get("correct_index"),
-                "explanation": ex.get("explanation"),
-                "is_published": ex.get("is_published", False),
-            }
-            res = client.table("cefr_exercises").insert(data).execute()
-            if res.data:
-                inserted.extend(res.data)
-        return {"success": True, "inserted": len(inserted)}
-    except Exception as e:
-        logging.error(f"[AdminRoute] Error saving exercise group: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.put("/exercises/{exercise_id}")
-async def update_cefr_exercise(exercise_id: str, body: CEFRExerciseUpdate):
-    """
-    Edits or publishes a CEFR exercise.
-    """
-    client = get_client()
-    update_data = {k: v for k, v in body.model_dump().items() if v is not None}
-
-    try:
-        res = (
-            client.table("cefr_exercises")
-            .update(update_data)
-            .eq("id", exercise_id)
-            .execute()
-        )
-        if not res.data:
-            raise HTTPException(status_code=404, detail="Exercise not found")
-        return {"success": True, "data": res.data[0]}
-    except Exception as e:
-        logging.error(f"[AdminRoute] Error updating exercise: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.delete("/exercises/{exercise_id}")
-async def delete_cefr_exercise(exercise_id: str):
-    """
-    Deletes a CEFR exercise.
-    """
-    client = get_client()
-    try:
-        client.table("cefr_exercises").delete().eq("id", exercise_id).execute()
-        return {"success": True, "message": "Exercise deleted successfully."}
-    except Exception as e:
-        logging.error(f"[AdminRoute] Error deleting exercise: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

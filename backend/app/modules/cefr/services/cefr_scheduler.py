@@ -109,7 +109,6 @@ class CEFRScheduler:
                     limit = schedule.get("materials_per_execution", 5)
                     selected_types = schedule.get("selected_types") or [
                         "flashcards",
-                        "exercises",
                         "simulations",
                     ]
                     await self.run_generation_with_limit(limit, selected_types)
@@ -159,7 +158,7 @@ class CEFRScheduler:
         Generates flashcards, exercises, and simulations automatically for each available level, up to the level limit.
         """
         if not selected_types:
-            selected_types = ["flashcards", "exercises", "simulations"]
+            selected_types = ["flashcards", "simulations"]
 
         types = [t.lower() for t in selected_types]
         logging.info(
@@ -248,35 +247,6 @@ class CEFRScheduler:
                             f"[CEFR Scheduler] Saved {len(saved_cards)} flashcards for {level}."
                         )
 
-                # Generate Exercises (5)
-                if "exercises" in types:
-                    exercises = await CEFRGeneratorService.generate_exercises(
-                        level=level, topic=topic, count=5
-                    )
-                    if exercises:
-                        saved_exercises = []
-                        for ex in exercises:
-                            data = {
-                                "level": level,
-                                "type": "multiple_choice",
-                                "question": ex.get("question"),
-                                "options": ex.get("options"),
-                                "correct_index": ex.get("correct_index"),
-                                "explanation": ex.get("explanation"),
-                                "topic": topic,
-                                "is_published": False,
-                            }
-                            insert_res = (
-                                self.client.table("cefr_exercises")
-                                .insert(data)
-                                .execute()
-                            )
-                            if insert_res.data:
-                                saved_exercises.extend(insert_res.data)
-                        logging.info(
-                            f"[CEFR Scheduler] Saved {len(saved_exercises)} exercises for {level}."
-                        )
-
                 # Generate Simulations (1)
                 if "simulations" in types:
                     simulations = await CEFRGeneratorService.generate_simulations(
@@ -360,5 +330,5 @@ class CEFRScheduler:
         Kept for compatibility if triggered manually / legacy.
         """
         await self.run_generation_with_limit(
-            6, ["flashcards", "exercises", "simulations"]
+            6, ["flashcards", "simulations"]
         )

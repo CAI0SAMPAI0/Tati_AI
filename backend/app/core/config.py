@@ -196,6 +196,9 @@ class Settings(BaseSettings):
     tavily_api_key: str = ""
     tavily_api_key_1: str = ""
     tavily_api_key_2: str = ""
+    tavily_api_key_3: str = ""
+    tavily_api_key_4: str = ""
+    tavily_api_key_5: str = ""
 
     video_limit_per_day: int = 3
     video_limit_per_week: int = 5
@@ -255,7 +258,10 @@ class Settings(BaseSettings):
 
     @property
     def tavily_keys(self) -> list[str]:
-        candidates = [self.tavily_api_key, self.tavily_api_key_1, self.tavily_api_key_2]
+        candidates = [
+            self.tavily_api_key, self.tavily_api_key_1, self.tavily_api_key_2,
+            self.tavily_api_key_3, self.tavily_api_key_4, self.tavily_api_key_5,
+        ]
         return [k.strip() for k in candidates if k.strip()]
 
     @property

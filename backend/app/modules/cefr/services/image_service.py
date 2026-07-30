@@ -22,44 +22,56 @@ def _cache_key(term: str) -> str:
 async def search_unsplash(query: str) -> str | None:
     api_key = os.environ.get("UNSPLASH_ACCESS_KEY", "")
     if not api_key:
+        logger.warning("[ImageService] UNSPLASH_ACCESS_KEY not set")
         return None
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 "https://api.unsplash.com/search/photos",
-                params={"query": query, "per_page": 1, "orientation": "landscape"},
+                params={"query": query, "per_page": 5, "orientation": "landscape"},
                 headers={"Authorization": f"Client-ID {api_key}"},
                 timeout=10,
             )
-            resp.raise_for_status()
+            if resp.status_code != 200:
+                logger.warning(f"[ImageService] Unsplash {resp.status_code}: {resp.text[:200]}")
+                return None
             data = resp.json()
             results = data.get("results", [])
             if results:
-                return results[0]["urls"]["regular"]
+                url = results[0]["urls"]["raw"]
+                logger.info(f"[ImageService] Unsplash OK: {url[:80]}...")
+                return url
+            logger.info(f"[ImageService] Unsplash: no results for '{query}'")
     except Exception as e:
-        logger.warning(f"Unsplash search failed for '{query}': {e}")
+        logger.warning(f"[ImageService] Unsplash failed for '{query}': {e}")
     return None
 
 
 async def search_pexels(query: str) -> str | None:
     api_key = os.environ.get("PEXELS_API_KEY", "")
     if not api_key:
+        logger.warning("[ImageService] PEXELS_API_KEY not set")
         return None
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 "https://api.pexels.com/v1/search",
-                params={"query": query, "per_page": 1},
+                params={"query": query, "per_page": 5, "orientation": "landscape"},
                 headers={"Authorization": api_key},
                 timeout=10,
             )
-            resp.raise_for_status()
+            if resp.status_code != 200:
+                logger.warning(f"[ImageService] Pexels {resp.status_code}: {resp.text[:200]}")
+                return None
             data = resp.json()
             photos = data.get("photos", [])
             if photos:
-                return photos[0]["src"]["large"]
+                url = photos[0]["src"]["original"]
+                logger.info(f"[ImageService] Pexels OK: {url[:80]}...")
+                return url
+            logger.info(f"[ImageService] Pexels: no results for '{query}'")
     except Exception as e:
-        logger.warning(f"Pexels search failed for '{query}': {e}")
+        logger.warning(f"[ImageService] Pexels failed for '{query}': {e}")
     return None
 
 
@@ -75,17 +87,23 @@ async def search_pixabay(query: str) -> str | None:
                     "key": api_key,
                     "q": query,
                     "image_type": "photo",
-                    "per_page": 3,
+                    "orientation": "horizontal",
+                    "per_page": 5,
+                    "safesearch": "true",
                 },
                 timeout=10,
             )
-            resp.raise_for_status()
+            if resp.status_code != 200:
+                logger.warning(f"[ImageService] Pixabay {resp.status_code}")
+                return None
             data = resp.json()
             hits = data.get("hits", [])
             if hits:
-                return hits[0]["largeImageURL"]
+                url = hits[0]["webformatURL"]
+                logger.info(f"[ImageService] Pixabay OK: {url[:80]}...")
+                return url
     except Exception as e:
-        logger.warning(f"Pixabay search failed for '{query}': {e}")
+        logger.warning(f"[ImageService] Pixabay failed for '{query}': {e}")
     return None
 
 

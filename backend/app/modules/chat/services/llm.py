@@ -309,11 +309,14 @@ async def groq_chat_json(
         if match:
             clean_json = match.group(1)
         else:
-            # Fallback robusto: Tenta extrair qualquer coisa entre as
-            # chaves principais
+            # Fallback robusto: Tenta extrair JSON entre chaves OU colchetes
             match = re.search(r"\{.*\}", clean_json, re.DOTALL)
             if match:
                 clean_json = match.group(0)
+            else:
+                match = re.search(r"\[.*\]", clean_json, re.DOTALL)
+                if match:
+                    clean_json = match.group(0)
 
         return json.loads(clean_json)
     except Exception as e:

@@ -67,64 +67,6 @@ def generate_cefr_flashcards_task(
     return asyncio.run(_run())
 
 
-@celery_app.task(name="app.modules.cefr.tasks.generate_cefr_exercises_task")
-def generate_cefr_exercises_task(
-    level: str,
-    topic: str,
-    count: int,
-    username: str = None,
-    custom_title: str = None,
-    reference_ids: list[str] = None,
-):
-    from app.core.database import get_client
-    from app.modules.cefr.services.generator import CEFRGeneratorService
-
-    async def _run():
-        exercises = await CEFRGeneratorService.generate_exercises(
-            level=level, topic=topic, count=count, reference_ids=reference_ids
-        )
-        if not exercises:
-            return {"success": False, "error": "Could not generate exercises"}
-
-        client = get_client()
-        display_title = custom_title if custom_title else topic
-        saved_exercises = []
-        for ex in exercises:
-            data = {
-                "level": level,
-                "type": "multiple_choice",
-                "question": ex.get("question"),
-                "options": ex.get("options"),
-                "correct_index": ex.get("correct_index"),
-                "explanation": ex.get("explanation"),
-                "topic": display_title,
-                "is_published": False,
-            }
-            insert_res = client.table("cefr_exercises").insert(data).execute()
-            if insert_res.data:
-                saved_exercises.extend(insert_res.data)
-
-        if username and saved_exercises:
-            from app.modules.notifications.services.notifications import (
-                notify_ai_generation,
-            )
-
-            notify_ai_generation(
-                username=username,
-                title="✨ Exercises Generated",
-                message=f"Exercises about '{display_title}' with {len(saved_exercises)} questions are ready.",
-                url="/admin",
-            )
-
-        return {
-            "success": True,
-            "generated": len(saved_exercises),
-            "data": saved_exercises,
-        }
-
-    return asyncio.run(_run())
-
-
 @celery_app.task(name="app.modules.cefr.tasks.generate_cefr_simulations_task")
 def generate_cefr_simulations_task(
     level: str,
