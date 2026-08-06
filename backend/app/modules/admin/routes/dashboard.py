@@ -590,6 +590,179 @@ async def delete_game(
     return await run_in_threadpool(_delete)
 
 
+# ── News ─────────────────────────────────────────────────────────────
+
+
+def _normalize_levels(levels) -> list[str]:
+    """Normaliza levels vindos como list ou string separada por vírgula."""
+    if isinstance(levels, str):
+        levels = [lev.strip().upper() for lev in levels.split(",") if lev.strip()]
+    levels = [str(lev).strip().upper() for lev in (levels or ["all"])]
+    return levels if levels else ["ALL"]
+
+
+def _is_instagram(url: str) -> bool:
+    """Detecta links do Instagram para não buscar metadados (og:title genérico)."""
+    host = ""
+    try:
+        from urllib.parse import urlparse
+        host = urlparse(url).netloc.lower()
+    except Exception:
+        pass
+    return "instagram.com" in host or "instagr.am" in host
+
+
+def _enrich_news_payload(data: dict) -> dict:
+    """Constrói o payload de news, buscando metadados do link quando necessário."""
+    import logging
+
+    from fastapi import HTTPException
+    from app.modules.activities.services.news_metadata import fetch_link_metadata
+
+    url = (data.get("url") or "").strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="URL is required")
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+
+    title = (data.get("title") or "").strip()
+    thumbnail = (data.get("thumbnail_url") or "").strip() or None
+    description = (data.get("description") or "").strip() or None
+
+    if (not title or not thumbnail) and not _is_instagram(url):
+        meta = fetch_link_metadata(url)
+        logging.info(f"[News] meta fetched for {url[:50]}: title={bool(title)} thumb={bool(thumbnail)}")
+        if not title:
+            title = meta.get("title") or ""
+        if not thumbnail:
+            thumbnail = meta.get("thumbnail")
+        if not description:
+            description = meta.get("description")
+
+    if not title:
+        from urllib.parse import urlparse
+        try:
+            title = urlparse(url).netloc or url
+        except Exception:
+            title = url
+
+    return {
+        "title": title,
+        "url": url,
+        "description": description,
+        "levels": _normalize_levels(data.get("levels") or ["all"]),
+        "thumbnail_url": thumbnail,
+        "is_published": bool(data.get("is_published", True)),
+    }
+
+
+@router.get("/news")
+async def list_news_admin(
+    user=Depends(require_staff),
+) -> list:
+    """Lista todas as news (admin)."""
+    from app.core.database import get_client
+    from fastapi.concurrency import run_in_threadpool
+
+    def _fetch() -> list:
+        db = get_client()
+        try:
+            res = db.table("news").select("*").order("created_at", desc=True).execute()
+            return res.data or []
+        except Exception:
+            return []
+
+    return await run_in_threadpool(_fetch)
+
+
+@router.post("/news")
+async def create_news(
+    data: dict,
+    user=Depends(require_staff),
+):
+    """Cria uma nova notícia, buscando título/thumbnail do link se necessário."""
+    import logging
+
+    from app.core.database import get_client
+    from fastapi.concurrency import run_in_threadpool
+
+    payload = _enrich_news_payload(data)
+    logging.info(f"[News] Creating: {payload}")
+
+    def _save():
+        db = get_client()
+        return db.table("news").insert(payload).execute()
+
+    res = await run_in_threadpool(_save)
+    logging.info(f"[News] Created result: {res.data}")
+    return res
+
+
+@router.put("/news/{news_id}")
+async def update_news(
+    news_id: str,
+    data: dict,
+    user=Depends(require_staff),
+):
+    """Atualiza uma news."""
+    from app.core.database import get_client
+    from fastapi.concurrency import run_in_threadpool
+
+    title = (data.get("title") or "").strip()
+    url = (data.get("url") or "").strip()
+    thumbnail = (data.get("thumbnail_url") or "").strip() or data.get("thumbnail_url") or None
+    if (not title or not thumbnail) and url and not _is_instagram(url):
+        from app.modules.activities.services.news_metadata import fetch_link_metadata
+        meta = fetch_link_metadata(url)
+        if not title:
+            title = meta.get("title", "")
+        if not thumbnail:
+            thumbnail = (meta.get("thumbnail") or None)
+
+    allowed_fields = {
+        "title", "url", "description", "levels",
+        "thumbnail_url", "is_published",
+    }
+    filtered = {k: v for k, v in data.items() if k in allowed_fields}
+    if "levels" in filtered:
+        filtered["levels"] = _normalize_levels(filtered["levels"])
+    if title:
+        filtered["title"] = title
+    if thumbnail:
+        filtered["thumbnail_url"] = thumbnail
+    if (data.get("description") is not None):
+        filtered["description"] = (data.get("description") or "").strip() or None
+    if "url" in filtered:
+        filtered["url"] = (filtered["url"] or "").strip()
+        if not filtered["url"].startswith(("http://", "https://")):
+            filtered["url"] = "https://" + filtered["url"]
+
+    if not filtered.get("title") or not filtered.get("url"):
+        raise HTTPException(status_code=400, detail="URL é obrigatória e título não pôde ser obtido")
+
+    def _update():
+        db = get_client()
+        return db.table("news").update(filtered).eq("id", news_id).execute()
+
+    return await run_in_threadpool(_update)
+
+
+@router.delete("/news/{news_id}")
+async def delete_news(
+    news_id: str,
+    user=Depends(require_staff),
+):
+    """Exclui uma news."""
+    from app.core.database import get_client
+    from fastapi.concurrency import run_in_threadpool
+
+    def _delete():
+        db = get_client()
+        return db.table("news").delete().eq("id", news_id).execute()
+
+    return await run_in_threadpool(_delete)
+
+
 @router.get("/flashcards")
 def get_dashboard_flashcards(
     db: Client = Depends(get_db), user=Depends(require_staff)

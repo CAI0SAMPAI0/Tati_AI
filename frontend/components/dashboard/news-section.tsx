@@ -8,8 +8,9 @@ import {
   PenLine,
   Eye,
   EyeOff,
-  Gamepad2,
+  Newspaper,
   ExternalLink,
+  ImageOff,
 } from 'lucide-react';
 
 import { apiGet, apiDelete, apiPost, apiPut } from '@/lib/api/client';
@@ -22,12 +23,13 @@ import { Spinner } from '@/components/ui/spinner';
 import toast from 'react-hot-toast';
 import { LEVEL_OPTIONS } from '@/lib/constants/levels';
 
-interface GameRow {
+interface NewsRow {
   id: string;
   title: string;
+  url: string;
   description: string;
-  wordwall_url: string;
   levels: string[];
+  thumbnail_url: string | null;
   is_published: boolean;
   created_at: string;
 }
@@ -35,7 +37,7 @@ interface GameRow {
 interface FormState {
   title: string;
   description: string;
-  wordwall_url: string;
+  url: string;
   levels: string[];
   is_published: boolean;
 }
@@ -43,44 +45,44 @@ interface FormState {
 const EMPTY_FORM: FormState = {
   title: '',
   description: '',
-  wordwall_url: '',
+  url: '',
   levels: ['all'],
   is_published: true,
 };
 
-export default function GamesSection() {
+export default function NewsSection() {
   const queryClient = useQueryClient();
-  const { data: rawGames = [], isLoading } = useQuery({
-    queryKey: ['admin-games'],
-    queryFn: () => apiGet(ENDPOINTS.ADMIN_GAMES),
+  const { data: rawNews = [], isLoading } = useQuery({
+    queryKey: ['admin-news'],
+    queryFn: () => apiGet(ENDPOINTS.ADMIN_NEWS),
     refetchInterval: 30_000,
   });
 
-  const games: GameRow[] = Array.isArray(rawGames)
-    ? rawGames
-    : (rawGames as any)?.data || [];
+  const news: NewsRow[] = Array.isArray(rawNews)
+    ? rawNews
+    : (rawNews as any)?.data || [];
 
-  const invalidateGames = () => queryClient.invalidateQueries({ queryKey: ['admin-games'] });
+  const invalidateNews = () => queryClient.invalidateQueries({ queryKey: ['admin-news'] });
 
   const [filterLevel, setFilterLevel] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingGame, setEditingGame] = useState<GameRow | null>(null);
+  const [editingNews, setEditingNews] = useState<NewsRow | null>(null);
   const [formData, setFormData] = useState<FormState>(EMPTY_FORM);
   const [isSaving, setIsSaving] = useState(false);
 
-  const filteredGames = games.filter((g) => {
+  const filteredNews = news.filter((n) => {
     if (filterLevel === 'all') return true;
-    const gLevels = (g.levels || []).map((l) => l.toUpperCase());
-    return gLevels.includes('ALL') || gLevels.includes(filterLevel.toUpperCase());
+    const nLevels = (n.levels || []).map((l) => l.toUpperCase());
+    return nLevels.includes('ALL') || nLevels.includes(filterLevel.toUpperCase());
   });
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this game?')) return;
+    if (!window.confirm('Delete this news item?')) return;
     const toastId = toast.loading('Deleting...');
     try {
-      await apiDelete(`${ENDPOINTS.ADMIN_GAMES}/${id}`);
-      toast.success('Game deleted.', { id: toastId });
-      invalidateGames();
+      await apiDelete(`${ENDPOINTS.ADMIN_NEWS}/${id}`);
+      toast.success('News deleted.', { id: toastId });
+      invalidateNews();
     } catch {
       toast.error('Error deleting.', { id: toastId });
     }
@@ -88,26 +90,26 @@ export default function GamesSection() {
 
   const handleTogglePublish = async (id: string, current: boolean) => {
     try {
-      await apiPut(`${ENDPOINTS.ADMIN_GAMES}/${id}`, { is_published: !current });
-      toast.success(current ? 'Game returned to drafts' : 'Game published!');
-      invalidateGames();
+      await apiPut(`${ENDPOINTS.ADMIN_NEWS}/${id}`, { is_published: !current });
+      toast.success(current ? 'News returned to drafts' : 'News published!');
+      invalidateNews();
     } catch {
       toast.error('Error updating status.');
     }
   };
 
-  const openModal = (game?: GameRow) => {
-    if (game) {
-      setEditingGame(game);
+  const openModal = (item?: NewsRow) => {
+    if (item) {
+      setEditingNews(item);
       setFormData({
-        title: game.title || '',
-        description: game.description || '',
-        wordwall_url: game.wordwall_url || '',
-        levels: game.levels || ['all'],
-        is_published: game.is_published,
+        title: item.title || '',
+        description: item.description || '',
+        url: item.url || '',
+        levels: item.levels || ['all'],
+        is_published: item.is_published,
       });
     } else {
-      setEditingGame(null);
+      setEditingNews(null);
       setFormData(EMPTY_FORM);
     }
     setIsModalOpen(true);
@@ -129,33 +131,28 @@ export default function GamesSection() {
   };
 
   const handleSave = async () => {
-    const title = formData.title || '';
-    if (!title.trim()) {
-      toast.error('Please provide a title for the game.');
-      return;
-    }
-    const url = formData.wordwall_url || '';
+    const url = formData.url || '';
     if (!url.trim()) {
-      toast.error('Please provide a WordWall URL.');
+      toast.error('Please provide the news URL.');
       return;
     }
     setIsSaving(true);
     try {
       const payload = {
-        title: title.trim(),
+        title: (formData.title || '').trim(),
         description: (formData.description || '').trim(),
-        wordwall_url: url.trim(),
+        url: url.trim(),
         levels: formData.levels,
         is_published: formData.is_published,
       };
 
-      const res = editingGame
-        ? await apiPut(`${ENDPOINTS.ADMIN_GAMES}/${editingGame.id}`, payload)
-        : await apiPost(ENDPOINTS.ADMIN_GAMES, payload);
+      const res = editingNews
+        ? await apiPut(`${ENDPOINTS.ADMIN_NEWS}/${editingNews.id}`, payload)
+        : await apiPost(ENDPOINTS.ADMIN_NEWS, payload);
 
       if (res.ok) {
-        toast.success(editingGame ? 'Game updated!' : 'Game created!');
-        await invalidateGames();
+        toast.success(editingNews ? 'News updated!' : 'News created!');
+        await invalidateNews();
         setIsModalOpen(false);
       } else {
         toast.error('Error saving.');
@@ -186,8 +183,8 @@ export default function GamesSection() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <h3 className="text-lg font-bold flex items-center gap-2">
-            <Gamepad2 size={22} className="text-primary" />
-            Games
+            <Newspaper size={22} className="text-primary" />
+            News
           </h3>
           <select
             className="bg-surface border border-border rounded-xl px-3 py-1.5 text-xs font-bold outline-none focus:border-primary/50 transition-all"
@@ -202,63 +199,74 @@ export default function GamesSection() {
         </div>
         <Button className="gap-2" onClick={() => openModal()}>
           <Plus size={18} />
-          Create Game
+          Create News
         </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredGames.length > 0 ? filteredGames.map((g) => (
-          <div key={g.id} className="bg-surface border border-border p-5 rounded-2xl flex flex-col gap-4 group hover:border-primary/40 transition-all">
-            <div className="flex items-start justify-between">
-              <div className="bg-primary/10 w-10 h-10 rounded-xl flex items-center justify-center text-primary">
-                <Gamepad2 size={20} />
-              </div>
-              <div className="flex flex-col items-end gap-1">
-                <span className={cn(
-                  "text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider",
-                  g.is_published ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'
-                )}>
-                  {g.is_published ? 'Published' : 'Draft'}
-                </span>
-                <div className="flex flex-wrap gap-1 justify-end">
-                  {(g.levels || ['all']).map((l) => (
+        {filteredNews.length > 0 ? filteredNews.map((n) => (
+          <div key={n.id} className="bg-surface border border-border rounded-2xl overflow-hidden flex flex-col group hover:border-primary/40 transition-all">
+            <div className="h-32 bg-bg-secondary relative overflow-hidden">
+              {n.thumbnail_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={n.thumbnail_url}
+                  alt={n.title}
+                  loading="lazy"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-primary/5 text-primary/40">
+                  <Newspaper size={36} />
+                </div>
+              )}
+              <span className={cn(
+                'absolute top-2 right-2 text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider shadow backdrop-blur-sm',
+                n.is_published ? 'bg-success/90 text-white border-success' : 'bg-warning/90 text-white border-warning'
+              )}>
+                {n.is_published ? 'Published' : 'Draft'}
+              </span>
+            </div>
+
+            <div className="p-5 flex flex-col gap-3 flex-1">
+              <div className="flex items-start justify-between gap-2">
+                <h4 className="font-bold text-text truncate flex-1">{n.title}</h4>
+                <div className="flex flex-wrap gap-1 justify-end shrink-0">
+                  {(n.levels || ['all']).map((l) => (
                     <span key={l} className="text-[0.6rem] font-bold px-2 py-0.5 rounded-full bg-surface-hover border border-border uppercase tracking-widest text-text-subtle">
-                      {l === 'all' || l === 'ALL' ? 'All Levels' : l.toUpperCase()}
+                      {l === 'all' || l === 'ALL' ? 'All' : l.toUpperCase()}
                     </span>
                   ))}
                 </div>
               </div>
+              {n.description && (
+                <p className="text-xs text-text-muted line-clamp-2 leading-relaxed">{n.description}</p>
+              )}
             </div>
 
-            <div>
-              <h4 className="font-bold text-text mb-1 truncate">{g.title}</h4>
-              <p className="text-xs text-text-muted line-clamp-2 leading-relaxed h-8">
-                {g.description}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 mt-auto pt-2">
+            <div className="px-5 pb-5 flex items-center gap-2 mt-auto">
               <a
-                href={g.wordwall_url}
+                href={n.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all text-xs font-bold border border-primary/20"
-                title="Open game"
+                title="Open link"
               >
                 <ExternalLink size={14} /> Open
               </a>
-              <button onClick={() => openModal(g)} className="p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title="Edit">
+              <button onClick={() => openModal(n)} className="p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title="Edit">
                 <PenLine size={14} />
               </button>
               <button
-                onClick={() => handleTogglePublish(g.id, !!g.is_published)}
+                onClick={() => handleTogglePublish(n.id, !!n.is_published)}
                 className="p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border"
-                title={g.is_published ? 'Unpublish (Draft)' : 'Publish'}
+                title={n.is_published ? 'Unpublish (Draft)' : 'Publish'}
               >
-                {g.is_published ? <EyeOff size={14} /> : <Eye size={14} />}
+                {n.is_published ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
               <button
-                onClick={() => handleDelete(g.id)}
+                onClick={() => handleDelete(n.id)}
                 className="p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle border border-border"
                 title="Delete"
               >
@@ -268,8 +276,8 @@ export default function GamesSection() {
           </div>
         )) : (
           <div className="col-span-full py-20 text-center border border-dashed border-border rounded-3xl bg-surface/30">
-            <Gamepad2 size={40} className="mx-auto mb-4 opacity-20" />
-            <p className="text-text-muted font-medium">No games created yet.</p>
+            <Newspaper size={40} className="mx-auto mb-4 opacity-20" />
+            <p className="text-text-muted font-medium">No news created yet.</p>
           </div>
         )}
       </div>
@@ -277,25 +285,30 @@ export default function GamesSection() {
       <DialogModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingGame ? 'Edit Game' : 'Create Game'}
+        title={editingNews ? 'Edit News' : 'Create News'}
       >
         <div className="space-y-4">
           <Input
-            label="Game Title"
-            value={formData.title}
-            onChange={setField('title')}
-            placeholder="Ex: Vocabulary Match - Animals"
+            label="News URL"
+            value={formData.url}
+            onChange={setField('url')}
+            placeholder="https://www.instagram.com/reels/... or https://news-site.com/..."
           />
-          <Input
-            label="WordWall URL"
-            value={formData.wordwall_url}
-            onChange={setField('wordwall_url')}
-            placeholder="https://wordwall.net/resource/..."
-          />
+          <div className="space-y-1.5">
+            <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">Title</label>
+            <Input
+              value={formData.title}
+              onChange={setField('title')}
+              placeholder="Leave empty to fetch automatically from the link"
+            />
+            <p className="text-[0.65rem] text-text-muted italic">
+              Optional — if empty, the backend gets the title (and thumbnail) from the link automatically.
+            </p>
+          </div>
           <div className="space-y-1.5">
             <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">Description</label>
             <textarea
-              placeholder="Brief description of the game"
+              placeholder="Optional short description"
               className="w-full min-h-[80px] p-3 bg-input border border-border rounded-xl text-sm outline-none focus:border-primary/50 transition-all leading-relaxed"
               value={formData.description}
               onChange={setField('description')}
@@ -324,7 +337,7 @@ export default function GamesSection() {
               })}
             </div>
             <p className="text-[0.65rem] text-text-muted italic">
-              Select which levels can see this game. If none selected, it shows for all.
+              Select which levels can see this news. If none selected, it shows for all.
             </p>
           </div>
 

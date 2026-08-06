@@ -13,6 +13,7 @@ import {
   Lightbulb,
   FileText,
   Gamepad2,
+  Newspaper,
   ExternalLink,
   CheckCircle2,
   Clock,
@@ -57,7 +58,7 @@ const formatFallbackTitle = (item: any) => {
   return item.slug ? `Exercise ${item.slug}` : 'English Worksheet';
 };
 
-type TabType = 'grammar' | 'vocabulary' | 'listenings' | 'reading' | 'flashcards' | 'simulations' | 'games';
+type TabType = 'grammar' | 'vocabulary' | 'listenings' | 'reading' | 'flashcards' | 'simulations' | 'games' | 'news';
 
 interface SimulationItem {
   id: string;
@@ -96,6 +97,16 @@ interface GameItem {
   description?: string;
   wordwall_url: string;
   levels?: string[];
+  is_published?: boolean;
+  created_at?: string;
+}
+interface NewsItem {
+  id: string;
+  title: string;
+  description?: string;
+  url: string;
+  levels?: string[];
+  thumbnail_url?: string | null;
   is_published?: boolean;
   created_at?: string;
 }
@@ -247,6 +258,14 @@ export default function ActivitiesClientPage() {
     queryKey: ['activities-games'],
     queryFn: () => apiGet<GameItem[]>(ENDPOINTS.ACTIVITIES_GAMES),
     staleTime: 10 * 60 * 1000,
+    refetchInterval: 30_000,
+  });
+
+  const { data: newsRaw = [] } = useQuery<NewsItem[]>({
+    queryKey: ['activities-news'],
+    queryFn: () => apiGet<NewsItem[]>(ENDPOINTS.ACTIVITIES_NEWS),
+    staleTime: 10 * 60 * 1000,
+    refetchInterval: 30_000,
   });
 
   useQuery({
@@ -380,6 +399,7 @@ export default function ActivitiesClientPage() {
     { id: 'flashcards', icon: <Layers size={18} />, label: 'Flashcards', count: flashcards.length },
     { id: 'simulations', icon: <Drama size={18} />, label: 'Simulations', count: simulations.length },
     { id: 'games', icon: <Gamepad2 size={18} />, label: 'Games', count: gamesRaw.length },
+    { id: 'news', icon: <Newspaper size={18} />, label: 'News', count: newsRaw.length },
   ];
 
   const handleLoadMore = () => {
@@ -767,6 +787,112 @@ export default function ActivitiesClientPage() {
                   <div className="py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
                     <Gamepad2 size={40} className="mx-auto mb-4 opacity-20" />
                     <p>No games available for your level.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'news' && (
+              <div className="space-y-8">
+                {newsRaw.length > 0 ? (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {newsRaw
+                        .filter((n) => !searchQuery || (n.title || '').toLowerCase().includes(searchQuery.toLowerCase()))
+                        .slice(0, visibleCount)
+                        .map((n) => {
+                          const isDone = completedActivityIds.has(n.id) || completedActivityIds.has(n.url);
+                          return (
+                            <div
+                              key={n.id}
+                              onClick={() =>
+                                setSelectedActivity({
+                                  id: n.id,
+                                  title: n.title || n.url,
+                                  url: n.url,
+                                  image: n.thumbnail_url || undefined,
+                                  source: 'News',
+                                  level: n.levels?.[0] || 'all',
+                                })
+                              }
+                              className="text-left bg-surface border border-border rounded-2xl overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 transition-all group cursor-pointer flex flex-col"
+                            >
+                              {n.thumbnail_url ? (
+                                <div className="h-36 overflow-hidden bg-bg-secondary relative">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={n.thumbnail_url}
+                                    alt={n.title || 'News'}
+                                    loading="lazy"
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                  />
+                                  <div className="absolute top-2 right-2">
+                                    {isDone ? (
+                                      <span className="flex items-center gap-1 bg-success text-white text-[0.65rem] font-bold px-2 py-0.5 rounded-full shadow">
+                                        <CheckCircle2 size={12} /> Completed
+                                      </span>
+                                    ) : (
+                                      <span className="flex items-center gap-1 bg-warning text-white text-[0.65rem] font-bold px-2 py-0.5 rounded-full shadow">
+                                        <Clock size={12} /> Pending
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="h-24 bg-primary/5 p-4 flex items-center justify-between border-b border-border/40 relative">
+                                  <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                                    <Newspaper size={20} />
+                                  </div>
+                                  <div className="flex gap-1">
+                                    {isDone ? (
+                                      <span className="flex items-center gap-1 bg-success text-white text-[0.65rem] font-bold px-2 py-0.5 rounded-full shadow">
+                                        <CheckCircle2 size={12} /> Completed
+                                      </span>
+                                    ) : (
+                                      <span className="flex items-center gap-1 bg-warning text-white text-[0.65rem] font-bold px-2 py-0.5 rounded-full shadow">
+                                        <Clock size={12} /> Pending
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="p-4 flex flex-col gap-2 flex-1">
+                                <h4 className="text-sm font-bold text-text line-clamp-2 group-hover:text-primary transition-colors">
+                                  {n.title || n.url}
+                                </h4>
+                                {n.description && (
+                                  <p className="text-[0.75rem] text-text-muted line-clamp-2">{n.description}</p>
+                                )}
+                              </div>
+
+                              <div className="px-4 pb-4 pt-1 flex items-center justify-between text-[0.7rem] text-text-muted border-t border-border/40">
+                                <span className="flex items-center gap-1">
+                                  <ExternalLink size={12} /> Open link
+                                </span>
+                                <span className="font-bold text-primary">Read</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                    {newsRaw.filter((n) => !searchQuery || (n.title || '').toLowerCase().includes(searchQuery.toLowerCase())).length > visibleCount && (
+                      <div className="flex justify-center pt-4">
+                        <button
+                          onClick={handleLoadMore}
+                          className="px-6 py-3 bg-surface hover:bg-surface-hover border border-border hover:border-primary/50 text-text font-bold text-sm rounded-2xl transition-all shadow-sm flex items-center gap-2 group"
+                        >
+                          <span>Load 10 More</span>
+                          <ChevronDown size={16} className="group-hover:translate-y-0.5 transition-transform" />
+                        </button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
+                    <Newspaper size={40} className="mx-auto mb-4 opacity-20" />
+                    <p>No news available for your level.</p>
                   </div>
                 )}
               </div>
