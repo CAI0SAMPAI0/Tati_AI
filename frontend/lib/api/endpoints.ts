@@ -90,6 +90,10 @@ export const ENDPOINTS = {
   TEST_ENGLISH_CONTENT: (level: string, category: string) =>
     `/activities/test-english/content?level=${level}&category=${category}`,
 
+  // LiveWorksheets (external content)
+  LIVEWORKSHEETS_CONTENT: (level: string, category: string) =>
+    `/activities/liveworksheets/content?level=${level}&category=${category}`,
+
   // Admin
   ADMIN_MODULE_GENERATE_FLASHCARDS: '/dashboard/flashcards/generate',
   ADMIN_SIMULATIONS: '/dashboard/simulations',

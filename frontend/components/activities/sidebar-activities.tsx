@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BookOpen, Trophy, ChartBar, MessageSquare, X, TrendingUp, Zap, ShoppingBag } from 'lucide-react';
 import { Target } from 'lucide-react';
+import { memo } from 'react';
 
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -13,8 +14,6 @@ interface SidebarActivitiesProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
-import { memo } from 'react';
 
 const NavItem = memo(
   ({
@@ -62,17 +61,13 @@ const NavItem = memo(
 );
 
 export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
-  
   const pathname = usePathname();
   const { user } = useAuth();
   const { prefetch } = usePrefetch();
 
-  // Durante a fase de testes, apenas o professor/programador vê o Hub Premium
-  const isAdminOrSpecial = user?.role === 'admin' || user?.role === 'teacher' || user?.username === 'Caio' || user?.username === 'caio' || user?.email?.toLowerCase().includes('caio');
-
   const isHubOnly = (user as any)?.is_hub_only;
 
-  const navItems = isHubOnly 
+  const navItems = isHubOnly
     ? [{ href: '/activities/hub', icon: <Zap size={20} />, label: 'Hub' }]
     : [
         { href: '/activities', icon: <BookOpen size={20} />, label: 'Activities' },
@@ -86,10 +81,10 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
 
   return (
     <>
-      {/* Overlay mobile */}
+      {/* Mobile Overlay (no blur) */}
       <div
         className={cn(
-          'fixed inset-0 bg-black/60 backdrop-blur-[2px] z-[60] transition-opacity md:hidden',
+          'fixed inset-0 bg-black/40 z-40 transition-opacity duration-300 md:hidden',
           isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}
         onClick={onClose}
@@ -97,15 +92,19 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
 
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 w-[280px] bg-bg-secondary border-r border-border z-[70] flex flex-col transition-transform duration-300',
-          isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
+          'fixed inset-y-0 left-0 w-[280px] bg-bg-secondary border-r border-border z-50 flex flex-col transition-transform duration-300 shadow-2xl',
+          isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         <div className="flex items-center justify-between p-6 shrink-0">
           <span className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest">
             Main Menu
           </span>
-          <button aria-label="Fechar menu" onClick={onClose} className="p-1.5 rounded-md hover:bg-surface-hover text-text-muted md:hidden">
+          <button
+            aria-label="Close menu"
+            onClick={onClose}
+            className="p-1.5 rounded-md hover:bg-surface-hover text-text-muted transition-colors md:hidden"
+          >
             <X size={18} />
           </button>
         </div>
@@ -122,9 +121,7 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
                 const route = item.href === '/activities/hub' ? 'hub-catalog' : item.href.replace('/', '');
                 prefetch(route || 'chat');
               }}
-              onClick={() => {
-                if (typeof window !== 'undefined' && window.innerWidth < 768) onClose();
-              }}
+              onClick={onClose}
             />
           ))}
         </nav>

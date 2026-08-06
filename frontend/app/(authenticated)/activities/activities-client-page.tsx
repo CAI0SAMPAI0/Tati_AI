@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Layers,
@@ -11,18 +11,20 @@ import {
   Search,
   BookOpen,
   Lightbulb,
-  GraduationCap,
   FileText,
-  Download,
   Gamepad2,
   ExternalLink,
+  CheckCircle2,
+  Clock,
+  ChevronDown,
 } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
 import { useSidebarState } from '@/hooks/useSidebarState';
 import { ActivityCard } from '@/components/activities/activity-card';
+import { ActivityViewerModal } from '@/components/activities/activity-viewer-modal';
 import { fetchWeeklyPlan } from '@/lib/api/weekly-plan';
-import { apiGet } from '@/lib/api/client';
+import { apiGet, apiPost } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
@@ -30,21 +32,33 @@ import { useAuth } from '@/hooks/useAuth';
 import { normalizeLevel } from '@/lib/constants/levels';
 import { API_BASE } from '@/lib/api/client';
 
-const teImg = (url: string) =>
-  url.includes('test-english.com')
-    ? `${API_BASE}/activities/test-english/image-proxy?url=${encodeURIComponent(url)}`
-    : url;
+const teImg = (url: string) => {
+  if (!url) return '';
+  if (url.includes('test-english.com')) {
+    return `${API_BASE}/activities/test-english/image-proxy?url=${encodeURIComponent(url)}`;
+  }
+  if (url.includes('liveworksheets.com')) {
+    return `${API_BASE}/activities/liveworksheets/image-proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+};
+
+const formatFallbackTitle = (item: any) => {
+  if (item.title && item.title.trim() && !/^\d+$/.test(item.title.trim())) {
+    return item.title.trim();
+  }
+  if (item.url) {
+    const parts = item.url.replace(/\/$/, '').split('/');
+    const slug = parts[parts.length - 2] || parts[parts.length - 1];
+    if (slug && !/^\d+$/.test(slug)) {
+      return slug.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+    }
+  }
+  return item.slug ? `Exercise ${item.slug}` : 'English Worksheet';
+};
 
 type TabType = 'grammar' | 'vocabulary' | 'listenings' | 'reading' | 'flashcards' | 'simulations' | 'games';
 
-interface ModuleItem {
-  id: string;
-  title: string;
-  level?: string;
-  levels?: string[];
-  flashcards?: Array<{ id: string }>;
-  user_status?: { is_done: boolean; score?: number };
-}
 interface SimulationItem {
   id: string;
   name: string;
@@ -67,28 +81,14 @@ interface FlashcardDeck {
   card_count?: number;
   level?: string;
 }
-interface GrammarTopicIndex {
-  topic: string;
-  level: string;
-  title: string;
-  source_name: string;
-  source_url: string;
-}
-interface GrammarDetail {
-  topic: string;
-  level: string;
-  title: string;
-  rule_summary: string;
-  key_structure: string;
-  tip_teacher_tati: string;
-  sources: Array<{ name: string; url: string }>;
-}
 interface TestEnglishItem {
+  id?: string;
   slug: string;
   title: string;
   image: string;
   url: string;
   level: string;
+  source?: string;
 }
 interface GameItem {
   id: string;
@@ -105,28 +105,13 @@ export default function ActivitiesClientPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('grammar');
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'done'>('all');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'test-english' | 'liveworksheets'>('all');
+  const [selectedActivity, setSelectedActivity] = useState<any | null>(null);
+
   const { sidebarOpen, toggleSidebar: handleToggleSidebar, closeSidebar: handleCloseSidebar } = useSidebarState();
-  const [visiblePodcastsCount, setVisiblePodcastsCount] = useState(10);
   const [filterLevel, setFilterLevel] = useState<string>('All');
   const [visibleCount, setVisibleCount] = useState(10);
-  const observerRef = useRef<IntersectionObserver | null>(null);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
-
-  const loadMore = useCallback(() => {
-    setVisibleCount((prev) => prev + 10);
-  }, []);
-
-  useEffect(() => {
-    if (observerRef.current) observerRef.current.disconnect();
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) loadMore();
-      },
-      { threshold: 0.1 }
-    );
-    if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
-    return () => observerRef.current?.disconnect();
-  }, [activeTab, loadMore]);
 
   const isStaff = user?.role && ['professor', 'professora', 'programador', 'Tatiana', 'Tati', 'Professora', 'Programador', 'admin', 'Admin'].includes(user.role);
 
@@ -134,7 +119,7 @@ export default function ActivitiesClientPage() {
 
   useEffect(() => {
     setVisibleCount(10);
-  }, [activeTab, effectiveLevel, searchQuery]);
+  }, [activeTab, effectiveLevel, searchQuery, statusFilter, sourceFilter]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -149,6 +134,31 @@ export default function ActivitiesClientPage() {
     localStorage.setItem('tati_last_activity_tab', activeTab);
   }, [activeTab]);
 
+  // User Submissions for Done vs Pending verification (Cached via React Query)
+  const { data: mySubmissions = [], refetch: refetchSubmissions } = useQuery<any[]>({
+    queryKey: ['my-submissions'],
+    queryFn: () => apiGet<any[]>('/activities/submissions/my'),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const completedActivityIds = useMemo(() => {
+    const set = new Set<string>();
+    if (Array.isArray(mySubmissions)) {
+      mySubmissions.forEach((sub: any) => {
+        const isDoneScore = sub.score !== undefined ? sub.score > 0 : true;
+        const statusNotPending = sub.metadata?.status !== 'pending';
+        if (isDoneScore && statusNotPending) {
+          if (sub.module_id) set.add(sub.module_id);
+          if (sub.activity_id) set.add(sub.activity_id);
+          if (sub.metadata?.url) set.add(sub.metadata.url);
+          if (sub.metadata?.slug) set.add(sub.metadata.slug);
+        }
+      });
+    }
+    return set;
+  }, [mySubmissions]);
+
+  // Simulations, Podcasts, Flashcards (Cached)
   const { data: simulationsRaw = [] } = useQuery<SimulationItem[]>({
     queryKey: ['activities-simulations', effectiveLevel],
     queryFn: () => apiGet<SimulationItem[]>(
@@ -156,6 +166,7 @@ export default function ActivitiesClientPage() {
         ? '/simulation/scenarios'
         : `/simulation/scenarios?level=${effectiveLevel}`
     ),
+    staleTime: 10 * 60 * 1000,
   });
   const { data: podcastsRaw = [] } = useQuery<PodcastItem[]>({
     queryKey: ['activities-podcasts', effectiveLevel],
@@ -164,6 +175,7 @@ export default function ActivitiesClientPage() {
         ? '/activities/podcasts/recommendations?lang=en-US'
         : `/activities/podcasts/recommendations?lang=en-US&level=${effectiveLevel}`
     ),
+    staleTime: 10 * 60 * 1000,
   });
   const { data: flashcardsRaw = [] } = useQuery<FlashcardDeck[]>({
     queryKey: ['activities-flashcards', effectiveLevel],
@@ -172,67 +184,69 @@ export default function ActivitiesClientPage() {
         ? '/activities/flashcards/my'
         : `/activities/flashcards/my?level=${effectiveLevel}`
     ),
+    staleTime: 10 * 60 * 1000,
   });
   const { data: podcastProgress } = useQuery({
     queryKey: ['activities-podcasts-progress'],
     queryFn: () => apiGet<{ completed: string[] }>('/activities/podcasts/progress'),
+    staleTime: 5 * 60 * 1000,
   });
   const { data: simulationProgress } = useQuery({
     queryKey: ['activities-simulations-progress'],
     queryFn: () => apiGet<{ completed: string[] }>('/simulation/progress'),
-  });
-  const { data: grammarIndex } = useQuery<{ topics: GrammarTopicIndex[]; sources: Array<{ name: string; url: string }> }>({
-    queryKey: ['grammar-index', effectiveLevel],
-    queryFn: () => apiGet<{ topics: GrammarTopicIndex[]; sources: Array<{ name: string; url: string }> }>(
-      effectiveLevel === 'All'
-        ? ENDPOINTS.GRAMMAR
-        : `${ENDPOINTS.GRAMMAR}?level=${effectiveLevel}`
-    ),
     staleTime: 5 * 60 * 1000,
-  });
-  const [selectedGrammarTopic, setSelectedGrammarTopic] = useState<string | null>(null);
-  const { data: grammarDetail } = useQuery<GrammarDetail>({
-    queryKey: ['grammar-detail', selectedGrammarTopic],
-    queryFn: () => apiGet<GrammarDetail>(`${ENDPOINTS.GRAMMAR}?topic=${selectedGrammarTopic}`),
-    enabled: !!selectedGrammarTopic,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: userProfile } = useQuery({
-    queryKey: ['my-profile'],
-    queryFn: () => apiGet<any>('/profile'),
-    refetchInterval: 10000,
   });
 
   const testEnglishLevel = effectiveLevel === 'All' ? 'all' : effectiveLevel;
 
-  const { data: grammarContent } = useQuery<{ items: TestEnglishItem[] }>({
+  // Test-English Content (Cached 30 mins)
+  const { data: grammarTE } = useQuery<{ items: TestEnglishItem[] }>({
     queryKey: ['test-english-grammar', testEnglishLevel],
     queryFn: () => apiGet<any>(ENDPOINTS.TEST_ENGLISH_CONTENT(testEnglishLevel, 'grammar')),
     staleTime: 30 * 60 * 1000,
   });
-
-  const { data: vocabularyContent } = useQuery<{ items: TestEnglishItem[] }>({
+  const { data: vocabularyTE } = useQuery<{ items: TestEnglishItem[] }>({
     queryKey: ['test-english-vocabulary', testEnglishLevel],
     queryFn: () => apiGet<any>(ENDPOINTS.TEST_ENGLISH_CONTENT(testEnglishLevel, 'vocabulary')),
     staleTime: 30 * 60 * 1000,
   });
-
-  const { data: listeningContent } = useQuery<{ items: TestEnglishItem[] }>({
+  const { data: listeningTE } = useQuery<{ items: TestEnglishItem[] }>({
     queryKey: ['test-english-listening', testEnglishLevel],
     queryFn: () => apiGet<any>(ENDPOINTS.TEST_ENGLISH_CONTENT(testEnglishLevel, 'listening')),
     staleTime: 30 * 60 * 1000,
   });
-
-  const { data: readingContent } = useQuery<{ items: TestEnglishItem[] }>({
+  const { data: readingTE } = useQuery<{ items: TestEnglishItem[] }>({
     queryKey: ['test-english-reading', testEnglishLevel],
     queryFn: () => apiGet<any>(ENDPOINTS.TEST_ENGLISH_CONTENT(testEnglishLevel, 'reading')),
+    staleTime: 30 * 60 * 1000,
+  });
+
+  // LiveWorksheets Content (Cached 30 mins)
+  const { data: grammarLW } = useQuery<{ items: TestEnglishItem[] }>({
+    queryKey: ['liveworksheets-grammar', testEnglishLevel],
+    queryFn: () => apiGet<any>(ENDPOINTS.LIVEWORKSHEETS_CONTENT(testEnglishLevel, 'grammar')),
+    staleTime: 30 * 60 * 1000,
+  });
+  const { data: vocabularyLW } = useQuery<{ items: TestEnglishItem[] }>({
+    queryKey: ['liveworksheets-vocabulary', testEnglishLevel],
+    queryFn: () => apiGet<any>(ENDPOINTS.LIVEWORKSHEETS_CONTENT(testEnglishLevel, 'vocabulary')),
+    staleTime: 30 * 60 * 1000,
+  });
+  const { data: listeningLW } = useQuery<{ items: TestEnglishItem[] }>({
+    queryKey: ['liveworksheets-listening', testEnglishLevel],
+    queryFn: () => apiGet<any>(ENDPOINTS.LIVEWORKSHEETS_CONTENT(testEnglishLevel, 'listening')),
+    staleTime: 30 * 60 * 1000,
+  });
+  const { data: readingLW } = useQuery<{ items: TestEnglishItem[] }>({
+    queryKey: ['liveworksheets-reading', testEnglishLevel],
+    queryFn: () => apiGet<any>(ENDPOINTS.LIVEWORKSHEETS_CONTENT(testEnglishLevel, 'reading')),
     staleTime: 30 * 60 * 1000,
   });
 
   const { data: gamesRaw = [] } = useQuery<GameItem[]>({
     queryKey: ['activities-games'],
     queryFn: () => apiGet<GameItem[]>(ENDPOINTS.ACTIVITIES_GAMES),
+    staleTime: 10 * 60 * 1000,
   });
 
   useQuery({
@@ -241,11 +255,64 @@ export default function ActivitiesClientPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const studyMaterials = useMemo(() => {
-    const mats = userProfile?.profile?.study_materials || [];
-    if (!searchQuery) return mats;
-    return mats.filter((m: any) => m.filename.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [userProfile, searchQuery]);
+  // Combine items for each category
+  const filterItems = useCallback(
+    (teItems: TestEnglishItem[] = [], lwItems: TestEnglishItem[] = []) => {
+      let combined = [
+        ...(teItems || []).map((i) => ({
+          ...i,
+          id: i.url || i.slug,
+          source: 'test-english.com',
+          title: formatFallbackTitle(i),
+        })),
+        ...(lwItems || []).map((i) => ({
+          ...i,
+          id: i.url || i.slug,
+          source: 'liveworksheets.com',
+          title: formatFallbackTitle(i),
+        })),
+      ];
+
+      if (searchQuery) {
+        combined = combined.filter((i) => i.title.toLowerCase().includes(searchQuery.toLowerCase()));
+      }
+      if (sourceFilter === 'test-english') {
+        combined = combined.filter((i) => i.source === 'test-english.com');
+      } else if (sourceFilter === 'liveworksheets') {
+        combined = combined.filter((i) => i.source === 'liveworksheets.com');
+      }
+
+      if (statusFilter === 'done') {
+        combined = combined.filter(
+          (i) => completedActivityIds.has(i.id) || completedActivityIds.has(i.url) || completedActivityIds.has(i.slug)
+        );
+      } else if (statusFilter === 'pending') {
+        combined = combined.filter(
+          (i) => !(completedActivityIds.has(i.id) || completedActivityIds.has(i.url) || completedActivityIds.has(i.slug))
+        );
+      }
+
+      return combined;
+    },
+    [searchQuery, sourceFilter, statusFilter, completedActivityIds]
+  );
+
+  const grammarItems = useMemo(
+    () => filterItems(grammarTE?.items, grammarLW?.items),
+    [grammarTE, grammarLW, filterItems]
+  );
+  const vocabularyItems = useMemo(
+    () => filterItems(vocabularyTE?.items, vocabularyLW?.items),
+    [vocabularyTE, vocabularyLW, filterItems]
+  );
+  const listeningItems = useMemo(
+    () => filterItems(listeningTE?.items, listeningLW?.items),
+    [listeningTE, listeningLW, filterItems]
+  );
+  const readingItems = useMemo(
+    () => filterItems(readingTE?.items, readingLW?.items),
+    [readingTE, readingLW, filterItems]
+  );
 
   const flashcards = useMemo(() => {
     if (!flashcardsRaw) return [];
@@ -282,15 +349,169 @@ export default function ActivitiesClientPage() {
     return filtered.filter((p) => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [podcastsRaw, searchQuery]);
 
+  // Mark completion handlers
+  const handleMarkDone = async (item: any) => {
+    const actId = item.url || item.slug || item.id;
+    await apiPost('/activities/submissions', {
+      activity_id: actId,
+      activity_type: item.source || 'external',
+      score: 100,
+      metadata: { title: item.title, url: item.url, slug: item.slug, status: 'done' },
+    });
+    await refetchSubmissions();
+  };
+
+  const handleMarkPending = async (item: any) => {
+    const actId = item.url || item.slug || item.id;
+    await apiPost('/activities/submissions', {
+      activity_id: actId,
+      activity_type: item.source || 'external',
+      score: 0,
+      metadata: { title: item.title, url: item.url, slug: item.slug, status: 'pending' },
+    });
+    await refetchSubmissions();
+  };
+
   const tabs: Array<{ id: TabType; icon: React.ReactNode; label: string; count?: number }> = [
-    { id: 'grammar', icon: <BookOpen size={18} />, label: 'Grammar', count: grammarContent?.items?.length },
-    { id: 'vocabulary', icon: <Lightbulb size={18} />, label: 'Vocabulary', count: vocabularyContent?.items?.length },
-    { id: 'listenings', icon: <Podcast size={18} />, label: 'Listening', count: listeningContent?.items?.length || podcasts.length },
-    { id: 'reading', icon: <FileText size={18} />, label: 'Reading', count: readingContent?.items?.length },
+    { id: 'grammar', icon: <BookOpen size={18} />, label: 'Grammar', count: grammarItems.length },
+    { id: 'vocabulary', icon: <Lightbulb size={18} />, label: 'Vocabulary', count: vocabularyItems.length },
+    { id: 'listenings', icon: <Podcast size={18} />, label: 'Listening', count: listeningItems.length || podcasts.length },
+    { id: 'reading', icon: <FileText size={18} />, label: 'Reading', count: readingItems.length },
     { id: 'flashcards', icon: <Layers size={18} />, label: 'Flashcards', count: flashcards.length },
     { id: 'simulations', icon: <Drama size={18} />, label: 'Simulations', count: simulations.length },
     { id: 'games', icon: <Gamepad2 size={18} />, label: 'Games', count: gamesRaw.length },
   ];
+
+  const handleLoadMore = () => {
+    setVisibleCount((prev) => prev + 10);
+  };
+
+  const renderCategoryGrid = (items: any[], categoryName: string, icon: React.ReactNode) => {
+    if (items.length === 0) {
+      return (
+        <div className="py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
+          No {categoryName} activities found matching your filters.
+        </div>
+      );
+    }
+
+    const currentItems = items.slice(0, visibleCount);
+    const hasMore = items.length > visibleCount;
+
+    return (
+      <div className="space-y-8">
+        <p className="text-text-muted text-sm max-w-2xl">
+          Interactive {categoryName} exercises for level {testEnglishLevel} from test-english.com & liveworksheets.com.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {currentItems.map((item) => {
+            const itemId = item.url || item.slug || item.id;
+            const isDone = completedActivityIds.has(itemId) || completedActivityIds.has(item.url) || completedActivityIds.has(item.slug);
+
+            return (
+              <div
+                key={itemId}
+                onClick={() => setSelectedActivity(item)}
+                className="text-left bg-surface border border-border rounded-2xl overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 transition-all group cursor-pointer flex flex-col justify-between"
+              >
+                <div>
+                  {item.image ? (
+                    <div className="h-36 overflow-hidden bg-bg-secondary relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={teImg(item.image)}
+                        alt={item.title}
+                        loading="lazy"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                      <div className="absolute top-2 right-2 flex gap-1">
+                        {isDone ? (
+                          <span className="flex items-center gap-1 bg-success text-white text-[0.65rem] font-bold px-2 py-0.5 rounded-full shadow">
+                            <CheckCircle2 size={12} /> Done
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 bg-warning/90 text-white text-[0.65rem] font-bold px-2 py-0.5 rounded-full shadow">
+                            <Clock size={12} /> Pending
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-24 overflow-hidden bg-primary/5 p-4 relative flex items-center justify-between border-b border-border/40">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                        {icon}
+                      </div>
+                      <div className="flex gap-1">
+                        {isDone ? (
+                          <span className="flex items-center gap-1 bg-success text-white text-[0.65rem] font-bold px-2 py-0.5 rounded-full shadow">
+                            <CheckCircle2 size={12} /> Done
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 bg-warning/90 text-white text-[0.65rem] font-bold px-2 py-0.5 rounded-full shadow">
+                            <Clock size={12} /> Pending
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                        {icon}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[0.6rem] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase">
+                          {item.level || testEnglishLevel}
+                        </span>
+                        <span className="text-[0.6rem] font-bold bg-bg text-text-subtle border border-border px-2 py-0.5 rounded-full">
+                          {item.source}
+                        </span>
+                      </div>
+                    </div>
+                    <h4 className="text-sm font-bold text-text line-clamp-2 group-hover:text-primary transition-colors">
+                      {item.title}
+                    </h4>
+                  </div>
+                </div>
+
+                <div className="px-4 pb-4 pt-1 flex items-center justify-between border-t border-border/40 mt-3">
+                  <span className="text-[0.7rem] text-text-muted flex items-center gap-1">
+                    <ExternalLink size={12} /> Practice
+                  </span>
+                  {isDone ? (
+                    <span className="text-[0.65rem] font-bold text-success flex items-center gap-1">
+                      <CheckCircle2 size={12} /> Completed
+                    </span>
+                  ) : (
+                    <span className="text-[0.65rem] font-bold text-warning flex items-center gap-1">
+                      <Clock size={12} /> Pending
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Load More Button (10 by 10) */}
+        {hasMore && (
+          <div className="flex flex-col items-center justify-center pt-4">
+            <button
+              onClick={handleLoadMore}
+              className="px-6 py-3 bg-surface hover:bg-surface-hover border border-border hover:border-primary/50 text-text font-bold text-sm rounded-2xl transition-all shadow-sm flex items-center gap-2 group"
+            >
+              <span>Load 10 More ({items.length - visibleCount} remaining)</span>
+              <ChevronDown size={16} className="group-hover:translate-y-0.5 transition-transform" />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-bg flex flex-col md:flex-row overflow-x-hidden">
@@ -300,18 +521,18 @@ export default function ActivitiesClientPage() {
         <MainHeader onToggleMenu={handleToggleSidebar} />
 
         <main className="p-4 md:p-8 max-w-7xl w-full mx-auto animate-fade-in">
-          <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <header className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
               <h1 className="text-2xl md:text-3xl font-display font-bold text-text mb-2">My Activities</h1>
               <p className="text-text-muted text-sm md:text-base max-w-2xl">
-                Practice vocabulary, grammar and pronunciation. Earn points in the ranking!
+                Practice vocabulary, grammar, reading and listening. Track Completed vs Pending activities!
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-stretch sm:items-center">
+            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-stretch sm:items-center flex-wrap">
               {isStaff && (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-text-subtle uppercase tracking-wider whitespace-nowrap">Filter by Level:</span>
+                  <span className="text-xs font-bold text-text-subtle uppercase tracking-wider whitespace-nowrap">Level:</span>
                   <select
                     value={filterLevel}
                     onChange={(e) => setFilterLevel(e.target.value)}
@@ -323,15 +544,45 @@ export default function ActivitiesClientPage() {
                     <option value="B1">B1</option>
                     <option value="B2">B2</option>
                     <option value="C1">C1</option>
+                    <option value="C2">C2</option>
                   </select>
                 </div>
               )}
-              <div className="relative w-full md:w-80">
+
+              {/* Status Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-text-subtle uppercase tracking-wider whitespace-nowrap">Status:</span>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  className="px-3 py-2 bg-surface border border-border rounded-2xl text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all cursor-pointer text-text"
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">⏳ Pending</option>
+                  <option value="done">✓ Completed</option>
+                </select>
+              </div>
+
+              {/* Source Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-text-subtle uppercase tracking-wider whitespace-nowrap">Source:</span>
+                <select
+                  value={sourceFilter}
+                  onChange={(e) => setSourceFilter(e.target.value as any)}
+                  className="px-3 py-2 bg-surface border border-border rounded-2xl text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all cursor-pointer text-text"
+                >
+                  <option value="all">All Sources</option>
+                  <option value="test-english">test-english.com</option>
+                  <option value="liveworksheets">liveworksheets.com</option>
+                </select>
+              </div>
+
+              <div className="relative w-full md:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle" size={18} />
                 <input
                   type="text"
                   placeholder="Search activity..."
-                  className="w-full pl-10 pr-4 py-2.5 bg-surface border border-border rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
+                  className="w-full pl-10 pr-4 py-2 bg-surface border border-border rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -363,354 +614,79 @@ export default function ActivitiesClientPage() {
           </nav>
 
           <div className="min-h-[400px]">
-            {activeTab === 'grammar' && (
-              <div className="space-y-8">
-                {grammarContent?.items && grammarContent.items.length > 0 ? (
-                  <div>
-                    <p className="text-text-muted text-sm mb-5 max-w-2xl">
-                      Grammar lessons and exercises for level {testEnglishLevel}.
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {grammarContent.items
-                        .filter(
-                          (t) =>
-                            !searchQuery ||
-                            t.title.toLowerCase().includes(searchQuery.toLowerCase()),
-                        )
-                        .slice(0, visibleCount)
-                        .map((item) => (
-                          <a
-                            key={item.slug}
-                            href={item.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-left bg-surface border border-border rounded-2xl overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 transition-all group"
-                          >
-                            {item.image && (
-                              <div className="h-32 overflow-hidden bg-bg-secondary">
-                                <img
-                                  src={teImg(item.image)}
-                                  alt={item.title}
-                                  loading="lazy"
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = 'none';
-                                  }}
-                                />
-                              </div>
-                            )}
-                            <div className="p-4 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                                  <BookOpen size={16} />
-                                </div>
-                                <span className="text-[0.6rem] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase">
-                                  {testEnglishLevel}
-                                </span>
-                              </div>
-                              <h4 className="text-sm font-bold text-text line-clamp-2">{item.title}</h4>
-                              <p className="text-[0.7rem] text-text-muted">test-english.com</p>
-                            </div>
-                          </a>
-                        ))}
-                    </div>
-                    {grammarContent.items.filter(
-                      (t) =>
-                        !searchQuery ||
-                        t.title.toLowerCase().includes(searchQuery.toLowerCase()),
-                    ).length > visibleCount && (
-                      <div ref={sentinelRef} className="h-10" />
-                    )}
-                  </div>
-                ) : (
-                  <div className="py-20 text-center text-text-muted">
-                    No grammar topics available for this level.
-                  </div>
-                )}
-              </div>
-            )}
+            {activeTab === 'grammar' && renderCategoryGrid(grammarItems, 'Grammar', <BookOpen size={16} />)}
+            {activeTab === 'vocabulary' && renderCategoryGrid(vocabularyItems, 'Vocabulary', <Lightbulb size={16} />)}
+            {activeTab === 'listenings' && renderCategoryGrid(listeningItems, 'Listening', <Podcast size={16} />)}
+            {activeTab === 'reading' && renderCategoryGrid(readingItems, 'Reading', <FileText size={16} />)}
 
-            {activeTab === 'listenings' && (
+            {activeTab === 'flashcards' && (
               <div className="space-y-8">
-                {listeningContent?.items && listeningContent.items.length > 0 ? (
-                  <div>
-                    <p className="text-text-muted text-sm mb-5 max-w-2xl">
-                      Listening tests for level {testEnglishLevel}.
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {listeningContent.items
-                        .filter(
-                          (t) =>
-                            !searchQuery ||
-                            t.title.toLowerCase().includes(searchQuery.toLowerCase()),
-                        )
-                        .slice(0, visibleCount)
-                        .map((item) => (
-                          <a
-                            key={item.slug}
-                            href={item.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-left bg-surface border border-border rounded-2xl overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 transition-all group"
-                          >
-                            {item.image && (
-                              <div className="h-32 overflow-hidden bg-bg-secondary">
-                                <img
-                                  src={teImg(item.image)}
-                                  alt={item.title}
-                                  loading="lazy"
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = 'none';
-                                  }}
-                                />
-                              </div>
-                            )}
-                            <div className="p-4 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                                  <Podcast size={16} />
-                                </div>
-                                <span className="text-[0.6rem] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase">
-                                  {testEnglishLevel}
-                                </span>
-                              </div>
-                              <h4 className="text-sm font-bold text-text line-clamp-2">{item.title}</h4>
-                              <p className="text-[0.7rem] text-text-muted">test-english.com</p>
-                            </div>
-                          </a>
-                        ))}
-                    </div>
-                    {listeningContent.items.filter(
-                      (t) =>
-                        !searchQuery ||
-                        t.title.toLowerCase().includes(searchQuery.toLowerCase()),
-                    ).length > visibleCount && (
-                      <div ref={sentinelRef} className="h-10" />
-                    )}
-                  </div>
-                ) : podcasts.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {podcasts.slice(0, visiblePodcastsCount).map((p) => (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {flashcards.length > 0 ? (
+                    flashcards.slice(0, visibleCount).map((f) => (
                       <ActivityCard
-                        key={p.id}
-                        title={p.title}
-                        description={p.description || 'Get ready to listen and practice.'}
-                        imageUrl={p.thumbnail}
-                        type="podcast"
-                        status={podcastProgress?.completed?.includes(p.id) ? 'done' : 'new'}
-                        onClick={() => router.push(`/listenings/${p.id}`)}
-                        actionLabel="Play"
-                        meta={[
-                          {
-                            icon: <Layers size={14} />,
-                            label: p.level || 'all',
-                          }
-                        ]}
+                        key={f.id}
+                        title={f.title}
+                        description={f.description || 'Your vocabulary flashcards.'}
+                        type="flashcard"
+                        status={completedActivityIds.has(f.id) ? 'done' : 'pending'}
+                        onClick={() => router.push(`/flashcards/${f.id}`)}
+                        meta={[{ icon: <FileBox size={14} />, label: `${f.card_count} cards` }]}
                       />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
-                    No listening content available.
-                  </div>
-                )}
-                {visiblePodcastsCount < podcasts.length && (
-                  <div className="flex justify-center mt-6">
+                    ))
+                  ) : (
+                    <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
+                      <Layers size={40} className="mx-auto mb-4 opacity-20" />
+                      <p>No flashcards available.</p>
+                    </div>
+                  )}
+                </div>
+                {flashcards.length > visibleCount && (
+                  <div className="flex justify-center pt-4">
                     <button
-                      onClick={() => setVisiblePodcastsCount(prev => prev + 10)}
-                      className="px-6 py-3 bg-surface hover:bg-surface-hover border border-border text-text font-bold rounded-xl transition-all shadow-sm flex items-center gap-2"
+                      onClick={handleLoadMore}
+                      className="px-6 py-3 bg-surface hover:bg-surface-hover border border-border hover:border-primary/50 text-text font-bold text-sm rounded-2xl transition-all shadow-sm flex items-center gap-2 group"
                     >
-                      Show More
+                      <span>Load 10 More</span>
+                      <ChevronDown size={16} className="group-hover:translate-y-0.5 transition-transform" />
                     </button>
                   </div>
                 )}
               </div>
             )}
 
-            {activeTab === 'vocabulary' && (
-              <div className="space-y-8">
-                {vocabularyContent?.items && vocabularyContent.items.length > 0 ? (
-                  <div>
-                    <p className="text-text-muted text-sm mb-5 max-w-2xl">
-                      Vocabulary lessons for level {testEnglishLevel}.
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {vocabularyContent.items
-                        .filter(
-                          (t) =>
-                            !searchQuery ||
-                            t.title.toLowerCase().includes(searchQuery.toLowerCase()),
-                        )
-                        .slice(0, visibleCount)
-                        .map((item) => (
-                          <a
-                            key={item.slug}
-                            href={item.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-left bg-surface border border-border rounded-2xl overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 transition-all group"
-                          >
-                            {item.image && (
-                              <div className="h-32 overflow-hidden bg-bg-secondary">
-                                <img
-                                  src={teImg(item.image)}
-                                  alt={item.title}
-                                  loading="lazy"
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = 'none';
-                                  }}
-                                />
-                              </div>
-                            )}
-                            <div className="p-4 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                                  <Lightbulb size={16} />
-                                </div>
-                                <span className="text-[0.6rem] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase">
-                                  {testEnglishLevel}
-                                </span>
-                              </div>
-                              <h4 className="text-sm font-bold text-text line-clamp-2">{item.title}</h4>
-                              <p className="text-[0.7rem] text-text-muted">test-english.com</p>
-                            </div>
-                          </a>
-                        ))}
-                    </div>
-                    {vocabularyContent.items.filter(
-                      (t) =>
-                        !searchQuery ||
-                        t.title.toLowerCase().includes(searchQuery.toLowerCase()),
-                    ).length > visibleCount && (
-                      <div ref={sentinelRef} className="h-10" />
-                    )}
-                  </div>
-                ) : (
-                  <div className="py-20 text-center text-text-muted">
-                    No vocabulary lessons available for this level.
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'reading' && (
-              <div className="space-y-8">
-                {readingContent?.items && readingContent.items.length > 0 ? (
-                  <div>
-                    <p className="text-text-muted text-sm mb-5 max-w-2xl">
-                      Reading tests for level {testEnglishLevel}.
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {readingContent.items
-                        .filter(
-                          (t) =>
-                            !searchQuery ||
-                            t.title.toLowerCase().includes(searchQuery.toLowerCase()),
-                        )
-                        .slice(0, visibleCount)
-                        .map((item) => (
-                          <a
-                            key={item.slug}
-                            href={item.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-left bg-surface border border-border rounded-2xl overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 transition-all group"
-                          >
-                            {item.image && (
-                              <div className="h-32 overflow-hidden bg-bg-secondary">
-                                <img
-                                  src={teImg(item.image)}
-                                  alt={item.title}
-                                  loading="lazy"
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = 'none';
-                                  }}
-                                />
-                              </div>
-                            )}
-                            <div className="p-4 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                                  <FileText size={16} />
-                                </div>
-                                <span className="text-[0.6rem] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase">
-                                  {testEnglishLevel}
-                                </span>
-                              </div>
-                              <h4 className="text-sm font-bold text-text line-clamp-2">{item.title}</h4>
-                              <p className="text-[0.7rem] text-text-muted">test-english.com</p>
-                            </div>
-                          </a>
-                        ))}
-                    </div>
-                    {readingContent.items.filter(
-                      (t) =>
-                        !searchQuery ||
-                        t.title.toLowerCase().includes(searchQuery.toLowerCase()),
-                    ).length > visibleCount && (
-                      <div ref={sentinelRef} className="h-10" />
-                    )}
-                  </div>
-                ) : (
-                  <div className="py-20 text-center text-text-muted">
-                    No reading tests available for this level.
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'flashcards' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {flashcards.length > 0 ? (
-                  flashcards.slice(0, visibleCount).map((f) => (
-                    <ActivityCard
-                      key={f.id}
-                      title={f.title}
-                      description={f.description || 'Your vocabulary flashcards.'}
-                      type="flashcard"
-                      onClick={() => router.push(`/flashcards/${f.id}`)}
-                      meta={[{ icon: <FileBox size={14} />, label: `${f.card_count} cards` }]}
-                    />
-                  ))
-                ) : (
-                  <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
-                    <Layers size={40} className="mx-auto mb-4 opacity-20" />
-                    <p>No flashcards available.</p>
-                  </div>
-                )}
-                {flashcards.length > visibleCount && (
-                  <div ref={sentinelRef} className="h-10" />
-                )}
-              </div>
-            )}
-
             {activeTab === 'simulations' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {simulations.length > 0 ? (
-                  simulations.slice(0, visibleCount).map((s) => (
-                    <ActivityCard
-                      key={s.id}
-                      title={s.name}
-                      emoji={s.emoji || s.icon}
-                      description={
-                        s.description || 'Choose a scenario and practice English in everyday situations'
-                      }
-                      type="simulation"
-                      status={simulationProgress?.completed?.includes(s.id) ? 'done' : 'pending'}
-                      onClick={() => router.push(`/voice?simulation_id=${s.id}`)}
-                      meta={[{ icon: <Play size={14} />, label: s.difficulty || 'normal' }]}
-                    />
-                  ))
-                ) : (
-                  <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
-                    No simulations available.
-                  </div>
-                )}
+              <div className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {simulations.length > 0 ? (
+                    simulations.slice(0, visibleCount).map((s) => (
+                      <ActivityCard
+                        key={s.id}
+                        title={s.name}
+                        emoji={s.emoji || s.icon}
+                        description={s.description || 'Choose a scenario and practice English in everyday situations'}
+                        type="simulation"
+                        status={simulationProgress?.completed?.includes(s.id) || completedActivityIds.has(s.id) ? 'done' : 'pending'}
+                        onClick={() => router.push(`/voice?simulation_id=${s.id}`)}
+                        meta={[{ icon: <Play size={14} />, label: s.difficulty || 'normal' }]}
+                      />
+                    ))
+                  ) : (
+                    <div className="col-span-full py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
+                      No simulations available.
+                    </div>
+                  )}
+                </div>
                 {simulations.length > visibleCount && (
-                  <div ref={sentinelRef} className="h-10" />
+                  <div className="flex justify-center pt-4">
+                    <button
+                      onClick={handleLoadMore}
+                      className="px-6 py-3 bg-surface hover:bg-surface-hover border border-border hover:border-primary/50 text-text font-bold text-sm rounded-2xl transition-all shadow-sm flex items-center gap-2 group"
+                    >
+                      <span>Load 10 More</span>
+                      <ChevronDown size={16} className="group-hover:translate-y-0.5 transition-transform" />
+                    </button>
+                  </div>
                 )}
               </div>
             )}
@@ -723,43 +699,68 @@ export default function ActivitiesClientPage() {
                       {gamesRaw
                         .filter((g) => !searchQuery || g.title.toLowerCase().includes(searchQuery.toLowerCase()))
                         .slice(0, visibleCount)
-                        .map((g) => (
-                          <a
-                            key={g.id}
-                            href={g.wordwall_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-left bg-surface border border-border rounded-2xl overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 transition-all group"
-                          >
-                            <div className="p-5 flex flex-col gap-3">
-                              <div className="flex items-start justify-between">
-                                <div className="bg-primary/10 w-10 h-10 rounded-xl flex items-center justify-center text-primary">
-                                  <Gamepad2 size={20} />
+                        .map((g) => {
+                          const isDone = completedActivityIds.has(g.id) || completedActivityIds.has(g.wordwall_url);
+                          return (
+                            <div
+                              key={g.id}
+                              onClick={() =>
+                                setSelectedActivity({
+                                  id: g.id,
+                                  title: g.title,
+                                  url: g.wordwall_url,
+                                  source: 'WordWall',
+                                  level: g.levels?.[0] || 'all',
+                                })
+                              }
+                              className="text-left bg-surface border border-border rounded-2xl overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 transition-all group cursor-pointer"
+                            >
+                              <div className="p-5 flex flex-col gap-3">
+                                <div className="flex items-start justify-between">
+                                  <div className="bg-primary/10 w-10 h-10 rounded-xl flex items-center justify-center text-primary">
+                                    <Gamepad2 size={20} />
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    {isDone ? (
+                                      <span className="flex items-center gap-1 bg-success text-white text-[0.65rem] font-bold px-2 py-0.5 rounded-full">
+                                        <CheckCircle2 size={12} /> Completed
+                                      </span>
+                                    ) : (
+                                      <span className="flex items-center gap-1 bg-warning text-white text-[0.65rem] font-bold px-2 py-0.5 rounded-full">
+                                        <Clock size={12} /> Pending
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="flex flex-wrap gap-1">
-                                  {(g.levels || ['all']).map((l) => (
-                                    <span key={l} className="text-[0.6rem] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase">
-                                      {l === 'all' || l === 'ALL' ? 'All' : l.toUpperCase()}
-                                    </span>
-                                  ))}
+                                <div>
+                                  <h4 className="text-sm font-bold text-text line-clamp-2 group-hover:text-primary transition-colors">
+                                    {g.title}
+                                  </h4>
+                                  {g.description && (
+                                    <p className="text-[0.75rem] text-text-muted line-clamp-2 mt-1">{g.description}</p>
+                                  )}
                                 </div>
-                              </div>
-                              <div>
-                                <h4 className="text-sm font-bold text-text line-clamp-2 group-hover:text-primary transition-colors">{g.title}</h4>
-                                {g.description && (
-                                  <p className="text-[0.75rem] text-text-muted line-clamp-2 mt-1">{g.description}</p>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2 text-[0.7rem] text-text-muted mt-auto pt-2">
-                                <ExternalLink size={12} />
-                                <span>Open on WordWall</span>
+                                <div className="flex items-center justify-between text-[0.7rem] text-text-muted mt-auto pt-2 border-t border-border/40">
+                                  <span className="flex items-center gap-1">
+                                    <ExternalLink size={12} /> WordWall
+                                  </span>
+                                  <span className="font-bold text-primary">Practice</span>
+                                </div>
                               </div>
                             </div>
-                          </a>
-                        ))}
+                          );
+                        })}
                     </div>
                     {gamesRaw.filter((g) => !searchQuery || g.title.toLowerCase().includes(searchQuery.toLowerCase())).length > visibleCount && (
-                      <div ref={sentinelRef} className="h-10" />
+                      <div className="flex justify-center pt-4">
+                        <button
+                          onClick={handleLoadMore}
+                          className="px-6 py-3 bg-surface hover:bg-surface-hover border border-border hover:border-primary/50 text-text font-bold text-sm rounded-2xl transition-all shadow-sm flex items-center gap-2 group"
+                        >
+                          <span>Load 10 More</span>
+                          <ChevronDown size={16} className="group-hover:translate-y-0.5 transition-transform" />
+                        </button>
+                      </div>
                     )}
                   </>
                 ) : (
@@ -773,6 +774,22 @@ export default function ActivitiesClientPage() {
           </div>
         </main>
       </div>
+
+      {/* Activity Viewer Modal with Done vs Pending tracking */}
+      <ActivityViewerModal
+        isOpen={!!selectedActivity}
+        onClose={() => setSelectedActivity(null)}
+        activity={selectedActivity}
+        isDone={
+          selectedActivity
+            ? completedActivityIds.has(selectedActivity.id) ||
+              completedActivityIds.has(selectedActivity.url) ||
+              completedActivityIds.has(selectedActivity.slug)
+            : false
+        }
+        onMarkDone={handleMarkDone}
+        onMarkPending={handleMarkPending}
+      />
     </div>
   );
 }

@@ -508,15 +508,27 @@ class ActivityService:
         metadata: dict[str, Any] = None,
     ) -> dict[str, Any]:
         """Registra uma submissão de atividade."""
+        import uuid
 
         def _save():
+            valid_module_id = None
+            if module_id:
+                try:
+                    uuid.UUID(str(module_id))
+                    valid_module_id = str(module_id)
+                except (ValueError, TypeError):
+                    valid_module_id = None
+
+            meta = dict(metadata) if metadata else {}
+            if not valid_module_id and module_id:
+                meta["external_id"] = str(module_id)
+
             data = {
                 "username": username,
-                "module_id": module_id,
+                "module_id": valid_module_id,
                 "activity_type": activity_type,
                 "score": score,
-                "metadata": metadata or {},
-                "created_at": "now()",
+                "metadata": meta,
             }
             return self.db.table("activity_submissions").insert(data).execute().data
 

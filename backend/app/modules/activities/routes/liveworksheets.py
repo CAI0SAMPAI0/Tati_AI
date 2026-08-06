@@ -1,4 +1,4 @@
-"""Rota para conteúdo externo do test-english.com — dados em cache local."""
+"""Rota para conteúdo externo do liveworksheets.com — dados em cache local."""
 
 import asyncio
 import hashlib
@@ -11,29 +11,28 @@ import httpx
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
 
-router = APIRouter(prefix="/test-english", tags=["Test English Content"])
+router = APIRouter(prefix="/liveworksheets", tags=["LiveWorksheets Content"])
 
 logger = logging.getLogger(__name__)
 
-DATA_FILE = os.path.join(os.path.dirname(__file__), "te_english_data.json")
-LEVEL_MAP = {"A1": "a1", "A2": "a2", "B1": "b1", "B1+": "b1-b2", "B2": "b2", "C1": "c1"}
-LEVELS = ["A1", "A2", "B1", "B1+", "B2", "C1"]
-CATEGORIES = {"grammar": "grammar-points", "vocabulary": "vocabulary", "listening": "listening", "reading": "reading"}
+DATA_FILE = os.path.join(os.path.dirname(__file__), "liveworksheets_data.json")
+LEVEL_MAP = {"A1": "A1", "A2": "A2", "B1": "B1", "B1+": "B1", "B2": "B2", "C1": "C1", "C2": "C2"}
+LEVELS = ["A1", "A2", "B1", "B1+", "B2", "C1", "C2"]
+CATEGORIES = ["grammar", "vocabulary", "listening", "reading"]
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
     "Accept": "image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
-    "Referer": "https://test-english.com/",
+    "Referer": "https://www.liveworksheets.com/",
 }
 
 _data: dict[str, dict[str, list[dict]]] | None = None
 
-IMAGE_CACHE_DIR = os.path.join(os.path.dirname(__file__), "_image_cache")
+IMAGE_CACHE_DIR = os.path.join(os.path.dirname(__file__), "_lw_image_cache")
 os.makedirs(IMAGE_CACHE_DIR, exist_ok=True)
 
 _image_semaphore = asyncio.Semaphore(3)
-
 _memory_cache: dict[str, tuple[bytes, str, float]] = {}
 _MEMORY_CACHE_TTL = 3600
 
@@ -59,52 +58,42 @@ def _load_data() -> dict[str, dict[str, list[dict]]]:
     if _data is not None:
         return _data
     if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            _data = json.load(f)
-        logger.info("Loaded test-english data from %s", DATA_FILE)
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                _data = json.load(f)
+            logger.info("Loaded liveworksheets data from %s", DATA_FILE)
+        except Exception as e:
+            logger.error("Error reading %s: %s", DATA_FILE, e)
+            _data = {cat: {lvl: [] for lvl in ["A1", "A2", "B1", "B2", "C1", "C2"]} for cat in CATEGORIES}
     else:
         logger.warning("Data file %s not found, using empty data", DATA_FILE)
-        _data = {cat: {lvl: [] for lvl in LEVELS} for cat in CATEGORIES}
+        _data = {cat: {lvl: [] for lvl in ["A1", "A2", "B1", "B2", "C1", "C2"]} for cat in CATEGORIES}
     return _data
 
 
-def _build_url(cat_slug: str, level_slug: str, item_slug: str) -> str:
-    return f"https://test-english.com/{cat_slug}/{level_slug}/{item_slug}/"
-
-
-def _enrich_items(items: list[dict], cat_slug: str, level_slug: str) -> list[dict]:
-    enriched = []
-    for item in items:
-        if item["slug"] == cat_slug:
-            continue
-        url = _build_url(cat_slug, level_slug, item["slug"])
-        enriched.append({**item, "url": url, "level": level_slug.upper().replace("-", "+")})
-    return enriched
-
-
 @router.get("/content")
-async def get_test_english_content(
-    level: str = Query("A1"), category: str = Query("grammar"),
+async def get_liveworksheets_content(
+    level: str = Query("A1"), category: str = Query("grammar")
 ):
-    if category.lower() not in CATEGORIES:
+    cat = category.lower()
+    if cat not in CATEGORIES:
         raise HTTPException(400, "Invalid category")
     data = _load_data()
-    cat = category.lower()
-    cat_slug = CATEGORIES[cat]
+
     if level.lower() == "all":
         all_items = []
-        for lvl in LEVELS:
-            level_slug = LEVEL_MAP[lvl]
-            raw = data.get(cat, {}).get(lvl, [])
-            all_items.extend(_enrich_items(raw, cat_slug, level_slug))
-        return {"success": True, "level": "all", "category": cat, "items": all_items, "source": "test-english.com"}
+        for lvl in ["A1", "A2", "B1", "B2", "C1", "C2"]:
+            all_items.extend(data.get(cat, {}).get(lvl, []))
+        return {"success": True, "level": "all", "category": cat, "items": all_items, "source": "liveworksheets.com"}
+
     level_code = level.upper()
-    if level_code not in LEVEL_MAP:
-        return {"success": True, "level": level_code, "category": cat, "items": [], "source": "test-english.com"}
-    level_slug = LEVEL_MAP[level_code]
-    raw = data.get(cat, {}).get(level_code, [])
-    items = _enrich_items(raw, cat_slug, level_slug)
-    return {"success": True, "level": level_code, "category": cat, "items": items, "source": "test-english.com"}
+    if level_code == "B1+":
+        level_code = "B1"
+    if level_code not in ["A1", "A2", "B1", "B2", "C1", "C2"]:
+        raise HTTPException(400, f"Invalid level: {level}")
+
+    items = data.get(cat, {}).get(level_code, [])
+    return {"success": True, "level": level_code, "category": cat, "items": items, "source": "liveworksheets.com"}
 
 
 @router.get("/levels")
@@ -145,7 +134,7 @@ async def proxy_image(url: str = Query(...)):
                     cffi_requests.get, url, impersonate="chrome120", timeout=15
                 )
                 if resp.status_code in (200, 304):
-                    content_type = resp.headers.get("content-type", "image/png")
+                    content_type = resp.headers.get("content-type", "image/jpeg")
                     body = resp.content
                     with open(cpath, "wb") as f:
                         f.write(body)

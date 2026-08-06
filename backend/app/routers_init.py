@@ -78,8 +78,17 @@ def register_all_routers(app: FastAPI) -> None:
     from app.modules.activities.routes.submissions import router as submissions_router
     from app.modules.activities.routes.trophies import router as trophies_router
     from app.modules.activities.routes.games import router as games_router
+    from app.modules.activities.routes.liveworksheets import (
+        router as liveworksheets_router,
+    )
     from app.modules.activities.routes.te_english import (
         router as te_english_router,
+    )
+
+    app.include_router(
+        liveworksheets_router,
+        prefix="/activities",
+        tags=["liveworksheets"],
     )
 
     app.include_router(
