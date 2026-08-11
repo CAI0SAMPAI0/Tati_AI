@@ -28,7 +28,6 @@ import { fetchWeeklyPlan } from '@/lib/api/weekly-plan';
 import { apiGet, apiPost } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import { cn } from '@/lib/utils';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { normalizeLevel } from '@/lib/constants/levels';
 import { API_BASE } from '@/lib/api/client';
@@ -112,7 +111,6 @@ interface NewsItem {
 }
 
 export default function ActivitiesClientPage() {
-  const router = useRouter();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('grammar');
   const [searchQuery, setSearchQuery] = useState('');
@@ -276,18 +274,20 @@ export default function ActivitiesClientPage() {
 
   // Combine items for each category
   const filterItems = useCallback(
-    (teItems: TestEnglishItem[] = [], lwItems: TestEnglishItem[] = []) => {
+    (teItems: TestEnglishItem[] = [], lwItems: TestEnglishItem[] = [], category?: string) => {
       let combined = [
         ...(teItems || []).map((i) => ({
           ...i,
           id: i.url || i.slug,
           source: 'test-english.com',
+          category,
           title: formatFallbackTitle(i),
         })),
         ...(lwItems || []).map((i) => ({
           ...i,
           id: i.url || i.slug,
           source: 'liveworksheets.com',
+          category,
           title: formatFallbackTitle(i),
         })),
       ];
@@ -317,19 +317,19 @@ export default function ActivitiesClientPage() {
   );
 
   const grammarItems = useMemo(
-    () => filterItems(grammarTE?.items, grammarLW?.items),
+    () => filterItems(grammarTE?.items, grammarLW?.items, 'grammar'),
     [grammarTE, grammarLW, filterItems]
   );
   const vocabularyItems = useMemo(
-    () => filterItems(vocabularyTE?.items, vocabularyLW?.items),
+    () => filterItems(vocabularyTE?.items, vocabularyLW?.items, 'vocabulary'),
     [vocabularyTE, vocabularyLW, filterItems]
   );
   const listeningItems = useMemo(
-    () => filterItems(listeningTE?.items, listeningLW?.items),
+    () => filterItems(listeningTE?.items, listeningLW?.items, 'listening'),
     [listeningTE, listeningLW, filterItems]
   );
   const readingItems = useMemo(
-    () => filterItems(readingTE?.items, readingLW?.items),
+    () => filterItems(readingTE?.items, readingLW?.items, 'reading'),
     [readingTE, readingLW, filterItems]
   );
 
@@ -375,7 +375,13 @@ export default function ActivitiesClientPage() {
       activity_id: actId,
       activity_type: item.source || 'external',
       score: 100,
-      metadata: { title: item.title, url: item.url, slug: item.slug, status: 'done' },
+      metadata: {
+        title: item.title,
+        url: item.url,
+        slug: item.slug,
+        status: 'done',
+        category: item.category,
+      },
     });
     await refetchSubmissions();
   };
@@ -386,7 +392,13 @@ export default function ActivitiesClientPage() {
       activity_id: actId,
       activity_type: item.source || 'external',
       score: 0,
-      metadata: { title: item.title, url: item.url, slug: item.slug, status: 'pending' },
+      metadata: {
+        title: item.title,
+        url: item.url,
+        slug: item.slug,
+        status: 'pending',
+        category: item.category,
+      },
     });
     await refetchSubmissions();
   };
@@ -650,7 +662,18 @@ export default function ActivitiesClientPage() {
                         description={f.description || 'Your vocabulary flashcards.'}
                         type="flashcard"
                         status={completedActivityIds.has(f.id) ? 'done' : 'pending'}
-                        onClick={() => router.push(`/flashcards/${f.id}`)}
+                        onClick={() =>
+                          setSelectedActivity({
+                            id: f.id,
+                            slug: f.id,
+                            title: f.title,
+                            url: `/flashcards/${f.id}`,
+                            route: `/flashcards/${f.id}`,
+                            source: 'Flashcards',
+                            category: 'flashcards',
+                            level: f.level || 'all',
+                          })
+                        }
                         meta={[{ icon: <FileBox size={14} />, label: `${f.card_count} cards` }]}
                       />
                     ))
@@ -687,7 +710,18 @@ export default function ActivitiesClientPage() {
                         description={s.description || 'Choose a scenario and practice English in everyday situations'}
                         type="simulation"
                         status={simulationProgress?.completed?.includes(s.id) || completedActivityIds.has(s.id) ? 'done' : 'pending'}
-                        onClick={() => router.push(`/voice?simulation_id=${s.id}`)}
+                        onClick={() =>
+                          setSelectedActivity({
+                            id: s.id,
+                            slug: s.id,
+                            title: s.name,
+                            url: `/voice?simulation_id=${s.id}`,
+                            route: `/voice?simulation_id=${s.id}`,
+                            source: 'Simulation',
+                            category: 'simulations',
+                            level: s.difficulty || 'all',
+                          })
+                        }
                         meta={[{ icon: <Play size={14} />, label: s.difficulty || 'normal' }]}
                       />
                     ))
@@ -730,6 +764,7 @@ export default function ActivitiesClientPage() {
                                   title: g.title,
                                   url: g.wordwall_url,
                                   source: 'WordWall',
+                                  category: 'games',
                                   level: g.levels?.[0] || 'all',
                                 })
                               }
@@ -812,6 +847,7 @@ export default function ActivitiesClientPage() {
                                   url: n.url,
                                   image: n.thumbnail_url || undefined,
                                   source: 'News',
+                                  category: 'news',
                                   level: n.levels?.[0] || 'all',
                                 })
                               }

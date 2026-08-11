@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { ExternalLink, CheckCircle2, Clock, X, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -11,6 +12,7 @@ interface ActivityItem {
   title: string;
   image?: string;
   url: string;
+  route?: string;
   level?: string;
   category?: string;
   source?: string;
@@ -33,6 +35,7 @@ export function ActivityViewerModal({
   onMarkDone,
   onMarkPending,
 }: ActivityViewerModalProps) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -54,7 +57,13 @@ export function ActivityViewerModal({
   }, [isOpen]);
 
   const handleOpenLink = () => {
-    if (activity) window.open(activity.url, '_blank', 'noopener,noreferrer');
+    if (!activity) return;
+    if (activity.route) {
+      router.push(activity.route);
+      onClose();
+    } else {
+      window.open(activity.url, '_blank', 'noopener,noreferrer');
+    }
   };
 
   const handleToggleDone = async () => {

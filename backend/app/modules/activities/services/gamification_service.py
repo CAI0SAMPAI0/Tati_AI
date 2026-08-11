@@ -24,6 +24,19 @@ class GamificationService:
         "first_login": 100,
     }
 
+    # Pontos concedidos ao marcar cada tipo de atividade como concluída.
+    # Aplicados no xp_data do usuário (mesmo XP exibido no Progresso).
+    ACTIVITY_POINTS = {
+        "grammar": 12,
+        "vocabulary": 10,
+        "listening": 10,
+        "reading": 8,
+        "flashcards": 8,
+        "simulations": 8,
+        "games": 8,
+        "news": 6,
+    }
+
     LEVELS = {
         "A1": {"min": 0, "max": 500},
         "A2": {"min": 500, "max": 1200},
@@ -114,6 +127,78 @@ class GamificationService:
             if config["min"] <= xp < config["max"]:
                 return level
         return "C2"
+
+    async def apply_activity_points(
+        self, username: str, category: str, delta: int
+    ) -> dict[str, Any] | None:
+        """Soma ou remove os pontos de uma atividade concluída/desmarcada.
+
+        `delta` deve ser +1 (concluiu) ou -1 (desmarcou) para a categoria
+        correspondente em ACTIVITY_POINTS. Atualiza xp, total_xp_earned,
+        nível e progresso, e invalida caches de usuário.
+        """
+        points = self.ACTIVITY_POINTS.get((category or "").lower().strip())
+        if points is None:
+            return None
+        amount = points * delta
+        if amount == 0:
+            return None
+
+        def _fetch():
+            res = (
+                self.db.table("users")
+                .select("xp_data")
+                .eq("username", username)
+                .single()
+                .execute()
+            )
+            return res.data.get("xp_data") if res.data else None
+
+        xp_data = await self._execute_db(_fetch)
+        if not isinstance(xp_data, dict):
+            xp_data = {}
+
+        old_xp = xp_data.get("xp", 0) or 0
+        new_xp = max(0, old_xp + amount)
+        new_total = max(0, (xp_data.get("total_xp_earned", 0) or 0) + amount)
+
+        new_level = self._calculate_level(new_xp)
+        level_config = self.LEVELS.get(new_level, self.LEVELS["A1"])
+        xp_in_level = new_xp - level_config["min"]
+        xp_needed = level_config["max"] - level_config["min"]
+
+        updated_data = dict(xp_data)
+        updated_data.update(
+            {
+                "xp": new_xp,
+                "total_xp_earned": new_total,
+                "level": new_level,
+                "level_progress": min(
+                    100, int((xp_in_level / xp_needed) * 100)
+                ),
+                "xp_to_next": level_config["max"] - new_xp,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+
+        def _update():
+            self.db.table("users").update({"xp_data": updated_data}).eq(
+                "username", username
+            ).execute()
+
+        await self._execute_db(_update)
+        await self._invalidate_user_caches(username)
+        return updated_data
+
+    async def _invalidate_user_caches(self, username: str) -> None:
+        """Invalida caches que exibem XP/pontuação do usuário."""
+        try:
+            from app.shared.services.upstash import cache_delete
+
+            await cache_delete(f"bootstrap:{username}")
+            await cache_delete(f"user_stats:{username}")
+        except Exception:
+            pass
 
     async def get_streak_data(self, username: str) -> dict[str, Any]:
         """Busca dados de streak do usuário."""

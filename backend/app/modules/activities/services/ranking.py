@@ -32,6 +32,59 @@ def _empty_stats(username: str, user_map: dict, level_map: dict) -> dict:
     }
 
 
+def _activity_scores(db) -> dict[str, int]:
+    """Soma, por usuário, os pontos das atividades concluídas.
+
+    Fonte da pontuação da competição: submissões marcadas como 'done'
+    (via modal) somadas aos pontos legados preservados de quando o
+    ranking era baseado em engajamento (armazenados em
+    `users.xp_data.legacy_competition_points`).
+    """
+    from app.modules.activities.services.gamification_service import (
+        GamificationService,
+    )
+
+    rows = (
+        db.table("activity_submissions")
+        .select("username, score, metadata")
+        .execute()
+        .data
+        or []
+    )
+    scores: dict[str, int] = {}
+    for r in rows:
+        meta = r.get("metadata") or {}
+        if int(r.get("score", 0) or 0) <= 0:
+            continue
+        if str(meta.get("status") or "").lower() == "pending":
+            continue
+        pts = meta.get("points_awarded")
+        if pts is None:
+            pts = GamificationService.ACTIVITY_POINTS.get(
+                str(meta.get("category") or "").lower().strip(), 0
+            )
+        pts = int(pts or 0)
+        if pts:
+            scores[r["username"]] = scores.get(r["username"], 0) + pts
+
+    # Pontos legados (ranking antigo por engajamento) preservados por usuário
+    try:
+        users_rows = (
+            db.table("users").select("username, xp_data").execute().data or []
+        )
+    except Exception:
+        users_rows = []
+    for u in users_rows:
+        xp_data = u.get("xp_data") or {}
+        legacy = int(
+            (xp_data or {}).get("legacy_competition_points", 0) or 0
+        )
+        if legacy:
+            scores[u["username"]] = scores.get(u["username"], 0) + legacy
+
+    return scores
+
+
 def get_ranking_data(username: str) -> dict:
     db = get_client()
     now = datetime.now(timezone.utc)
@@ -125,16 +178,13 @@ def get_ranking_data(username: str) -> dict:
 
 
 def get_ranking_by_level(username: str) -> dict:
-    """Retorna o ranking agrupado por níveis de proficiência."""
+    """Retorna o ranking por nível, baseado nos pontos de atividades concluídas."""
     db = get_client()
-    now = datetime.now(timezone.utc)
-    start_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     try:
         from app.core.config import settings
 
-        # 1. Busca todos os usuários e seus níveis (excluindo staff por
-        # role real)
+        # 1. Usuários e níveis, excluindo staff por role real
         try:
             all_users = (
                 db.table("users")
@@ -167,56 +217,25 @@ def get_ranking_by_level(username: str) -> dict:
         user_level_map = {
             u["username"]: normalize_level(u.get("level")) for u in all_users
         }
-        user_name_map = {
-            u["username"]: u.get("name") or u["username"] for u in all_users
-        }
 
-        # 2. Busca ações do mês
-        actions = (
-            db.table("study_sessions")
-            .select("username, activity_type")
-            .gte("created_at", start_month.isoformat())
-            .execute()
-            .data
-            or []
-        )
-        messages = (
-            db.table("messages")
-            .select("username")
-            .eq("role", "user")
-            .gte("created_at", start_month.isoformat())
-            .execute()
-            .data
-            or []
-        )
+        # 2. Pontos de atividades concluídas por usuário
+        scores = _activity_scores(db)
 
-        stats = {}
-        for u_name in user_level_map:
-            # Passa o mapa de nomes para a função auxiliar
-            stats[u_name] = _empty_stats(u_name, user_name_map, user_level_map)
-            stats[u_name]["level"] = user_level_map[u_name]
-            user_row = next((u for u in all_users if u.get("username") == u_name), None)
-            if user_row:
-                stats[u_name]["avatar_url"] = user_row.get("avatar_url") or (
-                    user_row.get("profile") or {}
-                ).get("avatar_url")
-        for a in actions:
-            u = a.get("username")
-            if u in stats:
-                stats[u]["score"] += ACTION_POINTS.get(a.get("activity_type"), 0)
-
-        for m in messages:
-            u = m.get("username")
-            if u in stats:
-                stats[u]["score"] += ACTION_POINTS["message"]
-
-        # 3. Agrupa por código CEFR padronizado (A1–C2)
+        # 3. Monta estatísticas por nível
         result: dict[str, list] = {code: [] for code in CEFR_ORDER}
-
-        for user_stat in stats.values():
-            lvl = normalize_level(str(user_stat.get("level", "A1")))
-            user_stat["level"] = lvl  # garante que exibe CEFR no payload
-            result.setdefault(lvl, []).append(user_stat)
+        for u in all_users:
+            uname = u["username"]
+            lvl = user_level_map[uname]
+            result.setdefault(lvl, []).append(
+                {
+                    "username": uname,
+                    "name": u.get("name") or uname,
+                    "level": lvl,
+                    "avatar_url": u.get("avatar_url")
+                    or (u.get("profile") or {}).get("avatar_url"),
+                    "score": scores.get(uname, 0),
+                }
+            )
 
         # Ordena cada categoria e limita ao TOP 10
         for cat in result:

@@ -179,22 +179,73 @@ class ProgressService:
         return res
 
     async def get_top_15_ranking(self) -> list[dict[str, Any]]:
-        cache_key = "ranking:top15"
-        cached = await cache_get(cache_key)
-        if cached:
-            return cached
+        """Ranking global por pontos de atividades concluídas (TOP 15).
 
-        from app.modules.users.routes.progress import _calculate_rankings
+        Calculado ao vivo a partir de activity_submissions para refletir
+        imediatamente a pontuação da competição.
+        """
+        from app.modules.activities.services.ranking import _activity_scores
 
         def _fetch():
-            now = datetime.now(timezone.utc)
-            month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            rankings = _calculate_rankings(self.db, month_start)
-            return rankings[:15]
+            from app.core.config import settings
+            from app.core.enums import normalize_level
 
-        res = await run_in_threadpool(_fetch)
-        await cache_set(cache_key, res, ttl=300)
-        return res
+            staff_usernames = set(settings.staff_roles)
+            access = (
+                self.db.table("student_access")
+                .select("username, role")
+                .execute()
+                .data
+                or []
+            )
+            for a in access:
+                if a.get("role") in ("professor", "professora", "programador", "admin"):
+                    staff_usernames.add(a.get("username"))
+
+            scores = _activity_scores(self.db)
+            if not scores:
+                return []
+
+            try:
+                users = (
+                    self.db.table("users")
+                    .select("username, name, level, avatar_url, profile")
+                    .in_("username", list(scores.keys()))
+                    .execute()
+                    .data
+                    or []
+                )
+            except Exception:
+                users = (
+                    self.db.table("users")
+                    .select("username, name, level, profile")
+                    .in_("username", list(scores.keys()))
+                    .execute()
+                    .data
+                    or []
+                )
+
+            user_map = {u["username"]: u for u in users}
+            ranking = []
+            for uname, pts in scores.items():
+                if uname in staff_usernames:
+                    continue
+                u = user_map.get(uname) or {}
+                ranking.append(
+                    {
+                        "username": uname,
+                        "name": u.get("name") or uname,
+                        "level": normalize_level(u.get("level")),
+                        "avatar_url": u.get("avatar_url")
+                        or (u.get("profile") or {}).get("avatar_url"),
+                        "score": pts,
+                    }
+                )
+
+            ranking.sort(key=lambda x: x["score"], reverse=True)
+            return ranking[:15]
+
+        return await run_in_threadpool(_fetch)
 
     async def get_winners(self) -> dict[str, Any]:
         from app.modules.users.routes.progress import _calculate_rankings

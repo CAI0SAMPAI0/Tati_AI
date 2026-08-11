@@ -507,21 +507,73 @@ class ActivityService:
         score: int,
         metadata: dict[str, Any] = None,
     ) -> dict[str, Any]:
-        """Registra uma submissão de atividade."""
+        """Registra uma submissão de atividade.
+
+        Cada atividade é gravada como uma única linha por usuário
+        (deduplicação por module_id/external_id/url/slug). Ao marcar como
+        concluída (+pontos) ou desmarcar (-pontos), os pontos de XP da
+        categoria são aplicados via GamificationService.
+        """
         import uuid
 
-        def _save():
-            valid_module_id = None
-            if module_id:
-                try:
-                    uuid.UUID(str(module_id))
-                    valid_module_id = str(module_id)
-                except (ValueError, TypeError):
-                    valid_module_id = None
+        from app.modules.activities.services.gamification_service import (
+            GamificationService,
+        )
 
-            meta = dict(metadata) if metadata else {}
-            if not valid_module_id and module_id:
-                meta["external_id"] = str(module_id)
+        meta = dict(metadata) if metadata else {}
+        valid_module_id = None
+        if module_id:
+            try:
+                uuid.UUID(str(module_id))
+                valid_module_id = str(module_id)
+            except (ValueError, TypeError):
+                valid_module_id = None
+
+        if not valid_module_id and module_id:
+            meta["external_id"] = str(module_id)
+
+        category = str(meta.get("category") or "").lower().strip()
+        is_done = score > 0 and str(meta.get("status") or "").lower() != "pending"
+
+        def _save() -> dict[str, Any]:
+            # Busca submissões existentes da MESMA atividade para deduplicar
+            # e detectar se a atividade já valia pontos.
+            rows = (
+                self.db.table("activity_submissions")
+                .select("id, module_id, score, metadata")
+                .eq("username", username)
+                .execute()
+                .data
+                or []
+            )
+
+            def _matches(r: dict) -> bool:
+                r_meta = r.get("metadata") or {}
+                if valid_module_id and str(r.get("module_id") or "") == valid_module_id:
+                    return True
+                if module_id and str(r_meta.get("external_id") or "") == str(module_id):
+                    return True
+                if meta.get("url") and r_meta.get("url") == meta.get("url"):
+                    return True
+                if meta.get("slug") and r_meta.get("slug") == meta.get("slug"):
+                    return True
+                return False
+
+            matching = [r for r in rows if _matches(r)]
+            was_done_with_points = any(
+                int((r.get("metadata") or {}).get("points_awarded", 0) or 0) > 0
+                for r in matching
+            )
+            matching_ids = [r["id"] for r in matching]
+            if matching_ids:
+                self.db.table("activity_submissions").delete().in_(
+                    "id", matching_ids
+                ).execute()
+
+            if is_done and category:
+                points = GamificationService.ACTIVITY_POINTS.get(category)
+                if points:
+                    meta["points_awarded"] = points
 
             data = {
                 "username": username,
@@ -530,9 +582,29 @@ class ActivityService:
                 "score": score,
                 "metadata": meta,
             }
-            return self.db.table("activity_submissions").insert(data).execute().data
+            inserted = self.db.table("activity_submissions").insert(data).execute().data
+            return {
+                "inserted": inserted[0] if inserted else None,
+                "was_done_with_points": was_done_with_points,
+                "category": category,
+                "is_done": is_done,
+            }
 
-        return await run_in_threadpool(_save)
+        result = await run_in_threadpool(_save)
+
+        # Transição de pontos
+        if result.get("inserted"):
+            gs = GamificationService()
+            if result["is_done"] and not result["was_done_with_points"]:
+                await gs.apply_activity_points(
+                    username, result["category"], delta=+1
+                )
+            elif not result["is_done"] and result["was_done_with_points"]:
+                await gs.apply_activity_points(
+                    username, result["category"], delta=-1
+                )
+
+        return result["inserted"] or {"success": True}
 
     async def save_correction(
         self,
