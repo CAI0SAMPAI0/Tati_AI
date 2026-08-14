@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare, Bell, ArrowRight, X, Loader2 } from 'lucide-react';
 import { useAuth } from '@/providers/auth-provider';
-import { apiPut } from '@/lib/api/client';
+import { apiPut, ApiClientError } from '@/lib/api/client';
 import { registerUnauthorizedHandler } from '@/lib/api/client';
 import toast from 'react-hot-toast';
 
