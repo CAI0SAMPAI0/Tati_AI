@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare, Bell, ArrowRight, X, Loader2 } from 'lucide-react';
 import { useAuth } from '@/providers/auth-provider';
 import { apiPut } from '@/lib/api/client';
+import { registerUnauthorizedHandler } from '@/lib/api/client';
 import toast from 'react-hot-toast';
 
 export function WhatsAppOnboardingModal() {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, token } = useAuth();
   const [phone, setPhone] = useState('');
   const [allowNotifications, setAllowNotifications] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -19,6 +20,16 @@ export function WhatsAppOnboardingModal() {
 
   if (!showModal) return null;
 
+  // Remove o handler global de logout não autorizado durante a operação do modal
+  useEffect(() => {
+    registerUnauthorizedHandler(null);
+    return () => {
+      registerUnauthorizedHandler(() => {
+        toast.error('Sessão expirada. Por favor, faça login novamente.');
+      });
+    };
+  }, [user?.role, token]);
+
   const handleSave = async (skip = false) => {
     setIsSubmitting(true);
     try {
@@ -28,7 +39,7 @@ export function WhatsAppOnboardingModal() {
         whatsapp_onboarded: true,
       };
 
-      const res = await apiPut<any>('/profile', payload);
+      const res = await apiPut<any>('/profile/', payload);
 
       if (res.ok) {
         // Atualiza o estado local do auth provider
@@ -46,9 +57,13 @@ export function WhatsAppOnboardingModal() {
       } else {
         toast.error('Erro ao salvar configurações do WhatsApp.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving WhatsApp settings:', error);
-      toast.error('Ocorreu uma falha de conexão.');
+      if (error instanceof ApiClientError && error.status === 401) {
+        toast.error('Sessão expirada. Por favor, faça login novamente.');
+      } else {
+        toast.error('Ocorreu uma falha de conexão.');
+      }
     } finally {
       setIsSubmitting(false);
     }

@@ -351,5 +351,32 @@ async def change_password(
     current_user: dict = Depends(get_current_user),
     db: Client = Depends(get_db),
 ) -> dict:
-    """Troca a senha do usuário autenticado."""
+    """Troca a senha do usuário autenticado (requer senha atual)."""
     return await AuthService.change_password(db, current_user, body)
+
+
+class ResetProfilePasswordBody(BaseModel):
+    """Dados para troca de senha sem informar a atual (autenticado)."""
+
+    new_password: str
+
+
+@router.post("/password-reset-profile")
+async def reset_password_profile(
+    body: ResetProfilePasswordBody,
+    current_user: dict = Depends(get_current_user),
+    db: Client = Depends(get_db),
+) -> dict:
+    """Redefine a senha do usuário logado sem exigir a senha atual.
+    Útil para usuários que não se lembram da senha mas estão autenticados."""
+    from app.core.exceptions import BusinessLogicError
+    from app.core.security import hash_password
+    from app.modules.users.repositories.user_repository import UserRepository
+
+    if not body.new_password or len(body.new_password) < 6:
+        raise BusinessLogicError("Nova senha deve ter pelo menos 6 caracteres")
+
+    await UserRepository.update_user(
+        db, current_user["username"], {"password": hash_password(body.new_password)}
+    )
+    return {"ok": True, "message": "Senha alterada com sucesso."}

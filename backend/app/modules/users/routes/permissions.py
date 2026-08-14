@@ -290,7 +290,11 @@ def _access_response(
 def _can_access_dashboard(user: dict) -> bool:
     username = user.get("username")
     role = user.get("role")
-    return role in settings.staff_roles or username in SPECIAL_USERS
+    if not role:
+        return username in SPECIAL_USERS
+    role_lower = role.lower()
+    staff_roles_lower = {r.lower() for r in settings.staff_roles}
+    return role_lower in staff_roles_lower or username in SPECIAL_USERS
 
 
 def _is_free_mode_period(today: date) -> bool:

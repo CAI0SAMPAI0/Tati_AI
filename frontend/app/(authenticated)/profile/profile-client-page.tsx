@@ -52,8 +52,8 @@ export default function ProfileClientPage() {
   });
 
   const [pwData, setFormDataPw] = useState({
-    current_pw: '',
     new_pw: '',
+    confirm_pw: '',
   });
 
   useEffect(() => {
@@ -121,11 +121,14 @@ export default function ProfileClientPage() {
     if (!pwData.new_pw || pwData.new_pw.length < 6) {
       return toast.error('Password must be at least 6 characters.');
     }
+    if (pwData.new_pw !== pwData.confirm_pw) {
+      return toast.error('Passwords do not match.');
+    }
     try {
-      const res = await apiPost<{ detail?: string }>('/profile/change-password', pwData);
+      const res = await apiPost<{ detail?: string }>('/auth/password-reset-profile', { new_password: pwData.new_pw });
       if (res.ok) {
-        toast.success('Saved successfully!');
-        setFormDataPw({ current_pw: '', new_pw: '' });
+        toast.success('Password updated successfully!');
+        setFormDataPw({ new_pw: '', confirm_pw: '' });
       } else {
         toast.error(res.data?.detail || 'Error saving. Please try again.');
       }
@@ -292,12 +295,12 @@ export default function ProfileClientPage() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-text-subtle uppercase ml-1">{'Current password'}</label>
+                <label className="text-xs font-bold text-text-subtle uppercase ml-1">{'New password'}</label>
                 <div className="relative">
                   <Input
                     type={showPw ? 'text' : 'password'}
-                    value={pwData.current_pw}
-                    onChange={(e) => setFormDataPw({ ...pwData, current_pw: e.target.value })}
+                    value={pwData.new_pw}
+                    onChange={(e) => setFormDataPw({ ...pwData, new_pw: e.target.value })}
                   />
                   <button onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-subtle">
                     {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -305,11 +308,11 @@ export default function ProfileClientPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-bold text-text-subtle uppercase ml-1">{'New password'}</label>
+                <label className="text-xs font-bold text-text-subtle uppercase ml-1">{'Confirm new password'}</label>
                 <Input
                   type={showPw ? 'text' : 'password'}
-                  value={pwData.new_pw}
-                  onChange={(e) => setFormDataPw({ ...pwData, new_pw: e.target.value })}
+                  value={pwData.confirm_pw}
+                  onChange={(e) => setFormDataPw({ ...pwData, confirm_pw: e.target.value })}
                 />
               </div>
               <Button variant="secondary" className="md:col-span-2 font-bold" onClick={handleChangePassword}>
