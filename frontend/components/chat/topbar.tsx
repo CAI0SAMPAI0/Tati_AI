@@ -1,7 +1,7 @@
 'use client';
 
-import { Menu, FileText, Mic } from 'lucide-react';
-
+import { Menu, FileText, Mic, BookOpen } from 'lucide-react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
 interface ChatTopbarProps {
@@ -11,6 +11,8 @@ interface ChatTopbarProps {
   onSwitchToVoice: () => void;
   showSummaryBtn: boolean;
 }
+
+const showActivities = true;
 
 export function ChatTopbar({
   title,
@@ -22,18 +24,35 @@ export function ChatTopbar({
   return (
     <header className="h-14 flex items-center justify-between px-4 border-b border-border bg-bg shrink-0">
       <div className="flex items-center gap-3 overflow-hidden">
-        <button aria-label="Abrir menu"
+        <button
+          aria-label="Abrir menu"
           onClick={onToggleSidebar}
           className="p-1.5 rounded-md hover:bg-surface-hover text-text-muted"
         >
           <Menu size={20} />
         </button>
+
         <h1 className="text-[0.875rem] font-bold text-text truncate">
           {title || 'Teacher Tati'}
         </h1>
       </div>
 
       <div className="flex items-center gap-2">
+        {showActivities && (
+          <Button
+            variant="secondary"
+            size="sm"
+            title="My Activities"
+            onClick={() => {
+              window.location.href = '/activities';
+            }}
+            className="flex gap-1.5 px-3 py-1.5 h-auto text-xs font-bold"
+          >
+            <BookOpen size={14} className="text-primary" />
+            <span className="hidden sm:inline">My Activities</span>
+          </Button>
+        )}
+
         {showSummaryBtn && (
           <Button
             variant="secondary"
@@ -46,6 +65,7 @@ export function ChatTopbar({
             <span className="hidden sm:inline">Summary</span>
           </Button>
         )}
+
         <Button
           variant="secondary"
           size="sm"

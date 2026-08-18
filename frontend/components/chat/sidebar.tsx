@@ -12,7 +12,6 @@ import {
   LogOut,
   X,
   ChevronRight,
-  Brain,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePrefetch } from '@/hooks/usePrefetch';
