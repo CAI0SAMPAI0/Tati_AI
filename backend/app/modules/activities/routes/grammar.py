@@ -1,18 +1,3 @@
-"""
-Sprint 20 – Grammar route.
-
-GET /grammar
-  ?topic=past_simple
-  ?level=B1
-Returns grammar explanation (rule, key structure, Teacher Tati tip) and
-source links (DW, BBC Learning English, test-english.com).
-
-GET /grammar (no params) -> topic index.
-
-POST /grammar/cache-clear
-  Clear all grammar cache entries (admin use).
-"""
-
 from app.core.dependencies.auth import get_current_user
 from app.modules.activities.services.grammar_service import grammar_service
 from app.shared.services.upstash import cache_delete

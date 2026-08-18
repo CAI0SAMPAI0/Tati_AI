@@ -595,6 +595,19 @@ class ActivityService:
         # Transição de pontos
         if result.get("inserted"):
             gs = GamificationService()
+            # Add study session entry if activity is done to count for study time charts
+            if result["is_done"]:
+                try:
+                    self.db.table("study_sessions").insert(
+                        {
+                            "username": username,
+                            "activity_type": result.get("category") or activity_type or "exercise",
+                            "duration_minutes": 3,
+                        }
+                    ).execute()
+                except Exception:
+                    pass
+
             if result["is_done"] and not result["was_done_with_points"]:
                 await gs.apply_activity_points(
                     username, result["category"], delta=+1

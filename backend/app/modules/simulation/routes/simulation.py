@@ -166,6 +166,7 @@ async def mark_simulation_complete(
                     "simulation_id": scenario_id,
                     "item_id": scenario_id,
                     "completed_at": datetime.now(timezone.utc).isoformat(),
+                    "status": "completed",
                 },
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }

@@ -718,6 +718,7 @@ async def mark_podcast_complete(
                     "podcast_id": podcast_id,
                     "item_id": podcast_id,
                     "completed_at": datetime.now(timezone.utc).isoformat(),
+                    "status": "completed",
                 },
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }

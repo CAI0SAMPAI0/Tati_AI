@@ -1,19 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { 
-  User, 
-  Trash2, 
-  Save, 
-  Brain, 
-  Target, 
+import {
+  User,
+  Trash2,
+  Save,
+  Brain,
+  Target,
   AlertCircle,
   Sparkles,
   RefreshCw,
   Clock,
   Send,
   BarChart2,
-  Award
+  CheckCircle
 } from 'lucide-react';
 import { DialogModal } from '@/components/ui/dialog-modal';
 import { Button } from '@/components/ui/button';
@@ -32,8 +32,8 @@ interface StudentModalProps {
 }
 
 export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModalProps) {
-  
-  const [activeTab, setActiveTab] = useState<'info' | 'prompt' | 'insight' | 'interests' | 'analytics'>('info');
+
+  const [activeTab, setActiveTab] = useState<'info' | 'prompt' | 'insight' | 'interests' | 'analytics' | 'progress'>('info');
   const [localStudent, setLocalStudent] = useState(student);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -46,8 +46,21 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
   const [isFetchingAnalytics, setIsFetchingAnalytics] = useState(false);
   const [nudgeMessage, setNudgeMessage] = useState('');
   const [isNudging, setIsNudging] = useState(false);
-  const [isDownloadingCert, setIsDownloadingCert] = useState(false);
+  const [activityProgress, setActivityProgress] = useState<any>(null);
+  const [isFetchingProgress, setIsFetchingProgress] = useState(false);
   const lang = 'en-US';
+
+  const fetchActivityProgress = async () => {
+    setIsFetchingProgress(true);
+    try {
+      const res = await apiGet<any>(`/dashboard/students/${encodeURIComponent(localStudent.username)}/activity-progress`);
+      setActivityProgress(res);
+    } catch (err) {
+      toast.error('Failed to load activity progress.');
+    } finally {
+      setIsFetchingProgress(false);
+    }
+  };
 
   // Reset local state when student changes
   useEffect(() => {
@@ -57,6 +70,7 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
     setInterests([]);
     setRecommendations([]);
     setAnalytics(null);
+    setActivityProgress(null);
     if (student) {
       setNudgeMessage(`Hi ${student.name || student.username}! Teacher Tati here. I noticed you haven't practiced English lately. Let's do a quick chat session today?`);
     }
@@ -75,34 +89,7 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
     }
   };
 
-  const handleDownloadCertificate = async () => {
-    setIsDownloadingCert(true);
-    try {
-      const token = localStorage.getItem('token');
-      const url = `${API_BASE}/dashboard/students/${encodeURIComponent(localStudent.username)}/certificate`;
 
-      const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (!response.ok) throw new Error('Download failed');
-
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = `Certificate_${localStudent.username}_${localStudent.level || 'A1'}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(downloadUrl);
-      toast.success('✔ Certificate downloaded successfully!');
-    } catch (err) {
-      console.error(err);
-      toast.error('✗ Error downloading certificate. Please try again.');
-    } finally {
-      setIsDownloadingCert(false);
-    }
-  };
 
   const handleSavePrompt = async () => {
     try {
@@ -202,14 +189,17 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
     if (activeTab === 'analytics' && localStudent) {
       fetchAnalytics();
     }
+    if (activeTab === 'progress' && localStudent) {
+      fetchActivityProgress();
+    }
   }, [activeTab, localStudent]);
 
   if (!localStudent) return null;
 
   return (
-    <DialogModal 
-      isOpen={isOpen} 
-      onClose={onClose} 
+    <DialogModal
+      isOpen={isOpen}
+      onClose={onClose}
       title={localStudent.name || localStudent.username}
     >
       <div className="flex flex-col gap-6">
@@ -218,6 +208,7 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
           {[
             { id: 'info', icon: <User size={14} />, label: 'Profile' },
             { id: 'analytics', icon: <BarChart2 size={14} />, label: 'Analytics' },
+            { id: 'progress', icon: <CheckCircle size={14} />, label: 'Progress' },
             { id: 'prompt', icon: <AlertCircle size={14} />, label: 'Prompt' },
             { id: 'insight', icon: <Brain size={14} />, label: 'Insight' },
             { id: 'interests', icon: <Target size={14} />, label: 'Interests' },
@@ -285,25 +276,9 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-border space-y-3">
-                <label className="text-xs font-bold text-text-muted uppercase tracking-widest block">{'Graduation & CEFR Certificate'}</label>
-                <Button
-                  onClick={handleDownloadCertificate}
-                  disabled={isDownloadingCert}
-                  className="w-full gap-2 bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-600 hover:to-amber-700 text-white font-bold shadow-md shadow-yellow-500/10 border-0"
-                >
-                  {isDownloadingCert ? (
-                    <span className="animate-spin">⏳</span>
-                  ) : (
-                    <Award size={16} />
-                  )}
-                  Download CEFR Certificate
-                </Button>
-              </div>
-
               <div className="pt-4 border-t border-border">
-                <Button 
-                  variant="secondary" 
+                <Button
+                  variant="secondary"
                   className="w-full text-danger hover:bg-danger/10 hover:text-danger border-danger/20"
                   onClick={handleDelete}
                   disabled={isDeleting}
@@ -318,9 +293,9 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
           {activeTab === 'prompt' && (
             <div className="space-y-4 animate-fade-in">
               <div className="p-4 bg-warning/5 border border-warning/10 rounded-2xl">
-                 <p className="text-xs text-warning leading-relaxed">Add extra instructions for Tati to follow <strong>only with this student</strong>.</p>
+                <p className="text-xs text-warning leading-relaxed">Add extra instructions for Tati to follow <strong>only with this student</strong>.</p>
               </div>
-              <textarea 
+              <textarea
                 className="w-full h-40 p-4 bg-bg border border-border rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all resize-none"
                 placeholder="Ex: Foque em corrigir o uso de preposições..."
                 value={promptText}
@@ -335,83 +310,83 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
 
           {activeTab === 'insight' && (
             <div className="space-y-4 animate-fade-in">
-               <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl flex flex-col items-center text-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                    <Sparkles size={24} />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-text">{'🧠 Generate Insight'}</h4>
-                    <p className="text-xs text-text-muted mt-1">{'Click 🧠 Generate Insight to analyze this student\'s history or Grammar Errors to see recurring mistakes.'}</p>
-                  </div>
-                  <div className="flex gap-2 w-full">
-                    <Button 
-                      onClick={handleGenerateInsight} 
-                      disabled={isGenerating}
-                      className="flex-1 gap-2"
-                    >
-                      {isGenerating ? <RefreshCw size={16} className="animate-spin" /> : <Brain size={16} />}
-                      {isGenerating ? '⏳ Analyzing...' : 'Generate Insight'}
-                    </Button>
-                    <Button 
-                      variant="secondary"
-                      onClick={handleGenerateGrammarErrors} 
-                      disabled={isGenerating}
-                      className="gap-2"
-                    >
-                      🧩 {'Grammar Errors'}
-                    </Button>
-                  </div>
-               </div>
+              <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl flex flex-col items-center text-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                  <Sparkles size={24} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-text">{'🧠 Generate Insight'}</h4>
+                  <p className="text-xs text-text-muted mt-1">{'Click 🧠 Generate Insight to analyze this student\'s history or Grammar Errors to see recurring mistakes.'}</p>
+                </div>
+                <div className="flex gap-2 w-full">
+                  <Button
+                    onClick={handleGenerateInsight}
+                    disabled={isGenerating}
+                    className="flex-1 gap-2"
+                  >
+                    {isGenerating ? <RefreshCw size={16} className="animate-spin" /> : <Brain size={16} />}
+                    {isGenerating ? '⏳ Analyzing...' : 'Generate Insight'}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={handleGenerateGrammarErrors}
+                    disabled={isGenerating}
+                    className="gap-2"
+                  >
+                    🧩 {'Grammar Errors'}
+                  </Button>
+                </div>
+              </div>
 
-               {insight && (
-                 <div className="p-4 bg-surface border border-border rounded-2xl animate-fade-in">
-                    <h5 className="text-xs font-bold text-primary uppercase tracking-widest mb-2 flex items-center gap-2">
-                      <Brain size={14} /> AI Analysis
-                    </h5>
-                    <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">{insight}</p>
-                 </div>
-               )}
+              {insight && (
+                <div className="p-4 bg-surface border border-border rounded-2xl animate-fade-in">
+                  <h5 className="text-xs font-bold text-primary uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <Brain size={14} /> AI Analysis
+                  </h5>
+                  <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">{insight}</p>
+                </div>
+              )}
             </div>
           )}
 
           {activeTab === 'interests' && (
             <div className="space-y-4 animate-fade-in">
-               <div className="p-10 text-center border border-dashed border-border rounded-3xl">
-                  <Target size={32} className="mx-auto text-text-subtle mb-3" />
-                  <p className="text-sm text-text-muted">{'The AI will analyze the history to map hobbies and suggest study plans.'}</p>
-                  <Button 
-                    variant="secondary" 
-                    className="mt-4 gap-2"
-                    onClick={handleFetchInterests}
-                    disabled={isAnalyzingInterests}
-                  >
-                    {isAnalyzingInterests ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                    {isAnalyzingInterests ? 'Analyzing...' : 'Analyze Interests'}
-                  </Button>
-               </div>
+              <div className="p-10 text-center border border-dashed border-border rounded-3xl">
+                <Target size={32} className="mx-auto text-text-subtle mb-3" />
+                <p className="text-sm text-text-muted">{'The AI will analyze the history to map hobbies and suggest study plans.'}</p>
+                <Button
+                  variant="secondary"
+                  className="mt-4 gap-2"
+                  onClick={handleFetchInterests}
+                  disabled={isAnalyzingInterests}
+                >
+                  {isAnalyzingInterests ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  {isAnalyzingInterests ? 'Analyzing...' : 'Analyze Interests'}
+                </Button>
+              </div>
 
-               {interests.length > 0 && (
-                 <div className="space-y-4">
-                    <div className="flex flex-wrap gap-2">
-                      {interests.map((interest, i) => (
-                        <span key={i} className="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-lg border border-primary/20">
-                          {interest}
-                        </span>
+              {interests.length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap gap-2">
+                    {interests.map((interest, i) => (
+                      <span key={i} className="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-lg border border-primary/20">
+                        {interest}
+                      </span>
+                    ))}
+                  </div>
+                  {recommendations.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-bold text-text-muted uppercase tracking-widest">{'Practical Recommendations'}</h4>
+                      {recommendations.map((rec: any, i) => (
+                        <div key={i} className="p-3 bg-surface border border-border rounded-xl text-xs leading-relaxed">
+                          <span className="font-bold text-primary mr-2">✦</span>
+                          <span className="font-bold">{rec.recommendation || rec}:</span> {rec.description}
+                        </div>
                       ))}
                     </div>
-                    {recommendations.length > 0 && (
-                      <div className="space-y-2">
-                        <h4 className="text-xs font-bold text-text-muted uppercase tracking-widest">{'Practical Recommendations'}</h4>
-                        {recommendations.map((rec: any, i) => (
-                          <div key={i} className="p-3 bg-surface border border-border rounded-xl text-xs leading-relaxed">
-                            <span className="font-bold text-primary mr-2">✦</span>
-                            <span className="font-bold">{rec.recommendation || rec}:</span> {rec.description}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                 </div>
-               )}
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -462,11 +437,11 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                               <span className="text-neutral-400">{day.messages_sent} msgs</span>
                             </div>
                             {/* Bar */}
-                            <div 
+                            <div
                               className={cn(
-                                "w-full rounded-t-md transition-all duration-300", 
+                                "w-full rounded-t-md transition-all duration-300",
                                 day.study_minutes > 0 ? "bg-primary group-hover:bg-primary/80" : "bg-border/30"
-                              )} 
+                              )}
                               style={{ height: `${heightPct}%` }}
                             />
                             {/* Label */}
@@ -489,12 +464,12 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                             <div className="flex justify-between items-center text-xs">
                               <span className="font-bold text-text truncate max-w-[70%]">{mod.title}</span>
                               <span className="text-[0.65rem] font-bold text-text-muted">
-                               {mod.completed_quizzes}/{mod.total_quizzes} {mod.type_label || "Quizzes"}
+                                {mod.completed_quizzes}/{mod.total_quizzes} {mod.type_label || "Quizzes"}
                               </span>
                             </div>
                             <div className="w-full bg-border/40 h-2 rounded-full overflow-hidden">
-                              <div 
-                                className="bg-primary h-full rounded-full transition-all duration-500" 
+                              <div
+                                className="bg-primary h-full rounded-full transition-all duration-500"
                                 style={{ width: `${mod.progress_pct}%` }}
                               />
                             </div>
@@ -507,8 +482,8 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                   {/* Risk Alert & Nudge Panel */}
                   <div className={cn(
                     "p-4 border rounded-2xl space-y-3",
-                    localStudent.risk_level !== 'active' 
-                      ? "bg-warning/5 border-warning/20" 
+                    localStudent.risk_level !== 'active'
+                      ? "bg-warning/5 border-warning/20"
                       : "bg-primary/5 border-primary/10"
                   )}>
                     <div className="flex items-start gap-3">
@@ -520,8 +495,8 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                       </div>
                       <div className="min-w-0 flex-1">
                         <h4 className="font-bold text-xs text-text">
-                          {localStudent.risk_level !== 'active' 
-                            ? `Inactive for ${localStudent.days_inactive} days!` 
+                          {localStudent.risk_level !== 'active'
+                            ? `Inactive for ${localStudent.days_inactive} days!`
                             : "Engagement status is healthy"}
                         </h4>
                         <p className="text-[0.7rem] text-text-muted mt-0.5">
@@ -539,8 +514,8 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                         value={nudgeMessage}
                         onChange={(e) => setNudgeMessage(e.target.value)}
                       />
-                      <Button 
-                        onClick={handleSendNudge} 
+                      <Button
+                        onClick={handleSendNudge}
                         disabled={isNudging || !nudgeMessage.trim()}
                         className="w-full text-xs py-1.5 h-auto gap-2"
                       >
@@ -553,8 +528,220 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
               )}
             </div>
           )}
+
+          {activeTab === 'progress' && (
+            <div className="space-y-5 animate-fade-in">
+              {isFetchingProgress ? (
+                <div className="flex justify-center items-center py-12">
+                  <RefreshCw size={24} className="animate-spin text-primary" />
+                </div>
+              ) : !activityProgress ? (
+                <p className="text-center text-xs text-text-muted">No activity progress data.</p>
+              ) : (
+                <>
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="p-2.5 bg-surface border border-border rounded-xl">
+                      <span className="text-[0.6rem] font-bold text-text-subtle uppercase tracking-wider block truncate">Grammar</span>
+                      <p className="text-base font-black text-text mt-0.5">{activityProgress.summary?.grammar || 0}</p>
+                    </div>
+                    <div className="p-2.5 bg-surface border border-border rounded-xl">
+                      <span className="text-[0.6rem] font-bold text-text-subtle uppercase tracking-wider block truncate">Vocab</span>
+                      <p className="text-base font-black text-text mt-0.5">{activityProgress.summary?.vocabulary || 0}</p>
+                    </div>
+                    <div className="p-2.5 bg-surface border border-border rounded-xl">
+                      <span className="text-[0.6rem] font-bold text-text-subtle uppercase tracking-wider block truncate">Listening</span>
+                      <p className="text-base font-black text-text mt-0.5">{activityProgress.summary?.listening || 0}</p>
+                    </div>
+                    <div className="p-2.5 bg-surface border border-border rounded-xl">
+                      <span className="text-[0.6rem] font-bold text-text-subtle uppercase tracking-wider block truncate">Reading</span>
+                      <p className="text-base font-black text-text mt-0.5">{activityProgress.summary?.reading || 0}</p>
+                    </div>
+                    <div className="p-2.5 bg-surface border border-border rounded-xl">
+                      <span className="text-[0.6rem] font-bold text-text-subtle uppercase tracking-wider block truncate">Flashcards</span>
+                      <p className="text-base font-black text-text mt-0.5">{activityProgress.summary?.flashcards || 0}</p>
+                    </div>
+                    <div className="p-2.5 bg-surface border border-border rounded-xl">
+                      <span className="text-[0.6rem] font-bold text-text-subtle uppercase tracking-wider block truncate">Simulations</span>
+                      <p className="text-base font-black text-text mt-0.5">{activityProgress.summary?.simulations || 0}</p>
+                    </div>
+                    <div className="p-2.5 bg-surface border border-border rounded-xl">
+                      <span className="text-[0.6rem] font-bold text-text-subtle uppercase tracking-wider block truncate">Games</span>
+                      <p className="text-base font-black text-text mt-0.5">{activityProgress.summary?.games || 0}</p>
+                    </div>
+                    <div className="p-2.5 bg-surface border border-border rounded-xl">
+                      <span className="text-[0.6rem] font-bold text-text-subtle uppercase tracking-wider block truncate">News</span>
+                      <p className="text-base font-black text-text mt-0.5">{activityProgress.summary?.news || 0}</p>
+                    </div>
+                  </div>
+
+                  {/* Submissions List */}
+                  {activityProgress.submissions?.length > 0 && (() => {
+                    // Local state for categorizing the list in student-modal
+                    const categories = ['all', 'grammar', 'vocabulary', 'listening', 'reading', 'simulations', 'games', 'news'];
+
+                    // Filter submissions based on a local state defined at the component wrapper if possible
+                    // However since this is inline, we can define a tab selector or simply list them categorized
+                    // Let's group them or render a tab list. Since we want an interactive tab selection, let's create a local filter state!
+                    return <StudentSubmissionsSection submissions={activityProgress.submissions} />;
+                  })()}
+
+                  {/* Flashcards List */}
+                  {activityProgress.flashcards?.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-bold text-text-muted uppercase tracking-widest">Flashcards Completed</h4>
+                      <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
+                        {activityProgress.flashcards.map((f: any, i: number) => (
+                          <div key={f.id || i} className="p-2.5 bg-bg-secondary/40 border border-border/80 rounded-xl flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="w-2 h-2 rounded-full bg-success shrink-0" />
+                              <span className="font-bold text-text truncate">Card #{f.card_index ?? i + 1}</span>
+                            </div>
+                            <span className="text-[0.6rem] text-success font-bold shrink-0">✓ Correct</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Vocabulary List */}
+                  {activityProgress.vocabulary?.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-bold text-text-muted uppercase tracking-widest">Vocabulary Learned</h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {activityProgress.vocabulary.map((v: any, i: number) => (
+                          <span key={v.id || i} className="px-2.5 py-1 bg-primary/10 text-primary text-[0.65rem] font-bold rounded-lg border border-primary/20">
+                            {v.word}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pronunciation */}
+                  {activityProgress.pronunciation?.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-bold text-text-muted uppercase tracking-widest">Pronunciation Challenges</h4>
+                      <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
+                        {activityProgress.pronunciation.map((p: any, i: number) => (
+                          <div key={i} className="p-2.5 bg-bg-secondary/40 border border-border/80 rounded-xl flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={cn("w-2 h-2 rounded-full shrink-0", p.is_done ? "bg-success" : "bg-warning")} />
+                              <span className="font-bold text-text truncate">{p.word || p.phrase || `Challenge #${i + 1}`}</span>
+                            </div>
+                            {p.score != null && <span className="text-text-muted shrink-0">{p.score}%</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </DialogModal>
+  );
+}
+
+function StudentSubmissionsSection({ submissions }: { submissions: any[] }) {
+  const [filter, setFilter] = useState<'all' | 'grammar' | 'vocabulary' | 'listening' | 'reading' | 'simulations' | 'games' | 'news'>('all');
+
+  const filtered = submissions.filter(s => {
+    if (filter === 'all') return true;
+    const cat = strNormalize(s.category || s.activity_type);
+    if (filter === 'vocabulary') return cat === 'vocab' || cat === 'vocabulary';
+    if (filter === 'listening') return cat === 'listening' || cat === 'listenings' || cat === 'podcast' || cat === 'podcasts';
+    if (filter === 'simulations') return cat === 'simulation' || cat === 'simulations';
+    if (filter === 'games') return cat === 'game' || cat === 'games';
+    if (filter === 'news') return cat === 'news' || cat === 'article' || cat === 'articles';
+    return cat === filter;
+  });
+
+  function strNormalize(val: any): string {
+    return String(val || '').toLowerCase().trim();
+  }
+
+  const tabs: Array<{ id: typeof filter; label: string }> = [
+    { id: 'all', label: 'All' },
+    { id: 'grammar', label: 'Grammar' },
+    { id: 'vocabulary', label: 'Vocab' },
+    { id: 'listening', label: 'Listening' },
+    { id: 'reading', label: 'Reading' },
+    { id: 'simulations', label: 'Simulations' },
+    { id: 'games', label: 'Games' },
+    { id: 'news', label: 'News' }
+  ];
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between border-b border-border pb-2">
+        <h4 className="text-xs font-bold text-text-muted uppercase tracking-widest">Completed Activities & Exercises</h4>
+        <span className="text-[0.6rem] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
+          {filtered.length} found
+        </span>
+      </div>
+
+      {/* Sub-tabs inside progress modal */}
+      <div className="flex bg-bg-secondary p-0.5 rounded-lg overflow-x-auto no-scrollbar gap-0.5 max-w-full">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setFilter(tab.id)}
+            className={cn(
+              "px-2.5 py-1 rounded text-[0.6rem] font-bold transition-all whitespace-nowrap",
+              filter === tab.id ? "bg-surface text-primary shadow-sm" : "text-text-muted hover:text-text"
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar">
+        {filtered.length === 0 ? (
+          <p className="text-center py-8 text-xs text-text-muted">No completed items in this category.</p>
+        ) : (
+          filtered.map((s: any) => (
+            <div key={s.id} className="p-3 bg-bg-secondary/40 border border-border/80 rounded-xl flex items-center justify-between text-xs hover:border-primary/20 transition-all">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-success shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-bold text-text truncate max-w-[260px]">
+                    {s.title && s.title.includes('') ? s.title.replace(/-/g, '–') : (s.title || 'Exercise')}
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                    <span className="px-1.5 py-0.2 bg-primary/5 border border-primary/10 text-primary rounded text-[0.5rem] font-bold uppercase tracking-wider">
+                      {s.category || 'general'}
+                    </span>
+                    {s.url && (
+                      <a
+                        href={s.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[0.55rem] text-text-muted hover:text-primary hover:underline truncate max-w-[150px]"
+                      >
+                        {s.url.includes('test-english.com') ? 'test-english.com' : new URL(s.url).hostname}
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 text-right">
+                {s.score != null && (
+                  <span className="font-extrabold text-success bg-success/15 px-2 py-0.5 rounded text-[0.65rem]">
+                    {s.score}%
+                  </span>
+                )}
+                <span className="text-[0.6rem] text-text-muted capitalize">
+                  {s.status}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
   );
 }

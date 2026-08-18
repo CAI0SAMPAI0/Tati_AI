@@ -96,32 +96,6 @@ export default function DashboardClientPage() {
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
 
-  const sectionTitles: Record<string, string> = {
-    overview: 'Overview',
-    reports: 'Reports',
-    students: 'Students',
-    simulations: 'Simulations',
-    games: 'Games',
-    news: 'News',
-    flashcards: 'Flashcards',
-    cefr: 'CEFR Materials',
-    submissions: 'Corrections',
-    whatsapp: 'WhatsApp Config'
-  };
-
-  const sectionSubs: Record<string, string> = {
-    overview: 'Platform summary',
-    reports: 'Overview and class metrics',
-    students: 'Student management',
-    simulations: 'Manage real-life conversation simulations',
-    games: 'Manage WordWall games for students',
-    news: 'Share news, reels and links with students',
-    flashcards: 'Vocabulary deck management',
-    cefr: 'CEFR diagnostic and RAG materials',
-    submissions: 'Student answers to review',
-    whatsapp: 'Connect and manage WhatsApp WAHA sessions'
-  };
-
   // Fetching data
   const { data: stats } = useQuery({
     queryKey: ['admin-dashboard-stats'],

@@ -128,7 +128,10 @@ export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose 
               icon={item.icon}
               label={item.label}
               isActive={activeSection === item.id}
-              onClick={() => { onSetSection(item.id); onClose(); }}
+              onClick={() => { 
+                onSetSection(item.id); 
+                if (window.innerWidth < 768) onClose(); 
+              }}
             />
           ))}
         </nav>

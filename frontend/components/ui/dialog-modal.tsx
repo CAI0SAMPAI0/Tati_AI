@@ -40,15 +40,19 @@ export function DialogModal({ isOpen, onClose, title, children, size = 'md' }: M
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             onClick={onClose}
             className="absolute inset-0 bg-bg/60 backdrop-blur-md"
           />
 
           {/* Conteúdo do Modal */}
           <motion.div 
+            layout={false}
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ duration: 0.2 }}
+            style={{ willChange: 'transform' }}
             onClick={(e) => e.stopPropagation()}
             className={cn(
               "relative w-full bg-surface border border-border rounded-3xl shadow-2xl p-4 md:p-6 flex flex-col z-10 max-h-[92vh] md:max-h-[84vh]",

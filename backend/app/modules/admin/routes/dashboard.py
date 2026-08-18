@@ -101,31 +101,7 @@ async def get_student_analytics(
     return await service.get_student_detail_analytics(username)
 
 
-@router.get("/students/{username}/certificate")
-async def get_student_certificate(username: str, user=Depends(require_staff)):
-    """Gera o certificado de conclusão de nível do aluno em PDF landscape."""
-    from datetime import datetime
-
-    from app.core.database import get_client
-    from app.shared.services.pdf_generator import generate_certificate_pdf
-    from fastapi.responses import FileResponse
-
-    db = get_client()
-    res = db.table("users").select("name, level").eq("username", username).execute()
-    if not res.data:
-        raise HTTPException(404, detail="Student not found")
-
-    student_name = res.data[0].get("name") or username
-    level = res.data[0].get("level") or "A1"
-    date_str = datetime.now().strftime("%B %d, %Y")
-
-    pdf_path = generate_certificate_pdf(student_name, level, date_str)
-
-    return FileResponse(
-        pdf_path,
-        media_type="application/pdf",
-        filename=f"Certificate_{username.replace(' ', '_')}_{level}.pdf",
-    )
+# Removed certificate route
 
 
 @router.post("/students/{username}/nudge")
@@ -240,6 +216,16 @@ async def get_recommendations(
 ) -> dict:
     """Retorna interesses e recomendações pedagógicas para um aluno."""
     return await service.get_recommendations(username, lang)
+
+
+@router.get("/students/{username}/activity-progress")
+async def get_progress(
+    username: str,
+    service: DashboardService = Depends(),
+    user=Depends(require_staff),
+) -> dict:
+    """Retorna progresso de módulos e atividades do aluno."""
+    return await service.get_student_exercise_done(username)
 
 
 # ── Simulações, Flashcards, Submissões ────────────────────────────────

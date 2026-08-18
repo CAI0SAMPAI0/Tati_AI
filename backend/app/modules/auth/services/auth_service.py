@@ -85,6 +85,13 @@ class AuthService:
                 db, user["username"], {"temp_password": None}
             )
 
+        # Trigger study day streak renewal and update active date upon login
+        try:
+            from app.modules.users.services.streaks import record_study_day
+            asyncio.create_task(record_study_day(user["username"], is_activity=False))
+        except Exception:
+            pass
+
         return await AuthService.build_token_response(user)
 
     @staticmethod
@@ -141,6 +148,12 @@ class AuthService:
 
         existing_user = await UserRepository.find_by_email(db, email)
         if existing_user:
+            # Trigger study day streak renewal and update active date upon google login
+            try:
+                from app.modules.users.services.streaks import record_study_day
+                asyncio.create_task(record_study_day(existing_user["username"], is_activity=False))
+            except Exception:
+                pass
             return await AuthService.build_token_response(existing_user)
 
         # Garante username único

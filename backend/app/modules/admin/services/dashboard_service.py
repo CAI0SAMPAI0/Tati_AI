@@ -215,8 +215,29 @@ class DashboardService:
                 if not username:
                     continue
 
-                # Prioriza data da última mensagem, senão data de criação
-                last_active_str = last_activity.get(username) or u.get("created_at", "")
+                # Prioritize last study date from streak_data, then last message, then created_at
+                st_data = u.get("streak_data") or {}
+                if not isinstance(st_data, dict):
+                    st_data = {}
+                last_study = st_data.get("last_study_date")
+                last_msg_date = last_activity.get(username)
+                
+                dates_to_compare = []
+                if last_study:
+                    dates_to_compare.append(last_study)
+                if last_msg_date:
+                    dates_to_compare.append(last_msg_date)
+                if u.get("created_at"):
+                    dates_to_compare.append(u.get("created_at"))
+                    
+                # Use the latest date from all available sources
+                if dates_to_compare:
+                    try:
+                        last_active_str = max(dates_to_compare, key=parse_dt)
+                    except Exception:
+                        last_active_str = last_study or last_msg_date or u.get("created_at", "")
+                else:
+                    last_active_str = u.get("created_at", "")
 
                 # Calcula dias de inatividade e nível de risco
                 days_inactive = 0
@@ -750,6 +771,203 @@ class DashboardService:
 
         return await run_in_threadpool(_fetch)
 
+    async def get_student_exercise_done(self, username: str) -> dict[str, Any]:
+        """Retorna lista de todos os exercícios concluídos pelo aluno agrupados por tipo/categoria."""
+
+        def _fetch():
+            # Get valid module and quiz IDs to filter out deleted/legacy records
+            try:
+                valid_modules = {row["id"] for row in self.db.table("modules").select("id").execute().data or []}
+                valid_quizzes = {row["id"] for row in self.db.table("quizzes").select("id").execute().data or []}
+            except Exception as e:
+                logging.info(f"[DashboardService] Erro ao buscar validadores de módulos/quizzes: {e}")
+                valid_modules = set()
+                valid_quizzes = set()
+
+            submissions = []
+            flashcards = []
+            vocabulary = []
+            pronunciation = []
+
+            # 1. Activity submissions
+            try:
+                res = (
+                    self.db.table("activity_submissions")
+                    .select(
+                        "id, score, username, created_at, activity_type, metadata, module_id"
+                    )
+                    .eq("username", username)
+                    .order("created_at", desc=True)
+                    .limit(500)
+                    .execute()
+                )
+                data = res.data or []
+                logging.info(f"[DashboardService EXERCISE CHECK] username={username} submissions_count={len(data)} raw_data={data}")
+                for row in data:
+                    meta = row.get("metadata") or {}
+                    status = (meta.get("status") or "pending").lower()
+                    is_done = (
+                        status in ("completed", "correct", "done") or
+                        (row.get("score") is not None and row.get("score", 0) >= 0 and status != "pending")
+                    )
+
+                    if is_done:
+                        submissions.append(
+                            {
+                                "id": row["id"],
+                                "score": row["score"],
+                                "username": row["username"],
+                                "created_at": row["created_at"],
+                                "activity_type": row["activity_type"],
+                                "is_done": True,
+                                "status": status or "completed",
+                                "title": meta.get("title") or row["activity_type"],
+                                "category": meta.get("category") or row["activity_type"],
+                                "url": meta.get("url"),
+                            }
+                        )
+            except Exception as e:
+                logging.info(
+                    f"[DashboardService] Erro ao buscar submissions feitas para '{username}': {e}"
+                )
+
+            # 2. Flashcards (user_flashcard_progress)
+            try:
+                res = (
+                    self.db.table("user_flashcard_progress")
+                    .select("*")
+                    .eq("username", username)
+                    .execute()
+                )
+                data = res.data or []
+                for row in data:
+                    mod_id = row.get("module_id")
+                    if mod_id and valid_modules and mod_id not in valid_modules:
+                        continue
+
+                    status = str(row.get("status") or "").lower().strip()
+                    if status in ("correct", "learned"):
+                        flashcards.append(
+                            {
+                                "id": row.get("id"),
+                                "username": row.get("username"),
+                                "module_id": row.get("module_id"),
+                                "card_index": row.get("card_index"),
+                                "status": row.get("status"),
+                                "created_at": row.get("created_at") or row.get("updated_at"),
+                                "activity_type": "flashcard",
+                                "is_done": True,
+                            }
+                        )
+            except Exception as e:
+                logging.info(
+                    f"[DashboardService] Erro ao buscar flashcards para '{username}': {e}"
+                )
+
+            # 3. Vocabulary (user_vocabulary)
+            try:
+                res = (
+                    self.db.table("user_vocabulary")
+                    .select("*")
+                    .eq("username", username)
+                    .execute()
+                )
+                data = res.data or []
+                for row in data:
+                    reps = row.get("repetitions", 0)
+                    status = row.get("status", "")
+                    if reps >= 4 or status == "learned":
+                        vocabulary.append(
+                            {
+                                "id": row.get("id"),
+                                "username": row.get("username"),
+                                "word": row.get("word"),
+                                "status": status,
+                                "repetitions": reps,
+                                "created_at": row.get("created_at") or row.get("updated_at"),
+                                "activity_type": "vocabulary",
+                                "is_done": True,
+                            }
+                        )
+            except Exception as e:
+                logging.info(
+                    f"[DashboardService] Erro ao buscar vocabulário para '{username}': {e}"
+                )
+
+            # 4. Pronunciation
+            try:
+                res = (
+                    self.db.table("users")
+                    .select("pronunciation_challenges")
+                    .eq("username", username)
+                    .execute()
+                )
+                data = res.data or []
+                if data and data[0].get("pronunciation_challenges"):
+                    challenges = data[0]["pronunciation_challenges"]
+                    if isinstance(challenges, list):
+                        for item in challenges:
+                            is_done = "completed" in item or "score" in item
+                            if is_done:
+                                entry = dict(item)
+                                entry["activity_type"] = "pronunciation"
+                                entry["is_done"] = True
+                                pronunciation.append(entry)
+            except Exception as e:
+                logging.info(
+                    f"[DashboardService] Erro ao buscar pronúncia para '{username}': {e}"
+                )
+
+            # Group submissions by their exact categories/types
+            grammar_count = 0
+            vocab_count = len(vocabulary)
+            listening_count = 0
+            reading_count = 0
+            flashcards_count = len(flashcards)
+            simulations_count = len(pronunciation)  # Count pronunciation here or simulations
+            games_count = 0
+            news_count = 0
+
+            # Count simulations from submissions
+            for s in submissions:
+                cat = str(s.get("category") or s.get("activity_type") or "").lower().strip()
+                if cat == "grammar":
+                    grammar_count += 1
+                elif cat in ("vocab", "vocabulary"):
+                    vocab_count += 1
+                elif cat in ("listening", "listenings", "podcast", "podcasts"):
+                    listening_count += 1
+                elif cat == "reading":
+                    reading_count += 1
+                elif cat == "flashcards" or cat == "flashcard":
+                    flashcards_count += 1
+                elif cat in ("simulation", "simulations"):
+                    simulations_count += 1
+                elif cat in ("game", "games"):
+                    games_count += 1
+                elif cat in ("news", "article", "articles"):
+                    news_count += 1
+
+            return {
+                "submissions": submissions,
+                "flashcards": flashcards,
+                "vocabulary": vocabulary,
+                "pronunciation": pronunciation,
+                "summary": {
+                    "grammar": grammar_count,
+                    "vocabulary": vocab_count,
+                    "listening": listening_count,
+                    "reading": reading_count,
+                    "flashcards": flashcards_count,
+                    "simulations": simulations_count,
+                    "games": games_count,
+                    "news": news_count,
+                    "total_all": grammar_count + vocab_count + listening_count + reading_count + flashcards_count + simulations_count + games_count + news_count
+                }
+            }
+
+        return await run_in_threadpool(_fetch)
+
     async def nudge_student(
         self, username: str, text: str, sender_username: str | None = None
     ) -> dict:
@@ -761,7 +979,7 @@ class DashboardService:
             create_notification(
                 username=username,
                 category="nudge",
-                title="Teacher Tati 👩‍🏫",
+                title="Teacher Tati",
                 message=text,
                 send_push=False,  # dispatch_universal_notification vai tratar do push
             )
@@ -937,10 +1155,6 @@ class DashboardService:
         """Exclui um usuário (aluno ou buyer) e todos os seus dados vinculados — evita erros de FK."""
 
         def _delete():
-            # ── 0. Resolve o username EXATO como está no banco (não forçar lowercase) ─
-            # O bug original: .lower() fazia o match falhar se o DB tinha capitalização
-            # diferente, resultando em orders não removidos e FK
-            # bloqueando a deleção.
             try:
                 user_row = (
                     self.db.table("users")
