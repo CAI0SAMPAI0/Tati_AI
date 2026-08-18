@@ -170,7 +170,7 @@ async def _stream_groq(
     last_error: Exception | None = None
 
     # Models to try in order: fast large model first, fallback to stable llama3
-    model_queue = ["llama-3.3-70b-versatile", "llama-3.2-11b-vision-preview"]
+    model_queue = ["openai/gpt-oss-20b", "llama-3.2-11b-vision-preview"]
     current_model_idx = 0
 
     while current_model_idx < len(model_queue):
@@ -261,13 +261,13 @@ async def groq_chat(
     messages: list[dict],
     max_tokens: int = 1500,
     temperature: float = 0.4,
-    model: str = "llama-3.3-70b-versatile",
+    model: str = "openai/gpt-oss-20b",
 ) -> str:
     """Chamada simples ao Groq com fallback automático entre chaves e modelos."""
     try:
         return await _groq_chat_attempt(messages, max_tokens, temperature, model)
     except Exception as e:
-        if "rate_limit" in str(e).lower() and model == "llama-3.3-70b-versatile":
+        if "rate_limit" in str(e).lower() and model == "openai/gpt-oss-20b":
             fallback_model = "llama-3.1-8b-instant"
             logging.warning(
                 f"[Groq chat] Rate limit hit for {model}. Falling back to {fallback_model}..."
@@ -416,7 +416,7 @@ async def search_image_on_internet(query: str) -> str:
                     },
                     {"role": "user", "content": query},
                 ],
-                model="llama-3.3-70b-versatile",
+                model="openai/gpt-oss-20b",
                 max_tokens=100,
             )
             optimized_query = optimized_query.strip().strip('"').strip("'")
