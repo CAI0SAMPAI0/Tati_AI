@@ -13,7 +13,6 @@ from app.core.enums import cefr_window, normalize_level
 from app.core.exceptions import BusinessLogicError, ContentNotFoundError
 from app.modules.activities.services.podcast_exercise import PodcastExerciseService
 from app.modules.activities.services.podcast_recommender import PodcastRecommender
-from app.shared.services.media_availability import MediaAvailabilityService
 from fastapi import APIRouter, BackgroundTasks, Depends, Header
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
@@ -476,7 +475,6 @@ async def get_podcast_recommendations(
     accept_language: str | None = Header(default=None),
 ):
     recommender = PodcastRecommender()
-    availability_service = MediaAvailabilityService()
 
     username = user.get("username")
     is_staff = user.get("is_staff", False)

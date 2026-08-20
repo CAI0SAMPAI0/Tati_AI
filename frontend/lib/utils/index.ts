@@ -7,6 +7,11 @@ export function cn(...classes: (string | undefined | null | false)[]): string {
 export function formatTime(isoString?: string | null): string {
   let date: Date;
   if (isoString) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(isoString)) {
+      const [year, month, day] = isoString.split('-').map(Number);
+      date = new Date(year, month - 1, day);
+      return date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' });
+    }
     const iso =
       isoString.includes('Z') || isoString.includes('+')
         ? isoString
@@ -21,6 +26,15 @@ export function formatTime(isoString?: string | null): string {
 export function formatDateTime(isoString?: string | null): string {
   let date: Date;
   if (isoString) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(isoString)) {
+      const [year, month, day] = isoString.split('-').map(Number);
+      date = new Date(year, month - 1, day);
+      return date.toLocaleDateString('en-US', {
+        month: '2-digit',
+        day: '2-digit',
+        year: 'numeric',
+      });
+    }
     const iso =
       isoString.includes('Z') || isoString.includes('+')
         ? isoString
@@ -41,6 +55,15 @@ export function formatDateTime(isoString?: string | null): string {
 export function formatDate(isoString?: string | null): string {
   let date: Date;
   if (isoString) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(isoString)) {
+      const [year, month, day] = isoString.split('-').map(Number);
+      date = new Date(year, month - 1, day);
+      return date.toLocaleDateString('en-US', {
+        month: '2-digit',
+        day: '2-digit',
+        year: 'numeric',
+      });
+    }
     const iso =
       isoString.includes('Z') || isoString.includes('+')
         ? isoString
