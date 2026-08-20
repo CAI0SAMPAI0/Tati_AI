@@ -3,6 +3,8 @@ import os
 from celery import Celery
 from celery.schedules import crontab
 from dotenv import load_dotenv
+from celery.signals import after_setup_logger, after_setup_task_logger
+
 
 load_dotenv()
 
@@ -123,8 +125,6 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute="*/10"),
     },
 }
-
-from celery.signals import after_setup_logger, after_setup_task_logger
 
 
 @after_setup_logger.connect

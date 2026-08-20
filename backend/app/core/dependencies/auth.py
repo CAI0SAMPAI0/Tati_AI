@@ -12,6 +12,7 @@ Contém:
 from __future__ import annotations
 
 from app.core.database import get_client
+from app.core.console import print_log
 from app.core.security import decode_token
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -37,12 +38,14 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     """
     payload = decode_token(token)
     if not payload:
+        print_log("Authentication rejected: invalid or expired token")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido ou expirado",
         )
 
     username = payload["sub"]
+    print_log("Authenticating request", username=username)
     db = get_client()
     try:
         rows = (
@@ -70,13 +73,14 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
                 .data
             )
         except Exception as e_inner:
-            logging.error(f"[Auth] Falha crítica ao ler usuário básico: {e_inner}")
+            print_log("Critical user lookup failure", username=username, error=type(e_inner).__name__)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Erro de comunicação com o banco de dados",
             )
 
     if not rows:
+        print_log("Authentication rejected: user not found", username=username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Sessão inválida",

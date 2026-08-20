@@ -118,8 +118,6 @@ else:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
 
-    print = logging.info
-
     app = FastAPI(
         title="Teacher Tati AI",
         description="API para o aplicativo de ensino de inglês Teacher Tati",

@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.core.dependencies.db import get_db
+from app.core.console import print_log
 from app.core.enums import normalize_level
 from app.core.exceptions import InvalidDocumentError, UserNotFoundError
 from app.shared.services.document_validator import validate_document_auto
@@ -30,6 +31,7 @@ class UserService:
         cache_key = f"profile:{username}"
         cached = await cache_get(cache_key)
         if cached:
+            print_log("Profile loaded from cache", username=username)
             # Compatibilidade com versões antigas que ainda montavam o modal
             # de WhatsApp. O onboarding foi desativado e não deve bloquear o acesso.
             cached_profile = cached.get("profile") or {}
@@ -77,8 +79,10 @@ class UserService:
 
         result = await run_in_threadpool(_fetch)
         if not result:
+            print_log("Profile not found", username=username)
             raise UserNotFoundError()
 
+        print_log("Profile loaded from database", username=username)
         await cache_set(cache_key, result, ttl=600)
         return result
 
@@ -135,6 +139,7 @@ class UserService:
             return update_data
 
         res = await run_in_threadpool(_update)
+        print_log("Profile updated", username=username, fields=",".join(body.keys()))
         await cache_delete(f"profile:{username}")
         return res
 

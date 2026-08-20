@@ -1,9 +1,9 @@
 import asyncio
-import logging
 from datetime import datetime, timezone
 from typing import Any
 
 from app.core.config import settings
+from app.core.console import print_log
 from app.core.enums import normalize_level
 from app.core.exceptions import (
     AuthenticationRequiredError,
@@ -46,9 +46,11 @@ class AuthService:
             async def _activate_special() -> None:
                 try:
                     await run_in_threadpool(activate_special_user, username, "full")
-                except Exception as e:
-                    logging.info(
-                        f"[Auth] Erro ao ativar subscription para {username}: {e}"
+                except Exception as exc:
+                    print_log(
+                        "Special user subscription activation failed",
+                        username=username,
+                        error=type(exc).__name__,
                     )
 
             asyncio.create_task(_activate_special())
@@ -68,8 +70,10 @@ class AuthService:
     async def authenticate_user(
         db: Client, username: str, password: str
     ) -> dict[str, Any]:
+        print_log("Looking up password account", username=username)
         user = await UserRepository.find_by_identifier(db, username)
         if not user:
+            print_log("Password account not found", username=username)
             raise AuthenticationRequiredError(detail="Usuário ou senha incorretos")
 
         password_ok = verify_password(password, user["password"])
@@ -78,6 +82,7 @@ class AuthService:
         )
 
         if not password_ok and not temp_ok:
+            print_log("Password verification failed", username=username)
             raise AuthenticationRequiredError(detail="Usuário ou senha incorretos")
 
         if temp_ok:
@@ -129,6 +134,7 @@ class AuthService:
         db: Client, credential: str, is_hub_only: bool = False
     ) -> dict[str, Any]:
         if not settings.google_client_id:
+            print_log("Google verification rejected: server client ID missing")
             raise HTTPException(status_code=503, detail="Google OAuth not configured")
 
         try:
@@ -140,14 +146,17 @@ class AuthService:
                 clock_skew_in_seconds=60,
             )
         except Exception as exc:
+            print_log("Google credential verification failed", error=type(exc).__name__)
             raise AuthenticationRequiredError(detail=f"Token Google inválido: {exc}")
 
         email = info.get("email", "").lower()
         name = info.get("name", email.split("@")[0])
+        print_log("Google identity received", username=email)
         base_username = email.split("@")[0].replace(".", "_").lower()
 
         existing_user = await UserRepository.find_by_email(db, email)
         if existing_user:
+            print_log("Existing Google account found", username=existing_user["username"])
             # Trigger study day streak renewal and update active date upon google login
             try:
                 from app.modules.users.services.streaks import record_study_day
@@ -174,6 +183,7 @@ class AuthService:
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         await UserRepository.insert_user(db, new_user)
+        print_log("New Google account created", username=username)
 
         return await AuthService.build_token_response(
             {k: v for k, v in new_user.items() if k != "password"}

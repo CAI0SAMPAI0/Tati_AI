@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import uuid
 
+from fastapi.responses import HTMLResponse
 from app.core.dependencies.auth import get_current_user
 from app.core.dependencies.db import get_db
+from app.core.console import print_log
 from app.modules.auth.services.auth_service import AuthService
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
@@ -94,12 +96,20 @@ async def login(
             pass
 
     if not username or not password:
+        print_log("Login rejected: missing credentials", username=username)
         raise HTTPException(
             status_code=422,
             detail="Credenciais não fornecidas ou formato inválido.",
         )
 
-    return await AuthService.authenticate_user(db, username, password)
+    print_log("Password login requested", username=username)
+    try:
+        result = await AuthService.authenticate_user(db, username, password)
+        print_log("Password login succeeded", username=username)
+        return result
+    except Exception as exc:
+        print_log("Password login failed", username=username, error=type(exc).__name__)
+        raise
 
 
 #  Register
@@ -139,12 +149,20 @@ async def google_login(request: Request, db: Client = Depends(get_db)) -> dict:
             pass
 
     if not credential:
+        print_log("Google login rejected: credential missing")
         raise HTTPException(
             status_code=422,
             detail="Google credential not provided.",
         )
 
-    return await AuthService.google_login(db, credential, is_hub_only)
+    print_log("Google web login requested", hub_only=is_hub_only)
+    try:
+        result = await AuthService.google_login(db, credential, is_hub_only)
+        print_log("Google web login succeeded", username=result.get("user", {}).get("username"))
+        return result
+    except Exception as exc:
+        print_log("Google web login failed", error=type(exc).__name__)
+        raise
 
 
 #  Google OAuth via system browser (for Capacitor/Android)
@@ -156,11 +174,13 @@ async def google_auth_url(request: Request, state: str = ""):
     from app.core.config import settings
 
     if not settings.google_client_id or not settings.google_client_secret:
+        print_log("Google native login rejected: OAuth is not configured")
         raise HTTPException(status_code=503, detail="Google OAuth not configured")
 
     if not state:
         state = uuid.uuid4().hex[:16]
     _oauth_results[state] = None  # placeholder
+    print_log("Google native OAuth state created", state=state)
 
     redirect_uri = str(request.url).split("?")[0].rsplit("/", 1)[0] + "/callback"
     redirect_uri = redirect_uri.replace("http://", "https://")
@@ -178,9 +198,6 @@ async def google_auth_url(request: Request, state: str = ""):
     return {"url": url, "state": state}
 
 
-from fastapi.responses import HTMLResponse
-
-
 @router.get("/google/callback")
 async def google_callback(
     request: Request, code: str = "", state: str = "", db: Client = Depends(get_db)
@@ -191,12 +208,14 @@ async def google_callback(
     from app.core.security import create_access_token
 
     if not code:
+        print_log("Google callback failed: code missing", state=state)
         return HTMLResponse(
             "<html><body><h2>Authentication failed</h2><p>No code received.</p></body></html>",
             status_code=400,
         )
 
     if not settings.google_client_secret:
+        print_log("Google callback failed: client secret missing", state=state)
         return HTMLResponse(
             "<html><body><h2>Server error</h2><p>Google OAuth not configured.</p></body></html>",
             status_code=500,
@@ -220,14 +239,16 @@ async def google_callback(
         )
 
     if token_resp.status_code != 200:
-        import logging
-
         try:
             error_body = token_resp.text
         except Exception:
             error_body = "(could not read body)"
-        logging.error(
-            f"[GoogleCallback] Token exchange failed: status={token_resp.status_code}, body={error_body}, redirect_uri={redirect_uri}"
+        print_log(
+            "Google callback token exchange failed",
+            state=state,
+            status=token_resp.status_code,
+            redirect_uri=redirect_uri,
+            response=error_body[:300],
         )
         return HTMLResponse(
             f'<html><body><h2>Authentication failed</h2><p>Could not exchange code for tokens.</p><pre style="font-size:12px;color:#999;">{error_body}</pre></body></html>',
@@ -238,6 +259,7 @@ async def google_callback(
     id_token_str = tokens.get("id_token")
 
     if not id_token_str:
+        print_log("Google callback failed: ID token missing", state=state)
         return HTMLResponse(
             "<html><body><h2>Authentication failed</h2><p>No ID token received.</p></body></html>",
             status_code=400,
@@ -253,7 +275,8 @@ async def google_callback(
             settings.google_client_id,
             clock_skew_in_seconds=60,
         )
-    except Exception:
+    except Exception as exc:
+        print_log("Google callback token verification failed", state=state, error=type(exc).__name__)
         return HTMLResponse(
             "<html><body><h2>Authentication failed</h2><p>Invalid Google token.</p></body></html>",
             status_code=400,
@@ -261,6 +284,7 @@ async def google_callback(
 
     email = info.get("email", "").lower()
     name = info.get("name", email.split("@")[0])
+    print_log("Google callback identity verified", username=email, state=state)
     base_username = email.split("@")[0].replace(".", "_").lower()
 
     from app.modules.users.repositories.user_repository import UserRepository
@@ -315,9 +339,11 @@ async def google_poll(state: str):
     """Polled by Capacitor app to retrieve OAuth result."""
     result = _oauth_results.get(state)
     if result is None:
+        print_log("Google poll not ready", state=state)
         return {"ready": False}
     # Clean up after first read
     del _oauth_results[state]
+    print_log("Google poll succeeded", username=result["user"].get("username"), state=state)
     return {"ready": True, "jwt": result["jwt"], "user": result["user"]}
 
 
