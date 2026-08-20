@@ -215,21 +215,24 @@ class DashboardService:
                 if not username:
                     continue
 
-                # Prioritize last study date from streak_data, then last message, then created_at
+                # Prefer the exact study timestamp, then study date, messages, and creation date.
                 st_data = u.get("streak_data") or {}
                 if not isinstance(st_data, dict):
                     st_data = {}
                 last_study = st_data.get("last_study_date")
+                last_study_at = st_data.get("last_study_at")
                 last_msg_date = last_activity.get(username)
-                
+
                 dates_to_compare = []
+                if last_study_at:
+                    dates_to_compare.append(last_study_at)
                 if last_study:
                     dates_to_compare.append(last_study)
                 if last_msg_date:
                     dates_to_compare.append(last_msg_date)
                 if u.get("created_at"):
                     dates_to_compare.append(u.get("created_at"))
-                    
+
                 # Use the latest date from all available sources
                 if dates_to_compare:
                     try:

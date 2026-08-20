@@ -1,5 +1,3 @@
-import logging
-
 """
 Serviço de Streaks (dias consecutivos de estudo).
 Gerencia o acompanhamento de dias consecutivos que o aluno praticou.
@@ -152,7 +150,7 @@ async def get_streak(username: str) -> dict:
             return streak_data
         return _empty_streak()
     except Exception as e:
-        logging.info(f"[Streak] Erro ao buscar streak para {username}: {e}")
+        print_log("Streak read failed", username=username, error=type(e).__name__)
         return _empty_streak()
 
 
@@ -161,6 +159,7 @@ def _empty_streak() -> dict:
         "current_streak": 0,
         "longest_streak": 0,
         "last_study_date": None,
+        "last_study_at": None,
         "total_study_days": 0,
         "study_dates": [],
     }
@@ -177,6 +176,7 @@ async def record_study_day(username: str, is_activity: bool = False) -> dict:
         db = get_client()
         today = _today(user_tz)
         today_str = today.isoformat()
+        activity_at = _now_iso(user_tz)
 
         # 1. Conta mensagens do usuário HOJE
         res = (
@@ -216,10 +216,18 @@ async def record_study_day(username: str, is_activity: bool = False) -> dict:
         study_dates = streak_data.get("study_dates", [])
 
         if last_date_str == today_str:
+            streak_data["last_study_at"] = activity_at
+            db.table("users").update(
+                {
+                    "streak_data": streak_data,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            ).eq("username", username).execute()
             print_log(
-                "Streak already recorded for today",
+                "Streak already counted; activity timestamp refreshed",
                 username=username,
                 today=today_str,
+                activity_at=activity_at,
                 current_streak=streak_data.get("current_streak", 0),
             )
             return streak_data
@@ -256,6 +264,7 @@ async def record_study_day(username: str, is_activity: bool = False) -> dict:
             streak_data["total_study_days"] = streak_data.get("total_study_days", 0) + 1
 
         streak_data["last_study_date"] = today_str
+        streak_data["last_study_at"] = activity_at
 
         db.table("users").update(
             {
@@ -268,6 +277,7 @@ async def record_study_day(username: str, is_activity: bool = False) -> dict:
             "Streak updated",
             username=username,
             today=today_str,
+            activity_at=activity_at,
             current_streak=streak_data.get("current_streak"),
             total_study_days=streak_data.get("total_study_days"),
         )
