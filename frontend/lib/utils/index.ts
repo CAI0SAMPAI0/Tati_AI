@@ -42,8 +42,9 @@ export function formatDateTime(isoString?: string | null): string {
         year: 'numeric',
       });
     }
-    date = parseDisplayDate(isoString);
-    if (!date) return '—';
+    const parsedDate = parseDisplayDate(isoString);
+    if (!parsedDate) return '—';
+    date = parsedDate;
   } else {
     return '—';
   }
@@ -67,8 +68,9 @@ export function formatDate(isoString?: string | null): string {
         year: 'numeric',
       });
     }
-    date = parseDisplayDate(isoString);
-    if (!date) return '—';
+    const parsedDate = parseDisplayDate(isoString);
+    if (!parsedDate) return '—';
+    date = parsedDate;
   } else {
     return '—';
   }
