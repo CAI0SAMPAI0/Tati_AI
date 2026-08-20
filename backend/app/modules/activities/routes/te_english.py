@@ -3,17 +3,15 @@
 import asyncio
 import hashlib
 import json
-import logging
 import os
 import time
 
 import httpx
+from app.core.console import print_log
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
 
 router = APIRouter(prefix="/test-english", tags=["Test English Content"])
-
-logger = logging.getLogger(__name__)
 
 DATA_FILE = os.path.join(os.path.dirname(__file__), "te_english_data.json")
 LEVEL_MAP = {"A1": "a1", "A2": "a2", "B1": "b1", "B1+": "b1-b2", "B2": "b2", "C1": "c1"}
@@ -61,9 +59,9 @@ def _load_data() -> dict[str, dict[str, list[dict]]]:
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             _data = json.load(f)
-        logger.info("Loaded test-english data from %s", DATA_FILE)
+        print_log("Loaded Test-English data", file=DATA_FILE)
     else:
-        logger.warning("Data file %s not found, using empty data", DATA_FILE)
+        print_log("Test-English data file not found", file=DATA_FILE)
         _data = {cat: {lvl: [] for lvl in LEVELS} for cat in CATEGORIES}
     return _data
 
@@ -114,6 +112,7 @@ async def get_available_levels():
 
 @router.get("/image-proxy")
 async def proxy_image(url: str = Query(...)):
+    print_log("Test-English image requested", url=url[:160])
     now = time.time()
     cached = _memory_cache.get(url)
     if cached and (now - cached[2]) < _MEMORY_CACHE_TTL:
@@ -140,13 +139,31 @@ async def proxy_image(url: str = Query(...)):
     async with _image_semaphore:
         for attempt in range(3):
             try:
-                from curl_cffi import requests as cffi_requests
-                resp = await asyncio.to_thread(
-                    cffi_requests.get, url, impersonate="chrome120", timeout=15
-                )
-                if resp.status_code in (200, 304):
+                try:
+                    from curl_cffi import requests as cffi_requests
+
+                    resp = await asyncio.to_thread(
+                        cffi_requests.get,
+                        url,
+                        headers=HEADERS,
+                        impersonate="chrome120",
+                        timeout=15,
+                    )
+                    status_code = resp.status_code
                     content_type = resp.headers.get("content-type", "image/png")
                     body = resp.content
+                except ImportError:
+                    async with httpx.AsyncClient(
+                        headers=HEADERS,
+                        follow_redirects=True,
+                        timeout=15,
+                    ) as client:
+                        fallback_resp = await client.get(url)
+                    status_code = fallback_resp.status_code
+                    content_type = fallback_resp.headers.get("content-type", "image/png")
+                    body = fallback_resp.content
+
+                if status_code in (200, 304) and body:
                     with open(cpath, "wb") as f:
                         f.write(body)
                     _memory_cache[url] = (body, content_type, now)
@@ -156,7 +173,14 @@ async def proxy_image(url: str = Query(...)):
                         headers={"Cache-Control": "public, max-age=86400"},
                     )
             except Exception as e:
-                logger.warning("Image proxy failed for %s: %s", url[:60], e)
+                print_log(
+                    "Test-English image proxy failed",
+                    url=url[:160],
+                    attempt=attempt + 1,
+                    error=type(e).__name__,
+                    detail=str(e)[:160],
+                )
                 await asyncio.sleep(0.5)
 
+    print_log("Test-English image proxy exhausted retries", url=url[:160])
     raise HTTPException(502, "Image fetch failed after retries")

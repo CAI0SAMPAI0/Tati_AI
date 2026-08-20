@@ -8,6 +8,7 @@ Serviço para gerenciamento de módulos, lições e progresso em atividades.
 from typing import Any
 
 from app.core.dependencies.db import get_db
+from app.core.console import print_log
 from app.core.utils.level_utils import matches_level
 from app.shared.services.upstash import cache_delete, cache_get, cache_set
 from fastapi import Depends
@@ -534,6 +535,15 @@ class ActivityService:
 
         category = str(meta.get("category") or "").lower().strip()
         is_done = score > 0 and str(meta.get("status") or "").lower() != "pending"
+        print_log(
+            "Activity submission started",
+            username=username,
+            activity_id=module_id,
+            activity_type=activity_type,
+            score=score,
+            is_done=is_done,
+            category=category,
+        )
 
         def _save() -> dict[str, Any]:
             # Busca submissões existentes da MESMA atividade para deduplicar
@@ -591,6 +601,14 @@ class ActivityService:
             }
 
         result = await run_in_threadpool(_save)
+        print_log(
+            "Activity submission saved",
+            username=username,
+            activity_id=module_id,
+            inserted=bool(result.get("inserted")),
+            is_done=result.get("is_done"),
+            was_done_with_points=result.get("was_done_with_points"),
+        )
 
         # Transição de pontos
         if result.get("inserted"):
@@ -622,6 +640,13 @@ class ActivityService:
                 from app.modules.users.services.streaks import record_study_day
 
                 await record_study_day(username, is_activity=True)
+            else:
+                print_log(
+                    "Streak skipped: activity is not completed",
+                    username=username,
+                    activity_id=module_id,
+                    score=score,
+                )
 
         return result["inserted"] or {"success": True}
 

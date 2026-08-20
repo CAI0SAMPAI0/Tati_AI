@@ -8,6 +8,7 @@ Gerencia o acompanhamento de dias consecutivos que o aluno praticou.
 import asyncio
 from datetime import date, datetime, timezone
 
+from app.core.console import print_log
 from app.core.database import get_client
 from fastapi.concurrency import run_in_threadpool
 
@@ -66,8 +67,12 @@ async def _execute_db(func, retries=3):
                 or "connection" in err_str
                 or "protocol" in err_str
             ) and attempt < retries - 1:
-                logging.info(f"[Streak DB] Connection issue, retrying ({
-                        attempt + 1}/{retries})...")
+                print_log(
+                    "Streak database connection issue, retrying",
+                    attempt=attempt + 1,
+                    retries=retries,
+                    error=type(e).__name__,
+                )
                 await asyncio.sleep(0.5 * (attempt + 1))
                 continue
 
@@ -163,7 +168,9 @@ def _empty_streak() -> dict:
 
 async def record_study_day(username: str, is_activity: bool = False) -> dict:
     """Registra atividade hoje e atualiza o streak."""
+    print_log("Streak update started", username=username, is_activity=is_activity)
     streak_data = await get_streak(username)
+    initial_streak_data = streak_data
     user_tz = streak_data.get("timezone", "America/Sao_Paulo")
 
     def _record():
@@ -181,6 +188,14 @@ async def record_study_day(username: str, is_activity: bool = False) -> dict:
             .execute()
         )
         msg_count = res.count or 0
+        print_log(
+            "Streak inputs loaded",
+            username=username,
+            today=today_str,
+            timezone=user_tz,
+            messages_today=msg_count,
+            previous_date=(initial_streak_data or {}).get("last_study_date"),
+        )
 
         # 2. Busca dados atuais
         row = (
@@ -201,6 +216,12 @@ async def record_study_day(username: str, is_activity: bool = False) -> dict:
         study_dates = streak_data.get("study_dates", [])
 
         if last_date_str == today_str:
+            print_log(
+                "Streak already recorded for today",
+                username=username,
+                today=today_str,
+                current_streak=streak_data.get("current_streak", 0),
+            )
             return streak_data
 
         # 3. Qualquer atividade ou pelo menos 1 mensagem conta!
@@ -208,6 +229,11 @@ async def record_study_day(username: str, is_activity: bool = False) -> dict:
             db.table("users").update({"streak_data": streak_data}).eq(
                 "username", username
             ).execute()
+            print_log(
+                "Streak not counted: no message or activity",
+                username=username,
+                today=today_str,
+            )
             return streak_data
 
         # 4. Atingiu a meta!
@@ -238,10 +264,23 @@ async def record_study_day(username: str, is_activity: bool = False) -> dict:
             }
         ).eq("username", username).execute()
 
+        print_log(
+            "Streak updated",
+            username=username,
+            today=today_str,
+            current_streak=streak_data.get("current_streak"),
+            total_study_days=streak_data.get("total_study_days"),
+        )
+
         return streak_data, previous_streak
 
     try:
         result = await _execute_db(_record)
+        print_log(
+            "Streak update finished",
+            username=username,
+            result_type=type(result).__name__,
+        )
 
         # Invalida o cache do Redis para forçar atualização no dashboard
         try:
@@ -278,7 +317,7 @@ async def record_study_day(username: str, is_activity: bool = False) -> dict:
             return streak_data
         return result
     except Exception as e:
-        logging.info(f"[Streak] Erro ao gravar: {e}")
+        print_log("Streak update failed", username=username, error=type(e).__name__)
         return _empty_streak()
 
 
