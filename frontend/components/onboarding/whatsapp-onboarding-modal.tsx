@@ -14,12 +14,6 @@ export function WhatsAppOnboardingModal() {
   const [allowNotifications, setAllowNotifications] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Regra de exibição: somente para alunos que ainda não passaram pelo onboarding do WhatsApp
-  const isStaff = ['admin', 'professor', 'professora', 'programador'].includes(user?.role?.toLowerCase() || '');
-  const showModal = user && !isStaff && !user.profile?.whatsapp_onboarded;
-
-  if (!showModal) return null;
-
   // Remove o handler global de logout não autorizado durante a operação do modal
   useEffect(() => {
     registerUnauthorizedHandler(null);
@@ -29,6 +23,12 @@ export function WhatsAppOnboardingModal() {
       });
     };
   }, [user?.role, token]);
+
+  // Regra de exibição: somente para alunos que ainda não passaram pelo onboarding do WhatsApp
+  const isStaff = ['admin', 'professor', 'professora', 'programador'].includes(user?.role?.toLowerCase() || '');
+  const showModal = user && !isStaff && !user.profile?.whatsapp_onboarded;
+
+  if (!showModal) return null;
 
   const handleSave = async (skip = false) => {
     setIsSubmitting(true);

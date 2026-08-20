@@ -16,8 +16,6 @@ const ChatSocketProvider = dynamic(
   { ssr: false }
 );
 
-import { WhatsAppOnboardingModal } from '@/components/onboarding/whatsapp-onboarding-modal';
-
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { token, isLoaded, isBootstrappingProfile } = useAuth();
   const router = useRouter();
@@ -42,7 +40,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     <NotificationProvider>
       <ChatSocketProvider>
         {children}
-        <WhatsAppOnboardingModal />
       </ChatSocketProvider>
     </NotificationProvider>
   );
