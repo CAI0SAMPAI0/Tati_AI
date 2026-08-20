@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
   Menu,
   Search,
@@ -104,6 +104,7 @@ export default function DashboardClientPage() {
   const { data: students } = useQuery<any[]>({
     queryKey: ['admin-dashboard-students'],
     queryFn: () => apiGet<any[]>('/dashboard/students'),
+    placeholderData: keepPreviousData,
     refetchInterval: 10000,
     refetchIntervalInBackground: false, // Pausa polling quando a aba está em background
   });

@@ -74,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(normalizedUser);
       saveStoredSession({ token, user: normalizedUser });
     } catch (err) {
-      if (err instanceof ApiClientError && err.status === 401) {
+      if (err instanceof ApiClientError && (err.status === 401 || err.status === 404)) {
         logoutRef.current();
       }
     }
@@ -172,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         triggerPodcastWarmup();
       })
       .catch((err) => {
-        if (err instanceof ApiClientError && err.status === 401) {
+        if (err instanceof ApiClientError && (err.status === 401 || err.status === 404)) {
           // Token inválido — faz logout silencioso
           logoutRef.current();
         }

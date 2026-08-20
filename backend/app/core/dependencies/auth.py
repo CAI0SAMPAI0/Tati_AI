@@ -33,8 +33,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     """Decodifica o JWT e retorna os dados essenciais do usuário.
 
     Raises:
-        HTTPException 401: Token inválido ou expirado.
-        HTTPException 404: Usuário não encontrado no banco.
+        HTTPException 401: Token inválido, expirado ou usuário removido.
     """
     payload = decode_token(token)
     if not payload:
@@ -79,8 +78,8 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
 
     if not rows:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuário não encontrado",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sessão inválida",
         )
 
     user = rows[0]

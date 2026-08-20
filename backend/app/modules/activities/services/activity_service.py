@@ -617,6 +617,12 @@ class ActivityService:
                     username, result["category"], delta=-1
                 )
 
+            # Qualquer atividade concluída conta como dia estudado.
+            if result["is_done"]:
+                from app.modules.users.services.streaks import record_study_day
+
+                await record_study_day(username, is_activity=True)
+
         return result["inserted"] or {"success": True}
 
     async def save_correction(
