@@ -82,7 +82,7 @@ class UserRepository:
                 rows = (
                     db.table("users")
                     .select(fields)
-                    .eq("email", email)
+                    .ilike("email", email)
                     .limit(1)
                     .execute()
                     .data
@@ -92,7 +92,7 @@ class UserRepository:
                 rows = (
                     db.table("users")
                     .select(fallback_fields)
-                    .eq("email", email)
+                    .ilike("email", email)
                     .limit(1)
                     .execute()
                     .data

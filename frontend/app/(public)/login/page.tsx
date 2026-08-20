@@ -72,7 +72,7 @@ export default function LoginPage() {
       if (typeof window === 'undefined') return;
       const g = (window as any).google;
       if (!g?.accounts?.id) {
-        if (retries < 15) setTimeout(() => initGoogle(retries + 1), 500);
+        if (retries < 30) setTimeout(() => initGoogle(retries + 1), 500);
         return;
       }
 
@@ -110,7 +110,10 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res = await loginWithGoogle(response.credential);
-      if (!res.ok) { setError('Error authenticating with Google.'); return; }
+      if (!res.ok) {
+        setError((res.data as any)?.detail || 'Error authenticating with Google.');
+        return;
+      }
       await saveSession(res.data.access_token, res.data.user);
       const user = res.data.user as any;
       if (isHubAccess || user.is_hub_only) {

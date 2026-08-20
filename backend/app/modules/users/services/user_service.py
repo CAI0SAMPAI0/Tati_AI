@@ -30,6 +30,11 @@ class UserService:
         cache_key = f"profile:{username}"
         cached = await cache_get(cache_key)
         if cached:
+            # Compatibilidade com versões antigas que ainda montavam o modal
+            # de WhatsApp. O onboarding foi desativado e não deve bloquear o acesso.
+            cached_profile = cached.get("profile") or {}
+            cached_profile["whatsapp_onboarded"] = True
+            cached["profile"] = cached_profile
             if not cached.get("avatar_url") and isinstance(cached.get("profile"), dict):
                 cached["avatar_url"] = cached["profile"].get("avatar_url")
             return cached
@@ -64,6 +69,9 @@ class UserService:
             avatar = row.get("avatar_url") or (row.get("profile") or {}).get(
                 "avatar_url"
             )
+            profile = row.get("profile") or {}
+            profile["whatsapp_onboarded"] = True
+            row["profile"] = profile
             row["avatar_url"] = avatar
             return row
 
