@@ -47,7 +47,7 @@ class CEFRService:
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=200,
                 temperature=0.1,
-                model="llama-3.1-8b-instant",
+                model="openai/gpt-oss-20b",
             )
             level = data.get("cefr_level", "A1").upper().strip()
             if level in ["A1", "A2", "B1", "B2", "C1", "C2"]:

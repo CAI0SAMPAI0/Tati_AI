@@ -21,6 +21,7 @@ class SimMessageRequest(BaseModel):
 
 class SimStartRequest(BaseModel):
     scenario_id: str
+    accent: str = "en-US"
 
 
 class SimAudioRequest(BaseModel):
@@ -61,7 +62,7 @@ async def start_simulation(
 ) -> dict:
     """Inicia uma nova sessão de simulação."""
     return await service.start_session(
-        current_user["username"], body.scenario_id, current_user.get("level", "A1")
+        current_user["username"], body.scenario_id, current_user.get("level", "A1"), accent=body.accent
     )
 
 

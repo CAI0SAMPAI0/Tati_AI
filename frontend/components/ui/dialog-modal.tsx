@@ -13,10 +13,16 @@ interface ModalProps {
 }
 
 export function DialogModal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
-  // Bloquear scroll do body quando aberto
+  // Bloquear scroll do body quando aberto e rolar para o topo
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      // Garante que a página / container rola para o topo ao abrir qualquer modal
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      const mainContainer = document.querySelector('main');
+      if (mainContainer) {
+        mainContainer.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     } else {
       document.body.style.overflow = 'unset';
     }
@@ -35,14 +41,14 @@ export function DialogModal({ isOpen, onClose, title, children, size = 'md' }: M
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 overflow-hidden">
-          {/* Overlay com Blur */}
+          {/* Overlay com Blur leve otimizado */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={onClose}
-            className="absolute inset-0 bg-bg/60 backdrop-blur-md"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
           />
 
           {/* Conteúdo do Modal */}

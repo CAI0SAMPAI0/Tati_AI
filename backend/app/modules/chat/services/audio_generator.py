@@ -4,15 +4,24 @@ import logging
 
 from app.core.config import settings
 
+VOICE_ACCENT_MAP = {
+    "en-US": "en-US-JennyNeural",
+    "en-GB": "en-GB-SoniaNeural",
+    "en-AU": "en-AU-NatashaNeural",
+    "en-IN": "en-IN-NeerjaNeural",
+    "en-CA": "en-CA-ClaraNeural",
+    "en-IE": "en-IE-EmilyNeural",
+    "en-ZA": "en-ZA-LeahNeural",
+}
 
-# tirado de llm e transportado para o gerador de áudio
-async def _tts_edge(text: str) -> str:
+
+async def _tts_edge(text: str, accent: str = "en-US") -> str:
     """Edge TTS (Microsoft) - gratuito e boa qualidade."""
     try:
         import edge_tts
 
-        # JennyNeural é geralmente mais rápida e estável que Ava
-        communicate = edge_tts.Communicate(text, "en-US-JennyNeural")
+        voice = VOICE_ACCENT_MAP.get(accent, "en-US-JennyNeural")
+        communicate = edge_tts.Communicate(text, voice)
         buf = io.BytesIO()
         async for chunk in communicate.stream():
             if chunk["type"] == "audio":
@@ -39,115 +48,68 @@ async def _tts_gtts(text: str) -> str:
 
 
 async def _tts_xtts(text: str) -> str:
-    """
-    Gera áudio usando um endpoint de XTTS (como um Hugging Face Space).
-    Suporta tanto retorno de bytes brutos (WAV/MP3) quanto JSON com base64.
-    """
     if not settings.xtts_api_url:
         return ""
 
-    import base64
-
-    import httpx
-
-    url = settings.xtts_api_url.strip()
-    payload = {
-        "text": text,
-        "language": settings.xtts_language,
-        "speaker_wav": settings.xtts_speaker_wav,
-    }
-
     try:
+        import httpx
+
+        url = settings.xtts_api_url.strip()
+        payload = {
+            "text": text,
+            "language": settings.xtts_language,
+            "speaker_wav": settings.xtts_speaker_wav,
+        }
+
         logging.info(f"[TTS] Enviando requisição para XTTS API: {url}")
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(url, json=payload, timeout=12.0)
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(url, json=payload)
 
             if resp.status_code != 200:
-                logging.warning(
-                    f"[TTS] XTTS API retornou status {resp.status_code}: {resp.text[:200]}"
-                )
                 return ""
 
-            content_type = resp.headers.get("content-type", "").lower()
+            content_type = resp.headers.get("content-type", "")
 
-            if (
-                "audio/" in content_type
-                or resp.content.startswith(b"RIFF")
-                or resp.content.startswith(b"ID3")
-                or resp.content.startswith(b"\xff\xfb")
-            ):
-                logging.info(
-                    "[TTS] XTTS retornou áudio binário bruto. Convertendo para base64."
-                )
+            if any(t in content_type for t in ["audio/", "application/octet-stream", "application/x-wav"]):
                 return base64.b64encode(resp.content).decode("utf-8")
 
             try:
                 data = resp.json()
-                for key in ["audio", "audio_base64", "data", "wav_base64"]:
-                    if key in data and isinstance(data[key], str):
-                        val = data[key]
-                        if "," in val:
-                            val = val.split(",")[-1]
-                        return val.strip()
+                audio_b64 = data.get("audio") or data.get("audio_b64") or data.get("audio_base64") or data.get("data")
 
-                if (
-                    "data" in data
-                    and isinstance(data["data"], list)
-                    and len(data["data"]) > 0
-                ):
-                    val = data["data"][0]
-                    if isinstance(val, dict) and "data" in val:
-                        val = val["data"]
-                    if isinstance(val, str):
-                        if "," in val:
-                            val = val.split(",")[-1]
-                        return val.strip()
-            except Exception as json_err:
-                logging.warning(
-                    f"[TTS] Falha ao parsear resposta JSON do XTTS: {json_err}"
-                )
-
-            if len(resp.content) > 1000:
-                logging.info(
-                    "[TTS] Fallback: assumindo áudio binário do XTTS devido ao tamanho."
-                )
-                return base64.b64encode(resp.content).decode("utf-8")
-
-    except Exception as exc:
-        logging.warning(f"[TTS] Erro ao chamar XTTS API: {exc}")
-
+                if audio_b64 and isinstance(audio_b64, str):
+                    if "," in audio_b64:
+                        audio_b64 = audio_b64.split(",")[-1]
+                    return audio_b64
+            except Exception:
+                pass
+    except Exception as e:
+        logging.warning(f"[TTS] XTTS erro geral: {e}")
     return ""
 
 
-async def generate_teacher_audio(texto: str) -> str | None:
+async def generate_teacher_audio(texto: str, accent: str = "en-US") -> str | None:
     """
-    Recebe um texto (gerado pelo Groq), faz fallback automático para XTTS, Edge TTS e, em seguida, para gTTS.
+    Recebe um texto, gera áudio via Edge TTS com o sotaque selecionado e faz fallback para XTTS/gTTS se necessário.
     """
+    logging.info(f"[AudioGenerator] Gerando áudio via Edge TTS com sotaque '{accent}'...")
+    audio_b64 = await _tts_edge(texto, accent=accent)
+    if audio_b64:
+        logging.info(f"✅ [AudioGenerator] Sucesso no áudio (Edge TTS, sotaque: {accent})!")
+        return audio_b64
+
     if settings.xtts_api_url:
-        logging.info("[AudioGenerator] Tentando XTTS (Hugging Face Space)...")
+        logging.info("[AudioGenerator] Tentando XTTS como fallback...")
         audio_b64 = await _tts_xtts(texto)
         if audio_b64:
-            logging.info("✅ [AudioGenerator] Sucesso na geração de áudio via XTTS!")
+            logging.info("✅ [AudioGenerator] Sucesso via XTTS!")
             return audio_b64
-        logging.warning(
-            "[AudioGenerator] XTTS falhou. Tentando Edge TTS de fallback..."
-        )
 
-    # Usando Edge TTS
-    logging.info("[AudioGenerator] Tentando Edge TTS (JennyNeural)...")
-    audio_b64 = await _tts_edge(texto)
-    if audio_b64:
-        logging.info("✅ [AudioGenerator] Sucesso na geração de áudio via Edge TTS!")
-        return audio_b64
-
-    # Usando gTTS caso o Edge falhe
-    logging.info("[AudioGenerator] Tentando gTTS (Fallback final)...")
+    logging.info("[AudioGenerator] Tentando gTTS (fallback final)...")
     audio_b64 = await _tts_gtts(texto)
     if audio_b64:
-        logging.info("✅ [AudioGenerator] Sucesso na geração de áudio via gTTS!")
+        logging.info("✅ [AudioGenerator] Sucesso via gTTS!")
         return audio_b64
 
-    logging.info(
-        "❌ [AudioGenerator] CRÍTICO: Todos os métodos de geração de áudio falharam."
-    )
+    logging.info("❌ [AudioGenerator] Todos os métodos de áudio falharam.")
     return None

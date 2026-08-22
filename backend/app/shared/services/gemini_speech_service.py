@@ -40,7 +40,7 @@ class PronunciationAssessmentResponse(BaseModel):
 class GeminiSpeechService:
     @property
     def is_configured(self) -> bool:
-        return len(settings.gemini_keys) > 0
+        return False
 
     async def evaluate_pronunciation(
         self, audio_bytes: bytes, reference_text: str
@@ -120,7 +120,7 @@ CRITICAL RULES:
 
                 def _generate():
                     response = client.models.generate_content(
-                        model="gemini-2.0-flash",
+                        model="gemini-2.5-flash",
                         contents=[prompt, audio_part],
                         config=types.GenerateContentConfig(
                             response_mime_type="application/json",

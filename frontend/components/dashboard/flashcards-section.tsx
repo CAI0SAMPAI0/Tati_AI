@@ -130,26 +130,30 @@ export function FlashcardsSection() {
       try {
         const details = await apiGet<any>(`/activities/modules/${deck.id}`);
         const existingLevels = details.levels || (details.level ? [details.level] : []);
+        const loadedFlashcards = (details.flashcards && details.flashcards.length > 0) 
+          ? details.flashcards 
+          : (deck.flashcards || []);
+
         setFormData({
           title: details.title || deck.title,
           description: details.description || deck.description || '',
-          card_count: details.flashcards?.length || deck.card_count || 10,
+          card_count: loadedFlashcards.length || deck.card_count || 10,
           level: details.level || deck.level || 'all',
           levels: Array.isArray(existingLevels) ? existingLevels : [],
           ai_theme: '',
           ai_with_images: false,
-          flashcards: details.flashcards || []
+          flashcards: loadedFlashcards
         });
       } catch (err) {
         setFormData({
           title: deck.title,
           description: deck.description || '',
-          card_count: deck.card_count || 10,
+          card_count: deck.flashcards?.length || deck.card_count || 10,
           level: deck.level || 'all',
           levels: deck.level ? [deck.level] : [],
           ai_theme: '',
           ai_with_images: false,
-          flashcards: []
+          flashcards: deck.flashcards || []
         });
       }
     } else {

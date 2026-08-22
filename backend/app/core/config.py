@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     supabase_service_key: str = Field("", validation_alias="SUPABASE_SERVICE_KEY")
 
     llm_provider: str = "groq"
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-2.5-flash"
 
     gemini_api_key: str = ""
     gemini_api_key_1: str = ""

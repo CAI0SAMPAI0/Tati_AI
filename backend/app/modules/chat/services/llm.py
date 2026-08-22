@@ -4,6 +4,8 @@ import base64
 import logging
 from collections.abc import AsyncIterator
 
+from fastapi.concurrency import run_in_threadpool
+
 from app.core.config import settings
 
 Message = dict[str, str]
@@ -133,11 +135,11 @@ async def transcribe_audio_verbose(
     return {"error": f"Erro no STT: {last_error}"}
 
 
-async def text_to_speech(text: str) -> str:
+async def text_to_speech(text: str, accent: str = "en-US") -> str:
     """Converte texto em áudio base64 chamando o gerador com clonagem e fallbacks."""
     from app.modules.chat.services.audio_generator import generate_teacher_audio
 
-    audio_b64 = await generate_teacher_audio(text)
+    audio_b64 = await generate_teacher_audio(text, accent=accent)
     if audio_b64:
         return audio_b64
 
@@ -169,8 +171,8 @@ async def _stream_groq(
     ]
     last_error: Exception | None = None
 
-    # Models to try in order: fast large model first, fallback to stable llama3
-    model_queue = ["openai/gpt-oss-20b", "llama-3.2-11b-vision-preview"]
+    # Models to try in order: fast large model first, fallback to stable
+    model_queue = ["openai/gpt-oss-20b", "openai/gpt-oss-120b"]
     current_model_idx = 0
 
     while current_model_idx < len(model_queue):
@@ -213,11 +215,8 @@ async def _stream_groq(
         if succeeded:
             return
 
-        # If we hit 413, escalate to the next model
-        if last_error and "413" in str(last_error):
-            current_model_idx += 1
-        else:
-            break
+        # If we hit 413 or failure, escalate to the next model
+        current_model_idx += 1
 
     yield f"[Erro Groq: todas as {len(keys)} chave(s) falharam. Último: {str(last_error)[:120]}]"
 
@@ -268,7 +267,7 @@ async def groq_chat(
         return await _groq_chat_attempt(messages, max_tokens, temperature, model)
     except Exception as e:
         if "rate_limit" in str(e).lower() and model == "openai/gpt-oss-20b":
-            fallback_model = "llama-3.1-8b-instant"
+            fallback_model = "openai/gpt-oss-120b"
             logging.warning(
                 f"[Groq chat] Rate limit hit for {model}. Falling back to {fallback_model}..."
             )
@@ -282,7 +281,7 @@ async def groq_chat_json(
     messages: list[dict],
     max_tokens: int = 1500,
     temperature: float = 0.4,
-    model: str = "llama-3.1-8b-instant",
+    model: str = "openai/gpt-oss-20b",
 ) -> dict:
     """
     Chama o Groq, garante que a saída seja tratada como JSON,
@@ -505,7 +504,7 @@ async def describe_image_with_gemini(image_bytes: bytes) -> str:
 
             def _generate():
                 response = client.models.generate_content(
-                    model="gemini-2.0-flash",
+                    model="gemini-2.5-flash",
                     contents=[
                         prompt,
                         types.Part.from_bytes(data=img_bytes, mime_type="image/png"),

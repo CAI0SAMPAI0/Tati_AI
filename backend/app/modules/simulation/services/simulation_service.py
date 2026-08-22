@@ -97,8 +97,8 @@ class SimulationService:
         from app.modules.chat.services.llm import groq_chat, text_to_speech
         from app.shared.services.history import save_message
 
-        reply_text = await groq_chat(messages, model="llama-3.1-8b-instant")
-        tts_b64 = await text_to_speech(reply_text) if reply_text else None
+        reply_text = await groq_chat(messages, model="openai/gpt-oss-20b")
+        tts_b64 = await text_to_speech(reply_text, accent=accent) if reply_text else None
 
         if reply_text:
             await save_message(
@@ -192,7 +192,7 @@ class SimulationService:
             {"role": "user", "content": content},
         ]
 
-        reply_text = await groq_chat(messages, model="llama-3.1-8b-instant")
+        reply_text = await groq_chat(messages, model="openai/gpt-oss-20b")
         tts_b64 = await text_to_speech(reply_text) if reply_text else None
 
         await save_message(

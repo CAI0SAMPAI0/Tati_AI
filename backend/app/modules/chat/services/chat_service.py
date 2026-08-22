@@ -184,52 +184,6 @@ class ChatService:
                     "language": trans_data.get("language"),
                     "duration": trans_data.get("duration"),
                 }
-            # Run phonetic analysis to detect mismatch phonemes
-            if content:
-                try:
-                    from app.shared.services.gemini_speech_service import (
-                        gemini_speech_service,
-                    )
-
-                    if gemini_speech_service.is_configured:
-                        gemini_res = await gemini_speech_service.evaluate_pronunciation(
-                            audio_bytes, content
-                        )
-                        if "error" not in gemini_res:
-                            incorrect_words = [
-                                f"'{w['word']}' (score: {w['score']}, error: {w['error_type']})"
-                                for w in gemini_res.get("words", [])
-                                if w.get("accuracy") == "incorrect"
-                                or w.get("score", 100) < 80
-                            ]
-                            if incorrect_words:
-                                phonetic_feedback_info = (
-                                    f"\n\n--- GEMINI PHONETIC ACCURACY ANALYSIS ---\n"
-                                    f"The student mispronounced or had trouble with these words: {', '.join(incorrect_words)}.\n"
-                                    f"Detailed feedback on their pronunciation: {gemini_res.get('feedback')}\n"
-                                    f"Please correct the student on these specific words in your response, being encouraging and friendly.\n"
-                                )
-                    else:
-                        from app.shared.services.phonetic_service import (
-                            phonetic_service,
-                        )
-
-                        phonetic_res = await run_in_threadpool(
-                            phonetic_service.evaluate_pronunciation,
-                            audio_bytes,
-                            content,
-                        )
-                        if phonetic_res and phonetic_res.get("mismatches"):
-                            mismatches = phonetic_res.get("mismatches", [])
-                            phonetic_feedback_info = (
-                                f"\n\n--- LOCAL PHONETIC ACCURACY ANALYSIS ---\n"
-                                f"The phonetic analyzer detected mismatches in these expected phonemes (which suggests the student mispronounced them): "
-                                f"{', '.join(mismatches)}\n"
-                                f"Expected IPA sequence: {phonetic_res.get('expected_ipa')}\n"
-                                f"Spoken IPA sequence: {phonetic_res.get('spoken_ipa')}\n"
-                            )
-                except Exception as pe:
-                    logging.error(f"Error in chat phonetic analysis: {pe}")
             # logging.info(f'[ChatService] Transcrição concluída: "{content[:50]}..."')
             await websocket.send_json({"type": "transcription", "text": content})
         elif msg_type == "file":
@@ -372,7 +326,7 @@ class ChatService:
                     [{"role": "user", "content": prompt}],
                     max_tokens=10,
                     temperature=0.1,
-                    model="llama-3.1-8b-instant",
+                    model="openai/gpt-oss-20b",
                 )
                 return res.strip().upper()
             except BaseException:
@@ -536,22 +490,21 @@ class ChatService:
                     {"type": "stream_token", "content": "\n[Error generating PDF]"}
                 )
 
-        await websocket.send_json({"type": "stream_end"})
-
-        # 6. Finaliza em Background para não travar o socket
-        asyncio.create_task(
-            self._post_response_tasks(
-                username,
-                content,
-                full_response,
-                websocket,
-                conv_id,
-                is_pdf_generation=is_pdf_generation,
-                pdf_filename=pdf_filename,
-                pre_tag=pre_tag_text,
-                simulation_id=simulation_id,
-            )
+        # 6. Gera áudio e finaliza tarefas antes do stream_end
+        await self._post_response_tasks(
+            username,
+            content,
+            full_response,
+            websocket,
+            conv_id,
+            is_pdf_generation=is_pdf_generation,
+            pdf_filename=pdf_filename,
+            pre_tag=pre_tag_text,
+            simulation_id=simulation_id,
+            msg=msg,
         )
+
+        await websocket.send_json({"type": "stream_end"})
 
         return pending_drill_target
 
@@ -586,6 +539,7 @@ class ChatService:
         pdf_filename: str = None,
         pre_tag: str = "",
         simulation_id: str | None = None,
+        msg: dict = None,
     ):
         """Tarefas após o streaming terminar."""
         try:
@@ -602,9 +556,10 @@ class ChatService:
             # 1. TTS e Salvar (PRIORIDADE)
             audio_b64 = None
             tts_text = ""
+            accent = msg.get("accent", "en-US") if isinstance(msg, dict) else "en-US"
             if not is_pdf_generation:
                 tts_text = self._clean_tts_text(full_response)
-                audio_b64 = await text_to_speech(tts_text)
+                audio_b64 = await text_to_speech(tts_text, accent=accent)
                 db_content = full_response
             else:
                 filename_to_save = pdf_filename or f"tati_doc_{conv_id}.pdf"

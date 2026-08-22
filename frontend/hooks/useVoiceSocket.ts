@@ -30,7 +30,7 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
 
     try {
       const { apiPost } = await import('@/lib/api/client');
-      const res = await apiPost<any>('/voice/conversations', {
+      const res = await apiPost<any>('/chat/conversations', {
         title: 'Voice Conversation',
         is_simulation: !!simulationId,
         simulation_id: simulationId || undefined,
@@ -246,7 +246,7 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
     };
   }, [token, handleMessage, simulationId]);
 
-  const sendAudio = useCallback(async (base64: string) => {
+  const sendAudio = useCallback(async (base64: string, accent?: string) => {
     if (!socketRef.current) return;
 
     // Garante que tem uma conversationId antes de enviar
@@ -285,7 +285,8 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
       audio: base64,
       conversation_id: convId,
       origin: 'voice',
-    };
+      accent: accent || 'en-US',
+    } as any;
     socketRef.current.send(msg);
   }, [ensureConversation]);
 

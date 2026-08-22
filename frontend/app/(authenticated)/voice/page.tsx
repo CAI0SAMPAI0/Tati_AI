@@ -91,6 +91,22 @@ function VoicePageContent() {
   const [activeWord, setActiveWord] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
+  const [accentIndex, setAccentIndex] = useState(0);
+  const ACCENTS = [
+    { id: 'en-US', label: '🇺🇸 American' },
+    { id: 'en-GB', label: '🇬🇧 British' },
+    { id: 'en-AU', label: '🇦🇺 Australian' },
+    { id: 'en-CA', label: '🇨🇦 Canadian' },
+    { id: 'en-IE', label: '🇮🇪 Irish' },
+    { id: 'en-IN', label: '🇮🇳 Indian' },
+    { id: 'en-ZA', label: '🇿🇦 South African' },
+  ];
+
+  const handleCycleAccent = () => {
+    setAccentIndex((prev) => (prev + 1) % ACCENTS.length);
+    toast.success(`Accent changed to: ${ACCENTS[(accentIndex + 1) % ACCENTS.length].label}`);
+  };
+
   const [volume, setVolume] = useState(1);
   const [speed, setSpeed] = useState(1);
   const [currentTime, setCurrentTime] = useState(0);
@@ -199,7 +215,10 @@ function VoicePageContent() {
     setIsStarting(true);
     setError(null);
     try {
-      const res = await apiPost<any>('/simulation/start', { scenario_id: simulationId });
+      const res = await apiPost<any>('/simulation/start', { 
+        scenario_id: simulationId,
+        accent: ACCENTS[accentIndex].id
+      });
       if (res.ok && res.data?.id) {
         const simData = res.data;
         setConvId(simData.id);
@@ -263,7 +282,9 @@ function VoicePageContent() {
   useEffect(() => {
     if (lastAudio && audioRef.current) {
       const audio = audioRef.current;
+      audio.pause();
       audio.src = `data:audio/mp3;base64,${lastAudio}`;
+      audio.load();
       audio.play().catch(e => {
         if (e.name === 'NotAllowedError') {
           toast('Tap the avatar to listen.', { icon: '📢' });
@@ -279,13 +300,18 @@ function VoicePageContent() {
     audio.playbackRate = speed;
     const onTimeUpdate = () => setCurrentTime(audio.currentTime);
     const onLoadedMetadata = () => setDuration(audio.duration);
+    const onEnded = () => {
+      setState('idle');
+    };
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
+    audio.addEventListener('ended', onEnded);
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
+      audio.removeEventListener('ended', onEnded);
     };
-  }, [volume, speed]);
+  }, [volume, speed, setState]);
 
   const handleSeek = (val: number) => {
     if (audioRef.current) {
@@ -317,7 +343,7 @@ function VoicePageContent() {
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64 = (reader.result as string).split(',')[1];
-          sendAudio(base64);
+          sendAudio(base64, ACCENTS[accentIndex].id);
         };
         reader.readAsDataURL(blob);
       };
@@ -599,6 +625,7 @@ function VoicePageContent() {
 
       <audio 
         ref={audioRef} 
+        autoPlay
         onEnded={() => {
           if (isLiveMode) {
             setLiveState('listening');
@@ -673,9 +700,19 @@ function VoicePageContent() {
             <h1 className="text-lg sm:text-3xl md:text-5xl font-black text-text tracking-tighter line-clamp-1 md:line-clamp-2">
               {simulationTitle || 'Teacher Tati'}
             </h1>
-            <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-0.5 sm:py-2 rounded-full bg-success/10 border border-success/30 shadow-lg backdrop-blur-2xl">
-              <span className="w-1 h-1 sm:w-2 sm:h-2 rounded-full bg-success animate-pulse" />
-              <span className="text-[7px] sm:text-[10px] font-black text-success uppercase tracking-widest">{'Online'}</span>
+            <div className="flex items-center justify-center gap-2">
+              <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-0.5 sm:py-2 rounded-full bg-success/10 border border-success/30 shadow-lg backdrop-blur-2xl">
+                <span className="w-1 h-1 sm:w-2 sm:h-2 rounded-full bg-success animate-pulse" />
+                <span className="text-[7px] sm:text-[10px] font-black text-success uppercase tracking-widest">{'Online'}</span>
+              </div>
+              <button 
+                onClick={handleCycleAccent}
+                title="Click to change accent"
+                className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-0.5 sm:py-2 rounded-full bg-primary/10 hover:bg-primary/20 border border-primary/30 shadow-lg backdrop-blur-2xl text-[8px] sm:text-[11px] font-bold text-primary transition-all active:scale-95 cursor-pointer"
+              >
+                <span>{ACCENTS[accentIndex].label}</span>
+                <span className="text-[9px] opacity-70">⚡</span>
+              </button>
             </div>
           </div>
         </div>
@@ -709,7 +746,7 @@ function VoicePageContent() {
           ) : (
             <AnimatePresence mode="popLayout" initial={false}>
               {simulationId && objectives.length > 0 && (
-                <MotionDiv initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white/40 dark:bg-white/5 border border-white/40 dark:border-white/10 p-4 rounded-3xl mb-6 space-y-3 animate-fade-in shadow-xl backdrop-blur-xl">
+                <MotionDiv key="simulation-objectives" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white/40 dark:bg-white/5 border border-white/40 dark:border-white/10 p-4 rounded-3xl mb-6 space-y-3 animate-fade-in shadow-xl backdrop-blur-xl">
                   <p className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest">Mission Objectives</p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {objectives.map(obj => {
@@ -725,19 +762,19 @@ function VoicePageContent() {
                 </MotionDiv>
               )}
               {messages.length === 0 && !transcription ? (
-                 <div className="h-full flex flex-col items-center justify-center text-center opacity-40 gap-4 p-4">
+                 <MotionDiv key="empty-state" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col items-center justify-center text-center opacity-40 gap-4 p-4">
                     <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 border-dashed border-primary/30 flex items-center justify-center">
                       <Mic size={24} className="text-primary/50" />
                     </div>
                     <p className="text-sm sm:text-lg italic tracking-widest text-center">
                         {isLiveMode ? 'Live Mode Active. Start speaking continuous English...' : simulationId ? 'Waiting for simulation...' : 'Say "Hello" to start your class...'}
                     </p>
-                 </div>
+                 </MotionDiv>
               ) : (
-                <>
+                <MotionDiv key="messages-list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full space-y-6">
                   <div className="w-full flex flex-col gap-6 sm:gap-8">
-                    {messages.map((m) => (
-                      <MotionDiv key={m.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full">
+                    {messages.map((m, idx) => (
+                      <MotionDiv key={m.id || `msg-${idx}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full">
                         <VoiceMessageBubble message={m} onWordClick={handleWordClick} />
                       </MotionDiv>
                     ))}
@@ -752,7 +789,7 @@ function VoicePageContent() {
                   {transcription && state === 'listening' && (
                     <div className="flex justify-end italic text-primary/70 pr-4 text-sm">&ldquo;{transcription}&rdquo;</div>
                   )}
-                </>
+                </MotionDiv>
               )}
             </AnimatePresence>
           )}
