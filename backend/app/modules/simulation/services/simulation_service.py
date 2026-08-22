@@ -37,7 +37,7 @@ class SimulationService:
         return await run_in_threadpool(get_scenario, scenario_id)
 
     async def start_session(
-        self, username: str, scenario_id: str, user_level: str = "A1"
+        self, username: str, scenario_id: str, user_level: str = "A1", accent: str = "en-US"
     ) -> dict[str, Any]:
         """Inicializa uma nova sessão de simulação e retorna o ID da conversa com a primeira mensagem da IA."""
         import uuid
@@ -138,6 +138,7 @@ class SimulationService:
         scenario_id: str,
         conversation_id: str | None = None,
         user_level: str = "A1",
+        accent: str = "en-US",
     ) -> dict[str, Any]:
         conv_id = conversation_id or f"sim_{username}_{scenario_id}"
         user_level = normalize_level(user_level)
@@ -193,7 +194,7 @@ class SimulationService:
         ]
 
         reply_text = await groq_chat(messages, model="openai/gpt-oss-20b")
-        tts_b64 = await text_to_speech(reply_text) if reply_text else None
+        tts_b64 = await text_to_speech(reply_text, accent=accent) if reply_text else None
 
         await save_message(
             conv_id, username, "assistant", reply_text, audio_b64=tts_b64

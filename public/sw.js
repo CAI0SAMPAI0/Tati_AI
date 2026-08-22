@@ -1,5 +1,5 @@
-const CACHE_NAME = 'tati-ai-v2.1.7';
-const API_CACHE_NAME = 'tati-ai-api-v2.1.7';
+const CACHE_NAME = 'tati-ai-v2.2.0';
+const API_CACHE_NAME = 'tati-ai-api-v2.2.0';
 const urlsToCache = [
   '/',
   '/index.html',

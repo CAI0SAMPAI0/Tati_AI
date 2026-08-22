@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { 
@@ -17,7 +18,8 @@ import {
   RefreshCcw,
   Activity,
   CheckCircle2,
-  Circle
+  Circle,
+  Globe
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -91,20 +93,118 @@ function VoicePageContent() {
   const [activeWord, setActiveWord] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
-  const [accentIndex, setAccentIndex] = useState(0);
   const ACCENTS = [
-    { id: 'en-US', label: '🇺🇸 American' },
-    { id: 'en-GB', label: '🇬🇧 British' },
-    { id: 'en-AU', label: '🇦🇺 Australian' },
-    { id: 'en-CA', label: '🇨🇦 Canadian' },
-    { id: 'en-IE', label: '🇮🇪 Irish' },
-    { id: 'en-IN', label: '🇮🇳 Indian' },
-    { id: 'en-ZA', label: '🇿🇦 South African' },
+    { id: 'en-US', label: '🇺🇸 American', shortLabel: 'US', desc: 'United States' },
+    { id: 'en-GB', label: '🇬🇧 British', shortLabel: 'UK', desc: 'United Kingdom' },
+    { id: 'en-AU', label: '🇦🇺 Australian', shortLabel: 'AU', desc: 'Australia' },
+    { id: 'en-CA', label: '🇨🇦 Canadian', shortLabel: 'CA', desc: 'Canada' },
+    { id: 'en-IE', label: '🇮🇪 Irish', shortLabel: 'IE', desc: 'Ireland' },
+    { id: 'en-IN', label: '🇮🇳 Indian', shortLabel: 'IN', desc: 'India' },
+    { id: 'en-ZA', label: '🇿🇦 South African', shortLabel: 'ZA', desc: 'South Africa' },
+    { id: 'en-NZ', label: '🇳🇿 New Zealand', shortLabel: 'NZ', desc: 'New Zealand' },
   ];
 
-  const handleCycleAccent = () => {
-    setAccentIndex((prev) => (prev + 1) % ACCENTS.length);
-    toast.success(`Accent changed to: ${ACCENTS[(accentIndex + 1) % ACCENTS.length].label}`);
+  const [accentIndex, setAccentIndex] = useState(0);
+  const [isChangingAccent, setIsChangingAccent] = useState(false);
+  const [isAccentMenuOpen, setIsAccentMenuOpen] = useState(false);
+  const accentMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('tati_voice_accent');
+      if (saved) {
+        const found = ACCENTS.findIndex(a => a.id === saved);
+        if (found !== -1) {
+          setAccentIndex(found);
+        }
+      }
+    } catch (_) {}
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (accentMenuRef.current && !accentMenuRef.current.contains(e.target as Node)) {
+        setIsAccentMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const changeAccentToIndex = async (newIndex: number) => {
+    const safeIndex = (newIndex + ACCENTS.length) % ACCENTS.length;
+    setAccentIndex(safeIndex);
+    const newAccent = ACCENTS[safeIndex];
+    try {
+      localStorage.setItem('tati_voice_accent', newAccent.id);
+    } catch (_) {}
+
+    toast.success(`Accent: ${newAccent.label}`, { id: 'accent-toast', duration: 2000 });
+
+    const currentMessages = isLiveMode ? liveMessages : normalMessages;
+    const lastAssistantMsg = [...currentMessages].reverse().find(m => m.role === 'assistant');
+
+    if (lastAssistantMsg && lastAssistantMsg.content) {
+      setIsChangingAccent(true);
+      try {
+        const res = await apiPost<{ audio: string }>('/chat/tts', {
+          text: lastAssistantMsg.content,
+          accent: newAccent.id,
+        });
+
+        if (res.ok && res.data?.audio) {
+          const newAudio = res.data.audio;
+
+          const updater = (prev: typeof currentMessages) => {
+            const lastIdx = prev.map(m => m.role).lastIndexOf('assistant');
+            if (lastIdx !== -1) {
+              const copy = [...prev];
+              copy[lastIdx] = { ...copy[lastIdx], audio_b64: newAudio };
+              return copy;
+            }
+            return prev;
+          };
+
+          if (isLiveMode) {
+            setLiveMessages(updater);
+          } else {
+            setNormalMessages(updater);
+          }
+
+          if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.src = `data:audio/mp3;base64,${newAudio}`;
+            audioRef.current.load();
+            audioRef.current.play().catch(e => {
+              console.log('Audio autoplay prevented or interrupted:', e);
+            });
+            if (isLiveMode) {
+              setLiveState('speaking');
+            } else {
+              setNormalState('speaking');
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error reloading audio with new accent:', err);
+      } finally {
+        setIsChangingAccent(false);
+      }
+    }
+  };
+
+  const handleCycleAccent = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    changeAccentToIndex(accentIndex + 1);
+  };
+
+  const handleWheelAccent = (e: React.WheelEvent) => {
+    e.preventDefault();
+    if (e.deltaY > 0) {
+      changeAccentToIndex(accentIndex + 1);
+    } else if (e.deltaY < 0) {
+      changeAccentToIndex(accentIndex - 1);
+    }
   };
 
   const [volume, setVolume] = useState(1);
@@ -485,7 +585,7 @@ function VoicePageContent() {
                       binary += String.fromCharCode(bytes[i]);
                     }
                     const base64 = btoa(binary);
-                    sendAudioChunk(base64);
+                    sendAudioChunk(base64, ACCENTS[accentIndex].id);
                     
                     accumulatedAudioRef.current = [];
                     silenceTimerRef.current = 0;
@@ -700,22 +800,122 @@ function VoicePageContent() {
             <h1 className="text-lg sm:text-3xl md:text-5xl font-black text-text tracking-tighter line-clamp-1 md:line-clamp-2">
               {simulationTitle || 'Teacher Tati'}
             </h1>
-            <div className="flex items-center justify-center gap-2">
-              <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-0.5 sm:py-2 rounded-full bg-success/10 border border-success/30 shadow-lg backdrop-blur-2xl">
-                <span className="w-1 h-1 sm:w-2 sm:h-2 rounded-full bg-success animate-pulse" />
-                <span className="text-[7px] sm:text-[10px] font-black text-success uppercase tracking-widest">{'Online'}</span>
+            <div className="flex flex-col items-center gap-2 w-full">
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-0.5 sm:py-1.5 rounded-full bg-success/10 border border-success/30 shadow-lg backdrop-blur-2xl">
+                  <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                  <span className="text-[8px] sm:text-[10px] font-black text-success uppercase tracking-widest">{'Online'}</span>
+                </div>
+
+                <button 
+                  onClick={handleCycleAccent}
+                  onWheel={handleWheelAccent}
+                  title="Clique para alternar ou use a roda do mouse para trocar de sotaque"
+                  className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-0.5 sm:py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 border border-primary/30 shadow-lg backdrop-blur-2xl text-[9px] sm:text-[11px] font-bold text-primary transition-all active:scale-95 cursor-pointer group select-none"
+                >
+                  {isChangingAccent ? (
+                    <RotateCcw className="animate-spin text-primary shrink-0" size={12} />
+                  ) : (
+                    <span className="shrink-0">{ACCENTS[accentIndex].label}</span>
+                  )}
+                  <span className="text-[8px] sm:text-[10px] opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-transform">⚡</span>
+                </button>
+
+                <button
+                  onClick={() => setIsAccentMenuOpen(true)}
+                  title="Ver e escolher todos os sotaques"
+                  className="p-1 sm:p-1.5 rounded-full bg-white/50 dark:bg-[#1a1c2e]/60 border border-white/60 dark:border-white/10 text-text-muted hover:text-primary transition-all active:scale-95 shadow-md text-xs flex items-center justify-center cursor-pointer"
+                >
+                  <Globe size={14} className="text-primary" />
+                </button>
               </div>
-              <button 
-                onClick={handleCycleAccent}
-                title="Click to change accent"
-                className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-0.5 sm:py-2 rounded-full bg-primary/10 hover:bg-primary/20 border border-primary/30 shadow-lg backdrop-blur-2xl text-[8px] sm:text-[11px] font-bold text-primary transition-all active:scale-95 cursor-pointer"
-              >
-                <span>{ACCENTS[accentIndex].label}</span>
-                <span className="text-[9px] opacity-70">⚡</span>
-              </button>
+
+              {/* Horizontal Scrollable Accent Carousel (Sempre Visível) */}
+              <div className="w-full max-w-[300px] sm:max-w-sm overflow-x-auto py-1 scrollbar-hide no-scrollbar flex items-center gap-1.5 px-1">
+                {ACCENTS.map((acc, idx) => {
+                  const isSelected = idx === accentIndex;
+                  return (
+                    <button
+                      key={acc.id}
+                      onClick={() => changeAccentToIndex(idx)}
+                      title={`${acc.label} (${acc.desc})`}
+                      className={cn(
+                        "shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] sm:text-[10px] font-bold transition-all active:scale-95 cursor-pointer shadow-sm",
+                        isSelected
+                          ? "bg-primary text-white shadow-primary/30 ring-2 ring-primary/40 font-black scale-105"
+                          : "bg-white/50 dark:bg-[#1a1c2e]/60 border border-white/60 dark:border-white/10 text-text-muted hover:text-primary hover:bg-white/80"
+                      )}
+                    >
+                      <span>{acc.label.split(' ')[0]}</span>
+                      <span>{acc.shortLabel}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Accent Picker Modal via React Portal (Garante que nunca seja cortado) */}
+        {typeof document !== 'undefined' && isAccentMenuOpen && createPortal(
+          <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 dark:bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+            <div 
+              className="fixed inset-0 cursor-pointer"
+              onClick={() => setIsAccentMenuOpen(false)}
+            />
+            <div className="relative w-full sm:max-w-md bg-white dark:bg-[#111322] border border-border/80 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 sm:p-6 z-10 max-h-[85vh] flex flex-col space-y-4 animate-in slide-in-from-bottom-5 duration-300">
+              <div className="flex items-center justify-between border-b border-border/40 pb-3 shrink-0">
+                <div className="space-y-0.5">
+                  <h3 className="text-base sm:text-lg font-black text-text flex items-center gap-2">
+                    <span>🌎</span> Sotaques em Inglês (Edge TTS)
+                  </h3>
+                  <p className="text-xs text-text-muted">A Teacher Tati responderá com a pronúncia selecionada</p>
+                </div>
+                <button 
+                  onClick={() => setIsAccentMenuOpen(false)}
+                  className="p-1.5 rounded-full hover:bg-surface-hover text-text-muted hover:text-text transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-y-auto max-h-[60vh] pr-1 custom-scrollbar">
+                {ACCENTS.map((acc, idx) => {
+                  const isSelected = idx === accentIndex;
+                  return (
+                    <button
+                      key={acc.id}
+                      onClick={() => {
+                        changeAccentToIndex(idx);
+                        setIsAccentMenuOpen(false);
+                      }}
+                      className={cn(
+                        "flex items-center justify-between p-3 rounded-2xl border text-left transition-all active:scale-98 cursor-pointer",
+                        isSelected
+                          ? "bg-primary text-white border-primary shadow-lg font-bold scale-[1.02]"
+                          : "bg-surface/60 dark:bg-white/5 border-border/60 hover:border-primary/40 hover:bg-primary/5 text-text"
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-xl shrink-0">{acc.label.split(' ')[0]}</span>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold truncate">{acc.label.split(' ').slice(1).join(' ')}</div>
+                          <div className={cn("text-[10px]", isSelected ? "text-white/80" : "text-text-muted")}>{acc.desc || acc.shortLabel}</div>
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <span className="w-5 h-5 rounded-full bg-white text-primary flex items-center justify-center text-xs font-black shrink-0 shadow">
+                          ✓
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
       </MotionDiv>
 
       <MotionDiv initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} className="flex-1 flex flex-col min-h-0 bg-white/5 dark:bg-[#05060b]/40 relative z-10">

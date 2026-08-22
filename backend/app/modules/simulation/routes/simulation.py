@@ -17,6 +17,7 @@ class SimMessageRequest(BaseModel):
     content: str
     conversation_id: str = ""
     scenario: str
+    accent: str = "en-US"
 
 
 class SimStartRequest(BaseModel):
@@ -90,6 +91,7 @@ async def send_simulation_message(
         body.scenario,
         body.conversation_id,
         current_user.get("level", "A1"),
+        accent=body.accent,
     )
 
 

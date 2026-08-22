@@ -41,6 +41,7 @@ class EditMessageBody(BaseModel):
 
 class TTSRequest(BaseModel):
     text: str
+    accent: str = "en-US"
 
 
 class CreateConversationBody(BaseModel):
@@ -177,7 +178,7 @@ async def get_summary(
 
 @router.post("/tts")
 async def tts_word(body: TTSRequest, current_user: dict = Depends(get_current_user)):
-    audio_b64 = await text_to_speech(body.text)
+    audio_b64 = await text_to_speech(body.text, accent=body.accent)
     if not audio_b64:
         raise HTTPException(status_code=503, detail="TTS indisponível")
     return {"audio": audio_b64}
@@ -418,7 +419,8 @@ async def voice_live_ws(
                             {"type": "stream_token", "content": final_json}
                         )
 
-                        audio_b64 = await text_to_speech(reply)
+                        accent = msg_data.get("accent", "en-US") if isinstance(msg_data, dict) else "en-US"
+                        audio_b64 = await text_to_speech(reply, accent=accent)
                         if audio_b64:
                             await websocket.send_json(
                                 {
@@ -460,7 +462,7 @@ async def voice_live_ws(
                         {"type": "stream_token", "content": final_json}
                     )
 
-                    audio_b64 = await text_to_speech(reply)
+                    audio_b64 = await text_to_speech(reply, accent="en-US")
                     if audio_b64:
                         await websocket.send_json(
                             {

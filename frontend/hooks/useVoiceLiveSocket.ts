@@ -124,12 +124,13 @@ export function useVoiceLiveSocket() {
     }
   }, []);
 
-  const sendAudioChunk = useCallback((base64: string) => {
+  const sendAudioChunk = useCallback((base64: string, accent?: string) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
     
     wsRef.current.send(JSON.stringify({
       type: 'audio',
-      audio: base64
+      audio: base64,
+      accent: accent || 'en-US',
     }));
   }, []);
 

@@ -43,6 +43,7 @@ export interface WsOutgoingMessage {
   conv_id?: string | null;
   conversation_id?: string | null;
   new_conversation?: boolean;
+  accent?: string;
 }
 
 export interface WsConnectionConfig {
