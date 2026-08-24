@@ -251,7 +251,7 @@ async def list_premium_content(
             has_access = (
                 (purchased_ids is not None and c["id"] in purchased_ids)
                 or username in SPECIAL_USERS
-                or user.get("role") == "admin"
+                or user.get("role") in STAFF_ROLES
             )
 
         preview_path = c.get("preview_path")
@@ -259,8 +259,7 @@ async def list_premium_content(
             public_preview_url(preview_path) if preview_path else c.get("thumbnail_url")
         )
         if preview_url and not str(preview_url).startswith("http"):
-            preview_url = f"{
-                settings.supabase_url}/storage/v1/object/public/hub-previews/{preview_url}"
+            preview_url = f"{settings.supabase_url}/storage/v1/object/public/hub-previews/{preview_url}"
 
         category = (c.get("category") or "other").lower()
 
@@ -293,6 +292,65 @@ async def list_premium_content_public(
     return await list_premium_content(user)
 
 
+STAFF_ROLES = {
+    "admin",
+    "Admin",
+    "programmer",
+    "programador",
+    "Programador",
+    "professor",
+    "professora",
+    "Professora",
+    "Tatiana",
+    "Tati",
+}
+
+
+def _check_content_access(db, user: dict, content_id: str) -> bool:
+    username = user.get("username") if user else None
+    role = user.get("role") if user else None
+
+    from app.modules.payments.services.subscription_manager import SPECIAL_USERS
+
+    if (username and username in SPECIAL_USERS) or (role and role in STAFF_ROLES):
+        return True
+
+    if not username:
+        return False
+
+    # 1. Verifica na tabela clássica premium_purchases
+    try:
+        purchase = (
+            db.table("premium_purchases")
+            .select("id, status")
+            .eq("username", username)
+            .eq("content_id", content_id)
+            .eq("status", "confirmed")
+            .execute()
+        )
+        if purchase.data:
+            return True
+    except Exception as e:
+        _hub_log(f"check_access error premium_purchases: {e}")
+
+    # 2. Fallback: verifica nas tabelas orders + order_items (fluxo hub-site público)
+    try:
+        order_items = (
+            db.table("order_items")
+            .select("order_id, orders!inner(id, username, status, asaas_id)")
+            .eq("content_id", content_id)
+            .execute()
+        )
+        for oi in order_items.data or []:
+            order = oi.get("orders", {})
+            if order.get("username") == username and order.get("status") == "confirmed":
+                return True
+    except Exception as e:
+        _hub_log(f"check_access error orders: {e}")
+
+    return False
+
+
 @router.get("/{content_id}/access")
 async def get_content_access(
     content_id: str,
@@ -302,7 +360,6 @@ async def get_content_access(
 ):
     """Retorna o link de acesso/download se o usuário tiver permissão."""
     db = get_client()
-    username = user.get("username")
 
     # Extrai o token para passar para as URLs das páginas
     raw_token = None
@@ -310,53 +367,9 @@ async def get_content_access(
         raw_token = authorization.split(" ")[1]
 
     # 1. Verifica se tem acesso
-    from app.modules.payments.services.subscription_manager import SPECIAL_USERS
-
-    is_special = username in SPECIAL_USERS or user.get("role") == "admin"
-
-    if not is_special:
-        # Verifica na tabela clássica premium_purchases
-        purchase = (
-            db.table("premium_purchases")
-            .select("id, status")
-            .eq("username", username)
-            .eq("content_id", content_id)
-            .eq("status", "confirmed")
-            .execute()
-        )
-
-        has_access = bool(purchase.data)
-        _hub_log(
-            f"access_check username={username} content_id={content_id} premium_purchases={
-                purchase.data}"
-        )
-
-        # Fallback: verifica nas tabelas orders + order_items (fluxo
-        # hub-site público)
-        if not has_access:
-            order_items = (
-                db.table("order_items")
-                .select("order_id, orders!inner(id, username, status, asaas_id)")
-                .eq("content_id", content_id)
-                .execute()
-            )
-
-            _hub_log(
-                f"access_check_orders username={username} content_id={content_id} order_items={
-                    order_items.data}"
-            )
-
-            for oi in order_items.data or []:
-                order = oi.get("orders", {})
-                if order.get("username") != username:
-                    continue
-
-                if order.get("status") == "confirmed":
-                    has_access = True
-                    break
-
-        if not has_access:
-            raise PremiumAccessDeniedError()
+    has_access = _check_content_access(db, user, content_id)
+    if not has_access:
+        raise PremiumAccessDeniedError()
 
     # 2. Busca informações do conteúdo
     content = (
@@ -399,8 +412,6 @@ async def get_content_access(
             # Detecta a base URL da requisição atual para montar o link
             # completo
             api_base = str(request.base_url).rstrip("/")
-            # Removido /api pois o servidor Python não usa esse prefixo
-            # nas rotas
 
             for i in range(len(pages)):
                 token_suffix = f"?token={raw_token}" if raw_token else ""
@@ -420,8 +431,6 @@ async def get_content_access(
     # 4. Caso contrário, fluxo antigo (Link direto ou Signed URL)
     source = item["content_source"]
     if source and not source.startswith("http"):
-
-        # Gera Signed URL em vez de link público direto
         res = db.storage.from_("module-files").create_signed_url(source, 900)
         source = res["signedURL"]
 
@@ -455,8 +464,6 @@ async def get_secure_page(
         payload = decode_token(final_token)
         if payload:
             username = payload["sub"]
-            # Cache de usuários pode ser feito aqui futuramente, por
-            # enquanto query rápida
             rows = (
                 db.table("users")
                 .select("username, email, role")
@@ -473,21 +480,9 @@ async def get_secure_page(
     email = user.get("email") or username
 
     # 2. Verifica se tem acesso
-    from app.modules.payments.services.subscription_manager import SPECIAL_USERS
-
-    is_special = username in SPECIAL_USERS or user.get("role") == "admin"
-
-    if not is_special:
-        purchase = (
-            db.table("premium_purchases")
-            .select("id")
-            .eq("username", username)
-            .eq("content_id", content_id)
-            .eq("status", "confirmed")
-            .execute()
-        )
-        if not purchase.data:
-            raise PremiumAccessDeniedError()
+    has_access = _check_content_access(db, user, content_id)
+    if not has_access:
+        raise PremiumAccessDeniedError()
 
     # 3. Busca informações do conteúdo
     content = (
@@ -579,7 +574,7 @@ async def download_premium_content(
             username = payload["sub"]
             rows = (
                 db.table("users")
-                .select("username, role")
+                .select("username, email, role")
                 .eq("username", username)
                 .execute()
             )
@@ -589,24 +584,10 @@ async def download_premium_content(
     if not user:
         raise AuthenticationRequiredError()
 
-    username = user.get("username")
-
     # 1. Verifica se tem acesso
-    from app.modules.payments.services.subscription_manager import SPECIAL_USERS
-
-    is_special = username in SPECIAL_USERS or user.get("role") == "admin"
-
-    if not is_special:
-        purchase = (
-            db.table("premium_purchases")
-            .select("id")
-            .eq("username", username)
-            .eq("content_id", content_id)
-            .eq("status", "confirmed")
-            .execute()
-        )
-        if not purchase.data:
-            raise PremiumAccessDeniedError()
+    has_access = _check_content_access(db, user, content_id)
+    if not has_access:
+        raise PremiumAccessDeniedError()
 
     # 2. Busca informações do conteúdo
     content = (
