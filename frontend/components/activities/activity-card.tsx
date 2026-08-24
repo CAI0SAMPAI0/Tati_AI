@@ -11,13 +11,6 @@ const statusConfig = {
   pending: { label: 'Pending', className: 'bg-warning/15 text-warning border-warning/30' },
 } as const;
 
-const typeIcons = {
-  flashcard: <Play size={18} />,
-  exercise: <FileText size={18} />,
-  simulation: <Play size={18} />,
-  podcast: <Headphones size={18} />,
-} as const;
-
 interface ActivityCardProps {
   title: string;
   description: string;
@@ -35,7 +28,6 @@ interface ActivityCardProps {
 export const ActivityCard = React.memo(function ActivityCard({
   title,
   description,
-  type,
   status,
   meta,
   onClick,

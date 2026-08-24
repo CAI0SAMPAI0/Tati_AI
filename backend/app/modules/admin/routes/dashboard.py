@@ -785,14 +785,17 @@ def get_dashboard_flashcards(
             import re
             from collections import defaultdict
 
+            def normalize_slug(s: str) -> str:
+                return re.sub(r"_+", "_", re.sub(r"[^a-zA-Z0-9]", "_", (s or "").lower())).strip("_")
+
             grouped_cf = defaultdict(list)
             for row in cefr_data:
                 row_level = row.get("level", "A1").upper()
-                topic = row.get("topic") or "General Vocabulary"
+                topic = (row.get("topic") or "General Vocabulary").strip()
                 grouped_cf[(row_level, topic)].append(row)
 
             for (lvl, topic), cards in grouped_cf.items():
-                topic_slug = re.sub(r"[^a-zA-Z0-9]", "_", topic.lower())
+                topic_slug = normalize_slug(topic)
                 deck_id = f"cefr_fc_{lvl.lower()}_{topic_slug}"
 
                 # Check if published
@@ -898,17 +901,18 @@ def update_flashcard_deck(
         parts = deck_id.split("_")
         if len(parts) >= 4:
             level = parts[2].upper()
-            topic_slug = "_".join(parts[3:])
-
             import re
+            def normalize_slug(s: str) -> str:
+                return re.sub(r"_+", "_", re.sub(r"[^a-zA-Z0-9]", "_", (s or "").lower())).strip("_")
+            topic_slug = normalize_slug("_".join(parts[3:]))
 
-            res = db.table("cefr_flashcards").select("*").eq("level", level).execute()
+            res = db.table("cefr_flashcards").select("*").ilike("level", level).execute()
             rows = res.data or []
 
             matched_rows = []
             for r in rows:
-                t = r.get("topic") or "General Vocabulary"
-                t_slug = re.sub(r"[^a-zA-Z0-9]", "_", t.lower())
+                t = (r.get("topic") or "General Vocabulary").strip()
+                t_slug = normalize_slug(t)
                 if t_slug == topic_slug:
                     matched_rows.append(r)
 
@@ -983,17 +987,18 @@ async def delete_flashcard_deck(
         parts = deck_id.split("_")
         if len(parts) >= 4:
             level = parts[2].upper()
-            topic_slug = "_".join(parts[3:])
-
-            res = db.table("cefr_flashcards").select("*").eq("level", level).execute()
-            rows = res.data or []
-
             import re
+            def normalize_slug(s: str) -> str:
+                return re.sub(r"_+", "_", re.sub(r"[^a-zA-Z0-9]", "_", (s or "").lower())).strip("_")
+            topic_slug = normalize_slug("_".join(parts[3:]))
+
+            res = db.table("cefr_flashcards").select("*").ilike("level", level).execute()
+            rows = res.data or []
 
             matched_rows = []
             for r in rows:
-                t = r.get("topic") or "General Vocabulary"
-                t_slug = re.sub(r"[^a-zA-Z0-9]", "_", t.lower())
+                t = (r.get("topic") or "General Vocabulary").strip()
+                t_slug = normalize_slug(t)
                 if t_slug == topic_slug:
                     matched_rows.append(r)
 

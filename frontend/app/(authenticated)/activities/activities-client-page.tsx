@@ -132,9 +132,21 @@ export default function ActivitiesClientPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('tati_last_activity_tab') as TabType;
-      if (saved && ['grammar', 'vocabulary', 'listenings', 'reading', 'flashcards', 'simulations', 'games'].includes(saved)) {
-        setActiveTab(saved);
+      const savedTab = localStorage.getItem('tati_last_activity_tab') as TabType;
+      if (savedTab && ['grammar', 'vocabulary', 'listenings', 'reading', 'flashcards', 'simulations', 'games', 'news'].includes(savedTab)) {
+        setActiveTab(savedTab);
+      }
+      const savedLevel = sessionStorage.getItem('tati_activities_filter_level');
+      if (savedLevel && ['All', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'].includes(savedLevel)) {
+        setFilterLevel(savedLevel);
+      }
+      const savedStatus = sessionStorage.getItem('tati_activities_filter_status') as any;
+      if (savedStatus && ['all', 'pending', 'done'].includes(savedStatus)) {
+        setStatusFilter(savedStatus);
+      }
+      const savedSource = sessionStorage.getItem('tati_activities_filter_source') as any;
+      if (savedSource && ['all', 'test-english', 'liveworksheets'].includes(savedSource)) {
+        setSourceFilter(savedSource);
       }
     }
   }, []);
@@ -142,6 +154,27 @@ export default function ActivitiesClientPage() {
   useEffect(() => {
     localStorage.setItem('tati_last_activity_tab', activeTab);
   }, [activeTab]);
+
+  const handleFilterLevelChange = (val: string) => {
+    setFilterLevel(val);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('tati_activities_filter_level', val);
+    }
+  };
+
+  const handleStatusFilterChange = (val: 'all' | 'pending' | 'done') => {
+    setStatusFilter(val);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('tati_activities_filter_status', val);
+    }
+  };
+
+  const handleSourceFilterChange = (val: 'all' | 'test-english' | 'liveworksheets') => {
+    setSourceFilter(val);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('tati_activities_filter_source', val);
+    }
+  };
 
   // User Submissions for Done vs Pending verification (Cached via React Query)
   const { data: mySubmissions = [], refetch: refetchSubmissions } = useQuery<any[]>({
@@ -567,7 +600,7 @@ export default function ActivitiesClientPage() {
                   <span className="text-xs font-bold text-text-subtle uppercase tracking-wider whitespace-nowrap">Level:</span>
                   <select
                     value={filterLevel}
-                    onChange={(e) => setFilterLevel(e.target.value)}
+                    onChange={(e) => handleFilterLevelChange(e.target.value)}
                     className="px-3 py-2 bg-surface border border-border rounded-2xl text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all cursor-pointer text-text"
                   >
                     <option value="All">All Levels</option>
@@ -586,7 +619,7 @@ export default function ActivitiesClientPage() {
                 <span className="text-xs font-bold text-text-subtle uppercase tracking-wider whitespace-nowrap">Status:</span>
                 <select
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  onChange={(e) => handleStatusFilterChange(e.target.value as any)}
                   className="px-3 py-2 bg-surface border border-border rounded-2xl text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all cursor-pointer text-text"
                 >
                   <option value="all">All Status</option>
@@ -600,7 +633,7 @@ export default function ActivitiesClientPage() {
                 <span className="text-xs font-bold text-text-subtle uppercase tracking-wider whitespace-nowrap">Source:</span>
                 <select
                   value={sourceFilter}
-                  onChange={(e) => setSourceFilter(e.target.value as any)}
+                  onChange={(e) => handleSourceFilterChange(e.target.value as any)}
                   className="px-3 py-2 bg-surface border border-border rounded-2xl text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all cursor-pointer text-text"
                 >
                   <option value="all">All Sources</option>

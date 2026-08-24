@@ -124,30 +124,33 @@ class ActivityService:
         return result
 
     async def get_module_details(self, module_id: str) -> dict[str, Any] | None:
-        """Busca detalhes de um módulo e suas lições."""
+        """Busca detalhes de um módulo e suas lições (ou deck virtual CEFR)."""
+        import re
+
+        def normalize_slug(s: str) -> str:
+            return re.sub(r"_+", "_", re.sub(r"[^a-zA-Z0-9]", "_", (s or "").lower())).strip("_")
+
         if str(module_id).startswith("cefr_fc_"):
-            parts = module_id.split("_")
+            parts = str(module_id).split("_")
             if len(parts) >= 4:
                 level = parts[2].upper()
+                target_slug = normalize_slug("_".join(parts[3:]))
 
                 def _fetch_cefr_fc():
                     res = (
                         self.db.table("cefr_flashcards")
                         .select("*")
-                        .eq("level", level)
-                        .eq("is_published", True)
+                        .ilike("level", level)
                         .execute()
                     )
                     rows = res.data or []
 
-                    import re
-
                     matched_rows = []
                     matched_topic = ""
                     for r in rows:
-                        t = r.get("topic") or "General Vocabulary"
-                        t_slug = re.sub(r"[^a-zA-Z0-9]", "_", t.lower())
-                        if t_slug == "_".join(parts[3:]):
+                        t = (r.get("topic") or "General Vocabulary").strip()
+                        t_slug = normalize_slug(t)
+                        if t_slug == target_slug:
                             matched_rows.append(r)
                             matched_topic = t
 
@@ -158,9 +161,9 @@ class ActivityService:
                     for row in matched_rows:
                         flashcards.append(
                             {
-                                "front": row["front"],
-                                "back": row["back"],
-                                "explanation": row["explanation"]
+                                "front": row.get("front") or "",
+                                "back": row.get("back") or "",
+                                "explanation": row.get("explanation")
                                 or "No explanation provided.",
                                 "image_url": row.get("image_url"),
                             }
@@ -179,6 +182,12 @@ class ActivityService:
             return None
 
         def _fetch():
+            import uuid
+            try:
+                uuid.UUID(str(module_id))
+            except (ValueError, TypeError):
+                return None
+
             try:
                 module = (
                     self.db.table("modules")
@@ -189,7 +198,6 @@ class ActivityService:
                     .data
                 )
             except Exception:
-                # .single() throws if 0 rows found
                 try:
                     rows = (
                         self.db.table("modules")

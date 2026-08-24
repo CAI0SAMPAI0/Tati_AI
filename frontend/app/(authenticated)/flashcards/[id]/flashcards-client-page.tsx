@@ -131,7 +131,7 @@ export default function FlashcardsClientPage() {
   const saveResult = (status: CardStatus) => {
     setResults(prev => [...prev, { card: currentCard, status, userAnswer: userInput }]);
     // Save progress to backend (fire and forget)
-    apiPost('/activities/flashcard-progress', {
+    apiPost('/activities/flashcards/progress', {
       deck_id: deckId,
       card_front: currentCard.front,
       status,

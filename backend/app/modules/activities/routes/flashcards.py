@@ -1,13 +1,20 @@
 import logging
+import re
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 from app.core.database import get_client
 from app.core.dependencies.auth import get_current_user
 from app.core.utils.level_utils import matches_level
+from app.modules.activities.services.activity_service import ActivityService
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 router = APIRouter()
+
+
+def normalize_slug(s: str) -> str:
+    return re.sub(r"_+", "_", re.sub(r"[^a-zA-Z0-9]", "_", (s or "").lower())).strip("_")
 
 
 class FlashcardProgressPayload(BaseModel):
@@ -22,7 +29,6 @@ async def get_my_flashcards(
 ):
     """Retorna flashcards do usuário filtrados por nível."""
     db = get_client()
-    # Se um level for passado (ex: filtro do dashboard), usa-o; senão usa o nível do usuário
     user_level = level if level else user.get("level")
 
     try:
@@ -54,18 +60,15 @@ async def get_my_flashcards(
             )
             cefr_data = cefr_res.data or []
 
-            import re
-            from collections import defaultdict
-
             grouped_cf = defaultdict(list)
             for row in cefr_data:
-                row_level = row.get("level", "A1")
+                row_level = row.get("level", "A1").upper()
                 if matches_level(user_level, row_level):
-                    topic = row.get("topic") or "General Vocabulary"
+                    topic = (row.get("topic") or "General Vocabulary").strip()
                     grouped_cf[(row_level, topic)].append(row)
 
             for (lvl, topic), cards in grouped_cf.items():
-                topic_slug = re.sub(r"[^a-zA-Z0-9]", "_", topic.lower())
+                topic_slug = normalize_slug(topic)
                 deck_id = f"cefr_fc_{lvl.lower()}_{topic_slug}"
                 filtered.append(
                     {
@@ -91,7 +94,70 @@ async def get_my_flashcards(
         return []
 
 
+@router.get("/review/friday")
+async def get_friday_review(user=Depends(get_current_user)):
+    """
+    Retorna um deck de revisão com os cards que o aluno errou ou não sabia.
+    Usado principalmente nas sextas-feiras para reforço.
+    Nunca repete cards que o aluno acertou.
+    """
+    db = get_client()
+    username = user.get("username")
+
+    try:
+        # Get cards marked 'wrong' or 'unknown'
+        res = (
+            db.table("user_flashcard_progress")
+            .select("*")
+            .eq("username", username)
+            .in_("status", ["wrong", "unknown"])
+            .execute()
+        )
+        progress_rows = res.data or []
+
+        if not progress_rows:
+            return {"has_review": False, "cards": [], "total": 0}
+
+        # For each failed card, try to get full card data from the deck
+        review_cards = []
+        deck_cache: dict = {}
+        service = ActivityService()
+
+        for row in progress_rows:
+            deck_id = str(row.get("deck_id") or "")
+            card_front = row.get("card_front")
+
+            if deck_id not in deck_cache:
+                deck_data = await service.get_module_details(deck_id)
+                deck_cache[deck_id] = deck_data
+
+            deck_data = deck_cache.get(deck_id)
+            if not deck_data or not deck_data.get("flashcards"):
+                continue
+
+            # Find the specific card
+            matching = [
+                c for c in deck_data["flashcards"] if c.get("front") == card_front
+            ]
+            if matching:
+                card = matching[0]
+                card["_deck_title"] = deck_data.get("title", "")
+                card["_status"] = row.get("status")
+                card["_deck_id"] = deck_id
+                review_cards.append(card)
+
+        return {
+            "has_review": len(review_cards) > 0,
+            "total": len(review_cards),
+            "cards": review_cards,
+        }
+    except Exception as e:
+        logging.info(f"[FridayReview] Erro: {e}")
+        return {"has_review": False, "cards": [], "total": 0, "error": str(e)}
+
+
 @router.post("/progress")
+@router.post("/flashcard-progress")
 async def save_flashcard_progress(
     payload: FlashcardProgressPayload, user=Depends(get_current_user)
 ):
@@ -141,68 +207,11 @@ async def save_flashcard_progress(
         return {"ok": False, "error": str(e)}
 
 
-@router.get("/review/friday")
-async def get_friday_review(user=Depends(get_current_user)):
-    """
-    Retorna um deck de revisão com os cards que o aluno errou ou não sabia.
-    Usado principalmente nas sextas-feiras para reforço.
-    Nunca repete cards que o aluno acertou.
-    """
-    db = get_client()
-    username = user.get("username")
-
-    try:
-        # Get cards marked 'wrong' or 'unknown'
-        res = (
-            db.table("user_flashcard_progress")
-            .select("*")
-            .eq("username", username)
-            .in_("status", ["wrong", "unknown"])
-            .execute()
-        )
-        progress_rows = res.data or []
-
-        if not progress_rows:
-            return {"has_review": False, "cards": [], "total": 0}
-
-        # For each failed card, try to get full card data from the deck
-        # module
-        review_cards = []
-        deck_cache: dict = {}
-
-        for row in progress_rows:
-            deck_id = row.get("deck_id")
-            card_front = row.get("card_front")
-
-            if deck_id not in deck_cache:
-                deck_res = (
-                    db.table("modules")
-                    .select("flashcards, title")
-                    .eq("id", deck_id)
-                    .execute()
-                )
-                deck_cache[deck_id] = deck_res.data[0] if deck_res.data else None
-
-            deck_data = deck_cache.get(deck_id)
-            if not deck_data or not deck_data.get("flashcards"):
-                continue
-
-            # Find the specific card
-            matching = [
-                c for c in deck_data["flashcards"] if c.get("front") == card_front
-            ]
-            if matching:
-                card = matching[0]
-                card["_deck_title"] = deck_data.get("title", "")
-                card["_status"] = row.get("status")
-                card["_deck_id"] = deck_id
-                review_cards.append(card)
-
-        return {
-            "has_review": len(review_cards) > 0,
-            "total": len(review_cards),
-            "cards": review_cards,
-        }
-    except Exception as e:
-        logging.info(f"[FridayReview] Erro: {e}")
-        return {"has_review": False, "cards": [], "total": 0, "error": str(e)}
+@router.get("/{deck_id}")
+async def get_flashcard_deck(deck_id: str, user=Depends(get_current_user)):
+    """Retorna detalhes de um deck específico de flashcards (módulo ou CEFR)."""
+    service = ActivityService()
+    details = await service.get_module_details(deck_id)
+    if details:
+        return details
+    return {"error": "not_found", "detail": "Flashcard deck not found"}

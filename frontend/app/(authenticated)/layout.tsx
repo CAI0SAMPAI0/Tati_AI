@@ -1,4 +1,5 @@
 import { AuthGuard } from '@/components/layout/auth-guard';
+import { ActivityRouteTracker } from '@/components/layout/activity-route-tracker';
 import NextDynamic from 'next/dynamic';
 
 const TourLauncher = NextDynamic(
@@ -6,9 +7,10 @@ const TourLauncher = NextDynamic(
   { ssr: false }
 );
 
-export default async function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
+export default function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
+      <ActivityRouteTracker />
       {children}
       <TourLauncher />
     </AuthGuard>
