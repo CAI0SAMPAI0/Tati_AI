@@ -26,7 +26,9 @@ import {
   EyeOff,
   Plus,
   Sparkles,
-  ImageIcon
+  ImageIcon,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { apiUpload, apiPost, apiGet, apiDelete, apiPut } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
@@ -95,6 +97,8 @@ export function CefrSection() {
   const [showTopicSelector, setShowTopicSelector] = useState(false);
   const [expandedTopicIdx, setExpandedTopicIdx] = useState<number | null>(null);
   const [selectedSubtopics, setSelectedSubtopics] = useState<string[]>([]);
+  const [selectedCuratorIds, setSelectedCuratorIds] = useState<string[]>([]);
+  const [isBulkCuratorProcessing, setIsBulkCuratorProcessing] = useState(false);
 
   const fetchGeneratedContent = async (silent = false) => {
     if (!silent) setLoadingGenerated(true);
@@ -1446,7 +1450,7 @@ export function CefrSection() {
               </div>
 
               {/* Type Tabs */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center flex-wrap">
                 {[
                   {
                     id: 'flashcards',
@@ -1459,7 +1463,10 @@ export function CefrSection() {
                 ].map((tab) => (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveCuratorTab(tab.id as any)}
+                    onClick={() => {
+                      setActiveCuratorTab(tab.id as any);
+                      setSelectedCuratorIds([]);
+                    }}
                     className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
                       activeCuratorTab === tab.id
                         ? 'bg-primary text-white border-primary shadow-sm shadow-primary/10'
@@ -1469,19 +1476,160 @@ export function CefrSection() {
                     {tab.label}
                   </button>
                 ))}
+
+                {((activeCuratorTab === 'flashcards' ? activeGroupedFlashcards : activeSimulations).length > 0) && (
+                  <button
+                    onClick={() => {
+                      const list = activeCuratorTab === 'flashcards' ? activeGroupedFlashcards : activeSimulations;
+                      if (selectedCuratorIds.length === list.length) {
+                        setSelectedCuratorIds([]);
+                      } else {
+                        setSelectedCuratorIds(list.map((item: any) => item.id));
+                      }
+                    }}
+                    className="flex items-center gap-1.5 text-xs font-bold text-text-muted hover:text-primary transition-all px-2.5 py-2 rounded-xl border border-border bg-surface ml-auto"
+                  >
+                    {selectedCuratorIds.length === (activeCuratorTab === 'flashcards' ? activeGroupedFlashcards : activeSimulations).length ? (
+                      <CheckSquare size={15} className="text-primary" />
+                    ) : (
+                      <Square size={15} />
+                    )}
+                    <span>
+                      {selectedCuratorIds.length === (activeCuratorTab === 'flashcards' ? activeGroupedFlashcards : activeSimulations).length
+                        ? 'Desmarcar Todos'
+                        : `Selecionar Todos (${(activeCuratorTab === 'flashcards' ? activeGroupedFlashcards : activeSimulations).length})`}
+                    </span>
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Action Row - Bulk Publish Button */}
-            {activeList.some((item: any) => !item.is_published) && (
-              <div className="flex justify-end animate-in fade-in duration-200">
-                <button
-                  onClick={handlePublishAllFiltered}
-                  className="px-4 py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-emerald-500/10"
-                >
-                  <CheckCircle2 size={14} />
-                  Publish All Filtered ({activeList.filter((item: any) => !item.is_published).length} drafts)
-                </button>
+            {/* Barra de Ações em Lote do Curator */}
+            {selectedCuratorIds.length > 0 && (
+              <div className="bg-primary/10 border border-primary/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
+                <div className="flex items-center gap-2">
+                  <span className="bg-primary text-white text-xs font-bold px-2.5 py-1 rounded-lg">
+                    {selectedCuratorIds.length} selecionado(s)
+                  </span>
+                  <span className="text-xs text-text-muted">
+                    de {(activeCuratorTab === 'flashcards' ? activeGroupedFlashcards : activeSimulations).length} itens visíveis
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={async () => {
+                      if (selectedCuratorIds.length === 0) return;
+                      setIsBulkCuratorProcessing(true);
+                      const toastId = toast.loading('Publicando itens selecionados...');
+                      try {
+                        if (activeCuratorTab === 'flashcards') {
+                          const groupsToUpdate = activeGroupedFlashcards.filter((g: any) => selectedCuratorIds.includes(g.id));
+                          await Promise.all(
+                            groupsToUpdate.map((g: any) =>
+                              apiPut(`/cefr/admin/flashcards/group?level=${g.level}&topic=${encodeURIComponent(g.topic)}&is_published=true`, null)
+                            )
+                          );
+                        } else {
+                          await Promise.all(
+                            selectedCuratorIds.map((id: string) =>
+                              apiPut(`/cefr/admin/simulations/${id}`, { is_published: true })
+                            )
+                          );
+                        }
+                        toast.success(`${selectedCuratorIds.length} item(ns) publicado(s)!`, { id: toastId });
+                        setSelectedCuratorIds([]);
+                        fetchGeneratedContent(true);
+                      } catch (err: any) {
+                        toast.error(err.message || 'Erro ao publicar.', { id: toastId });
+                      } finally {
+                        setIsBulkCuratorProcessing(false);
+                      }
+                    }}
+                    disabled={isBulkCuratorProcessing}
+                    className="px-3.5 py-1.5 bg-success text-white hover:bg-success/90 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                  >
+                    <CheckCircle2 size={14} />
+                    Publicar Selecionados
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (selectedCuratorIds.length === 0) return;
+                      setIsBulkCuratorProcessing(true);
+                      const toastId = toast.loading('Movendo para rascunho...');
+                      try {
+                        if (activeCuratorTab === 'flashcards') {
+                          const groupsToUpdate = activeGroupedFlashcards.filter((g: any) => selectedCuratorIds.includes(g.id));
+                          await Promise.all(
+                            groupsToUpdate.map((g: any) =>
+                              apiPut(`/cefr/admin/flashcards/group?level=${g.level}&topic=${encodeURIComponent(g.topic)}&is_published=false`, null)
+                            )
+                          );
+                        } else {
+                          await Promise.all(
+                            selectedCuratorIds.map((id: string) =>
+                              apiPut(`/cefr/admin/simulations/${id}`, { is_published: false })
+                            )
+                          );
+                        }
+                        toast.success(`${selectedCuratorIds.length} item(ns) movido(s) para rascunho!`, { id: toastId });
+                        setSelectedCuratorIds([]);
+                        fetchGeneratedContent(true);
+                      } catch (err: any) {
+                        toast.error(err.message || 'Erro ao mover para rascunho.', { id: toastId });
+                      } finally {
+                        setIsBulkCuratorProcessing(false);
+                      }
+                    }}
+                    disabled={isBulkCuratorProcessing}
+                    className="px-3.5 py-1.5 bg-warning text-white hover:bg-warning/90 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                  >
+                    <EyeOff size={14} />
+                    Mover para Rascunho
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (selectedCuratorIds.length === 0) return;
+                      if (!window.confirm(`Tem certeza que deseja excluir permanentemente ${selectedCuratorIds.length} item(ns) selecionado(s)?`)) return;
+                      setIsBulkCuratorProcessing(true);
+                      const toastId = toast.loading('Excluindo itens selecionados...');
+                      try {
+                        if (activeCuratorTab === 'flashcards') {
+                          const groupsToDelete = activeGroupedFlashcards.filter((g: any) => selectedCuratorIds.includes(g.id));
+                          await Promise.all(
+                            groupsToDelete.map((g: any) =>
+                              apiDelete(`/cefr/admin/flashcards/group?level=${g.level}&topic=${encodeURIComponent(g.topic)}`)
+                            )
+                          );
+                        } else {
+                          await Promise.all(
+                            selectedCuratorIds.map((id: string) =>
+                              apiDelete(`/cefr/admin/simulations/${id}`)
+                            )
+                          );
+                        }
+                        toast.success(`${selectedCuratorIds.length} item(ns) excluído(s) com sucesso.`, { id: toastId });
+                        setSelectedCuratorIds([]);
+                        fetchGeneratedContent(true);
+                      } catch (err: any) {
+                        toast.error(err.message || 'Erro ao excluir.', { id: toastId });
+                      } finally {
+                        setIsBulkCuratorProcessing(false);
+                      }
+                    }}
+                    disabled={isBulkCuratorProcessing}
+                    className="px-3.5 py-1.5 bg-danger text-white hover:bg-danger/90 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                  >
+                    <Trash2 size={14} />
+                    Excluir Selecionados
+                  </button>
+                  <button
+                    onClick={() => setSelectedCuratorIds([])}
+                    className="px-2.5 py-1.5 text-xs text-text-muted hover:text-text font-bold transition-all"
+                  >
+                    Limpar
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -1503,11 +1651,37 @@ export function CefrSection() {
                   }
                   return (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-150">
-                      {activeGroupedFlashcards.map((group) => (
-                        <div key={group.id} className="bg-surface border border-border rounded-2xl p-5 flex flex-col gap-4 group hover:border-primary/40 transition-all">
+                      {activeGroupedFlashcards.map((group) => {
+                        const isSelected = selectedCuratorIds.includes(group.id);
+                        return (
+                        <div
+                          key={group.id}
+                          className={cn(
+                            "bg-surface border rounded-2xl p-5 flex flex-col gap-4 group transition-all relative",
+                            isSelected ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-border hover:border-primary/40"
+                          )}
+                        >
                           <div className="flex items-start justify-between">
-                            <div className="bg-indigo-500/10 w-10 h-10 rounded-xl flex items-center justify-center text-indigo-400">
-                               <Layers size={20} />
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCuratorIds((prev) =>
+                                    prev.includes(group.id) ? prev.filter((item) => item !== group.id) : [...prev, group.id]
+                                  );
+                                }}
+                                className="text-text-muted hover:text-primary transition-all p-0.5"
+                                title={isSelected ? "Desmarcar" : "Selecionar"}
+                              >
+                                {isSelected ? (
+                                  <CheckSquare size={20} className="text-primary" />
+                                ) : (
+                                  <Square size={20} />
+                                )}
+                              </button>
+                              <div className="bg-indigo-500/10 w-10 h-10 rounded-xl flex items-center justify-center text-indigo-400">
+                                 <Layers size={20} />
+                              </div>
                             </div>
                             <div className="flex flex-col items-end gap-1">
                               <span className="text-[0.65rem] font-bold px-2 py-0.5 rounded-full bg-indigo-500/5 border border-indigo-500/20 text-indigo-400">
@@ -1548,7 +1722,8 @@ export function CefrSection() {
                              </button>
                           </div>
                         </div>
-                      ))}
+                      );
+                      })}
                     </div>
                   );
                 })()
@@ -1565,11 +1740,37 @@ export function CefrSection() {
                   }
                   return (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-150">
-                      {activeSimulations.map((sim) => (
-                        <div key={sim.id} className="bg-surface border border-border rounded-2xl p-5 flex flex-col gap-4 group hover:border-primary/40 transition-all">
+                      {activeSimulations.map((sim) => {
+                        const isSelected = selectedCuratorIds.includes(sim.id);
+                        return (
+                        <div
+                          key={sim.id}
+                          className={cn(
+                            "bg-surface border rounded-2xl p-5 flex flex-col gap-4 group transition-all relative",
+                            isSelected ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-border hover:border-primary/40"
+                          )}
+                        >
                           <div className="flex items-start justify-between">
-                            <div className="bg-pink-500/10 w-10 h-10 rounded-xl flex items-center justify-center text-pink-400">
-                               <Clapperboard size={20} />
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCuratorIds((prev) =>
+                                    prev.includes(sim.id) ? prev.filter((item) => item !== sim.id) : [...prev, sim.id]
+                                  );
+                                }}
+                                className="text-text-muted hover:text-primary transition-all p-0.5"
+                                title={isSelected ? "Desmarcar" : "Selecionar"}
+                              >
+                                {isSelected ? (
+                                  <CheckSquare size={20} className="text-primary" />
+                                ) : (
+                                  <Square size={20} />
+                                )}
+                              </button>
+                              <div className="bg-pink-500/10 w-10 h-10 rounded-xl flex items-center justify-center text-pink-400">
+                                 <Clapperboard size={20} />
+                              </div>
                             </div>
                             <div className="flex flex-col items-end gap-1">
                               <span className={cn(
@@ -1607,7 +1808,8 @@ export function CefrSection() {
                              </button>
                           </div>
                         </div>
-                      ))}
+                      );
+                      })}
                     </div>
                   );
                 })()

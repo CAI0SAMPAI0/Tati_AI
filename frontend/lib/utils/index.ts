@@ -4,53 +4,47 @@ export function cn(...classes: (string | undefined | null | false)[]): string {
 }
 
 function parseDisplayDate(value: string): Date | null {
+  if (!value) return null;
   const trimmed = value.trim();
+  if (!trimmed || trimmed === '—' || trimmed === 'None') return null;
+
+  // Formato puro YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
     const [year, month, day] = trimmed.split('-').map(Number);
     return new Date(year, month - 1, day);
+  }
+
+  // Formatos com barra DD/MM/YYYY ou MM/DD/YYYY
+  if (/^(\d{1,2})\/(\d{1,2})\/(\d{4})/.test(trimmed)) {
+    const d = new Date(trimmed);
+    if (!Number.isNaN(d.getTime())) return d;
   }
 
   const normalized = trimmed
     .replace(' ', 'T')
     .replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
   const date = new Date(normalized.includes('Z') || /[+-]\d{2}:?\d{2}$/.test(normalized) ? normalized : `${normalized}Z`);
-  return Number.isNaN(date.getTime()) ? null : date;
+  if (!Number.isNaN(date.getTime())) return date;
+
+  const fallbackDate = new Date(trimmed);
+  return Number.isNaN(fallbackDate.getTime()) ? null : fallbackDate;
 }
 
-// Formata tempo de ISO string considerando timezone
+// Formata tempo de ISO string considerando timezone do navegador
 export function formatTime(isoString?: string | null): string {
-  let date: Date;
-  if (isoString) {
-    date = parseDisplayDate(isoString) ?? new Date();
-    if (/^\d{4}-\d{2}-\d{2}$/.test(isoString.trim())) {
-      return date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' });
-    }
-  } else {
-    date = new Date();
-  }
-  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  if (!isoString || isoString === '—' || isoString === 'None') return '—';
+  const date = parseDisplayDate(isoString);
+  if (!date) return isoString;
+  return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
 export function formatDateTime(isoString?: string | null): string {
-  let date: Date;
-  if (isoString) {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(isoString.trim())) {
-      date = parseDisplayDate(isoString)!;
-      return date.toLocaleDateString('en-US', {
-        month: '2-digit',
-        day: '2-digit',
-        year: 'numeric',
-      });
-    }
-    const parsedDate = parseDisplayDate(isoString);
-    if (!parsedDate) return '—';
-    date = parsedDate;
-  } else {
-    return '—';
-  }
-  return date.toLocaleString('en-US', { 
+  if (!isoString || isoString === '—' || isoString === 'None') return '—';
+  const parsedDate = parseDisplayDate(isoString);
+  if (!parsedDate) return isoString;
+  return parsedDate.toLocaleString('pt-BR', { 
+    day: '2-digit',
     month: '2-digit',
-    day: '2-digit', 
     year: 'numeric',
     hour: '2-digit', 
     minute: '2-digit' 

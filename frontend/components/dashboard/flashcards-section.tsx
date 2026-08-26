@@ -16,7 +16,11 @@ import {
   Image as ImageIcon,
   Upload,
   Loader2,
-  X
+  X,
+  CheckSquare,
+  Square,
+  CheckCircle2,
+  AlertTriangle
 } from 'lucide-react';
 import { apiGet, apiDelete, apiPost, apiPut, apiUpload } from '@/lib/api/client';
 
@@ -88,6 +92,8 @@ export function FlashcardsSection() {
   const [formData, setFormData] = useState<FormState>(EMPTY_FORM);
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedDeckIds, setSelectedDeckIds] = useState<string[]>([]);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
   const filteredDecks = (decks as FlashcardDeck[]).filter((d: FlashcardDeck) => {
     if (filterLevel === 'all') return true;
@@ -121,6 +127,55 @@ export function FlashcardsSection() {
       invalidateDecks();
     } catch {
       toast.error('Error updating status.');
+    }
+  };
+
+  const toggleSelectDeck = (id: string) => {
+    setSelectedDeckIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedDeckIds.length === filteredDecks.length) {
+      setSelectedDeckIds([]);
+    } else {
+      setSelectedDeckIds(filteredDecks.map((d) => d.id));
+    }
+  };
+
+  const handleBulkPublish = async (publish: boolean) => {
+    if (selectedDeckIds.length === 0) return;
+    setIsBulkProcessing(true);
+    const toastId = toast.loading(publish ? 'Publicando decks selecionados...' : 'Movendo para rascunho...');
+    try {
+      await Promise.all(
+        selectedDeckIds.map((id) => apiPut(`/dashboard/flashcards/${id}`, { is_published: publish }))
+      );
+      toast.success(publish ? `${selectedDeckIds.length} decks publicados com sucesso!` : `${selectedDeckIds.length} decks movidos para rascunho!`, { id: toastId });
+      setSelectedDeckIds([]);
+      invalidateDecks();
+    } catch {
+      toast.error('Erro ao atualizar decks em lote.', { id: toastId });
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedDeckIds.length === 0) return;
+    if (!window.confirm(`Tem certeza que deseja excluir permanentemente ${selectedDeckIds.length} deck(s) selecionado(s)?`)) return;
+    setIsBulkProcessing(true);
+    const toastId = toast.loading('Excluindo decks selecionados...');
+    try {
+      await Promise.all(selectedDeckIds.map((id) => apiDelete(`/dashboard/flashcards/${id}`)));
+      toast.success(`${selectedDeckIds.length} deck(s) excluído(s) com sucesso.`, { id: toastId });
+      setSelectedDeckIds([]);
+      invalidateDecks();
+    } catch {
+      toast.error('Erro ao excluir decks selecionados.', { id: toastId });
+    } finally {
+      setIsBulkProcessing(false);
     }
   };
 
@@ -393,7 +448,7 @@ export function FlashcardsSection() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-         <div className="flex items-center gap-4">
+         <div className="flex items-center gap-4 flex-wrap">
             <h3 className="text-lg font-bold flex items-center gap-2">
                 <Layers size={22} className="text-primary" />
                 {'Flashcard Decks'}
@@ -407,6 +462,21 @@ export function FlashcardsSection() {
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
+            {filteredDecks.length > 0 && (
+              <button
+                onClick={handleSelectAll}
+                className="flex items-center gap-1.5 text-xs font-bold text-text-muted hover:text-primary transition-all px-2.5 py-1 rounded-lg border border-border bg-surface"
+              >
+                {selectedDeckIds.length === filteredDecks.length ? (
+                  <CheckSquare size={15} className="text-primary" />
+                ) : (
+                  <Square size={15} />
+                )}
+                <span>
+                  {selectedDeckIds.length === filteredDecks.length ? 'Desmarcar Todos' : `Selecionar Todos (${filteredDecks.length})`}
+                </span>
+              </button>
+            )}
          </div>
          <Button className="gap-2" onClick={() => openModal()}>
             <Plus size={18} />
@@ -414,12 +484,79 @@ export function FlashcardsSection() {
          </Button>
       </div>
 
+      {/* Barra de Ações em Lote */}
+      {selectedDeckIds.length > 0 && (
+        <div className="bg-primary/10 border border-primary/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <span className="bg-primary text-white text-xs font-bold px-2.5 py-1 rounded-lg">
+              {selectedDeckIds.length} selecionado(s)
+            </span>
+            <span className="text-xs text-text-muted">de {filteredDecks.length} decks visíveis</span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => handleBulkPublish(true)}
+              disabled={isBulkProcessing}
+              className="px-3.5 py-1.5 bg-success text-white hover:bg-success/90 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+            >
+              <CheckCircle2 size={14} />
+              Publicar Selecionados
+            </button>
+            <button
+              onClick={() => handleBulkPublish(false)}
+              disabled={isBulkProcessing}
+              className="px-3.5 py-1.5 bg-warning text-white hover:bg-warning/90 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+            >
+              <EyeOff size={14} />
+              Mover para Rascunho
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={isBulkProcessing}
+              className="px-3.5 py-1.5 bg-danger text-white hover:bg-danger/90 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+            >
+              <Trash2 size={14} />
+              Excluir Selecionados
+            </button>
+            <button
+              onClick={() => setSelectedDeckIds([])}
+              className="px-2.5 py-1.5 text-xs text-text-muted hover:text-text font-bold transition-all"
+            >
+              Limpar
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredDecks.length > 0 ? filteredDecks.map((d: FlashcardDeck) => (
-          <div key={d.id} className="bg-surface border border-border rounded-2xl p-5 flex flex-col gap-4 group hover:border-primary/40 transition-all">
+        {filteredDecks.length > 0 ? filteredDecks.map((d: FlashcardDeck) => {
+          const isSelected = selectedDeckIds.includes(d.id);
+          return (
+          <div
+            key={d.id}
+            className={cn(
+              "bg-surface border rounded-2xl p-5 flex flex-col gap-4 group transition-all relative",
+              isSelected ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-border hover:border-primary/40"
+            )}
+          >
             <div className="flex items-start justify-between">
-              <div className="bg-primary/10 w-10 h-10 rounded-xl flex items-center justify-center text-primary">
-                 <FileBox size={20} />
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => toggleSelectDeck(d.id)}
+                  className="text-text-muted hover:text-primary transition-all p-0.5"
+                  title={isSelected ? "Desmarcar" : "Selecionar"}
+                >
+                  {isSelected ? (
+                    <CheckSquare size={20} className="text-primary" />
+                  ) : (
+                    <Square size={20} />
+                  )}
+                </button>
+                <div className="bg-primary/10 w-10 h-10 rounded-xl flex items-center justify-center text-primary">
+                   <FileBox size={20} />
+                </div>
               </div>
               <div className="flex flex-col items-end gap-1">
                 <span className="text-[0.65rem] font-bold px-2 py-0.5 rounded-full bg-primary/5 border border-primary/20 text-primary">
@@ -473,7 +610,8 @@ export function FlashcardsSection() {
                </a>
             </div>
           </div>
-        )) : (
+        );
+        }) : (
           <div className="col-span-full py-20 text-center border border-dashed border-border rounded-3xl">
              <p className="text-text-muted">{'No decks found.'}</p>
           </div>

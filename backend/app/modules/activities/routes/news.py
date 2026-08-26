@@ -38,13 +38,16 @@ def _parse_levels(raw) -> list[str]:
 
 
 @router.get("/news")
+@router.get("/news/")
 async def list_news(
+    level: str | None = None,
     user: dict = Depends(get_current_user),
 ) -> list:
-    """Lista notícias publicadas filtradas pelo nível do aluno."""
+    """Lista notícias publicadas. Professores, administradores e filtros globais vêem todas as notícias."""
     from app.core.database import get_client
 
-    user_level = (user.get("level") or "").upper()
+    user_level = (level or user.get("level") or "").upper().strip()
+    user_role = (user.get("role") or "").lower().strip()
     username = user.get("username", "unknown")
 
     def _fetch() -> list:
@@ -59,10 +62,15 @@ async def list_news(
             )
             items = res.data or []
             logging.info(
-                f"[News] user={username} level={user_level} fetched={len(items)}"
+                f"[News] user={username} role={user_role} level={user_level} fetched={len(items)}"
             )
 
-            if not user_level or user_level in ("ALL", "ADMIN", ""):
+            # Professores, programadores, administradores, staff ou sem nível restritivo vêem todas as 14 notícias
+            if (
+                user_role in ("professor", "programador", "admin", "staff", "superadmin")
+                or not user_level
+                or user_level in ("ALL", "ADMIN", "")
+            ):
                 return items
 
             filtered = []

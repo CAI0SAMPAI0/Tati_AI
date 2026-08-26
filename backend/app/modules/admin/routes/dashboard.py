@@ -643,6 +643,7 @@ def _enrich_news_payload(data: dict) -> dict:
 
 
 @router.get("/news")
+@router.get("/news/")
 async def list_news_admin(
     user=Depends(require_staff),
 ) -> list:
@@ -662,6 +663,7 @@ async def list_news_admin(
 
 
 @router.post("/news")
+@router.post("/news/")
 async def create_news(
     data: dict,
     user=Depends(require_staff),
