@@ -410,6 +410,97 @@ def liveworksheets_content(request: HttpRequest, level: str = "A1", category: st
     return ExternalContentService.get_liveworksheets_content(level, category)
 
 
+# Cache em memória para os proxies de imagem das atividades
+_ACTIVITY_IMAGE_CACHE = {}
+
+@activities_router.get("/test-english/image-proxy", auth=auth_optional)
+@activities_router.get("/liveworksheets/image-proxy", auth=auth_optional)
+def proxy_activity_image(request: HttpRequest, url: str):
+    """
+    Proxy de imagens para TestEnglish e LiveWorksheets evitando bloqueio de CORS/hotlinking.
+    """
+    if not url:
+        return HttpResponse(status=400)
+    
+    if url in _ACTIVITY_IMAGE_CACHE:
+        body, content_type = _ACTIVITY_IMAGE_CACHE[url]
+        return HttpResponse(body, content_type=content_type, headers={"Cache-Control": "public, max-age=86400"})
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://test-english.com/" if "test-english" in url else "https://www.liveworksheets.com/",
+    }
+    try:
+        with httpx.Client(headers=headers, follow_redirects=True, timeout=10.0) as client:
+            resp = client.get(url)
+            if resp.status_code == 200:
+                ct = resp.headers.get("content-type", "image/jpeg")
+                _ACTIVITY_IMAGE_CACHE[url] = (resp.content, ct)
+                if len(_ACTIVITY_IMAGE_CACHE) > 2000:
+                    _ACTIVITY_IMAGE_CACHE.pop(next(iter(_ACTIVITY_IMAGE_CACHE)))
+                return HttpResponse(resp.content, content_type=ct, headers={"Cache-Control": "public, max-age=86400"})
+    except Exception as e:
+        logger.warning(f"[ImageProxy] Erro ao buscar imagem {url}: {e}")
+    
+    return HttpResponse(status=404)
+
+
+@activities_router.get("/hub/{content_id}/pages/{page_index}", auth=auth_optional)
+def get_hub_page(request: HttpRequest, content_id: str, page_index: int, token: Optional[str] = None):
+    """
+    Retorna a página de um documento seguro do Hub com marca d'água do email.
+    """
+    user = None
+    if token:
+        from apps.authentication.security import decode_jwt_token
+        payload = decode_jwt_token(token)
+        if payload:
+            user = User.objects.filter(username=payload.get("sub")).first()
+    if not user and isinstance(request.auth, User):
+        user = request.auth
+    if not user and getattr(request, 'user', None) and request.user.is_authenticated:
+        user = request.user
+
+    email = getattr(user, 'email', '') or getattr(user, 'username', 'Tati AI') if user else 'Aluno Tati AI'
+
+    from apps.activities.secure_document_service import get_client, apply_watermark, _RAW_IMAGE_CACHE
+    import json
+
+    raw_pages = []
+    from django.db import connection
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT secure_pages FROM premium_content WHERE id = %s", [content_id])
+        row = cursor.fetchone()
+        if row and row[0]:
+            raw_pages = row[0]
+            if isinstance(raw_pages, str):
+                try:
+                    raw_pages = json.loads(raw_pages)
+                except Exception:
+                    raw_pages = []
+
+    if raw_pages and isinstance(raw_pages[-1], str) and raw_pages[-1].startswith('{"'):
+        raw_pages = raw_pages[:-1]
+
+    if page_index < 0 or page_index >= len(raw_pages):
+        return HttpResponse(status=404)
+
+    storage_path = raw_pages[page_index]
+
+    file_data = _RAW_IMAGE_CACHE.get(storage_path)
+    if not file_data:
+        try:
+            db = get_client()
+            file_data = db.storage.from_("hub-secure-pages").download(storage_path)
+            _RAW_IMAGE_CACHE[storage_path] = file_data
+        except Exception as e:
+            logger.warning(f"[Hub] Erro ao baixar imagem da página {storage_path}: {e}")
+            return HttpResponse(status=500)
+
+    watermarked = apply_watermark(file_data, email)
+    return HttpResponse(watermarked, content_type="image/webp", headers={"Cache-Control": "private, max-age=3600"})
+
+
 # ── FLASHCARD ASSETS & CLOUDINARY UPLOAD ──────────────────────────────
 
 flashcard_assets_router = Router(tags=["Flashcard Assets"])

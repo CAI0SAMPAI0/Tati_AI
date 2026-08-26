@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     # Third-party Apps
     'corsheaders',
     'channels',
+    'debug_toolbar',
     'django_celery_results',
     'django_celery_beat',
 
@@ -53,6 +54,7 @@ AUTH_USER_MODEL = 'authentication.User'
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
     'app.middleware.PerformanceMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -61,6 +63,17 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+def show_toolbar_callback(request):
+    if os.getenv('DJANGO_SETTINGS_MODULE', '').endswith('development') or os.getenv('DEBUG', 'false').lower() in ('true', '1'):
+        return True
+    return bool(getattr(request, 'user', None) and getattr(request.user, 'is_staff', False))
+
+DEBUG_TOOLBAR_CONFIG = {
+    'SHOW_TOOLBAR_CALLBACK': 'app.settings.base.show_toolbar_callback',
+    'RENDER_PANELS': True,
+}
+INTERNAL_IPS = ['127.0.0.1', 'localhost']
 
 ROOT_URLCONF = 'app.urls'
 

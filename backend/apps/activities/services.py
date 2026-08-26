@@ -636,12 +636,73 @@ class HubService:
         if not has_access and float(item.price or 0.0) > 0:
             raise HttpError(403, "Acesso bloqueado. Adquira o material no Hub ou assine o plano.")
 
+        # 1. Checa se o material é do tipo documento seguro com páginas
+        from apps.activities.secure_document_service import get_client, _RAW_IMAGE_CACHE
+        import json
+
+        secure_pages = []
+        raw_pages = getattr(item, 'secure_pages', None)
+        if not raw_pages:
+            try:
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT secure_pages, processing_status FROM premium_content WHERE id = %s", [content_id])
+                    row = cursor.fetchone()
+                    if row and row[0]:
+                        raw_pages = row[0]
+            except Exception as e:
+                logger.warning(f"[Hub] Erro ao buscar secure_pages: {e}")
+
+        if raw_pages:
+            if isinstance(raw_pages, str):
+                try:
+                    secure_pages = json.loads(raw_pages)
+                except Exception:
+                    secure_pages = []
+            elif isinstance(raw_pages, list):
+                secure_pages = list(raw_pages)
+
+        external_links = []
+        if secure_pages and isinstance(secure_pages[-1], str) and secure_pages[-1].startswith('{"external_links"'):
+            try:
+                meta = json.loads(secure_pages.pop())
+                external_links = meta.get("external_links", [])
+            except Exception:
+                pass
+
+        if secure_pages:
+            base_url = os.getenv("API_URL", "https://caio007-tati-ai-backend.hf.space").rstrip('/')
+            page_urls = [
+                f"{base_url}/activities/hub/{content_id}/pages/{i}"
+                for i in range(len(secure_pages))
+            ]
+            return {
+                "type": "secure_images",
+                "pages": page_urls,
+                "total_pages": len(page_urls),
+                "is_secure_viewer": True,
+                "title": item.title,
+                "external_links": external_links,
+                "has_access": True,
+            }
+
+        # 2. Se for arquivo direto (PPTX, PDF no Storage)
         source = item.content_source or item.preview_path or ""
+        if source and not source.startswith("http"):
+            try:
+                db = get_client()
+                res = db.storage.from_("module-files").create_signed_url(source, 3600)
+                if res and isinstance(res, dict) and res.get("signedURL"):
+                    source = res["signedURL"]
+            except Exception as e:
+                logger.warning(f"[Hub] Erro ao gerar signed URL para {source}: {e}")
+
         return {
             "url": source,
             "type": "direct",
             "title": item.title,
             "has_access": True,
+            "is_secure_viewer": False,
             "is_secure": bool(item.is_secure),
         }
 

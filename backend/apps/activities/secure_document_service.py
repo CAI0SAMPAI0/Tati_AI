@@ -20,6 +20,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 PREVIEW_BUCKET = "hub-previews"
 SECURE_BUCKET = "hub-secure-pages"
+_RAW_IMAGE_CACHE = {}
 
 
 def _convert_to_pdf(input_path: str, output_dir: str) -> str | None:
