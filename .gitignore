@@ -16,6 +16,8 @@ venv/
 backend-fastapi/
 backend-django/
 db.sqlite3
+backend/staticfiles/
+staticfiles/
 
 # IDE
 .vscode/

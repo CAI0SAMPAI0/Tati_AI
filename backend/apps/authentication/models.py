@@ -179,3 +179,12 @@ class User(AbstractBaseUser):
     @property
     def is_hub_only(self) -> bool:
         return False
+
+    def has_perm(self, perm, obj=None) -> bool:
+        return self.is_staff
+
+    def has_perms(self, perm_list, obj=None) -> bool:
+        return self.is_staff
+
+    def has_module_perms(self, app_label: str) -> bool:
+        return self.is_staff

@@ -65,12 +65,8 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             await self.send_json({"type": "pong"})
             return
 
-        # 2. Mensagem de texto do chat
-        text_content = content.get("content") or content.get("text") or content.get("message")
         conv_id = content.get("conversation_id")
-
         if not conv_id:
-            # Cria conversa automática se não enviada
             conv = await Conversation.objects.acreate(
                 username=self.username,
                 title="Conversa com a Teacher Tati",
@@ -79,30 +75,60 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         else:
             conv_id = str(conv_id)
 
+        # 2. Processamento de Áudio (Voice Message)
+        text_content = ""
+        is_audio = msg_type == "audio" or bool(content.get("audio"))
+
+        if is_audio:
+            from apps.chat.audio_service import AudioService
+            raw_audio = content.get("audio") or ""
+            text_content = await AudioService.transcribe_audio_async(raw_audio)
+            if not text_content:
+                text_content = "(Áudio não compreendido)"
+            
+            # Envia a transcrição imediata para o balão do usuário no frontend
+            await self.send_json({"type": "transcription", "text": text_content})
+        else:
+            text_content = content.get("content") or content.get("text") or content.get("message") or ""
+
         if not text_content:
             return
 
-        # Inicia evento de streaming
+        # 3. Inicia streaming de resposta
         await self.send_json({"type": "stream_start", "conversation_id": conv_id})
 
         try:
-            # Gera resposta da IA
             if not self.user:
                 self.user = await aget_user_by_username(self.username)
 
-            # Executa geração via AIService
             from asgiref.sync import sync_to_async
-            reply = await sync_to_async(AIService.generate_reply)(
+            from apps.chat.audio_service import AudioService
+
+            res = await sync_to_async(AIService.generate_reply)(
                 user=self.user,
                 conversation_id=conv_id,
                 user_text=text_content,
             )
 
-            # Envia resposta
+            reply_text = res.get("reply") if isinstance(res, dict) else str(res)
+            audio_b64 = res.get("audio_b64") if isinstance(res, dict) else ""
+
+            if not audio_b64 and is_audio:
+                audio_b64 = await AudioService.text_to_speech_async(reply_text)
+
+            # Envia o texto da resposta
             await self.send_json({
                 "type": "stream_token",
-                "content": reply,
+                "content": reply_text,
             })
+
+            # Se for modo de voz ou tiver áudio gerado, envia o payload de áudio
+            if audio_b64:
+                await self.send_json({
+                    "type": "audio_response",
+                    "audio": audio_b64,
+                    "audio_b64": audio_b64,
+                })
 
             # Finaliza stream
             await self.send_json({"type": "stream_end"})
@@ -111,7 +137,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             logger.error(f"[ChatWS] Erro ao processar mensagem: {e}")
             await self.send_json({
                 "type": "error",
-                "message": "Desculpe, tive um problema de conexão. Por favor, tente novamente.",
+                "message": "Desculpe, tive um problema ao responder. Por favor, tente novamente.",
             })
 
 
