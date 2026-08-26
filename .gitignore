@@ -12,6 +12,10 @@ dist/
 build/
 .venv/
 venv/
+# Backups & Ignored
+backend-fastapi/
+backend-django/
+db.sqlite3
 
 # IDE
 .vscode/

@@ -1,30 +1,37 @@
+# Dockerfile de Produção para o Backend Django (ASGI / Daphne)
 FROM python:3.12-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+WORKDIR /app
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DJANGO_SETTINGS_MODULE=app.settings.production
+
+# Instalar dependências de sistema para compilação e conversão de documentos
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    gcc \
+    libpq-dev \
     curl \
+    ffmpeg \
     libreoffice \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
-
 COPY requirements.txt .
 RUN pip install --no-cache-dir pip==24.2 \
-    && pip install --no-cache-dir -r requirements.txt \
-    && python -c "import nltk; nltk.download('averaged_perceptron_tagger'); nltk.download('averaged_perceptron_tagger_eng'); nltk.download('cmudict')"
+    && pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Coleta arquivos estáticos
+RUN python manage.py collectstatic --noinput || true
+
 EXPOSE 7860
 
-# Healthcheck para Railway/Hugging Face saber quando o container esta pronto
+# Healthcheck para Hugging Face Spaces / Railway
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:7860/health || exit 1
+  CMD curl -f http://localhost:${PORT:-7860}/health || exit 1
 
-# Inicia o Uvicorn. Se USE_CELERY=true, o main.py inicia o Celery de forma programática nos bastidores
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-7860}"]
-
+# Executa o Daphne na porta configurada pelo Hugging Face Spaces ($PORT ou 7860)
+CMD ["sh", "-c", "daphne -b 0.0.0.0 -p ${PORT:-7860} app.asgi:application"]

@@ -367,15 +367,15 @@ export default function ProfileClientPage() {
                     <span className="text-[0.6rem] font-bold text-primary uppercase tracking-widest">days</span>
                   </div>
                 ) : (
-                  <Button variant="secondary" className="gap-2 shrink-0" onClick={() => router.push('/payment')}>
+                  <Button variant="secondary" className="gap-2 shrink-0" onClick={() => router.push('/activities/hub')}>
                     <Zap size={16} />
-                    Manage Plan
+                    Hub Materials
                   </Button>
                 )
               ) : (
-                <Button className="gap-2 shrink-0 shadow-glow" onClick={() => router.push('/payment')}>
+                <Button className="gap-2 shrink-0 shadow-glow" onClick={() => router.push('/activities/hub')}>
                   <Zap size={16} />
-                  Subscribe Now
+                  Hub Materials
                 </Button>
               )}
             </div>

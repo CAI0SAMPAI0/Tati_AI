@@ -418,13 +418,6 @@ export default function ProgressClientPage() {
                     </div>
                   )}
                 </div>
-
-                <Link href="/shop" prefetch={true} className="w-full">
-                  <Button variant="secondary" size="sm" className="w-full gap-1.5 text-xs font-bold border-dashed border-primary/40 hover:border-primary text-primary hover:bg-primary/5">
-                    <ShoppingBag size={14} />
-                    Visit Shop to Buy Freezes
-                  </Button>
-                </Link>
               </div>
             </div>
 
