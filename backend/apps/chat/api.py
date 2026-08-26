@@ -63,6 +63,8 @@ async def get_conversation_summary(request: HttpRequest, conversation_id: str, l
 
 # ── ENVIO DE MENSAGEM & RESPOSTA DA IA ────────────────────────────────
 
+@chat_router.post("", auth=auth_required)
+@chat_router.post("/", auth=auth_required)
 @chat_router.post("/message", auth=auth_required)
 async def send_chat_message(request: HttpRequest, payload: SendMessageInput):
     """
