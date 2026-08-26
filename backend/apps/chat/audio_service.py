@@ -120,11 +120,20 @@ class AudioService:
         else:
             audio_bytes = audio_data
 
+        if not audio_bytes or len(audio_bytes) < 200:
+            return ""
+
         default_prompt = (
-            "Transcribe the audio verbatim, exactly as spoken in English. "
-            "The speaker is an ESL student practicing English."
+            "Transcribe the spoken audio verbatim in English. "
+            "The speaker is an ESL student practicing English conversation. "
+            "Ignore background static, hiss, breathing, clicks, mic pops, and trailing silence. "
+            "Do not output noise sounds or onomatopoeias like tsh, shh, psst, or clicks."
         )
         effective_prompt = f"{default_prompt} {prompt}" if prompt else default_prompt
+        noise_pattern = re.compile(
+            r'^(t+s+h+|s+h+|tsh+|t+c+h+|ps+h+|[.\s?!,-]+|\[.*\]|\(.*\)|\{.*\})+$',
+            re.IGNORECASE
+        )
 
         for key in keys:
             try:
@@ -133,10 +142,15 @@ class AudioService:
                     file=("input.webm", audio_bytes),
                     model="whisper-large-v3-turbo",
                     response_format="text",
+                    temperature=0.0,
                     prompt=effective_prompt,
                 )
                 if resp:
-                    return str(resp).strip()
+                    text = str(resp).strip()
+                    if noise_pattern.match(text) or text.lower() in ("tshh", "tshh.", "tshhhhhh.", "shh", "shhh", "...", "you", "[blank_audio]"):
+                        logger.info(f"[AudioService] Ignorando ruído de fundo/alucinação: {text}")
+                        return ""
+                    return text
             except Exception as e:
                 logger.warning(f"[AudioService] Whisper falhou na chave {key[:10]}: {e}")
 
