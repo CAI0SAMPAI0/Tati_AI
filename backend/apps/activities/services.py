@@ -956,6 +956,43 @@ class SubmissionService:
         if activity_id and "activity_id" not in metadata:
             metadata["activity_id"] = str(activity_id)
 
+        target_url = metadata.get("url") or str(activity_id)
+        target_slug = metadata.get("slug") or str(activity_id)
+        status_req = metadata.get("status") or data.get("status") or ("completed" if score > 0 else "pending")
+
+        # 1. Se for marcar como PENDENTE (Reverter)
+        if status_req == "pending" or score <= 0:
+            from django.db.models import Q
+            ActivitySubmission.objects.filter(
+                Q(username=username) & (
+                    Q(metadata__activity_id=str(activity_id)) |
+                    Q(metadata__url=target_url) |
+                    Q(metadata__slug=target_slug)
+                )
+            ).delete()
+
+            total_xp = user.total_xp if user and isinstance(user, User) else 0
+            streak_count = user.streak_count if user and isinstance(user, User) else 0
+
+            return {
+                "success": True,
+                "status": "pending",
+                "message": "Atividade revertida para pendente.",
+                "xp_earned": 0,
+                "new_total_xp": total_xp,
+                "streak_count": streak_count,
+            }
+
+        # 2. Se for marcar como CONCLUÍDO
+        from django.db.models import Q
+        ActivitySubmission.objects.filter(
+            Q(username=username) & (
+                Q(metadata__activity_id=str(activity_id)) |
+                Q(metadata__url=target_url) |
+                Q(metadata__slug=target_slug)
+            )
+        ).delete()
+
         xp_earned = 15 if score >= 70 else 5
         if user and isinstance(user, User):
             XPService.award_xp(user, xp_earned, f"Atividade {activity_type}")

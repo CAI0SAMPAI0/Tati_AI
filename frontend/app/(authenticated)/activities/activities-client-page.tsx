@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { normalizeLevel } from '@/lib/constants/levels';
 import { API_BASE } from '@/lib/api/client';
+import toast from 'react-hot-toast';
 
 const teImg = (url: string) => {
   if (!url) return '';
@@ -417,36 +418,47 @@ export default function ActivitiesClientPage() {
   // Mark completion handlers
   const handleMarkDone = async (item: any) => {
     const actId = item.url || item.slug || item.id;
-    await apiPost('/activities/submissions', {
-      activity_id: actId,
-      activity_type: item.source || 'external',
-      score: 100,
-      metadata: {
-        title: item.title,
-        url: item.url,
-        slug: item.slug,
-        status: 'done',
-        category: item.category,
-      },
-    });
-    await refetchSubmissions();
+    try {
+      await apiPost('/activities/submissions', {
+        activity_id: actId,
+        activity_type: item.source || 'external',
+        score: 100,
+        metadata: {
+          title: item.title,
+          url: item.url,
+          slug: item.slug,
+          status: 'done',
+          category: item.category,
+        },
+      });
+      toast.success("Atividade concluída com sucesso!", { id: 'act-status' });
+      await refetchSubmissions();
+    } catch (e) {
+      toast.error("Erro ao concluir atividade.");
+    }
   };
 
   const handleMarkPending = async (item: any) => {
     const actId = item.url || item.slug || item.id;
-    await apiPost('/activities/submissions', {
-      activity_id: actId,
-      activity_type: item.source || 'external',
-      score: 0,
-      metadata: {
-        title: item.title,
-        url: item.url,
-        slug: item.slug,
+    try {
+      await apiPost('/activities/submissions', {
+        activity_id: actId,
+        activity_type: item.source || 'external',
+        score: 0,
         status: 'pending',
-        category: item.category,
-      },
-    });
-    await refetchSubmissions();
+        metadata: {
+          title: item.title,
+          url: item.url,
+          slug: item.slug,
+          status: 'pending',
+          category: item.category,
+        },
+      });
+      toast.success("Atividade revertida para pendente!", { id: 'act-status' });
+      await refetchSubmissions();
+    } catch (e) {
+      toast.error("Erro ao reverter atividade.");
+    }
   };
 
   const tabs: Array<{ id: TabType; icon: React.ReactNode; label: string; count?: number }> = [
