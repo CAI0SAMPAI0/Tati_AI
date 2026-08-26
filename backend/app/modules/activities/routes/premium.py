@@ -22,6 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 router = APIRouter()
 
 
+@router.get("")
 @router.get("/")
 async def list_premium_content(
     user: dict = Depends(get_current_user), service: PremiumService = Depends()

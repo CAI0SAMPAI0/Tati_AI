@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, File, UploadFile
 router = APIRouter()
 
 
+@router.get("")
 @router.get("/")
 async def admin_list_premium(
     service: PremiumService = Depends(), user=Depends(require_staff)
@@ -20,6 +21,7 @@ async def admin_list_premium(
     return await service.list_all_admin()
 
 
+@router.post("")
 @router.post("/")
 async def admin_create_premium(
     data: dict, service: PremiumService = Depends(), user=Depends(require_staff)

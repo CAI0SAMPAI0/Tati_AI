@@ -17,6 +17,7 @@ class OnboardingUpdate(BaseModel):
     has_seen_onboarding: bool = True
 
 
+@router.get("")
 @router.get("/")
 async def get_onboarding_status(user=Depends(get_current_user)):
     """Retorna se o usuário já completou o onboarding."""
@@ -45,6 +46,7 @@ async def get_onboarding_status(user=Depends(get_current_user)):
     return result
 
 
+@router.post("")
 @router.post("/")
 async def mark_onboarding_done(body: OnboardingUpdate, user=Depends(get_current_user)):
     """Marca o onboarding como concluído."""

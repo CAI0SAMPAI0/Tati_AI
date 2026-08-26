@@ -45,14 +45,19 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if request.scope.get("type") == "websocket":
             return await call_next(request)
 
-        # Ignora rate limiting para rotas de health check e estáticos
+        # Ignora rate limiting para rotas de health check, metricas e documentacao
         if request.url.path in (
             "/health",
+            "/health/",
+            "/metrics",
+            "/metrics/",
+            "/tasks/health",
             "/cors-test",
             "/docs",
             "/openapi.json",
             "/redoc",
-        ):
+            "/favicon.ico",
+        ) or request.url.path.startswith("/metrics"):
             response = await call_next(request)
             return response
 

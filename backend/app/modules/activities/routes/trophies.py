@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends
 router = APIRouter()
 
 
+@router.get("")
 @router.get("/")
 @router.get("/all")
 async def my_trophies(

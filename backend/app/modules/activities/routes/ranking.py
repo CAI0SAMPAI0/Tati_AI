@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends
 router = APIRouter()
 
 
+@router.get("")
 @router.get("/")
 async def get_ranking(
     category: str = "global", limit: int = 20, service: ActivityService = Depends()

@@ -29,6 +29,7 @@ async def list_goals(user=Depends(get_current_user)):
     return get_goals(user["username"])
 
 
+@router.post("")
 @router.post("/")
 async def add_goal(body: GoalCreate, user=Depends(get_current_user)):
     """Cria nova meta."""
