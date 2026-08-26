@@ -722,7 +722,15 @@ function StudentSubmissionsSection({ submissions }: { submissions: any[] }) {
                         rel="noopener noreferrer"
                         className="text-[0.55rem] text-text-muted hover:text-primary hover:underline truncate max-w-[150px]"
                       >
-                        {s.url.includes('test-english.com') ? 'test-english.com' : new URL(s.url).hostname}
+                        {(() => {
+                          try {
+                            if (s.url.includes('test-english.com')) return 'test-english.com';
+                            if (s.url.startsWith('http')) return new URL(s.url).hostname;
+                            return s.url;
+                          } catch {
+                            return s.url;
+                          }
+                        })()}
                       </a>
                     )}
                   </div>

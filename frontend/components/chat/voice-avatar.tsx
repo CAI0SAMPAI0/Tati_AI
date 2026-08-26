@@ -133,29 +133,10 @@ export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAva
    * Uses CSS animation for fade-in instead of manual opacity → no white screen.
    */
   const changeMouth = useCallback((newUrl: string) => {
-    const now = Date.now();
-    if (now - lastChangeRef.current < MIN_HOLD_MS) {
-      // Schedule retry after hold expires
-      pendingRef.current = newUrl;
-      if (!holdTimerRef.current) {
-        holdTimerRef.current = setTimeout(() => {
-          holdTimerRef.current = null;
-          const pending = pendingRef.current;
-          pendingRef.current = null;
-          if (pending) changeMouth(pending);
-        }, MIN_HOLD_MS - (now - lastChangeRef.current) + 5);
-      }
-      return;
-    }
-    if (newUrl === currentMouthRef.current) return;
-
+    if (!newUrl || newUrl === currentMouthRef.current) return;
     currentMouthRef.current = newUrl;
-    lastChangeRef.current = Date.now();
-
-    // Update render state — CSS animation on key change handles fade-in
     setMouthSrc(newUrl);
-    setMouthKey(k => k + 1);
-  }, []); // ← stable, zero deps
+  }, []);
 
   const frameForLevel = useCallback((level: MouthLevel, emotion: 'surprise' | 'positive' | 'neutral'): string => {
     const f = framesRef.current;
@@ -340,13 +321,11 @@ export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAva
       <div className="w-full h-full rounded-full border-[6px] border-primary shadow-[0_0_60px_rgba(124,58,237,0.3)] overflow-hidden bg-bg-secondary relative z-10 transition-transform duration-500 hover:scale-105">
 
         {/* Layer 1 — Boca (visema atual) */}
-        {/* Changing `key` restarts the CSS fade-in animation — no opacity stuck at 0 */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          key={mouthKey}
           src={mouthSrc}
           alt="Teacher Tati"
-          className="absolute inset-0 w-full h-full object-cover avatar-mouth"
+          className="absolute inset-0 w-full h-full object-cover"
         />
 
         {/* Layer 2 — Reação emocional (surprise/choque) */}

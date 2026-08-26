@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Upload,
   FileText,
@@ -85,7 +86,6 @@ export function CefrSection() {
 
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [editingItemType, setEditingItemType] = useState<'flashcard' | 'exercise' | 'simulation' | null>(null);
-  const [expandedImageUrl, setExpandedImageUrl] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [savingEdit, setSavingEdit] = useState(false);
   const [generatingCardImages, setGeneratingCardImages] = useState<Record<number, boolean>>({});
@@ -1715,17 +1715,6 @@ export function CefrSection() {
                                 (e.target as HTMLImageElement).style.display = 'none';
                               }}
                             />
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setExpandedImageUrl(card.image_url);
-                              }}
-                              className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-all flex items-center justify-center"
-                              title="Expand image"
-                            >
-                              <Eye size={16} className="text-white" />
-                            </button>
                           </>
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
@@ -1810,16 +1799,6 @@ export function CefrSection() {
                           }}
                           className="flex-1 bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text focus:ring-1 focus:ring-primary/20 outline-none"
                         />
-                        {card.image_url && (
-                          <button
-                            type="button"
-                            onClick={() => setExpandedImageUrl(card.image_url)}
-                            className="p-1.5 bg-surface border border-border rounded-lg text-primary hover:bg-primary/10 transition-all"
-                            title="Expand image"
-                          >
-                            <Eye size={14} />
-                          </button>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -1866,30 +1845,6 @@ export function CefrSection() {
           </div>
         </div>
       </DialogModal>
-
-      {/* Image Preview Modal */}
-      {expandedImageUrl && (
-        <div
-          className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setExpandedImageUrl(null)}
-        >
-          <div className="relative max-w-2xl max-h-[80vh] w-full">
-            <button
-              onClick={() => setExpandedImageUrl(null)}
-              className="absolute -top-3 -right-3 bg-white text-black p-2 rounded-full shadow-lg hover:bg-gray-100 z-10"
-            >
-              <X size={20} />
-            </button>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={expandedImageUrl}
-              alt="Preview"
-              className="w-full h-full object-contain rounded-xl"
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

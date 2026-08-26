@@ -36,9 +36,9 @@ export function RedirectModal({ method, url, value, title, paymentId, onClose, o
   });
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-bg/80 backdrop-blur-xl animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
       <div className={cn(
-        "bg-surface border border-border rounded-[2.5rem] w-full max-w-sm shadow-2xl overflow-hidden transition-all duration-500",
+        "bg-surface border border-border rounded-[2.5rem] w-full max-w-sm shadow-2xl overflow-hidden transition-all duration-300 transform-gpu",
         paymentConfirmed ? "scale-105 border-success/50 shadow-success/20" : "scale-100"
       )}>
         {/* Header */}

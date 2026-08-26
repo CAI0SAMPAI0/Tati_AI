@@ -50,14 +50,6 @@ export default function HubHeader({ onToggleMenu }: HubHeaderProps) {
           Beta
         </span>
 
-        <button
-          type="button"
-          className="hidden rounded-lg p-2 text-muted transition hover:bg-bgSecondary sm:block"
-          aria-label="Notificações"
-        >
-          <Bell size={20} />
-        </button>
-
         {user && (
           <div className="relative" ref={menuRef}>
             <button

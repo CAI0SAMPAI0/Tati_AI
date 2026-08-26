@@ -25,6 +25,7 @@ export function useChatSocket(conversationId: string | null) {
   
   const convIdRef = useRef<string | null>(conversationId);
   const pendingPdfRef = useRef<{ pdf_b64: string; filename: string } | null>(null);
+  const pendingAudioRef = useRef<string | null>(null);
 
   // Sync ref with state
   useEffect(() => {
@@ -101,10 +102,12 @@ export function useChatSocket(conversationId: string | null) {
             conversation_id: currentId || '',
             role: 'assistant',
             content: finalContent,
+            audio_b64: pendingAudioRef.current || null,
             created_at: new Date().toISOString(),
             pdf_b64: pendingPdfRef.current?.pdf_b64 || null,
             pdf_filename: pendingPdfRef.current?.filename || null,
           };
+          pendingAudioRef.current = null;
           
           setMessages((prev) => {
             // Avoid duplicates by ID
@@ -161,6 +164,7 @@ export function useChatSocket(conversationId: string | null) {
         break;
       case 'audio_response':
         if (msg.audio) {
+          pendingAudioRef.current = msg.audio;
           setMessages((prev) => {
             const last = [...prev];
             for (let i = last.length - 1; i >= 0; i--) {

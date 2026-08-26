@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { cn } from '@/lib/utils';
 
 interface ModalProps {
   isOpen: boolean;
@@ -70,21 +71,21 @@ export function DialogModal({ isOpen, onClose, title, children, size = 'md' }: M
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.15 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-md cursor-pointer"
+            className="fixed inset-0 bg-black/70 dark:bg-black/85 backdrop-blur-sm cursor-pointer"
           />
 
           {/* Modal Container */}
           <motion.div 
             layout={false}
-            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            initial={{ opacity: 0, scale: 0.97, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 15 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            exit={{ opacity: 0, scale: 0.97, y: 10 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
             onClick={(e) => e.stopPropagation()}
             className={cn(
-              "relative w-full bg-surface dark:bg-[#121424] border border-border/80 dark:border-white/10 rounded-3xl shadow-2xl p-4 sm:p-6 flex flex-col z-10 max-h-[90vh] md:max-h-[86vh] overflow-hidden",
+              "relative w-full bg-surface dark:bg-[#121424] border border-border/80 dark:border-white/10 rounded-3xl shadow-2xl p-4 sm:p-6 flex flex-col z-10 max-h-[90vh] md:max-h-[86vh] overflow-hidden transform-gpu",
               maxWidthClasses[size]
             )}
           >
@@ -109,9 +110,4 @@ export function DialogModal({ isOpen, onClose, title, children, size = 'md' }: M
   );
 
   return createPortal(modalContent, document.body);
-}
-
-// Helper local para cn
-function cn(...classes: (string | boolean | undefined | null)[]) {
-  return classes.filter(Boolean).join(' ');
 }

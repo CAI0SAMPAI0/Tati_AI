@@ -274,6 +274,21 @@ async def load_history(conversation_id: str) -> list[dict]:
         return []
 
 
+def _clean_dialogue_content(content: str) -> str:
+    if not content:
+        return ""
+    content_str = str(content).strip()
+    if content_str.startswith("{") and content_str.endswith("}"):
+        try:
+            import json
+            data = json.loads(content_str)
+            if isinstance(data, dict):
+                return data.get("reply") or data.get("content") or data.get("text") or content_str
+        except Exception:
+            pass
+    return content_str
+
+
 async def get_summary(conversation_id: str) -> dict:
     # Check in-memory cache for summary
     if conversation_id in SUMMARY_CACHE:
@@ -282,9 +297,37 @@ async def get_summary(conversation_id: str) -> dict:
     try:
         from app.modules.chat.services.llm import groq_chat
 
-        history = await load_llm_history(conversation_id)
-        prompt = f"Summarize this conversation: {history}"
-        res = await groq_chat([{"role": "user", "content": prompt}])
+        messages = await load_history(conversation_id)
+        if not messages:
+            return {"summary": "No messages found for this conversation."}
+
+        dialogue_lines = []
+        for m in messages[-25:]:
+            role_label = "Student" if m.get("role") == "user" else "Teacher Tati"
+            text = _clean_dialogue_content(m.get("content") or "")
+            if text:
+                dialogue_lines.append(f"{role_label}: {text}")
+
+        dialogue_str = "\n".join(dialogue_lines)
+
+        messages_payload = [
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert English teacher. Provide a concise, clear Pedagogical Summary "
+                    "of the student's conversation with Teacher Tati. Include: "
+                    "1) Main topics discussed, "
+                    "2) Vocabulary and grammar highlights or corrections, "
+                    "3) Constructive advice for future practice. "
+                    "Format with clean Markdown with clear headings and bullet points. Never mention JSON, internal code, or raw response keys."
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"Please summarize this conversation:\n\n{dialogue_str}",
+            },
+        ]
+        res = await groq_chat(messages_payload)
         summary_result = {"summary": res}
         # Store in cache
         SUMMARY_CACHE[conversation_id] = summary_result

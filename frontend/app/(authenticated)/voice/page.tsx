@@ -639,18 +639,23 @@ function VoicePageContent() {
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
 
-    const draw = () => {
+    let lastFrameTime = 0;
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+    gradient.addColorStop(0, '#818cf8');
+    gradient.addColorStop(1, '#ec4899');
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = 3;
+
+    const draw = (timestamp: number) => {
       animationFrameRef.current = requestAnimationFrame(draw);
+      
+      // Limita para ~30-40 FPS para economizar 50% de CPU/GPU
+      if (timestamp - lastFrameTime < 25) return;
+      lastFrameTime = timestamp;
+
       analyser.getByteTimeDomainData(dataArray);
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.lineWidth = 3;
-      
-      const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-      gradient.addColorStop(0, '#818cf8');
-      gradient.addColorStop(1, '#ec4899');
-      ctx.strokeStyle = gradient;
-      
       ctx.beginPath();
       const sliceWidth = canvas.width / bufferLength;
       let x = 0;
@@ -671,7 +676,7 @@ function VoicePageContent() {
       ctx.stroke();
     };
 
-    draw();
+    animationFrameRef.current = requestAnimationFrame(draw);
     return () => {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };

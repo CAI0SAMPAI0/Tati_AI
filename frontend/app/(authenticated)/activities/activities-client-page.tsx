@@ -200,7 +200,7 @@ export default function ActivitiesClientPage() {
     return set;
   }, [mySubmissions]);
 
-  // Simulations, Podcasts, Flashcards (Cached)
+  // Simulations, Podcasts, Flashcards (Cached - fetched only when relevant tab is active)
   const { data: simulationsRaw = [] } = useQuery<SimulationItem[]>({
     queryKey: ['activities-simulations', effectiveLevel],
     queryFn: () => apiGet<SimulationItem[]>(
@@ -209,6 +209,7 @@ export default function ActivitiesClientPage() {
         : `/simulation/scenarios?level=${effectiveLevel}`
     ),
     staleTime: 10 * 60 * 1000,
+    enabled: activeTab === 'simulations',
   });
   const { data: podcastsRaw = [] } = useQuery<PodcastItem[]>({
     queryKey: ['activities-podcasts', effectiveLevel],
@@ -218,6 +219,7 @@ export default function ActivitiesClientPage() {
         : `/activities/podcasts/recommendations?lang=en-US&level=${effectiveLevel}`
     ),
     staleTime: 10 * 60 * 1000,
+    enabled: activeTab === 'listenings',
   });
   const { data: flashcardsRaw = [] } = useQuery<FlashcardDeck[]>({
     queryKey: ['activities-flashcards', effectiveLevel],
@@ -227,16 +229,19 @@ export default function ActivitiesClientPage() {
         : `/activities/flashcards/my?level=${effectiveLevel}`
     ),
     staleTime: 10 * 60 * 1000,
+    enabled: activeTab === 'flashcards',
   });
   const { data: podcastProgress } = useQuery({
     queryKey: ['activities-podcasts-progress'],
     queryFn: () => apiGet<{ completed: string[] }>('/activities/podcasts/progress'),
     staleTime: 5 * 60 * 1000,
+    enabled: activeTab === 'listenings',
   });
   const { data: simulationProgress } = useQuery({
     queryKey: ['activities-simulations-progress'],
     queryFn: () => apiGet<{ completed: string[] }>('/simulation/progress'),
     staleTime: 5 * 60 * 1000,
+    enabled: activeTab === 'simulations',
   });
 
   const testEnglishLevel = effectiveLevel === 'All' ? 'all' : effectiveLevel;
@@ -246,21 +251,25 @@ export default function ActivitiesClientPage() {
     queryKey: ['test-english-grammar', testEnglishLevel],
     queryFn: () => apiGet<any>(ENDPOINTS.TEST_ENGLISH_CONTENT(testEnglishLevel, 'grammar')),
     staleTime: 30 * 60 * 1000,
+    enabled: activeTab === 'grammar',
   });
   const { data: vocabularyTE } = useQuery<{ items: TestEnglishItem[] }>({
     queryKey: ['test-english-vocabulary', testEnglishLevel],
     queryFn: () => apiGet<any>(ENDPOINTS.TEST_ENGLISH_CONTENT(testEnglishLevel, 'vocabulary')),
     staleTime: 30 * 60 * 1000,
+    enabled: activeTab === 'vocabulary',
   });
   const { data: listeningTE } = useQuery<{ items: TestEnglishItem[] }>({
     queryKey: ['test-english-listening', testEnglishLevel],
     queryFn: () => apiGet<any>(ENDPOINTS.TEST_ENGLISH_CONTENT(testEnglishLevel, 'listening')),
     staleTime: 30 * 60 * 1000,
+    enabled: activeTab === 'listenings',
   });
   const { data: readingTE } = useQuery<{ items: TestEnglishItem[] }>({
     queryKey: ['test-english-reading', testEnglishLevel],
     queryFn: () => apiGet<any>(ENDPOINTS.TEST_ENGLISH_CONTENT(testEnglishLevel, 'reading')),
     staleTime: 30 * 60 * 1000,
+    enabled: activeTab === 'reading',
   });
 
   // LiveWorksheets Content (Cached 30 mins)
@@ -268,35 +277,39 @@ export default function ActivitiesClientPage() {
     queryKey: ['liveworksheets-grammar', testEnglishLevel],
     queryFn: () => apiGet<any>(ENDPOINTS.LIVEWORKSHEETS_CONTENT(testEnglishLevel, 'grammar')),
     staleTime: 30 * 60 * 1000,
+    enabled: activeTab === 'grammar',
   });
   const { data: vocabularyLW } = useQuery<{ items: TestEnglishItem[] }>({
     queryKey: ['liveworksheets-vocabulary', testEnglishLevel],
     queryFn: () => apiGet<any>(ENDPOINTS.LIVEWORKSHEETS_CONTENT(testEnglishLevel, 'vocabulary')),
     staleTime: 30 * 60 * 1000,
+    enabled: activeTab === 'vocabulary',
   });
   const { data: listeningLW } = useQuery<{ items: TestEnglishItem[] }>({
     queryKey: ['liveworksheets-listening', testEnglishLevel],
     queryFn: () => apiGet<any>(ENDPOINTS.LIVEWORKSHEETS_CONTENT(testEnglishLevel, 'listening')),
     staleTime: 30 * 60 * 1000,
+    enabled: activeTab === 'listenings',
   });
   const { data: readingLW } = useQuery<{ items: TestEnglishItem[] }>({
     queryKey: ['liveworksheets-reading', testEnglishLevel],
     queryFn: () => apiGet<any>(ENDPOINTS.LIVEWORKSHEETS_CONTENT(testEnglishLevel, 'reading')),
     staleTime: 30 * 60 * 1000,
+    enabled: activeTab === 'reading',
   });
 
   const { data: gamesRaw = [] } = useQuery<GameItem[]>({
     queryKey: ['activities-games'],
     queryFn: () => apiGet<GameItem[]>(ENDPOINTS.ACTIVITIES_GAMES),
     staleTime: 10 * 60 * 1000,
-    refetchInterval: 30_000,
+    enabled: activeTab === 'games',
   });
 
   const { data: newsRaw = [] } = useQuery<NewsItem[]>({
     queryKey: ['activities-news'],
     queryFn: () => apiGet<NewsItem[]>(ENDPOINTS.ACTIVITIES_NEWS),
     staleTime: 10 * 60 * 1000,
-    refetchInterval: 30_000,
+    enabled: activeTab === 'news',
   });
 
   useQuery({

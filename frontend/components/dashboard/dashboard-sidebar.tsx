@@ -45,7 +45,7 @@ interface DashboardSidebarProps {
 import { memo } from 'react';
 
 const DashNavItem = memo(
-  ({
+  function DashNavItem({
     id,
     icon,
     label,
@@ -57,7 +57,7 @@ const DashNavItem = memo(
     label: string;
     isActive: boolean;
     onClick: () => void;
-  }) => {
+  }) {
     return (
       <button
         onClick={onClick}
@@ -83,6 +83,7 @@ const DashNavItem = memo(
     );
   }
 );
+DashNavItem.displayName = 'DashNavItem';
 
 export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose }: DashboardSidebarProps) {
   return (

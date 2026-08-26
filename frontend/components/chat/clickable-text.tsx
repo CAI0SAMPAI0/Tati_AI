@@ -1,10 +1,7 @@
-'use client';
-
-import React, { useMemo, useRef } from 'react';
-import dynamic from 'next/dynamic';
+import React from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
-
-const ReactMarkdownLazy = dynamic(() => import('react-markdown'), { ssr: false });
 
 interface ClickableTextProps {
   content: string;
@@ -13,11 +10,7 @@ interface ClickableTextProps {
   className?: string;
 }
 
-export function ClickableText({ content, isMarkdown = true, onWordClick, className }: ClickableTextProps) {
-  const gfmRef = useRef<any>(null);
-  if (gfmRef.current === null) {
-    import('remark-gfm').then(m => { gfmRef.current = m.default; });
-  }
+export const ClickableText = React.memo(function ClickableText({ content, isMarkdown = true, onWordClick, className }: ClickableTextProps) {
 
   const handleClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -50,8 +43,8 @@ export function ClickableText({ content, isMarkdown = true, onWordClick, classNa
 
   return (
     <div className={cn("prose-container", className)} onClick={handleClick}>
-      <ReactMarkdownLazy
-        remarkPlugins={gfmRef.current ? [gfmRef.current] : []}
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
         components={{
           p: ({ children }: any) => <p>{wrapChildren(children)}</p>,
           li: ({ children }: any) => <li>{wrapChildren(children)}</li>,
@@ -64,10 +57,10 @@ export function ClickableText({ content, isMarkdown = true, onWordClick, classNa
         }}
       >
         {content}
-      </ReactMarkdownLazy>
+      </ReactMarkdown>
     </div>
   );
-}
+});
 
 function wrapChildren(children: React.ReactNode): React.ReactNode {
   return React.Children.map(children, (child) => {

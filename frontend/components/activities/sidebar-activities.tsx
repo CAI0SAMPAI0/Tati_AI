@@ -16,7 +16,7 @@ interface SidebarActivitiesProps {
 }
 
 const NavItem = memo(
-  ({
+  function NavItem({
     href,
     icon,
     label,
@@ -30,7 +30,7 @@ const NavItem = memo(
     isActive: boolean;
     onMouseEnter: () => void;
     onClick: () => void;
-  }) => {
+  }) {
     return (
       <Link
         href={href}
@@ -59,6 +59,7 @@ const NavItem = memo(
     );
   }
 );
+NavItem.displayName = 'NavItem';
 
 export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
   const pathname = usePathname();

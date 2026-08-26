@@ -98,12 +98,12 @@ export function ActivityViewerModal({
     >
       {/* Blur + dim overlay */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-md"
+        className="absolute inset-0 bg-black/75 backdrop-blur-sm"
         style={{ zIndex: -1 }}
       />
 
       {/* Modal card */}
-      <div className="bg-surface border border-border rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-6 relative overflow-hidden">
+      <div className="bg-surface border border-border rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-6 relative overflow-hidden transform-gpu">
         {/* Close button */}
         <button
           onClick={onClose}
