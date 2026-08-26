@@ -97,10 +97,8 @@ if DATABASE_URL:
         conn_max_age=0,
         conn_health_checks=True,
     )
-    # Se estiver usando o pooler do Supabase, força a porta 6543 (Transaction Mode) para evitar limite de 15 sessões
-    if 'pooler.supabase.com' in str(db_config.get('HOST', '')):
-        db_config['PORT'] = 6543
-        db_config['DISABLE_SERVER_SIDE_CURSORS'] = True
+    if 'pooler.supabase.com' in str(db_config.get('HOST', '')) and not db_config.get('PORT'):
+        db_config['PORT'] = 5432
 
     db_config.setdefault('OPTIONS', {})['connect_timeout'] = 10
     DATABASES = {'default': db_config}
@@ -113,11 +111,10 @@ else:
     }
 
 # ── CACHE (UPSTASH REDIS / DJANGO CACHE BACKEND) ─────────────────────
-# Conecta django.core.cache diretamente ao Upstash Redis / Redis
 UPSTASH_REDIS_URL = os.getenv('UPSTASH_REDIS_URL')
 REDIS_URL = os.getenv('REDIS_URL', UPSTASH_REDIS_URL)
 
-if REDIS_URL and REDIS_URL.startswith(('redis://', 'rediss://')):
+if REDIS_URL and REDIS_URL.startswith(('redis://', 'rediss://')) and os.getenv('USE_REDIS_CACHE', 'false').lower() in ('true', '1'):
     CACHES = {
         'default': {
             'BACKEND': 'django_redis.cache.RedisCache',
@@ -151,7 +148,8 @@ CELERY_TIMEZONE = 'America/Sao_Paulo'
 CELERY_ENABLE_UTC = True
 
 # ── DJANGO CHANNELS (WEBSOCKETS LAYER) ────────────────────────────────
-if REDIS_URL and REDIS_URL.startswith(('redis://', 'rediss://')):
+# Em containers autônomos (HF Spaces), InMemoryChannelLayer garante latência zero e 0 falhas de conexão de rede
+if os.getenv('USE_REDIS_CHANNELS', 'false').lower() in ('true', '1') and REDIS_URL and REDIS_URL.startswith(('redis://', 'rediss://')):
     CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
