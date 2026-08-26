@@ -86,8 +86,8 @@ export default function SecureDocumentViewer({
       <div className="space-y-6">
         {access.pages?.map((url, index) => {
           const pageLinks = access.external_links?.filter(l => l.page === index) || [];
-          console.log('pageLinks para página', index, pageLinks);
-
+          const storageUrl = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_URL || 'https://gkziqqjswecteekanwnv.supabase.co/storage/v1/object/public/hub-secure-pages';
+          const safeUrl = url.startsWith('http') ? url : `${storageUrl}/${url}`;
 
           return (
             <figure
@@ -97,14 +97,14 @@ export default function SecureDocumentViewer({
               }`}
             >
               <div 
-                className="relative w-full mx-auto transition-all duration-300"
+                className="relative w-full mx-auto transition-all duration-300 min-h-[500px]"
                 style={{ 
                   aspectRatio: aspectRatios[index] ? `${aspectRatios[index]}` : '3/4',
                   maxWidth: isFullscreen ? '1024px' : '768px'
                 }}
               >
                 <Image
-                  src={url}
+                  src={safeUrl}
                   alt={`Página ${index + 1}`}
                   fill
                   className="object-contain bg-white"

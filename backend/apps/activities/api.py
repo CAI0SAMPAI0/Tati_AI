@@ -1,9 +1,14 @@
+import logging
+import httpx
 from typing import List, Optional, Any, Dict
 from pydantic import BaseModel
 from ninja import Router, File, UploadedFile
 from ninja.errors import HttpError
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse
 from django.contrib.auth import get_user_model
+from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 from apps.authentication.security import auth_required, auth_optional
 from .schemas import (
@@ -456,9 +461,9 @@ def get_hub_page(request: HttpRequest, content_id: str, page_index: int, token: 
         payload = decode_jwt_token(token)
         if payload:
             user = User.objects.filter(username=payload.get("sub")).first()
-    if not user and isinstance(request.auth, User):
+    if not user and getattr(request, 'auth', None) and isinstance(request.auth, User):
         user = request.auth
-    if not user and getattr(request, 'user', None) and request.user.is_authenticated:
+    if not user and getattr(request, 'user', None) and getattr(request.user, 'is_authenticated', False):
         user = request.user
 
     email = getattr(user, 'email', '') or getattr(user, 'username', 'Tati AI') if user else 'Aluno Tati AI'
@@ -493,12 +498,28 @@ def get_hub_page(request: HttpRequest, content_id: str, page_index: int, token: 
             db = get_client()
             file_data = db.storage.from_("hub-secure-pages").download(storage_path)
             _RAW_IMAGE_CACHE[storage_path] = file_data
-        except Exception as e:
-            logger.warning(f"[Hub] Erro ao baixar imagem da página {storage_path}: {e}")
-            return HttpResponse(status=500)
+        except Exception as err:
+            logger.info(f"[Hub] Download via client falhou ({err}), tentando via HTTP direto...")
+            try:
+                supa_url = getattr(settings, 'SUPABASE_URL', 'https://gkziqqjswecteekanwnv.supabase.co').rstrip('/')
+                public_img_url = f"{supa_url}/storage/v1/object/public/hub-secure-pages/{storage_path}"
+                with httpx.Client(timeout=15.0) as client:
+                    resp = client.get(public_img_url)
+                    if resp.status_code == 200:
+                        file_data = resp.content
+                        _RAW_IMAGE_CACHE[storage_path] = file_data
+            except Exception as e2:
+                logger.warning(f"[Hub] Erro fatal ao baixar página {storage_path}: {e2}")
 
-    watermarked = apply_watermark(file_data, email)
-    return HttpResponse(watermarked, content_type="image/webp", headers={"Cache-Control": "private, max-age=3600"})
+    if not file_data:
+        return HttpResponse(status=404)
+
+    try:
+        watermarked = apply_watermark(file_data, email)
+        return HttpResponse(watermarked, content_type="image/webp", headers={"Cache-Control": "private, max-age=3600"})
+    except Exception as e:
+        logger.warning(f"[Hub] Erro ao aplicar watermark: {e}")
+        return HttpResponse(file_data, content_type="image/webp", headers={"Cache-Control": "private, max-age=3600"})
 
 
 # ── FLASHCARD ASSETS & CLOUDINARY UPLOAD ──────────────────────────────
