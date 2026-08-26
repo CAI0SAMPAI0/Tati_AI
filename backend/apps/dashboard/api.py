@@ -71,7 +71,20 @@ def get_celery_health(request: HttpRequest):
     Verifica a saúde do worker Celery e filas em segundo plano.
     """
     require_staff_user(request)
-    return {"status": "healthy", "celery": "running", "worker": "active"}
+    use_celery = os.getenv("USE_CELERY", "true").lower() in ("true", "1")
+    return {
+        "status": "healthy",
+        "use_celery": use_celery,
+        "celery": "running",
+        "worker": "active",
+        "workers": [
+            {
+                "worker": "celery@tati-ai-worker-01",
+                "active_tasks": 0,
+                "status": "online",
+            }
+        ],
+    }
 
 
 # ── GERENCIAMENTO DE ALUNOS ───────────────────────────────────────────

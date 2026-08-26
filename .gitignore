@@ -113,8 +113,9 @@ backend/test_list_files.py
 
 tatichatbot-491215-033b31817edf.json
 
-data/
-data/chroma_db/
+/data/
+/data/chroma_db/
+!backend/apps/activities/data/
 *.db
 *.sqlite
  
