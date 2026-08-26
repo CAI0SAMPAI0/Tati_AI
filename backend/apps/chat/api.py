@@ -106,15 +106,20 @@ class TranscribeInput(BaseModel):
 @chat_router.post("/tts", auth=auth_optional)
 async def synthesize_voice(request: HttpRequest, payload: TTSInput):
     """
-    Sintetiza áudio falado com a voz da Teacher Tati via Edge TTS assíncrono.
+    Sintetiza áudio falado com a voz da Teacher Tati via Edge TTS assíncrono respeitando o sotaque preferido do usuário.
     """
     from .audio_service import AudioService
     text = payload.text or payload.message or ""
-    accent = payload.accent or "en-US"
+    accent = payload.accent
+    if not accent or accent == "en-US":
+        if hasattr(request, "auth") and request.auth and hasattr(request.auth, "profile") and isinstance(request.auth.profile, dict):
+            accent = request.auth.profile.get("preferred_accent") or accent or "en-US"
+    accent = accent or "en-US"
     audio_b64 = await AudioService.text_to_speech_async(text, accent=accent)
     return {
         "audio": audio_b64,
         "audio_b64": audio_b64,
+        "accent": accent,
         "duration_seconds": 2.0,
     }
 

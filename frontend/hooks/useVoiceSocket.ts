@@ -285,7 +285,7 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
       audio: base64,
       conversation_id: convId,
       origin: 'voice',
-      accent: accent || 'en-US',
+      accent: accent || (typeof window !== 'undefined' ? localStorage.getItem('tati_voice_accent') || 'en-US' : 'en-US'),
     } as any;
     socketRef.current.send(msg);
   }, [ensureConversation]);

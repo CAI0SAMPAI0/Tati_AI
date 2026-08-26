@@ -417,6 +417,10 @@ def update_notification_preferences(request: HttpRequest, payload: NotificationP
         profile["streak_alerts"] = data["streak_alerts"]
     if "whatsapp_number" in data:
         profile["whatsapp_number"] = data["whatsapp_number"]
+    if "preferred_accent" in data:
+        profile["preferred_accent"] = data["preferred_accent"]
+    if "accent" in data:
+        profile["preferred_accent"] = data["accent"]
 
     user.profile = profile
     user.save(update_fields=["profile"])

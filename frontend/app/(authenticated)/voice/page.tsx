@@ -81,7 +81,7 @@ function VoicePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { theme, resolvedTheme, setTheme } = useTheme();
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
   const convIdParam = searchParams.get('conv_id');
   const simulationId = searchParams.get('simulation_id');
 
@@ -111,15 +111,15 @@ function VoicePageContent() {
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('tati_voice_accent');
-      if (saved) {
-        const found = ACCENTS.findIndex(a => a.id === saved);
+      const preferred = user?.profile?.preferred_accent || localStorage.getItem('tati_voice_accent');
+      if (preferred) {
+        const found = ACCENTS.findIndex(a => a.id === preferred);
         if (found !== -1) {
           setAccentIndex(found);
         }
       }
     } catch (_) {}
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -138,6 +138,23 @@ function VoicePageContent() {
     try {
       localStorage.setItem('tati_voice_accent', newAccent.id);
     } catch (_) {}
+
+    // Sincroniza automaticamente com o perfil do backend e configurações
+    apiPut('/profile', { preferred_accent: newAccent.id, accent: newAccent.id })
+      .then(() => {
+        if (user && updateProfile) {
+          updateProfile({
+            ...user,
+            preferred_accent: newAccent.id,
+            profile: {
+              ...user.profile,
+              preferred_accent: newAccent.id,
+              accent: newAccent.id,
+            }
+          });
+        }
+      })
+      .catch((err) => console.error('Failed to sync accent from voice page:', err));
 
     toast.success(`Accent: ${newAccent.label}`, { id: 'accent-toast', duration: 2000 });
 

@@ -110,14 +110,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (typeof window === 'undefined' || pushAttemptedRef.current) return;
     pushAttemptedRef.current = true;
 
-    if (process.env.NODE_ENV !== 'production') return;
-
     try {
       const { Capacitor } = await import('@capacitor/core');
       const isNative = Capacitor.isNativePlatform();
 
       if (isNative) {
-        const PushNotifications = (window as any).Capacitor.Plugins.PushNotifications;
+        const PushNotifications = (window as any).Capacitor?.Plugins?.PushNotifications;
+        if (!PushNotifications) return;
 
         let permStatus = await PushNotifications.checkPermissions();
         if (permStatus.receive === 'prompt') {

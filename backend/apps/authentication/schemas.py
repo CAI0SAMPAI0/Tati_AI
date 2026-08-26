@@ -62,6 +62,7 @@ class UserOut(BaseModel):
     total_xp: int = 0
     is_special_access: bool = False
     is_hub_only: bool = False
+    preferred_accent: Optional[str] = "en-US"
 
 
 class TokenResponse(BaseModel):
@@ -84,4 +85,6 @@ class ProfileUpdateInput(BaseModel):
     responsible_email: Optional[str] = None
     whatsapp_number: Optional[str] = None
     allow_whatsapp_notifications: Optional[bool] = None
+    preferred_accent: Optional[str] = None
+    accent: Optional[str] = None
     profile: Optional[dict] = None

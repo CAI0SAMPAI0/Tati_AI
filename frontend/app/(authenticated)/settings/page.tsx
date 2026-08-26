@@ -25,6 +25,7 @@ import toast from 'react-hot-toast';
 import { useTour } from '@/hooks/useTour';
 import { apiGet, apiPut } from '@/lib/api/client';
 import { useAuth } from '@/providers/auth-provider';
+import { ACCENTS, getStoredAccent, saveStoredAccent } from '@/lib/constants/accents';
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
@@ -32,6 +33,8 @@ export default function SettingsPage() {
   const { restartTour } = useTour();
   const { user, updateProfile } = useAuth();
   const [mounted, setMounted] = useState(false);
+
+  const [selectedAccent, setSelectedAccent] = useState('en-US');
 
   const [settings, setSettings] = useState({
     audioSpeed: '1',
@@ -85,29 +88,61 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (user) {
-      setWhatsappNumber(user.profile?.whatsapp_number || '');
-      setAllowWhatsappNotifications(user.profile?.allow_whatsapp_notifications ?? false);
+    if (user?.profile?.preferred_accent) {
+      setSelectedAccent(user.profile.preferred_accent);
+      saveStoredAccent(user.profile.preferred_accent);
+    } else {
+      setSelectedAccent(getStoredAccent());
     }
   }, [user]);
 
+  const handleAccentSelect = async (accentId: string) => {
+    setSelectedAccent(accentId);
+    saveStoredAccent(accentId);
+    const accentObj = ACCENTS.find((a) => a.id === accentId);
+    toast.success(`Sotaque alterado para ${accentObj?.label || accentId}`, { id: 'accent-sync' });
+
+    try {
+      await apiPut('/profile', { preferred_accent: accentId, accent: accentId });
+      if (user) {
+        updateProfile({
+          ...user,
+          preferred_accent: accentId,
+          profile: {
+            ...user.profile,
+            preferred_accent: accentId,
+            accent: accentId,
+          },
+        });
+      }
+    } catch (e) {
+      console.error('Failed to sync accent to profile:', e);
+    }
+  };
+
   const handleSaveAll = async () => {
     localStorage.setItem('tati_settings', JSON.stringify(settings));
+    saveStoredAccent(selectedAccent);
     try {
       await apiPut('/users/notification-preferences', prefs);
       
       await apiPut('/profile', {
         whatsapp_number: whatsappNumber.trim() || null,
         allow_whatsapp_notifications: allowWhatsappNotifications,
+        preferred_accent: selectedAccent,
+        accent: selectedAccent,
       });
 
       if (user) {
         updateProfile({
           ...user,
+          preferred_accent: selectedAccent,
           profile: {
             ...user.profile,
             whatsapp_number: whatsappNumber.trim() || undefined,
             allow_whatsapp_notifications: allowWhatsappNotifications,
+            preferred_accent: selectedAccent,
+            accent: selectedAccent,
           }
         });
       }
@@ -177,10 +212,10 @@ export default function SettingsPage() {
           <section className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
             <div className="p-6 border-b border-border bg-bg-secondary/30 flex items-center gap-3">
                <Volume2 size={20} className="text-primary" />
-               <h2 className="font-bold text-sm uppercase tracking-wider">Audio</h2>
+               <h2 className="font-bold text-sm uppercase tracking-wider">Audio & Voice Accent</h2>
             </div>
-            <div className="p-6">
-               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="p-6 space-y-6">
+               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-border">
                   <div>
                     <p className="text-sm font-bold text-text mb-0.5">Default speed</p>
                     <p className="text-xs text-text-muted">Playback speed for audio responses</p>
@@ -197,6 +232,38 @@ export default function SettingsPage() {
                       { value: '2', label: '2x' },
                     ]}
                   />
+               </div>
+
+               <div>
+                  <div className="mb-3">
+                    <p className="text-sm font-bold text-text mb-0.5">Teacher Tati Voice Accent</p>
+                    <p className="text-xs text-text-muted">Sotaque padrão utilizado em todo o sistema (Chat, Voz, Flashcards e Atividades)</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                    {ACCENTS.map((accent) => {
+                      const isSelected = selectedAccent === accent.id;
+                      return (
+                        <button
+                          key={accent.id}
+                          type="button"
+                          onClick={() => handleAccentSelect(accent.id)}
+                          className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${
+                            isSelected
+                              ? 'border-primary bg-primary/10 text-primary shadow-sm ring-2 ring-primary/20'
+                              : 'border-border bg-bg hover:border-text-muted/30 text-text'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full mb-1">
+                            <span className="text-sm font-bold">{accent.label}</span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-surface border border-border uppercase">
+                              {accent.shortLabel}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-text-muted">{accent.desc}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                </div>
             </div>
           </section>

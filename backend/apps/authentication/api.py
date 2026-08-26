@@ -168,9 +168,11 @@ def update_profile(request: HttpRequest, payload: ProfileUpdateInput):
     profile_dict = user.profile if isinstance(user.profile, dict) else {}
 
     # Campos que residem dentro do JSON de perfil
-    for subfield in ["responsible_email", "whatsapp_number", "allow_whatsapp_notifications", "occupation", "focus"]:
+    for subfield in ["responsible_email", "whatsapp_number", "allow_whatsapp_notifications", "occupation", "focus", "preferred_accent", "accent"]:
         if subfield in update_data and update_data[subfield] is not None:
             profile_dict[subfield] = update_data[subfield]
+            if subfield == "accent":
+                profile_dict["preferred_accent"] = update_data[subfield]
 
     if "profile" in update_data and isinstance(update_data["profile"], dict):
         profile_dict.update(update_data["profile"])

@@ -113,8 +113,15 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             reply_text = res.get("reply") if isinstance(res, dict) else str(res)
             audio_b64 = res.get("audio_b64") if isinstance(res, dict) else ""
 
+            accent = content.get("accent")
+            if not accent or accent == "en-US":
+                if self.user and isinstance(getattr(self.user, "profile", None), dict):
+                    accent = self.user.profile.get("preferred_accent") or self.user.profile.get("accent") or "en-US"
+                else:
+                    accent = "en-US"
+
             if not audio_b64 and is_audio:
-                audio_b64 = await AudioService.text_to_speech_async(reply_text)
+                audio_b64 = await AudioService.text_to_speech_async(reply_text, accent=accent)
 
             # Envia o texto da resposta
             await self.send_json({

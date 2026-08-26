@@ -26,6 +26,7 @@ class AuthService:
         prof = user.profile if isinstance(user.profile, dict) else {}
         focus = prof.get("focus") or getattr(user, "focus", None) or "General Conversation"
         occupation = prof.get("occupation") or getattr(user, "occupation", None) or ""
+        preferred_accent = prof.get("preferred_accent") or prof.get("accent") or "en-US"
         return UserOut(
             id=str(user.username),
             username=user.username,
@@ -44,6 +45,7 @@ class AuthService:
             total_xp=user.total_xp,
             is_special_access=user.is_special_access,
             is_hub_only=user.is_hub_only,
+            preferred_accent=preferred_accent,
         )
 
     @classmethod

@@ -130,7 +130,7 @@ export function useVoiceLiveSocket() {
     wsRef.current.send(JSON.stringify({
       type: 'audio',
       audio: base64,
-      accent: accent || 'en-US',
+      accent: accent || (typeof window !== 'undefined' ? localStorage.getItem('tati_voice_accent') || 'en-US' : 'en-US'),
     }));
   }, []);
 

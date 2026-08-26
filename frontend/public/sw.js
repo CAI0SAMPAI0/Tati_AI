@@ -181,35 +181,58 @@ self.addEventListener('fetch', (event) => {
 
 // --- PUSH NOTIFICATIONS ---
 self.addEventListener('push', (event) => {
-  if (!event.data) return;
-  try {
-    const data = event.json();
-    const title = data.title || 'Teacher Tati';
-    const options = {
-      body: data.body || '',
-      icon: '/icons/icon-192x192.png',
-      badge: '/icons/icon-192x192.png',
-      data: {
-        url: data.url || '/'
-      }
-    };
-    event.waitUntil(
-      self.registration.showNotification(title, options)
-    );
-  } catch (err) {
-    console.error('Error handling push event:', err);
+  let data = {};
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch (_) {
+      data = { body: event.data.text() };
+    }
   }
+
+  const title = data.title || 'Teacher Tatiana';
+  const options = {
+    body: data.body || data.message || 'Você tem uma nova notificação de estudo!',
+    icon: data.icon || '/icons/icon-192x192.png',
+    badge: data.badge || '/icons/icon-192x192.png',
+    image: data.image || undefined,
+    vibrate: [200, 100, 200],
+    tag: data.tag || 'tati-notification',
+    renotify: true,
+    requireInteraction: true,
+    data: {
+      url: data.url || data.link || '/dashboard',
+      ...data,
+    },
+    actions: [
+      { action: 'open', title: 'Abrir App' },
+      { action: 'close', title: 'Dispensar' }
+    ]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  );
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const urlToOpen = event.notification.data?.url || '/';
+  if (event.action === 'close') return;
+
+  const targetPath = event.notification.data?.url || '/dashboard';
+  const urlToOpen = new URL(targetPath, self.location.origin).href;
+
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      for (let i = 0; i < windowClients.length; i++) {
-        const client = windowClients[i];
-        if (client.url.includes(urlToOpen) && 'focus' in client) {
+      for (const client of windowClients) {
+        if (client.url === urlToOpen && 'focus' in client) {
           return client.focus();
+        }
+      }
+      for (const client of windowClients) {
+        if ('focus' in client && 'navigate' in client) {
+          client.focus();
+          return client.navigate(urlToOpen);
         }
       }
       if (clients.openWindow) {
