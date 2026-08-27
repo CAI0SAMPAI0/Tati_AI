@@ -222,3 +222,6 @@ PROGRAMMER_USERNAMES = [
     for u in os.getenv('PROGRAMMER_USERNAMES', 'programador,admin,caio').split(',')
     if u.strip()
 ]
+# ── GOOGLE OAUTH ──────────────────────────────────────────────────────
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID') or os.getenv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')

@@ -86,9 +86,119 @@ def register(request: HttpRequest, payload: RegisterInput):
 @auth_router.post("/google", response=TokenResponse)
 def google_auth(request: HttpRequest, payload: GoogleAuthInput):
     """
-    Autenticação social via Google OAuth2 (Web popup ou mobile).
+    Autenticação social via Google OAuth2 (Web popup ou mobile com id_token).
     """
     return AuthService.google_login(payload.credential, payload.is_hub_only)
+
+
+@auth_router.get("/google/url")
+def get_google_auth_url(request: HttpRequest):
+    """
+    Retorna a URL de autorização do Google OAuth e o token de estado para login mobile / popup.
+    """
+    import os
+    import uuid
+    from urllib.parse import urlencode
+    from django.conf import settings
+    from django.core.cache import cache
+
+    client_id = getattr(settings, 'GOOGLE_CLIENT_ID', '') or os.getenv('GOOGLE_CLIENT_ID', '') or os.getenv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', '')
+    if not client_id:
+        raise HttpError(503, "Google OAuth não configurado no servidor.")
+
+    state = str(uuid.uuid4())
+    cache.set(f"google_oauth_state_{state}", {"ready": False}, timeout=600)
+
+    host = request.get_host()
+    proto = "https" if request.is_secure() or request.headers.get("X-Forwarded-Proto") == "https" else "http"
+    redirect_uri = f"{proto}://{host}/auth/google/callback"
+
+    params = {
+        "client_id": client_id,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "redirect_uri": redirect_uri,
+        "state": state,
+        "access_type": "offline",
+        "prompt": "select_account",
+    }
+    auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+    return {"url": auth_url, "state": state}
+
+
+@auth_router.get("/google/callback")
+def google_oauth_callback(request: HttpRequest, code: str = None, state: str = None, error: str = None):
+    """
+    Callback para o redirecionamento do Google OAuth2.
+    """
+    import os
+    import requests
+    from django.conf import settings
+    from django.core.cache import cache
+    from django.http import HttpResponse
+
+    if error or not code or not state:
+        return HttpResponse("<h3>Erro na autenticação com o Google. Pode fechar esta janela.</h3>", status=400)
+
+    client_id = getattr(settings, 'GOOGLE_CLIENT_ID', '') or os.getenv('GOOGLE_CLIENT_ID', '')
+    client_secret = getattr(settings, 'GOOGLE_CLIENT_SECRET', '') or os.getenv('GOOGLE_CLIENT_SECRET', '')
+
+    host = request.get_host()
+    proto = "https" if request.is_secure() or request.headers.get("X-Forwarded-Proto") == "https" else "http"
+    redirect_uri = f"{proto}://{host}/auth/google/callback"
+
+    token_url = "https://oauth2.googleapis.com/token"
+    data = {
+        "code": code,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code",
+    }
+    resp = requests.post(token_url, data=data, timeout=10)
+    if not resp.ok:
+        return HttpResponse("<h3>Falha ao trocar código com o Google. Pode fechar esta janela.</h3>", status=400)
+
+    tokens = resp.json()
+    id_token_str = tokens.get("id_token")
+    if not id_token_str:
+        return HttpResponse("<h3>Token de identidade não retornado pelo Google. Pode fechar esta janela.</h3>", status=400)
+
+    token_res = AuthService.google_login(id_token_str)
+    user_dict = token_res.user.dict() if hasattr(token_res.user, 'dict') else token_res.user.model_dump() if hasattr(token_res.user, 'model_dump') else token_res.user
+
+    cache.set(f"google_oauth_state_{state}", {
+        "ready": True,
+        "jwt": token_res.access_token,
+        "user": user_dict,
+    }, timeout=600)
+
+    html = """
+    <!DOCTYPE html>
+    <html>
+    <head><title>Login Concluído</title></head>
+    <body style="font-family:sans-serif; text-align:center; padding:50px;">
+        <h2>Autenticado com sucesso!</h2>
+        <p>Você pode fechar esta aba e voltar para o aplicativo.</p>
+        <script>
+            try { window.close(); } catch(e) {}
+        </script>
+    </body>
+    </html>
+    """
+    return HttpResponse(html, content_type="text/html")
+
+
+@auth_router.get("/google/poll/{state}")
+def poll_google_login(request: HttpRequest, state: str):
+    """
+    Polling para o app mobile verificar se o login social do Google foi concluído.
+    """
+    from django.core.cache import cache
+    data = cache.get(f"google_oauth_state_{state}")
+    if not data:
+        return {"ready": False}
+    return data
 
 
 @auth_router.post("/refresh", response=TokenResponse)
