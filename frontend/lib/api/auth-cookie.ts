@@ -1,6 +1,6 @@
 export const AUTH_TOKEN_COOKIE = 'auth_token';
 
-const COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
+const COOKIE_MAX_AGE_SECONDS = 90 * 24 * 60 * 60; // 90 dias de sessão persistente
 
 export function setAuthTokenCookie(token: string): void {
   if (typeof document === 'undefined') return;

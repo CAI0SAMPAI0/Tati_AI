@@ -3,9 +3,9 @@
 import { WS_BASE } from '@/lib/api/client';
 import type { WsIncomingMessage } from './types';
 
-const PING_INTERVAL_MS = 20_000;
-const BASE_RECONNECT_DELAY_MS = 1_500;
-const MAX_RECONNECT_DELAY_MS = 12_000;
+const PING_INTERVAL_MS = 15_000;
+const BASE_RECONNECT_DELAY_MS = 1_000;
+const MAX_RECONNECT_DELAY_MS = 8_000;
 
 export type ChatSocketEventType =
   | 'pong'
@@ -56,9 +56,34 @@ export class ChatSocket {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
   private destroyed = false;
+  private boundVisibilityHandler: (() => void) | null = null;
+  private boundOnlineHandler: (() => void) | null = null;
 
   constructor(config: ChatSocketConfig) {
     this.config = { ...config };
+    this.setupLifecycleListeners();
+  }
+
+  private setupLifecycleListeners(): void {
+    if (typeof document !== 'undefined') {
+      this.boundVisibilityHandler = () => {
+        if (document.visibilityState === 'visible' && !this.destroyed) {
+          if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            this.connect();
+          }
+        }
+      };
+      document.addEventListener('visibilitychange', this.boundVisibilityHandler);
+    }
+
+    if (typeof window !== 'undefined') {
+      this.boundOnlineHandler = () => {
+        if (!this.destroyed && (!this.ws || this.ws.readyState !== WebSocket.OPEN)) {
+          this.connect();
+        }
+      };
+      window.addEventListener('online', this.boundOnlineHandler);
+    }
   }
 
   updateConfig(newConfig: Partial<ChatSocketConfig>): void {
@@ -126,6 +151,14 @@ export class ChatSocket {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
+    }
+    if (this.boundVisibilityHandler && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.boundVisibilityHandler);
+      this.boundVisibilityHandler = null;
+    }
+    if (this.boundOnlineHandler && typeof window !== 'undefined') {
+      window.removeEventListener('online', this.boundOnlineHandler);
+      this.boundOnlineHandler = null;
     }
     if (this.ws) {
       this.ws.close();

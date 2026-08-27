@@ -12,7 +12,7 @@ User = get_user_model()
 
 JWT_SECRET_KEY = getattr(settings, 'SECRET_KEY', 'default-jwt-secret-key-2026')
 JWT_ALGORITHM = getattr(settings, 'JWT_ALGORITHM', 'HS256')
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES', 21600))  # 15 dias padrão
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES', 129600))  # 90 dias (3 meses)
 
 
 # ── CRIPTO & HASH DE SENHA ────────────────────────────────────────────
