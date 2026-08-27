@@ -11,43 +11,163 @@ from .schemas import NotificationOut, SubscribePushInput
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
-BREVO_API_KEY = os.getenv("BREVO_API_KEY") or os.getenv("brevo_smtp_key")
-WAHA_API_URL = os.getenv("WAHA_API_URL", "https://waha-noweb-tati-ai.onrender.com")
-WAHA_API_KEY = os.getenv("WAHA_API_KEY", "")
+def get_brevo_api_key() -> Optional[str]:
+    # Checa possíveis variáveis de ambiente para a chave do Brevo
+    for key_name in ["BREVO_API_KEY", "brevo_api_key", "BREVO_KEY", "brevo_smtp_key", "SMTP_PASSWORD"]:
+        val = os.getenv(key_name)
+        if val and ("xkeysib-" in val or "xsmtpsib-" in val or len(val) > 20):
+            return val.strip()
+    return None
+
+
+def get_verified_sender_email() -> str:
+    # Brevo exige que o remetente seja um e-mail verificado na conta Brevo
+    return (
+        os.getenv("BREVO_SENDER_EMAIL")
+        or os.getenv("SMTP_FROM")
+        or os.getenv("SMTP_USER")
+        or os.getenv("RESEND_FROM")
+        or "caio.matos@aedb.br"
+    )
 
 
 class BrevoEmailService:
     @staticmethod
     def send_email(to_email: str, subject: str, html_content: str, recipient_name: str = None) -> bool:
-        if not BREVO_API_KEY:
-            logger.warning(f"[Brevo] BREVO_API_KEY não configurada. Simulando envio para {to_email}: {subject}")
-            return True
+        res = BrevoEmailService.send_email_detailed(to_email, subject, html_content, recipient_name)
+        return res.get("success", False)
 
-        url = "https://api.brevo.com/v3/smtp/email"
-        headers = {
-            "api-key": BREVO_API_KEY,
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
-        payload = {
-            "sender": {"name": "Teacher Tati", "email": os.getenv("SMTP_FROM", "contato@tati-ai.com")},
-            "to": [{"email": to_email, "name": recipient_name or to_email}],
+    @staticmethod
+    def send_email_detailed(to_email: str, subject: str, html_content: str, recipient_name: str = None) -> dict:
+        brevo_key = get_brevo_api_key()
+        sender_email = get_verified_sender_email()
+        sender_name = os.getenv("SMTP_FROM_NAME", "Teacher Tati")
+
+        diagnostics = {
+            "to_email": to_email,
             "subject": subject,
-            "htmlContent": html_content,
+            "sender_email": sender_email,
+            "brevo_key_configured": bool(brevo_key),
+            "attempts": [],
         }
 
-        try:
-            with httpx.Client(timeout=8.0) as client:
-                res = client.post(url, headers=headers, json=payload)
-                if res.status_code in (200, 201, 202):
-                    logger.info(f"[Brevo] E-mail enviado com sucesso para {to_email}")
-                    return True
+        # ── 1. BREVO HTTP API (Porta 443) ──────────────────────────────────
+        if brevo_key:
+            url = "https://api.brevo.com/v3/smtp/email"
+            headers = {
+                "api-key": brevo_key,
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            }
+            payload = {
+                "sender": {"name": sender_name, "email": sender_email},
+                "to": [{"email": to_email, "name": recipient_name or to_email}],
+                "subject": subject,
+                "htmlContent": html_content,
+            }
+
+            try:
+                with httpx.Client(timeout=12.0) as client:
+                    res = client.post(url, headers=headers, json=payload)
+                    diagnostics["attempts"].append({
+                        "provider": "Brevo HTTP API",
+                        "status_code": res.status_code,
+                        "response": res.text,
+                    })
+
+                    if res.status_code in (200, 201, 202):
+                        logger.info(f"[Brevo] E-mail enviado com sucesso para {to_email}")
+                        diagnostics["success"] = True
+                        diagnostics["provider"] = "Brevo"
+                        return diagnostics
+                    else:
+                        logger.error(f"[Brevo] Erro status {res.status_code}: {res.text}. Tentando provedores alternativos...")
+            except Exception as e:
+                logger.error(f"[Brevo] Falha de conexão: {e}")
+                diagnostics["attempts"].append({
+                    "provider": "Brevo HTTP API",
+                    "error": str(e),
+                })
+        else:
+            diagnostics["attempts"].append({
+                "provider": "Brevo HTTP API",
+                "skipped": "Chave do Brevo não encontrada nas variáveis de ambiente.",
+            })
+
+        # ── 2. RESEND HTTP API FALLBACK (Porta 443) ────────────────────────
+        resend_key = os.getenv("RESEND_API_KEY")
+        if resend_key and not resend_key.startswith("xkeysib-"):
+            try:
+                resend_sender = os.getenv("RESEND_FROM", "Teacher Tati <onboarding@resend.dev>")
+                resend_payload = {
+                    "from": resend_sender,
+                    "to": [to_email],
+                    "subject": subject,
+                    "html": html_content,
+                }
+                resend_headers = {
+                    "Authorization": f"Bearer {resend_key}",
+                    "Content-Type": "application/json",
+                }
+                with httpx.Client(timeout=12.0) as client:
+                    res = client.post("https://api.resend.com/emails", headers=resend_headers, json=resend_payload)
+                    diagnostics["attempts"].append({
+                        "provider": "Resend HTTP API",
+                        "status_code": res.status_code,
+                        "response": res.text,
+                    })
+                    if res.status_code in (200, 201, 202):
+                        logger.info(f"[Resend] E-mail enviado com sucesso para {to_email}")
+                        diagnostics["success"] = True
+                        diagnostics["provider"] = "Resend"
+                        return diagnostics
+            except Exception as e:
+                logger.error(f"[Resend] Falha de envio: {e}")
+                diagnostics["attempts"].append({
+                    "provider": "Resend HTTP API",
+                    "error": str(e),
+                })
+
+        # ── 3. SMTP FALLBACK (Gmail / Custom SMTP) ─────────────────────────
+        smtp_host = os.getenv("SMTP_HOST")
+        smtp_user = os.getenv("SMTP_USER")
+        smtp_pass = os.getenv("SMTP_PASSWORD")
+        if smtp_host and smtp_user and smtp_pass:
+            try:
+                import smtplib
+                from email.mime.text import MIMEText
+                from email.mime.multipart import MIMEMultipart
+
+                smtp_port = int(os.getenv("SMTP_PORT", "587"))
+                msg = MIMEMultipart("alternative")
+                msg["Subject"] = subject
+                msg["From"] = f"{sender_name} <{smtp_user}>"
+                msg["To"] = to_email
+                msg.attach(MIMEText(html_content, "html"))
+
+                if smtp_port == 465:
+                    with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
+                        server.login(smtp_user, smtp_pass)
+                        server.send_message(msg)
                 else:
-                    logger.error(f"[Brevo] Erro status {res.status_code}: {res.text}")
-                    return False
-        except Exception as e:
-            logger.error(f"[Brevo] Falha ao enviar e-mail: {e}")
-            return False
+                    with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+                        server.starttls()
+                        server.login(smtp_user, smtp_pass)
+                        server.send_message(msg)
+
+                logger.info(f"[SMTP] E-mail enviado com sucesso via SMTP ({smtp_host}) para {to_email}")
+                diagnostics["success"] = True
+                diagnostics["provider"] = "SMTP"
+                diagnostics["attempts"].append({"provider": "SMTP", "status": "sent"})
+                return diagnostics
+            except Exception as e:
+                logger.error(f"[SMTP] Falha no envio SMTP: {e}")
+                diagnostics["attempts"].append({"provider": "SMTP", "error": str(e)})
+
+        # Se nenhum provedor conseguiu enviar
+        diagnostics["success"] = False
+        logger.warning(f"[EmailService] Nenhum provedor de e-mail conseguiu entregar a mensagem para {to_email}.")
+        return diagnostics
 
 
 class WahaWhatsAppService:

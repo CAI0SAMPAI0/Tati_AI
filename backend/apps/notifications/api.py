@@ -55,20 +55,53 @@ def subscribe_push(request: HttpRequest, payload: SubscribePushInput):
     return NotificationService.register_push_subscription(request.auth, payload)
 
 
-# ── DISPARO DE E-MAIL (BREVO) ─────────────────────────────────────────
+# ── DISPARO DE E-MAIL (BREVO & MULTI-PROVIDER) ───────────────────────
 
 @notifications_router.post("/send-email", auth=auth_required)
 def send_email(request: HttpRequest, payload: SendEmailInput):
     """
-    Envia e-mail transacional via API do Brevo.
+    Envia e-mail transacional via API do Brevo com fallbacks automáticos.
     """
-    success = BrevoEmailService.send_email(
+    diag = BrevoEmailService.send_email_detailed(
         to_email=payload.to_email,
         subject=payload.subject,
         html_content=payload.html_content,
         recipient_name=payload.recipient_name,
     )
-    return {"ok": success}
+    return {"ok": diag.get("success", False), "details": diag}
+
+
+@notifications_router.get("/email-status", auth=auth_required)
+def get_email_status(request: HttpRequest):
+    """
+    Retorna o status de configuração dos provedores de e-mail (Brevo, Resend, SMTP).
+    """
+    from .services import get_brevo_api_key, get_verified_sender_email
+    brevo_key = get_brevo_api_key()
+    resend_key = os.getenv("RESEND_API_KEY")
+    smtp_host = os.getenv("SMTP_HOST")
+
+    return {
+        "brevo_configured": bool(brevo_key),
+        "brevo_key_preview": f"{brevo_key[:8]}...{brevo_key[-4:]}" if brevo_key else None,
+        "verified_sender": get_verified_sender_email(),
+        "resend_configured": bool(resend_key),
+        "smtp_configured": bool(smtp_host and os.getenv("SMTP_USER")),
+    }
+
+
+@notifications_router.post("/test-email", auth=auth_required)
+def test_email(request: HttpRequest, payload: SendEmailInput):
+    """
+    Endpoint de teste detalhado para verificar exatamente o retorno da API do Brevo e provedores.
+    """
+    diag = BrevoEmailService.send_email_detailed(
+        to_email=payload.to_email,
+        subject=payload.subject or "Teacher Tati — Teste de Entrega",
+        html_content=payload.html_content or "<p>Este é um e-mail de teste do sistema Teacher Tati.</p>",
+        recipient_name=payload.recipient_name,
+    )
+    return diag
 
 
 # ── DISPARO DE WHATSAPP (WAHA) ────────────────────────────────────────
