@@ -77,6 +77,13 @@ class User(AbstractBaseUser):
     vocabulary = models.JSONField(default=dict, blank=True, null=True, db_column='vocabulary')
     weekly_plan = models.JSONField(default=dict, blank=True, null=True, db_column='weekly_plan')
 
+    phone = models.CharField(max_length=50, blank=True, null=True, db_column='phone')
+    cpf = models.CharField(max_length=50, blank=True, null=True, db_column='cpf')
+    cpf_cnpj = models.CharField(max_length=50, blank=True, null=True, db_column='cpf_cnpj')
+    focus = models.CharField(max_length=100, blank=True, null=True, db_column='focus', default='General Conversation')
+    reset_token = models.CharField(max_length=255, blank=True, null=True, db_column='reset_token')
+    reset_token_expires = models.CharField(max_length=100, blank=True, null=True, db_column='reset_token_expires')
+
     # Flags e campos auxiliares do Supabase
     temp_password = models.CharField(max_length=255, blank=True, null=True, db_column='temp_password')
     is_exempt = models.BooleanField(default=False, null=True, blank=True, db_column='is_exempt')
@@ -160,9 +167,17 @@ class User(AbstractBaseUser):
     def is_staff(self) -> bool:
         return self.role in (UserRole.PROGRAMADOR, UserRole.PROFESSOR, 'admin', 'Admin')
 
+    @is_staff.setter
+    def is_staff(self, val: bool):
+        pass
+
     @property
     def is_superuser(self) -> bool:
         return self.role == UserRole.PROGRAMADOR or self.username == 'programador'
+
+    @is_superuser.setter
+    def is_superuser(self, val: bool):
+        pass
 
     @property
     def is_programmer(self) -> bool:
@@ -178,7 +193,12 @@ class User(AbstractBaseUser):
 
     @property
     def is_hub_only(self) -> bool:
-        return False
+        return self.role in (UserRole.BUYER, 'buyer')
+
+    @is_hub_only.setter
+    def is_hub_only(self, val: bool):
+        if val:
+            self.role = UserRole.BUYER
 
     def has_perm(self, perm, obj=None) -> bool:
         return self.is_staff

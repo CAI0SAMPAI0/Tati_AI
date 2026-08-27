@@ -107,9 +107,7 @@ class AuthService:
         if user.email.lower() in superadmins or user.username.lower() in programmers:
             if user.role != UserRole.PROGRAMADOR:
                 user.role = UserRole.PROGRAMADOR
-                user.is_staff = True
-                user.is_superuser = True
-                user.save(update_fields=['role', 'is_staff', 'is_superuser'])
+                user.save(update_fields=['role'])
 
         return cls.build_token_response(user)
 
@@ -212,9 +210,12 @@ class AuthService:
 
         # Define papel inicial
         superadmins = getattr(settings, 'SUPERADMIN_EMAILS', [])
-        role = UserRole.PROGRAMADOR if email in superadmins else UserRole.STUDENT
-        is_staff = role == UserRole.PROGRAMADOR
-        is_superuser = role == UserRole.PROGRAMADOR
+        if getattr(data, 'is_hub_only', False):
+            role = UserRole.BUYER
+        elif email in superadmins:
+            role = UserRole.PROGRAMADOR
+        else:
+            role = UserRole.STUDENT
 
         user = User.objects.create(
             username=username,
@@ -223,9 +224,6 @@ class AuthService:
             password=hash_password(data.password),
             role=role,
             level=data.level.upper() if data.level.upper() in CEFRLevel.values else CEFRLevel.A1,
-            is_hub_only=data.is_hub_only,
-            is_staff=is_staff,
-            is_superuser=is_superuser,
         )
 
         logger.info(f"[Auth] Novo usuário registrado com sucesso: {username} ({role})")
@@ -254,7 +252,7 @@ class AuthService:
         user = User.objects.filter(email=email).first()
         if not user:
             # Cria username a partir do email
-            base_username = email.split("@")[0].lower()
+            base_username = email.split("@")[0].lower().replace(".", "_")
             candidate = base_username
             counter = 1
             while User.objects.filter(username=candidate).exists():
@@ -262,17 +260,21 @@ class AuthService:
                 counter += 1
 
             superadmins = getattr(settings, 'SUPERADMIN_EMAILS', [])
-            role = UserRole.PROGRAMADOR if email in superadmins else UserRole.STUDENT
+            if is_hub_only:
+                role = UserRole.BUYER
+            elif email in superadmins:
+                role = UserRole.PROGRAMADOR
+            else:
+                role = UserRole.STUDENT
+
+            profile_data = {'avatar_url': picture} if picture else {}
 
             user = User.objects.create(
                 username=candidate,
                 email=email,
                 name=name or candidate,
-                avatar_url=picture,
                 role=role,
-                is_hub_only=is_hub_only,
-                is_staff=(role == UserRole.PROGRAMADOR),
-                is_superuser=(role == UserRole.PROGRAMADOR),
+                profile=profile_data,
             )
             user.set_unusable_password()
             user.save()
@@ -280,8 +282,10 @@ class AuthService:
         else:
             # Atualiza avatar se não tiver
             if picture and not user.avatar_url:
-                user.avatar_url = picture
-                user.save(update_fields=['avatar_url'])
+                prof = user.profile if isinstance(user.profile, dict) else {}
+                prof['avatar_url'] = picture
+                user.profile = prof
+                user.save(update_fields=['profile'])
 
         return cls.build_token_response(user)
 
