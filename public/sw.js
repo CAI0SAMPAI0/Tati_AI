@@ -1,5 +1,5 @@
-const CACHE_NAME = 'tati-ai-v2.3.0';
-const API_CACHE_NAME = 'tati-ai-api-v2.3.0';
+const CACHE_NAME = 'tati-ai-v2.3.1';
+const API_CACHE_NAME = 'tati-ai-api-v2.3.1';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -161,11 +161,13 @@ self.addEventListener('push', (event) => {
   const origin = self.location.origin;
   const rawIcon = data.icon || '/icons/icon-192x192.png';
   const iconUrl = rawIcon.startsWith('http') ? rawIcon : `${origin}${rawIcon.startsWith('/') ? '' : '/'}${rawIcon}`;
+  const badgeUrl = `${origin}/icons/badge-96x96.png`;
 
   const title = data.title || 'Teacher Tatiana';
   const options = {
     body: data.body || data.message || 'You have a new study notification!',
     icon: iconUrl,
+    badge: badgeUrl,
     vibrate: [200, 100, 200],
     tag: data.tag || 'tati-notification',
     renotify: true,
