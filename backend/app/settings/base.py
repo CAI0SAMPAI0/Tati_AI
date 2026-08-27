@@ -105,9 +105,10 @@ DATABASE_URL = (
     or os.getenv('POSTGRES_URL')
 )
 if DATABASE_URL:
+    conn_max_age = int(os.getenv('DB_CONN_MAX_AGE', '0'))
     db_config = dj_database_url.config(
         default=DATABASE_URL,
-        conn_max_age=600,
+        conn_max_age=conn_max_age,
         conn_health_checks=True,
     )
     if 'pooler.supabase.com' in str(db_config.get('HOST', '')) and not db_config.get('PORT'):
