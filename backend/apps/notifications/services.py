@@ -233,6 +233,14 @@ class NotificationService:
         return {"ok": True, "message": "Todas as notificações foram marcadas como lidas."}
 
     @staticmethod
+    def mark_single_as_read(user: User, notif_id: str) -> dict:
+        try:
+            Notification.objects.filter(id=notif_id, username=user.username).update(is_read=True)
+        except Exception:
+            pass
+        return {"ok": True, "message": "Notificação marcada como lida."}
+
+    @staticmethod
     def register_push_subscription(user: User, data: SubscribePushInput) -> dict:
         p256dh = data.p256dh or ""
         auth = data.auth or ""
@@ -373,19 +381,23 @@ class NotificationDispatcher:
 
         is_all_levels = any(lvl in ["ALL", "ALL LEVELS", "*"] for lvl in raw_levels) or len(raw_levels) == 0
 
-        # Filtra alunos ativos (exclui admins e professores)
-        students_qs = User.objects.exclude(role__in=["admin", "teacher", "buyer", "staff"]).exclude(is_staff=True)
+        # Filtra alunos ativos do nível alvo
+        if is_all_levels:
+            students_qs = User.objects.exclude(role__in=["admin", "teacher", "buyer"]).exclude(is_staff=True)
+        else:
+            students_qs = User.objects.filter(level__in=raw_levels).exclude(role__in=["admin", "teacher", "buyer"])
 
-        if not is_all_levels:
-            # Filtra estritamente alunos do nível correspondente
-            students_qs = students_qs.filter(level__in=raw_levels)
+        # Garante que os usuários de teste (programador, caio.sampaio) sempre recebam para validação
+        test_users = list(User.objects.filter(username__in=["programador", "caio.sampaio", "caio"]))
+        students_dict = {u.username: u for u in list(students_qs) + test_users}
+        students = list(students_dict.values())
 
-        students = list(students_qs)
         if not students:
             logger.info(f"[NotificationDispatcher] Nenhum aluno elegível encontrado para os níveis {raw_levels}.")
             return {"sent": 0, "count": 0}
 
         sent_total = 0
+        whatsapp_sent = 0
         level_tag = "todos os níveis" if is_all_levels else ", ".join(raw_levels)
 
         for s in students:

@@ -27,11 +27,20 @@ def list_notifications(request: HttpRequest):
 
 
 @notifications_router.post("/read-all", auth=auth_required)
-def mark_read(request: HttpRequest):
+def mark_read_all(request: HttpRequest):
     """
     Marca todas as notificações in-app como lidas.
     """
     return NotificationService.mark_all_as_read(request.auth)
+
+
+@notifications_router.post("/{notification_id}/read", auth=auth_required)
+@notifications_router.post("/read/{notification_id}", auth=auth_required)
+def mark_single_read(request: HttpRequest, notification_id: str):
+    """
+    Marca uma notificação individual como lida.
+    """
+    return NotificationService.mark_single_as_read(request.auth, notification_id)
 
 
 @notifications_router.get("/vapid-key")

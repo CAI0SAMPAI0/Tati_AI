@@ -58,7 +58,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       const data = await apiGet<AppNotification[]>(ENDPOINTS.NOTIFICATIONS);
       const list = Array.isArray(data) ? data : [];
       
-      const unreadNudges = list.filter(n => !n.is_read && n.category === 'nudge');
+      const unreadNudges = list.filter(n => !n.is_read && n.category === 'nudge' && !lastNotifIds.current.has(n.id));
 
       if (initialLoadDone.current) {
         // Check for new notifications to show toast
@@ -79,14 +79,16 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           if (shown) {
             apiPost(ENDPOINTS.NOTIFICATION_READ(n.id), {}).catch(() => null);
             n.is_read = true;
+            lastNotifIds.current.add(n.id);
           }
         });
       } else {
-        // Show unread nudges on initial load so the user sees them at the top of the screen immediately
+        // Show unread nudges on initial load once and mark as read
         unreadNudges.forEach(n => {
           toast(`${n.title}: ${n.body}`, { icon: '🍎', duration: 8000 });
           apiPost(ENDPOINTS.NOTIFICATION_READ(n.id), {}).catch(() => null);
           n.is_read = true;
+          lastNotifIds.current.add(n.id);
         });
       }
 
