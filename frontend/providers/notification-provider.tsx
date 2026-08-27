@@ -56,7 +56,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     try {
       if (isInitial) setLoading(true);
       const data = await apiGet<AppNotification[]>(ENDPOINTS.NOTIFICATIONS);
-      const list = Array.isArray(data) ? data : [];
+      const rawList = Array.isArray(data) ? data : [];
+      const uniqueMap = new Map<string, AppNotification>();
+      rawList.forEach(n => {
+        if (n && n.id) uniqueMap.set(String(n.id), n);
+      });
+      const list = Array.from(uniqueMap.values());
       
       const unreadNudges = list.filter(n => !n.is_read && n.category === 'nudge' && !lastNotifIds.current.has(n.id));
 
@@ -193,25 +198,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     try {
       const registration = await navigator.serviceWorker.ready;
 
-      const existingSub = await registration.pushManager.getSubscription();
-      if (existingSub) {
-        const subJson = existingSub.toJSON();
-        if (subJson.endpoint) {
-          try {
-            await apiPost('/notifications/subscribe', {
-              endpoint: subJson.endpoint,
-              keys: {
-                p256dh: subJson.keys?.p256dh || '',
-                auth: subJson.keys?.auth || '',
-              },
-              user_agent: navigator.userAgent,
-            });
-          } catch {
-          }
-        }
-        return;
-      }
-
       const keyData = await apiGet<{ public_key: string }>('/notifications/vapid-key');
       if (!keyData || !keyData.public_key) {
         console.error('[Push] Failed to retrieve VAPID key from backend.');
@@ -229,25 +215,66 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         return outputArray;
       };
 
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: convertVapidKey(keyData.public_key),
-      });
+      let subscription = await registration.pushManager.getSubscription();
 
-      const subJson = subscription.toJSON();
-      if (subJson.endpoint && subJson.keys?.p256dh && subJson.keys?.auth) {
-        await apiPost('/notifications/subscribe', {
-          endpoint: subJson.endpoint,
-          keys: {
-            p256dh: subJson.keys.p256dh,
-            auth: subJson.keys.auth,
-          },
-          user_agent: navigator.userAgent,
+      // Se já temos a subscrição, tenta sincronizar com o backend
+      if (subscription) {
+        const subJson = subscription.toJSON();
+        if (subJson.endpoint) {
+          try {
+            await apiPost('/notifications/subscribe', {
+              endpoint: subJson.endpoint,
+              keys: {
+                p256dh: subJson.keys?.p256dh || '',
+                auth: subJson.keys?.auth || '',
+              },
+              user_agent: navigator.userAgent,
+            });
+            return;
+          } catch {
+            // Se falhou, desinscreve a chave antiga para recriar
+            try { await subscription.unsubscribe(); } catch {}
+            subscription = null;
+          }
+        }
+      }
+
+      // Inscreve com a chave VAPID atual
+      try {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: convertVapidKey(keyData.public_key),
         });
-        console.log('[Push] User subscribed to push notifications!');
+      } catch (subErr) {
+        // Se deu AbortError, limpa subscription fantasma e tenta novamente
+        const stale = await registration.pushManager.getSubscription();
+        if (stale) {
+          await stale.unsubscribe().catch(() => null);
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: convertVapidKey(keyData.public_key),
+          });
+        } else {
+          throw subErr;
+        }
+      }
+
+      if (subscription) {
+        const subJson = subscription.toJSON();
+        if (subJson.endpoint && subJson.keys?.p256dh && subJson.keys?.auth) {
+          await apiPost('/notifications/subscribe', {
+            endpoint: subJson.endpoint,
+            keys: {
+              p256dh: subJson.keys.p256dh,
+              auth: subJson.keys.auth,
+            },
+            user_agent: navigator.userAgent,
+          });
+          console.log('[Push] User subscribed to push notifications successfully!');
+        }
       }
     } catch (err: any) {
-      console.warn('[Push] Subscription failed:', err);
+      console.warn('[Push] Subscription notice:', err?.message || err);
     }
   }, []);
 

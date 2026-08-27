@@ -398,22 +398,35 @@ class NotificationDispatcher:
 
         sent_total = 0
         whatsapp_sent = 0
-        level_tag = "todos os níveis" if is_all_levels else ", ".join(raw_levels)
+        level_tag = "all levels" if is_all_levels else ", ".join(raw_levels)
+
+        # 2 horas de janela para evitar duplicatas acidentais
+        two_hours_ago = datetime.now(timezone.utc) - timedelta(hours=2)
 
         for s in students:
-            first_name = (s.name or s.username or "Aluno").strip().split()[0].capitalize()
-            notif_title = "🍎 Nova atividade da Teacher Tatiana!"
-            notif_body = f"Olá {first_name}! Uma nova atividade de {activity_type} (\"{title}\") foi liberada para o seu nível {s.level or level_tag}. Venha praticar!"
+            first_name = (s.name or s.username or "Student").strip().split()[0].capitalize()
+            student_level = s.level or level_tag
+            notif_title = "New Activity from Teacher Tatiana!"
+            notif_body = f"Hello {first_name}! A new {activity_type} activity (\"{title}\") is now available for your level ({student_level}). Come practice!"
 
             try:
-                # 1. Salva no banco in-app (dropdown de notificações)
-                Notification.objects.create(
+                # Evita criar duplicata se já existir idêntica recente
+                already_exists = Notification.objects.filter(
                     username=s.username,
-                    category="new_activity",
                     title=notif_title,
                     body=notif_body,
-                    is_read=False,
-                )
+                    created_at__gte=two_hours_ago,
+                ).exists()
+
+                if not already_exists:
+                    # 1. Salva no banco in-app (dropdown de notificações)
+                    Notification.objects.create(
+                        username=s.username,
+                        category="new_activity",
+                        title=notif_title,
+                        body=notif_body,
+                        is_read=False,
+                    )
 
                 # 2. Envia Push em segundo plano (tela de bloqueio / navegador)
                 NotificationDispatcher.send_push_to_user(
@@ -424,28 +437,44 @@ class NotificationDispatcher:
                     tag=f"new-act-{activity_type}",
                 )
                 sent_total += 1
+
+                # 3. WhatsApp (WAHA) se habilitado e o aluno tiver telefone
+                student_phone = getattr(s, 'phone', None) or (s.profile or {}).get('phone') if isinstance(s.profile, dict) else None
+                if send_whatsapp and student_phone:
+                    wa_msg = f"*Teacher Tatiana*\n\nHello *{first_name}*! A new *{activity_type}* activity (\"{title}\") is now available for your level *{student_level}*.\n\n👉 Practice now: https://tati-ai.com{url}"
+                    if WahaWhatsAppService.send_message(student_phone, wa_msg):
+                        whatsapp_sent += 1
+
             except Exception as e:
                 logger.error(f"[NotificationDispatcher] Erro ao notificar {s.username}: {e}")
 
-        logger.info(f"[NotificationDispatcher] Notificações enviadas com sucesso para {sent_total} alunos do nível {raw_levels}.")
-        return {"success": True, "sent": sent_total, "levels": raw_levels}
+        logger.info(f"[NotificationDispatcher] Notificações enviadas para {sent_total} alunos (Push/In-App) e {whatsapp_sent} (WhatsApp) no nível {raw_levels}.")
+        return {"success": True, "sent": sent_total, "whatsapp_sent": whatsapp_sent, "levels": raw_levels}
 
     @staticmethod
-    def notify_streak_risk(user: User, streak_count: int) -> dict:
+    def notify_streak_risk(user: User, streak_count: int, send_whatsapp: bool = False) -> dict:
         """
-        Dispara alerta de ofensiva em risco para alunos que ainda não praticaram hoje.
+        Dispara alerta de ofensiva em risco para alunos que ainda não praticaram hoje (em inglês).
         """
-        first_name = (user.name or user.username or "Aluno").strip().split()[0].capitalize()
-        title = f"🔥 Sua ofensiva está em risco, {first_name}!"
-        body = f"Você tem uma sequência de {streak_count} dias! Faça 1 atividade rápida hoje para manter seu streak vivo."
+        first_name = (user.name or user.username or "Student").strip().split()[0].capitalize()
+        title = f"Your streak is at risk, {first_name}!"
+        body = f"You have a {streak_count}-day streak! Complete 1 quick exercise today to keep your streak alive."
 
-        Notification.objects.create(
+        two_hours_ago = datetime.now(timezone.utc) - timedelta(hours=2)
+        already_exists = Notification.objects.filter(
             username=user.username,
-            category="nudge",
             title=title,
-            body=body,
-            is_read=False,
-        )
+            created_at__gte=two_hours_ago,
+        ).exists()
+
+        if not already_exists:
+            Notification.objects.create(
+                username=user.username,
+                category="nudge",
+                title=title,
+                body=body,
+                is_read=False,
+            )
 
         push_res = NotificationDispatcher.send_push_to_user(
             username=user.username,
@@ -454,5 +483,11 @@ class NotificationDispatcher:
             url="/activities",
             tag="streak-risk",
         )
+
+        student_phone = getattr(user, 'phone', None) or (user.profile or {}).get('phone') if isinstance(user.profile, dict) else None
+        if send_whatsapp and student_phone:
+            wa_msg = f"*Teacher Tatiana — Streak Alert*\n\nHello *{first_name}*! Your *{streak_count}-day study streak* is at risk today!\n\nDo a quick 3-minute exercise now to keep your streak: https://tati-ai.com/activities"
+            WahaWhatsAppService.send_message(student_phone, wa_msg)
+
         return {"success": True, "push": push_res}
 
