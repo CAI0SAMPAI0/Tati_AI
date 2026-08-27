@@ -123,13 +123,6 @@ class AudioService:
         if not audio_bytes or len(audio_bytes) < 200:
             return ""
 
-        default_prompt = (
-            "Transcribe the spoken audio verbatim in English. "
-            "The speaker is an ESL student practicing English conversation. "
-            "Ignore background static, hiss, breathing, clicks, mic pops, and trailing silence. "
-            "Do not output noise sounds or onomatopoeias like tsh, shh, psst, or clicks."
-        )
-        effective_prompt = f"{default_prompt} {prompt}" if prompt else default_prompt
         noise_pattern = re.compile(
             r'^(t+s+h+|s+h+|tsh+|t+c+h+|ps+h+|[.\s?!,-]+|\[.*\]|\(.*\)|\{.*\})+$',
             re.IGNORECASE
@@ -138,16 +131,23 @@ class AudioService:
         for key in keys:
             try:
                 client = AsyncGroq(api_key=key)
-                resp = await client.audio.transcriptions.create(
-                    file=("input.webm", audio_bytes),
-                    model="whisper-large-v3-turbo",
-                    response_format="text",
-                    temperature=0.0,
-                    prompt=effective_prompt,
-                )
+                create_kwargs = {
+                    "file": ("input.webm", audio_bytes),
+                    "model": "whisper-large-v3-turbo",
+                    "response_format": "text",
+                    "temperature": 0.0,
+                    "language": "en",
+                }
+                if prompt:
+                    create_kwargs["prompt"] = prompt
+
+                resp = await client.audio.transcriptions.create(**create_kwargs)
                 if resp:
                     text = str(resp).strip()
-                    if noise_pattern.match(text) or text.lower() in ("tshh", "tshh.", "tshhhhhh.", "shh", "shhh", "...", "you", "[blank_audio]"):
+                    if (
+                        noise_pattern.match(text)
+                        or text.lower() in ("tshh", "tshh.", "tshhhhhh.", "shh", "shhh", "...", "you", "[blank_audio]", "thank you.", "thank you")
+                    ):
                         logger.info(f"[AudioService] Ignorando ruído de fundo/alucinação: {text}")
                         return ""
                     return text
