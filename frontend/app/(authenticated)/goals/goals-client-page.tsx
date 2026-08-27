@@ -328,7 +328,7 @@ export default function GoalsClientPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsModalOpen(false)}
-              className="absolute inset-0 bg-bg/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/75 dark:bg-black/85"
             />
             <MotionDiv 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}

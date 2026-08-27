@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Upload,
@@ -1880,130 +1880,25 @@ export function CefrSection() {
 
               <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
                 {(editForm.flashcards || []).map((card: any, idx: number) => (
-                  <div key={idx} className="p-4 bg-surface border border-border rounded-xl space-y-3 relative group">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const current = editForm.flashcards || [];
-                        setEditForm({
-                          ...editForm,
-                          flashcards: current.filter((_: any, i: number) => i !== idx)
-                        });
-                      }}
-                      className="absolute top-2 right-2 p-1 text-text-subtle hover:text-danger opacity-0 group-hover:opacity-100 transition-all"
-                      title="Remove Card"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-
-                    <div className="grid grid-cols-[80px,1fr,1fr] gap-3 items-start">
-                      <div
-                        className="w-[80px] h-[80px] rounded-lg bg-input border border-border overflow-hidden flex items-center justify-center relative cursor-pointer group/img"
-                        onClick={() => {
-                          const input = document.getElementById(`cefr-file-${idx}`) as HTMLInputElement;
-                          input?.click();
-                        }}
-                        title="Click to upload image"
-                      >
-                        {card.image_url ? (
-                          <>
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              key={card.image_url}
-                              src={card.image_url}
-                              alt=""
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = 'none';
-                              }}
-                            />
-                          </>
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <ImageIcon size={20} className="text-text-muted opacity-30" />
-                          </div>
-                        )}
-                        <input
-                          type="file"
-                          id={`cefr-file-${idx}`}
-                          className="hidden"
-                          accept="image/*"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            const formDataUpload = new FormData();
-                            formDataUpload.append('file', file);
-                            const res = await apiUpload<{ url: string }>('/flashcard-assets/upload-image', formDataUpload);
-                            if (res.ok && res.data?.url) {
-                              const newCards = [...editForm.flashcards];
-                              newCards[idx] = { ...newCards[idx], image_url: res.data.url };
-                              setEditForm({ ...editForm, flashcards: newCards });
-                              toast.success('Image uploaded!');
-                            }
-                            e.target.value = '';
-                          }}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-text-subtle uppercase mb-1">Front (Term)</label>
-                        <input
-                          type="text"
-                          value={card.front || ''}
-                          onChange={(e) => {
-                            const newCards = [...editForm.flashcards];
-                            newCards[idx] = { ...newCards[idx], front: e.target.value };
-                            setEditForm({ ...editForm, flashcards: newCards });
-                          }}
-                          className="w-full bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text focus:ring-1 focus:ring-primary/20 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-text-subtle uppercase mb-1">Back (Definition)</label>
-                        <input
-                          type="text"
-                          value={card.back || ''}
-                          onChange={(e) => {
-                            const newCards = [...editForm.flashcards];
-                            newCards[idx] = { ...newCards[idx], back: e.target.value };
-                            setEditForm({ ...editForm, flashcards: newCards });
-                          }}
-                          className="w-full bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text focus:ring-1 focus:ring-primary/20 outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-text-subtle uppercase mb-1">Explanation</label>
-                      <textarea
-                        value={card.explanation || ''}
-                        onChange={(e) => {
-                          const newCards = [...editForm.flashcards];
-                          newCards[idx] = { ...newCards[idx], explanation: e.target.value };
-                          setEditForm({ ...editForm, flashcards: newCards });
-                        }}
-                        className="w-full bg-bg border border-border rounded-lg px-3 py-1 text-xs text-text focus:ring-1 focus:ring-primary/20 outline-none resize-none min-h-[50px]"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-[10px] font-bold text-text-subtle uppercase mb-1">Image URL</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          placeholder="Paste image URL..."
-                          value={card.image_url || ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            const newCards = [...editForm.flashcards];
-                            newCards[idx] = { ...newCards[idx], image_url: val };
-                            setEditForm({ ...editForm, flashcards: newCards });
-                          }}
-                          className="flex-1 bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text focus:ring-1 focus:ring-primary/20 outline-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
+                  <CuratorFlashcardItem
+                    key={idx}
+                    card={card}
+                    idx={idx}
+                    onUpdate={(i, field, value) => {
+                      const newCards = [...(editForm.flashcards || [])];
+                      newCards[i] = { ...newCards[i], [field]: value };
+                      setEditForm((prev: any) => ({ ...prev, flashcards: newCards }));
+                    }}
+                    onRemove={(i) => {
+                      const newCards = (editForm.flashcards || []).filter((_: any, index: number) => index !== i);
+                      setEditForm((prev: any) => ({ ...prev, flashcards: newCards }));
+                    }}
+                    onImageUpload={(i, url) => {
+                      const newCards = [...(editForm.flashcards || [])];
+                      newCards[i] = { ...newCards[i], image_url: url };
+                      setEditForm((prev: any) => ({ ...prev, flashcards: newCards }));
+                    }}
+                  />
                 ))}
               </div>
             </div>
@@ -2050,3 +1945,120 @@ export function CefrSection() {
     </div>
   );
 }
+
+interface CuratorFlashcardItemProps {
+  card: any;
+  idx: number;
+  onUpdate: (idx: number, field: string, value: string) => void;
+  onRemove: (idx: number) => void;
+  onImageUpload: (idx: number, url: string) => void;
+}
+
+const CuratorFlashcardItem = React.memo(function CuratorFlashcardItem({
+  card,
+  idx,
+  onUpdate,
+  onRemove,
+  onImageUpload,
+}: CuratorFlashcardItemProps) {
+  return (
+    <div className="p-4 bg-surface border border-border rounded-xl space-y-3 relative group">
+      <button
+        type="button"
+        onClick={() => onRemove(idx)}
+        className="absolute top-2 right-2 p-1 text-text-subtle hover:text-danger opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+        title="Remove Card"
+      >
+        <Trash2 size={14} />
+      </button>
+
+      <div className="grid grid-cols-[80px,1fr,1fr] gap-3 items-start">
+        <div
+          className="w-[80px] h-[80px] rounded-lg bg-input border border-border overflow-hidden flex items-center justify-center relative cursor-pointer group/img"
+          onClick={() => {
+            const input = document.getElementById(`cefr-file-${idx}`) as HTMLInputElement;
+            input?.click();
+          }}
+          title="Click to upload image"
+        >
+          {card.image_url ? (
+            <img
+              key={card.image_url}
+              src={card.image_url}
+              alt=""
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <ImageIcon size={20} className="text-text-muted opacity-30" />
+            </div>
+          )}
+          <input
+            type="file"
+            id={`cefr-file-${idx}`}
+            className="hidden"
+            accept="image/*"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const formDataUpload = new FormData();
+              formDataUpload.append('file', file);
+              const res = await apiUpload<{ url: string }>('/flashcard-assets/upload-image', formDataUpload);
+              if (res.ok && res.data?.url) {
+                onImageUpload(idx, res.data.url);
+                toast.success('Image uploaded!');
+              }
+              e.target.value = '';
+            }}
+          />
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-bold text-text-subtle uppercase mb-1">Front (Term)</label>
+          <input
+            type="text"
+            value={card.front || ''}
+            onChange={(e) => onUpdate(idx, 'front', e.target.value)}
+            className="w-full bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text focus:ring-1 focus:ring-primary/20 outline-none"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold text-text-subtle uppercase mb-1">Back (Definition)</label>
+          <input
+            type="text"
+            value={card.back || ''}
+            onChange={(e) => onUpdate(idx, 'back', e.target.value)}
+            className="w-full bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text focus:ring-1 focus:ring-primary/20 outline-none"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-[10px] font-bold text-text-subtle uppercase mb-1">Explanation</label>
+        <textarea
+          value={card.explanation || ''}
+          onChange={(e) => onUpdate(idx, 'explanation', e.target.value)}
+          className="w-full bg-bg border border-border rounded-lg px-3 py-1 text-xs text-text focus:ring-1 focus:ring-primary/20 outline-none resize-none min-h-[50px]"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <label className="block text-[10px] font-bold text-text-subtle uppercase mb-1">Image URL</label>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Paste image URL..."
+            value={card.image_url || ''}
+            onChange={(e) => onUpdate(idx, 'image_url', e.target.value)}
+            className="flex-1 bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text focus:ring-1 focus:ring-primary/20 outline-none"
+          />
+        </div>
+      </div>
+    </div>
+  );
+});
+
+

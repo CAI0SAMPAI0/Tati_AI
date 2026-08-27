@@ -296,14 +296,16 @@ export default function DashboardClientPage() {
         </main>
       </div>
 
-      <StudentModal 
-        isOpen={isStudentModalOpen}
-        onClose={() => setIsStudentModalOpen(false)}
-        student={selectedStudent}
-        onUpdate={() => {
-          queryClient.invalidateQueries({ queryKey: ['admin-dashboard-students'] });
-        }}
-      />
+      {isStudentModalOpen && selectedStudent && (
+        <StudentModal 
+          isOpen={isStudentModalOpen}
+          onClose={() => setIsStudentModalOpen(false)}
+          student={selectedStudent}
+          onUpdate={() => {
+            queryClient.invalidateQueries({ queryKey: ['admin-dashboard-students'] });
+          }}
+        />
+      )}
     </div>
   );
 }

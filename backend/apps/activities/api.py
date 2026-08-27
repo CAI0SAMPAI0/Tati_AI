@@ -951,7 +951,11 @@ def save_flashcard_group(request: HttpRequest, body: CEFRFlashcardGroupSaveSchem
 
     # Cria novos cards
     inserted = []
+    has_published = False
     for card in body.flashcards:
+        is_pub = card.get("is_published", True)
+        if is_pub:
+            has_published = True
         fc = Flashcard.objects.create(
             id=uuid.uuid4(),
             level=body.new_level.upper(),
@@ -960,9 +964,23 @@ def save_flashcard_group(request: HttpRequest, body: CEFRFlashcardGroupSaveSchem
             back=card.get("back", ""),
             explanation=card.get("explanation", ""),
             image_url=card.get("image_url", ""),
-            is_published=card.get("is_published", True),
+            is_published=is_pub,
         )
         inserted.append(str(fc.id))
+
+    if has_published:
+        try:
+            from apps.notifications.services import NotificationDispatcher
+            NotificationDispatcher.notify_students_for_activity(
+                activity_type="Flashcards CEFR",
+                title=body.new_topic,
+                levels=body.new_level.upper(),
+                is_published=True,
+                url="/activities",
+            )
+        except Exception as exc:
+            logger.warning(f"[CEFR Admin] Erro ao notificar alunos de flashcards: {exc}")
+
     return {"success": True, "inserted": len(inserted)}
 
 
@@ -976,6 +994,7 @@ def update_cefr_simulation(request: HttpRequest, sim_id: str, payload: dict):
     cs = CEFRSimulation.objects.filter(id=clean_id).first()
     if not cs:
         raise HttpError(404, "Simulação não encontrada.")
+    was_published = cs.is_published
     if "level" in payload:
         cs.level = str(payload["level"]).strip().upper()
     if "difficulty" in payload:
@@ -989,6 +1008,20 @@ def update_cefr_simulation(request: HttpRequest, sim_id: str, payload: dict):
     if "is_published" in payload:
         cs.is_published = payload["is_published"]
     cs.save()
+
+    if cs.is_published and not was_published:
+        try:
+            from apps.notifications.services import NotificationDispatcher
+            NotificationDispatcher.notify_students_for_activity(
+                activity_type="Simulação CEFR",
+                title=cs.topic,
+                levels=cs.level,
+                is_published=True,
+                url="/voice",
+            )
+        except Exception as exc:
+            logger.warning(f"[CEFR Admin] Erro ao notificar alunos de simulação: {exc}")
+
     return {"success": True, "data": {"id": str(cs.id), "level": cs.level}}
 
 

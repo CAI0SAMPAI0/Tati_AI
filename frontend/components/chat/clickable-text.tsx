@@ -22,8 +22,10 @@ export const ClickableText = React.memo(function ClickableText({ content, isMark
     }
   };
 
+  const rawContent = content || '';
+
   if (!isMarkdown) {
-    const parts = content.split(/(\s+)/);
+    const parts = rawContent.split(/(\s+)/);
     return (
       <div className={cn("whitespace-pre-wrap", className)} onClick={handleClick}>
         {parts.map((part, i) => {

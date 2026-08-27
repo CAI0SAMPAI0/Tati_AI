@@ -96,9 +96,9 @@ export function ActivityViewerModal({
       style={{ zIndex: 9999 }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      {/* Blur + dim overlay */}
+      {/* Dim overlay */}
       <div
-        className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/75 dark:bg-black/85"
         style={{ zIndex: -1 }}
       />
 

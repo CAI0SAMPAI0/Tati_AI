@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   User,
   Trash2,
@@ -17,12 +17,11 @@ import {
 } from 'lucide-react';
 import { DialogModal } from '@/components/ui/dialog-modal';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 
 import { apiPut, apiPost, apiDelete, apiGet, API_BASE } from '@/lib/api/client';
 import toast from 'react-hot-toast';
-import { cn, formatTime, formatDateTime } from '@/lib/utils/index';
-import { CEFR_LEVELS, normalizeLevel, levelLabel } from '@/lib/constants/levels';
+import { cn, formatDateTime } from '@/lib/utils/index';
+import { CEFR_LEVELS, normalizeLevel } from '@/lib/constants/levels';
 
 interface StudentModalProps {
   isOpen: boolean;
@@ -82,10 +81,10 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
     try {
       await apiPut(`/dashboard/students/${encodeURIComponent(localStudent.username)}`, { level });
       setLocalStudent({ ...localStudent, level });
-      toast.success('✔ Level updated successfully!');
+      toast.success('Level updated successfully!');
       onUpdate();
     } catch (err) {
-      toast.error('✗ Error saving. Please try again.');
+      toast.error('Error saving. Please try again.');
     }
   };
 
@@ -95,10 +94,10 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
     try {
       await apiPut(`/dashboard/students/${encodeURIComponent(localStudent.username)}`, { custom_prompt: promptText });
       setLocalStudent({ ...localStudent, custom_prompt: promptText });
-      toast.success('✔ Prompt saved! Takes effect on next message.');
+      toast.success('Prompt saved! Takes effect on next message.');
       onUpdate();
     } catch (err) {
-      toast.error('✗ Error saving. Please try again.');
+      toast.error('Error saving. Please try again.');
     }
   };
 
@@ -111,7 +110,7 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
       onClose();
       onUpdate();
     } catch (err) {
-      toast.error('✗ Error saving. Please try again.');
+      toast.error('Error saving. Please try again.');
     } finally {
       setIsDeleting(false);
     }
@@ -186,13 +185,13 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
   };
 
   useEffect(() => {
-    if (activeTab === 'analytics' && localStudent) {
+    if (activeTab === 'analytics' && localStudent && !analytics) {
       fetchAnalytics();
     }
-    if (activeTab === 'progress' && localStudent) {
+    if (activeTab === 'progress' && localStudent && !activityProgress) {
       fetchActivityProgress();
     }
-  }, [activeTab, localStudent]);
+  }, [activeTab, localStudent, analytics, activityProgress]);
 
   if (!localStudent) return null;
 
@@ -425,30 +424,33 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                       <BarChart2 size={14} /> Study Time (last 7 days)
                     </h4>
                     <div className="h-28 flex items-end gap-3 px-2 pt-2 border-b border-border pb-1">
-                      {(analytics.study_time_chart || []).map((day: any, idx: number) => {
-                        const maxVal = Math.max(...(analytics.study_time_chart || []).map((d: any) => d.study_minutes), 10);
-                        const heightPct = Math.min(100, Math.max(8, (day.study_minutes / maxVal) * 100));
-                        return (
-                          <div key={idx} className="flex-1 flex flex-col items-center group relative h-full justify-end">
-                            {/* Bar Tooltip */}
-                            <div className="absolute bottom-full mb-1 bg-neutral-950 text-white text-[0.6rem] p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-lg border border-border/20">
-                              <span className="font-bold">{day.study_minutes} min</span>
-                              <br />
-                              <span className="text-neutral-400">{day.messages_sent} msgs</span>
+                      {(() => {
+                        const chartData = analytics.study_time_chart || [];
+                        const maxVal = Math.max(...chartData.map((d: any) => d.study_minutes || 0), 10);
+                        return chartData.map((day: any, idx: number) => {
+                          const heightPct = Math.min(100, Math.max(8, ((day.study_minutes || 0) / maxVal) * 100));
+                          return (
+                            <div key={idx} className="flex-1 flex flex-col items-center group relative h-full justify-end">
+                              {/* Bar Tooltip */}
+                              <div className="absolute bottom-full mb-1 bg-neutral-950 text-white text-[0.6rem] p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-lg border border-border/20">
+                                <span className="font-bold">{day.study_minutes} min</span>
+                                <br />
+                                <span className="text-neutral-400">{day.messages_sent} msgs</span>
+                              </div>
+                              {/* Bar */}
+                              <div
+                                className={cn(
+                                  "w-full rounded-t-md transition-all duration-300",
+                                  day.study_minutes > 0 ? "bg-primary group-hover:bg-primary/80" : "bg-border/30"
+                                )}
+                                style={{ height: `${heightPct}%` }}
+                              />
+                              {/* Label */}
+                              <span className="text-[0.65rem] text-text-muted mt-1.5 font-bold uppercase tracking-wider">{day.day_name}</span>
                             </div>
-                            {/* Bar */}
-                            <div
-                              className={cn(
-                                "w-full rounded-t-md transition-all duration-300",
-                                day.study_minutes > 0 ? "bg-primary group-hover:bg-primary/80" : "bg-border/30"
-                              )}
-                              style={{ height: `${heightPct}%` }}
-                            />
-                            {/* Label */}
-                            <span className="text-[0.65rem] text-text-muted mt-1.5 font-bold uppercase tracking-wider">{day.day_name}</span>
-                          </div>
-                        );
-                      })}
+                          );
+                        });
+                      })()}
                     </div>
                   </div>
 
@@ -645,23 +647,42 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
   );
 }
 
+function getHostFromUrl(rawUrl: string): string {
+  if (!rawUrl) return '';
+  if (rawUrl.includes('test-english.com')) return 'test-english.com';
+  if (rawUrl.startsWith('http')) {
+    try {
+      return new URL(rawUrl).hostname;
+    } catch {
+      return rawUrl;
+    }
+  }
+  return rawUrl;
+}
+
 function StudentSubmissionsSection({ submissions }: { submissions: any[] }) {
   const [filter, setFilter] = useState<'all' | 'grammar' | 'vocabulary' | 'listening' | 'reading' | 'simulations' | 'games' | 'news'>('all');
+  const [visibleCount, setVisibleCount] = useState(20);
 
-  const filtered = submissions.filter(s => {
-    if (filter === 'all') return true;
-    const cat = strNormalize(s.category || s.activity_type);
-    if (filter === 'vocabulary') return cat === 'vocab' || cat === 'vocabulary';
-    if (filter === 'listening') return cat === 'listening' || cat === 'listenings' || cat === 'podcast' || cat === 'podcasts';
-    if (filter === 'simulations') return cat === 'simulation' || cat === 'simulations';
-    if (filter === 'games') return cat === 'game' || cat === 'games';
-    if (filter === 'news') return cat === 'news' || cat === 'article' || cat === 'articles';
-    return cat === filter;
-  });
+  const filtered = useMemo(() => {
+    return (submissions || []).filter(s => {
+      if (filter === 'all') return true;
+      const cat = String(s.category || s.activity_type || '').toLowerCase().trim();
+      if (filter === 'vocabulary') return cat === 'vocab' || cat === 'vocabulary';
+      if (filter === 'listening') return cat === 'listening' || cat === 'listenings' || cat === 'podcast' || cat === 'podcasts';
+      if (filter === 'simulations') return cat === 'simulation' || cat === 'simulations';
+      if (filter === 'games') return cat === 'game' || cat === 'games';
+      if (filter === 'news') return cat === 'news' || cat === 'article' || cat === 'articles';
+      return cat === filter;
+    });
+  }, [submissions, filter]);
 
-  function strNormalize(val: any): string {
-    return String(val || '').toLowerCase().trim();
-  }
+  // Reset pagination when filter changes
+  useEffect(() => {
+    setVisibleCount(20);
+  }, [filter]);
+
+  const displayed = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
 
   const tabs: Array<{ id: typeof filter; label: string }> = [
     { id: 'all', label: 'All' },
@@ -700,10 +721,10 @@ function StudentSubmissionsSection({ submissions }: { submissions: any[] }) {
       </div>
 
       <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar">
-        {filtered.length === 0 ? (
+        {displayed.length === 0 ? (
           <p className="text-center py-8 text-xs text-text-muted">No completed items in this category.</p>
         ) : (
-          filtered.map((s: any) => (
+          displayed.map((s: any) => (
             <div key={s.id} className="p-3 bg-bg-secondary/40 border border-border/80 rounded-xl flex items-center justify-between text-xs hover:border-primary/20 transition-all">
               <div className="flex items-center gap-2.5 min-w-0">
                 <span className="w-2 h-2 rounded-full bg-success shrink-0" />
@@ -722,15 +743,7 @@ function StudentSubmissionsSection({ submissions }: { submissions: any[] }) {
                         rel="noopener noreferrer"
                         className="text-[0.55rem] text-text-muted hover:text-primary hover:underline truncate max-w-[150px]"
                       >
-                        {(() => {
-                          try {
-                            if (s.url.includes('test-english.com')) return 'test-english.com';
-                            if (s.url.startsWith('http')) return new URL(s.url).hostname;
-                            return s.url;
-                          } catch {
-                            return s.url;
-                          }
-                        })()}
+                        {getHostFromUrl(s.url)}
                       </a>
                     )}
                   </div>
@@ -748,6 +761,14 @@ function StudentSubmissionsSection({ submissions }: { submissions: any[] }) {
               </div>
             </div>
           ))
+        )}
+        {filtered.length > visibleCount && (
+          <button
+            onClick={() => setVisibleCount((prev) => prev + 20)}
+            className="w-full py-2 text-xs font-bold text-primary hover:bg-primary/5 rounded-xl border border-primary/20 transition-all cursor-pointer"
+          >
+            Carregar mais (+{filtered.length - visibleCount})
+          </button>
         )}
       </div>
     </div>

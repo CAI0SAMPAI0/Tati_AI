@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Layers,
@@ -16,11 +15,9 @@ import {
   Image as ImageIcon,
   Upload,
   Loader2,
-  X,
   CheckSquare,
   Square,
   CheckCircle2,
-  AlertTriangle
 } from 'lucide-react';
 import { apiGet, apiDelete, apiPost, apiPut, apiUpload } from '@/lib/api/client';
 
@@ -689,112 +686,19 @@ export function FlashcardsSection() {
               {formData.flashcards.length > 0 ? (
                 <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
                   {formData.flashcards.map((card, idx) => (
-                    <div key={idx} className="grid grid-cols-[50px,1fr,1fr,auto] gap-2 items-center bg-surface p-2 rounded-xl border border-border group">
-                      {/* Image Preview / Upload */}
-                      <div 
-                        className="w-[50px] h-[50px] rounded-lg bg-input border border-border overflow-hidden flex items-center justify-center relative cursor-pointer group/img"
-                        onClick={() => document.getElementById(`file-upload-${idx}`)?.click()}
-                        title="Click to upload image"
-                      >
-                        {card.image_url ? (
-                          <>
-                            <img 
-                              key={card.image_url}
-                              src={card.image_url} 
-                              alt="" 
-                              className="w-full h-full object-cover"
-                              onError={() => {
-                                console.error(`[Flashcards] Error loading image for card ${idx}: ${card.image_url}`);
-                                setImageErrors(prev => ({ ...prev, [idx]: true }));
-                              }}
-                              onLoad={() => {
-                                setImageErrors(prev => ({ ...prev, [idx]: false }));
-                              }}
-                            />
-                          </>
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <ImageIcon size={16} className="text-text-muted opacity-30" />
-                          </div>
-                        )}
-                        
-                        {/* Overlay with Upload Icon */}
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-all flex items-center justify-center">
-                          <Upload size={14} className="text-white" />
-                        </div>
-
-                        {(generatingImages[idx] || uploadingImages[idx]) && (
-                          <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                            <Loader2 size={16} className="text-primary animate-spin" />
-                          </div>
-                        )}
-                        
-                        <input 
-                          type="file" 
-                          id={`file-upload-${idx}`} 
-                          className="hidden" 
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleImageUpload(idx, file);
-                            e.target.value = ''; // Reset for same file re-upload
-                          }}
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1">
-                        <input 
-                          className="bg-transparent border-b border-border text-xs py-1 outline-none focus:border-primary transition-all"
-                          placeholder="Front (term)"
-                          value={card.front}
-                          onChange={(e) => updateCard(idx, 'front', e.target.value)}
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <input 
-                          className="bg-transparent border-b border-border text-xs py-1 outline-none focus:border-primary transition-all"
-                          placeholder="Back (meaning)"
-                          value={card.back}
-                          onChange={(e) => updateCard(idx, 'back', e.target.value)}
-                        />
-                        <div className="flex items-center gap-2 mt-1">
-                           <input 
-                            className="flex-1 bg-transparent border-b border-border text-[0.6rem] py-0.5 outline-none focus:border-primary transition-all opacity-70"
-                            placeholder="Image URL"
-                            value={card.image_url || ''}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              // Basic fix for Google Search links: try to extract the original URL or at least prevent the direct imgres link
-                              if (val.includes('imgres?q=')) {
-                                const urlParams = new URLSearchParams(val.split('?')[1]);
-                                const imgUrl = urlParams.get('imgurl');
-                                if (imgUrl) {
-                                  setImageErrors(prev => ({ ...prev, [idx]: false }));
-                                  updateCard(idx, 'image_url', decodeURIComponent(imgUrl));
-                                  return;
-                                }
-                              }
-                              setImageErrors(prev => ({ ...prev, [idx]: false }));
-                              updateCard(idx, 'image_url', val);
-                            }}
-                            onBlur={(e) => {
-                              handleUrlUpload(idx, e.target.value);
-                            }}
-                          />
-                          <button 
-                            onClick={() => generateCardImage(idx)}
-                            disabled={generatingImages[idx]}
-                            className={`p-1 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-all ${generatingImages[idx] ? 'animate-pulse' : ''}`}
-                            title="Generate/Search Image"
-                          >
-                            <Sparkles size={10} />
-                          </button>
-                        </div>
-                      </div>
-                      <button onClick={() => removeCard(idx)} className="text-text-subtle hover:text-danger p-1 self-center">
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
+                    <ManualCardItem
+                      key={idx}
+                      card={card}
+                      idx={idx}
+                      isGenerating={!!generatingImages[idx]}
+                      isUploading={!!uploadingImages[idx]}
+                      hasImageError={!!imageErrors[idx]}
+                      onUpdate={updateCard}
+                      onRemove={removeCard}
+                      onImageUpload={handleImageUpload}
+                      onGenerateImage={generateCardImage}
+                      onUrlUpload={handleUrlUpload}
+                    />
                   ))}
                 </div>
               ) : (
@@ -845,4 +749,133 @@ export function FlashcardsSection() {
     </div>
   );
 }
+
+interface ManualCardItemProps {
+  card: { front: string; back: string; image_url?: string };
+  idx: number;
+  isGenerating: boolean;
+  isUploading: boolean;
+  hasImageError: boolean;
+  onUpdate: (idx: number, field: keyof Flashcard, value: string) => void;
+  onRemove: (idx: number) => void;
+  onImageUpload: (idx: number, file: File) => void;
+  onGenerateImage: (idx: number) => void;
+  onUrlUpload: (idx: number, url: string) => void;
+}
+
+const ManualCardItem = React.memo(function ManualCardItem({
+  card,
+  idx,
+  isGenerating,
+  isUploading,
+  hasImageError,
+  onUpdate,
+  onRemove,
+  onImageUpload,
+  onGenerateImage,
+  onUrlUpload,
+}: ManualCardItemProps) {
+  return (
+    <div className="grid grid-cols-[50px,1fr,1fr,auto] gap-2 items-center bg-surface p-2 rounded-xl border border-border group">
+      {/* Image Preview / Upload */}
+      <div 
+        className="w-[50px] h-[50px] rounded-lg bg-input border border-border overflow-hidden flex items-center justify-center relative cursor-pointer group/img"
+        onClick={() => document.getElementById(`file-upload-${idx}`)?.click()}
+        title="Click to upload image"
+      >
+        {card.image_url && !hasImageError ? (
+          <img 
+            key={card.image_url}
+            src={card.image_url} 
+            alt="" 
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <ImageIcon size={16} className="text-text-muted opacity-30" />
+          </div>
+        )}
+        
+        {/* Overlay with Upload Icon */}
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-all flex items-center justify-center">
+          <Upload size={14} className="text-white" />
+        </div>
+
+        {(isGenerating || isUploading) && (
+          <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+            <Loader2 size={16} className="text-primary animate-spin" />
+          </div>
+        )}
+        
+        <input 
+          type="file" 
+          id={`file-upload-${idx}`} 
+          className="hidden" 
+          accept="image/*"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) onImageUpload(idx, file);
+            e.target.value = '';
+          }}
+        />
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <input 
+          className="bg-transparent border-b border-border text-xs py-1 outline-none focus:border-primary transition-all"
+          placeholder="Front (term)"
+          value={card.front}
+          onChange={(e) => onUpdate(idx, 'front', e.target.value)}
+        />
+      </div>
+      <div className="flex flex-col gap-1">
+        <input 
+          className="bg-transparent border-b border-border text-xs py-1 outline-none focus:border-primary transition-all"
+          placeholder="Back (meaning)"
+          value={card.back}
+          onChange={(e) => onUpdate(idx, 'back', e.target.value)}
+        />
+        <div className="flex items-center gap-2 mt-1">
+          <input 
+            className="flex-1 bg-transparent border-b border-border text-[0.6rem] py-0.5 outline-none focus:border-primary transition-all opacity-70"
+            placeholder="Image URL"
+            value={card.image_url || ''}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val.includes('imgres?q=')) {
+                const urlParams = new URLSearchParams(val.split('?')[1]);
+                const imgUrl = urlParams.get('imgurl');
+                if (imgUrl) {
+                  onUpdate(idx, 'image_url', decodeURIComponent(imgUrl));
+                  return;
+                }
+              }
+              onUpdate(idx, 'image_url', val);
+            }}
+            onBlur={(e) => {
+              onUrlUpload(idx, e.target.value);
+            }}
+          />
+          <button 
+            type="button"
+            onClick={() => onGenerateImage(idx)}
+            disabled={isGenerating}
+            className={`p-1 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-all ${isGenerating ? 'animate-pulse' : ''}`}
+            title="Generate/Search Image"
+          >
+            <Sparkles size={10} />
+          </button>
+        </div>
+      </div>
+      <button 
+        type="button" 
+        onClick={() => onRemove(idx)} 
+        className="text-text-subtle hover:text-danger p-1 self-center"
+      >
+        <Trash2 size={12} />
+      </button>
+    </div>
+  );
+});
+
 

@@ -73,7 +73,7 @@ export function DialogModal({ isOpen, onClose, title, children, size = 'md' }: M
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/70 dark:bg-black/85 backdrop-blur-sm cursor-pointer"
+            className="fixed inset-0 bg-black/75 dark:bg-black/85 cursor-pointer"
           />
 
           {/* Modal Container */}

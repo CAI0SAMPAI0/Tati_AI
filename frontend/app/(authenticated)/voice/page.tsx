@@ -880,7 +880,7 @@ function VoicePageContent() {
 
         {/* Accent Picker Modal via React Portal (Garante que nunca seja cortado) */}
         {typeof document !== 'undefined' && isAccentMenuOpen && createPortal(
-          <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 dark:bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 dark:bg-black/85 animate-in fade-in duration-200">
             <div 
               className="fixed inset-0 cursor-pointer"
               onClick={() => setIsAccentMenuOpen(false)}

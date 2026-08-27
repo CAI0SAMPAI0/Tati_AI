@@ -39,9 +39,9 @@ def get_vapid_public_key(request: HttpRequest):
     """
     Retorna a chave pública VAPID para push notifications no navegador.
     """
-    import os
-    vapid_key = os.getenv("VAPID_PUBLIC_KEY", "BNbJ_QkF3Y9e3p8UqX8mS4vE8a9w0yK4mO2pL3vN5")
-    return {"public_key": vapid_key, "vapid_public_key": vapid_key}
+    from .services import NotificationDispatcher
+    vapid = NotificationDispatcher.get_vapid_keys()
+    return {"public_key": vapid["public_key"], "vapid_public_key": vapid["public_key"]}
 
 
 # ── REGISTRO DE WEBPUSH ───────────────────────────────────────────────
@@ -53,6 +53,31 @@ def subscribe_push(request: HttpRequest, payload: SubscribePushInput):
     Registra um token de WebPush do navegador para avisos de streak e lições.
     """
     return NotificationService.register_push_subscription(request.auth, payload)
+
+
+# ── DISPARO DE NOTIFICAÇÃO MANUAL / TESTE (POR NÍVEL OU GLOBAL) ──────
+
+@notifications_router.post("/broadcast", auth=auth_required)
+def broadcast_notification(request: HttpRequest, payload: dict):
+    """
+    Permite à professora ou administrador enviar uma notificação personalizada para alunos de um nível ou todos.
+    Ex: payload = {"title": "Título", "activity_type": "Grammar", "levels": ["B1"], "is_published": True}
+    """
+    from .services import NotificationDispatcher
+    activity_type = payload.get("activity_type", "Atividade")
+    title = payload.get("title", "Nova Lição")
+    levels = payload.get("levels", ["ALL"])
+    is_pub = payload.get("is_published", True)
+    url = payload.get("url", "/activities")
+
+    return NotificationDispatcher.notify_students_for_activity(
+        activity_type=activity_type,
+        title=title,
+        levels=levels,
+        is_published=is_pub,
+        url=url,
+    )
+
 
 
 # ── DISPARO DE E-MAIL (BREVO & MULTI-PROVIDER) ───────────────────────

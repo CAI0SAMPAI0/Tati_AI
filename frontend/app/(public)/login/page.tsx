@@ -444,7 +444,7 @@ export default function LoginPage() {
                 <p className="text-[0.82rem] text-text-muted mb-5 leading-relaxed">{'Enter your username or email.'}</p>
                 <Input label={'Username or Email'} placeholder={'Username or Email'} autoComplete="username" value={forgotId} onChange={(e) => setForgotId(e.target.value)} />
                 <Button type="submit" fullWidth loading={loading}>
-                  {'Send Reset Code'}
+                  {'Reset your password'}
                 </Button>
                 {forgotResult && (
                   <div className={`mt-4 p-3.5 rounded-md text-[0.83rem] leading-relaxed ${forgotResult.type === 'success' ? 'bg-success/10 border border-success/30 text-success' : 'bg-danger/10 border border-danger/30 text-danger'}`}>

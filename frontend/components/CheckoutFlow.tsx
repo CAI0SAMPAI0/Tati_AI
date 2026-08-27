@@ -356,7 +356,7 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
       <button
         type="button"
         aria-label="Fechar"
-        className="absolute inset-0 bg-ink/65 backdrop-blur-md cursor-default transition-all"
+        className="absolute inset-0 bg-black/75 dark:bg-black/85 cursor-default transition-all"
         onClick={handleClose}
       />
  

@@ -346,6 +346,20 @@ class DashboardService:
             flashcards=cards,
             is_published=is_published,
         )
+
+        if is_published:
+            try:
+                from apps.notifications.services import NotificationDispatcher
+                NotificationDispatcher.notify_students_for_activity(
+                    activity_type="Flashcards",
+                    title=m.title,
+                    levels=m.level,
+                    is_published=True,
+                    url="/activities",
+                )
+            except Exception as exc:
+                logger.warning(f"[Dashboard] Erro ao notificar alunos de flashcards: {exc}")
+
         return {"success": True, "id": str(m.id), "title": m.title, "card_count": len(cards)}
 
     @staticmethod
@@ -365,6 +379,7 @@ class DashboardService:
                     raise HttpError(404, "Baralho CEFR não encontrado.")
                 
                 matched_ids = [c.id for c in matched_cards]
+                was_published = matched_cards[0].is_published
                 if "is_published" in data:
                     Flashcard.objects.filter(id__in=matched_ids).update(is_published=data["is_published"])
                 if "title" in data and data["title"]:
@@ -373,12 +388,27 @@ class DashboardService:
                 if "level" in data and data["level"]:
                     Flashcard.objects.filter(id__in=matched_ids).update(level=data["level"].upper())
 
+                now_published = data.get("is_published", was_published)
+                if now_published and not was_published:
+                    try:
+                        from apps.notifications.services import NotificationDispatcher
+                        NotificationDispatcher.notify_students_for_activity(
+                            activity_type="Flashcards CEFR",
+                            title=data.get("title", matched_cards[0].topic),
+                            levels=data.get("level", level),
+                            is_published=True,
+                            url="/activities",
+                        )
+                    except Exception as exc:
+                        logger.warning(f"[Dashboard] Erro ao notificar alunos: {exc}")
+
                 return {"success": True, "id": deck_id, "title": data.get("title", matched_cards[0].topic), "card_count": len(matched_cards)}
             raise HttpError(400, "ID do baralho CEFR inválido.")
 
         m = Module.objects.filter(id=deck_id).first()
         if not m:
             raise HttpError(404, "Baralho não encontrado.")
+        was_published = m.is_published
         if "title" in data:
             m.title = data["title"]
         if "level" in data:
@@ -390,6 +420,20 @@ class DashboardService:
         if "is_published" in data:
             m.is_published = data["is_published"]
         m.save()
+
+        if m.is_published and not was_published:
+            try:
+                from apps.notifications.services import NotificationDispatcher
+                NotificationDispatcher.notify_students_for_activity(
+                    activity_type="Flashcards",
+                    title=m.title,
+                    levels=m.level,
+                    is_published=True,
+                    url="/activities",
+                )
+            except Exception as exc:
+                logger.warning(f"[Dashboard] Erro ao notificar alunos: {exc}")
+
         return {"success": True, "id": str(m.id), "title": m.title, "card_count": len(m.flashcards or [])}
 
     @staticmethod
@@ -517,6 +561,20 @@ class DashboardService:
             is_active=is_published,
             initial_message=initial_msg,
         )
+
+        if is_published:
+            try:
+                from apps.notifications.services import NotificationDispatcher
+                NotificationDispatcher.notify_students_for_activity(
+                    activity_type="Simulação",
+                    title=s.name,
+                    levels=s.levels or [s.difficulty],
+                    is_published=True,
+                    url="/voice",
+                )
+            except Exception as exc:
+                logger.warning(f"[Dashboard] Erro ao notificar alunos de simulação: {exc}")
+
         return {"success": True, "id": str(s.id), "name": s.name}
 
     @staticmethod
@@ -526,6 +584,7 @@ class DashboardService:
             cs = CEFRSimulation.objects.filter(id=clean_id).first()
             if not cs:
                 raise HttpError(404, "Simulação não encontrada.")
+            was_published = cs.is_published
             if "name" in data:
                 cs.topic = data["name"]
             if "description" in data:
@@ -533,11 +592,26 @@ class DashboardService:
             if "is_published" in data:
                 cs.is_published = data["is_published"]
             cs.save()
+
+            if cs.is_published and not was_published:
+                try:
+                    from apps.notifications.services import NotificationDispatcher
+                    NotificationDispatcher.notify_students_for_activity(
+                        activity_type="Simulação CEFR",
+                        title=cs.topic,
+                        levels=cs.level,
+                        is_published=True,
+                        url="/voice",
+                    )
+                except Exception as exc:
+                    logger.warning(f"[Dashboard] Erro ao notificar alunos: {exc}")
+
             return {"success": True, "id": sim_id}
 
         s = SimulationScenario.objects.filter(id=sim_id).first()
         if not s:
             raise HttpError(404, "Simulação não encontrada.")
+        was_published = s.is_active
         if "name" in data:
             s.name = data["name"]
         if "description" in data:
@@ -555,6 +629,20 @@ class DashboardService:
         if "initial_message" in data:
             s.initial_message = data["initial_message"]
         s.save()
+
+        if s.is_active and not was_published:
+            try:
+                from apps.notifications.services import NotificationDispatcher
+                NotificationDispatcher.notify_students_for_activity(
+                    activity_type="Simulação",
+                    title=s.name,
+                    levels=s.levels or [s.difficulty],
+                    is_published=True,
+                    url="/voice",
+                )
+            except Exception as exc:
+                logger.warning(f"[Dashboard] Erro ao notificar alunos: {exc}")
+
         return {"success": True, "id": str(s.id), "name": s.name}
 
     @staticmethod
@@ -595,13 +683,28 @@ class DashboardService:
         if isinstance(levels, str):
             levels = [l.strip().upper() for l in levels.split(",") if l.strip()]
 
+        is_published = data.get("is_published", True)
         g = Game.objects.create(
             title=title,
             description=data.get("description", ""),
             wordwall_url=wordwall_url,
             levels=levels,
-            is_published=data.get("is_published", True),
+            is_published=is_published,
         )
+
+        if is_published:
+            try:
+                from apps.notifications.services import NotificationDispatcher
+                NotificationDispatcher.notify_students_for_activity(
+                    activity_type="Game",
+                    title=g.title,
+                    levels=g.levels,
+                    is_published=True,
+                    url="/activities",
+                )
+            except Exception as exc:
+                logger.warning(f"[Dashboard] Erro ao notificar alunos de game: {exc}")
+
         return {"success": True, "id": str(g.id), "title": g.title}
 
     @staticmethod
@@ -609,6 +712,7 @@ class DashboardService:
         g = Game.objects.filter(id=game_id).first()
         if not g:
             raise HttpError(404, "Game não encontrado.")
+        was_published = g.is_published
         if "title" in data:
             g.title = data["title"]
         if "description" in data:
@@ -621,6 +725,20 @@ class DashboardService:
         if "is_published" in data:
             g.is_published = data["is_published"]
         g.save()
+
+        if g.is_published and not was_published:
+            try:
+                from apps.notifications.services import NotificationDispatcher
+                NotificationDispatcher.notify_students_for_activity(
+                    activity_type="Game",
+                    title=g.title,
+                    levels=g.levels,
+                    is_published=True,
+                    url="/activities",
+                )
+            except Exception as exc:
+                logger.warning(f"[Dashboard] Erro ao notificar alunos de game: {exc}")
+
         return {"success": True, "id": str(g.id), "title": g.title}
 
     @staticmethod
@@ -661,14 +779,65 @@ class DashboardService:
         if isinstance(levels, str):
             levels = [l.strip().upper() for l in levels.split(",") if l.strip()]
 
+        is_published = data.get("is_published", True)
         n = NewsItem.objects.create(
             title=title,
             url=url,
             description=data.get("description", ""),
             levels=levels,
             thumbnail_url=data.get("thumbnail_url") or None,
-            is_published=data.get("is_published", True),
+            is_published=is_published,
         )
+
+        if is_published:
+            try:
+                from apps.notifications.services import NotificationDispatcher
+                NotificationDispatcher.notify_students_for_activity(
+                    activity_type="Artigo de Notícia",
+                    title=n.title,
+                    levels=n.levels,
+                    is_published=True,
+                    url="/activities",
+                )
+            except Exception as exc:
+                logger.warning(f"[Dashboard] Erro ao notificar alunos de notícia: {exc}")
+
+        return {"success": True, "id": str(n.id), "title": n.title}
+
+    @staticmethod
+    def update_news(news_id: str, data: dict) -> dict:
+        n = NewsItem.objects.filter(id=news_id).first()
+        if not n:
+            raise HttpError(404, "Notícia não encontrada.")
+        was_published = n.is_published
+        if "title" in data:
+            n.title = data["title"]
+        if "url" in data:
+            n.url = data["url"]
+        if "description" in data:
+            n.description = data["description"]
+        if "thumbnail_url" in data:
+            n.thumbnail_url = data["thumbnail_url"]
+        if "levels" in data:
+            lvls = data["levels"]
+            n.levels = [l.strip().upper() for l in lvls.split(",")] if isinstance(lvls, str) else lvls
+        if "is_published" in data:
+            n.is_published = data["is_published"]
+        n.save()
+
+        if n.is_published and not was_published:
+            try:
+                from apps.notifications.services import NotificationDispatcher
+                NotificationDispatcher.notify_students_for_activity(
+                    activity_type="Artigo de Notícia",
+                    title=n.title,
+                    levels=n.levels,
+                    is_published=True,
+                    url="/activities",
+                )
+            except Exception as exc:
+                logger.warning(f"[Dashboard] Erro ao notificar alunos de notícia: {exc}")
+
         return {"success": True, "id": str(n.id), "title": n.title}
 
     @staticmethod

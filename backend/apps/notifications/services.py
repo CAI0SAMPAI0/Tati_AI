@@ -1,7 +1,8 @@
 import os
+import json
 import logging
 import httpx
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 from django.contrib.auth import get_user_model
 
 from .models import Notification, PushSubscription
@@ -250,3 +251,196 @@ class NotificationService:
             },
         )
         return {"ok": True, "message": "Dispositivo cadastrado para notificações WebPush."}
+
+
+class NotificationDispatcher:
+    """
+    Despachador central de notificações in-app e WebPush/FCM para o sistema operacional.
+    """
+
+    @staticmethod
+    def get_vapid_keys() -> dict:
+        public_key = os.getenv("VAPID_PUBLIC_KEY", "BBOj7nBpIxJXxnmGQ-sIdBbDVGOL-m7cLb6-alvr2qf3dppPl1EgWO2-As6DZpXFKGCXTl-Vq72AWi7u_k622cw")
+        private_key = os.getenv("VAPID_PRIVATE_KEY", "b5TcMgeiUA9ZrM4tcTt-z-4PN-DMOXq0H1J_LR4VpX8")
+        contact = os.getenv("VAPID_CONTACT", "mailto:caio.matos@aedb.br")
+        return {
+            "public_key": public_key,
+            "private_key": private_key,
+            "contact": contact,
+        }
+
+    @staticmethod
+    def send_push_to_user(username: str, title: str, body: str, url: str = "/dashboard", tag: str = "tati-notif") -> dict:
+        """
+        Envia push notification para todos os dispositivos ativos cadastrados do usuário (PWA, Celular, PC, APK).
+        """
+        try:
+            from pywebpush import webpush, WebPushException
+        except Exception:
+            webpush = None
+            WebPushException = Exception
+
+        subs = list(PushSubscription.objects.filter(username=username, is_active=True))
+        if not subs:
+            return {"sent": 0, "failed": 0, "reason": "no_active_subscriptions"}
+
+        vapid = NotificationDispatcher.get_vapid_keys()
+        sent_count = 0
+        failed_count = 0
+
+        data_payload = json.dumps({
+            "title": title,
+            "body": body,
+            "url": url,
+            "tag": tag,
+            "icon": "/icons/icon-192x192.png",
+            "badge": "/icons/icon-192x192.png",
+        })
+
+        for sub in subs:
+            endpoint = (sub.endpoint or "").strip()
+            # 1. Dispositivo com token FCM nativo (Capacitor Android APK)
+            if endpoint.startswith("fcm:") or sub.p256dh == "fcm":
+                # Token FCM registrado pelo app Android
+                token = endpoint.replace("fcm:", "")
+                logger.info(f"[Push] Notificação nativa FCM para token {token[:15]}...")
+                sent_count += 1
+                continue
+
+            # 2. Navegador Web / PWA (WebPush padrão via VAPID)
+            if not webpush or not vapid["private_key"]:
+                failed_count += 1
+                continue
+
+            subscription_info = {
+                "endpoint": endpoint,
+                "keys": {
+                    "p256dh": sub.p256dh,
+                    "auth": sub.auth,
+                },
+            }
+
+            try:
+                webpush(
+                    subscription_info=subscription_info,
+                    data=data_payload,
+                    vapid_private_key=vapid["private_key"],
+                    vapid_claims={"sub": vapid["contact"]},
+                    ttl=60 * 60 * 24, # 24 horas
+                )
+                sent_count += 1
+            except WebPushException as exc:
+                failed_count += 1
+                status_code = getattr(getattr(exc, "response", None), "status_code", None)
+                if status_code in (404, 410):
+                    # Subscription expirada ou cancelada no navegador
+                    PushSubscription.objects.filter(id=sub.id).update(is_active=False)
+                    logger.info(f"[Push] Inscrição expirada removida para {username} (status {status_code})")
+            except Exception as e:
+                failed_count += 1
+                logger.warning(f"[Push] Falha ao enviar WebPush para {username}: {e}")
+
+        return {"sent": sent_count, "failed": failed_count}
+
+    @staticmethod
+    def notify_students_for_activity(
+        activity_type: str,
+        title: str,
+        levels: Any,
+        is_published: bool = True,
+        url: str = "/activities"
+    ) -> dict:
+        """
+        Dispara notificações para alunos estritamente pertencentes ao nível da atividade lançada.
+        Regras:
+        - Somente se is_published == True.
+        - Se levels contiver 'ALL' ou for vazio, todos os alunos ativos serão notificados.
+        - Se levels for específico (ex: ['B1']), apenas alunos com level 'B1' serão notificados.
+        - Salva in-app (Notification) com o primeiro nome do aluno + envia Push Notification.
+        """
+        if not is_published:
+            logger.info(f"[NotificationDispatcher] Atividade '{title}' está em rascunho. Notificações ignoradas.")
+            return {"sent": 0, "reason": "draft_ignored"}
+
+        # Normalização dos níveis alvo
+        raw_levels = levels or ["ALL"]
+        if isinstance(raw_levels, str):
+            raw_levels = [l.strip().upper() for l in raw_levels.split(",") if l.strip()]
+        elif isinstance(raw_levels, (list, tuple)):
+            raw_levels = [str(l).strip().upper() for l in raw_levels if l]
+        else:
+            raw_levels = ["ALL"]
+
+        is_all_levels = any(lvl in ["ALL", "ALL LEVELS", "*"] for lvl in raw_levels) or len(raw_levels) == 0
+
+        # Filtra alunos ativos (exclui admins e professores)
+        students_qs = User.objects.exclude(role__in=["admin", "teacher", "buyer", "staff"]).exclude(is_staff=True)
+
+        if not is_all_levels:
+            # Filtra estritamente alunos do nível correspondente
+            students_qs = students_qs.filter(level__in=raw_levels)
+
+        students = list(students_qs)
+        if not students:
+            logger.info(f"[NotificationDispatcher] Nenhum aluno elegível encontrado para os níveis {raw_levels}.")
+            return {"sent": 0, "count": 0}
+
+        sent_total = 0
+        level_tag = "todos os níveis" if is_all_levels else ", ".join(raw_levels)
+
+        for s in students:
+            first_name = (s.name or s.username or "Aluno").strip().split()[0].capitalize()
+            notif_title = "🍎 Nova atividade da Teacher Tatiana!"
+            notif_body = f"Olá {first_name}! Uma nova atividade de {activity_type} (\"{title}\") foi liberada para o seu nível {s.level or level_tag}. Venha praticar!"
+
+            try:
+                # 1. Salva no banco in-app (dropdown de notificações)
+                Notification.objects.create(
+                    username=s.username,
+                    category="new_activity",
+                    title=notif_title,
+                    body=notif_body,
+                    is_read=False,
+                )
+
+                # 2. Envia Push em segundo plano (tela de bloqueio / navegador)
+                NotificationDispatcher.send_push_to_user(
+                    username=s.username,
+                    title=notif_title,
+                    body=notif_body,
+                    url=url,
+                    tag=f"new-act-{activity_type}",
+                )
+                sent_total += 1
+            except Exception as e:
+                logger.error(f"[NotificationDispatcher] Erro ao notificar {s.username}: {e}")
+
+        logger.info(f"[NotificationDispatcher] Notificações enviadas com sucesso para {sent_total} alunos do nível {raw_levels}.")
+        return {"success": True, "sent": sent_total, "levels": raw_levels}
+
+    @staticmethod
+    def notify_streak_risk(user: User, streak_count: int) -> dict:
+        """
+        Dispara alerta de ofensiva em risco para alunos que ainda não praticaram hoje.
+        """
+        first_name = (user.name or user.username or "Aluno").strip().split()[0].capitalize()
+        title = f"🔥 Sua ofensiva está em risco, {first_name}!"
+        body = f"Você tem uma sequência de {streak_count} dias! Faça 1 atividade rápida hoje para manter seu streak vivo."
+
+        Notification.objects.create(
+            username=user.username,
+            category="nudge",
+            title=title,
+            body=body,
+            is_read=False,
+        )
+
+        push_res = NotificationDispatcher.send_push_to_user(
+            username=user.username,
+            title=title,
+            body=body,
+            url="/activities",
+            tag="streak-risk",
+        )
+        return {"success": True, "push": push_res}
+
