@@ -3,13 +3,15 @@ import logging
 import httpx
 from typing import List, Optional
 from django.contrib.auth import get_user_model
-from ninja.errors import HttpError
 
 from .models import Notification, PushSubscription
 from .schemas import NotificationOut, SubscribePushInput
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+WAHA_API_URL = os.getenv("WAHA_API_URL", "")
+WAHA_API_KEY = os.getenv("WAHA_API_KEY", "")
 
 def get_brevo_api_key() -> Optional[str]:
     # Checa possíveis variáveis de ambiente para a chave do Brevo

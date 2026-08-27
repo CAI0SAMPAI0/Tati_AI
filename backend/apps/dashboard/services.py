@@ -8,7 +8,15 @@ from ninja.errors import HttpError
 
 from apps.authentication.models import User
 from apps.chat.models import Message, SimulationScenario, CEFRSimulation
-from apps.activities.models import ActivitySubmission, Module, Game, NewsItem, Flashcard
+from apps.activities.models import (
+    ActivitySubmission,
+    Module,
+    Game,
+    NewsItem,
+    Flashcard,
+    UserVocabulary,
+    UserFlashcardProgress,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -728,46 +736,100 @@ class DashboardService:
 
         # 1. Progresso dos Módulos
         modules = Module.objects.filter(is_published=True).order_by('order')
-        submissions = set(
-            ActivitySubmission.objects.filter(username=username)
-            .values_list('activity_type', flat=True)
-        )
+        submissions = list(ActivitySubmission.objects.filter(username=username))
         
+        completed_mod_keys = set()
+        for sub in submissions:
+            if sub.module_id:
+                completed_mod_keys.add(str(sub.module_id))
+            if sub.activity_type:
+                completed_mod_keys.add(sub.activity_type)
+            if sub.metadata and isinstance(sub.metadata, dict):
+                if sub.metadata.get('slug'):
+                    completed_mod_keys.add(sub.metadata.get('slug'))
+                if sub.metadata.get('activity_id'):
+                    completed_mod_keys.add(str(sub.metadata.get('activity_id')))
+
         module_progress = []
         for idx, m in enumerate(modules):
-            completed = 1 if str(m.id) in submissions or m.title in submissions else (1 if idx == 0 else 0)
+            fc = m.flashcards if isinstance(m.flashcards, list) else []
+            total_items = max(1, len(fc))
+            is_done = 1 if (str(m.id) in completed_mod_keys or m.title in completed_mod_keys or idx == 0) else 0
             module_progress.append({
                 "module_id": str(m.id),
                 "title": m.title,
                 "order": m.order,
                 "level": m.level,
-                "total_quizzes": 1,
-                "completed_quizzes": completed,
-                "progress_pct": 100 if completed else 0,
-                "type_label": "Módulo",
+                "total_quizzes": total_items,
+                "completed_quizzes": is_done * total_items,
+                "progress_pct": 100 if is_done else 0,
+                "type_label": "Cards" if fc else "Quizzes",
             })
 
-        # 2. Tempo de Estudo Semanal
+        # 2. Tempo de Estudo Semanal e Gráfico dos 7 dias
         today = date.today()
         seven_days_ago = today - timedelta(days=6)
+        day_names_en = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        
         daily_msgs = (
             Message.objects.filter(username=username, role='user', created_at__date__gte=seven_days_ago)
             .annotate(day=TruncDate('created_at'))
             .values('day')
             .annotate(count=Count('id'))
         )
-        counts_by_day = {item['day']: item['count'] for item in daily_msgs}
-        weekly_study_time = [
-            round((counts_by_day.get(today - timedelta(days=i), 0) * 3), 1)  # minutos estimados
-            for i in range(6, -1, -1)
-        ]
+        msg_counts_by_day = {item['day']: item['count'] for item in daily_msgs}
+
+        daily_subs = (
+            ActivitySubmission.objects.filter(username=username, created_at__date__gte=seven_days_ago)
+            .annotate(day=TruncDate('created_at'))
+            .values('day')
+            .annotate(count=Count('id'))
+        )
+        sub_counts_by_day = {item['day']: item['count'] for item in daily_subs}
+
+        study_time_chart = []
+        total_study_minutes_weekly = 0
+        total_messages_weekly = 0
+        total_activities_weekly = 0
+
+        for i in range(6, -1, -1):
+            d = today - timedelta(days=i)
+            day_msgs = msg_counts_by_day.get(d, 0)
+            day_acts = sub_counts_by_day.get(d, 0)
+            
+            day_study_min = (day_msgs * 2) + (day_acts * 6)
+            if day_study_min == 0 and (day_msgs > 0 or day_acts > 0):
+                day_study_min = 5
+
+            study_time_chart.append({
+                "day_name": day_names_en[d.weekday()],
+                "date": d.isoformat(),
+                "study_minutes": day_study_min,
+                "messages_sent": day_msgs,
+                "activities_done": day_acts,
+            })
+
+            total_study_minutes_weekly += day_study_min
+            total_messages_weekly += day_msgs
+            total_activities_weekly += day_acts
+
+        avg_daily = round(total_study_minutes_weekly / 7.0, 1)
+
+        summary = {
+            "total_study_minutes_weekly": total_study_minutes_weekly,
+            "avg_study_minutes_daily": avg_daily,
+            "total_messages_weekly": total_messages_weekly,
+            "total_activities_weekly": total_activities_weekly,
+        }
 
         total_msgs = Message.objects.filter(username=username, role='user').count()
-        total_exercises = ActivitySubmission.objects.filter(username=username).count()
+        total_exercises = len(submissions)
 
         return {
+            "summary": summary,
+            "study_time_chart": study_time_chart,
             "module_progress": module_progress,
-            "weekly_study_time": weekly_study_time,
+            "weekly_study_time": [item["study_minutes"] for item in study_time_chart],
             "total_xp": u.total_xp,
             "streak_count": u.streak_count,
             "current_level": u.level or "A1",
@@ -777,19 +839,90 @@ class DashboardService:
 
     @staticmethod
     def get_student_activity_progress(username: str) -> dict:
-        subs = ActivitySubmission.objects.filter(username=username).order_by('-created_at')[:50]
+        subs = list(ActivitySubmission.objects.filter(username=username).order_by('-created_at')[:100])
+        
+        counts = {
+            "grammar": 0,
+            "vocabulary": 0,
+            "listening": 0,
+            "reading": 0,
+            "flashcards": 0,
+            "simulations": 0,
+            "games": 0,
+            "news": 0,
+        }
+
+        mapped_submissions = []
+        for s in subs:
+            meta = s.metadata if isinstance(s.metadata, dict) else {}
+            cat_raw = (meta.get("category") or s.activity_type or "exercise").lower()
+            
+            if "gramm" in cat_raw:
+                cat = "grammar"
+            elif "vocab" in cat_raw:
+                cat = "vocabulary"
+            elif "listen" in cat_raw:
+                cat = "listening"
+            elif "read" in cat_raw:
+                cat = "reading"
+            elif "simul" in cat_raw:
+                cat = "simulations"
+            elif "game" in cat_raw or "wordwall" in cat_raw:
+                cat = "games"
+            elif "news" in cat_raw:
+                cat = "news"
+            elif "flash" in cat_raw:
+                cat = "flashcards"
+            else:
+                cat = "grammar"
+
+            counts[cat] = counts.get(cat, 0) + 1
+
+            raw_title = meta.get("title") or meta.get("slug") or s.activity_type.replace("-", " ").title()
+            if "test-english" in str(raw_title).lower() or not raw_title:
+                raw_title = meta.get("title") or f"{cat.title()} Practice"
+
+            status = "completed" if (s.status in ("completed", "done") or (s.score and s.score > 0)) else "pending"
+
+            mapped_submissions.append({
+                "id": str(s.id),
+                "activity_type": cat,
+                "title": raw_title,
+                "score": s.score or 100,
+                "status": status,
+                "created_at": s.created_at.isoformat() if s.created_at else "",
+            })
+
+        fc_progress = list(UserFlashcardProgress.objects.filter(user_id=username).order_by('-reviewed_at')[:30])
+        counts["flashcards"] += len(fc_progress)
+
+        vocab_learned = list(UserVocabulary.objects.filter(username=username).order_by('-created_at')[:30])
+        counts["vocabulary"] += len(vocab_learned)
+
         return {
-            "submissions": [
+            "summary": counts,
+            "submissions": mapped_submissions,
+            "total": len(mapped_submissions),
+            "flashcards": [
                 {
-                    "id": str(s.id),
-                    "activity_type": s.activity_type,
-                    "score": s.score,
-                    "status": s.status,
-                    "created_at": s.created_at.isoformat() if s.created_at else "",
+                    "id": str(f.id),
+                    "flashcard_id": f.flashcard_id,
+                    "status": f.status,
+                    "reviewed_at": f.reviewed_at.isoformat() if f.reviewed_at else "",
                 }
-                for s in subs
+                for f in fc_progress
             ],
-            "total": subs.count(),
+            "vocabulary": [
+                {
+                    "id": str(v.id),
+                    "word": v.word,
+                    "definition": v.definition,
+                    "example_sentence": v.example_sentence,
+                    "created_at": v.created_at.isoformat() if v.created_at else "",
+                }
+                for v in vocab_learned
+            ],
+            "pronunciation": [],
         }
 
     @staticmethod
