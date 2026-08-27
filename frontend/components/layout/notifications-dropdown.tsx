@@ -70,7 +70,7 @@ export const NotificationsDropdown = memo(function NotificationsDropdown() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-surface border border-border rounded-2xl shadow-2xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed sm:absolute left-4 right-4 sm:left-auto sm:right-0 top-16 sm:top-full mt-2 sm:w-80 max-w-[calc(100vw-2rem)] bg-surface border border-border rounded-2xl shadow-2xl z-[300] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-surface">
             <span className="text-sm font-bold text-text">

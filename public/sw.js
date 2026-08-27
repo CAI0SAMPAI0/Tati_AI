@@ -1,5 +1,5 @@
-const CACHE_NAME = 'tati-ai-v2.2.1';
-const API_CACHE_NAME = 'tati-ai-api-v2.2.1';
+const CACHE_NAME = 'tati-ai-v2.3.0';
+const API_CACHE_NAME = 'tati-ai-api-v2.3.0';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -145,4 +145,65 @@ self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
+});
+
+// --- PUSH NOTIFICATIONS ---
+self.addEventListener('push', (event) => {
+  let data = {};
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch (_) {
+      data = { body: event.data.text() };
+    }
+  }
+
+  const title = data.title || 'Teacher Tatiana';
+  const options = {
+    body: data.body || data.message || 'You have a new study notification!',
+    icon: data.icon || '/icons/icon-192x192.png',
+    badge: data.badge || '/icons/icon-192x192.png',
+    vibrate: [200, 100, 200],
+    tag: data.tag || 'tati-notification',
+    renotify: true,
+    data: {
+      url: data.url || data.link || '/activities',
+      ...data,
+    },
+    actions: [
+      { action: 'open', title: 'Open' },
+      { action: 'close', title: 'Dismiss' }
+    ]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  if (event.action === 'close') return;
+
+  const targetPath = event.notification.data?.url || '/activities';
+  const urlToOpen = new URL(targetPath, self.location.origin).href;
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if (client.url === urlToOpen && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      for (const client of windowClients) {
+        if ('focus' in client && 'navigate' in client) {
+          client.focus();
+          return client.navigate(urlToOpen);
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
+  );
 });

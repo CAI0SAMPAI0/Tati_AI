@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tati-ai-v2.2.0';
+const CACHE_NAME = 'tati-ai-v2.3.0';
 const STATIC_ASSETS = ['/', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
 
 self.addEventListener('install', (event) => {
@@ -192,21 +192,20 @@ self.addEventListener('push', (event) => {
 
   const title = data.title || 'Teacher Tatiana';
   const options = {
-    body: data.body || data.message || 'Você tem uma nova notificação de estudo!',
+    body: data.body || data.message || 'You have a new study notification!',
     icon: data.icon || '/icons/icon-192x192.png',
     badge: data.badge || '/icons/icon-192x192.png',
     image: data.image || undefined,
     vibrate: [200, 100, 200],
     tag: data.tag || 'tati-notification',
     renotify: true,
-    requireInteraction: true,
     data: {
-      url: data.url || data.link || '/dashboard',
+      url: data.url || data.link || '/activities',
       ...data,
     },
     actions: [
-      { action: 'open', title: 'Abrir App' },
-      { action: 'close', title: 'Dispensar' }
+      { action: 'open', title: 'Open' },
+      { action: 'close', title: 'Dismiss' }
     ]
   };
 
