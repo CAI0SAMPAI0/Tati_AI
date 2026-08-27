@@ -839,7 +839,7 @@ class DashboardService:
 
     @staticmethod
     def get_student_activity_progress(username: str) -> dict:
-        subs = list(ActivitySubmission.objects.filter(username=username).order_by('-created_at')[:100])
+        subs = list(ActivitySubmission.objects.filter(username=username).order_by('-created_at')[:200])
         
         counts = {
             "grammar": 0,
@@ -855,13 +855,13 @@ class DashboardService:
         mapped_submissions = []
         for s in subs:
             meta = s.metadata if isinstance(s.metadata, dict) else {}
-            cat_raw = (meta.get("category") or s.activity_type or "exercise").lower()
+            cat_raw = str(meta.get("category") or s.activity_type or "grammar").lower()
             
             if "gramm" in cat_raw:
                 cat = "grammar"
             elif "vocab" in cat_raw:
                 cat = "vocabulary"
-            elif "listen" in cat_raw:
+            elif "listen" in cat_raw or "podcast" in cat_raw:
                 cat = "listening"
             elif "read" in cat_raw:
                 cat = "reading"
@@ -869,7 +869,7 @@ class DashboardService:
                 cat = "simulations"
             elif "game" in cat_raw or "wordwall" in cat_raw:
                 cat = "games"
-            elif "news" in cat_raw:
+            elif "news" in cat_raw or "article" in cat_raw:
                 cat = "news"
             elif "flash" in cat_raw:
                 cat = "flashcards"
@@ -878,25 +878,52 @@ class DashboardService:
 
             counts[cat] = counts.get(cat, 0) + 1
 
-            raw_title = meta.get("title") or meta.get("slug") or s.activity_type.replace("-", " ").title()
-            if "test-english" in str(raw_title).lower() or not raw_title:
-                raw_title = meta.get("title") or f"{cat.title()} Practice"
+            # Resolução do título do exercício / simulação
+            title = meta.get("title") or meta.get("slug")
+            if not title:
+                if cat == "simulations":
+                    sim_id = meta.get("scenario_id") or meta.get("simulation_id") or meta.get("activity_id")
+                    if sim_id:
+                        try:
+                            sc = SimulationScenario.objects.filter(id=sim_id).first()
+                            title = sc.name if sc else "Conversational Simulation"
+                        except Exception:
+                            title = "Conversational Simulation"
+                    else:
+                        title = "Conversational Simulation"
+                else:
+                    title = s.activity_type.replace("-", " ").title()
+
+            if "test-english" in str(title).lower() or not title:
+                title = f"{cat.title()} Practice"
 
             status = "completed" if (s.status in ("completed", "done") or (s.score and s.score > 0)) else "pending"
 
             mapped_submissions.append({
                 "id": str(s.id),
+                "category": cat,
                 "activity_type": cat,
-                "title": raw_title,
+                "title": title,
+                "url": meta.get("url") or "",
                 "score": s.score or 100,
                 "status": status,
                 "created_at": s.created_at.isoformat() if s.created_at else "",
             })
 
-        fc_progress = list(UserFlashcardProgress.objects.filter(user_id=username).order_by('-reviewed_at')[:30])
+        # Flashcards protegidos contra UUID error
+        fc_progress = []
+        try:
+            fc_progress = list(UserFlashcardProgress.objects.filter(user_id=username).order_by('-reviewed_at')[:30])
+        except Exception:
+            pass
         counts["flashcards"] += len(fc_progress)
 
-        vocab_learned = list(UserVocabulary.objects.filter(username=username).order_by('-created_at')[:30])
+        # Vocabulário aprendido
+        vocab_learned = []
+        try:
+            vocab_learned = list(UserVocabulary.objects.filter(username=username).order_by('-created_at')[:30])
+        except Exception:
+            pass
         counts["vocabulary"] += len(vocab_learned)
 
         return {
@@ -906,7 +933,7 @@ class DashboardService:
             "flashcards": [
                 {
                     "id": str(f.id),
-                    "flashcard_id": f.flashcard_id,
+                    "flashcard_id": str(f.flashcard_id),
                     "status": f.status,
                     "reviewed_at": f.reviewed_at.isoformat() if f.reviewed_at else "",
                 }
