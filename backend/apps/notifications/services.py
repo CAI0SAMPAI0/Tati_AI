@@ -302,7 +302,6 @@ class NotificationDispatcher:
             "url": url,
             "tag": tag,
             "icon": "/icons/icon-192x192.png",
-            "badge": "/icons/icon-192x192.png",
         })
 
         for sub in subs:

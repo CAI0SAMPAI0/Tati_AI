@@ -190,11 +190,14 @@ self.addEventListener('push', (event) => {
     }
   }
 
+  const origin = self.location.origin;
+  const rawIcon = data.icon || '/icons/icon-192x192.png';
+  const iconUrl = rawIcon.startsWith('http') ? rawIcon : `${origin}${rawIcon.startsWith('/') ? '' : '/'}${rawIcon}`;
+
   const title = data.title || 'Teacher Tatiana';
   const options = {
     body: data.body || data.message || 'You have a new study notification!',
-    icon: data.icon || '/icons/icon-192x192.png',
-    badge: data.badge || '/icons/icon-192x192.png',
+    icon: iconUrl,
     image: data.image || undefined,
     vibrate: [200, 100, 200],
     tag: data.tag || 'tati-notification',
