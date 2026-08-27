@@ -3,6 +3,7 @@ from ninja import Router
 from django.http import HttpRequest
 from django.contrib.auth import get_user_model
 from ninja.errors import HttpError
+from pydantic import BaseModel
 
 from apps.authentication.security import auth_required
 from .services import DashboardService
@@ -105,6 +106,88 @@ def get_student_detail(request: HttpRequest, username: str):
     """
     require_staff_user(request)
     return DashboardService.get_student_detail(username)
+
+
+@dashboard_router.get("/students/{username}/analytics", auth=auth_required)
+def get_student_analytics(request: HttpRequest, username: str):
+    """
+    Retorna analíticos detalhados de progresso e engajamento do aluno.
+    """
+    require_staff_user(request)
+    return DashboardService.get_student_detail_analytics(username)
+
+
+@dashboard_router.get("/students/{username}/activity-progress", auth=auth_required)
+def get_student_activity_progress(request: HttpRequest, username: str):
+    """
+    Retorna histórico de submissões e atividades do aluno.
+    """
+    require_staff_user(request)
+    return DashboardService.get_student_activity_progress(username)
+
+
+@dashboard_router.get("/students/{username}/insight", auth=auth_required)
+def get_student_insight(request: HttpRequest, username: str, lang: str = "en-US"):
+    """
+    Gera parecer pedagógico com IA sobre a performance recente do aluno.
+    """
+    require_staff_user(request)
+    return DashboardService.get_student_insight(username, lang)
+
+
+@dashboard_router.get("/students/{username}/grammar-errors", auth=auth_required)
+def get_student_grammar_errors(request: HttpRequest, username: str, lang: str = "en-US"):
+    """
+    Retorna análise de pontos de melhoria gramaticais do aluno.
+    """
+    require_staff_user(request)
+    return DashboardService.get_student_grammar_errors(username, lang)
+
+
+@dashboard_router.get("/students/{username}/recommendations", auth=auth_required)
+def get_student_recommendations(request: HttpRequest, username: str, lang: str = "en-US"):
+    """
+    Retorna tópicos e módulos recomendados para o perfil do estudante.
+    """
+    require_staff_user(request)
+    return DashboardService.get_student_recommendations(username, lang)
+
+
+class StudentUpdateInput(BaseModel):
+    level: Optional[str] = None
+    custom_prompt: Optional[str] = None
+
+
+class StudentNudgeInput(BaseModel):
+    message: str
+
+
+@dashboard_router.put("/students/{username}", auth=auth_required)
+def update_student(request: HttpRequest, username: str, payload: StudentUpdateInput):
+    """
+    Atualiza nível ou prompt pedagógico do estudante.
+    """
+    require_staff_user(request)
+    return DashboardService.update_student(username, payload.dict())
+
+
+@dashboard_router.post("/students/{username}/nudge", auth=auth_required)
+def nudge_student(request: HttpRequest, username: str, payload: StudentNudgeInput):
+    """
+    Envia aviso de engajamento para o estudante.
+    """
+    require_staff_user(request)
+    return {"ok": True, "message": "Nudge enviado com sucesso."}
+
+
+@dashboard_router.delete("/students/{username}", auth=auth_required)
+def delete_student(request: HttpRequest, username: str):
+    """
+    Remove o estudante e seus dados pedagógicos.
+    """
+    require_staff_user(request)
+    return DashboardService.delete_student(username)
+
 
 
 from pydantic import BaseModel

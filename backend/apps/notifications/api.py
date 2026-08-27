@@ -46,6 +46,7 @@ def get_vapid_public_key(request: HttpRequest):
 
 # ── REGISTRO DE WEBPUSH ───────────────────────────────────────────────
 
+@notifications_router.post("/subscribe", auth=auth_required)
 @notifications_router.post("/subscribe-push", auth=auth_required)
 def subscribe_push(request: HttpRequest, payload: SubscribePushInput):
     """

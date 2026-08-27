@@ -34,7 +34,6 @@ INSTALLED_APPS = [
     # Third-party Apps
     'corsheaders',
     'channels',
-    'debug_toolbar',
     'django_celery_results',
     'django_celery_beat',
 
@@ -54,7 +53,6 @@ AUTH_USER_MODEL = 'authentication.User'
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'debug_toolbar.middleware.DebugToolbarMiddleware',
     'app.middleware.PerformanceMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -64,16 +62,15 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-def show_toolbar_callback(request):
-    if os.getenv('DJANGO_SETTINGS_MODULE', '').endswith('development') or os.getenv('DEBUG', 'false').lower() in ('true', '1'):
-        return True
-    return bool(getattr(request, 'user', None) and getattr(request.user, 'is_staff', False))
-
-DEBUG_TOOLBAR_CONFIG = {
-    'SHOW_TOOLBAR_CALLBACK': 'app.settings.base.show_toolbar_callback',
-    'RENDER_PANELS': True,
-}
-INTERNAL_IPS = ['127.0.0.1', 'localhost']
+# Ativa debug_toolbar apenas se explicitamente habilitado via variável de ambiente (desativado por padrão em produção/HF)
+if os.getenv('ENABLE_DEBUG_TOOLBAR', 'false').lower() in ('true', '1'):
+    INSTALLED_APPS.append('debug_toolbar')
+    MIDDLEWARE.insert(2, 'debug_toolbar.middleware.DebugToolbarMiddleware')
+    DEBUG_TOOLBAR_CONFIG = {
+        'SHOW_TOOLBAR_CALLBACK': lambda req: True,
+        'RENDER_PANELS': True,
+    }
+    INTERNAL_IPS = ['127.0.0.1', 'localhost']
 
 ROOT_URLCONF = 'app.urls'
 
@@ -222,6 +219,7 @@ PROGRAMMER_USERNAMES = [
     for u in os.getenv('PROGRAMMER_USERNAMES', 'programador,admin,caio').split(',')
     if u.strip()
 ]
+
 # ── GOOGLE OAUTH ──────────────────────────────────────────────────────
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID') or os.getenv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')

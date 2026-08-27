@@ -432,14 +432,19 @@ def proxy_activity_image(request: HttpRequest, url: str):
         return HttpResponse(body, content_type=content_type, headers={"Cache-Control": "public, max-age=86400"})
     
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://test-english.com/" if "test-english" in url else "https://www.liveworksheets.com/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Sec-Fetch-Dest": "image",
+        "Sec-Fetch-Mode": "no-cors",
+        "Sec-Fetch-Site": "cross-site",
+        "Referer": "https://www.liveworksheets.com/" if "liveworksheets" in url else "https://test-english.com/",
     }
     try:
         with httpx.Client(headers=headers, follow_redirects=True, timeout=10.0) as client:
             resp = client.get(url)
             if resp.status_code == 200:
-                ct = resp.headers.get("content-type", "image/jpeg")
+                ct = resp.headers.get("content-type", "image/webp" if "webp" in url else "image/jpeg")
                 _ACTIVITY_IMAGE_CACHE[url] = (resp.content, ct)
                 if len(_ACTIVITY_IMAGE_CACHE) > 2000:
                     _ACTIVITY_IMAGE_CACHE.pop(next(iter(_ACTIVITY_IMAGE_CACHE)))
@@ -447,7 +452,9 @@ def proxy_activity_image(request: HttpRequest, url: str):
     except Exception as e:
         logger.warning(f"[ImageProxy] Erro ao buscar imagem {url}: {e}")
     
-    return HttpResponse(status=404)
+    # Fallback transparente SVG para evitar erro quebrado no frontend
+    fallback_svg = '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"><rect width="400" height="300" fill="#1e293b"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#94a3b8" font-family="sans-serif" font-size="16">Activity Worksheet</text></svg>'
+    return HttpResponse(fallback_svg, content_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
 
 
 @activities_router.get("/hub/{content_id}/pages/{page_index}", auth=auth_optional)

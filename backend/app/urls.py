@@ -9,8 +9,8 @@ urlpatterns = [
     # Painel Administrativo Nativo do Django
     path('django-admin/', admin.site.urls),
 
-    # Django Debug Toolbar
-    path('__debug__/', include('debug_toolbar.urls')),
+    # Django Debug Toolbar (apenas se habilitado nas settings)
+    *([path('__debug__/', include('debug_toolbar.urls'))] if 'debug_toolbar' in settings.INSTALLED_APPS else []),
 
     # Servir arquivos estáticos (CSS, JS, Imagens do Admin) e de Mídia
     re_path(r'^static/(?P<path>.*)$', serve, {'document_root': settings.STATIC_ROOT}),
