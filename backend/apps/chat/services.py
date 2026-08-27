@@ -2,10 +2,8 @@ import os
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import List, AsyncGenerator
-from django.contrib.auth import get_user_model
+from typing import List
 from django.utils import timezone as django_timezone
-from ninja.errors import HttpError
 from groq import Groq
 import google.generativeai as genai
 
@@ -16,9 +14,9 @@ from .schemas import (
     MessageOut,
     SendMessageInput,
 )
+from apps.authentication.models import User
 from apps.users.services import XPService, StreakService
 
-User = get_user_model()
 logger = logging.getLogger(__name__)
 
 # Configuração dos clientes de IA
@@ -61,7 +59,7 @@ def get_groq_keys() -> List[str]:
 class ConversationService:
     @staticmethod
     def list_conversations(user: User) -> List[ConversationOut]:
-        convs = Conversation.objects.filter(username=user.username)[:50]
+        convs = Conversation.objects.filter(username=user.username).only("id", "title", "model", "is_simulation", "created_at", "updated_at")[:50]
         return [
             ConversationOut(
                 id=c.id,

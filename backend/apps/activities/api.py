@@ -176,7 +176,7 @@ def get_games(request: HttpRequest):
     """
     Lista jogos educativos interativos (Wordwall).
     """
-    qs = Game.objects.filter(is_published=True)
+    qs = Game.objects.filter(is_published=True).only("id", "title", "description", "wordwall_url", "levels")
     return [
         GameOut(
             id=g.id,
@@ -194,7 +194,7 @@ def get_news(request: HttpRequest):
     """
     Lista notícias em inglês graduadas por nível CEFR.
     """
-    qs = NewsItem.objects.filter(is_published=True)
+    qs = NewsItem.objects.filter(is_published=True).only("id", "title", "url", "description", "levels", "thumbnail_url")
     return [
         NewsOut(
             id=n.id,

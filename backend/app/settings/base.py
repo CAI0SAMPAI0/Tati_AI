@@ -107,7 +107,7 @@ DATABASE_URL = (
 if DATABASE_URL:
     db_config = dj_database_url.config(
         default=DATABASE_URL,
-        conn_max_age=0,
+        conn_max_age=600,
         conn_health_checks=True,
     )
     if 'pooler.supabase.com' in str(db_config.get('HOST', '')) and not db_config.get('PORT'):

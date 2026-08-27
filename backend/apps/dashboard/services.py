@@ -1,15 +1,15 @@
 import logging
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
-from typing import List, Dict, Any, Optional
-from django.contrib.auth import get_user_model
+from typing import Optional
+from django.db.models import Count, Max
+from django.db.models.functions import TruncDate
 from ninja.errors import HttpError
 
+from apps.authentication.models import User
 from apps.chat.models import Message, SimulationScenario, CEFRSimulation
-from apps.activities.models import ActivitySubmission, Flashcard, Module, Game, NewsItem
-from apps.payments.models import Subscription, Order
+from apps.activities.models import ActivitySubmission, Module, Game, NewsItem
 
-User = get_user_model()
 logger = logging.getLogger(__name__)
 
 EXCLUDED_USERS = ["programador", "admin", "professor", "professora"]
@@ -60,16 +60,16 @@ class DashboardService:
     @staticmethod
     def get_stats() -> dict:
         today = date.today()
-        users = list(User.objects.exclude(username__in=EXCLUDED_USERS))
-        students = [u for u in users if u.role != 'buyer']
-        buyers = [u for u in users if u.role == 'buyer']
+        base_users = User.objects.exclude(username__in=EXCLUDED_USERS)
+        total_students = base_users.exclude(role='buyer').count()
+        total_buyers = base_users.filter(role='buyer').count()
 
         messages_today = Message.objects.filter(role='user', created_at__date=today).count()
-        active_today = len(set(Message.objects.filter(role='user', created_at__date=today).values_list('username', flat=True)))
+        active_today = Message.objects.filter(role='user', created_at__date=today).values('username').distinct().count()
 
         return {
-            "total_students": len(students),
-            "total_buyers": len(buyers),
+            "total_students": total_students,
+            "total_buyers": total_buyers,
             "total_messages": messages_today,
             "active_today": active_today,
         }
@@ -78,7 +78,7 @@ class DashboardService:
     def get_my_stats(username: str) -> dict:
         msgs = Message.objects.filter(username=username, role='user').count()
         subs = ActivitySubmission.objects.filter(username=username).count()
-        u = User.objects.filter(username=username).first()
+        u = User.objects.filter(username=username).only('streak_data', 'xp_data').first()
         streak = u.streak_count if u else 0
         xp = u.total_xp if u else 0
 
@@ -94,11 +94,14 @@ class DashboardService:
 
     @staticmethod
     def get_reports_overview() -> dict:
-        users = list(User.objects.exclude(username__in=EXCLUDED_USERS).exclude(role='buyer'))
-        total_students = len(users)
+        base_users = User.objects.exclude(username__in=EXCLUDED_USERS).exclude(role='buyer')
+        total_students = base_users.count()
 
         total_msgs = Message.objects.filter(role='user').count()
         total_exercises = ActivitySubmission.objects.count()
+
+        # Carrega apenas campos necessários para métricas de usuário
+        users = list(base_users.only('id', 'name', 'username', 'level', 'streak_data', 'xp_data'))
 
         active_users = [u for u in users if u.streak_count > 0]
         avg_streak = round(sum(u.streak_count for u in users) / total_students, 1) if total_students > 0 else 0.0
@@ -112,13 +115,17 @@ class DashboardService:
             lvl = (u.level or "A1").upper()
             counts[lvl] = counts.get(lvl, 0) + 1
 
-        # Weekly activity (últimos 7 dias)
+        # Weekly activity em UMA ÚNICA query agregada com TruncDate
         today = date.today()
-        weekly_counts = []
-        for i in range(6, -1, -1):
-            d = today - timedelta(days=i)
-            c = Message.objects.filter(role='user', created_at__date=d).count()
-            weekly_counts.append(c)
+        seven_days_ago = today - timedelta(days=6)
+        daily_counts_qs = (
+            Message.objects.filter(role='user', created_at__date__gte=seven_days_ago)
+            .annotate(day=TruncDate('created_at'))
+            .values('day')
+            .annotate(count=Count('id'))
+        )
+        counts_by_day = {item['day']: item['count'] for item in daily_counts_qs}
+        weekly_counts = [counts_by_day.get(today - timedelta(days=i), 0) for i in range(6, -1, -1)]
 
         return {
             "total_students": total_students,
@@ -139,32 +146,37 @@ class DashboardService:
         if level:
             users = users.filter(level__iexact=level)
 
-        # Mapeia última mensagem por usuário
-        latest_msgs = {}
-        msg_counts = {}
-        for m in Message.objects.filter(role='user').order_by('created_at'):
-            latest_msgs[m.username] = m.created_at
-            msg_counts[m.username] = msg_counts.get(m.username, 0) + 1
+        # Mapeia última mensagem e total por usuário via agregação SQL
+        msg_stats = (
+            Message.objects.filter(role='user')
+            .values('username')
+            .annotate(count=Count('id'), last_active=Max('created_at'))
+        )
+        msg_counts = {m['username']: m['count'] for m in msg_stats}
+        latest_msgs = {m['username']: m['last_active'] for m in msg_stats}
 
-        # Mapeia última submissão por usuário
-        latest_subs = {}
-        for s in ActivitySubmission.objects.all().order_by('created_at'):
-            latest_subs[s.username] = s.created_at
+        # Mapeia última submissão por usuário via agregação SQL
+        sub_stats = (
+            ActivitySubmission.objects.values('username')
+            .annotate(last_active=Max('created_at'))
+        )
+        latest_subs = {s['username']: s['last_active'] for s in sub_stats}
 
         # Mapeia última palavra adicionada no vocabulário
         latest_vocab = {}
         try:
             from apps.activities.models import UserVocabulary, UserFlashcardProgress
-            for v in UserVocabulary.objects.all().order_by('created_at'):
-                latest_vocab[v.username] = v.created_at
+            vocab_stats = UserVocabulary.objects.values('username').annotate(last_active=Max('created_at'))
+            latest_vocab = {v['username']: v['last_active'] for v in vocab_stats}
         except Exception:
             pass
 
         # Mapeia última revisão de flashcard
         latest_fc = {}
         try:
-            for f in UserFlashcardProgress.objects.all().order_by('reviewed_at'):
-                latest_fc[f.user_id] = f.reviewed_at
+            from apps.activities.models import UserFlashcardProgress
+            fc_stats = UserFlashcardProgress.objects.values('user_id').annotate(last_active=Max('reviewed_at'))
+            latest_fc = {f['user_id']: f['last_active'] for f in fc_stats}
         except Exception:
             pass
 
