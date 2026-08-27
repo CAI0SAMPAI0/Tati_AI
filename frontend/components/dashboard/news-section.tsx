@@ -154,6 +154,23 @@ export default function NewsSection() {
     }
   };
 
+  const handleToggleLevel = (levelValue: string) => {
+    setFormData((prev) => {
+      const current = prev.levels.map((l) => l.toUpperCase());
+      const target = levelValue.toUpperCase();
+      const isCurrentlySelected = current.includes(target);
+
+      let newLevels: string[];
+      if (isCurrentlySelected) {
+        newLevels = prev.levels.filter((l) => l.toUpperCase() !== target);
+      } else {
+        newLevels = [...prev.levels, levelValue];
+      }
+
+      return { ...prev, levels: newLevels };
+    });
+  };
+
   const openModal = (item?: NewsRow) => {
     if (item) {
       setEditingNews(item);
@@ -169,21 +186,6 @@ export default function NewsSection() {
       setFormData(EMPTY_FORM);
     }
     setIsModalOpen(true);
-  };
-
-  const handleToggleLevel = (level: string) => {
-    setFormData((prev) => {
-      const current = prev.levels;
-      if (level === 'all') {
-        return { ...prev, levels: ['all'] };
-      }
-      const filtered = current.filter((l) => l !== 'all' && l !== 'ALL');
-      if (filtered.includes(level)) {
-        const next = filtered.filter((l) => l !== level);
-        return { ...prev, levels: next.length === 0 ? ['all'] : next };
-      }
-      return { ...prev, levels: [...filtered, level] };
-    });
   };
 
   const handleSave = async () => {
@@ -325,93 +327,96 @@ export default function NewsSection() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredNews.length > 0 ? filteredNews.map((n) => {
-          const isSelected = selectedNewsIds.includes(n.id);
-          return (
-          <div
-            key={n.id}
-            className={cn(
-              "bg-surface border rounded-2xl overflow-hidden flex flex-col group transition-all relative",
-              isSelected ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-border hover:border-primary/40"
-            )}
-          >
-            <div className="h-32 bg-bg-secondary relative overflow-hidden">
-              <button
-                type="button"
-                onClick={() => toggleSelectNews(n.id)}
-                className="absolute top-2 left-2 z-10 bg-surface/90 backdrop-blur-sm rounded-lg p-1 text-text-muted hover:text-primary transition-all shadow"
-                title={isSelected ? "Deselect" : "Select"}
+        {filteredNews.length > 0 ? (
+          filteredNews.map((n) => {
+            const isSelected = selectedNewsIds.includes(n.id);
+            return (
+              <div
+                key={n.id}
+                className={cn(
+                  "bg-surface border rounded-2xl overflow-hidden flex flex-col group transition-all relative",
+                  isSelected ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-border hover:border-primary/40"
+                )}
               >
-                {isSelected ? <CheckSquare size={16} className="text-primary" /> : <Square size={16} />}
-              </button>
-              {n.thumbnail_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={n.thumbnail_url}
-                  alt={n.title}
-                  loading="lazy"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-primary/5 text-primary/40">
-                  <Newspaper size={36} />
+                <div className="h-32 bg-bg-secondary relative overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => toggleSelectNews(n.id)}
+                    className="absolute top-2 left-2 z-10 bg-surface/90 backdrop-blur-sm rounded-lg p-1 text-text-muted hover:text-primary transition-all shadow"
+                    title={isSelected ? "Deselect" : "Select"}
+                  >
+                    {isSelected ? <CheckSquare size={16} className="text-primary" /> : <Square size={16} />}
+                  </button>
+                  {n.thumbnail_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={n.thumbnail_url}
+                      alt={n.title}
+                      loading="lazy"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-primary/5 text-primary/40">
+                      <Newspaper size={36} />
+                    </div>
+                  )}
+                  <span className={cn(
+                    'absolute top-2 right-2 text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider shadow backdrop-blur-sm',
+                    n.is_published ? 'bg-success/90 text-white border-success' : 'bg-warning/90 text-white border-warning'
+                  )}>
+                    {n.is_published ? 'Published' : 'Draft'}
+                  </span>
                 </div>
-              )}
-              <span className={cn(
-                'absolute top-2 right-2 text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider shadow backdrop-blur-sm',
-                n.is_published ? 'bg-success/90 text-white border-success' : 'bg-warning/90 text-white border-warning'
-              )}>
-                {n.is_published ? 'Published' : 'Draft'}
-              </span>
-            </div>
 
-            <div className="p-5 flex flex-col gap-3 flex-1">
-              <div className="flex items-start justify-between gap-2">
-                <h4 className="font-bold text-text truncate flex-1">{n.title}</h4>
-                <div className="flex flex-wrap gap-1 justify-end shrink-0">
-                  {(n.levels || ['all']).map((l) => (
-                    <span key={l} className="text-[0.6rem] font-bold px-2 py-0.5 rounded-full bg-surface-hover border border-border uppercase tracking-widest text-text-subtle">
-                      {l === 'all' || l === 'ALL' ? 'All' : l.toUpperCase()}
-                    </span>
-                  ))}
+                <div className="p-5 flex flex-col gap-3 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="font-bold text-text truncate flex-1">{n.title}</h4>
+                    <div className="flex flex-wrap gap-1 justify-end shrink-0">
+                      {(n.levels || ['all']).map((l) => (
+                        <span key={l} className="text-[0.6rem] font-bold px-2 py-0.5 rounded-full bg-surface-hover border border-border uppercase tracking-widest text-text-subtle">
+                          {l === 'all' || l === 'ALL' ? 'All' : l.toUpperCase()}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  {n.description && (
+                    <p className="text-xs text-text-muted line-clamp-2 leading-relaxed">{n.description}</p>
+                  )}
+                </div>
+
+                <div className="px-5 pb-5 flex items-center gap-2 mt-auto">
+                  <a
+                    href={n.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all text-xs font-bold border border-primary/20"
+                    title="Read article"
+                  >
+                    <ExternalLink size={14} /> Read
+                  </a>
+                  <button onClick={() => openModal(n)} className="p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title="Edit">
+                    <PenLine size={14} />
+                  </button>
+                  <button
+                    onClick={() => handleTogglePublish(n.id, !!n.is_published)}
+                    className="p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border"
+                    title={n.is_published ? 'Unpublish (Draft)' : 'Publish'}
+                  >
+                    {n.is_published ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(n.id)}
+                    className="p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle border border-border"
+                    title="Delete"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </div>
-              {n.description && (
-                <p className="text-xs text-text-muted line-clamp-2 leading-relaxed">{n.description}</p>
-              )}
-            </div>
-
-            <div className="px-5 pb-5 flex items-center gap-2 mt-auto">
-              <a
-                href={n.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all text-xs font-bold border border-primary/20"
-                title="Open link"
-              >
-                <ExternalLink size={14} /> Open
-              </a>
-              <button onClick={() => openModal(n)} className="p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title="Edit">
-                <PenLine size={14} />
-              </button>
-              <button
-                onClick={() => handleTogglePublish(n.id, !!n.is_published)}
-                className="p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border"
-                title={n.is_published ? 'Unpublish (Draft)' : 'Publish'}
-              >
-                {n.is_published ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-              <button
-                onClick={() => handleDelete(n.id)}
-                className="p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle border border-border"
-                title="Delete"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </div>
-        )) : (
+            );
+          })
+        ) : (
           <div className="col-span-full py-20 text-center border border-dashed border-border rounded-3xl bg-surface/30">
             <Newspaper size={40} className="mx-auto mb-4 opacity-20" />
             <p className="text-text-muted font-medium">No news created yet.</p>
@@ -426,26 +431,21 @@ export default function NewsSection() {
       >
         <div className="space-y-4">
           <Input
+            label="News Title"
+            value={formData.title}
+            onChange={setField('title')}
+            placeholder="Ex: BBC Learning English - World News"
+          />
+          <Input
             label="News URL"
             value={formData.url}
             onChange={setField('url')}
-            placeholder="https://www.instagram.com/reels/... or https://news-site.com/..."
+            placeholder="https://..."
           />
-          <div className="space-y-1.5">
-            <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">Title</label>
-            <Input
-              value={formData.title}
-              onChange={setField('title')}
-              placeholder="Leave empty to fetch automatically from the link"
-            />
-            <p className="text-[0.65rem] text-text-muted italic">
-              Optional — if empty, the backend gets the title (and thumbnail) from the link automatically.
-            </p>
-          </div>
           <div className="space-y-1.5">
             <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">Description</label>
             <textarea
-              placeholder="Optional short description"
+              placeholder="Brief summary or context of the news"
               className="w-full min-h-[80px] p-3 bg-input border border-border rounded-xl text-sm outline-none focus:border-primary/50 transition-all leading-relaxed"
               value={formData.description}
               onChange={setField('description')}
@@ -464,40 +464,33 @@ export default function NewsSection() {
                     className={cn(
                       'px-3 py-1.5 rounded-lg text-xs font-bold border transition-all',
                       isActive
-                        ? 'bg-primary text-white border-primary'
-                        : 'bg-surface border-border text-text-muted hover:border-primary/50'
+                        ? 'bg-primary text-white border-primary shadow-sm'
+                        : 'bg-surface text-text-muted border-border hover:border-primary/40'
                     )}
                   >
-                    {opt.value}
+                    {opt.label}
                   </button>
                 );
               })}
             </div>
-            <p className="text-[0.65rem] text-text-muted italic">
-              Select which levels can see this news. If none selected, it shows for all.
-            </p>
           </div>
-
-          <div className="flex items-center gap-3">
-            <label className="text-[0.73rem] font-semibold text-text-muted uppercase tracking-wider">Published</label>
-            <button
-              type="button"
-              onClick={() => setFormData((prev) => ({ ...prev, is_published: !prev.is_published }))}
-              className={cn(
-                'relative w-10 h-5 rounded-full transition-colors',
-                formData.is_published ? 'bg-primary' : 'bg-border'
-              )}
-            >
-              <span className={cn(
-                'absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform',
-                formData.is_published && 'translate-x-5'
-              )} />
-            </button>
+          <div className="flex items-center gap-2 pt-2">
+            <input
+              type="checkbox"
+              id="is_published_news"
+              checked={formData.is_published}
+              onChange={(e) => setFormData((prev) => ({ ...prev, is_published: e.target.checked }))}
+              className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
+            />
+            <label htmlFor="is_published_news" className="text-xs text-text-muted font-medium cursor-pointer">
+              Publish immediately (visible to students)
+            </label>
           </div>
-
-          <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-border">
-            <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} loading={isSaving}>Save</Button>
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
+            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? 'Saving...' : editingNews ? 'Save Changes' : 'Create News'}
+            </Button>
           </div>
         </div>
       </DialogModal>

@@ -31,7 +31,7 @@ import { useVoiceLiveSocket } from '@/hooks/useVoiceLiveSocket';
 import { VoiceAvatar } from '@/components/chat/voice-avatar';
 import { VoiceMessageBubble } from '@/components/chat/voice-message-bubble';
 import WordTooltip from '@/components/chat/word-tooltip';
-import { apiGet, apiPost } from '@/lib/api/client';
+import { apiGet, apiPost, apiPut } from '@/lib/api/client';
 import toast from 'react-hot-toast';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/providers/auth-provider';

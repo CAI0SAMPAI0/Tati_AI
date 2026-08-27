@@ -16,6 +16,8 @@ export interface User {
   nickname?: string;
   occupation?: string;
   focus?: string;
+  preferred_accent?: string;
+  accent?: string;
   /**
    * Optional nested profile information returned by the backend.
    * Currently used for `responsible_email` in the profile page.
@@ -25,6 +27,8 @@ export interface User {
     whatsapp_number?: string;
     allow_whatsapp_notifications?: boolean;
     whatsapp_onboarded?: boolean;
+    preferred_accent?: string;
+    accent?: string;
   };
 }
 

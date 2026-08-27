@@ -1,9 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
 import {
   Plus,
   Trash2,
@@ -41,7 +39,6 @@ interface SimulationRow {
   emoji?: string;
 }
 
-
 interface FormState {
   name: string;
   description: string;
@@ -75,14 +72,14 @@ export default function SimulationsSection() {
   const invalidateSimulations = () => queryClient.invalidateQueries({ queryKey: ['admin-simulations'] });
 
   const handleToggleLevel = (levelValue: string) => {
-    setFormData(prev => {
-      const current = prev.levels.map(l => l.toUpperCase());
+    setFormData((prev) => {
+      const current = prev.levels.map((l) => l.toUpperCase());
       const target = levelValue.toUpperCase();
       const isCurrentlySelected = current.includes(target);
 
       let newLevels: string[];
       if (isCurrentlySelected) {
-        newLevels = prev.levels.filter(l => l.toUpperCase() !== target);
+        newLevels = prev.levels.filter((l) => l.toUpperCase() !== target);
       } else {
         newLevels = [...prev.levels, levelValue];
       }
@@ -90,7 +87,6 @@ export default function SimulationsSection() {
       return { ...prev, levels: newLevels };
     });
   };
-
 
   const [filterLevel, setFilterLevel] = useState('all');
   const [selectedSimIds, setSelectedSimIds] = useState<string[]>([]);
@@ -178,7 +174,7 @@ export default function SimulationsSection() {
 
   const handleTogglePublish = async (id: string, current: boolean) => {
     try {
-      await apiPut(`${ENDPOINTS.ADMIN_SIMULATIONS}/${id}`, { is_published: !current });
+      await apiPut(`${ENDPOINTS.ADMIN_SIMULATIONS}/${id}`, { is_published: !current, is_active: !current });
       toast.success(current ? 'Simulation returned to drafts' : 'Simulation published!');
       invalidateSimulations();
     } catch {
@@ -189,12 +185,12 @@ export default function SimulationsSection() {
   const openModal = (sim?: SimulationRow) => {
     if (sim) {
       setEditingSim(sim);
-      const existingLevels = (sim as any).levels || (sim.difficulty && sim.difficulty !== 'all' && sim.difficulty !== 'todos' ? [sim.difficulty] : []);
+      const simLevels = sim.levels || (sim.difficulty && sim.difficulty !== 'all' ? [sim.difficulty] : []);
       setFormData({
         name: sim.name || '',
         description: sim.description || '',
-        difficulty: sim.difficulty === 'all' || sim.difficulty === 'todos' ? 'all' : normalizeLevel(sim.difficulty),
-        levels: Array.isArray(existingLevels) ? existingLevels : [],
+        difficulty: sim.difficulty || 'all',
+        levels: Array.isArray(simLevels) ? simLevels : [],
         system_prompt: sim.system_prompt || '',
         emoji: sim.emoji || '🎭',
       });
@@ -206,77 +202,38 @@ export default function SimulationsSection() {
   };
 
   const handleGenerateWithAI = async () => {
-    if (!formData.system_prompt.trim()) {
-      toast.error('Please provide a context or instructions first.');
+    if (!formData.name.trim()) {
+      toast.error('Please enter at least a topic name to generate.');
       return;
     }
     setIsGenerating(true);
+    const toastId = toast.loading('Teacher Tati AI is crafting this simulation...');
     try {
-      const payload = {
-        topic: formData.name || 'New Simulation',
-        levels: formData.levels,
-        instructions: formData.system_prompt,
-        use_ai_generation: true
-      };
+      const res = await apiPost<{ task_id?: string; detail?: string; simulation_id?: string }>(
+        ENDPOINTS.ADMIN_SIMULATIONS,
+        {
+          name: formData.name,
+          description: formData.description,
+          difficulty: formData.difficulty,
+          levels: formData.levels,
+          use_ai_generation: true,
+          is_ai_generated: true,
+        }
+      );
 
-      const res = await apiPost<{ success: boolean; task_id?: string }>(ENDPOINTS.ADMIN_SIMULATIONS, payload);
-
-      if (res.ok && res.data.success && res.data.task_id) {
-        const taskId = res.data.task_id;
-        toast.loading('AI is generating the scenario...', { id: taskId });
-        
-        const MAX_POLL_RETRIES = 60;
-        let pollRetries = 0;
-        const pollInterval = setInterval(async () => {
-          try {
-            pollRetries++;
-            if (pollRetries > MAX_POLL_RETRIES) {
-              clearInterval(pollInterval);
-              setIsGenerating(false);
-              toast.error('Generation timed out. Please try again.', { id: taskId });
-              return;
-            }
-            const statusRes = await apiGet<{status: string; result?: any; error?: string}>(`/tasks/status/${taskId}`);
-            if (statusRes) {
-              if (statusRes.status === 'success') {
-                clearInterval(pollInterval);
-                setIsGenerating(false);
-                toast.success('Simulation generated successfully!', { id: taskId });
-                
-                const updatedSim = statusRes.result as SimulationRow;
-                if (updatedSim) {
-                  const updatedLevels = (updatedSim as any).levels || (updatedSim.difficulty && updatedSim.difficulty !== 'all' ? [updatedSim.difficulty] : []);
-                  setFormData({
-                    name: updatedSim.name,
-                    description: updatedSim.description || '',
-                    difficulty: updatedSim.difficulty || 'all',
-                    levels: Array.isArray(updatedLevels) ? updatedLevels : [],
-                    system_prompt: updatedSim.system_prompt || '',
-                    emoji: updatedSim.emoji || '🎭',
-                  });
-                  if (!editingSim) setEditingSim(updatedSim);
-                }
-                
-                await invalidateSimulations();
-              } else if (statusRes.status === 'failed') {
-                clearInterval(pollInterval);
-                setIsGenerating(false);
-                toast.error(`Failed to generate: ${statusRes.error || 'Unknown error'}`, { id: taskId });
-              }
-            }
-          } catch (err: any) {
-            clearInterval(pollInterval);
-            setIsGenerating(false);
-            toast.error(`Error checking status: ${err.message}`, { id: taskId });
-          }
-        }, 2000);
+      if (res.ok) {
+        toast.dismiss(toastId);
+        toast.success('Simulation generated successfully!');
+        setIsGenerating(false);
+        await invalidateSimulations();
+        setIsModalOpen(false);
       } else {
         setIsGenerating(false);
-        toast.error('Error generating with AI.');
+        toast.error('Error generating with AI.', { id: toastId });
       }
     } catch {
       setIsGenerating(false);
-      toast.error('Connection error with AI.');
+      toast.error('Connection error with AI.', { id: toastId });
     }
   };
 
@@ -318,9 +275,9 @@ export default function SimulationsSection() {
     const toastId = toast.loading('Starting simulation...');
     try {
       const res = await apiPost(ENDPOINTS.CONVERSATIONS, {
-        title: "Simulation: " + s.name,
+        title: 'Simulation: ' + s.name,
         is_simulation: true,
-        simulation_id: s.id
+        simulation_id: s.id,
       });
       if (res.ok && (res.data as any)?.id) {
         toast.dismiss(toastId);
@@ -360,7 +317,7 @@ export default function SimulationsSection() {
             value={filterLevel}
             onChange={(e) => setFilterLevel(e.target.value)}
           >
-            {LEVEL_FILTER_OPTIONS.map(opt => (
+            {LEVEL_FILTER_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
@@ -432,94 +389,96 @@ export default function SimulationsSection() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredSimulations.length > 0 ? filteredSimulations.map((s: any) => {
-          const isSelected = selectedSimIds.includes(s.id);
-          return (
-          <div
-            key={s.id}
-            className={cn(
-              "bg-surface border p-5 rounded-2xl flex flex-col gap-4 group transition-all relative",
-              isSelected ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-border hover:border-primary/40"
-            )}
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => toggleSelectSim(s.id)}
-                  className="text-text-muted hover:text-primary transition-all p-0.5"
-                  title={isSelected ? "Deselect" : "Select"}
-                >
-                  {isSelected ? <CheckSquare size={17} className="text-primary" /> : <Square size={17} />}
-                </button>
-                <div className="bg-primary/10 w-10 h-10 rounded-xl flex items-center justify-center text-primary font-black uppercase text-xs">
-                  {(() => {
-                    const simLevels = s.levels || (s.difficulty && s.difficulty !== 'all' && s.difficulty !== 'todos' ? [s.difficulty] : []);
-                    if (Array.isArray(simLevels) && simLevels.length > 0) {
-                      return simLevels[0]?.[0] || 'B';
-                    }
-                    return s.difficulty === 'all' || s.difficulty === 'todos' ? 'A' : (s.difficulty?.[0] || 'B');
-                  })()}
+        {filteredSimulations.length > 0 ? (
+          filteredSimulations.map((s: any) => {
+            const isSelected = selectedSimIds.includes(s.id);
+            return (
+              <div
+                key={s.id}
+                className={cn(
+                  "bg-surface border p-5 rounded-2xl flex flex-col gap-4 group transition-all relative",
+                  isSelected ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-border hover:border-primary/40"
+                )}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleSelectSim(s.id)}
+                      className="text-text-muted hover:text-primary transition-all p-0.5"
+                      title={isSelected ? "Deselect" : "Select"}
+                    >
+                      {isSelected ? <CheckSquare size={17} className="text-primary" /> : <Square size={17} />}
+                    </button>
+                    <div className="bg-primary/10 w-10 h-10 rounded-xl flex items-center justify-center text-primary font-black uppercase text-xs">
+                      {(() => {
+                        const simLevels = s.levels || (s.difficulty && s.difficulty !== 'all' && s.difficulty !== 'todos' ? [s.difficulty] : []);
+                        if (Array.isArray(simLevels) && simLevels.length > 0) {
+                          return simLevels[0]?.[0] || 'B';
+                        }
+                        return s.difficulty === 'all' || s.difficulty === 'todos' ? 'A' : (s.difficulty?.[0] || 'B');
+                      })()}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={cn(
+                      "text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider",
+                      s.is_published ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'
+                    )}>
+                      {s.is_published ? 'Published' : 'Draft'}
+                    </span>
+                    <span className="text-[0.6rem] font-bold px-2 py-0.5 rounded-full bg-surface-hover border border-border uppercase tracking-widest text-text-subtle">
+                      {(() => {
+                        const simLevels = s.levels || (s.difficulty && s.difficulty !== 'all' && s.difficulty !== 'todos' ? [s.difficulty] : []);
+                        if (Array.isArray(simLevels) && simLevels.length > 0) {
+                          return simLevels.map((l: string) => levelLabel(l)).join(', ');
+                        }
+                        return s.difficulty === 'all' || s.difficulty === 'todos' ? 'All Levels' : levelLabel(s.difficulty);
+                      })()}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-text mb-1 truncate">{s.name}</h4>
+                  <p className="text-xs text-text-muted line-clamp-2 leading-relaxed h-8">
+                    {s.description}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 mt-auto pt-2">
+                  <button
+                    onClick={() => handleStartSimulation(s)}
+                    className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all text-xs font-bold border border-primary/20"
+                    title="Start simulation"
+                  >
+                    <Play size={14} /> Play
+                  </button>
+                  <button onClick={() => openModal(s)} className="p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title="Edit">
+                    <PenLine size={14} />
+                  </button>
+                  <button
+                    onClick={() => handleTogglePublish(s.id, !!s.is_published)}
+                    className="p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border"
+                    title={s.is_published ? 'Unpublish (Draft)' : 'Publish'}
+                  >
+                    {s.is_published ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(s.id)}
+                    className="p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle border border-border"
+                    title="Delete"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </div>
-              <div className="flex flex-col items-end gap-1">
-                <span className={cn(
-                  "text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider",
-                  s.is_published ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'
-                )}>
-                  {s.is_published ? 'Published' : 'Draft'}
-                </span>
-                <span className="text-[0.6rem] font-bold px-2 py-0.5 rounded-full bg-surface-hover border border-border uppercase tracking-widest text-text-subtle">
-                  {(() => {
-                    const simLevels = s.levels || (s.difficulty && s.difficulty !== 'all' && s.difficulty !== 'todos' ? [s.difficulty] : []);
-                    if (Array.isArray(simLevels) && simLevels.length > 0) {
-                      return simLevels.map((l: string) => levelLabel(l)).join(', ');
-                    }
-                    return s.difficulty === 'all' || s.difficulty === 'todos' ? 'All Levels' : levelLabel(s.difficulty);
-                  })()}
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-bold text-text mb-1 truncate">{s.name}</h4>
-              <p className="text-xs text-text-muted line-clamp-2 leading-relaxed h-8">
-                {s.description}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 mt-auto pt-2">
-              <button
-                onClick={() => handleStartSimulation(s)}
-                className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all text-xs font-bold border border-primary/20"
-                title="Start simulation"
-              >
-                <Play size={14} /> Play
-              </button>
-              <button onClick={() => openModal(s)} className="p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title="Edit">
-                <PenLine size={14} />
-              </button>
-              <button
-                onClick={() => handleTogglePublish(s.id, !!s.is_published)}
-                className="p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border"
-                title={s.is_published ? "Unpublish (Draft)" : "Publish"}
-              >
-                {s.is_published ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-              <button
-                onClick={() => handleDelete(s.id)}
-                className="p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle border border-border"
-                title="Delete"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </div>
-        )) : (
+            );
+          })
+        ) : (
           <div className="col-span-full py-20 text-center border border-dashed border-border rounded-3xl bg-surface/30">
             <Clapperboard size={40} className="mx-auto mb-4 opacity-20" />
-
-            <p className="text-text-muted font-medium">{'No simulations created yet.'}</p>
+            <p className="text-text-muted font-medium">No simulations created yet.</p>
           </div>
         )}
       </div>
@@ -530,88 +489,81 @@ export default function SimulationsSection() {
         title={editingSim ? 'Edit Simulation' : 'Create Simulation'}
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-4 gap-4">
-            <div className="col-span-3">
+          <div className="flex gap-3 items-end">
+            <div className="flex-1">
               <Input
-                label={'Simulation Name'}
+                label="Topic / Situation"
                 value={formData.name}
                 onChange={setField('name')}
-                placeholder="Ex: Job Interview at Google"
+                placeholder="Ex: Job interview for an international company"
               />
             </div>
-            <div>
-              <Input
-                label={'Emoji'}
-                value={formData.emoji}
-                onChange={setField('emoji')}
-                placeholder="🎭"
-              />
-            </div>
+            {!editingSim && (
+              <Button
+                type="button"
+                variant="secondary"
+                className="gap-2 shrink-0 bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20"
+                onClick={handleGenerateWithAI}
+                disabled={isGenerating || !formData.name.trim()}
+              >
+                <Sparkles size={16} />
+                {isGenerating ? 'Generating...' : 'Generate with AI'}
+              </Button>
+            )}
           </div>
-          <div className="mb-4">
+
+          <div className="space-y-1.5">
+            <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">Description (Context for the student)</label>
+            <textarea
+              placeholder="Ex: You are applying for a Senior Developer position..."
+              className="w-full min-h-[80px] p-3 bg-input border border-border rounded-xl text-sm outline-none focus:border-primary/50 transition-all leading-relaxed"
+              value={formData.description}
+              onChange={setField('description')}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">System Prompt (AI Persona & Instructions)</label>
+            <textarea
+              placeholder="Ex: You are the interviewer, Mr. Smith. Be formal and ask 3 technical questions..."
+              className="w-full min-h-[100px] p-3 bg-input border border-border rounded-xl text-sm font-mono text-xs outline-none focus:border-primary/50 transition-all leading-relaxed"
+              value={formData.system_prompt}
+              onChange={setField('system_prompt')}
+            />
+          </div>
+
+          <div className="space-y-1.5">
             <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">Levels</label>
-            <div className="flex flex-wrap gap-1.5">
-              {LEVEL_OPTIONS.map(opt => {
+            <div className="flex flex-wrap gap-2">
+              {LEVEL_OPTIONS.map((opt) => {
                 const isActive = formData.levels.map((l) => l.toUpperCase()).includes(opt.value.toUpperCase());
                 return (
                   <button
                     key={opt.value}
                     type="button"
                     onClick={() => handleToggleLevel(opt.value)}
-                    className={`px-2.5 py-1 rounded-lg text-[0.7rem] font-bold uppercase tracking-wider border transition-all ${
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg text-xs font-bold border transition-all',
                       isActive
-                        ? 'bg-primary/15 text-primary border-primary/30'
-                        : 'bg-surface text-text-muted border-border hover:border-border-focus'
-                    }`}
+                        ? 'bg-primary text-white border-primary shadow-sm'
+                        : 'bg-surface text-text-muted border-border hover:border-primary/40'
+                    )}
                   >
                     {opt.label}
                   </button>
                 );
               })}
             </div>
-            <p className="text-[0.65rem] text-text-subtle mt-1.5">
-              Select which levels can see this simulation. If none selected, it shows for all.
-            </p>
-          </div>
-          <Input
-            label={'Description'}
-            value={formData.description}
-            onChange={setField('description')}
-            placeholder="Brief description of the scenario"
-          />
-
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="block text-[0.73rem] font-semibold text-text-muted uppercase tracking-wider">System Prompt (IA Instructions)</label>
-              <button 
-                onClick={handleGenerateWithAI}
-                disabled={isGenerating || !formData.system_prompt.trim()}
-                className="flex items-center gap-1.5 text-[0.65rem] font-black uppercase text-primary hover:text-primary/80 disabled:opacity-50 transition-all"
-              >
-                {isGenerating ? <RotateCcw size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                {isGenerating ? 'Improving...' : 'Improve with IA'}
-              </button>
-            </div>
-            <textarea
-              placeholder={'You are Tati, a friendly receptionist at a hotel...'}
-              className="w-full min-h-[160px] p-4 bg-input border border-border rounded-xl text-sm outline-none focus:border-primary/50 transition-all font-mono leading-relaxed"
-              value={formData.system_prompt}
-              onChange={setField('system_prompt')}
-            ></textarea>
-            <p className="text-[0.65rem] text-text-muted italic">
-              Write the instructions for the AI here. Use the button above to let Tati improve your prompt.
-            </p>
           </div>
 
-          <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-border">
-            <Button variant="secondary" onClick={() => setIsModalOpen(false)}>{'Cancel'}</Button>
-            <Button onClick={handleSave} loading={isSaving}>{'Save'}</Button>
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
+            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? 'Saving...' : editingSim ? 'Save Changes' : 'Create Simulation'}
+            </Button>
           </div>
         </div>
       </DialogModal>
     </section>
   );
 }
-
-
-

@@ -152,6 +152,23 @@ export default function GamesSection() {
     }
   };
 
+  const handleToggleLevel = (levelValue: string) => {
+    setFormData((prev) => {
+      const current = prev.levels.map((l) => l.toUpperCase());
+      const target = levelValue.toUpperCase();
+      const isCurrentlySelected = current.includes(target);
+
+      let newLevels: string[];
+      if (isCurrentlySelected) {
+        newLevels = prev.levels.filter((l) => l.toUpperCase() !== target);
+      } else {
+        newLevels = [...prev.levels, levelValue];
+      }
+
+      return { ...prev, levels: newLevels };
+    });
+  };
+
   const openModal = (game?: GameRow) => {
     if (game) {
       setEditingGame(game);
@@ -167,21 +184,6 @@ export default function GamesSection() {
       setFormData(EMPTY_FORM);
     }
     setIsModalOpen(true);
-  };
-
-  const handleToggleLevel = (level: string) => {
-    setFormData((prev) => {
-      const current = prev.levels;
-      if (level === 'all') {
-        return { ...prev, levels: ['all'] };
-      }
-      const filtered = current.filter((l) => l !== 'all' && l !== 'ALL');
-      if (filtered.includes(level)) {
-        const next = filtered.filter((l) => l !== level);
-        return { ...prev, levels: next.length === 0 ? ['all'] : next };
-      }
-      return { ...prev, levels: [...filtered, level] };
-    });
   };
 
   const handleSave = async () => {
@@ -323,84 +325,87 @@ export default function GamesSection() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredGames.length > 0 ? filteredGames.map((g) => {
-          const isSelected = selectedGameIds.includes(g.id);
-          return (
-          <div
-            key={g.id}
-            className={cn(
-              "bg-surface border p-5 rounded-2xl flex flex-col gap-4 group transition-all relative",
-              isSelected ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-border hover:border-primary/40"
-            )}
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => toggleSelectGame(g.id)}
-                  className="text-text-muted hover:text-primary transition-all p-0.5"
-                  title={isSelected ? "Deselect" : "Select"}
-                >
-                  {isSelected ? <CheckSquare size={17} className="text-primary" /> : <Square size={17} />}
-                </button>
-                <div className="bg-primary/10 w-10 h-10 rounded-xl flex items-center justify-center text-primary">
-                  <Gamepad2 size={20} />
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-1">
-                <span className={cn(
-                  "text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider",
-                  g.is_published ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'
-                )}>
-                  {g.is_published ? 'Published' : 'Draft'}
-                </span>
-                <div className="flex flex-wrap gap-1 justify-end">
-                  {(g.levels || ['all']).map((l) => (
-                    <span key={l} className="text-[0.6rem] font-bold px-2 py-0.5 rounded-full bg-surface-hover border border-border uppercase tracking-widest text-text-subtle">
-                      {l === 'all' || l === 'ALL' ? 'All Levels' : l.toUpperCase()}
+        {filteredGames.length > 0 ? (
+          filteredGames.map((g) => {
+            const isSelected = selectedGameIds.includes(g.id);
+            return (
+              <div
+                key={g.id}
+                className={cn(
+                  "bg-surface border p-5 rounded-2xl flex flex-col gap-4 group transition-all relative",
+                  isSelected ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-border hover:border-primary/40"
+                )}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleSelectGame(g.id)}
+                      className="text-text-muted hover:text-primary transition-all p-0.5"
+                      title={isSelected ? "Deselect" : "Select"}
+                    >
+                      {isSelected ? <CheckSquare size={17} className="text-primary" /> : <Square size={17} />}
+                    </button>
+                    <div className="bg-primary/10 w-10 h-10 rounded-xl flex items-center justify-center text-primary">
+                      <Gamepad2 size={20} />
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={cn(
+                      "text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider",
+                      g.is_published ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'
+                    )}>
+                      {g.is_published ? 'Published' : 'Draft'}
                     </span>
-                  ))}
+                    <div className="flex flex-wrap gap-1 justify-end">
+                      {(g.levels || ['all']).map((l) => (
+                        <span key={l} className="text-[0.6rem] font-bold px-2 py-0.5 rounded-full bg-surface-hover border border-border uppercase tracking-widest text-text-subtle">
+                          {l === 'all' || l === 'ALL' ? 'All Levels' : l.toUpperCase()}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-text mb-1 truncate">{g.title}</h4>
+                  <p className="text-xs text-text-muted line-clamp-2 leading-relaxed h-8">
+                    {g.description}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 mt-auto pt-2">
+                  <a
+                    href={g.wordwall_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all text-xs font-bold border border-primary/20"
+                    title="Open game"
+                  >
+                    <ExternalLink size={14} /> Open
+                  </a>
+                  <button onClick={() => openModal(g)} className="p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title="Edit">
+                    <PenLine size={14} />
+                  </button>
+                  <button
+                    onClick={() => handleTogglePublish(g.id, !!g.is_published)}
+                    className="p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border"
+                    title={g.is_published ? 'Unpublish (Draft)' : 'Publish'}
+                  >
+                    {g.is_published ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(g.id)}
+                    className="p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle border border-border"
+                    title="Delete"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </div>
-            </div>
-
-            <div>
-              <h4 className="font-bold text-text mb-1 truncate">{g.title}</h4>
-              <p className="text-xs text-text-muted line-clamp-2 leading-relaxed h-8">
-                {g.description}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 mt-auto pt-2">
-              <a
-                href={g.wordwall_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-all text-xs font-bold border border-primary/20"
-                title="Open game"
-              >
-                <ExternalLink size={14} /> Open
-              </a>
-              <button onClick={() => openModal(g)} className="p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title="Edit">
-                <PenLine size={14} />
-              </button>
-              <button
-                onClick={() => handleTogglePublish(g.id, !!g.is_published)}
-                className="p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border"
-                title={g.is_published ? 'Unpublish (Draft)' : 'Publish'}
-              >
-                {g.is_published ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-              <button
-                onClick={() => handleDelete(g.id)}
-                className="p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle border border-border"
-                title="Delete"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </div>
-        )) : (
+            );
+          })
+        ) : (
           <div className="col-span-full py-20 text-center border border-dashed border-border rounded-3xl bg-surface/30">
             <Gamepad2 size={40} className="mx-auto mb-4 opacity-20" />
             <p className="text-text-muted font-medium">No games created yet.</p>
@@ -448,40 +453,33 @@ export default function GamesSection() {
                     className={cn(
                       'px-3 py-1.5 rounded-lg text-xs font-bold border transition-all',
                       isActive
-                        ? 'bg-primary text-white border-primary'
-                        : 'bg-surface border-border text-text-muted hover:border-primary/50'
+                        ? 'bg-primary text-white border-primary shadow-sm'
+                        : 'bg-surface text-text-muted border-border hover:border-primary/40'
                     )}
                   >
-                    {opt.value}
+                    {opt.label}
                   </button>
                 );
               })}
             </div>
-            <p className="text-[0.65rem] text-text-muted italic">
-              Select which levels can see this game. If none selected, it shows for all.
-            </p>
           </div>
-
-          <div className="flex items-center gap-3">
-            <label className="text-[0.73rem] font-semibold text-text-muted uppercase tracking-wider">Published</label>
-            <button
-              type="button"
-              onClick={() => setFormData((prev) => ({ ...prev, is_published: !prev.is_published }))}
-              className={cn(
-                'relative w-10 h-5 rounded-full transition-colors',
-                formData.is_published ? 'bg-primary' : 'bg-border'
-              )}
-            >
-              <span className={cn(
-                'absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform',
-                formData.is_published && 'translate-x-5'
-              )} />
-            </button>
+          <div className="flex items-center gap-2 pt-2">
+            <input
+              type="checkbox"
+              id="is_published_game"
+              checked={formData.is_published}
+              onChange={(e) => setFormData((prev) => ({ ...prev, is_published: e.target.checked }))}
+              className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
+            />
+            <label htmlFor="is_published_game" className="text-xs text-text-muted font-medium cursor-pointer">
+              Publish immediately (visible to students)
+            </label>
           </div>
-
-          <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-border">
-            <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} loading={isSaving}>Save</Button>
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
+            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? 'Saving...' : editingGame ? 'Save Changes' : 'Create Game'}
+            </Button>
           </div>
         </div>
       </DialogModal>
