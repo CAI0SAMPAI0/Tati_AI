@@ -175,10 +175,10 @@ def update_student(request: HttpRequest, username: str, payload: StudentUpdateIn
 @dashboard_router.post("/students/{username}/nudge", auth=auth_required)
 def nudge_student(request: HttpRequest, username: str, payload: StudentNudgeInput):
     """
-    Envia aviso de engajamento para o estudante.
+    Envia aviso de engajamento para o estudante (chat, email, whatsapp e in-app).
     """
     require_staff_user(request)
-    return {"ok": True, "message": "Nudge enviado com sucesso."}
+    return DashboardService.nudge_student(username, payload.message)
 
 
 @dashboard_router.delete("/students/{username}", auth=auth_required)

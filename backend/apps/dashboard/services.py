@@ -7,7 +7,7 @@ from django.db.models.functions import TruncDate
 from ninja.errors import HttpError
 
 from apps.authentication.models import User
-from apps.chat.models import Message, SimulationScenario, CEFRSimulation
+from apps.chat.models import Message, SimulationScenario, CEFRSimulation, Conversation
 from apps.activities.models import (
     ActivitySubmission,
     Module,
@@ -997,3 +997,93 @@ class DashboardService:
         ActivitySubmission.objects.filter(username=username).delete()
         u.delete()
         return {"success": True, "deleted": username}
+
+    @staticmethod
+    def nudge_student(username: str, message: str) -> dict:
+        import os
+        import uuid
+        u = User.objects.filter(username=username).first()
+        if not u:
+            raise HttpError(404, "Estudante não encontrado.")
+
+        # 1. Cria ou recupera uma conversa ativa do aluno e insere a mensagem da Teacher Tati
+        conv = Conversation.objects.filter(username=username).order_by('-updated_at').first()
+        if not conv:
+            conv = Conversation.objects.create(
+                id=str(uuid.uuid4()),
+                username=username,
+                title="Mensagem da Teacher Tati",
+            )
+        
+        Message.objects.create(
+            id=uuid.uuid4(),
+            session_id=str(conv.id),
+            username=username,
+            role="assistant",
+            content=message,
+        )
+
+        # 2. Registra Notificação In-App
+        from apps.notifications.models import Notification
+        Notification.objects.create(
+            id=uuid.uuid4(),
+            username=username,
+            category="nudge",
+            title="Teacher Tati 🍎",
+            body=message,
+            is_read=False,
+        )
+
+        # 3. Dispara E-mail via Brevo/Resend/SMTP
+        from apps.notifications.services import BrevoEmailService, WahaWhatsAppService
+        email_sent = False
+        if u.email:
+            site_url = os.getenv("FRONTEND_URL") or os.getenv("NEXT_PUBLIC_APP_URL") or "https://tati-ai.vercel.app"
+            chat_link = f"{site_url.rstrip('/')}/chat"
+            
+            html_content = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; color: #333; padding: 20px; line-height: 1.6;">
+                <div style="text-align: center; margin-bottom: 24px;">
+                    <h2 style="color: #6366f1; margin-bottom: 4px;">Teacher Tatiana Duarte</h2>
+                    <p style="color: #666; font-size: 14px; margin: 0;">Sua professora particular de inglês com IA</p>
+                </div>
+                <div style="background-color: #f8fafc; border-left: 4px solid #6366f1; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+                    <p style="margin: 0; font-size: 15px; font-style: italic; color: #1e293b;">"{message}"</p>
+                </div>
+                <p>Olá, <strong>{u.name or u.username}</strong>!</p>
+                <p>Estou passando para te lembrar da importância de manter a consistência nos seus estudos de inglês. Um pouquinho por dia faz toda a diferença para destravar a sua fluência!</p>
+                <div style="text-align: center; margin: 32px 0;">
+                    <a href="{chat_link}" style="background-color: #6366f1; color: white; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 15px; display: inline-block; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);">
+                        💬 Responder à Teacher Tati Agora
+                    </a>
+                </div>
+                <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 32px; border-top: 1px solid #e2e8f0; pt: 16px;">
+                    Tati AI — English Learning Experience. Todos os direitos reservados.
+                </p>
+            </div>
+            """
+            diag = BrevoEmailService.send_email_detailed(
+                to_email=u.email,
+                subject=f"Teacher Tati: {message[:40]}...",
+                html_content=html_content,
+                recipient_name=u.name or u.username,
+            )
+            email_sent = diag.get("success", False)
+
+        # 4. Dispara WhatsApp se o aluno tiver número cadastrado
+        whatsapp_sent = False
+        prof = u.profile if isinstance(u.profile, dict) else {}
+        phone = prof.get("whatsapp_number") or prof.get("phone") or getattr(u, "whatsapp_number", None)
+        if phone:
+            whatsapp_sent = WahaWhatsAppService.send_message(
+                phone_number=str(phone),
+                message=f"🍎 *Teacher Tati:*\n\n{message}\n\nAcesse para responder: https://tati-ai.vercel.app/chat"
+            )
+
+        return {
+            "success": True,
+            "username": username,
+            "email_sent": email_sent,
+            "whatsapp_sent": whatsapp_sent,
+            "message": "Nudge despachado com sucesso!",
+        }
