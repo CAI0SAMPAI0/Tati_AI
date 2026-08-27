@@ -14,8 +14,9 @@ class NotificationOut(BaseModel):
 
 class SubscribePushInput(BaseModel):
     endpoint: str
-    p256dh: str
-    auth: str
+    p256dh: Optional[str] = ""
+    auth: Optional[str] = ""
+    keys: Optional[Dict[str, Any]] = None
     user_agent: Optional[str] = ""
 
 

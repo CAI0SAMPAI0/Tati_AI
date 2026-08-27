@@ -11,6 +11,9 @@ import {
   Newspaper,
   ExternalLink,
   ImageOff,
+  CheckSquare,
+  Square,
+  CheckCircle2,
 } from 'lucide-react';
 
 import { apiGet, apiDelete, apiPost, apiPut } from '@/lib/api/client';
@@ -65,6 +68,8 @@ export default function NewsSection() {
   const invalidateNews = () => queryClient.invalidateQueries({ queryKey: ['admin-news'] });
 
   const [filterLevel, setFilterLevel] = useState('all');
+  const [selectedNewsIds, setSelectedNewsIds] = useState<string[]>([]);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingNews, setEditingNews] = useState<NewsRow | null>(null);
   const [formData, setFormData] = useState<FormState>(EMPTY_FORM);
@@ -75,6 +80,57 @@ export default function NewsSection() {
     const nLevels = (n.levels || []).map((l) => l.toUpperCase());
     return nLevels.includes('ALL') || nLevels.includes(filterLevel.toUpperCase());
   });
+
+  const handleSelectAll = () => {
+    if (selectedNewsIds.length === filteredNews.length) {
+      setSelectedNewsIds([]);
+    } else {
+      setSelectedNewsIds(filteredNews.map((n) => n.id));
+    }
+  };
+
+  const toggleSelectNews = (id: string) => {
+    setSelectedNewsIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkPublish = async (publish: boolean) => {
+    if (selectedNewsIds.length === 0) return;
+    setIsBulkProcessing(true);
+    const toastId = toast.loading(publish ? 'Publishing selected news...' : 'Moving selected news to drafts...');
+    try {
+      await Promise.all(
+        selectedNewsIds.map((id) => apiPut(`${ENDPOINTS.ADMIN_NEWS}/${id}`, { is_published: publish }))
+      );
+      toast.success(publish ? `${selectedNewsIds.length} news item(s) published!` : `${selectedNewsIds.length} news item(s) moved to drafts!`, { id: toastId });
+      setSelectedNewsIds([]);
+      invalidateNews();
+    } catch {
+      toast.error('Error updating selected news.', { id: toastId });
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedNewsIds.length === 0) return;
+    if (!window.confirm(`Are you sure you want to permanently delete ${selectedNewsIds.length} selected news item(s)?`)) return;
+    setIsBulkProcessing(true);
+    const toastId = toast.loading('Deleting selected news...');
+    try {
+      await Promise.all(
+        selectedNewsIds.map((id) => apiDelete(`${ENDPOINTS.ADMIN_NEWS}/${id}`))
+      );
+      toast.success(`${selectedNewsIds.length} news item(s) deleted!`, { id: toastId });
+      setSelectedNewsIds([]);
+      invalidateNews();
+    } catch {
+      toast.error('Error deleting selected news.', { id: toastId });
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Delete this news item?')) return;
@@ -131,15 +187,20 @@ export default function NewsSection() {
   };
 
   const handleSave = async () => {
+    const title = formData.title || '';
+    if (!title.trim()) {
+      toast.error('Please provide a title for the news.');
+      return;
+    }
     const url = formData.url || '';
     if (!url.trim()) {
-      toast.error('Please provide the news URL.');
+      toast.error('Please provide a news URL.');
       return;
     }
     setIsSaving(true);
     try {
       const payload = {
-        title: (formData.title || '').trim(),
+        title: title.trim(),
         description: (formData.description || '').trim(),
         url: url.trim(),
         levels: formData.levels,
@@ -181,7 +242,7 @@ export default function NewsSection() {
   return (
     <section className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <h3 className="text-lg font-bold flex items-center gap-2">
             <Newspaper size={22} className="text-primary" />
             News
@@ -196,6 +257,21 @@ export default function NewsSection() {
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
+          {filteredNews.length > 0 && (
+            <button
+              onClick={handleSelectAll}
+              className="flex items-center gap-1.5 text-xs font-bold text-text-muted hover:text-primary transition-all px-2.5 py-1 rounded-lg border border-border bg-surface"
+            >
+              {selectedNewsIds.length === filteredNews.length ? (
+                <CheckSquare size={15} className="text-primary" />
+              ) : (
+                <Square size={15} />
+              )}
+              <span>
+                {selectedNewsIds.length === filteredNews.length ? 'Deselect All' : `Select All (${filteredNews.length})`}
+              </span>
+            </button>
+          )}
         </div>
         <Button className="gap-2" onClick={() => openModal()}>
           <Plus size={18} />
@@ -203,10 +279,71 @@ export default function NewsSection() {
         </Button>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedNewsIds.length > 0 && (
+        <div className="bg-primary/10 border border-primary/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <span className="bg-primary text-white text-xs font-bold px-2.5 py-1 rounded-lg">
+              {selectedNewsIds.length} selected
+            </span>
+            <span className="text-xs text-text-muted">of {filteredNews.length} visible news items</span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => handleBulkPublish(true)}
+              disabled={isBulkProcessing}
+              className="px-3.5 py-1.5 bg-success text-white hover:bg-success/90 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+            >
+              <CheckCircle2 size={14} />
+              Publish Selected
+            </button>
+            <button
+              onClick={() => handleBulkPublish(false)}
+              disabled={isBulkProcessing}
+              className="px-3.5 py-1.5 bg-warning text-white hover:bg-warning/90 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+            >
+              <EyeOff size={14} />
+              Move to Draft
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={isBulkProcessing}
+              className="px-3.5 py-1.5 bg-danger text-white hover:bg-danger/90 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+            >
+              <Trash2 size={14} />
+              Delete Selected
+            </button>
+            <button
+              onClick={() => setSelectedNewsIds([])}
+              className="px-2.5 py-1.5 text-xs text-text-muted hover:text-text font-bold transition-all"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredNews.length > 0 ? filteredNews.map((n) => (
-          <div key={n.id} className="bg-surface border border-border rounded-2xl overflow-hidden flex flex-col group hover:border-primary/40 transition-all">
+        {filteredNews.length > 0 ? filteredNews.map((n) => {
+          const isSelected = selectedNewsIds.includes(n.id);
+          return (
+          <div
+            key={n.id}
+            className={cn(
+              "bg-surface border rounded-2xl overflow-hidden flex flex-col group transition-all relative",
+              isSelected ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-border hover:border-primary/40"
+            )}
+          >
             <div className="h-32 bg-bg-secondary relative overflow-hidden">
+              <button
+                type="button"
+                onClick={() => toggleSelectNews(n.id)}
+                className="absolute top-2 left-2 z-10 bg-surface/90 backdrop-blur-sm rounded-lg p-1 text-text-muted hover:text-primary transition-all shadow"
+                title={isSelected ? "Deselect" : "Select"}
+              >
+                {isSelected ? <CheckSquare size={16} className="text-primary" /> : <Square size={16} />}
+              </button>
               {n.thumbnail_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img

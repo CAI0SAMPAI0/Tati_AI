@@ -1496,23 +1496,23 @@ export function CefrSection() {
                     )}
                     <span>
                       {selectedCuratorIds.length === (activeCuratorTab === 'flashcards' ? activeGroupedFlashcards : activeSimulations).length
-                        ? 'Desmarcar Todos'
-                        : `Selecionar Todos (${(activeCuratorTab === 'flashcards' ? activeGroupedFlashcards : activeSimulations).length})`}
+                        ? 'Deselect All'
+                        : `Select All (${(activeCuratorTab === 'flashcards' ? activeGroupedFlashcards : activeSimulations).length})`}
                     </span>
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Barra de Ações em Lote do Curator */}
+            {/* Curator Bulk Action Bar */}
             {selectedCuratorIds.length > 0 && (
               <div className="bg-primary/10 border border-primary/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
                 <div className="flex items-center gap-2">
                   <span className="bg-primary text-white text-xs font-bold px-2.5 py-1 rounded-lg">
-                    {selectedCuratorIds.length} selecionado(s)
+                    {selectedCuratorIds.length} selected
                   </span>
                   <span className="text-xs text-text-muted">
-                    de {(activeCuratorTab === 'flashcards' ? activeGroupedFlashcards : activeSimulations).length} itens visíveis
+                    of {(activeCuratorTab === 'flashcards' ? activeGroupedFlashcards : activeSimulations).length} visible items
                   </span>
                 </div>
 
@@ -1521,7 +1521,7 @@ export function CefrSection() {
                     onClick={async () => {
                       if (selectedCuratorIds.length === 0) return;
                       setIsBulkCuratorProcessing(true);
-                      const toastId = toast.loading('Publicando itens selecionados...');
+                      const toastId = toast.loading('Publishing selected items...');
                       try {
                         if (activeCuratorTab === 'flashcards') {
                           const groupsToUpdate = activeGroupedFlashcards.filter((g: any) => selectedCuratorIds.includes(g.id));
@@ -1537,11 +1537,11 @@ export function CefrSection() {
                             )
                           );
                         }
-                        toast.success(`${selectedCuratorIds.length} item(ns) publicado(s)!`, { id: toastId });
+                        toast.success(`${selectedCuratorIds.length} item(s) published!`, { id: toastId });
                         setSelectedCuratorIds([]);
                         fetchGeneratedContent(true);
                       } catch (err: any) {
-                        toast.error(err.message || 'Erro ao publicar.', { id: toastId });
+                        toast.error(err.message || 'Error publishing.', { id: toastId });
                       } finally {
                         setIsBulkCuratorProcessing(false);
                       }
@@ -1550,13 +1550,13 @@ export function CefrSection() {
                     className="px-3.5 py-1.5 bg-success text-white hover:bg-success/90 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
                   >
                     <CheckCircle2 size={14} />
-                    Publicar Selecionados
+                    Publish Selected
                   </button>
                   <button
                     onClick={async () => {
                       if (selectedCuratorIds.length === 0) return;
                       setIsBulkCuratorProcessing(true);
-                      const toastId = toast.loading('Movendo para rascunho...');
+                      const toastId = toast.loading('Moving to drafts...');
                       try {
                         if (activeCuratorTab === 'flashcards') {
                           const groupsToUpdate = activeGroupedFlashcards.filter((g: any) => selectedCuratorIds.includes(g.id));
@@ -1572,11 +1572,11 @@ export function CefrSection() {
                             )
                           );
                         }
-                        toast.success(`${selectedCuratorIds.length} item(ns) movido(s) para rascunho!`, { id: toastId });
+                        toast.success(`${selectedCuratorIds.length} item(s) moved to drafts!`, { id: toastId });
                         setSelectedCuratorIds([]);
                         fetchGeneratedContent(true);
                       } catch (err: any) {
-                        toast.error(err.message || 'Erro ao mover para rascunho.', { id: toastId });
+                        toast.error(err.message || 'Error moving to drafts.', { id: toastId });
                       } finally {
                         setIsBulkCuratorProcessing(false);
                       }
@@ -1585,14 +1585,14 @@ export function CefrSection() {
                     className="px-3.5 py-1.5 bg-warning text-white hover:bg-warning/90 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
                   >
                     <EyeOff size={14} />
-                    Mover para Rascunho
+                    Move to Draft
                   </button>
                   <button
                     onClick={async () => {
                       if (selectedCuratorIds.length === 0) return;
-                      if (!window.confirm(`Tem certeza que deseja excluir permanentemente ${selectedCuratorIds.length} item(ns) selecionado(s)?`)) return;
+                      if (!window.confirm(`Are you sure you want to permanently delete ${selectedCuratorIds.length} selected item(s)?`)) return;
                       setIsBulkCuratorProcessing(true);
-                      const toastId = toast.loading('Excluindo itens selecionados...');
+                      const toastId = toast.loading('Deleting selected items...');
                       try {
                         if (activeCuratorTab === 'flashcards') {
                           const groupsToDelete = activeGroupedFlashcards.filter((g: any) => selectedCuratorIds.includes(g.id));
@@ -1608,11 +1608,11 @@ export function CefrSection() {
                             )
                           );
                         }
-                        toast.success(`${selectedCuratorIds.length} item(ns) excluído(s) com sucesso.`, { id: toastId });
+                        toast.success(`${selectedCuratorIds.length} item(s) deleted successfully.`, { id: toastId });
                         setSelectedCuratorIds([]);
                         fetchGeneratedContent(true);
                       } catch (err: any) {
-                        toast.error(err.message || 'Erro ao excluir.', { id: toastId });
+                        toast.error(err.message || 'Error deleting.', { id: toastId });
                       } finally {
                         setIsBulkCuratorProcessing(false);
                       }
@@ -1621,13 +1621,13 @@ export function CefrSection() {
                     className="px-3.5 py-1.5 bg-danger text-white hover:bg-danger/90 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
                   >
                     <Trash2 size={14} />
-                    Excluir Selecionados
+                    Delete Selected
                   </button>
                   <button
                     onClick={() => setSelectedCuratorIds([])}
                     className="px-2.5 py-1.5 text-xs text-text-muted hover:text-text font-bold transition-all"
                   >
-                    Limpar
+                    Clear
                   </button>
                 </div>
               </div>

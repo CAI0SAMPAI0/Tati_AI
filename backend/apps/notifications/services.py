@@ -111,12 +111,18 @@ class NotificationService:
 
     @staticmethod
     def register_push_subscription(user: User, data: SubscribePushInput) -> dict:
+        p256dh = data.p256dh or ""
+        auth = data.auth or ""
+        if data.keys and isinstance(data.keys, dict):
+            p256dh = data.keys.get("p256dh", p256dh)
+            auth = data.keys.get("auth", auth)
+
         PushSubscription.objects.update_or_create(
             username=user.username,
             endpoint=data.endpoint,
             defaults={
-                "p256dh": data.p256dh,
-                "auth": data.auth,
+                "p256dh": p256dh,
+                "auth": auth,
                 "user_agent": data.user_agent or "",
                 "is_active": True,
             },

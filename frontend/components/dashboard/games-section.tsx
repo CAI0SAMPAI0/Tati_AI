@@ -10,6 +10,9 @@ import {
   EyeOff,
   Gamepad2,
   ExternalLink,
+  CheckSquare,
+  Square,
+  CheckCircle2,
 } from 'lucide-react';
 
 import { apiGet, apiDelete, apiPost, apiPut } from '@/lib/api/client';
@@ -63,6 +66,8 @@ export default function GamesSection() {
   const invalidateGames = () => queryClient.invalidateQueries({ queryKey: ['admin-games'] });
 
   const [filterLevel, setFilterLevel] = useState('all');
+  const [selectedGameIds, setSelectedGameIds] = useState<string[]>([]);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGame, setEditingGame] = useState<GameRow | null>(null);
   const [formData, setFormData] = useState<FormState>(EMPTY_FORM);
@@ -73,6 +78,57 @@ export default function GamesSection() {
     const gLevels = (g.levels || []).map((l) => l.toUpperCase());
     return gLevels.includes('ALL') || gLevels.includes(filterLevel.toUpperCase());
   });
+
+  const handleSelectAll = () => {
+    if (selectedGameIds.length === filteredGames.length) {
+      setSelectedGameIds([]);
+    } else {
+      setSelectedGameIds(filteredGames.map((g) => g.id));
+    }
+  };
+
+  const toggleSelectGame = (id: string) => {
+    setSelectedGameIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkPublish = async (publish: boolean) => {
+    if (selectedGameIds.length === 0) return;
+    setIsBulkProcessing(true);
+    const toastId = toast.loading(publish ? 'Publishing selected games...' : 'Moving selected games to drafts...');
+    try {
+      await Promise.all(
+        selectedGameIds.map((id) => apiPut(`${ENDPOINTS.ADMIN_GAMES}/${id}`, { is_published: publish }))
+      );
+      toast.success(publish ? `${selectedGameIds.length} game(s) published!` : `${selectedGameIds.length} game(s) moved to drafts!`, { id: toastId });
+      setSelectedGameIds([]);
+      invalidateGames();
+    } catch {
+      toast.error('Error updating selected games.', { id: toastId });
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedGameIds.length === 0) return;
+    if (!window.confirm(`Are you sure you want to permanently delete ${selectedGameIds.length} selected game(s)?`)) return;
+    setIsBulkProcessing(true);
+    const toastId = toast.loading('Deleting selected games...');
+    try {
+      await Promise.all(
+        selectedGameIds.map((id) => apiDelete(`${ENDPOINTS.ADMIN_GAMES}/${id}`))
+      );
+      toast.success(`${selectedGameIds.length} game(s) deleted!`, { id: toastId });
+      setSelectedGameIds([]);
+      invalidateGames();
+    } catch {
+      toast.error('Error deleting selected games.', { id: toastId });
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Delete this game?')) return;
@@ -184,7 +240,7 @@ export default function GamesSection() {
   return (
     <section className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <h3 className="text-lg font-bold flex items-center gap-2">
             <Gamepad2 size={22} className="text-primary" />
             Games
@@ -199,6 +255,21 @@ export default function GamesSection() {
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
+          {filteredGames.length > 0 && (
+            <button
+              onClick={handleSelectAll}
+              className="flex items-center gap-1.5 text-xs font-bold text-text-muted hover:text-primary transition-all px-2.5 py-1 rounded-lg border border-border bg-surface"
+            >
+              {selectedGameIds.length === filteredGames.length ? (
+                <CheckSquare size={15} className="text-primary" />
+              ) : (
+                <Square size={15} />
+              )}
+              <span>
+                {selectedGameIds.length === filteredGames.length ? 'Deselect All' : `Select All (${filteredGames.length})`}
+              </span>
+            </button>
+          )}
         </div>
         <Button className="gap-2" onClick={() => openModal()}>
           <Plus size={18} />
@@ -206,12 +277,75 @@ export default function GamesSection() {
         </Button>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedGameIds.length > 0 && (
+        <div className="bg-primary/10 border border-primary/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <span className="bg-primary text-white text-xs font-bold px-2.5 py-1 rounded-lg">
+              {selectedGameIds.length} selected
+            </span>
+            <span className="text-xs text-text-muted">of {filteredGames.length} visible games</span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => handleBulkPublish(true)}
+              disabled={isBulkProcessing}
+              className="px-3.5 py-1.5 bg-success text-white hover:bg-success/90 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+            >
+              <CheckCircle2 size={14} />
+              Publish Selected
+            </button>
+            <button
+              onClick={() => handleBulkPublish(false)}
+              disabled={isBulkProcessing}
+              className="px-3.5 py-1.5 bg-warning text-white hover:bg-warning/90 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+            >
+              <EyeOff size={14} />
+              Move to Draft
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={isBulkProcessing}
+              className="px-3.5 py-1.5 bg-danger text-white hover:bg-danger/90 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+            >
+              <Trash2 size={14} />
+              Delete Selected
+            </button>
+            <button
+              onClick={() => setSelectedGameIds([])}
+              className="px-2.5 py-1.5 text-xs text-text-muted hover:text-text font-bold transition-all"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredGames.length > 0 ? filteredGames.map((g) => (
-          <div key={g.id} className="bg-surface border border-border p-5 rounded-2xl flex flex-col gap-4 group hover:border-primary/40 transition-all">
+        {filteredGames.length > 0 ? filteredGames.map((g) => {
+          const isSelected = selectedGameIds.includes(g.id);
+          return (
+          <div
+            key={g.id}
+            className={cn(
+              "bg-surface border p-5 rounded-2xl flex flex-col gap-4 group transition-all relative",
+              isSelected ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-border hover:border-primary/40"
+            )}
+          >
             <div className="flex items-start justify-between">
-              <div className="bg-primary/10 w-10 h-10 rounded-xl flex items-center justify-center text-primary">
-                <Gamepad2 size={20} />
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => toggleSelectGame(g.id)}
+                  className="text-text-muted hover:text-primary transition-all p-0.5"
+                  title={isSelected ? "Deselect" : "Select"}
+                >
+                  {isSelected ? <CheckSquare size={17} className="text-primary" /> : <Square size={17} />}
+                </button>
+                <div className="bg-primary/10 w-10 h-10 rounded-xl flex items-center justify-center text-primary">
+                  <Gamepad2 size={20} />
+                </div>
               </div>
               <div className="flex flex-col items-end gap-1">
                 <span className={cn(

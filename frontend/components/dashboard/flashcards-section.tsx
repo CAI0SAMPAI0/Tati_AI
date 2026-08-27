@@ -473,7 +473,7 @@ export function FlashcardsSection() {
                   <Square size={15} />
                 )}
                 <span>
-                  {selectedDeckIds.length === filteredDecks.length ? 'Desmarcar Todos' : `Selecionar Todos (${filteredDecks.length})`}
+                  {selectedDeckIds.length === filteredDecks.length ? 'Deselect All' : `Select All (${filteredDecks.length})`}
                 </span>
               </button>
             )}
@@ -484,14 +484,14 @@ export function FlashcardsSection() {
          </Button>
       </div>
 
-      {/* Barra de Ações em Lote */}
+      {/* Bulk Action Bar */}
       {selectedDeckIds.length > 0 && (
         <div className="bg-primary/10 border border-primary/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
           <div className="flex items-center gap-2">
             <span className="bg-primary text-white text-xs font-bold px-2.5 py-1 rounded-lg">
-              {selectedDeckIds.length} selecionado(s)
+              {selectedDeckIds.length} selected
             </span>
-            <span className="text-xs text-text-muted">de {filteredDecks.length} decks visíveis</span>
+            <span className="text-xs text-text-muted">of {filteredDecks.length} visible decks</span>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -501,7 +501,7 @@ export function FlashcardsSection() {
               className="px-3.5 py-1.5 bg-success text-white hover:bg-success/90 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
             >
               <CheckCircle2 size={14} />
-              Publicar Selecionados
+              Publish Selected
             </button>
             <button
               onClick={() => handleBulkPublish(false)}
@@ -509,7 +509,7 @@ export function FlashcardsSection() {
               className="px-3.5 py-1.5 bg-warning text-white hover:bg-warning/90 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
             >
               <EyeOff size={14} />
-              Mover para Rascunho
+              Move to Draft
             </button>
             <button
               onClick={handleBulkDelete}
@@ -517,13 +517,13 @@ export function FlashcardsSection() {
               className="px-3.5 py-1.5 bg-danger text-white hover:bg-danger/90 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
             >
               <Trash2 size={14} />
-              Excluir Selecionados
+              Delete Selected
             </button>
             <button
               onClick={() => setSelectedDeckIds([])}
               className="px-2.5 py-1.5 text-xs text-text-muted hover:text-text font-bold transition-all"
             >
-              Limpar
+              Clear
             </button>
           </div>
         </div>

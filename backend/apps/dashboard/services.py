@@ -8,7 +8,7 @@ from ninja.errors import HttpError
 
 from apps.authentication.models import User
 from apps.chat.models import Message, SimulationScenario, CEFRSimulation
-from apps.activities.models import ActivitySubmission, Module, Game, NewsItem
+from apps.activities.models import ActivitySubmission, Module, Game, NewsItem, Flashcard
 
 logger = logging.getLogger(__name__)
 
@@ -257,6 +257,12 @@ class DashboardService:
 
     @staticmethod
     def get_flashcards_admin() -> list[dict]:
+        import re
+        from collections import defaultdict
+
+        def normalize_slug(s: str) -> str:
+            return re.sub(r"_+", "_", re.sub(r"[^a-zA-Z0-9]", "_", (s or "").lower())).strip("_")
+
         decks = []
         modules = Module.objects.all()
         for m in modules:
@@ -264,12 +270,56 @@ class DashboardService:
             decks.append({
                 "id": str(m.id),
                 "title": m.title,
+                "description": m.description or "No description provided.",
                 "level": m.level,
                 "card_count": len(fc),
                 "cards": fc,
                 "flashcards": fc,
                 "is_published": m.is_published,
+                "is_cefr": False,
+                "created_at": "",
             })
+
+        # Agrupa flashcards CEFR por (level, topic)
+        try:
+            cf_cards = Flashcard.objects.all().order_by('-created_at')
+            grouped_cf = defaultdict(list)
+            for row in cf_cards:
+                row_level = (row.level or "A1").upper()
+                topic = (row.topic or "General Vocabulary").strip()
+                grouped_cf[(row_level, topic)].append(row)
+
+            for (lvl, topic), cards in grouped_cf.items():
+                topic_slug = normalize_slug(topic)
+                deck_id = f"cefr_fc_{lvl.lower()}_{topic_slug}"
+                is_pub = all(c.is_published for c in cards)
+
+                card_list = [
+                    {
+                        "front": c.front,
+                        "back": c.back,
+                        "explanation": c.explanation or "",
+                        "image_url": c.image_url or "",
+                    }
+                    for c in cards
+                ]
+
+                decks.append({
+                    "id": deck_id,
+                    "title": topic,
+                    "description": f"Vocabulary deck about {topic}.",
+                    "card_count": len(cards),
+                    "cards": card_list,
+                    "flashcards": card_list,
+                    "level": lvl,
+                    "is_published": is_pub,
+                    "is_cefr": True,
+                    "created_at": cards[0].created_at.isoformat() if cards[0].created_at else "",
+                })
+        except Exception as e:
+            logger.warning(f"[DashboardService] Erro ao agrupar CEFR flashcards: {e}")
+
+        decks.sort(key=lambda x: x.get("created_at") or "", reverse=True)
         return decks
 
     @staticmethod
@@ -292,6 +342,32 @@ class DashboardService:
 
     @staticmethod
     def update_flashcard_deck(deck_id: str, data: dict) -> dict:
+        import re
+        def normalize_slug(s: str) -> str:
+            return re.sub(r"_+", "_", re.sub(r"[^a-zA-Z0-9]", "_", (s or "").lower())).strip("_")
+
+        if deck_id.startswith("cefr_fc_"):
+            parts = deck_id.split("_")
+            if len(parts) >= 4:
+                level = parts[2].upper()
+                topic_slug = normalize_slug("_".join(parts[3:]))
+                cf_cards = list(Flashcard.objects.filter(level__iexact=level))
+                matched_cards = [c for c in cf_cards if normalize_slug(c.topic or "General Vocabulary") == topic_slug]
+                if not matched_cards:
+                    raise HttpError(404, "Baralho CEFR não encontrado.")
+                
+                matched_ids = [c.id for c in matched_cards]
+                if "is_published" in data:
+                    Flashcard.objects.filter(id__in=matched_ids).update(is_published=data["is_published"])
+                if "title" in data and data["title"]:
+                    new_title = re.sub(r"^CEFR\s+[A-Z0-9]+:\s*", "", data["title"])
+                    Flashcard.objects.filter(id__in=matched_ids).update(topic=new_title)
+                if "level" in data and data["level"]:
+                    Flashcard.objects.filter(id__in=matched_ids).update(level=data["level"].upper())
+
+                return {"success": True, "id": deck_id, "title": data.get("title", matched_cards[0].topic), "card_count": len(matched_cards)}
+            raise HttpError(400, "ID do baralho CEFR inválido.")
+
         m = Module.objects.filter(id=deck_id).first()
         if not m:
             raise HttpError(404, "Baralho não encontrado.")
@@ -310,6 +386,23 @@ class DashboardService:
 
     @staticmethod
     def delete_flashcard_deck(deck_id: str) -> dict:
+        import re
+        def normalize_slug(s: str) -> str:
+            return re.sub(r"_+", "_", re.sub(r"[^a-zA-Z0-9]", "_", (s or "").lower())).strip("_")
+
+        if deck_id.startswith("cefr_fc_"):
+            parts = deck_id.split("_")
+            if len(parts) >= 4:
+                level = parts[2].upper()
+                topic_slug = normalize_slug("_".join(parts[3:]))
+                cf_cards = list(Flashcard.objects.filter(level__iexact=level))
+                matched_cards = [c for c in cf_cards if normalize_slug(c.topic or "General Vocabulary") == topic_slug]
+                if matched_cards:
+                    matched_ids = [c.id for c in matched_cards]
+                    Flashcard.objects.filter(id__in=matched_ids).delete()
+                    return {"success": True, "deleted": deck_id}
+            raise HttpError(404, "Baralho CEFR não encontrado.")
+
         m = Module.objects.filter(id=deck_id).first()
         if m:
             m.delete()
