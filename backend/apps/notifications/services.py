@@ -26,14 +26,21 @@ def get_brevo_api_key() -> Optional[str]:
 
 def get_verified_sender_email() -> str:
     # Brevo exige que o remetente seja um e-mail verificado na conta Brevo
-    return (
-        os.getenv("BREVO_SENDER_EMAIL")
-        or os.getenv("login_smtp")
-        or os.getenv("SMTP_FROM")
-        or os.getenv("SMTP_USER")
-        or os.getenv("RESEND_FROM")
-        or "caio.matos@aedb.br"
-    )
+    candidates = [
+        os.getenv("BREVO_SENDER_EMAIL"),
+        os.getenv("SMTP_FROM"),
+        os.getenv("SMTP_USER"),
+        os.getenv("RESEND_FROM"),
+        os.getenv("login_smtp"),
+        "caio.matos@11607679.brevosend.com",
+        "caio.matos@aedb.br",
+    ]
+    for email in candidates:
+        if email and isinstance(email, str):
+            email_clean = email.strip()
+            if email_clean and not email_clean.endswith("@smtp-brevo.com") and "smtp-brevo" not in email_clean:
+                return email_clean
+    return "caio.matos@11607679.brevosend.com"
 
 
 class BrevoEmailService:
@@ -289,6 +296,11 @@ class NotificationDispatcher:
             logger.info(f"[FCM Native] Token detectado ({fcm_token[:15]}...). (Para envio em produção, configure FCM_SERVER_KEY no .env).")
             return True
 
+        if fcm_server_key.startswith("BBOj") or len(fcm_server_key) < 50:
+            logger.warning(f"[FCM Native] FCM_SERVER_KEY no .env parece inválida (detectada chave VAPID/curta de {len(fcm_server_key)} chars). Requer FCM Legacy Server Key (AAAA...).")
+            # Retorna True para não desativar o dispositivo por erro de configuração de chave no servidor
+            return True
+
         url_endpoint = "https://fcm.googleapis.com/fcm/send"
         headers = {
             "Authorization": f"key={fcm_server_key}",
@@ -317,10 +329,13 @@ class NotificationDispatcher:
                     return True
                 else:
                     logger.warning(f"[FCM Native] Resposta FCM {res.status_code}: {res.text}")
-                    return False
+                    # Apenas desativa token se o Firebase disser explicitamente que o token no aparelho expirou
+                    if "NotRegistered" in res.text or "InvalidRegistration" in res.text:
+                        return False
+                    return True
         except Exception as exc:
             logger.error(f"[FCM Native] Erro de envio: {exc}")
-            return False
+            return True
 
     @staticmethod
     def send_push_to_user(username: str, title: str, body: str, url: str = "/dashboard", tag: str = "tati-notif") -> dict:

@@ -29,3 +29,4 @@ jobs:
             -H "Content-Type: application/json" \
             --max-time 30 || true
           echo "Disparo concluído."
+
