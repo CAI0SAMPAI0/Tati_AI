@@ -126,6 +126,8 @@ credentials.json
 # Chaves de serviço (NUNCA versionar)
 service-account.json
 *service_account*.json
+*firebase-adminsdk*.json
+device-streaming-*.json
 tatichatbot-*.json
 credentials*.json
 google-services.json

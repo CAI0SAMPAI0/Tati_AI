@@ -286,11 +286,83 @@ class NotificationDispatcher:
             "contact": contact,
         }
 
+def _send_fcm_v1_admin_sdk(fcm_token: str, title: str, body: str, url: str) -> Optional[bool]:
+    """
+    Tenta enviar via Firebase Admin SDK (HTTP v1) usando o arquivo de credenciais JSON.
+    Retorna True se enviou com sucesso, False se o token do dispositivo expirou, ou None se o JSON não foi encontrado.
+    """
+    try:
+        import firebase_admin
+        from firebase_admin import credentials, messaging
+    except Exception:
+        return None
+
+    try:
+        if not firebase_admin._apps:
+            root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+            json_candidates = [
+                os.getenv("FIREBASE_CREDENTIALS_PATH"),
+                os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
+                "device-streaming-fc45919f-firebase-adminsdk-fbsvc-1e7b2ed04e.json",
+                os.path.join(root_dir, "device-streaming-fc45919f-firebase-adminsdk-fbsvc-1e7b2ed04e.json"),
+            ]
+            cred_path = None
+            for p in json_candidates:
+                if p and os.path.exists(p):
+                    cred_path = p
+                    break
+
+            if not cred_path:
+                return None
+
+            cred = credentials.Certificate(cred_path)
+            firebase_admin.initialize_app(cred)
+
+        message = messaging.Message(
+            notification=messaging.Notification(title=title, body=body),
+            data={"url": url, "title": title, "body": body},
+            token=fcm_token,
+            android=messaging.AndroidConfig(priority="high"),
+        )
+        response = messaging.send(message)
+        logger.info(f"[FCM Admin SDK] Notificação enviada com sucesso via HTTP v1 API: {response}")
+        return True
+    except Exception as exc:
+        logger.warning(f"[FCM Admin SDK] Erro ao enviar via Admin SDK: {exc}")
+        exc_str = str(exc).lower()
+        if "notregistered" in exc_str or "unregistered" in exc_str:
+            return False
+        return True
+
+
+class NotificationDispatcher:
+    """
+    Despachador central de notificações in-app e WebPush/FCM para o sistema operacional.
+    """
+
+    @staticmethod
+    def get_vapid_keys() -> dict:
+        public_key = os.getenv("VAPID_PUBLIC_KEY", "BBOj7nBpIxJXxnmGQ-sIdBbDVGOL-m7cLb6-alvr2qf3dppPl1EgWO2-As6DZpXFKGCXTl-Vq72AWi7u_k622cw")
+        private_key = os.getenv("VAPID_PRIVATE_KEY", "b5TcMgeiUA9ZrM4tcTt-z-4PN-DMOXq0H1J_LR4VpX8")
+        contact = os.getenv("VAPID_CONTACT", "mailto:caio.matos@aedb.br")
+        return {
+            "public_key": public_key,
+            "private_key": private_key,
+            "contact": contact,
+        }
+
     @staticmethod
     def send_fcm_native_push(fcm_token: str, title: str, body: str, url: str) -> bool:
         """
         Envia notificação push para o app Android nativo (Flutter APK) via Firebase Cloud Messaging.
+        Suporta Firebase Admin SDK (HTTP v1 JSON) e fallback para FCM Legacy Key.
         """
+        # 1. Tenta enviar via Firebase Admin SDK (Chave JSON Service Account)
+        v1_result = _send_fcm_v1_admin_sdk(fcm_token, title, body, url)
+        if v1_result is not None:
+            return v1_result
+
+        # 2. Fallback via Legacy HTTP API
         fcm_server_key = os.getenv("FCM_SERVER_KEY") or os.getenv("FIREBASE_SERVER_KEY")
         if not fcm_server_key:
             logger.info(f"[FCM Native] Token detectado ({fcm_token[:15]}...). (Para envio em produção, configure FCM_SERVER_KEY no .env).")
