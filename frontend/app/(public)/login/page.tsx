@@ -48,18 +48,35 @@ export default function LoginPage() {
     clearMessages();
   };
 
-  // Handle Google OAuth redirect callback (used in Capacitor/Android)
+  // Handle Google OAuth and Token query params
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const userParam = params.get('user');
+
+    if (token) {
+      let userObj: any = null;
+      try {
+        if (userParam) userObj = JSON.parse(decodeURIComponent(userParam));
+      } catch (_) {}
+
+      // Limpa os parâmetros da URL
+      window.history.replaceState({}, '', window.location.pathname);
+
+      saveSession(token, userObj || { username: 'student' }).then(() => {
+        router.replace('/chat');
+      });
+      return;
+    }
+
     const credential = params.get('credential');
     if (credential) {
       handleGoogleCredential({ credential });
-      // Clean up URL
       window.history.replaceState({}, '', window.location.pathname);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [saveSession, router]);
 
   // Google OAuth
   useEffect(() => {
@@ -198,6 +215,15 @@ export default function LoginPage() {
         is_hub_only: isHubAccess
       });
       if (!res.ok) { setError((res.data as any).detail || 'Error creating account.'); return; }
+
+      // Faz login automático na hora e entra direto no chat!
+      const loginRes = await loginWithCredentials(regUsername, regPassword);
+      if (loginRes.ok) {
+        await saveSession(loginRes.data.access_token, loginRes.data.user);
+        router.push('/chat');
+        return;
+      }
+
       setSuccess('Account created! Sign in now.');
       setTimeout(() => switchTab('login'), 1500);
     } catch {

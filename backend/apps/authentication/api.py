@@ -198,8 +198,10 @@ def google_oauth_callback(request: HttpRequest, code: str = None, state: str = N
     }, timeout=600)
 
     import json
+    from urllib.parse import quote
     user_json = json.dumps(user_dict)
     jwt_token = token_res.access_token
+    redirect_target = f"https://tati-ai.vercel.app/login?token={jwt_token}&user={quote(user_json)}"
 
     html = f"""
     <!DOCTYPE html>
@@ -236,24 +238,15 @@ def google_oauth_callback(request: HttpRequest, code: str = None, state: str = N
         <h2>Autenticado com sucesso!</h2>
         <p style="color: #9ca3af;">Redirecionando para o aplicativo...</p>
         <script>
-            try {{
-                localStorage.setItem('token', '{jwt_token}');
-                localStorage.setItem('user', JSON.stringify({user_json}));
-                document.cookie = 'token={jwt_token}; path=/; max-age=2592000; SameSite=Lax';
-            }} catch(e) {{}}
-
             setTimeout(function() {{
                 try {{
                     if (window.opener) {{
                         window.opener.postMessage({{ type: 'GOOGLE_AUTH_SUCCESS', token: '{jwt_token}', user: {user_json} }}, '*');
                         window.close();
-                    }} else {{
-                        window.location.href = 'https://tati-ai.vercel.app/chat';
                     }}
-                }} catch(e) {{
-                    window.location.href = 'https://tati-ai.vercel.app/chat';
-                }}
-            }}, 400);
+                }} catch(e) {{}}
+                window.location.href = '{redirect_target}';
+            }}, 300);
         </script>
     </body>
     </html>
