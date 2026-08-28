@@ -66,8 +66,6 @@ export default function LoginPage() {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     if (!clientId) return;
 
-    if (Capacitor.isNativePlatform()) return;
-
     const initGoogle = (retries = 0) => {
       if (typeof window === 'undefined') return;
       const g = (window as any).google;
@@ -131,21 +129,28 @@ export default function LoginPage() {
 
   const isHubAccess = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('access') === 'hub';
 
-  const handleGoogleLoginCapacitor = useCallback(async () => {
+  const handleGoogleLogin = useCallback(async () => {
     clearMessages();
-    setLoading(true);
     setError('');
-    try {
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const urlRes = await fetch(`${apiBase}/auth/google/url`);
-      const data = await urlRes.json();
-      if (!data.url) { setError('Google login not configured.'); return; }
-      window.location.href = data.url;
-    } catch {
-      setError('Connection error. Check if the server is running.');
-    } finally {
-      setLoading(false);
+
+    // 1. Se estiver rodando dentro do App Flutter nativo, aciona o handler nativo
+    if (typeof window !== 'undefined' && (window as any).flutter_inappwebview) {
+      setLoading(true);
+      (window as any).flutter_inappwebview.callHandler('googleLogin');
+      return;
     }
+
+    // 2. Se o botão do Google GIS estiver presente, aciona o popup nativo do Google
+    const gBtn = googleBtnRef.current?.querySelector('div[role="button"]') as HTMLElement;
+    if (gBtn) {
+      gBtn.click();
+      return;
+    }
+
+    // 3. Fallback: Redireciona diretamente para o fluxo Google OAuth no backend (sem exibir JSON)
+    setLoading(true);
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+    window.location.href = `${apiBase}/auth/google/login`;
   }, []);
 
   // Login
@@ -331,14 +336,7 @@ export default function LoginPage() {
                 <div className="relative w-full mb-4">
                   <button
                     type="button"
-                    onClick={() => {
-                      if (Capacitor.isNativePlatform()) {
-                        handleGoogleLoginCapacitor();
-                      } else {
-                        (googleBtnRef.current?.querySelector('div[role="button"]') as HTMLElement)?.click();
-                      }
-                      (googleBtnRef.current?.querySelector('div[role="button"]') as HTMLElement)?.click();
-                    }}
+                    onClick={handleGoogleLogin}
                     className="w-full py-2.5 bg-input text-text border border-border rounded-[9px] text-sm font-medium flex items-center justify-center gap-2.5 hover:bg-bg-secondary transition-colors cursor-pointer"
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24">
@@ -349,9 +347,6 @@ export default function LoginPage() {
                     </svg>
                     <span>{'Continue with Google'}</span>
                   </button>
-                  {!Capacitor.isNativePlatform() && (
-                    <div ref={googleBtnRef} className="absolute inset-0 overflow-hidden rounded-[9px] opacity-[0.001] cursor-pointer flex items-center justify-center" />
-                  )}
                   <div ref={googleBtnRef} className="absolute inset-0 overflow-hidden rounded-[9px] opacity-[0.001] cursor-pointer flex items-center justify-center" />
                 </div>
                 <div className="flex items-center gap-3 mb-4 text-text-subtle text-[0.73rem] tracking-wider">
