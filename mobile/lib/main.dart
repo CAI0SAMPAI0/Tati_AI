@@ -226,31 +226,29 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                 onWebViewCreated: (controller) {
                   webViewController = controller;
 
-                  // Handler para Login Google Nativo
+                  // Handler para Login Google Nativo (Abre modal do Android)
                   controller.addJavaScriptHandler(
                     handlerName: 'googleLogin',
                     callback: (args) async {
                       try {
-                        debugPrint('[Google Login] Iniciando login nativo...');
+                        debugPrint('[Google Login] Abrindo modal nativo de contas do Android...');
                         final GoogleSignIn googleSignIn = GoogleSignIn(
-                          serverClientId: '237918390149-kh6ta3o2d011ehkqn2s3iept839asarl.apps.googleusercontent.com',
-                          scopes: ['email', 'profile', 'openid'],
+                          scopes: ['email', 'profile'],
                         );
 
-                        // Força logout antes para permitir escolher conta
-                        await googleSignIn.signOut();
-
+                        // Abre o modal nativo com as contas do celular
                         final GoogleSignInAccount? account = await googleSignIn.signIn();
                         if (account != null) {
+                          debugPrint('[Google Login] Conta selecionada: ${account.email}');
                           final GoogleSignInAuthentication auth = await account.authentication;
-                          final String? idToken = auth.idToken;
+                          final String? tokenToSend = auth.idToken ?? auth.accessToken;
 
-                          if (idToken != null) {
-                            debugPrint('[Google Login] ID Token obtido, enviando ao backend...');
+                          if (tokenToSend != null) {
+                            debugPrint('[Google Login] Token obtido, enviando ao backend...');
                             final response = await http.post(
                               Uri.parse("$backendApiUrl/auth/google"),
                               headers: {"Content-Type": "application/json"},
-                              body: jsonEncode({"credential": idToken}),
+                              body: jsonEncode({"credential": tokenToSend}),
                             );
 
                             if (response.statusCode == 200) {
@@ -264,6 +262,7 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                               await controller.evaluateJavascript(source: """
                                 localStorage.setItem('token', '$token');
                                 localStorage.setItem('user', '${jsonEncode(user)}');
+                                document.cookie = 'token=$token; path=/; max-age=2592000; SameSite=Lax';
                                 window.location.href = '/chat';
                               """);
 
@@ -278,10 +277,7 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                           }
                         }
                       } catch (e) {
-                        debugPrint('[Google Login] Erro: $e');
-                        // Fallback: Redireciona diretamente para o Google OAuth no backend
-                        final fallbackUrl = "$backendApiUrl/auth/google/login";
-                        await controller.evaluateJavascript(source: "window.location.href = '$fallbackUrl'");
+                        debugPrint('[Google Login] Erro ao abrir modal nativo: $e');
                       }
                       return {"success": false};
                     },

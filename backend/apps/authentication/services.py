@@ -231,6 +231,8 @@ class AuthService:
 
     @classmethod
     def google_login(cls, credential: str, is_hub_only: bool = False) -> TokenResponse:
+        id_info = None
+        # 1. Tenta validar como Google ID Token (JWT)
         try:
             google_client_id = getattr(settings, 'GOOGLE_CLIENT_ID', '')
             id_info = id_token.verify_oauth2_token(
@@ -239,7 +241,23 @@ class AuthService:
                 audience=google_client_id if google_client_id else None,
             )
         except Exception as e:
-            logger.warning(f"[Auth] Validação do Google OAuth falhou: {e}")
+            logger.info(f"[Auth] Não é ID Token ou falhou verificação JWT ({e}). Tentando como Access Token...")
+
+        # 2. Fallback: Se for Google Access Token (obtido direto do celular via google_sign_in)
+        if not id_info:
+            try:
+                import httpx
+                resp = httpx.get(
+                    "https://www.googleapis.com/oauth2/v3/userinfo",
+                    headers={"Authorization": f"Bearer {credential}"},
+                    timeout=8.0,
+                )
+                if resp.status_code == 200:
+                    id_info = resp.json()
+            except Exception as e:
+                logger.warning(f"[Auth] Validação via Google userinfo falhou: {e}")
+
+        if not id_info:
             raise HttpError(401, "Token do Google inválido ou expirado.")
 
         email = id_info.get("email", "").strip().lower()
