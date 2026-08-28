@@ -1,0 +1,31 @@
+name: Scheduled Notifications Cron
+
+on:
+  schedule:
+    # 14:00 BRT (17:00 UTC) - Lembrete de Inatividade
+    - cron: '0 17 * * *'
+    # 19:00 BRT (22:00 UTC) - Lembrete de Ofensiva (Streak Reminder 1)
+    - cron: '0 22 * * *'
+    # 21:30 BRT (00:30 UTC) - Lembrete de Ofensiva Urgente (Streak Reminder 2)
+    - cron: '30 0 * * *'
+    # Domingo 20:00 BRT (23:00 UTC) - Relatório Semanal de Evolução
+    - cron: '0 23 * * 0'
+  workflow_dispatch:
+    inputs:
+      notification_type:
+        description: 'Tipo de notificação (all, streak, weekly, inactivity)'
+        required: true
+        default: 'all'
+
+jobs:
+  trigger-notifications:
+    name: Dispatch Scheduled Notifications
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Notification Endpoint on Hugging Face
+        run: |
+          echo "Disparando notificações agendadas..."
+          curl -X POST "https://caio007-tati-ai-backend.hf.space/api/v1/notifications/send-all-test" \
+            -H "Content-Type: application/json" \
+            --max-time 30 || true
+          echo "Disparo concluído."
