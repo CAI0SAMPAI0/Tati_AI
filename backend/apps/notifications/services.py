@@ -354,10 +354,13 @@ class NotificationDispatcher:
             # 1. Dispositivo com token FCM nativo (Flutter / Android APK)
             if endpoint.startswith("fcm:") or sub.p256dh == "fcm":
                 token = endpoint.replace("fcm:", "")
-                if NotificationDispatcher.send_fcm_native_push(token, title, body, url):
+                success = NotificationDispatcher.send_fcm_native_push(token, title, body, url)
+                if success:
                     sent_count += 1
                 else:
                     failed_count += 1
+                    # Inativa token FCM inválido/obsoleto
+                    PushSubscription.objects.filter(id=sub.id).update(is_active=False)
                 continue
 
             # 2. Navegador Web / PWA (WebPush padrão via VAPID)
