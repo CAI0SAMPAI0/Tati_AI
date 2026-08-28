@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "com.tatiana.tati_ai_mobile"
-    compileSdk = 36
+    compileSdk = 34
+    ndkVersion = "30.0.16138531"
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
@@ -16,7 +17,7 @@ android {
 
     defaultConfig {
         applicationId = "com.tatiana.tati_ai_mobile"
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName
