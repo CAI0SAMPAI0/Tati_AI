@@ -51,3 +51,4 @@ O arquivo compilado estará pronto em:
 * **120 FPS:** Renderização fluida via GPU com `InAppWebView`.
 * **Push em Background:** Acorda o celular mesmo com tela bloqueada e app fechado.
 * **Multiplataforma:** O mesmo projeto pode gerar versão para iPhone (iOS) no futuro.
+

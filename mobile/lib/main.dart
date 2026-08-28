@@ -58,7 +58,6 @@ void main() async {
   await flutterLocalNotificationsPlugin.initialize(
     initializationSettings,
     onDidReceiveNotificationResponse: (NotificationResponse response) {
-      // Deep link quando o usuário clica na notificação
       final String? payload = response.payload;
       if (payload != null && payload.isNotEmpty) {
         TatiAppScreen.navigateToRoute(payload);
@@ -111,7 +110,6 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
   bool isPageLoaded = false;
   String? fcmToken;
 
-  // URL padrão da plataforma (produção / local)
   final String appUrl = "https://tati-ai.com";
   final String backendApiUrl = "https://caio007-tati-ai-backend.hf.space";
 
@@ -128,16 +126,13 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
   }
 
   Future<void> _initPermissionsAndPush() async {
-    // 1. Permissões de Notificação e Microfone (para chat de voz)
     await Permission.notification.request();
     await Permission.microphone.request();
 
     try {
-      // 2. Token FCM oficial
       fcmToken = await FirebaseMessaging.instance.getToken();
       debugPrint('[FCM] Token do Dispositivo: $fcmToken');
 
-      // 3. Ouvinte de Foreground (App aberto)
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         RemoteNotification? notification = message.notification;
         Map<String, dynamic> data = message.data;
@@ -163,7 +158,6 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
         }
       });
 
-      // 4. Clique na notificação com o app em segundo plano
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
         final targetUrl = message.data['url'];
         if (targetUrl != null) {
@@ -175,7 +169,6 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
     }
   }
 
-  // Sincroniza o token FCM com o backend quando o aluno faz login na WebView
   Future<void> _syncTokenWithBackend(String username, String token) async {
     if (fcmToken == null) return;
     try {
@@ -228,7 +221,6 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                 onWebViewCreated: (controller) {
                   webViewController = controller;
 
-                  // Handler JavaScript para interceptar login e enviar o FCM Token ao backend
                   controller.addJavaScriptHandler(
                     handlerName: 'onUserLogin',
                     callback: (args) {
@@ -243,7 +235,6 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                     },
                   );
                 },
-                // Permissão automática de microfone para o Chat de Voz e Pronunciation Reader
                 onPermissionRequest: (controller, request) async {
                   return PermissionResponse(
                     resources: request.resources,
@@ -260,7 +251,6 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                     isPageLoaded = true;
                   });
 
-                  // Injeta script auxiliar para escutar login
                   await controller.evaluateJavascript(source: """
                     window.addEventListener('storage', function(e) {
                       if (e.key === 'token' && e.newValue) {
