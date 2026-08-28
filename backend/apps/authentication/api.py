@@ -126,6 +126,17 @@ def get_google_auth_url(request: HttpRequest):
     return {"url": auth_url, "state": state}
 
 
+@auth_router.get("/google/login")
+def redirect_to_google_login(request: HttpRequest):
+    """
+    Redireciona diretamente o navegador/app (HTTP 302) para a tela de login do Google OAuth.
+    """
+    from django.shortcuts import redirect
+    auth_data = get_google_auth_url(request)
+    return redirect(auth_data["url"])
+
+
+
 @auth_router.get("/google/callback")
 def google_oauth_callback(request: HttpRequest, code: str = None, state: str = None, error: str = None):
     """
