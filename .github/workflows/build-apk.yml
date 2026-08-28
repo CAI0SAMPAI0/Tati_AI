@@ -1,0 +1,42 @@
+name: Build Flutter APK
+
+on:
+  workflow_dispatch: # Permite disparar manualmente com 1 clique no GitHub
+  push:
+    branches: [ main ]
+    paths:
+      - 'mobile/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.x'
+          channel: 'stable'
+
+      - name: Install Dependencies
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Build Android Release APK
+        working-directory: mobile
+        run: flutter build apk --release
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tati-ai-release-apk
+          path: mobile/build/app/outputs/flutter-apk/app-release.apk
