@@ -127,20 +127,31 @@ def get_email_status(request: HttpRequest):
 @notifications_router.post("/send-all-test", auth=auth_optional)
 def send_all_test_notifications(request: HttpRequest, username: Optional[str] = None):
     """
-    Dispara todas as 6 notificações do sistema (Email, Push e In-App) para o usuário.
+    Dispara todas as 6 notificações do sistema (Email, Push e In-App) para caio.sampaio e programador.
     """
     from django.contrib.auth import get_user_model
     from .services import NotificationSchedulerService
     User = get_user_model()
-    target_user = request.auth
-    if not target_user:
-        target_name = username or "caio.sampaio"
-        target_user = User.objects.filter(username=target_name).first() or User.objects.filter(email__icontains="caio").first()
+    
+    target_names = ["caio.sampaio", "programador"]
+    if username:
+        target_names = [username]
+    elif request.auth and hasattr(request.auth, "username") and isinstance(request.auth, User):
+        target_names = list(set([request.auth.username] + target_names))
 
-    if not target_user:
-        raise HttpError(404, "Usuário alvo não encontrado.")
+    targets = list(User.objects.filter(username__in=target_names))
+    if not targets:
+        targets = list(User.objects.filter(email__icontains="caio"))
 
-    return NotificationSchedulerService.send_all_test_notifications_to_user(target_user)
+    if not targets:
+        raise HttpError(404, "Nenhum usuário alvo encontrado.")
+
+    all_results = {}
+    for target_user in targets:
+        res = NotificationSchedulerService.send_all_test_notifications_to_user(target_user)
+        all_results[target_user.username] = res
+
+    return {"ok": True, "target_users": [u.username for u in targets], "results": all_results}
 
 
 
