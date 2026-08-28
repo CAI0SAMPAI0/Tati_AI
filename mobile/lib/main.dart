@@ -136,6 +136,11 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
       fcmToken = await FirebaseMessaging.instance.getToken();
       debugPrint('[FCM] Token do Dispositivo: $fcmToken');
 
+      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+        fcmToken = newToken;
+        debugPrint('[FCM] Token renovado pelo Firebase: $fcmToken');
+      });
+
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         RemoteNotification? notification = message.notification;
         Map<String, dynamic> data = message.data;
