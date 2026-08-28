@@ -4,8 +4,6 @@ on:
   workflow_dispatch: # Permite disparar manualmente com 1 clique no GitHub
   push:
     branches: [ main ]
-    paths:
-      - 'mobile/**'
 
 jobs:
   build:
