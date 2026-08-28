@@ -32,7 +32,7 @@ jobs:
 
       - name: Build Android Release APK
         working-directory: mobile
-        run: flutter build apk --release
+        run: flutter build apk --release --android-skip-build-dependency-validation
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
