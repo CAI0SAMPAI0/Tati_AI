@@ -358,6 +358,21 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                         } catch(err) {}
                       }
                     });
+
+                    // Sincroniza o token FCM imediatamente ao carregar se já estiver logado
+                    try {
+                      var storedToken = localStorage.getItem('token');
+                      var userStr = localStorage.getItem('user');
+                      if (storedToken && userStr) {
+                        var userObj = JSON.parse(userStr);
+                        if (userObj.username) {
+                          window.flutter_inappwebview.callHandler('onUserLogin', {
+                            username: userObj.username,
+                            token: storedToken
+                          });
+                        }
+                      }
+                    } catch(err) {}
                   """);
                 },
               ),
