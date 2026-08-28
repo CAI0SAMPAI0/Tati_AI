@@ -184,15 +184,63 @@ def google_oauth_callback(request: HttpRequest, code: str = None, state: str = N
         "user": user_dict,
     }, timeout=600)
 
-    html = """
+    import json
+    user_json = json.dumps(user_dict)
+    jwt_token = token_res.access_token
+
+    html = f"""
     <!DOCTYPE html>
     <html>
-    <head><title>Login Concluído</title></head>
-    <body style="font-family:sans-serif; text-align:center; padding:50px;">
+    <head>
+        <meta charset="utf-8"/>
+        <title>Autenticado com sucesso</title>
+        <style>
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background-color: #0f1015;
+                color: #ffffff;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                margin: 0;
+            }}
+            .spinner {{
+                border: 3px solid rgba(139, 92, 246, 0.2);
+                border-top-color: #8b5cf6;
+                border-radius: 50%;
+                width: 36px;
+                height: 36px;
+                animation: spin 0.8s linear infinite;
+                margin-bottom: 16px;
+            }}
+            @keyframes spin {{ to {{ transform: rotate(360deg); }} }}
+        </style>
+    </head>
+    <body>
+        <div class="spinner"></div>
         <h2>Autenticado com sucesso!</h2>
-        <p>Você pode fechar esta aba e voltar para o aplicativo.</p>
+        <p style="color: #9ca3af;">Redirecionando para o aplicativo...</p>
         <script>
-            try { window.close(); } catch(e) {}
+            try {{
+                localStorage.setItem('token', '{jwt_token}');
+                localStorage.setItem('user', JSON.stringify({user_json}));
+                document.cookie = 'token={jwt_token}; path=/; max-age=2592000; SameSite=Lax';
+            }} catch(e) {{}}
+
+            setTimeout(function() {{
+                try {{
+                    if (window.opener) {{
+                        window.opener.postMessage({{ type: 'GOOGLE_AUTH_SUCCESS', token: '{jwt_token}', user: {user_json} }}, '*');
+                        window.close();
+                    }} else {{
+                        window.location.href = 'https://tati-ai.vercel.app/chat';
+                    }}
+                }} catch(e) {{
+                    window.location.href = 'https://tati-ai.vercel.app/chat';
+                }}
+            }}, 400);
         </script>
     </body>
     </html>

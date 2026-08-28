@@ -8,6 +8,9 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ── BACKGROUND FCM HANDLER ──────────────────────────────────────────
 @pragma('vm:entry-point')
@@ -49,7 +52,7 @@ void main() async {
 
   // Inicializa o canal de notificações local do Android
   const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
+      AndroidInitializationSettings('@mipmap/launcher_icon');
 
   const InitializationSettings initializationSettings = InitializationSettings(
     android: initializationSettingsAndroid,
@@ -110,8 +113,8 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
   bool isPageLoaded = false;
   String? fcmToken;
 
-  final String appUrl = "https://tati-ai.com";
-  final String backendApiUrl = "https://caio007-tati-ai-backend.hf.space";
+  final String appUrl = "https://tati-ai.vercel.app";
+  final String backendApiUrl = "https://caio007-tati-ai-backend.hf.space/api/v1";
 
   @override
   void initState() {
@@ -147,7 +150,7 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                 notificationChannel.id,
                 notificationChannel.name,
                 channelDescription: notificationChannel.description,
-                icon: '@mipmap/ic_launcher',
+                icon: '@mipmap/launcher_icon',
                 importance: Importance.max,
                 priority: Priority.high,
                 playSound: true,
@@ -217,9 +220,72 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                   mediaPlaybackRequiresUserGesture: false,
                   useHybridComposition: true,
                   transparentBackground: true,
+                  saveFormData: true,
+                  sharedCookiesEnabled: true,
                 ),
                 onWebViewCreated: (controller) {
                   webViewController = controller;
+
+                  // Handler para Login Google Nativo
+                  controller.addJavaScriptHandler(
+                    handlerName: 'googleLogin',
+                    callback: (args) async {
+                      try {
+                        debugPrint('[Google Login] Iniciando login nativo...');
+                        final GoogleSignIn googleSignIn = GoogleSignIn(
+                          serverClientId: '237918390149-kh6ta3o2d011ehkqn2s3iept839asarl.apps.googleusercontent.com',
+                          scopes: ['email', 'profile', 'openid'],
+                        );
+
+                        // Força logout antes para permitir escolher conta
+                        await googleSignIn.signOut();
+
+                        final GoogleSignInAccount? account = await googleSignIn.signIn();
+                        if (account != null) {
+                          final GoogleSignInAuthentication auth = await account.authentication;
+                          final String? idToken = auth.idToken;
+
+                          if (idToken != null) {
+                            debugPrint('[Google Login] ID Token obtido, enviando ao backend...');
+                            final response = await http.post(
+                              Uri.parse("$backendApiUrl/auth/google"),
+                              headers: {"Content-Type": "application/json"},
+                              body: jsonEncode({"credential": idToken}),
+                            );
+
+                            if (response.statusCode == 200) {
+                              final data = jsonDecode(response.body);
+                              final token = data['access_token'];
+                              final user = data['user'];
+
+                              debugPrint('[Google Login] Sucesso! Injetando sessão no WebView.');
+
+                              // Injeta no localStorage e redireciona
+                              await controller.evaluateJavascript(source: """
+                                localStorage.setItem('token', '$token');
+                                localStorage.setItem('user', '${jsonEncode(user)}');
+                                window.location.href = '/chat';
+                              """);
+
+                              if (user != null && user['username'] != null) {
+                                _syncTokenWithBackend(user['username'], token);
+                              }
+
+                              return {"success": true};
+                            } else {
+                              debugPrint('[Google Login] Erro no backend: ${response.body}');
+                            }
+                          }
+                        }
+                      } catch (e) {
+                        debugPrint('[Google Login] Erro: $e');
+                        // Fallback: Redireciona diretamente para o Google OAuth no backend
+                        final fallbackUrl = "$backendApiUrl/auth/google/login";
+                        await controller.evaluateJavascript(source: "window.location.href = '$fallbackUrl'");
+                      }
+                      return {"success": false};
+                    },
+                  );
 
                   controller.addJavaScriptHandler(
                     handlerName: 'onUserLogin',
@@ -252,6 +318,26 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                   });
 
                   await controller.evaluateJavascript(source: """
+                    // Bridge para detectar Flutter e injetar comportamentos
+                    window.isFlutterApp = true;
+
+                    // Interceptação direta apenas quando o clique é no botão do Google
+                    document.addEventListener('mousedown', function(e) {
+                      var target = e.target;
+                      while (target && target !== document) {
+                        // Verifica se o elemento clicado (ou seus pais) é um botão e contém "Google"
+                        if ((target.tagName === 'BUTTON' || target.getAttribute('role') === 'button') &&
+                            target.innerText && target.innerText.toLowerCase().includes('google')) {
+                          console.log('[Bridge] Google Login Clicked');
+                          window.flutter_inappwebview.callHandler('googleLogin');
+                          e.preventDefault();
+                          e.stopPropagation();
+                          return;
+                        }
+                        target = target.parentNode;
+                      }
+                    }, true);
+
                     window.addEventListener('storage', function(e) {
                       if (e.key === 'token' && e.newValue) {
                         try {
