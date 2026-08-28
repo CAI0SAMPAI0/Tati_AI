@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import httpx
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Any, Dict
 from django.contrib.auth import get_user_model
 
@@ -533,4 +534,152 @@ class NotificationDispatcher:
             WahaWhatsAppService.send_message(student_phone, wa_msg)
 
         return {"success": True, "push": push_res}
+
+
+class NotificationSchedulerService:
+    """
+    Agendador inteligente de notificações (Streak, Relatório Semanal, Inatividade, Marcos)
+    Espelha a lógica do FastAPI com suporte a Email HTML (Brevo/Resend/SMTP), Push Notification e In-App.
+    """
+
+    @staticmethod
+    def send_all_test_notifications_to_user(user: User) -> dict:
+        """
+        Dispara todos os 6 tipos de notificação para um usuário específico (Email + Push + In-App).
+        """
+        first_name = (user.name or user.username or "Student").strip().split()[0].capitalize()
+        email = user.email
+        results = []
+
+        # 1. Streak Reminder
+        streak_val = getattr(user, 'streak', None) or 5
+        title_1 = "Don't break your streak! 🔥"
+        body_1 = f"Hello {first_name}! You're on a {streak_val}-day streak. Practice just 5 minutes today with Teacher Tati to keep it alive!"
+        html_1 = f"""
+<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
+  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <div style="text-align: center; margin-bottom: 24px;"><span style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">🔥 STREAK AT RISK</span></div>
+    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Don't break your streak, {first_name}!</h1>
+    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">You have worked hard to reach a <strong style="color: #f59e0b;">{streak_val}-day study streak</strong>. Don't let your progress slip away! Just 5 minutes of practice with Teacher Tati keeps your flame burning.</p>
+    <div style="text-align: center; margin: 32px 0;"><a href="https://tati-ai.vercel.app/activities" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Practice with Tati Now →</a></div>
+    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Personalized English Coaching</p>
+  </div>
+</body></html>"""
+        diag_1 = BrevoEmailService.send_email_detailed(email, title_1, html_1, first_name) if email else {}
+        push_1 = NotificationDispatcher.send_push_to_user(user.username, title_1, body_1, url="/activities", tag="streak-reminder")
+        Notification.objects.create(username=user.username, category="streaks", title=title_1, body=body_1)
+        results.append({"type": "streak_reminder", "email_sent": diag_1.get("success", False), "push": push_1})
+
+        # 2. Weekly Progress Report
+        from apps.users.services import ProgressReportService
+        report_data = ProgressReportService.get_weekly_report(user) if hasattr(ProgressReportService, 'get_weekly_report') else {}
+        mins_studied = report_data.get("total_study_minutes", 75)
+        acts_done = report_data.get("activities_completed", 8)
+        vocab_learned = report_data.get("vocabulary_learned", 15)
+        title_2 = "📊 Your Weekly Progress Report - Teacher Tati AI"
+        body_2 = f"Hello {first_name}! Your weekly report is ready: {mins_studied} min practiced, {acts_done} activities completed, and +{vocab_learned} words learned!"
+        html_2 = f"""
+<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
+  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(124, 58, 237, 0.15); color: #a78bfa; border: 1px solid rgba(124, 58, 237, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">📊 WEEKLY EVOLUTION REPORT</span></div>
+    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Great progress this week, {first_name}!</h1>
+    <table style="width: 100%; border-collapse: collapse; margin: 24px 0;"><tr>
+      <td style="padding: 12px; background: #221b40; border-radius: 12px 0 0 12px; text-align: center; width: 33.3%;"><div style="font-size: 22px; font-weight: 800; color: #7c3aed;">{mins_studied} min</div><div style="font-size: 12px; color: #948aa8;">Study Time</div></td>
+      <td style="padding: 12px; background: #221b40; border-left: 1px solid #312759; border-right: 1px solid #312759; text-align: center; width: 33.3%;"><div style="font-size: 22px; font-weight: 800; color: #10b981;">{acts_done}</div><div style="font-size: 12px; color: #948aa8;">Activities</div></td>
+      <td style="padding: 12px; background: #221b40; border-radius: 0 12px 12px 0; text-align: center; width: 33.3%;"><div style="font-size: 22px; font-weight: 800; color: #f59e0b;">+{vocab_learned}</div><div style="font-size: 12px; color: #948aa8;">Words</div></td>
+    </tr></table>
+    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/dashboard" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 15px; display: inline-block;">View Full Report →</a></div>
+    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Real Results.</p>
+  </div>
+</body></html>"""
+        diag_2 = BrevoEmailService.send_email_detailed(email, title_2, html_2, first_name) if email else {}
+        push_2 = NotificationDispatcher.send_push_to_user(user.username, title_2, body_2, url="/dashboard", tag="weekly-report")
+        Notification.objects.create(username=user.username, category="weekly_report", title=title_2, body=body_2)
+        results.append({"type": "weekly_report", "email_sent": diag_2.get("success", False), "push": push_2})
+
+        # 3. Streak Broken Comeback
+        title_3 = "A fresh start awaits! 🌅"
+        body_3 = f"Hello {first_name}, your streak ended, but every champion has a comeback. Today is Day 1 of your next record!"
+        html_3 = f"""
+<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
+  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">💪 TIME FOR A COMEBACK</span></div>
+    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Streak lost... but not you, {first_name}!</h1>
+    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">Consistency isn't about never missing a day — it's about bouncing right back. Teacher Tati is ready for your next session!</p>
+    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/chat" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Start Day 1 Now →</a></div>
+    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Continuous Progress.</p>
+  </div>
+</body></html>"""
+        diag_3 = BrevoEmailService.send_email_detailed(email, title_3, html_3, first_name) if email else {}
+        push_3 = NotificationDispatcher.send_push_to_user(user.username, title_3, body_3, url="/chat", tag="streak-broken")
+        Notification.objects.create(username=user.username, category="streaks", title=title_3, body=body_3)
+        results.append({"type": "streak_broken", "email_sent": diag_3.get("success", False), "push": push_3})
+
+        # 4. Streak Milestone (7 Days)
+        title_4 = "🏆 7-Day Streak Achieved! You're on fire!"
+        body_4 = f"Congratulations {first_name}! You've reached a 7-day study streak. You are building a powerful English habit!"
+        html_4 = f"""
+<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
+  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">🏆 MILESTONE UNLOCKED</span></div>
+    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">7 Days in a Row, {first_name}!</h1>
+    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">One full week of consistency! You are now among the most dedicated English students. Teacher Tati is super proud!</p>
+    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/achievements" style="background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Claim Trophy & XP →</a></div>
+    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Celebrate every milestone.</p>
+  </div>
+</body></html>"""
+        diag_4 = BrevoEmailService.send_email_detailed(email, title_4, html_4, first_name) if email else {}
+        push_4 = NotificationDispatcher.send_push_to_user(user.username, title_4, body_4, url="/achievements", tag="streak-milestone")
+        Notification.objects.create(username=user.username, category="achievements", title=title_4, body=body_4)
+        results.append({"type": "streak_milestone", "email_sent": diag_4.get("success", False), "push": push_4})
+
+        # 5. New Activity Released
+        title_5 = "📚 New Listening Activity: 'Mastering Everyday English'"
+        body_5 = f"Hi {first_name}! Teacher Tatiana just published a brand-new activity designed for your level. Check it out and boost your listening skills!"
+        html_5 = f"""
+<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
+  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(124, 58, 237, 0.15); color: #c084fc; border: 1px solid rgba(124, 58, 237, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">📚 NEW ACTIVITY</span></div>
+    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">New Material from Teacher Tatiana!</h1>
+    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">A fresh exercise — <strong style="color: #ffffff;">"Mastering Everyday English"</strong> — is now open for your profile!</p>
+    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/activities" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Start Activity Now →</a></div>
+    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Real-world English practice.</p>
+  </div>
+</body></html>"""
+        diag_5 = BrevoEmailService.send_email_detailed(email, title_5, html_5, first_name) if email else {}
+        push_5 = NotificationDispatcher.send_push_to_user(user.username, title_5, body_5, url="/activities", tag="new-activity")
+        Notification.objects.create(username=user.username, category="new_activity", title=title_5, body=body_5)
+        results.append({"type": "new_activity", "email_sent": diag_5.get("success", False), "push": push_5})
+
+        # 6. Inactivity Nudge
+        title_6 = "Tati is waiting for you! 🍎"
+        body_6 = f"Hello {first_name}, it's been a few days since your last practice. Let's have a quick 3-minute conversation to keep your skills sharp!"
+        html_6 = f"""
+<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
+  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(236, 72, 153, 0.15); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">🍎 WE MISS YOU</span></div>
+    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Tati is waiting for you, {first_name}!</h1>
+    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">A quick 3-minute audio or text chat today will keep your English fluent and natural. Say hello to Teacher Tatiana!</p>
+    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/chat" style="background: linear-gradient(135deg, #ec4899, #d946ef); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Say Hello to Tati →</a></div>
+    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Always here for your learning journey.</p>
+  </div>
+</body></html>"""
+        diag_6 = BrevoEmailService.send_email_detailed(email, title_6, html_6, first_name) if email else {}
+        push_6 = NotificationDispatcher.send_push_to_user(user.username, title_6, body_6, url="/chat", tag="inactivity-nudge")
+        Notification.objects.create(username=user.username, category="retention", title=title_6, body=body_6)
+        results.append({"type": "inactivity_nudge", "email_sent": diag_6.get("success", False), "push": push_6})
+
+        return {
+            "success": True,
+            "username": user.username,
+            "email": email,
+            "notifications_dispatched": results,
+        }
+
 

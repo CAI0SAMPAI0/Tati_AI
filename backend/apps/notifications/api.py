@@ -124,18 +124,14 @@ def get_email_status(request: HttpRequest):
     }
 
 
-@notifications_router.post("/test-email", auth=auth_required)
-def test_email(request: HttpRequest, payload: SendEmailInput):
+@notifications_router.post("/send-all-test", auth=auth_required)
+def send_all_test_notifications(request: HttpRequest):
     """
-    Endpoint de teste detalhado para verificar exatamente o retorno da API do Brevo e provedores.
+    Dispara todas as 6 notificações do sistema (Email, Push e In-App) para o usuário autenticado.
     """
-    diag = BrevoEmailService.send_email_detailed(
-        to_email=payload.to_email,
-        subject=payload.subject or "Teacher Tati — Teste de Entrega",
-        html_content=payload.html_content or "<p>Este é um e-mail de teste do sistema Teacher Tati.</p>",
-        recipient_name=payload.recipient_name,
-    )
-    return diag
+    from .services import NotificationSchedulerService
+    return NotificationSchedulerService.send_all_test_notifications_to_user(request.auth)
+
 
 
 # ── DISPARO DE WHATSAPP (WAHA) ────────────────────────────────────────
