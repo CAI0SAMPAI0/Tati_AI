@@ -131,26 +131,29 @@ export default function LoginPage() {
 
   const handleGoogleLogin = useCallback(async () => {
     clearMessages();
+    setLoading(true);
     setError('');
 
-    // 1. Se estiver rodando dentro do App Flutter nativo, aciona o handler nativo
+    // 1. Se estiver rodando dentro do App Flutter nativo, tenta o handler nativo
     if (typeof window !== 'undefined' && (window as any).flutter_inappwebview) {
-      setLoading(true);
       (window as any).flutter_inappwebview.callHandler('googleLogin');
       return;
     }
 
-    // 2. Se o botão do Google GIS estiver presente, aciona o popup nativo do Google
-    const gBtn = googleBtnRef.current?.querySelector('div[role="button"]') as HTMLElement;
-    if (gBtn) {
-      gBtn.click();
-      return;
+    // 2. Navega diretamente para a tela de autenticação do Google (accounts.google.com)
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://caio007-tati-ai-backend.hf.space';
+      const res = await fetch(`${apiBase}/auth/google/url`);
+      const data = await res.json();
+      if (data && data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      window.location.href = `${apiBase}/auth/google/login`;
+    } catch {
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://caio007-tati-ai-backend.hf.space';
+      window.location.href = `${apiBase}/auth/google/login`;
     }
-
-    // 3. Fallback: Redireciona diretamente para o fluxo Google OAuth no backend (sem exibir JSON)
-    setLoading(true);
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-    window.location.href = `${apiBase}/auth/google/login`;
   }, []);
 
   // Login

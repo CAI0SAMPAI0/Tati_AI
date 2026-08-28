@@ -277,7 +277,19 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                           }
                         }
                       } catch (e) {
-                        debugPrint('[Google Login] Erro ao abrir modal nativo: $e');
+                        debugPrint('[Google Login] Erro no modal nativo ($e). Abrindo tela do Google no WebView...');
+                        try {
+                          final res = await http.get(Uri.parse("$backendApiUrl/auth/google/url"));
+                          if (res.statusCode == 200) {
+                            final data = jsonDecode(res.body);
+                            final String? googleAuthUrl = data['url'];
+                            if (googleAuthUrl != null) {
+                              await controller.loadUrl(urlRequest: URLRequest(url: WebUri(googleAuthUrl)));
+                              return {"success": true};
+                            }
+                          }
+                        } catch (_) {}
+                        await controller.loadUrl(urlRequest: URLRequest(url: WebUri("$backendApiUrl/auth/google/login")));
                       }
                       return {"success": false};
                     },
