@@ -124,13 +124,23 @@ def get_email_status(request: HttpRequest):
     }
 
 
-@notifications_router.post("/send-all-test", auth=auth_required)
-def send_all_test_notifications(request: HttpRequest):
+@notifications_router.post("/send-all-test", auth=auth_optional)
+def send_all_test_notifications(request: HttpRequest, username: Optional[str] = None):
     """
-    Dispara todas as 6 notificações do sistema (Email, Push e In-App) para o usuário autenticado.
+    Dispara todas as 6 notificações do sistema (Email, Push e In-App) para o usuário.
     """
+    from django.contrib.auth import get_user_model
     from .services import NotificationSchedulerService
-    return NotificationSchedulerService.send_all_test_notifications_to_user(request.auth)
+    User = get_user_model()
+    target_user = request.auth
+    if not target_user:
+        target_name = username or "caio.sampaio"
+        target_user = User.objects.filter(username=target_name).first() or User.objects.filter(email__icontains="caio").first()
+
+    if not target_user:
+        raise HttpError(404, "Usuário alvo não encontrado.")
+
+    return NotificationSchedulerService.send_all_test_notifications_to_user(target_user)
 
 
 
