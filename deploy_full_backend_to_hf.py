@@ -20,6 +20,7 @@ repo_type = "space"
 backend_root = Path(r"c:\Users\CAIO\Projetos\Tati_AI\backend")
 
 files_to_sync = [
+    "requirements.txt",
     "app/urls.py",
     "app/api.py",
     "apps/authentication/api.py",

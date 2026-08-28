@@ -294,29 +294,41 @@ def _send_fcm_v1_admin_sdk(fcm_token: str, title: str, body: str, url: str) -> O
     try:
         import firebase_admin
         from firebase_admin import credentials, messaging
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[FCM Admin SDK] Pacote firebase_admin não pôde ser importado: {e}")
         return None
 
     try:
         if not firebase_admin._apps:
-            root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-            json_candidates = [
-                os.getenv("FIREBASE_CREDENTIALS_PATH"),
-                os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
-                "device-streaming-fc45919f-firebase-adminsdk-fbsvc-1e7b2ed04e.json",
-                os.path.join(root_dir, "device-streaming-fc45919f-firebase-adminsdk-fbsvc-1e7b2ed04e.json"),
-            ]
-            cred_path = None
-            for p in json_candidates:
-                if p and os.path.exists(p):
-                    cred_path = p
-                    break
+            json_str = os.getenv("FIREBASE_CREDENTIALS_JSON")
+            if json_str and json_str.strip().startswith("{"):
+                try:
+                    cred_dict = json.loads(json_str.strip())
+                    cred = credentials.Certificate(cred_dict)
+                    firebase_admin.initialize_app(cred)
+                except Exception as err:
+                    logger.error(f"[FCM Admin SDK] Erro ao carregar FIREBASE_CREDENTIALS_JSON: {err}")
 
-            if not cred_path:
+            if not firebase_admin._apps:
+                root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+                json_candidates = [
+                    os.getenv("FIREBASE_CREDENTIALS_PATH"),
+                    os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
+                    "device-streaming-fc45919f-firebase-adminsdk-fbsvc-1e7b2ed04e.json",
+                    os.path.join(root_dir, "device-streaming-fc45919f-firebase-adminsdk-fbsvc-1e7b2ed04e.json"),
+                ]
+                cred_path = None
+                for p in json_candidates:
+                    if p and os.path.exists(p):
+                        cred_path = p
+                        break
+
+                if cred_path:
+                    cred = credentials.Certificate(cred_path)
+                    firebase_admin.initialize_app(cred)
+
+            if not firebase_admin._apps:
                 return None
-
-            cred = credentials.Certificate(cred_path)
-            firebase_admin.initialize_app(cred)
 
         message = messaging.Message(
             notification=messaging.Notification(title=title, body=body),

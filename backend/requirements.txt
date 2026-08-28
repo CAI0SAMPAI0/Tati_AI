@@ -61,6 +61,7 @@ gTTS>=2.5.0
 # Notifications
 pywebpush>=1.14.0
 resend>=2.0.0
+firebase-admin>=6.5.0
 
 # Monitoring
 sentry-sdk[django]>=2.0.0
