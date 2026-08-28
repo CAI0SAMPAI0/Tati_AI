@@ -1,0 +1,293 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:http/http.dart' as http;
+
+// ── BACKGROUND FCM HANDLER ──────────────────────────────────────────
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  try {
+    await Firebase.initializeApp();
+  } catch (_) {}
+}
+
+// ── NOTIFICATION PLUGIN ──────────────────────────────────────────────
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
+const AndroidNotificationChannel notificationChannel = AndroidNotificationChannel(
+  'tati_ai_channel',
+  'Teacher Tatiana Notifications',
+  description: 'Notifications for new activities, streak alerts and study updates',
+  importance: Importance.max,
+  playSound: true,
+  enableVibration: true,
+);
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Trava orientação em retrato para melhor usabilidade
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
+  // Inicializa o Firebase
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  } catch (e) {
+    debugPrint('[Firebase] Init notice: $e');
+  }
+
+  // Inicializa o canal de notificações local do Android
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+
+  const InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+  );
+
+  await flutterLocalNotificationsPlugin.initialize(
+    initializationSettings,
+    onDidReceiveNotificationResponse: (NotificationResponse response) {
+      // Deep link quando o usuário clica na notificação
+      final String? payload = response.payload;
+      if (payload != null && payload.isNotEmpty) {
+        TatiAppScreen.navigateToRoute(payload);
+      }
+    },
+  );
+
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(notificationChannel);
+
+  runApp(const TatiApp());
+}
+
+class TatiApp extends StatelessWidget {
+  const TatiApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Teacher Tatiana AI',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF0F1015),
+        primaryColor: const Color(0xFF8B5CF6),
+      ),
+      home: const TatiAppScreen(),
+    );
+  }
+}
+
+class TatiAppScreen extends StatefulWidget {
+  const TatiAppScreen({super.key});
+
+  static void Function(String route)? onNavigate;
+
+  static void navigateToRoute(String route) {
+    onNavigate?.call(route);
+  }
+
+  @override
+  State<TatiAppScreen> createState() => _TatiAppScreenState();
+}
+
+class _TatiAppScreenState extends State<TatiAppScreen> {
+  InAppWebViewController? webViewController;
+  double loadingProgress = 0;
+  bool isPageLoaded = false;
+  String? fcmToken;
+
+  // URL padrão da plataforma (produção / local)
+  final String appUrl = "https://tati-ai.com";
+  final String backendApiUrl = "https://caio007-tati-ai-backend.hf.space";
+
+  @override
+  void initState() {
+    super.initState();
+    TatiAppScreen.onNavigate = (route) {
+      if (webViewController != null) {
+        final target = route.startsWith('/') ? "$appUrl$route" : route;
+        webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri(target)));
+      }
+    };
+    _initPermissionsAndPush();
+  }
+
+  Future<void> _initPermissionsAndPush() async {
+    // 1. Permissões de Notificação e Microfone (para chat de voz)
+    await Permission.notification.request();
+    await Permission.microphone.request();
+
+    try {
+      // 2. Token FCM oficial
+      fcmToken = await FirebaseMessaging.instance.getToken();
+      debugPrint('[FCM] Token do Dispositivo: $fcmToken');
+
+      // 3. Ouvinte de Foreground (App aberto)
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        RemoteNotification? notification = message.notification;
+        Map<String, dynamic> data = message.data;
+
+        if (notification != null) {
+          flutterLocalNotificationsPlugin.show(
+            notification.hashCode,
+            notification.title,
+            notification.body,
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                notificationChannel.id,
+                notificationChannel.name,
+                channelDescription: notificationChannel.description,
+                icon: '@mipmap/ic_launcher',
+                importance: Importance.max,
+                priority: Priority.high,
+                playSound: true,
+              ),
+            ),
+            payload: data['url'] ?? '/activities',
+          );
+        }
+      });
+
+      // 4. Clique na notificação com o app em segundo plano
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        final targetUrl = message.data['url'];
+        if (targetUrl != null) {
+          TatiAppScreen.navigateToRoute(targetUrl);
+        }
+      });
+    } catch (e) {
+      debugPrint('[FCM] Setup notice: $e');
+    }
+  }
+
+  // Sincroniza o token FCM com o backend quando o aluno faz login na WebView
+  Future<void> _syncTokenWithBackend(String username, String token) async {
+    if (fcmToken == null) return;
+    try {
+      await http.post(
+        Uri.parse("$backendApiUrl/notifications/subscribe"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode({
+          "endpoint": "fcm:$fcmToken",
+          "p256dh": "fcm",
+          "auth": "fcm",
+          "user_agent": "TatiAI Flutter Android App",
+        }),
+      );
+      debugPrint('[FCM] Token sincronizado com sucesso para: $username');
+    } catch (err) {
+      debugPrint('[FCM] Erro ao sincronizar token: $err');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return WillPopScope(
+      onWillPop: () async {
+        if (webViewController != null && await webViewController!.canGoBack()) {
+          webViewController!.goBack();
+          return false;
+        }
+        return true;
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0F1015),
+        body: SafeArea(
+          child: Stack(
+            children: [
+              InAppWebView(
+                initialUrlRequest: URLRequest(url: WebUri(appUrl)),
+                initialSettings: InAppWebViewSettings(
+                  javaScriptEnabled: true,
+                  domStorageEnabled: true,
+                  databaseEnabled: true,
+                  supportZoom: false,
+                  allowsInlineMediaPlayback: true,
+                  mediaPlaybackRequiresUserGesture: false,
+                  useHybridComposition: true,
+                  transparentBackground: true,
+                ),
+                onWebViewCreated: (controller) {
+                  webViewController = controller;
+
+                  // Handler JavaScript para interceptar login e enviar o FCM Token ao backend
+                  controller.addJavaScriptHandler(
+                    handlerName: 'onUserLogin',
+                    callback: (args) {
+                      if (args.isNotEmpty && args[0] is Map) {
+                        final data = args[0] as Map;
+                        final username = data['username']?.toString() ?? '';
+                        final userToken = data['token']?.toString() ?? '';
+                        if (username.isNotEmpty && userToken.isNotEmpty) {
+                          _syncTokenWithBackend(username, userToken);
+                        }
+                      }
+                    },
+                  );
+                },
+                // Permissão automática de microfone para o Chat de Voz e Pronunciation Reader
+                onPermissionRequest: (controller, request) async {
+                  return PermissionResponse(
+                    resources: request.resources,
+                    action: PermissionResponseAction.GRANT,
+                  );
+                },
+                onProgressChanged: (controller, progress) {
+                  setState(() {
+                    loadingProgress = progress / 100;
+                  });
+                },
+                onLoadStop: (controller, url) async {
+                  setState(() {
+                    isPageLoaded = true;
+                  });
+
+                  // Injeta script auxiliar para escutar login
+                  await controller.evaluateJavascript(source: """
+                    window.addEventListener('storage', function(e) {
+                      if (e.key === 'token' && e.newValue) {
+                        try {
+                          var userStr = localStorage.getItem('user');
+                          var userObj = userStr ? JSON.parse(userStr) : {};
+                          window.flutter_inappwebview.callHandler('onUserLogin', {
+                            username: userObj.username || '',
+                            token: e.newValue
+                          });
+                        } catch(err) {}
+                      }
+                    });
+                  """);
+                },
+              ),
+              if (loadingProgress < 1.0 && !isPageLoaded)
+                LinearProgressIndicator(
+                  value: loadingProgress,
+                  backgroundColor: Colors.transparent,
+                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+                  minHeight: 2.5,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -278,6 +278,49 @@ class NotificationDispatcher:
         }
 
     @staticmethod
+    def send_fcm_native_push(fcm_token: str, title: str, body: str, url: str) -> bool:
+        """
+        Envia notificação push para o app Android nativo (Flutter APK) via Firebase Cloud Messaging.
+        """
+        fcm_server_key = os.getenv("FCM_SERVER_KEY") or os.getenv("FIREBASE_SERVER_KEY")
+        if not fcm_server_key:
+            logger.info(f"[FCM Native] Token detectado ({fcm_token[:15]}...). (Para envio em produção, configure FCM_SERVER_KEY no .env).")
+            return True
+
+        url_endpoint = "https://fcm.googleapis.com/fcm/send"
+        headers = {
+            "Authorization": f"key={fcm_server_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "to": fcm_token,
+            "notification": {
+                "title": title,
+                "body": body,
+                "sound": "default",
+                "click_action": "FLUTTER_NOTIFICATION_CLICK",
+            },
+            "data": {
+                "url": url,
+                "title": title,
+                "body": body,
+            },
+            "priority": "high",
+        }
+        try:
+            with httpx.Client(timeout=8.0) as client:
+                res = client.post(url_endpoint, headers=headers, json=payload)
+                if res.status_code == 200:
+                    logger.info(f"[FCM Native] Notificação entregue com sucesso para token {fcm_token[:15]}...")
+                    return True
+                else:
+                    logger.warning(f"[FCM Native] Resposta FCM {res.status_code}: {res.text}")
+                    return False
+        except Exception as exc:
+            logger.error(f"[FCM Native] Erro de envio: {exc}")
+            return False
+
+    @staticmethod
     def send_push_to_user(username: str, title: str, body: str, url: str = "/dashboard", tag: str = "tati-notif") -> dict:
         """
         Envia push notification para todos os dispositivos ativos cadastrados do usuário (PWA, Celular, PC, APK).
@@ -306,12 +349,13 @@ class NotificationDispatcher:
 
         for sub in subs:
             endpoint = (sub.endpoint or "").strip()
-            # 1. Dispositivo com token FCM nativo (Capacitor Android APK)
+            # 1. Dispositivo com token FCM nativo (Flutter / Android APK)
             if endpoint.startswith("fcm:") or sub.p256dh == "fcm":
-                # Token FCM registrado pelo app Android
                 token = endpoint.replace("fcm:", "")
-                logger.info(f"[Push] Notificação nativa FCM para token {token[:15]}...")
-                sent_count += 1
+                if NotificationDispatcher.send_fcm_native_push(token, title, body, url):
+                    sent_count += 1
+                else:
+                    failed_count += 1
                 continue
 
             # 2. Navegador Web / PWA (WebPush padrão via VAPID)
