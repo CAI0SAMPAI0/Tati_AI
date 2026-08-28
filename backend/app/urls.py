@@ -16,6 +16,8 @@ urlpatterns = [
     re_path(r'^static/(?P<path>.*)$', serve, {'document_root': settings.STATIC_ROOT}),
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 
-    # NinjaAPI Router montado na raiz para compatibilidade total com os endpoints do frontend
+    # NinjaAPI Router montado tanto em /api/v1/, /api/ e na raiz para compatibilidade total com todos os apps e frontends
+    path('api/v1/', api.urls),
+    path('api/', api.urls),
     path('', api.urls),
 ]
