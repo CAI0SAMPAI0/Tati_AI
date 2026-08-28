@@ -17,7 +17,7 @@ WAHA_API_KEY = os.getenv("WAHA_API_KEY", "")
 
 def get_brevo_api_key() -> Optional[str]:
     # Checa possíveis variáveis de ambiente para a chave do Brevo
-    for key_name in ["BREVO_API_KEY", "brevo_api_key", "BREVO_KEY", "brevo_smtp_key", "SMTP_PASSWORD"]:
+    for key_name in ["BREVO_API_KEY", "BREVO_API_KEY_TATY", "brevo_api_key", "BREVO_KEY", "brevo_smtp_key", "SMTP_PASSWORD", "smtp_password"]:
         val = os.getenv(key_name)
         if val and ("xkeysib-" in val or "xsmtpsib-" in val or len(val) > 20):
             return val.strip()
@@ -28,6 +28,7 @@ def get_verified_sender_email() -> str:
     # Brevo exige que o remetente seja um e-mail verificado na conta Brevo
     return (
         os.getenv("BREVO_SENDER_EMAIL")
+        or os.getenv("login_smtp")
         or os.getenv("SMTP_FROM")
         or os.getenv("SMTP_USER")
         or os.getenv("RESEND_FROM")
