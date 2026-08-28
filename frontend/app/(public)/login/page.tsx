@@ -135,51 +135,17 @@ export default function LoginPage() {
     clearMessages();
     setLoading(true);
     setError('');
-    let done = false;
     try {
       const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       const urlRes = await fetch(`${apiBase}/auth/google/url`);
       const data = await urlRes.json();
       if (!data.url) { setError('Google login not configured.'); return; }
-
-      const { Browser } = await import('@capacitor/browser');
-
-      const pollOnce = async (state: string): Promise<boolean> => {
-        try {
-          const r = await fetch(`${apiBase}/auth/google/poll/${state}`);
-          const j = await r.json();
-          if (j.ready) {
-            done = true;
-            try { await Browser.close(); } catch {}
-            await saveSession(j.jwt, j.user);
-            router.push('/chat');
-            return true;
-          }
-        } catch {}
-        return false;
-      };
-
-      // browserPageLoaded fires via native bridge when ANY page loads
-      Browser.addListener('browserPageLoaded', async () => {
-        if (done) return;
-        await pollOnce(data.state);
-      });
-
-      // browserFinished fires when user closes the Custom Tab manually
-      Browser.addListener('browserFinished', async () => {
-        if (done) return;
-        await pollOnce(data.state);
-      });
-
-      await Browser.open({ url: data.url });
       window.location.href = data.url;
     } catch {
-      if (!done) setError('Connection error. Check if the server is running.');
       setError('Connection error. Check if the server is running.');
     } finally {
       setLoading(false);
     }
-  }, [router, saveSession]);
   }, []);
 
   // Login
