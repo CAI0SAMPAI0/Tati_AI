@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { loginWithCredentials, loginWithGoogle, registerUser, requestPasswordReset, resetPasswordWithToken } from '@/lib/api/auth';
 import { LEVEL_OPTIONS } from '@/lib/constants/levels';
+import { Capacitor } from '@capacitor/core';
 
 
 type Tab = 'login' | 'register' | 'forgot' | 'reset';
@@ -64,6 +65,8 @@ export default function LoginPage() {
   useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     if (!clientId) return;
+
+    if (Capacitor.isNativePlatform()) return;
 
     const initGoogle = (retries = 0) => {
       if (typeof window === 'undefined') return;
@@ -132,17 +135,51 @@ export default function LoginPage() {
     clearMessages();
     setLoading(true);
     setError('');
+    let done = false;
     try {
       const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       const urlRes = await fetch(`${apiBase}/auth/google/url`);
       const data = await urlRes.json();
       if (!data.url) { setError('Google login not configured.'); return; }
+
+      const { Browser } = await import('@capacitor/browser');
+
+      const pollOnce = async (state: string): Promise<boolean> => {
+        try {
+          const r = await fetch(`${apiBase}/auth/google/poll/${state}`);
+          const j = await r.json();
+          if (j.ready) {
+            done = true;
+            try { await Browser.close(); } catch {}
+            await saveSession(j.jwt, j.user);
+            router.push('/chat');
+            return true;
+          }
+        } catch {}
+        return false;
+      };
+
+      // browserPageLoaded fires via native bridge when ANY page loads
+      Browser.addListener('browserPageLoaded', async () => {
+        if (done) return;
+        await pollOnce(data.state);
+      });
+
+      // browserFinished fires when user closes the Custom Tab manually
+      Browser.addListener('browserFinished', async () => {
+        if (done) return;
+        await pollOnce(data.state);
+      });
+
+      await Browser.open({ url: data.url });
       window.location.href = data.url;
     } catch {
+      if (!done) setError('Connection error. Check if the server is running.');
       setError('Connection error. Check if the server is running.');
     } finally {
       setLoading(false);
     }
+  }, [router, saveSession]);
   }, []);
 
   // Login
@@ -329,6 +366,11 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => {
+                      if (Capacitor.isNativePlatform()) {
+                        handleGoogleLoginCapacitor();
+                      } else {
+                        (googleBtnRef.current?.querySelector('div[role="button"]') as HTMLElement)?.click();
+                      }
                       (googleBtnRef.current?.querySelector('div[role="button"]') as HTMLElement)?.click();
                     }}
                     className="w-full py-2.5 bg-input text-text border border-border rounded-[9px] text-sm font-medium flex items-center justify-center gap-2.5 hover:bg-bg-secondary transition-colors cursor-pointer"
@@ -341,6 +383,9 @@ export default function LoginPage() {
                     </svg>
                     <span>{'Continue with Google'}</span>
                   </button>
+                  {!Capacitor.isNativePlatform() && (
+                    <div ref={googleBtnRef} className="absolute inset-0 overflow-hidden rounded-[9px] opacity-[0.001] cursor-pointer flex items-center justify-center" />
+                  )}
                   <div ref={googleBtnRef} className="absolute inset-0 overflow-hidden rounded-[9px] opacity-[0.001] cursor-pointer flex items-center justify-center" />
                 </div>
                 <div className="flex items-center gap-3 mb-4 text-text-subtle text-[0.73rem] tracking-wider">
