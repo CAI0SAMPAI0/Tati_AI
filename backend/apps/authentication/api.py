@@ -123,6 +123,19 @@ def get_google_auth_url(request: HttpRequest):
         "prompt": "select_account",
     }
     auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+
+    accept = request.headers.get("accept", "").lower()
+    is_json = (
+        "application/json" in accept
+        or request.GET.get("format") == "json"
+        or request.headers.get("x-requested-with") == "XMLHttpRequest"
+    )
+
+    # Se foi acessado diretamente pelo navegador ou WebView como página web (sem AJAX JSON), redireciona na hora
+    if not is_json and ("text/html" in accept or "*/*" in accept):
+        from django.shortcuts import redirect
+        return redirect(auth_url)
+
     return {"url": auth_url, "state": state}
 
 
