@@ -1,11 +1,9 @@
 import os
 import logging
 import uuid
-import re
 from datetime import datetime, timezone
 from typing import List
 import warnings
-from groq import Groq
 
 warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
 import google.generativeai as genai
@@ -20,15 +18,6 @@ from apps.authentication.models import User
 from apps.users.services import XPService, StreakService
 
 logger = logging.getLogger(__name__)
-
-
-def clean_llm_reply(text: str) -> str:
-    """Remove tags de pensamento interno (<think>...</think>) de modelos de raciocínio."""
-    if not text:
-        return ""
-    text = re.sub(r"<think>[\s\S]*?</think>", "", text)
-    return text.strip()
-
 
 # Configuração dos clientes de IA
 GROQ_API_KEY = os.getenv("GROQ_API_KEY") or os.getenv("GROQ_API_KEY_1")
@@ -50,7 +39,7 @@ You are speaking directly with your student, {name}, who is currently at CEFR Le
 Your Guidelines:
 1. Speak predominantly in natural, clear English adapted strictly to the student's {level} proficiency.
 2. If the student makes a grammatical, vocabulary, or pronunciation mistake, gently provide a quick correction with an encouraging tip.
-3. If the student asks in Portuguese or is a beginner (A1/A2), understand them completely and provide brief Portuguese explanations in parentheses when introducing new expressions.
+3. If the student is a beginner (A1/A2), you may provide brief Portuguese explanations in parentheses when introducing new expressions.
 4. Keep answers engaging, concise (1-3 short paragraphs), and ask an open question to stimulate speaking and conversational practice.
 5. Emphasize real-world communicative confidence and active listening.
 """
@@ -101,7 +90,7 @@ class ConversationService:
             id=new_id,
             username=user.username,
             title=data.title or "Nova Conversa com a Teacher Tati",
-            model=data.model or "groq/qwen/qwen3.8-27b",
+            model=data.model or "groq/openai/gpt-oss-120b",
             is_simulation=data.is_simulation,
             simulation_id=data.simulation_id,
             created_at=now_str,
@@ -112,37 +101,36 @@ class ConversationService:
             title=conv.title,
             model=conv.model,
             is_simulation=bool(conv.is_simulation),
-            created_at=str(conv.created_at),
-            updated_at=str(conv.updated_at),
+            created_at=conv.created_at,
+            updated_at=conv.updated_at,
         )
 
     @staticmethod
-    def get_messages(conversation_id: str, user: User) -> List[MessageOut]:
-        msgs = Message.objects.filter(
-            session_id=conversation_id, username=user.username
-        ).order_by("created_at")[:100]
+    def get_messages(user: User, conversation_id: str) -> List[MessageOut]:
+        msgs = Message.objects.filter(session_id=conversation_id)
+        if user and hasattr(user, "username") and user.username:
+            user_msgs = msgs.filter(username=user.username)
+            if user_msgs.exists():
+                msgs = user_msgs
         return [
             MessageOut(
-                id=str(m.id),
+                id=m.id,
+                session_id=m.session_id,
                 role=m.role,
                 content=m.content,
-                audio=m.audio_b64,
-                created_at=str(m.created_at),
+                audio_b64=m.audio_b64,
+                created_at=m.created_at.isoformat() if m.created_at else None,
             )
             for m in msgs
         ]
 
     @staticmethod
-    def delete_conversation(conversation_id: str, user: User) -> bool:
-        deleted_count, _ = Conversation.objects.filter(
-            id=conversation_id, username=user.username
+    def delete_conversation(user: User, conversation_id: str) -> dict:
+        Conversation.objects.filter(id=conversation_id, username=user.username).delete()
+        Message.objects.filter(
+            session_id=conversation_id, username=user.username
         ).delete()
-        if deleted_count > 0:
-            Message.objects.filter(
-                session_id=conversation_id, username=user.username
-            ).delete()
-            return True
-        return False
+        return {"ok": True, "message": "Conversa removida com sucesso."}
 
     @staticmethod
     def get_summary(user: User, conversation_id: str, lang: str = "pt") -> dict:
@@ -185,17 +173,10 @@ class ConversationService:
 
 
 class AIService:
-    @staticmethod
+    @classmethod
     def generate_reply(
-        user: User,
-        conversation_id: str,
-        user_text: str,
-        difficulty: str = None,
+        cls, user: User, conversation_id: str, user_text: str, difficulty: str = None
     ) -> dict:
-        """
-        Processa a mensagem do aluno e gera a resposta contextual da Teacher Tati
-        utilizando cascata de modelos Groq (Qwen/GPT) e fallback Gemini.
-        """
         # 1. Salva mensagem do usuário
         Message.objects.create(
             session_id=conversation_id,
@@ -218,14 +199,9 @@ class AIService:
 
         reply_text = ""
 
-        # 3. Tenta todas as chaves Groq em cascata com modelos compatíveis
+        # 3. Tenta todas as chaves Groq em cascata
         keys = get_groq_keys()
-        groq_models = [
-            "qwen/qwen3.8-27b",
-            "qwen/qwen3.6-27b",
-            "openai/gpt-oss-120b",
-            "openai/gpt-oss-20b",
-        ]
+        groq_models = ["openai/gpt-oss-120b", "qwen/qwen3.6-27b"]
 
         for key in keys:
             if reply_text:
@@ -240,10 +216,8 @@ class AIService:
                             temperature=0.7,
                             max_tokens=600,
                         )
-                        raw_content = chat_completion.choices[0].message.content
-                        cleaned = clean_llm_reply(raw_content)
-                        if cleaned:
-                            reply_text = cleaned
+                        reply_text = chat_completion.choices[0].message.content
+                        if reply_text:
                             break
                     except Exception as mod_err:
                         logger.warning(
@@ -254,20 +228,16 @@ class AIService:
                     f"[AI] Groq client failed with key {key[:10]}: {key_err}"
                 )
 
-        # 4. Fallback: Gemini (com modelos vigentes)
+        # 4. Fallback: Gemini
         if not reply_text and GEMINI_API_KEY:
-            gemini_models = [
-                "gemini-3.6-flash",
-                "gemini-3.7-flash",
-                "gemini-flash-latest",
-            ]
+            gemini_models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-3.6-flash"]
             for gem_model in gemini_models:
                 try:
                     model = genai.GenerativeModel(gem_model)
                     prompt_full = f"{sys_prompt}\n\nUser: {user_text}\nTeacher Tati:"
                     response = model.generate_content(prompt_full)
-                    if response.text:
-                        reply_text = clean_llm_reply(response.text)
+                    reply_text = response.text
+                    if reply_text:
                         break
                 except Exception as e:
                     logger.warning(f"[AI] Gemini model {gem_model} failed: {e}")
