@@ -157,6 +157,12 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'America/Sao_Paulo'
 CELERY_ENABLE_UTC = True
+CELERY_BEAT_SCHEDULE = {
+    'sync-hub-materials-every-30-mins': {
+        'task': 'apps.activities.tasks.sync_hub_materials_task',
+        'schedule': 1800.0,
+    },
+}
 
 # ── DJANGO CHANNELS (WEBSOCKETS LAYER) ────────────────────────────────
 # Em containers autônomos (HF Spaces), InMemoryChannelLayer garante latência zero e 0 falhas de conexão de rede

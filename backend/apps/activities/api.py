@@ -457,10 +457,35 @@ def proxy_activity_image(request: HttpRequest, url: str):
     return HttpResponse(fallback_svg, content_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
 
 
+def _generate_fallback_hub_page(title: str, page_number: int, email: str) -> bytes:
+    import html
+    safe_title = html.escape(title or "Material Didático Tati AI")
+    safe_email = html.escape(email or "Aluno Tati AI")
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1131" viewBox="0 0 800 1131">
+  <defs>
+    <pattern id="wm" width="280" height="180" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
+      <text x="20" y="90" fill="rgba(148, 163, 184, 0.12)" font-size="14" font-weight="bold" font-family="system-ui, sans-serif">{safe_email}</text>
+    </pattern>
+  </defs>
+  <rect width="800" height="1131" fill="#0f172a"/>
+  <rect width="800" height="1131" fill="url(#wm)"/>
+  <rect x="40" y="40" width="720" height="1051" rx="16" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <circle cx="400" cy="380" r="50" fill="#8b5cf6" fill-opacity="0.15" stroke="#8b5cf6" stroke-width="2"/>
+  <path d="M385 365h30v30h-30z" fill="none" stroke="#a78bfa" stroke-width="2"/>
+  <path d="M392 375h16M392 382h16" stroke="#a78bfa" stroke-width="2" stroke-linecap="round"/>
+  <text x="400" y="470" text-anchor="middle" fill="#f8fafc" font-size="22" font-weight="bold" font-family="system-ui, sans-serif">{safe_title}</text>
+  <text x="400" y="510" text-anchor="middle" fill="#94a3b8" font-size="16" font-family="system-ui, sans-serif">Página {page_number}</text>
+  <text x="400" y="550" text-anchor="middle" fill="#64748b" font-size="13" font-family="system-ui, sans-serif">Material seguro sincronizado</text>
+  <text x="400" y="1040" text-anchor="middle" fill="#64748b" font-size="12" font-family="system-ui, sans-serif">Licenciado exclusivamente para {safe_email}</text>
+</svg>"""
+    return svg.encode("utf-8")
+
+
 @activities_router.get("/hub/{content_id}/pages/{page_index}", auth=auth_optional)
 def get_hub_page(request: HttpRequest, content_id: str, page_index: int, token: Optional[str] = None):
     """
     Retorna a página de um documento seguro do Hub com marca d'água do email.
+    Garante que o arquivo sempre exista e nunca retorne 404 quebrando o visualizador.
     """
     user = None
     if token:
@@ -479,47 +504,104 @@ def get_hub_page(request: HttpRequest, content_id: str, page_index: int, token: 
     import json
 
     raw_pages = []
+    title = "Material Didático"
+    preview_path = None
+    content_source = None
     from django.db import connection
     with connection.cursor() as cursor:
-        cursor.execute("SELECT secure_pages FROM premium_content WHERE id = %s", [content_id])
+        cursor.execute("SELECT secure_pages, title, preview_path, content_source FROM premium_content WHERE id = %s", [content_id])
         row = cursor.fetchone()
-        if row and row[0]:
-            raw_pages = row[0]
-            if isinstance(raw_pages, str):
-                try:
-                    raw_pages = json.loads(raw_pages)
-                except Exception:
-                    raw_pages = []
+        if row:
+            if row[0]:
+                raw_pages = row[0]
+                if isinstance(raw_pages, str):
+                    try:
+                        raw_pages = json.loads(raw_pages)
+                    except Exception:
+                        raw_pages = []
+            if row[1]:
+                title = str(row[1])
+            if row[2]:
+                preview_path = str(row[2])
+            if len(row) > 3 and row[3]:
+                content_source = str(row[3])
 
     if raw_pages and isinstance(raw_pages[-1], str) and raw_pages[-1].startswith('{"'):
         raw_pages = raw_pages[:-1]
 
-    if page_index < 0 or page_index >= len(raw_pages):
-        return HttpResponse(status=404)
+    file_data = None
+    storage_path = raw_pages[page_index] if 0 <= page_index < len(raw_pages) else f"{content_id}/page_{page_index+1}.webp"
 
-    storage_path = raw_pages[page_index]
-
+    # 1. Verifica no cache em memória
     file_data = _RAW_IMAGE_CACHE.get(storage_path)
-    if not file_data:
+
+    # 2. Verifica no disco local persistente (MEDIA_ROOT/hub_pages/{content_id}/page_{page_index+1}.webp)
+    local_dir = os.path.join(settings.MEDIA_ROOT, "hub_pages", content_id)
+    local_file = os.path.join(local_dir, f"page_{page_index + 1}.webp")
+    if not file_data and os.path.exists(local_file):
+        try:
+            with open(local_file, "rb") as f:
+                file_data = f.read()
+                _RAW_IMAGE_CACHE[storage_path] = file_data
+        except Exception:
+            pass
+
+    # 3. Tenta baixar do Supabase (e salva no disco local para cache futuro)
+    if not file_data and 0 <= page_index < len(raw_pages):
         try:
             db = get_client()
             file_data = db.storage.from_("hub-secure-pages").download(storage_path)
-            _RAW_IMAGE_CACHE[storage_path] = file_data
+            if file_data:
+                _RAW_IMAGE_CACHE[storage_path] = file_data
+                os.makedirs(local_dir, exist_ok=True)
+                with open(local_file, "wb") as f:
+                    f.write(file_data)
         except Exception as err:
             logger.info(f"[Hub] Download via client falhou ({err}), tentando via HTTP direto...")
             try:
                 supa_url = getattr(settings, 'SUPABASE_URL', 'https://gkziqqjswecteekanwnv.supabase.co').rstrip('/')
                 public_img_url = f"{supa_url}/storage/v1/object/public/hub-secure-pages/{storage_path}"
-                with httpx.Client(timeout=15.0) as client:
+                with httpx.Client(timeout=10.0) as client:
                     resp = client.get(public_img_url)
                     if resp.status_code == 200:
                         file_data = resp.content
                         _RAW_IMAGE_CACHE[storage_path] = file_data
+                        os.makedirs(local_dir, exist_ok=True)
+                        with open(local_file, "wb") as f:
+                            f.write(file_data)
             except Exception as e2:
-                logger.warning(f"[Hub] Erro fatal ao baixar página {storage_path}: {e2}")
+                logger.warning(f"[Hub] Erro ao baixar página do Supabase {storage_path}: {e2}")
 
+    # 4. Se o Supabase falhou (ex: 402 Payment Required), tenta sincronizar/regerar a partir do content_source
+    if not file_data and content_source:
+        try:
+            from .tasks import sync_material_pages
+            from .models import PremiumContent
+            m = PremiumContent.objects.filter(id=content_id).first()
+            if m and sync_material_pages(m):
+                if os.path.exists(local_file):
+                    with open(local_file, "rb") as f:
+                        file_data = f.read()
+                        _RAW_IMAGE_CACHE[storage_path] = file_data
+        except Exception as sync_err:
+            logger.warning(f"[Hub] Erro no auto-sync de emergência para {content_id}: {sync_err}")
+
+    # 5. Fallback para preview caso a página específica não esteja disponível e seja a primeira página
+    if not file_data and preview_path and page_index == 0:
+        try:
+            supa_url = getattr(settings, 'SUPABASE_URL', 'https://gkziqqjswecteekanwnv.supabase.co').rstrip('/')
+            preview_img_url = f"{supa_url}/storage/v1/object/public/hub-previews/{preview_path}"
+            with httpx.Client(timeout=8.0) as client:
+                resp = client.get(preview_img_url)
+                if resp.status_code == 200:
+                    file_data = resp.content
+        except Exception:
+            pass
+
+    # 6. Se ainda assim não houver imagem física, gera dinamicamente a página com marca d'água evitando 404
     if not file_data:
-        return HttpResponse(status=404)
+        fallback_svg = _generate_fallback_hub_page(title, page_index + 1, email)
+        return HttpResponse(fallback_svg, content_type="image/svg+xml", headers={"Cache-Control": "public, max-age=60"})
 
     try:
         watermarked = apply_watermark(file_data, email)
@@ -561,6 +643,21 @@ def upload_flashcard_image_from_url(request: HttpRequest, payload: dict):
 
 admin_premium_router = Router(tags=["Admin Premium Materials"])
 
+
+class AdminPremiumIn(Schema):
+    title: Optional[str] = None
+    description: Optional[str] = ""
+    price: Optional[float] = 0.0
+    price_students: Optional[float] = 0.0
+    price_buyers: Optional[float] = 0.0
+    type: Optional[str] = "pdf"
+    category: Optional[str] = "other"
+    content_source: Optional[str] = ""
+    thumbnail_url: Optional[str] = None
+    emoji: Optional[str] = "✨"
+    is_active: Optional[bool] = True
+
+
 @admin_premium_router.get("", auth=auth_optional)
 def list_admin_premium(request: HttpRequest):
     """
@@ -599,39 +696,50 @@ def upload_premium_file(request: HttpRequest, file: UploadedFile = File(...)):
     return {"file_path": url, "url": url}
 
 
+@admin_premium_router.post("/sync", auth=auth_optional)
+def sync_all_premium_materials(request: HttpRequest):
+    """
+    Sincroniza e garante o cache local em disco de todos os materiais do Hub.
+    """
+    from .tasks import sync_hub_materials_task
+    result = sync_hub_materials_task()
+    return {"success": True, "result": result}
+
+
 @admin_premium_router.post("", auth=auth_optional)
-def create_admin_premium(request: HttpRequest, payload: dict):
+def create_admin_premium(request: HttpRequest, payload: AdminPremiumIn):
     from .models import PremiumContent
     import uuid
-    title = (payload.get("title") or "").strip()
+    title = (payload.title or "").strip()
     if not title:
         raise HttpError(400, "Title is required")
     m = PremiumContent.objects.create(
         id=str(uuid.uuid4()),
         title=title,
-        description=payload.get("description", ""),
-        price=payload.get("price", 0.0),
-        price_students=payload.get("price_students", 0.0),
-        price_buyers=payload.get("price_buyers", 0.0),
-        type=payload.get("type", "pdf"),
-        category=payload.get("category", "other"),
-        content_source=payload.get("content_source", ""),
-        thumbnail_url=payload.get("thumbnail_url"),
-        emoji=payload.get("emoji", "✨"),
-        is_active=payload.get("is_active", True),
+        description=payload.description or "",
+        price=payload.price or 0.0,
+        price_students=payload.price_students or 0.0,
+        price_buyers=payload.price_buyers or 0.0,
+        type=payload.type or "pdf",
+        category=payload.category or "other",
+        content_source=payload.content_source or "",
+        thumbnail_url=payload.thumbnail_url,
+        emoji=payload.emoji or "✨",
+        is_active=payload.is_active if payload.is_active is not None else True,
     )
     return {"success": True, "id": str(m.id), "title": m.title}
 
 
 @admin_premium_router.put("/{content_id}", auth=auth_optional)
-def update_admin_premium(request: HttpRequest, content_id: str, payload: dict):
+def update_admin_premium(request: HttpRequest, content_id: str, payload: AdminPremiumIn):
     from .models import PremiumContent
     m = PremiumContent.objects.filter(id=content_id).first()
     if not m:
         raise HttpError(404, "Material não encontrado.")
-    for k in ["title", "description", "price", "price_students", "price_buyers", "type", "category", "content_source", "thumbnail_url", "emoji", "is_active"]:
-        if k in payload:
-            setattr(m, k, payload[k])
+    data = payload.dict(exclude_unset=True)
+    for k, v in data.items():
+        if v is not None and hasattr(m, k):
+            setattr(m, k, v)
     m.save()
     return {"success": True, "id": str(m.id), "title": m.title}
 

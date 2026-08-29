@@ -4,7 +4,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import List
 from django.utils import timezone as django_timezone
-from groq import Groq
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
 import google.generativeai as genai
 
 from .models import Conversation, Message
