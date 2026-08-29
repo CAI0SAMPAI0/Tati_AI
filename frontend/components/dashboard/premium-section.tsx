@@ -411,10 +411,13 @@ export function PremiumSection() {
                 placeholder={
                   formData.type === 'link'
                     ? 'https://notebooklm.google.com/...'
+                    : isUploading
+                    ? 'Uploading file to Cloudinary...'
                     : 'File path or URL...'
                 }
                 value={formData.content_source}
                 onChange={(e) => setFormData(prev => ({ ...prev, content_source: e.target.value }))}
+                disabled={isUploading}
               />
               {formData.type !== 'link' && formData.type !== 'video' && (
                 <>
@@ -430,16 +433,25 @@ export function PremiumSection() {
                     disabled={isUploading}
                     className="px-3 py-2 bg-surface border border-border rounded-md hover:border-primary/50 transition-all text-text-muted hover:text-primary disabled:opacity-50"
                   >
-                    <UploadCloud size={18} />
+                    {isUploading ? <Spinner size="sm" /> : <UploadCloud size={18} />}
                   </button>
                 </>
               )}
             </div>
+            {isUploading && (
+              <p className="text-xs text-primary mt-1.5 animate-pulse">
+                Enviando arquivo para o Cloudinary, aguarde finalizar para salvar...
+              </p>
+            )}
           </div>
 
           <div className="flex justify-end gap-3 mt-4">
-            <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} loading={isSaving}>Save Material</Button>
+            <Button variant="secondary" onClick={() => setIsModalOpen(false)} disabled={isSaving || isUploading}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} loading={isSaving} disabled={isUploading}>
+              {isUploading ? 'Uploading...' : 'Save Material'}
+            </Button>
           </div>
         </div>
       </DialogModal>

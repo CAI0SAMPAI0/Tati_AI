@@ -844,6 +844,21 @@ def sync_all_premium_materials(request: HttpRequest):
     return {"success": True, "result": result}
 
 
+@admin_premium_router.post("/{content_id}/sync", auth=auth_optional)
+def sync_single_premium_material(request: HttpRequest, content_id: str):
+    """
+    Força a sincronização e extração de links de um material específico.
+    """
+    from .models import PremiumContent
+    from .tasks import sync_material_pages
+
+    m = PremiumContent.objects.filter(id=content_id).first()
+    if not m:
+        raise HttpError(404, "Material não encontrado.")
+    ok = sync_material_pages(m, force=True)
+    return {"success": ok, "id": str(m.id), "title": m.title}
+
+
 @admin_premium_router.post("", auth=auth_optional)
 def create_admin_premium(request: HttpRequest, payload: AdminPremiumIn):
     from .models import PremiumContent
