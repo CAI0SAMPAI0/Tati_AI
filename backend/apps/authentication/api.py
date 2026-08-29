@@ -91,28 +91,36 @@ def google_auth(request: HttpRequest, payload: GoogleAuthInput):
     return AuthService.google_login(payload.credential, payload.is_hub_only)
 
 
-@auth_router.get("/google/url")
-def get_google_auth_url(request: HttpRequest):
-    """
-    Retorna a URL de autorização do Google OAuth e o token de estado para login mobile / popup.
-    """
+def _get_google_redirect_uri(request: HttpRequest) -> str:
+    from django.conf import settings
+    import os
+    backend_base = getattr(settings, 'BACKEND_BASE_URL', '') or os.getenv('BACKEND_BASE_URL', '')
+    if backend_base:
+        return f"{backend_base.rstrip('/')}/auth/google/callback"
+    host = request.headers.get("X-Forwarded-Host") or request.get_host()
+    proto = "https" if request.is_secure() or request.headers.get("X-Forwarded-Proto") == "https" or "hf.space" in host else "http"
+    return f"{proto}://{host}/auth/google/callback"
+
+
+def _build_google_auth_data(request: HttpRequest) -> tuple[str, str]:
     import os
     import uuid
     from urllib.parse import urlencode
     from django.conf import settings
     from django.core.cache import cache
 
-    client_id = getattr(settings, 'GOOGLE_CLIENT_ID', '') or os.getenv('GOOGLE_CLIENT_ID', '') or os.getenv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', '')
+    client_id = (
+        getattr(settings, 'GOOGLE_CLIENT_ID', '')
+        or os.getenv('GOOGLE_CLIENT_ID', '')
+        or os.getenv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', '')
+    )
     if not client_id:
-        raise HttpError(503, "Google OAuth não configurado no servidor.")
+        raise HttpError(503, "Google OAuth não configurado no servidor. Configure GOOGLE_CLIENT_ID.")
 
     state = str(uuid.uuid4())
     cache.set(f"google_oauth_state_{state}", {"ready": False}, timeout=600)
 
-    host = request.get_host()
-    proto = "https" if request.is_secure() or request.headers.get("X-Forwarded-Proto") == "https" else "http"
-    redirect_uri = f"{proto}://{host}/auth/google/callback"
-
+    redirect_uri = _get_google_redirect_uri(request)
     params = {
         "client_id": client_id,
         "response_type": "code",
@@ -123,19 +131,16 @@ def get_google_auth_url(request: HttpRequest):
         "prompt": "select_account",
     }
     auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+    return auth_url, state
 
-    accept = request.headers.get("accept", "").lower()
-    is_json = (
-        "application/json" in accept
-        or request.GET.get("format") == "json"
-        or request.headers.get("x-requested-with") == "XMLHttpRequest"
-    )
 
-    # Se foi acessado diretamente pelo navegador ou WebView como página web (sem AJAX JSON), redireciona na hora
-    if not is_json and ("text/html" in accept or "*/*" in accept):
-        from django.shortcuts import redirect
-        return redirect(auth_url)
-
+@auth_router.get("/google/url")
+def get_google_auth_url(request: HttpRequest):
+    """
+    Retorna a URL de autorização do Google OAuth e o token de estado para login mobile / popup.
+    Sempre retorna JSON com {url, state}.
+    """
+    auth_url, state = _build_google_auth_data(request)
     return {"url": auth_url, "state": state}
 
 
@@ -145,9 +150,8 @@ def redirect_to_google_login(request: HttpRequest):
     Redireciona diretamente o navegador/app (HTTP 302) para a tela de login do Google OAuth.
     """
     from django.shortcuts import redirect
-    auth_data = get_google_auth_url(request)
-    return redirect(auth_data["url"])
-
+    auth_url, _ = _build_google_auth_data(request)
+    return redirect(auth_url)
 
 
 @auth_router.get("/google/callback")
@@ -164,12 +168,17 @@ def google_oauth_callback(request: HttpRequest, code: str = None, state: str = N
     if error or not code or not state:
         return HttpResponse("<h3>Erro na autenticação com o Google. Pode fechar esta janela.</h3>", status=400)
 
-    client_id = getattr(settings, 'GOOGLE_CLIENT_ID', '') or os.getenv('GOOGLE_CLIENT_ID', '')
-    client_secret = getattr(settings, 'GOOGLE_CLIENT_SECRET', '') or os.getenv('GOOGLE_CLIENT_SECRET', '')
+    client_id = (
+        getattr(settings, 'GOOGLE_CLIENT_ID', '')
+        or os.getenv('GOOGLE_CLIENT_ID', '')
+        or os.getenv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', '')
+    )
+    client_secret = (
+        getattr(settings, 'GOOGLE_CLIENT_SECRET', '')
+        or os.getenv('GOOGLE_CLIENT_SECRET', '')
+    )
 
-    host = request.get_host()
-    proto = "https" if request.is_secure() or request.headers.get("X-Forwarded-Proto") == "https" else "http"
-    redirect_uri = f"{proto}://{host}/auth/google/callback"
+    redirect_uri = _get_google_redirect_uri(request)
 
     token_url = "https://oauth2.googleapis.com/token"
     data = {
@@ -181,7 +190,7 @@ def google_oauth_callback(request: HttpRequest, code: str = None, state: str = N
     }
     resp = requests.post(token_url, data=data, timeout=10)
     if not resp.ok:
-        return HttpResponse("<h3>Falha ao trocar código com o Google. Pode fechar esta janela.</h3>", status=400)
+        return HttpResponse(f"<h3>Falha ao trocar código com o Google. Pode fechar esta janela.</h3>", status=400)
 
     tokens = resp.json()
     id_token_str = tokens.get("id_token")
@@ -201,7 +210,8 @@ def google_oauth_callback(request: HttpRequest, code: str = None, state: str = N
     from urllib.parse import quote
     user_json = json.dumps(user_dict)
     jwt_token = token_res.access_token
-    redirect_target = f"https://tati-ai.vercel.app/login?token={jwt_token}&user={quote(user_json)}"
+    frontend_url = getattr(settings, 'FRONTEND_URL', '') or os.getenv('FRONTEND_URL', '') or 'https://tati-ai.vercel.app'
+    redirect_target = f"{frontend_url.rstrip('/')}/login?token={jwt_token}&user={quote(user_json)}"
 
     html = f"""
     <!DOCTYPE html>

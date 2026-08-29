@@ -54,6 +54,7 @@ export default function LoginPage() {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     const userParam = params.get('user');
+    const isHub = params.get('access') === 'hub';
 
     if (token) {
       let userObj: any = null;
@@ -65,7 +66,11 @@ export default function LoginPage() {
       window.history.replaceState({}, '', window.location.pathname);
 
       saveSession(token, userObj || { username: 'student' }).then(() => {
-        router.replace('/chat');
+        if (isHub || userObj?.is_hub_only) {
+          window.location.href = process.env.NEXT_PUBLIC_HUB_SITE_URL || 'http://localhost:3001/materiais';
+        } else {
+          router.replace('/chat');
+        }
       });
       return;
     }
@@ -158,17 +163,22 @@ export default function LoginPage() {
     }
 
     // 2. Navega diretamente para a tela de autenticação do Google (accounts.google.com)
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://caio007-tati-ai-backend.hf.space';
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://caio007-tati-ai-backend.hf.space';
-      const res = await fetch(`${apiBase}/auth/google/url`);
-      const data = await res.json();
-      if (data && data.url) {
-        window.location.href = data.url;
-        return;
+      const res = await fetch(`${apiBase}/auth/google/url`, {
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.url) {
+          window.location.href = data.url;
+          return;
+        }
       }
       window.location.href = `${apiBase}/auth/google/login`;
     } catch {
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://caio007-tati-ai-backend.hf.space';
       window.location.href = `${apiBase}/auth/google/login`;
     }
   }, []);

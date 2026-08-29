@@ -284,7 +284,10 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                       } catch (e) {
                         debugPrint('[Google Login] Erro no modal nativo ($e). Abrindo tela do Google no WebView...');
                         try {
-                          final res = await http.get(Uri.parse("$backendApiUrl/auth/google/url"));
+                          final res = await http.get(
+                            Uri.parse("$backendApiUrl/auth/google/url"),
+                            headers: {"Accept": "application/json"},
+                          );
                           if (res.statusCode == 200) {
                             final data = jsonDecode(res.body);
                             final String? googleAuthUrl = data['url'];
