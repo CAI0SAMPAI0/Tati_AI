@@ -10,34 +10,34 @@ from .secure_document_service import _RAW_IMAGE_CACHE
 logger = logging.getLogger(__name__)
 
 
-def sync_material_pages(content: PremiumContent) -> bool:
+def sync_material_pages(content: PremiumContent, force: bool = False) -> bool:
     """
     Garante que as imagens de um material premium estejam salvas e persistidas no cache local do servidor.
-    Se o Supabase falhar (ex: 402 Payment Required), baixa a partir do content_source (Cloudinary/Drive)
-    e reconverte as páginas automaticamente para que nunca sumam do Hub.
+    Extrai todos os links clicáveis (NotebookLM, sites, etc.) e reconverte as páginas automaticamente.
     """
     content_id = str(content.id)
     local_dir = os.path.join(settings.MEDIA_ROOT, "hub_pages", content_id)
     os.makedirs(local_dir, exist_ok=True)
 
-    # 1. Se já tem páginas no disco local, carrega para memória e valida
-    existing_pages = [
-        f
-        for f in os.listdir(local_dir)
-        if f.startswith("page_") and f.endswith(".webp")
-    ]
-    if existing_pages:
-        for p in existing_pages:
-            full_p = os.path.join(local_dir, p)
-            try:
-                with open(full_p, "rb") as f:
-                    _RAW_IMAGE_CACHE[f"{content_id}/{p}"] = f.read()
-            except Exception:
-                pass
-        logger.info(
-            f"[HubSync] Material {content.title} ({content_id}) possui {len(existing_pages)} páginas salvas em disco."
-        )
-        return True
+    # 1. Se já tem páginas no disco local e não é forçado, carrega para memória e valida
+    if not force:
+        existing_pages = [
+            f
+            for f in os.listdir(local_dir)
+            if f.startswith("page_") and f.endswith(".webp")
+        ]
+        if existing_pages:
+            for p in existing_pages:
+                full_p = os.path.join(local_dir, p)
+                try:
+                    with open(full_p, "rb") as f:
+                        _RAW_IMAGE_CACHE[f"{content_id}/{p}"] = f.read()
+                except Exception:
+                    pass
+            logger.info(
+                f"[HubSync] Material {content.title} ({content_id}) possui {len(existing_pages)} páginas salvas em disco."
+            )
+            return True
 
     # 2. Se content_source for uma URL de arquivo (Cloudinary, Drive ou HTTP), baixa e reconverte
     source_url = content.content_source or ""
@@ -46,7 +46,7 @@ def sync_material_pages(content: PremiumContent) -> bool:
             logger.info(
                 f"[HubSync] Baixando arquivo fonte para '{content.title}': {source_url}"
             )
-            with httpx.Client(timeout=45.0, follow_redirects=True) as client:
+            with httpx.Client(timeout=60.0, follow_redirects=True) as client:
                 resp = client.get(source_url)
                 if resp.status_code == 200:
                     ext = (
@@ -63,6 +63,14 @@ def sync_material_pages(content: PremiumContent) -> bool:
                         converted = _convert_to_pdf(temp_input, local_dir)
                         if converted and os.path.exists(converted):
                             actual_pdf = converted
+
+                    # Extrai links clicáveis diretamente do PDF (PyMuPDF)
+                    from .secure_document_service import extract_links_from_pdf
+
+                    extracted_links = extract_links_from_pdf(actual_pdf)
+                    logger.info(
+                        f"[HubSync] Extraídos {len(extracted_links)} links clicáveis de '{content.title}'."
+                    )
 
                     poppler = os.getenv("POPPLER_PATH")
                     pages = convert_from_path(actual_pdf, 200, poppler_path=poppler)
@@ -83,25 +91,50 @@ def sync_material_pages(content: PremiumContent) -> bool:
                     except OSError:
                         pass
 
+                    # Se encontrou links clicáveis, salva no final do array de páginas
+                    if extracted_links:
+                        import json
+
+                        storage_paths.append(
+                            json.dumps({"external_links": extracted_links})
+                        )
+
                     # Atualiza secure_pages no banco
                     content.processing_status = "ready"
                     content.is_secure = True
+                    content.thumbnail_url = f"{content_id}/page_1.webp"
                     try:
                         from django.db import connection
                         import json
 
                         with connection.cursor() as cursor:
                             cursor.execute(
-                                "UPDATE premium_content SET secure_pages = %s, processing_status = 'ready', is_secure = true WHERE id = %s",
-                                [json.dumps(storage_paths), content_id],
+                                "UPDATE premium_content SET secure_pages = %s, processing_status = 'ready', is_secure = true, thumbnail_url = %s WHERE id = %s",
+                                [
+                                    json.dumps(storage_paths),
+                                    content.thumbnail_url,
+                                    content_id,
+                                ],
                             )
                     except Exception as db_err:
                         logger.warning(
                             f"[HubSync] Erro ao atualizar DB para {content.title}: {db_err}"
                         )
 
+                    try:
+                        from app.shared.services.upstash import upstash_service
+
+                        if (
+                            upstash_service._ensure_connected()
+                            and upstash_service._redis
+                        ):
+                            upstash_service._redis.delete("catalog:public_list")
+                            upstash_service._redis.delete("hub:active_contents")
+                    except Exception:
+                        pass
+
                     logger.info(
-                        f"[HubSync] Material '{content.title}' reconvertido com sucesso! {len(storage_paths)} páginas salvas em disco."
+                        f"[HubSync] Material '{content.title}' reconvertido com sucesso! {len(storage_paths)} páginas e {len(extracted_links)} links salvos."
                     )
                     return True
         except Exception as e:

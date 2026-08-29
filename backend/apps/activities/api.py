@@ -870,7 +870,7 @@ def create_admin_premium(request: HttpRequest, payload: AdminPremiumIn):
         try:
             from .tasks import sync_material_pages
 
-            sync_material_pages(m)
+            sync_material_pages(m, force=True)
         except Exception as sync_err:
             logger.warning(f"[Admin] Erro ao sincronizar material novo: {sync_err}")
 
@@ -896,7 +896,7 @@ def update_admin_premium(
         try:
             from .tasks import sync_material_pages
 
-            sync_material_pages(m)
+            sync_material_pages(m, force=True)
         except Exception as sync_err:
             logger.warning(
                 f"[Admin] Erro ao sincronizar material atualizado: {sync_err}"
