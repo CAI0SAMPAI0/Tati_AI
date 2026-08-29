@@ -1,3 +1,6 @@
+import os
+import io
+import json
 import logging
 import httpx
 from typing import List, Optional, Any, Dict
@@ -485,130 +488,138 @@ def _generate_fallback_hub_page(title: str, page_number: int, email: str) -> byt
 def get_hub_page(request: HttpRequest, content_id: str, page_index: int, token: Optional[str] = None):
     """
     Retorna a página de um documento seguro do Hub com marca d'água do email.
-    Garante que o arquivo sempre exista e nunca retorne 404 quebrando o visualizador.
+    Garante que o arquivo sempre exista e nunca retorne 500 ou 404 quebrando o visualizador.
     """
-    user = None
-    if token:
-        from apps.authentication.security import decode_jwt_token
-        payload = decode_jwt_token(token)
-        if payload:
-            user = User.objects.filter(username=payload.get("sub")).first()
-    if not user and getattr(request, 'auth', None) and isinstance(request.auth, User):
-        user = request.auth
-    if not user and getattr(request, 'user', None) and getattr(request.user, 'is_authenticated', False):
-        user = request.user
+    email = 'Aluno Tati AI'
+    title = 'Material Didático'
+    try:
+        user = None
+        if token:
+            from apps.authentication.security import decode_jwt_token
+            payload = decode_jwt_token(token)
+            if payload:
+                user = User.objects.filter(username=payload.get("sub")).first()
+        if not user and getattr(request, 'auth', None) and isinstance(request.auth, User):
+            user = request.auth
+        if not user and getattr(request, 'user', None) and getattr(request.user, 'is_authenticated', False):
+            user = request.user
 
-    email = getattr(user, 'email', '') or getattr(user, 'username', 'Tati AI') if user else 'Aluno Tati AI'
+        if user:
+            email = getattr(user, 'email', '') or getattr(user, 'username', 'Tati AI')
 
-    from apps.activities.secure_document_service import get_client, apply_watermark, _RAW_IMAGE_CACHE
-    import json
+        from apps.activities.secure_document_service import get_client, apply_watermark, _RAW_IMAGE_CACHE
 
-    raw_pages = []
-    title = "Material Didático"
-    preview_path = None
-    content_source = None
-    from django.db import connection
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT secure_pages, title, preview_path, content_source FROM premium_content WHERE id = %s", [content_id])
-        row = cursor.fetchone()
-        if row:
-            if row[0]:
-                raw_pages = row[0]
-                if isinstance(raw_pages, str):
-                    try:
-                        raw_pages = json.loads(raw_pages)
-                    except Exception:
-                        raw_pages = []
-            if row[1]:
-                title = str(row[1])
-            if row[2]:
-                preview_path = str(row[2])
-            if len(row) > 3 and row[3]:
-                content_source = str(row[3])
+        raw_pages = []
+        preview_path = None
+        content_source = None
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT secure_pages, title, preview_path, content_source FROM premium_content WHERE id = %s", [content_id])
+            row = cursor.fetchone()
+            if row:
+                if row[0]:
+                    raw_pages = row[0]
+                    if isinstance(raw_pages, str):
+                        try:
+                            raw_pages = json.loads(raw_pages)
+                        except Exception:
+                            raw_pages = []
+                if row[1]:
+                    title = str(row[1])
+                if row[2]:
+                    preview_path = str(row[2])
+                if len(row) > 3 and row[3]:
+                    content_source = str(row[3])
 
-    if raw_pages and isinstance(raw_pages[-1], str) and raw_pages[-1].startswith('{"'):
-        raw_pages = raw_pages[:-1]
+        if raw_pages and isinstance(raw_pages[-1], str) and raw_pages[-1].startswith('{"'):
+            raw_pages = raw_pages[:-1]
 
-    file_data = None
-    storage_path = raw_pages[page_index] if 0 <= page_index < len(raw_pages) else f"{content_id}/page_{page_index+1}.webp"
+        file_data = None
+        storage_path = raw_pages[page_index] if 0 <= page_index < len(raw_pages) else f"{content_id}/page_{page_index+1}.webp"
 
-    # 1. Verifica no cache em memória
-    file_data = _RAW_IMAGE_CACHE.get(storage_path)
+        # 1. Verifica no cache em memória
+        file_data = _RAW_IMAGE_CACHE.get(storage_path)
 
-    # 2. Verifica no disco local persistente (MEDIA_ROOT/hub_pages/{content_id}/page_{page_index+1}.webp)
-    local_dir = os.path.join(settings.MEDIA_ROOT, "hub_pages", content_id)
-    local_file = os.path.join(local_dir, f"page_{page_index + 1}.webp")
-    if not file_data and os.path.exists(local_file):
-        try:
-            with open(local_file, "rb") as f:
-                file_data = f.read()
-                _RAW_IMAGE_CACHE[storage_path] = file_data
-        except Exception:
-            pass
+        # 2. Verifica no disco local persistente (MEDIA_ROOT/hub_pages/{content_id}/page_{page_index+1}.webp)
+        media_root = getattr(settings, 'MEDIA_ROOT', '/app/media')
+        local_dir = os.path.join(media_root, "hub_pages", content_id)
+        local_file = os.path.join(local_dir, f"page_{page_index + 1}.webp")
+        if not file_data and os.path.exists(local_file):
+            try:
+                with open(local_file, "rb") as f:
+                    file_data = f.read()
+                    _RAW_IMAGE_CACHE[storage_path] = file_data
+            except Exception:
+                pass
 
-    # 3. Tenta baixar do Supabase (e salva no disco local para cache futuro)
-    if not file_data and 0 <= page_index < len(raw_pages):
-        try:
-            db = get_client()
-            file_data = db.storage.from_("hub-secure-pages").download(storage_path)
-            if file_data:
-                _RAW_IMAGE_CACHE[storage_path] = file_data
-                os.makedirs(local_dir, exist_ok=True)
-                with open(local_file, "wb") as f:
-                    f.write(file_data)
-        except Exception as err:
-            logger.info(f"[Hub] Download via client falhou ({err}), tentando via HTTP direto...")
+        # 3. Tenta baixar do Supabase (e salva no disco local para cache futuro)
+        if not file_data and 0 <= page_index < len(raw_pages):
+            try:
+                db = get_client()
+                file_data = db.storage.from_("hub-secure-pages").download(storage_path)
+                if file_data:
+                    _RAW_IMAGE_CACHE[storage_path] = file_data
+                    os.makedirs(local_dir, exist_ok=True)
+                    with open(local_file, "wb") as f:
+                        f.write(file_data)
+            except Exception as err:
+                logger.info(f"[Hub] Download via client falhou ({err}), tentando via HTTP direto...")
+                try:
+                    supa_url = getattr(settings, 'SUPABASE_URL', 'https://gkziqqjswecteekanwnv.supabase.co').rstrip('/')
+                    public_img_url = f"{supa_url}/storage/v1/object/public/hub-secure-pages/{storage_path}"
+                    with httpx.Client(timeout=10.0) as client:
+                        resp = client.get(public_img_url)
+                        if resp.status_code == 200:
+                            file_data = resp.content
+                            _RAW_IMAGE_CACHE[storage_path] = file_data
+                            os.makedirs(local_dir, exist_ok=True)
+                            with open(local_file, "wb") as f:
+                                f.write(file_data)
+                except Exception as e2:
+                    logger.warning(f"[Hub] Erro ao baixar página do Supabase {storage_path}: {e2}")
+
+        # 4. Se o Supabase falhou (ex: 402 Payment Required), tenta sincronizar/regerar a partir do content_source
+        if not file_data and content_source:
+            try:
+                from .tasks import sync_material_pages
+                from .models import PremiumContent
+                m = PremiumContent.objects.filter(id=content_id).first()
+                if m and sync_material_pages(m):
+                    if os.path.exists(local_file):
+                        with open(local_file, "rb") as f:
+                            file_data = f.read()
+                            _RAW_IMAGE_CACHE[storage_path] = file_data
+            except Exception as sync_err:
+                logger.warning(f"[Hub] Erro no auto-sync de emergência para {content_id}: {sync_err}")
+
+        # 5. Fallback para preview caso a página específica não esteja disponível e seja a primeira página
+        if not file_data and preview_path and page_index == 0:
             try:
                 supa_url = getattr(settings, 'SUPABASE_URL', 'https://gkziqqjswecteekanwnv.supabase.co').rstrip('/')
-                public_img_url = f"{supa_url}/storage/v1/object/public/hub-secure-pages/{storage_path}"
-                with httpx.Client(timeout=10.0) as client:
-                    resp = client.get(public_img_url)
+                preview_img_url = f"{supa_url}/storage/v1/object/public/hub-previews/{preview_path}"
+                with httpx.Client(timeout=8.0) as client:
+                    resp = client.get(preview_img_url)
                     if resp.status_code == 200:
                         file_data = resp.content
-                        _RAW_IMAGE_CACHE[storage_path] = file_data
-                        os.makedirs(local_dir, exist_ok=True)
-                        with open(local_file, "wb") as f:
-                            f.write(file_data)
-            except Exception as e2:
-                logger.warning(f"[Hub] Erro ao baixar página do Supabase {storage_path}: {e2}")
+            except Exception:
+                pass
 
-    # 4. Se o Supabase falhou (ex: 402 Payment Required), tenta sincronizar/regerar a partir do content_source
-    if not file_data and content_source:
+        # 6. Se ainda assim não houver imagem física, gera dinamicamente a página com marca d'água evitando 404/500
+        if not file_data:
+            fallback_svg = _generate_fallback_hub_page(title, page_index + 1, email)
+            return HttpResponse(fallback_svg, content_type="image/svg+xml", headers={"Cache-Control": "public, max-age=60"})
+
         try:
-            from .tasks import sync_material_pages
-            from .models import PremiumContent
-            m = PremiumContent.objects.filter(id=content_id).first()
-            if m and sync_material_pages(m):
-                if os.path.exists(local_file):
-                    with open(local_file, "rb") as f:
-                        file_data = f.read()
-                        _RAW_IMAGE_CACHE[storage_path] = file_data
-        except Exception as sync_err:
-            logger.warning(f"[Hub] Erro no auto-sync de emergência para {content_id}: {sync_err}")
+            watermarked = apply_watermark(file_data, email)
+            return HttpResponse(watermarked, content_type="image/webp", headers={"Cache-Control": "private, max-age=3600"})
+        except Exception as e:
+            logger.warning(f"[Hub] Erro ao aplicar watermark: {e}")
+            return HttpResponse(file_data, content_type="image/webp", headers={"Cache-Control": "private, max-age=3600"})
 
-    # 5. Fallback para preview caso a página específica não esteja disponível e seja a primeira página
-    if not file_data and preview_path and page_index == 0:
-        try:
-            supa_url = getattr(settings, 'SUPABASE_URL', 'https://gkziqqjswecteekanwnv.supabase.co').rstrip('/')
-            preview_img_url = f"{supa_url}/storage/v1/object/public/hub-previews/{preview_path}"
-            with httpx.Client(timeout=8.0) as client:
-                resp = client.get(preview_img_url)
-                if resp.status_code == 200:
-                    file_data = resp.content
-        except Exception:
-            pass
-
-    # 6. Se ainda assim não houver imagem física, gera dinamicamente a página com marca d'água evitando 404
-    if not file_data:
+    except Exception as fatal_err:
+        logger.error(f"[Hub] Erro inesperado em get_hub_page para {content_id} pág {page_index}: {fatal_err}")
         fallback_svg = _generate_fallback_hub_page(title, page_index + 1, email)
         return HttpResponse(fallback_svg, content_type="image/svg+xml", headers={"Cache-Control": "public, max-age=60"})
-
-    try:
-        watermarked = apply_watermark(file_data, email)
-        return HttpResponse(watermarked, content_type="image/webp", headers={"Cache-Control": "private, max-age=3600"})
-    except Exception as e:
-        logger.warning(f"[Hub] Erro ao aplicar watermark: {e}")
-        return HttpResponse(file_data, content_type="image/webp", headers={"Cache-Control": "private, max-age=3600"})
 
 
 # ── FLASHCARD ASSETS & CLOUDINARY UPLOAD ──────────────────────────────
