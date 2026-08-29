@@ -33,23 +33,30 @@ _RAW_IMAGE_CACHE = {}
 def _convert_to_pdf(input_path: str, output_dir: str) -> str | None:
     """Usa LibreOffice para converter arquivos (PPTX, DOCX) em PDF."""
     try:
-        # Tenta caminhos comuns do LibreOffice no Windows
-        soffice_path = "soffice"  # Se estiver no PATH
-        possible_paths = [
-            r"C:\Program Files\LibreOffice\program\soffice.exe",
-            r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
-        ]
-        for p in possible_paths:
-            if os.path.exists(p):
-                soffice_path = p
-                break
+        soffice_path = (
+            "libreoffice"
+            if shutil.which("libreoffice")
+            else ("soffice" if shutil.which("soffice") else None)
+        )
+        if not soffice_path:
+            possible_paths = [
+                "/usr/bin/libreoffice",
+                "/usr/bin/soffice",
+                r"C:\Program Files\LibreOffice\program\soffice.exe",
+                r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+            ]
+            for p in possible_paths:
+                if os.path.exists(p):
+                    soffice_path = p
+                    break
+
+        if not soffice_path:
+            soffice_path = "soffice"
 
         logging.info(
             f"[SecureDoc] Convertendo {input_path} para PDF usando {soffice_path}..."
         )
 
-        # Comando: soffice --headless --convert-to pdf --outdir [dir]
-        # [file]
         result = subprocess.run(
             [
                 soffice_path,
@@ -65,8 +72,6 @@ def _convert_to_pdf(input_path: str, output_dir: str) -> str | None:
             check=True,
         )
 
-        # O LibreOffice gera o arquivo com o mesmo nome mas extensão
-        # .pdf
         base_name = os.path.splitext(os.path.basename(input_path))[0]
         pdf_path = os.path.join(output_dir, f"{base_name}.pdf")
 

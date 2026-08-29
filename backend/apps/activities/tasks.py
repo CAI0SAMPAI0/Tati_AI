@@ -49,20 +49,26 @@ def sync_material_pages(content: PremiumContent, force: bool = False) -> bool:
             with httpx.Client(timeout=60.0, follow_redirects=True) as client:
                 resp = client.get(source_url)
                 if resp.status_code == 200:
-                    ext = (
-                        os.path.splitext(source_url.split("?")[0])[1].lower() or ".pdf"
-                    )
-                    temp_input = os.path.join(local_dir, f"source_temp{ext}")
-                    with open(temp_input, "wb") as f:
-                        f.write(resp.content)
-
-                    actual_pdf = temp_input
-                    if not ext.endswith(".pdf"):
+                    is_pdf = resp.content.startswith(b"%PDF")
+                    if is_pdf:
+                        temp_input = os.path.join(local_dir, "source_temp.pdf")
+                        with open(temp_input, "wb") as f:
+                            f.write(resp.content)
+                        actual_pdf = temp_input
+                    else:
+                        temp_input = os.path.join(local_dir, "source_temp.pptx")
+                        with open(temp_input, "wb") as f:
+                            f.write(resp.content)
                         from .secure_document_service import _convert_to_pdf
 
                         converted = _convert_to_pdf(temp_input, local_dir)
                         if converted and os.path.exists(converted):
                             actual_pdf = converted
+                        else:
+                            logger.error(
+                                f"[HubSync] Falha na conversão LibreOffice de '{temp_input}' para PDF."
+                            )
+                            actual_pdf = temp_input
 
                     # Extrai links clicáveis diretamente do PDF (PyMuPDF)
                     from .secure_document_service import extract_links_from_pdf
