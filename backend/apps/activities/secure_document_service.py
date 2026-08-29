@@ -57,29 +57,40 @@ def _convert_to_pdf(input_path: str, output_dir: str) -> str | None:
             f"[SecureDoc] Convertendo {input_path} para PDF usando {soffice_path}..."
         )
 
+        cmd = [
+            soffice_path,
+            "--headless",
+            "--invisible",
+            "--nodefault",
+            "--nofirststartwizard",
+            "-env:UserInstallation=file:///tmp/libreoffice_profile",
+            "--convert-to",
+            "pdf",
+            "--outdir",
+            output_dir,
+            input_path,
+        ]
+
         result = subprocess.run(
-            [
-                soffice_path,
-                "--headless",
-                "--convert-to",
-                "pdf",
-                "--outdir",
-                output_dir,
-                input_path,
-            ],
+            cmd,
             capture_output=True,
             text=True,
-            check=True,
+            timeout=60,
         )
 
         base_name = os.path.splitext(os.path.basename(input_path))[0]
         pdf_path = os.path.join(output_dir, f"{base_name}.pdf")
 
+        if result.returncode != 0 or not os.path.exists(pdf_path):
+            logging.error(
+                f"[SecureDoc] LibreOffice falhou (code {result.returncode}): stdout={result.stdout} stderr={result.stderr}"
+            )
+
         if os.path.exists(pdf_path):
             return pdf_path
         return None
     except Exception as e:
-        logging.info(f"[SecureDoc] Erro na conversão para PDF: {e}")
+        logging.error(f"[SecureDoc] Erro na conversão para PDF: {e}")
         return None
 
 
