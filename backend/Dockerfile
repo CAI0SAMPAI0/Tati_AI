@@ -33,5 +33,5 @@ EXPOSE 7860
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD curl -f http://localhost:${PORT:-7860}/health || exit 1
 
-# Executa o Daphne na porta configurada pelo Hugging Face Spaces ($PORT ou 7860)
-CMD ["sh", "-c", "daphne -b 0.0.0.0 -p ${PORT:-7860} app.asgi:application"]
+# Executa o Gunicorn com workers Uvicorn ASGI (3 workers paralelos para balancear carga e WebSockets)
+CMD ["sh", "-c", "gunicorn app.asgi:application -w ${WEB_CONCURRENCY:-3} -k uvicorn.workers.UvicornWorker -b 0.0.0.0:${PORT:-7860} --timeout 120 --access-logfile -"]
