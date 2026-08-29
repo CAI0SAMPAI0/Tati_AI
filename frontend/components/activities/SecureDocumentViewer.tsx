@@ -118,6 +118,16 @@ export default function SecureDocumentViewer({
                       setAspectRatios((prev) => ({ ...prev, [index]: ratio }));
                     }
                   }}
+                  onError={(e) => {
+                    const img = e.target as HTMLImageElement;
+                    if (!img.dataset.retried) {
+                      img.dataset.retried = 'true';
+                      setTimeout(() => {
+                        const separator = safeUrl.includes('?') ? '&' : '?';
+                        img.src = `${safeUrl}${separator}retry=${Date.now()}`;
+                      }, 1000);
+                    }
+                  }}
                 />
 
                 {/* Links Mapeados (Botões Clicáveis Transparentes) */}
