@@ -160,9 +160,24 @@ def _build_google_auth_data(request: HttpRequest) -> tuple[str, str]:
 def get_google_auth_url(request: HttpRequest):
     """
     Retorna a URL de autorização do Google OAuth e o token de estado para login mobile / popup.
-    Sempre retorna JSON com {url, state}.
+    Se for acessado diretamente pelo navegador/WebView (navegação), redireciona (302) automaticamente para o Google.
+    Se for chamado via AJAX/API (Accept: application/json), retorna JSON {url, state}.
     """
+    from django.shortcuts import redirect
+
     auth_url, state = _build_google_auth_data(request)
+
+    accept = request.headers.get("Accept", "").lower()
+    sec_dest = request.headers.get("Sec-Fetch-Dest", "").lower()
+
+    # Se a requisição veio de uma navegação direta do WebView/Navegador
+    if (
+        "text/html" in accept
+        or sec_dest == "document"
+        or "application/json" not in accept
+    ):
+        return redirect(auth_url)
+
     return {"url": auth_url, "state": state}
 
 
