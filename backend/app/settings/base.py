@@ -157,6 +157,8 @@ else:
     }
 
 # ── CELERY & BACKGROUND TASKS ─────────────────────────────────────────
+from celery.schedules import crontab
+
 CELERY_BROKER_URL = os.getenv(
     "CELERY_BROKER_URL", REDIS_URL or "redis://localhost:6379/0"
 )
@@ -167,11 +169,21 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "America/Sao_Paulo"
-CELERY_ENABLE_UTC = True
+CELERY_ENABLE_UTC = False
 CELERY_BEAT_SCHEDULE = {
     "sync-hub-materials-every-30-mins": {
         "task": "apps.activities.tasks.sync_hub_materials_task",
         "schedule": 1800.0,
+    },
+    "daily-streak-reminders-20h": {
+        "task": "apps.notifications.tasks.send_daily_streak_reminders_task",
+        "schedule": crontab(hour=20, minute=0),  # 20:00 Horário de Brasília
+    },
+    "weekly-progress-reports-sunday-19h": {
+        "task": "apps.notifications.tasks.send_weekly_progress_reports_task",
+        "schedule": crontab(
+            hour=19, minute=0, day_of_week=0
+        ),  # Domingo 19:00 Horário de Brasília
     },
 }
 

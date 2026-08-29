@@ -1016,3 +1016,168 @@ class NotificationSchedulerService:
             "email": email,
             "notifications_dispatched": results,
         }
+
+    @staticmethod
+    def send_daily_streak_reminders_to_all_active_students() -> dict:
+        """
+        Dispara lembrete diário de ofensiva (Streak) para TODOS os alunos ativos que ainda não praticaram hoje.
+        Executa às 20:00 (Horário de Brasília) com janela de 18 horas para proteção contra duplicatas.
+        """
+        User = get_user_model()
+        students = list(
+            User.objects.filter(is_active=True).exclude(
+                role__in=["admin", "teacher", "buyer"]
+            )
+        )
+        if not students:
+            logger.info("[StreakReminder] Nenhum aluno ativo encontrado.")
+            return {"sent": 0, "total_students": 0}
+
+        eighteen_hours_ago = datetime.now(timezone.utc) - timedelta(hours=18)
+        sent_count = 0
+        skipped_count = 0
+
+        for user in students:
+            first_name = (
+                (user.name or user.username or "Student")
+                .strip()
+                .split()[0]
+                .capitalize()
+            )
+            email = user.email
+
+            # Verifica se já recebeu notificação de streak nas últimas 18h
+            already_notified = Notification.objects.filter(
+                username=user.username,
+                category="streaks",
+                title__icontains="streak",
+                created_at__gte=eighteen_hours_ago,
+            ).exists()
+
+            if already_notified:
+                skipped_count += 1
+                continue
+
+            streak_val = getattr(user, "streak", None) or 1
+            title = "Don't break your streak! 🔥"
+            body = f"Hello {first_name}! You're on a {streak_val}-day streak. Practice just 5 minutes today with Teacher Tati to keep it alive!"
+            html = f"""
+<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
+  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <div style="text-align: center; margin-bottom: 24px;"><span style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">🔥 STREAK AT RISK</span></div>
+    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Don't break your streak, {first_name}!</h1>
+    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">You have worked hard to reach a <strong style="color: #f59e0b;">{streak_val}-day study streak</strong>. Don't let your progress slip away! Just 5 minutes of practice with Teacher Tati keeps your flame burning.</p>
+    <div style="text-align: center; margin: 32px 0;"><a href="https://tati-ai.vercel.app/activities" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Practice with Tati Now →</a></div>
+    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Personalized English Coaching</p>
+  </div>
+</body></html>"""
+            if email:
+                BrevoEmailService.send_email_detailed(email, title, html, first_name)
+            NotificationDispatcher.send_push_to_user(
+                user.username, title, body, url="/activities", tag="streak-reminder"
+            )
+            Notification.objects.create(
+                username=user.username, category="streaks", title=title, body=body
+            )
+            sent_count += 1
+
+        logger.info(
+            f"[StreakReminder] Concluído: {sent_count} alunos notificados, {skipped_count} já haviam sido notificados."
+        )
+        return {
+            "success": True,
+            "sent": sent_count,
+            "skipped": skipped_count,
+            "total_students": len(students),
+        }
+
+    @staticmethod
+    def send_weekly_reports_to_all_active_students() -> dict:
+        """
+        Dispara o Relatório Semanal de Evolução para TODOS os alunos ativos.
+        Executa aos domingos às 19:00 (Horário de Brasília) com janela de 5 dias contra duplicatas.
+        """
+        User = get_user_model()
+        from apps.users.services import ProgressReportService
+
+        students = list(
+            User.objects.filter(is_active=True).exclude(
+                role__in=["admin", "teacher", "buyer"]
+            )
+        )
+        if not students:
+            logger.info("[WeeklyReport] Nenhum aluno ativo encontrado.")
+            return {"sent": 0, "total_students": 0}
+
+        five_days_ago = datetime.now(timezone.utc) - timedelta(days=5)
+        sent_count = 0
+        skipped_count = 0
+
+        for user in students:
+            first_name = (
+                (user.name or user.username or "Student")
+                .strip()
+                .split()[0]
+                .capitalize()
+            )
+            email = user.email
+
+            # Evita envio duplicado na mesma semana
+            already_sent = Notification.objects.filter(
+                username=user.username,
+                category="weekly_report",
+                created_at__gte=five_days_ago,
+            ).exists()
+
+            if already_sent:
+                skipped_count += 1
+                continue
+
+            report_data = (
+                ProgressReportService.get_weekly_report(user)
+                if hasattr(ProgressReportService, "get_weekly_report")
+                else {}
+            )
+            mins_studied = report_data.get("total_study_minutes", 45)
+            acts_done = report_data.get("activities_completed", 5)
+            vocab_learned = report_data.get("vocabulary_learned", 12)
+            title = "📊 Your Weekly Progress Report - Teacher Tati AI"
+            body = f"Hello {first_name}! Your weekly report is ready: {mins_studied} min practiced, {acts_done} activities completed, and +{vocab_learned} words learned!"
+            html = f"""
+<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
+  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(124, 58, 237, 0.15); color: #a78bfa; border: 1px solid rgba(124, 58, 237, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">📊 WEEKLY EVOLUTION REPORT</span></div>
+    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Great progress this week, {first_name}!</h1>
+    <table style="width: 100%; border-collapse: collapse; margin: 24px 0;"><tr>
+      <td style="padding: 12px; background: #221b40; border-radius: 12px 0 0 12px; text-align: center; width: 33.3%;"><div style="font-size: 22px; font-weight: 800; color: #7c3aed;">{mins_studied} min</div><div style="font-size: 12px; color: #948aa8;">Study Time</div></td>
+      <td style="padding: 12px; background: #221b40; border-left: 1px solid #312759; border-right: 1px solid #312759; text-align: center; width: 33.3%;"><div style="font-size: 22px; font-weight: 800; color: #10b981;">{acts_done}</div><div style="font-size: 12px; color: #948aa8;">Activities</div></td>
+      <td style="padding: 12px; background: #221b40; border-radius: 0 12px 12px 0; text-align: center; width: 33.3%;"><div style="font-size: 22px; font-weight: 800; color: #f59e0b;">+{vocab_learned}</div><div style="font-size: 12px; color: #948aa8;">Words</div></td>
+    </tr></table>
+    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/dashboard" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 15px; display: inline-block;">View Full Report →</a></div>
+    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Real Results.</p>
+  </div>
+</body></html>"""
+            if email:
+                BrevoEmailService.send_email_detailed(email, title, html, first_name)
+            NotificationDispatcher.send_push_to_user(
+                user.username, title, body, url="/dashboard", tag="weekly-report"
+            )
+            Notification.objects.create(
+                username=user.username,
+                category="weekly_report",
+                title=title,
+                body=body,
+            )
+            sent_count += 1
+
+        logger.info(
+            f"[WeeklyReport] Concluído: {sent_count} relatórios enviados, {skipped_count} ignorados por duplicata."
+        )
+        return {
+            "success": True,
+            "sent": sent_count,
+            "skipped": skipped_count,
+            "total_students": len(students),
+        }

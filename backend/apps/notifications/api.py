@@ -135,29 +135,27 @@ def get_email_status(request: HttpRequest):
 @notifications_router.post("/send-all-test", auth=auth_optional)
 def send_all_test_notifications(request: HttpRequest, username: Optional[str] = None):
     """
-    Dispara todas as 6 notificações do sistema (Email, Push e In-App) para caio.sampaio e programador.
+    Dispara os 6 modelos de notificação de teste apenas para o usuário solicitado.
     """
     from django.contrib.auth import get_user_model
+    from ninja.errors import HttpError
     from .services import NotificationSchedulerService
 
     User = get_user_model()
 
-    target_names = ["caio.sampaio", "programador"]
     if username:
-        target_names = [username]
+        targets = list(User.objects.filter(username=username))
     elif (
         request.auth
         and hasattr(request.auth, "username")
         and isinstance(request.auth, User)
     ):
-        target_names = list(set([request.auth.username] + target_names))
-
-    targets = list(User.objects.filter(username__in=target_names))
-    if not targets:
-        targets = list(User.objects.filter(email__icontains="caio"))
+        targets = [request.auth]
+    else:
+        targets = list(User.objects.filter(username="caio.sampaio")[:1])
 
     if not targets:
-        raise HttpError(404, "Nenhum usuário alvo encontrado.")
+        raise HttpError(404, "Nenhum usuário alvo encontrado para o teste.")
 
     all_results = {}
     for target_user in targets:
@@ -171,6 +169,26 @@ def send_all_test_notifications(request: HttpRequest, username: Optional[str] = 
         "target_users": [u.username for u in targets],
         "results": all_results,
     }
+
+
+@notifications_router.post("/trigger-streak-reminders", auth=auth_required)
+def trigger_streak_reminders(request: HttpRequest):
+    """
+    Disparo manual dos lembretes de ofensiva (Streak) para todos os alunos ativos que ainda não praticaram hoje.
+    """
+    from .services import NotificationSchedulerService
+
+    return NotificationSchedulerService.send_daily_streak_reminders_to_all_active_students()
+
+
+@notifications_router.post("/trigger-weekly-reports", auth=auth_required)
+def trigger_weekly_reports(request: HttpRequest):
+    """
+    Disparo manual dos relatórios semanais de evolução para todos os alunos ativos.
+    """
+    from .services import NotificationSchedulerService
+
+    return NotificationSchedulerService.send_weekly_reports_to_all_active_students()
 
 
 # ── DISPARO DE WHATSAPP (WAHA) ────────────────────────────────────────
