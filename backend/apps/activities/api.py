@@ -866,6 +866,14 @@ def create_admin_premium(request: HttpRequest, payload: AdminPremiumIn):
         emoji=payload.emoji or "✨",
         is_active=payload.is_active if payload.is_active is not None else True,
     )
+    if m.content_source and m.content_source.startswith("http"):
+        try:
+            from .tasks import sync_material_pages
+
+            sync_material_pages(m)
+        except Exception as sync_err:
+            logger.warning(f"[Admin] Erro ao sincronizar material novo: {sync_err}")
+
     return {"success": True, "id": str(m.id), "title": m.title}
 
 
@@ -883,6 +891,17 @@ def update_admin_premium(
         if v is not None and hasattr(m, k):
             setattr(m, k, v)
     m.save()
+
+    if m.content_source and m.content_source.startswith("http"):
+        try:
+            from .tasks import sync_material_pages
+
+            sync_material_pages(m)
+        except Exception as sync_err:
+            logger.warning(
+                f"[Admin] Erro ao sincronizar material atualizado: {sync_err}"
+            )
+
     return {"success": True, "id": str(m.id), "title": m.title}
 
 
