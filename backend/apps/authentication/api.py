@@ -263,6 +263,8 @@ def google_oauth_callback(
         f"{frontend_url.rstrip('/')}/login?token={jwt_token}&user={quote(user_json)}"
     )
 
+    username_val = user_dict.get("username", "") if isinstance(user_dict, dict) else ""
+
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -298,15 +300,35 @@ def google_oauth_callback(
         <h2>Autenticado com sucesso!</h2>
         <p style="color: #9ca3af;">Redirecionando para o aplicativo...</p>
         <script>
+            // 1. Salva credenciais imediatamente no localStorage e cookie
+            try {{
+                localStorage.setItem('token', '{jwt_token}');
+                localStorage.setItem('user', '{user_json}');
+                document.cookie = 'token={jwt_token}; path=/; max-age=2592000; SameSite=Lax';
+            }} catch(e) {{}}
+
+            // 2. Notifica o app Flutter nativo caso esteja embutido no InAppWebView
+            try {{
+                if (window.flutter_inappwebview) {{
+                    window.flutter_inappwebview.callHandler('onUserLogin', {{
+                        username: '{username_val}',
+                        token: '{jwt_token}'
+                    }});
+                }}
+            }} catch(e) {{}}
+
+            // 3. Notifica janela pai caso seja popup Web
+            try {{
+                if (window.opener) {{
+                    window.opener.postMessage({{ type: 'GOOGLE_AUTH_SUCCESS', token: '{jwt_token}', user: {user_json} }}, '*');
+                    window.close();
+                }}
+            }} catch(e) {{}}
+
+            // 4. Redireciona suavemente para a rota da aplicação
             setTimeout(function() {{
-                try {{
-                    if (window.opener) {{
-                        window.opener.postMessage({{ type: 'GOOGLE_AUTH_SUCCESS', token: '{jwt_token}', user: {user_json} }}, '*');
-                        window.close();
-                    }}
-                }} catch(e) {{}}
                 window.location.href = '{redirect_target}';
-            }}, 300);
+            }}, 200);
         </script>
     </body>
     </html>

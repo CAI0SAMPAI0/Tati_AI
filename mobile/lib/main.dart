@@ -337,23 +337,6 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                     // Bridge para detectar Flutter e injetar comportamentos
                     window.isFlutterApp = true;
 
-                    // Interceptação direta apenas quando o clique é no botão do Google
-                    document.addEventListener('mousedown', function(e) {
-                      var target = e.target;
-                      while (target && target !== document) {
-                        // Verifica se o elemento clicado (ou seus pais) é um botão e contém "Google"
-                        if ((target.tagName === 'BUTTON' || target.getAttribute('role') === 'button') &&
-                            target.innerText && target.innerText.toLowerCase().includes('google')) {
-                          console.log('[Bridge] Google Login Clicked');
-                          window.flutter_inappwebview.callHandler('googleLogin');
-                          e.preventDefault();
-                          e.stopPropagation();
-                          return;
-                        }
-                        target = target.parentNode;
-                      }
-                    }, true);
-
                     window.addEventListener('storage', function(e) {
                       if (e.key === 'token' && e.newValue) {
                         try {
