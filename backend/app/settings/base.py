@@ -101,11 +101,15 @@ DATABASE_URL = (
     or os.getenv("POSTGRES_URL")
 )
 if DATABASE_URL:
-    conn_max_age = int(os.getenv("DB_CONN_MAX_AGE", "0"))
+    # Para o Supabase Pooler (limite estrito de 15 conexões simultâneas), fecha após cada requisição
+    is_supabase = "supabase" in DATABASE_URL
+    conn_max_age = 0 if is_supabase else int(os.getenv("DB_CONN_MAX_AGE", "0"))
+    conn_health_checks = False if is_supabase else True
+
     db_config = dj_database_url.config(
         default=DATABASE_URL,
         conn_max_age=conn_max_age,
-        conn_health_checks=True,
+        conn_health_checks=conn_health_checks,
     )
     if "pooler.supabase.com" in str(db_config.get("HOST", "")) and not db_config.get(
         "PORT"
