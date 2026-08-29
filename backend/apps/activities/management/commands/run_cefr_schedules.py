@@ -17,6 +17,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         force = options.get("force", True)
-        self.stdout.write(self.style.NOTICE("Iniciando execução dos agendamentos CEFR..."))
+        self.stdout.write(
+            self.style.NOTICE("Iniciando execução dos agendamentos CEFR...")
+        )
         res = CEFRGeneratorService.check_and_run_schedules(force=force)
         self.stdout.write(self.style.SUCCESS(f"Concluído: {res.get('message')}"))

@@ -2,7 +2,8 @@ import time
 import logging
 from django.db import connection
 
-logger = logging.getLogger('performance')
+logger = logging.getLogger("performance")
+
 
 class PerformanceMiddleware:
     def __init__(self, get_response):
@@ -18,7 +19,11 @@ class PerformanceMiddleware:
         num_queries = len(connection.queries) - initial_queries
 
         # Loga desempenho das requisições de API no terminal
-        if not request.path.startswith('/static') and not request.path.startswith('/media'):
-            print(f'[PERF] {request.method} {request.path} -> {response.status_code} ({duration_ms:.1f}ms)')
+        if not request.path.startswith("/static") and not request.path.startswith(
+            "/media"
+        ):
+            print(
+                f"[PERF] {request.method} {request.path} -> {response.status_code} ({duration_ms:.1f}ms)"
+            )
 
         return response

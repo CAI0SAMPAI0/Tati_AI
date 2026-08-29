@@ -1,12 +1,9 @@
-import json
 import logging
 import urllib.parse
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from apps.authentication.security import decode_token
-from apps.authentication.models import User
-from apps.chat.services import AIService, ConversationService
-from apps.chat.models import Conversation, Message
-from apps.users.services import StreakService, XPService
+from apps.chat.services import AIService
+from apps.chat.models import Conversation
 from shared.async_db import aget_user_by_username
 
 logger = logging.getLogger(__name__)
@@ -55,7 +52,9 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         logger.info(f"[ChatWS] Conexão WebSocket aceita para o aluno: {self.username}")
 
     async def disconnect(self, close_code):
-        logger.info(f"[ChatWS] Desconectado: {getattr(self, 'username', 'anon')} (Code: {close_code})")
+        logger.info(
+            f"[ChatWS] Desconectado: {getattr(self, 'username', 'anon')} (Code: {close_code})"
+        )
 
     async def receive_json(self, content):
         msg_type = content.get("type", "message")
@@ -81,15 +80,21 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
 
         if is_audio:
             from apps.chat.audio_service import AudioService
+
             raw_audio = content.get("audio") or ""
             text_content = await AudioService.transcribe_audio_async(raw_audio)
             if not text_content:
                 text_content = "(Áudio não compreendido)"
-            
+
             # Envia a transcrição imediata para o balão do usuário no frontend
             await self.send_json({"type": "transcription", "text": text_content})
         else:
-            text_content = content.get("content") or content.get("text") or content.get("message") or ""
+            text_content = (
+                content.get("content")
+                or content.get("text")
+                or content.get("message")
+                or ""
+            )
 
         if not text_content:
             return
@@ -116,36 +121,48 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             accent = content.get("accent")
             if not accent or accent == "en-US":
                 if self.user and isinstance(getattr(self.user, "profile", None), dict):
-                    accent = self.user.profile.get("preferred_accent") or self.user.profile.get("accent") or "en-US"
+                    accent = (
+                        self.user.profile.get("preferred_accent")
+                        or self.user.profile.get("accent")
+                        or "en-US"
+                    )
                 else:
                     accent = "en-US"
 
             if not audio_b64 and is_audio:
-                audio_b64 = await AudioService.text_to_speech_async(reply_text, accent=accent)
+                audio_b64 = await AudioService.text_to_speech_async(
+                    reply_text, accent=accent
+                )
 
             # Envia o texto da resposta
-            await self.send_json({
-                "type": "stream_token",
-                "content": reply_text,
-            })
+            await self.send_json(
+                {
+                    "type": "stream_token",
+                    "content": reply_text,
+                }
+            )
 
             # Se for modo de voz ou tiver áudio gerado, envia o payload de áudio
             if audio_b64:
-                await self.send_json({
-                    "type": "audio_response",
-                    "audio": audio_b64,
-                    "audio_b64": audio_b64,
-                })
+                await self.send_json(
+                    {
+                        "type": "audio_response",
+                        "audio": audio_b64,
+                        "audio_b64": audio_b64,
+                    }
+                )
 
             # Finaliza stream
             await self.send_json({"type": "stream_end"})
 
         except Exception as e:
             logger.error(f"[ChatWS] Erro ao processar mensagem: {e}")
-            await self.send_json({
-                "type": "error",
-                "message": "Desculpe, tive um problema ao responder. Por favor, tente novamente.",
-            })
+            await self.send_json(
+                {
+                    "type": "error",
+                    "message": "Desculpe, tive um problema ao responder. Por favor, tente novamente.",
+                }
+            )
 
 
 class LiveChatConsumer(AsyncJsonWebsocketConsumer):

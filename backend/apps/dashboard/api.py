@@ -22,6 +22,7 @@ def require_staff_user(request: HttpRequest):
 
 # ── ESTATÍSTICAS RÁPIDAS & OVERVIEW ───────────────────────────────────
 
+
 @dashboard_router.get("/stats", auth=auth_required)
 def get_stats(request: HttpRequest):
     """
@@ -91,8 +92,11 @@ def get_celery_health(request: HttpRequest):
 
 # ── GERENCIAMENTO DE ALUNOS ───────────────────────────────────────────
 
+
 @dashboard_router.get("/students", auth=auth_required)
-def get_students(request: HttpRequest, search: Optional[str] = None, level: Optional[str] = None):
+def get_students(
+    request: HttpRequest, search: Optional[str] = None, level: Optional[str] = None
+):
     """
     Lista todos os estudantes matriculados com metadados pedagógicos.
     """
@@ -137,7 +141,9 @@ def get_student_insight(request: HttpRequest, username: str, lang: str = "en-US"
 
 
 @dashboard_router.get("/students/{username}/grammar-errors", auth=auth_required)
-def get_student_grammar_errors(request: HttpRequest, username: str, lang: str = "en-US"):
+def get_student_grammar_errors(
+    request: HttpRequest, username: str, lang: str = "en-US"
+):
     """
     Retorna análise de pontos de melhoria gramaticais do aluno.
     """
@@ -146,7 +152,9 @@ def get_student_grammar_errors(request: HttpRequest, username: str, lang: str = 
 
 
 @dashboard_router.get("/students/{username}/recommendations", auth=auth_required)
-def get_student_recommendations(request: HttpRequest, username: str, lang: str = "en-US"):
+def get_student_recommendations(
+    request: HttpRequest, username: str, lang: str = "en-US"
+):
     """
     Retorna tópicos e módulos recomendados para o perfil do estudante.
     """
@@ -190,7 +198,6 @@ def delete_student(request: HttpRequest, username: str):
     return DashboardService.delete_student(username)
 
 
-
 from pydantic import BaseModel
 
 
@@ -205,6 +212,7 @@ class FlashcardDeckInput(BaseModel):
 
 
 # ── FLASHCARDS ADMIN ──────────────────────────────────────────────────
+
 
 @dashboard_router.get("/flashcards", auth=auth_required)
 def get_admin_flashcards(request: HttpRequest):
@@ -225,7 +233,9 @@ def create_flashcard_deck(request: HttpRequest, payload: FlashcardDeckInput):
 
 
 @dashboard_router.put("/flashcards/{deck_id}", auth=auth_required)
-def update_flashcard_deck(request: HttpRequest, deck_id: str, payload: FlashcardDeckInput):
+def update_flashcard_deck(
+    request: HttpRequest, deck_id: str, payload: FlashcardDeckInput
+):
     """
     Atualiza um baralho de flashcards existente.
     """
@@ -243,6 +253,7 @@ def delete_flashcard_deck(request: HttpRequest, deck_id: str):
 
 
 # ── SIMULAÇÕES ADMIN ──────────────────────────────────────────────────
+
 
 class SimulationInput(BaseModel):
     name: Optional[str] = "Nova Simulação"
@@ -284,7 +295,9 @@ def create_simulation(request: HttpRequest, payload: SimulationInput):
 
 
 @dashboard_router.put("/simulations/{simulation_id}", auth=auth_required)
-def update_simulation(request: HttpRequest, simulation_id: str, payload: SimulationInput):
+def update_simulation(
+    request: HttpRequest, simulation_id: str, payload: SimulationInput
+):
     """
     Atualiza um cenário de simulação existente.
     """
@@ -302,6 +315,7 @@ def delete_simulation(request: HttpRequest, simulation_id: str):
 
 
 # ── GAMES ADMIN (WORDWALL) ────────────────────────────────────────────
+
 
 class GameInput(BaseModel):
     title: Optional[str] = ""
@@ -348,6 +362,7 @@ def delete_game(request: HttpRequest, game_id: str):
 
 
 # ── NEWS ADMIN (NOTÍCIAS EM INGLÊS) ───────────────────────────────────
+
 
 class NewsInput(BaseModel):
     title: Optional[str] = ""
@@ -396,6 +411,7 @@ def delete_news(request: HttpRequest, news_id: str):
 
 # ── WAHA (WHATSAPP SESSIONS) ──────────────────────────────────────────
 
+
 @dashboard_router.get("/waha/sessions", auth=auth_required)
 def get_waha_sessions(request: HttpRequest):
     """
@@ -403,6 +419,7 @@ def get_waha_sessions(request: HttpRequest):
     """
     require_staff_user(request)
     from apps.notifications.waha_service import WahaService
+
     return WahaService.get_sessions()
 
 
@@ -413,8 +430,9 @@ def start_waha_session(request: HttpRequest):
     """
     require_staff_user(request)
     from apps.notifications.waha_service import WahaService
+
     user = request.auth
-    session_name = getattr(user, 'username', 'default') if user else 'default'
+    session_name = getattr(user, "username", "default") if user else "default"
     return WahaService.start_session(session_name)
 
 
@@ -425,8 +443,9 @@ def stop_waha_session(request: HttpRequest):
     """
     require_staff_user(request)
     from apps.notifications.waha_service import WahaService
+
     user = request.auth
-    session_name = getattr(user, 'username', 'default') if user else 'default'
+    session_name = getattr(user, "username", "default") if user else "default"
     return WahaService.stop_session(session_name)
 
 
@@ -438,8 +457,11 @@ def get_waha_session_qr(request: HttpRequest, session: Optional[str] = None):
     require_staff_user(request)
     from apps.notifications.waha_service import WahaService
     from django.http import HttpResponse
+
     user = request.auth
-    session_name = session or (getattr(user, 'username', 'default') if user else 'default')
+    session_name = session or (
+        getattr(user, "username", "default") if user else "default"
+    )
     qr_bytes = WahaService.get_qr_image(session_name)
     if qr_bytes:
         return HttpResponse(qr_bytes, content_type="image/png")

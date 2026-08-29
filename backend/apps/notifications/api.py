@@ -18,6 +18,7 @@ notifications_router = Router(tags=["Notifications"])
 
 # ── NOTIFICAÇÕES IN-APP ───────────────────────────────────────────────
 
+
 @notifications_router.get("", response=List[NotificationOut], auth=auth_required)
 def list_notifications(request: HttpRequest):
     """
@@ -49,11 +50,13 @@ def get_vapid_public_key(request: HttpRequest):
     Retorna a chave pública VAPID para push notifications no navegador.
     """
     from .services import NotificationDispatcher
+
     vapid = NotificationDispatcher.get_vapid_keys()
     return {"public_key": vapid["public_key"], "vapid_public_key": vapid["public_key"]}
 
 
 # ── REGISTRO DE WEBPUSH ───────────────────────────────────────────────
+
 
 @notifications_router.post("/subscribe", auth=auth_required)
 @notifications_router.post("/subscribe-push", auth=auth_required)
@@ -66,6 +69,7 @@ def subscribe_push(request: HttpRequest, payload: SubscribePushInput):
 
 # ── DISPARO DE NOTIFICAÇÃO MANUAL / TESTE (POR NÍVEL OU GLOBAL) ──────
 
+
 @notifications_router.post("/broadcast", auth=auth_required)
 def broadcast_notification(request: HttpRequest, payload: dict):
     """
@@ -73,6 +77,7 @@ def broadcast_notification(request: HttpRequest, payload: dict):
     Ex: payload = {"title": "Título", "activity_type": "Grammar", "levels": ["B1"], "is_published": True}
     """
     from .services import NotificationDispatcher
+
     activity_type = payload.get("activity_type", "Atividade")
     title = payload.get("title", "Nova Lição")
     levels = payload.get("levels", ["ALL"])
@@ -88,8 +93,8 @@ def broadcast_notification(request: HttpRequest, payload: dict):
     )
 
 
-
 # ── DISPARO DE E-MAIL (BREVO & MULTI-PROVIDER) ───────────────────────
+
 
 @notifications_router.post("/send-email", auth=auth_required)
 def send_email(request: HttpRequest, payload: SendEmailInput):
@@ -111,13 +116,16 @@ def get_email_status(request: HttpRequest):
     Retorna o status de configuração dos provedores de e-mail (Brevo, Resend, SMTP).
     """
     from .services import get_brevo_api_key, get_verified_sender_email
+
     brevo_key = get_brevo_api_key()
     resend_key = os.getenv("RESEND_API_KEY")
     smtp_host = os.getenv("SMTP_HOST")
 
     return {
         "brevo_configured": bool(brevo_key),
-        "brevo_key_preview": f"{brevo_key[:8]}...{brevo_key[-4:]}" if brevo_key else None,
+        "brevo_key_preview": f"{brevo_key[:8]}...{brevo_key[-4:]}"
+        if brevo_key
+        else None,
         "verified_sender": get_verified_sender_email(),
         "resend_configured": bool(resend_key),
         "smtp_configured": bool(smtp_host and os.getenv("SMTP_USER")),
@@ -131,12 +139,17 @@ def send_all_test_notifications(request: HttpRequest, username: Optional[str] = 
     """
     from django.contrib.auth import get_user_model
     from .services import NotificationSchedulerService
+
     User = get_user_model()
-    
+
     target_names = ["caio.sampaio", "programador"]
     if username:
         target_names = [username]
-    elif request.auth and hasattr(request.auth, "username") and isinstance(request.auth, User):
+    elif (
+        request.auth
+        and hasattr(request.auth, "username")
+        and isinstance(request.auth, User)
+    ):
         target_names = list(set([request.auth.username] + target_names))
 
     targets = list(User.objects.filter(username__in=target_names))
@@ -148,14 +161,20 @@ def send_all_test_notifications(request: HttpRequest, username: Optional[str] = 
 
     all_results = {}
     for target_user in targets:
-        res = NotificationSchedulerService.send_all_test_notifications_to_user(target_user)
+        res = NotificationSchedulerService.send_all_test_notifications_to_user(
+            target_user
+        )
         all_results[target_user.username] = res
 
-    return {"ok": True, "target_users": [u.username for u in targets], "results": all_results}
-
+    return {
+        "ok": True,
+        "target_users": [u.username for u in targets],
+        "results": all_results,
+    }
 
 
 # ── DISPARO DE WHATSAPP (WAHA) ────────────────────────────────────────
+
 
 @notifications_router.post("/send-whatsapp", auth=auth_required)
 def send_whatsapp(request: HttpRequest, payload: SendWhatsAppInput):

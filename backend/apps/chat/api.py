@@ -9,8 +9,6 @@ from .schemas import (
     CreateConversationInput,
     MessageOut,
     SendMessageInput,
-    VoiceSynthesisInput,
-    VoiceSynthesisOut,
 )
 from .services import ConversationService, AIService
 
@@ -19,6 +17,7 @@ chat_router = Router(tags=["Teacher Tati AI Chat"])
 
 
 # ── CONVERSAS & HISTÓRICO ─────────────────────────────────────────────
+
 
 @chat_router.get("/conversations", response=List[ConversationOut], auth=auth_required)
 def list_conversations(request: HttpRequest):
@@ -36,7 +35,11 @@ def create_conversation(request: HttpRequest, payload: CreateConversationInput):
     return ConversationService.create_conversation(request.auth, payload)
 
 
-@chat_router.get("/conversations/{conversation_id}/messages", response=List[MessageOut], auth=auth_required)
+@chat_router.get(
+    "/conversations/{conversation_id}/messages",
+    response=List[MessageOut],
+    auth=auth_required,
+)
 def get_messages(request: HttpRequest, conversation_id: str):
     """
     Retorna o histórico completo de mensagens trocadas na conversa.
@@ -53,15 +56,21 @@ def delete_conversation(request: HttpRequest, conversation_id: str):
 
 
 @chat_router.get("/conversations/{conversation_id}/summary", auth=auth_required)
-async def get_conversation_summary(request: HttpRequest, conversation_id: str, lang: Optional[str] = "pt"):
+async def get_conversation_summary(
+    request: HttpRequest, conversation_id: str, lang: Optional[str] = "pt"
+):
     """
     Gera um resumo pedagógico detalhado da sessão de conversa em inglês de forma assíncrona.
     """
     from asgiref.sync import sync_to_async
-    return await sync_to_async(ConversationService.get_summary)(request.auth, conversation_id, lang=lang or "pt")
+
+    return await sync_to_async(ConversationService.get_summary)(
+        request.auth, conversation_id, lang=lang or "pt"
+    )
 
 
 # ── ENVIO DE MENSAGEM & RESPOSTA DA IA ────────────────────────────────
+
 
 @chat_router.post("", auth=auth_required)
 @chat_router.post("/", auth=auth_required)
@@ -71,6 +80,7 @@ async def send_chat_message(request: HttpRequest, payload: SendMessageInput):
     Envia uma mensagem do aluno e gera a resposta contextual da Teacher Tati acompanhada do áudio falado.
     """
     from asgiref.sync import sync_to_async
+
     res = await sync_to_async(AIService.generate_reply)(
         user=request.auth,
         conversation_id=payload.conversation_id,
@@ -90,6 +100,7 @@ async def send_chat_message(request: HttpRequest, payload: SendMessageInput):
 
 from pydantic import BaseModel
 
+
 class TTSInput(BaseModel):
     text: Optional[str] = ""
     message: Optional[str] = ""
@@ -102,6 +113,7 @@ class TranscribeInput(BaseModel):
 
 # ── SÍNTESE DE VOZ & TTS ──────────────────────────────────────────────
 
+
 @chat_router.post("/synthesize-voice", auth=auth_optional)
 @chat_router.post("/tts", auth=auth_optional)
 async def synthesize_voice(request: HttpRequest, payload: TTSInput):
@@ -109,10 +121,16 @@ async def synthesize_voice(request: HttpRequest, payload: TTSInput):
     Sintetiza áudio falado com a voz da Teacher Tati via Edge TTS assíncrono respeitando o sotaque preferido do usuário.
     """
     from .audio_service import AudioService
+
     text = payload.text or payload.message or ""
     accent = payload.accent
     if not accent or accent == "en-US":
-        if hasattr(request, "auth") and request.auth and hasattr(request.auth, "profile") and isinstance(request.auth.profile, dict):
+        if (
+            hasattr(request, "auth")
+            and request.auth
+            and hasattr(request.auth, "profile")
+            and isinstance(request.auth.profile, dict)
+        ):
             accent = request.auth.profile.get("preferred_accent") or accent or "en-US"
     accent = accent or "en-US"
     audio_b64 = await AudioService.text_to_speech_async(text, accent=accent)
@@ -126,11 +144,13 @@ async def synthesize_voice(request: HttpRequest, payload: TTSInput):
 
 # ── TRANSCRIÇÃO DE VOZ (STT) ──────────────────────────────────────────
 
+
 @chat_router.post("/transcribe", auth=auth_optional)
 async def transcribe_chat_voice(request: HttpRequest, payload: TranscribeInput):
     """
     Transcreve áudio do aluno usando Whisper Large V3 assíncrono.
     """
     from .audio_service import AudioService
+
     text = await AudioService.transcribe_audio_async(payload.audio or "")
     return {"text": text, "transcription": text}

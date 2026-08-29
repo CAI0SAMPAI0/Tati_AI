@@ -5,40 +5,82 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='UserError',
+            name="UserError",
             fields=[
-                ('id', models.UUIDField(db_column='id', default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('username', models.CharField(db_column='username', max_length=150)),
-                ('incorrect_text', models.TextField(db_column='incorrect_text', default='')),
-                ('correct_text', models.TextField(db_column='correct_text', default='')),
-                ('explanation', models.TextField(blank=True, db_column='explanation', default='')),
-                ('category', models.CharField(db_column='category', default='grammar', max_length=100)),
-                ('created_at', models.DateTimeField(auto_now_add=True, db_column='created_at', null=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        db_column="id",
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("username", models.CharField(db_column="username", max_length=150)),
+                (
+                    "incorrect_text",
+                    models.TextField(db_column="incorrect_text", default=""),
+                ),
+                (
+                    "correct_text",
+                    models.TextField(db_column="correct_text", default=""),
+                ),
+                (
+                    "explanation",
+                    models.TextField(blank=True, db_column="explanation", default=""),
+                ),
+                (
+                    "category",
+                    models.CharField(
+                        db_column="category", default="grammar", max_length=100
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        auto_now_add=True, db_column="created_at", null=True
+                    ),
+                ),
             ],
             options={
-                'db_table': 'user_errors',
-                'ordering': ['-created_at'],
-                'managed': False,
+                "db_table": "user_errors",
+                "ordering": ["-created_at"],
+                "managed": False,
             },
         ),
         migrations.CreateModel(
-            name='UserOnboarding',
+            name="UserOnboarding",
             fields=[
-                ('username', models.CharField(db_column='username', max_length=150, primary_key=True, serialize=False)),
-                ('has_seen_onboarding', models.BooleanField(db_column='has_seen_onboarding', default=False)),
-                ('updated_at', models.DateTimeField(auto_now=True, db_column='updated_at', null=True)),
+                (
+                    "username",
+                    models.CharField(
+                        db_column="username",
+                        max_length=150,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                (
+                    "has_seen_onboarding",
+                    models.BooleanField(db_column="has_seen_onboarding", default=False),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(
+                        auto_now=True, db_column="updated_at", null=True
+                    ),
+                ),
             ],
             options={
-                'db_table': 'user_onboarding',
-                'managed': False,
+                "db_table": "user_onboarding",
+                "managed": False,
             },
         ),
     ]

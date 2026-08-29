@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 
 
 @dataclass
@@ -159,7 +159,7 @@ class GrammarService:
                         "source_name": entry.source_name,
                         "source_url": entry.source_url,
                     }
-        
+
         filtered = CATALOG
         if level and level.upper() not in ("ALL", "ANY"):
             filtered = [e for e in CATALOG if e.level.upper() == level.upper()]

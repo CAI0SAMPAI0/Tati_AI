@@ -1,5 +1,4 @@
 from ninja import NinjaAPI, Router
-from ninja.errors import HttpError
 from django.http import JsonResponse, HttpRequest
 import os
 import logging
@@ -20,7 +19,9 @@ def global_exception_handler(request, exc):
     return JsonResponse(
         {
             "detail": "Internal Server Error",
-            "error": str(exc) if os.getenv("DEBUG", "False").lower() in ("true", "1") else "Erro interno no servidor.",
+            "error": str(exc)
+            if os.getenv("DEBUG", "False").lower() in ("true", "1")
+            else "Erro interno no servidor.",
             "path": request.path,
         },
         status=500,
@@ -33,6 +34,7 @@ def health_check(request):
     Health check da API e do banco de dados (Django ORM).
     """
     from django.db import connection
+
     db_status = "ok"
     db_msg = "Database connection verified successfully"
     try:
@@ -64,14 +66,16 @@ def app_version(request):
     """
     Retorna a versão mínima do app móvel e URL de download do APK.
     """
-    download_url = os.getenv("APP_DOWNLOAD_URL", "https://tati-ai.vercel.app/downloads/tati-ai.apk")
+    download_url = os.getenv(
+        "APP_DOWNLOAD_URL", "https://tati-ai.vercel.app/downloads/tati-ai.apk"
+    )
     return {
         "android": os.getenv("APP_VERSION_ANDROID", "1.0.0"),
         "download_url": download_url,
     }
 
 
-from apps.authentication.security import auth_required, auth_optional
+from apps.authentication.security import auth_optional
 from apps.authentication.api import auth_router, profile_router
 from apps.users.api import users_router, avatar_router
 from apps.activities.api import (
@@ -110,10 +114,12 @@ api.add_router("/cefr/images", cefr_images_router)
 
 tasks_router = Router(tags=["Async Tasks"])
 
+
 @tasks_router.get("/status/{task_id}", auth=auth_optional)
 @tasks_router.get("/{task_id}", auth=auth_optional)
 def get_task_status(request: HttpRequest, task_id: str):
     return {"status": "success", "success": True, "task_id": task_id}
+
 
 api.add_router("/tasks", tasks_router)
 

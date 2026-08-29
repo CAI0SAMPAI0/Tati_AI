@@ -1,5 +1,4 @@
 import logging
-from typing import Tuple, Optional
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from ninja.errors import HttpError
@@ -24,7 +23,9 @@ class AuthService:
     @staticmethod
     def _build_user_out(user: User) -> UserOut:
         prof = user.profile if isinstance(user.profile, dict) else {}
-        focus = prof.get("focus") or getattr(user, "focus", None) or "General Conversation"
+        focus = (
+            prof.get("focus") or getattr(user, "focus", None) or "General Conversation"
+        )
         occupation = prof.get("occupation") or getattr(user, "occupation", None) or ""
         preferred_accent = prof.get("preferred_accent") or prof.get("accent") or "en-US"
         return UserOut(
@@ -68,7 +69,9 @@ class AuthService:
 
     @classmethod
     def authenticate_user(cls, login_data: LoginInput) -> TokenResponse:
-        identifier = (login_data.username or login_data.email or login_data.identifier or "").strip()
+        identifier = (
+            login_data.username or login_data.email or login_data.identifier or ""
+        ).strip()
         password = login_data.password
 
         if not identifier or not password:
@@ -77,7 +80,10 @@ class AuthService:
         print(f"[Auth] Tentativa de login para identifier='{identifier}'")
 
         # Busca por username ou email (case-insensitive)
-        user = User.objects.filter(username__iexact=identifier).first() or User.objects.filter(email__iexact=identifier).first()
+        user = (
+            User.objects.filter(username__iexact=identifier).first()
+            or User.objects.filter(email__iexact=identifier).first()
+        )
 
         if not user:
             print(f"[Auth] Usuario nao encontrado no banco: '{identifier}'")
@@ -90,7 +96,9 @@ class AuthService:
         password_ok = verify_password(password, user.password)
         temp_ok = user.temp_password and verify_password(password, user.temp_password)
 
-        print(f"[Auth] Validacao de senha: password_ok={password_ok}, temp_ok={bool(temp_ok)}")
+        print(
+            f"[Auth] Validacao de senha: password_ok={password_ok}, temp_ok={bool(temp_ok)}"
+        )
 
         if not password_ok and not temp_ok:
             print(f"[Auth] Senha invalida para: '{user.username}'")
@@ -99,15 +107,15 @@ class AuthService:
 
         if temp_ok:
             user.temp_password = None
-            user.save(update_fields=['temp_password'])
+            user.save(update_fields=["temp_password"])
 
         # Auto-promove para programador se configurado em SUPERADMIN_EMAILS
-        superadmins = getattr(settings, 'SUPERADMIN_EMAILS', [])
-        programmers = getattr(settings, 'PROGRAMMER_USERNAMES', [])
+        superadmins = getattr(settings, "SUPERADMIN_EMAILS", [])
+        programmers = getattr(settings, "PROGRAMMER_USERNAMES", [])
         if user.email.lower() in superadmins or user.username.lower() in programmers:
             if user.role != UserRole.PROGRAMADOR:
                 user.role = UserRole.PROGRAMADOR
-                user.save(update_fields=['role'])
+                user.save(update_fields=["role"])
 
         return cls.build_token_response(user)
 
@@ -118,9 +126,15 @@ class AuthService:
         from datetime import datetime, timedelta, timezone
 
         identifier = (identifier or "").strip().lower()
-        user = User.objects.filter(email__iexact=identifier).first() or User.objects.filter(username__iexact=identifier).first()
+        user = (
+            User.objects.filter(email__iexact=identifier).first()
+            or User.objects.filter(username__iexact=identifier).first()
+        )
         if not user:
-            return {"ok": True, "message": "Se o e-mail existir, você receberá instruções de redefinição."}
+            return {
+                "ok": True,
+                "message": "Se o e-mail existir, você receberá instruções de redefinição.",
+            }
 
         reset_token = secrets.token_urlsafe(32)
         expires_at = (datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat()
@@ -132,7 +146,12 @@ class AuthService:
         user.save(update_fields=["profile"])
 
         from apps.notifications.services import BrevoEmailService
-        site_url = os.getenv("FRONTEND_URL") or os.getenv("NEXT_PUBLIC_APP_URL") or "http://localhost:3000"
+
+        site_url = (
+            os.getenv("FRONTEND_URL")
+            or os.getenv("NEXT_PUBLIC_APP_URL")
+            or "http://localhost:3000"
+        )
         reset_link = f"{site_url.rstrip('/')}/reset-password?token={reset_token}"
 
         html_content = f"""
@@ -167,7 +186,9 @@ class AuthService:
         from datetime import datetime, timezone
 
         if not token or len(new_password) < 6:
-            raise HttpError(400, "Senha inválida ou token ausente. Mínimo de 6 caracteres.")
+            raise HttpError(
+                400, "Senha inválida ou token ausente. Mínimo de 6 caracteres."
+            )
 
         users = User.objects.all()
         target_user = None
@@ -179,7 +200,9 @@ class AuthService:
                     try:
                         exp = datetime.fromisoformat(expires_str)
                         if datetime.now(timezone.utc) > exp:
-                            raise HttpError(400, "Token expirado. Solicite uma nova redefinição.")
+                            raise HttpError(
+                                400, "Token expirado. Solicite uma nova redefinição."
+                            )
                     except (ValueError, TypeError):
                         pass
                 target_user = u
@@ -209,8 +232,8 @@ class AuthService:
             raise HttpError(400, "Este e-mail já está cadastrado.")
 
         # Define papel inicial
-        superadmins = getattr(settings, 'SUPERADMIN_EMAILS', [])
-        if getattr(data, 'is_hub_only', False):
+        superadmins = getattr(settings, "SUPERADMIN_EMAILS", [])
+        if getattr(data, "is_hub_only", False):
             role = UserRole.BUYER
         elif email in superadmins:
             role = UserRole.PROGRAMADOR
@@ -223,7 +246,9 @@ class AuthService:
             name=data.name.strip(),
             password=hash_password(data.password),
             role=role,
-            level=data.level.upper() if data.level.upper() in CEFRLevel.values else CEFRLevel.A1,
+            level=data.level.upper()
+            if data.level.upper() in CEFRLevel.values
+            else CEFRLevel.A1,
         )
 
         logger.info(f"[Auth] Novo usuário registrado com sucesso: {username} ({role})")
@@ -234,19 +259,22 @@ class AuthService:
         id_info = None
         # 1. Tenta validar como Google ID Token (JWT)
         try:
-            google_client_id = getattr(settings, 'GOOGLE_CLIENT_ID', '')
+            google_client_id = getattr(settings, "GOOGLE_CLIENT_ID", "")
             id_info = id_token.verify_oauth2_token(
                 credential,
                 google_requests.Request(),
                 audience=google_client_id if google_client_id else None,
             )
         except Exception as e:
-            logger.info(f"[Auth] Não é ID Token ou falhou verificação JWT ({e}). Tentando como Access Token...")
+            logger.info(
+                f"[Auth] Não é ID Token ou falhou verificação JWT ({e}). Tentando como Access Token..."
+            )
 
         # 2. Fallback: Se for Google Access Token (obtido direto do celular via google_sign_in)
         if not id_info:
             try:
                 import httpx
+
                 resp = httpx.get(
                     "https://www.googleapis.com/oauth2/v3/userinfo",
                     headers={"Authorization": f"Bearer {credential}"},
@@ -277,7 +305,7 @@ class AuthService:
                 candidate = f"{base_username}{counter}"
                 counter += 1
 
-            superadmins = getattr(settings, 'SUPERADMIN_EMAILS', [])
+            superadmins = getattr(settings, "SUPERADMIN_EMAILS", [])
             if is_hub_only:
                 role = UserRole.BUYER
             elif email in superadmins:
@@ -285,7 +313,7 @@ class AuthService:
             else:
                 role = UserRole.STUDENT
 
-            profile_data = {'avatar_url': picture} if picture else {}
+            profile_data = {"avatar_url": picture} if picture else {}
 
             user = User.objects.create(
                 username=candidate,
@@ -301,9 +329,9 @@ class AuthService:
             # Atualiza avatar se não tiver
             if picture and not user.avatar_url:
                 prof = user.profile if isinstance(user.profile, dict) else {}
-                prof['avatar_url'] = picture
+                prof["avatar_url"] = picture
                 user.profile = prof
-                user.save(update_fields=['profile'])
+                user.save(update_fields=["profile"])
 
         return cls.build_token_response(user)
 

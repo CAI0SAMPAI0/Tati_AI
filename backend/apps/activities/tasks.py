@@ -1,7 +1,6 @@
 import os
 import logging
 import httpx
-from typing import Optional
 from django.conf import settings
 from celery import shared_task
 from pdf2image import convert_from_path
@@ -22,7 +21,11 @@ def sync_material_pages(content: PremiumContent) -> bool:
     os.makedirs(local_dir, exist_ok=True)
 
     # 1. Se já tem páginas no disco local, carrega para memória e valida
-    existing_pages = [f for f in os.listdir(local_dir) if f.startswith("page_") and f.endswith(".webp")]
+    existing_pages = [
+        f
+        for f in os.listdir(local_dir)
+        if f.startswith("page_") and f.endswith(".webp")
+    ]
     if existing_pages:
         for p in existing_pages:
             full_p = os.path.join(local_dir, p)
@@ -31,14 +34,18 @@ def sync_material_pages(content: PremiumContent) -> bool:
                     _RAW_IMAGE_CACHE[f"{content_id}/{p}"] = f.read()
             except Exception:
                 pass
-        logger.info(f"[HubSync] Material {content.title} ({content_id}) possui {len(existing_pages)} páginas salvas em disco.")
+        logger.info(
+            f"[HubSync] Material {content.title} ({content_id}) possui {len(existing_pages)} páginas salvas em disco."
+        )
         return True
 
     # 2. Se content_source for uma URL de arquivo (Cloudinary, Drive ou HTTP), baixa e reconverte
     source_url = content.content_source or ""
     if source_url and source_url.startswith("http"):
         try:
-            logger.info(f"[HubSync] Baixando arquivo fonte para '{content.title}': {source_url}")
+            logger.info(
+                f"[HubSync] Baixando arquivo fonte para '{content.title}': {source_url}"
+            )
             with httpx.Client(timeout=45.0, follow_redirects=True) as client:
                 resp = client.get(source_url)
                 if resp.status_code == 200:
@@ -68,22 +75,30 @@ def sync_material_pages(content: PremiumContent) -> bool:
                     try:
                         from django.db import connection
                         import json
+
                         with connection.cursor() as cursor:
                             cursor.execute(
                                 "UPDATE premium_content SET secure_pages = %s, processing_status = 'ready', is_secure = true WHERE id = %s",
-                                [json.dumps(storage_paths), content_id]
+                                [json.dumps(storage_paths), content_id],
                             )
                     except Exception as db_err:
-                        logger.warning(f"[HubSync] Erro ao atualizar DB para {content.title}: {db_err}")
+                        logger.warning(
+                            f"[HubSync] Erro ao atualizar DB para {content.title}: {db_err}"
+                        )
 
-                    logger.info(f"[HubSync] Material '{content.title}' reconvertido com sucesso! {len(storage_paths)} páginas salvas em disco.")
+                    logger.info(
+                        f"[HubSync] Material '{content.title}' reconvertido com sucesso! {len(storage_paths)} páginas salvas em disco."
+                    )
                     return True
         except Exception as e:
-            logger.warning(f"[HubSync] Erro ao sincronizar a partir do content_source ({source_url}): {e}")
+            logger.warning(
+                f"[HubSync] Erro ao sincronizar a partir do content_source ({source_url}): {e}"
+            )
 
     # 3. Tenta baixar do Supabase caso esteja acessível
     try:
         from .secure_document_service import get_client
+
         db = get_client()
         raw_pages = getattr(content, "secure_pages", None) or []
         for storage_path in raw_pages:
@@ -114,6 +129,7 @@ def sync_hub_materials_task():
     for m in materials:
         if sync_material_pages(m):
             count += 1
-    logger.info(f"[HubSync] Sincronização concluída: {count}/{materials.count()} materiais persistidos localmente.")
+    logger.info(
+        f"[HubSync] Sincronização concluída: {count}/{materials.count()} materiais persistidos localmente."
+    )
     return {"total": materials.count(), "synced": count}
-

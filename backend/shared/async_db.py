@@ -10,8 +10,8 @@ def aget_user_by_username(username: str):
 
 
 __all__ = [
-    'database_sync_to_async',
-    'sync_to_async',
-    'async_to_sync',
-    'aget_user_by_username',
+    "database_sync_to_async",
+    "sync_to_async",
+    "async_to_sync",
+    "aget_user_by_username",
 ]

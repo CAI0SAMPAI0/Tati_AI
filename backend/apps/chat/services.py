@@ -3,8 +3,8 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from typing import List
-from django.utils import timezone as django_timezone
 import warnings
+
 warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
 import google.generativeai as genai
 
@@ -13,7 +13,6 @@ from .schemas import (
     ConversationOut,
     CreateConversationInput,
     MessageOut,
-    SendMessageInput,
 )
 from apps.authentication.models import User
 from apps.users.services import XPService, StreakService
@@ -50,7 +49,13 @@ def get_groq_keys() -> List[str]:
     keys = []
     if os.getenv("GROQ_KEYS"):
         keys.extend([k.strip() for k in os.getenv("GROQ_KEYS").split(",") if k.strip()])
-    for env_var in ["GROQ_API_KEY", "GROQ_API_KEY_1", "GROQ_API_KEY_2", "GROQ_API_KEY_3", "GROQ_API_KEY_4"]:
+    for env_var in [
+        "GROQ_API_KEY",
+        "GROQ_API_KEY_1",
+        "GROQ_API_KEY_2",
+        "GROQ_API_KEY_3",
+        "GROQ_API_KEY_4",
+    ]:
         val = os.getenv(env_var)
         if val and val.strip() and val.strip() not in keys:
             keys.append(val.strip())
@@ -60,7 +65,9 @@ def get_groq_keys() -> List[str]:
 class ConversationService:
     @staticmethod
     def list_conversations(user: User) -> List[ConversationOut]:
-        convs = Conversation.objects.filter(username=user.username).only("id", "title", "model", "is_simulation", "created_at", "updated_at")[:50]
+        convs = Conversation.objects.filter(username=user.username).only(
+            "id", "title", "model", "is_simulation", "created_at", "updated_at"
+        )[:50]
         return [
             ConversationOut(
                 id=c.id,
@@ -74,7 +81,9 @@ class ConversationService:
         ]
 
     @staticmethod
-    def create_conversation(user: User, data: CreateConversationInput) -> ConversationOut:
+    def create_conversation(
+        user: User, data: CreateConversationInput
+    ) -> ConversationOut:
         now_str = datetime.now(timezone.utc).isoformat()
         new_id = str(uuid.uuid4())
         conv = Conversation.objects.create(
@@ -118,14 +127,20 @@ class ConversationService:
     @staticmethod
     def delete_conversation(user: User, conversation_id: str) -> dict:
         Conversation.objects.filter(id=conversation_id, username=user.username).delete()
-        Message.objects.filter(session_id=conversation_id, username=user.username).delete()
+        Message.objects.filter(
+            session_id=conversation_id, username=user.username
+        ).delete()
         return {"ok": True, "message": "Conversa removida com sucesso."}
 
     @staticmethod
     def get_summary(user: User, conversation_id: str, lang: str = "pt") -> dict:
-        msgs = Message.objects.filter(session_id=conversation_id).order_by("created_at")[:25]
+        msgs = Message.objects.filter(session_id=conversation_id).order_by(
+            "created_at"
+        )[:25]
         if not msgs:
-            return {"summary": "Nenhuma mensagem encontrada nesta conversa para resumir."}
+            return {
+                "summary": "Nenhuma mensagem encontrada nesta conversa para resumir."
+            }
 
         history_text = "\n".join([f"{m.role.upper()}: {m.content}" for m in msgs])
         prompt = (
@@ -159,7 +174,9 @@ class ConversationService:
 
 class AIService:
     @classmethod
-    def generate_reply(cls, user: User, conversation_id: str, user_text: str, difficulty: str = None) -> dict:
+    def generate_reply(
+        cls, user: User, conversation_id: str, user_text: str, difficulty: str = None
+    ) -> dict:
         # 1. Salva mensagem do usuário
         Message.objects.create(
             session_id=conversation_id,
@@ -169,7 +186,9 @@ class AIService:
         )
 
         # 2. Constrói histórico de mensagens
-        history_msgs = Message.objects.filter(session_id=conversation_id).order_by('-created_at')[:10]
+        history_msgs = Message.objects.filter(session_id=conversation_id).order_by(
+            "-created_at"
+        )[:10]
         history = list(reversed(history_msgs))
 
         sys_prompt = get_tati_system_prompt(user, difficulty)
@@ -201,9 +220,13 @@ class AIService:
                         if reply_text:
                             break
                     except Exception as mod_err:
-                        logger.warning(f"[AI] Groq model {g_model} failed with key {key[:10]}: {mod_err}")
+                        logger.warning(
+                            f"[AI] Groq model {g_model} failed with key {key[:10]}: {mod_err}"
+                        )
             except Exception as key_err:
-                logger.warning(f"[AI] Groq client failed with key {key[:10]}: {key_err}")
+                logger.warning(
+                    f"[AI] Groq client failed with key {key[:10]}: {key_err}"
+                )
 
         # 4. Fallback: Gemini
         if not reply_text and GEMINI_API_KEY:
@@ -225,6 +248,7 @@ class AIService:
 
         # 6. Gera áudio via Edge TTS
         from .audio_service import AudioService
+
         audio_b64 = AudioService.text_to_speech(reply_text)
 
         # 7. Salva resposta da Teacher Tati
@@ -241,6 +265,13 @@ class AIService:
         StreakService.record_activity(user)
 
         # Atualiza timestamp da conversa
-        Conversation.objects.filter(id=conversation_id).update(updated_at=datetime.now(timezone.utc).isoformat())
+        Conversation.objects.filter(id=conversation_id).update(
+            updated_at=datetime.now(timezone.utc).isoformat()
+        )
 
-        return {"reply": reply_text, "audio_b64": audio_b64, "audio": audio_b64, "id": str(msg.id)}
+        return {
+            "reply": reply_text,
+            "audio_b64": audio_b64,
+            "audio": audio_b64,
+            "id": str(msg.id),
+        }

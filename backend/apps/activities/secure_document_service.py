@@ -8,10 +8,17 @@ from typing import Any
 from django.conf import settings
 from supabase import create_client
 
+
 def get_client():
     url = getattr(settings, "SUPABASE_URL", os.getenv("SUPABASE_URL", ""))
-    key = getattr(settings, "SUPABASE_SERVICE_ROLE_KEY", os.getenv("SUPABASE_SERVICE_ROLE_KEY", os.getenv("SUPABASE_KEY", "")))
+    key = getattr(
+        settings,
+        "SUPABASE_SERVICE_ROLE_KEY",
+        os.getenv("SUPABASE_SERVICE_ROLE_KEY", os.getenv("SUPABASE_KEY", "")),
+    )
     return create_client(url, key)
+
+
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -155,8 +162,7 @@ class SecureDocumentService:
                             self.poppler_path = p
                             break
 
-        logging.info(f"[SecureDoc] Poppler Path em uso: {
-                self.poppler_path}")
+        logging.info(f"[SecureDoc] Poppler Path em uso: {self.poppler_path}")
         self.drive_folder_id = os.getenv("DRIVE_HUB_BACKUP_FOLDER_ID") or os.getenv(
             "DRIVE_TATI_FILES"
         )
@@ -398,7 +404,9 @@ def public_preview_url(preview_path: str | None) -> str | None:
     """Monta URL pública do bucket hub-previews."""
     if not preview_path:
         return None
-    base = (getattr(settings, "SUPABASE_URL", os.getenv("SUPABASE_URL", "")) or "").rstrip("/")
+    base = (
+        getattr(settings, "SUPABASE_URL", os.getenv("SUPABASE_URL", "")) or ""
+    ).rstrip("/")
     if not base:
         return None
     return f"{base}/storage/v1/object/public/{PREVIEW_BUCKET}/{preview_path}"

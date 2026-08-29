@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from ninja.errors import HttpError
 import mercadopago
 
-from .models import Order, Subscription, PremiumPurchase
+from .models import Subscription, PremiumPurchase
 from .schemas import (
     CreatePixInput,
     PixPaymentOut,
@@ -32,7 +32,11 @@ class MercadoPagoService:
     @classmethod
     def create_pix_payment(cls, user: User, data: CreatePixInput) -> PixPaymentOut:
         sdk = cls._get_sdk()
-        external_reference = f"PLAN:{user.username}:{data.target_id or 'full'}" if data.target_type == "subscription" else f"HUB:{user.username}:{data.target_id}"
+        external_reference = (
+            f"PLAN:{user.username}:{data.target_id or 'full'}"
+            if data.target_type == "subscription"
+            else f"HUB:{user.username}:{data.target_id}"
+        )
 
         payment_data = {
             "transaction_amount": float(data.amount),
@@ -71,9 +75,15 @@ class MercadoPagoService:
             raise HttpError(500, f"Falha na comunicação com o Mercado Pago: {str(e)}")
 
     @classmethod
-    def create_preference(cls, user: User, data: CreatePreferenceInput) -> PreferenceOut:
+    def create_preference(
+        cls, user: User, data: CreatePreferenceInput
+    ) -> PreferenceOut:
         sdk = cls._get_sdk()
-        external_reference = f"PLAN:{user.username}:{data.target_id or 'full'}" if data.target_type == "subscription" else f"HUB:{user.username}:{data.target_id}"
+        external_reference = (
+            f"PLAN:{user.username}:{data.target_id or 'full'}"
+            if data.target_type == "subscription"
+            else f"HUB:{user.username}:{data.target_id}"
+        )
 
         preference_data = {
             "items": [
@@ -139,9 +149,13 @@ class MercadoPagoService:
             try:
                 with httpx.Client(timeout=4.0) as client:
                     client.post(FORWARD_WEBHOOK_URL, json=payload)
-                    logger.info(f"[MercadoPago] Webhook encaminhado com sucesso para: {FORWARD_WEBHOOK_URL}")
+                    logger.info(
+                        f"[MercadoPago] Webhook encaminhado com sucesso para: {FORWARD_WEBHOOK_URL}"
+                    )
             except Exception as fwd_err:
-                logger.warning(f"[MercadoPago] Falha ao encaminhar webhook para {FORWARD_WEBHOOK_URL}: {fwd_err}")
+                logger.warning(
+                    f"[MercadoPago] Falha ao encaminhar webhook para {FORWARD_WEBHOOK_URL}: {fwd_err}"
+                )
 
         # 2. Processa notificação
         payment_id = payload.get("data", {}).get("id") or payload.get("id")
@@ -167,8 +181,8 @@ class MercadoPagoService:
                 if prefix in ("PLAN", "SUB"):
                     # Libera assinatura
                     user.is_premium_active = True
-                    user.save(update_fields=['is_premium_active'])
-                    
+                    user.save(update_fields=["is_premium_active"])
+
                     Subscription.objects.create(
                         username=username,
                         plan_type="full",
@@ -176,7 +190,9 @@ class MercadoPagoService:
                         payment_id=str(payment_id),
                         expires_at=datetime.now(timezone.utc) + timedelta(days=32),
                     )
-                    logger.info(f"[MercadoPago] Assinatura ativada para aluno: {username}")
+                    logger.info(
+                        f"[MercadoPago] Assinatura ativada para aluno: {username}"
+                    )
 
                 elif prefix in ("HUB", "PREMIUM"):
                     # Libera material do hub
@@ -185,6 +201,8 @@ class MercadoPagoService:
                         content_id=target_id,
                         status="completed",
                     )
-                    logger.info(f"[MercadoPago] Material {target_id} liberado para: {username}")
+                    logger.info(
+                        f"[MercadoPago] Material {target_id} liberado para: {username}"
+                    )
 
         return {"ok": True, "processed": True, "status": "approved"}

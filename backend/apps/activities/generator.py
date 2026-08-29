@@ -63,6 +63,7 @@ class CEFRGeneratorService:
         ref_context = ""
         if reference_ids:
             from .models import CEFRReference
+
             ref_id_list = [r.strip() for r in reference_ids.split(",") if r.strip()]
             refs = list(CEFRReference.objects.filter(id__in=ref_id_list))
             if refs:
@@ -70,7 +71,9 @@ class CEFRGeneratorService:
                 if ref_levels and (not level or level == "A1"):
                     lvl = ref_levels[0].upper()
                 ref_names = ", ".join([r.filename for r in refs])
-                ref_context = f"\nContext from selected reference files ({lvl}): {ref_names}."
+                ref_context = (
+                    f"\nContext from selected reference files ({lvl}): {ref_names}."
+                )
 
         client = cls._get_groq_client()
 
@@ -159,11 +162,13 @@ Return ONLY a JSON object in this exact format:
                         "explanation": explanation,
                         "image_url": img_url,
                         "is_published": False,
-                    }
+                    },
                 )
                 created.append(fc)
 
-        logger.info(f"[CEFR Generator] Criados/Atualizados {len(created)} flashcards únicos para o baralho '{deck_title}' ({lvl}).")
+        logger.info(
+            f"[CEFR Generator] Criados/Atualizados {len(created)} flashcards únicos para o baralho '{deck_title}' ({lvl})."
+        )
         return created
 
     @classmethod
@@ -222,7 +227,9 @@ Return ONLY a JSON object in this exact format:
                 level=lvl,
                 topic=sim_data.get("topic", sim_topic),
                 scenario=sim_data.get("scenario", ""),
-                roles=sim_data.get("roles", {"student": "Student", "ai": "Teacher Tatiana"}),
+                roles=sim_data.get(
+                    "roles", {"student": "Student", "ai": "Teacher Tatiana"}
+                ),
                 goal=sim_data.get("goal", ""),
                 is_published=False,
             )
@@ -238,13 +245,25 @@ Return ONLY a JSON object in this exact format:
         """
         tz = ZoneInfo("America/Sao_Paulo")
         now = datetime.datetime.now(tz)
-        weekday_map = {0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri", 5: "sat", 6: "sun"}
+        weekday_map = {
+            0: "mon",
+            1: "tue",
+            2: "wed",
+            3: "thu",
+            4: "fri",
+            5: "sat",
+            6: "sun",
+        }
         current_weekday = weekday_map[now.weekday()]
 
         schedules = list(CEFRSchedule.objects.filter(active=True))
         if not schedules:
             logger.info("[CEFR Scheduler] Nenhum agendamento ativo.")
-            return {"success": True, "generated": 0, "message": "Nenhum agendamento ativo."}
+            return {
+                "success": True,
+                "generated": 0,
+                "message": "Nenhum agendamento ativo.",
+            }
 
         generated_flashcards = 0
         generated_sims = 0
@@ -254,7 +273,11 @@ Return ONLY a JSON object in this exact format:
             weekdays_lower = [str(w).lower().strip() for w in weekdays]
 
             # Se 'force' for True, executa independente do dia
-            should_run = force or (current_weekday in weekdays_lower) or (len(weekdays_lower) == 0)
+            should_run = (
+                force
+                or (current_weekday in weekdays_lower)
+                or (len(weekdays_lower) == 0)
+            )
             if not should_run:
                 continue
 
@@ -262,6 +285,7 @@ Return ONLY a JSON object in this exact format:
             count = sched.materials_per_execution or 5
 
             import random
+
             topic = random.choice(EVERYDAY_TOPICS)
 
             if "flashcards" in types:

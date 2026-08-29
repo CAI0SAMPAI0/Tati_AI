@@ -1,6 +1,4 @@
-import os
 import uuid
-import json
 import logging
 from typing import Optional, List, Dict, Any
 from django.http import HttpRequest
@@ -11,7 +9,7 @@ from pydantic import BaseModel
 from groq import AsyncGroq
 from asgiref.sync import sync_to_async
 
-from apps.authentication.security import auth_required, auth_optional
+from apps.authentication.security import auth_optional
 from apps.chat.models import SimulationScenario, CEFRSimulation, Conversation, Message
 from apps.activities.models import ActivitySubmission
 from apps.users.services import XPService, StreakService
@@ -24,6 +22,7 @@ simulation_router = Router(tags=["Simulations & Scenarios"])
 
 
 # ── SCHEMAS ───────────────────────────────────────────────────────────
+
 
 class SimStartInput(BaseModel):
     scenario_id: str
@@ -50,6 +49,7 @@ class SimEvaluateInput(BaseModel):
 
 # ── HELPERS ───────────────────────────────────────────────────────────
 
+
 def _get_scenario_details(scenario_id: str) -> Optional[dict]:
     if scenario_id.startswith("cefr_sim_"):
         clean_id = scenario_id.replace("cefr_sim_", "")
@@ -69,7 +69,10 @@ def _get_scenario_details(scenario_id: str) -> Optional[dict]:
             "system_prompt": f"You are {teacher_role}. The user is {student_role}. Goal: {cs.goal}. Scenario: {cs.scenario}",
             "emoji": "🎭",
             "initial_message": f"Hello! Let's start our scenario: '{cs.topic}'.",
-            "objectives": [f"Achieve goal: {cs.goal}", f"Practice {cs.topic} in English"],
+            "objectives": [
+                f"Achieve goal: {cs.goal}",
+                f"Practice {cs.topic} in English",
+            ],
         }
 
     s = SimulationScenario.objects.filter(id=scenario_id).first()
@@ -84,42 +87,60 @@ def _get_scenario_details(scenario_id: str) -> Optional[dict]:
         "levels": s.levels or [],
         "system_prompt": s.system_prompt,
         "emoji": s.emoji or "🎭",
-        "initial_message": s.initial_message or s.greeting or f"Hello! Let's practice: {s.name}.",
+        "initial_message": s.initial_message
+        or s.greeting
+        or f"Hello! Let's practice: {s.name}.",
         "objectives": [f"Complete conversational practice for {s.name}"],
     }
 
 
 # ── ENDPOINTS (ASYNC) ───────────────────────────────────────────────────
 
+
 @simulation_router.get("/scenarios", auth=auth_optional)
 async def list_scenarios(request: HttpRequest, level: Optional[str] = None):
     """
     Lista todos os cenários de simulação disponíveis (livres e CEFR), opcionalmente filtrados por nível.
     """
+
     def _fetch():
         user = request.auth if isinstance(request.auth, User) else None
-        effective_level = (level or (user.level if user else "A1") or "A1").strip().upper()
+        effective_level = (
+            (level or (user.level if user else "A1") or "A1").strip().upper()
+        )
 
         scenarios = []
 
         # 1. SimulationScenarios
         qs_scenarios = SimulationScenario.objects.filter(is_active=True)
         for s in qs_scenarios:
-            s_lvls = s.levels or ([s.difficulty] if s.difficulty and s.difficulty.lower() != "all" else ["all"])
+            s_lvls = s.levels or (
+                [s.difficulty]
+                if s.difficulty and s.difficulty.lower() != "all"
+                else ["all"]
+            )
             s_lvls_upper = [str(l).strip().upper() for l in s_lvls]
 
-            if effective_level == "ALL" or "ALL" in s_lvls_upper or effective_level in s_lvls_upper:
-                scenarios.append({
-                    "id": str(s.id),
-                    "name": s.name,
-                    "name_en": s.name_en or s.name,
-                    "description": s.description,
-                    "difficulty": s.difficulty or "all",
-                    "levels": s_lvls,
-                    "system_prompt": s.system_prompt,
-                    "emoji": s.emoji or "🎭",
-                    "initial_message": s.initial_message or s.greeting or "Hello! Let's begin.",
-                })
+            if (
+                effective_level == "ALL"
+                or "ALL" in s_lvls_upper
+                or effective_level in s_lvls_upper
+            ):
+                scenarios.append(
+                    {
+                        "id": str(s.id),
+                        "name": s.name,
+                        "name_en": s.name_en or s.name,
+                        "description": s.description,
+                        "difficulty": s.difficulty or "all",
+                        "levels": s_lvls,
+                        "system_prompt": s.system_prompt,
+                        "emoji": s.emoji or "🎭",
+                        "initial_message": s.initial_message
+                        or s.greeting
+                        or "Hello! Let's begin.",
+                    }
+                )
 
         # 2. CEFRSimulations
         qs_cefr = CEFRSimulation.objects.filter(is_published=True)
@@ -127,17 +148,19 @@ async def list_scenarios(request: HttpRequest, level: Optional[str] = None):
             cs_lvl = (cs.level or "A1").strip().upper()
             if effective_level == "ALL" or effective_level == cs_lvl:
                 roles = cs.roles if isinstance(cs.roles, dict) else {}
-                scenarios.append({
-                    "id": f"cefr_sim_{cs.id}",
-                    "name": cs.topic,
-                    "name_en": cs.topic,
-                    "description": cs.scenario,
-                    "difficulty": cs_lvl,
-                    "levels": [cs_lvl],
-                    "system_prompt": f"Goal: {cs.goal}. Student role: {roles.get('student', 'Student')}. Teacher role: {roles.get('ai', 'Teacher')}.",
-                    "emoji": "🎭",
-                    "initial_message": f"Hello! We are starting the scenario: '{cs.topic}'.",
-                })
+                scenarios.append(
+                    {
+                        "id": f"cefr_sim_{cs.id}",
+                        "name": cs.topic,
+                        "name_en": cs.topic,
+                        "description": cs.scenario,
+                        "difficulty": cs_lvl,
+                        "levels": [cs_lvl],
+                        "system_prompt": f"Goal: {cs.goal}. Student role: {roles.get('student', 'Student')}. Teacher role: {roles.get('ai', 'Teacher')}.",
+                        "emoji": "🎭",
+                        "initial_message": f"Hello! We are starting the scenario: '{cs.topic}'.",
+                    }
+                )
 
         return scenarios
 
@@ -170,8 +193,13 @@ async def start_simulation(request: HttpRequest, payload: SimStartInput):
         raise HttpError(404, "Cenário não encontrado.")
 
     conv_id = f"sim_{uuid.uuid4().hex[:10]}"
-    sys_prompt = sc.get("system_prompt") or f"You are simulating the scenario: {sc.get('name')}."
-    initial_text = sc.get("initial_message") or f"Hello! Welcome to our session. Let's practice {sc.get('name')}."
+    sys_prompt = (
+        sc.get("system_prompt") or f"You are simulating the scenario: {sc.get('name')}."
+    )
+    initial_text = (
+        sc.get("initial_message")
+        or f"Hello! Welcome to our session. Let's practice {sc.get('name')}."
+    )
 
     keys = get_groq_keys()
     for key in keys:
@@ -180,8 +208,14 @@ async def start_simulation(request: HttpRequest, payload: SimStartInput):
             res = await client.chat.completions.create(
                 model="openai/gpt-oss-120b",
                 messages=[
-                    {"role": "system", "content": f"{sys_prompt}\nCRITICAL: Respond ENTIRELY in English. Introduce yourself in character and greet the user to start the conversation."},
-                    {"role": "user", "content": "Hello! I am ready to start the scenario."}
+                    {
+                        "role": "system",
+                        "content": f"{sys_prompt}\nCRITICAL: Respond ENTIRELY in English. Introduce yourself in character and greet the user to start the conversation.",
+                    },
+                    {
+                        "role": "user",
+                        "content": "Hello! I am ready to start the scenario.",
+                    },
                 ],
                 max_tokens=150,
                 temperature=0.6,
@@ -232,11 +266,15 @@ async def start_simulation(request: HttpRequest, payload: SimStartInput):
 
 
 @simulation_router.post("/transcribe", auth=auth_optional)
-async def transcribe_simulation_audio(request: HttpRequest, payload: SimTranscribeInput):
+async def transcribe_simulation_audio(
+    request: HttpRequest, payload: SimTranscribeInput
+):
     """
     Transcreve áudio do aluno na simulação usando Whisper Large V3 assíncrono.
     """
-    text = await AudioService.transcribe_audio_async(payload.audio, prompt=payload.prompt or "Simulation conversation")
+    text = await AudioService.transcribe_audio_async(
+        payload.audio, prompt=payload.prompt or "Simulation conversation"
+    )
     return {"text": text, "transcription": text}
 
 
@@ -253,7 +291,10 @@ async def send_simulation_message(request: HttpRequest, payload: SimMessageInput
     accent = payload.accent or "en-US"
 
     sc = await sync_to_async(_get_scenario_details)(scenario_id) if scenario_id else {}
-    sys_prompt = (sc.get("system_prompt") if sc else None) or "You are Teacher Tati conducting a real-world conversational English simulation. Respond entirely in English."
+    sys_prompt = (
+        (sc.get("system_prompt") if sc else None)
+        or "You are Teacher Tati conducting a real-world conversational English simulation. Respond entirely in English."
+    )
 
     def _save_user_msg_and_get_history():
         try:
@@ -266,12 +307,19 @@ async def send_simulation_message(request: HttpRequest, payload: SimMessageInput
         except Exception:
             pass
 
-        history_msgs = Message.objects.filter(session_id=conv_id).order_by('-created_at')[:8]
+        history_msgs = Message.objects.filter(session_id=conv_id).order_by(
+            "-created_at"
+        )[:8]
         return list(reversed(history_msgs))
 
     history = await sync_to_async(_save_user_msg_and_get_history)()
 
-    messages_payload = [{"role": "system", "content": f"{sys_prompt}\nCRITICAL: Respond ENTIRELY in natural English, stay strictly in character, keep answers engaging (1-3 sentences), and encourage the student."}]
+    messages_payload = [
+        {
+            "role": "system",
+            "content": f"{sys_prompt}\nCRITICAL: Respond ENTIRELY in natural English, stay strictly in character, keep answers engaging (1-3 sentences), and encourage the student.",
+        }
+    ]
     for m in history:
         messages_payload.append({"role": m.role, "content": m.content})
 
@@ -326,6 +374,7 @@ async def evaluate_simulation(request: HttpRequest, payload: SimEvaluateInput):
     """
     Avalia a performance do aluno na simulação e registra a conclusão.
     """
+
     def _evaluate():
         user = request.auth if isinstance(request.auth, User) else None
         username = user.username if user else "aluno"
@@ -364,15 +413,23 @@ async def get_simulation_progress(request: HttpRequest):
     """
     Retorna a lista de IDs de cenários e simulações já concluídos pelo aluno.
     """
+
     def _fetch_progress():
         user = request.auth if isinstance(request.auth, User) else None
         username = user.username if user else "aluno"
 
         completed = set()
-        subs = ActivitySubmission.objects.filter(username=username, activity_type="simulation")
+        subs = ActivitySubmission.objects.filter(
+            username=username, activity_type="simulation"
+        )
         for s in subs:
             meta = s.metadata if isinstance(s.metadata, dict) else {}
-            sid = meta.get("scenario_id") or meta.get("simulation_id") or meta.get("item_id") or meta.get("activity_id")
+            sid = (
+                meta.get("scenario_id")
+                or meta.get("simulation_id")
+                or meta.get("item_id")
+                or meta.get("activity_id")
+            )
             if sid:
                 completed.add(str(sid))
             if s.module_id:
@@ -384,10 +441,13 @@ async def get_simulation_progress(request: HttpRequest):
 
 
 @simulation_router.post("/complete/{scenario_id}", auth=auth_optional)
-async def mark_simulation_complete(request: HttpRequest, scenario_id: str, payload: Optional[dict] = None):
+async def mark_simulation_complete(
+    request: HttpRequest, scenario_id: str, payload: Optional[dict] = None
+):
     """
     Registra a conclusão com sucesso de um cenário de simulação pelo aluno.
     """
+
     def _complete():
         user = request.auth if isinstance(request.auth, User) else None
         username = user.username if user else "aluno"

@@ -1,5 +1,4 @@
 import logging
-import json
 import asyncio
 from django.core.cache import cache
 from typing import Any, Optional
@@ -7,6 +6,7 @@ from typing import Any, Optional
 logger = logging.getLogger(__name__)
 
 # ── CACHE HELPERS (DJANGO CORE CACHE + REDIS) ─────────────────────────
+
 
 async def cache_get(key: str) -> Optional[Any]:
     """
@@ -71,7 +71,9 @@ async def acquire_lock(lock_name: str, expire_seconds: int = 300) -> bool:
     """
     try:
         # cache.add() no Django é o equivalente nativo do SETNX (retorna True se a chave não existia)
-        return await asyncio.to_thread(cache.add, f"lock:{lock_name}", "1", expire_seconds)
+        return await asyncio.to_thread(
+            cache.add, f"lock:{lock_name}", "1", expire_seconds
+        )
     except Exception as e:
         logger.warning(f"[Lock] Falha ao adquirir lock {lock_name}: {e}")
         return True  # Fallback permissivo

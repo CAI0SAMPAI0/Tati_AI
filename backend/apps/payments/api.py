@@ -18,6 +18,7 @@ payments_router = Router(tags=["Mercado Pago Payments"])
 
 # ── COBRANÇA PIX ──────────────────────────────────────────────────────
 
+
 @payments_router.post("/mercadopago/pix", response=PixPaymentOut, auth=auth_required)
 def create_pix_payment(request: HttpRequest, payload: CreatePixInput):
     """
@@ -28,7 +29,10 @@ def create_pix_payment(request: HttpRequest, payload: CreatePixInput):
 
 # ── CHECKOUT TRANSPARENTE / PREFERENCE ────────────────────────────────
 
-@payments_router.post("/mercadopago/preference", response=PreferenceOut, auth=auth_required)
+
+@payments_router.post(
+    "/mercadopago/preference", response=PreferenceOut, auth=auth_required
+)
 def create_preference(request: HttpRequest, payload: CreatePreferenceInput):
     """
     Gera link de checkout do Mercado Pago (Cartão de Crédito, Boleto, PIX).
@@ -37,6 +41,7 @@ def create_preference(request: HttpRequest, payload: CreatePreferenceInput):
 
 
 # ── CONSULTA DE STATUS DE PAGAMENTO / ASSINATURA ──────────────────────
+
 
 @payments_router.get("/status", auth=auth_required)
 def get_current_user_payment_status(request: HttpRequest):
@@ -64,7 +69,13 @@ def get_payment_plans(request: HttpRequest):
             "name": "Plano Mensal",
             "price": 49.90,
             "period": "mês",
-            "features": ["Acesso Ilimitado à Teacher Tati", "Simulações CEFR", "Flashcards com SRS", "Podcasts Interativos", "Suporte WhatsApp"],
+            "features": [
+                "Acesso Ilimitado à Teacher Tati",
+                "Simulações CEFR",
+                "Flashcards com SRS",
+                "Podcasts Interativos",
+                "Suporte WhatsApp",
+            ],
         },
         {
             "id": "quarterly",
@@ -72,14 +83,23 @@ def get_payment_plans(request: HttpRequest):
             "price": 129.90,
             "period": "3 meses",
             "popular": True,
-            "features": ["Tudo do plano mensal", "Desconto de 15%", "Relatórios de Evolução em PDF", "Grupo VIP com Professora Tatiana"],
+            "features": [
+                "Tudo do plano mensal",
+                "Desconto de 15%",
+                "Relatórios de Evolução em PDF",
+                "Grupo VIP com Professora Tatiana",
+            ],
         },
         {
             "id": "annual",
             "name": "Plano Anual",
             "price": 399.90,
             "period": "ano",
-            "features": ["Tudo do plano trimestral", "Melhor Custo-Benefício (Economize 35%)", "Acesso a todos os materiais do Hub"],
+            "features": [
+                "Tudo do plano trimestral",
+                "Melhor Custo-Benefício (Economize 35%)",
+                "Acesso a todos os materiais do Hub",
+            ],
         },
     ]
 
@@ -92,7 +112,9 @@ def subscribe_plan(request: HttpRequest, payload: dict):
     return {"ok": True, "message": "Iniciando assinatura..."}
 
 
-@payments_router.get("/status/{payment_id}", response=PaymentStatusOut, auth=auth_required)
+@payments_router.get(
+    "/status/{payment_id}", response=PaymentStatusOut, auth=auth_required
+)
 def get_payment_status(request: HttpRequest, payment_id: str):
     """
     Consulta o status atualizado de uma transação no Mercado Pago.
@@ -102,6 +124,7 @@ def get_payment_status(request: HttpRequest, payment_id: str):
 
 # ── WEBHOOK MERCADO PAGO ──────────────────────────────────────────────
 
+
 @payments_router.post("/mercadopago/webhook")
 def mercadopago_webhook(request: HttpRequest):
     """
@@ -109,7 +132,8 @@ def mercadopago_webhook(request: HttpRequest):
     """
     try:
         import json
-        body = json.loads(request.body.decode('utf-8'))
+
+        body = json.loads(request.body.decode("utf-8"))
     except Exception:
         body = {}
     return MercadoPagoService.process_webhook(body)

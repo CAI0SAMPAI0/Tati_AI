@@ -25,12 +25,20 @@ class ProgressReportGenerator:
             user = User(username=username, name=username, level="A1")
 
         seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
-        msgs_count = Message.objects.filter(username=username, role='user', created_at__gte=seven_days_ago).count()
-        errors = list(UserError.objects.filter(username=username, created_at__gte=seven_days_ago)[:5])
+        msgs_count = Message.objects.filter(
+            username=username, role="user", created_at__gte=seven_days_ago
+        ).count()
+        errors = list(
+            UserError.objects.filter(username=username, created_at__gte=seven_days_ago)[
+                :5
+            ]
+        )
 
         report_dir = Path(settings.BASE_DIR) / "assets" / "reports"
         os.makedirs(report_dir, exist_ok=True)
-        pdf_path = str(report_dir / f"report_{username}_{datetime.now().strftime('%Y%m%d')}.pdf")
+        pdf_path = str(
+            report_dir / f"report_{username}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        )
 
         doc = SimpleDocTemplate(
             pdf_path,
@@ -77,38 +85,76 @@ class ProgressReportGenerator:
         )
 
         story.append(Paragraph("Weekly Evolution Report", title_style))
-        story.append(Paragraph(f"Student: <b>{user.name or username}</b> | Level: <b>{user.level or 'A1'}</b>", card_style))
-        story.append(Paragraph(f"Generated on {datetime.now().strftime('%d/%m/%Y')} | Teacher Tati AI", period_style))
+        story.append(
+            Paragraph(
+                f"Student: <b>{user.name or username}</b> | Level: <b>{user.level or 'A1'}</b>",
+                card_style,
+            )
+        )
+        story.append(
+            Paragraph(
+                f"Generated on {datetime.now().strftime('%d/%m/%Y')} | Teacher Tati AI",
+                period_style,
+            )
+        )
 
         # Stats Table
         stats_data = [
             [
-                Paragraph(f"<b>{msgs_count}</b><br/><font color='#6B7280' size='8'>Messages Sent</font>", card_style),
-                Paragraph(f"<b>{len(errors)}</b><br/><font color='#6B7280' size='8'>Errors Captured</font>", card_style),
-                Paragraph(f"<b>{user.total_xp} XP</b><br/><font color='#6B7280' size='8'>Total Experience</font>", card_style),
+                Paragraph(
+                    f"<b>{msgs_count}</b><br/><font color='#6B7280' size='8'>Messages Sent</font>",
+                    card_style,
+                ),
+                Paragraph(
+                    f"<b>{len(errors)}</b><br/><font color='#6B7280' size='8'>Errors Captured</font>",
+                    card_style,
+                ),
+                Paragraph(
+                    f"<b>{user.total_xp} XP</b><br/><font color='#6B7280' size='8'>Total Experience</font>",
+                    card_style,
+                ),
             ]
         ]
         st = Table(stats_data, colWidths=[160, 160, 160])
-        st.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), BRAND_BG),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
-            ("TOPPADDING", (0, 0), (-1, -1), 12),
-        ]))
+        st.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), BRAND_BG),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+                    ("TOPPADDING", (0, 0), (-1, -1), 12),
+                ]
+            )
+        )
         story.append(st)
         story.append(Spacer(1, 20))
 
         # Learning tips & highlights
         story.append(Paragraph("Pedagogical Insights", section_style))
-        story.append(Paragraph("• Regular conversation with Teacher Tati improves vocabulary retention and phonetic fluency.", card_style))
-        story.append(Paragraph("• Complete daily quizzes and review Friday flashcards to strengthen weak memory points.", card_style))
+        story.append(
+            Paragraph(
+                "• Regular conversation with Teacher Tati improves vocabulary retention and phonetic fluency.",
+                card_style,
+            )
+        )
+        story.append(
+            Paragraph(
+                "• Complete daily quizzes and review Friday flashcards to strengthen weak memory points.",
+                card_style,
+            )
+        )
         story.append(Spacer(1, 15))
 
         if errors:
             story.append(Paragraph("Recent Corrections", section_style))
             for err in errors:
-                story.append(Paragraph(f"• <i>{err.detected_error or 'Usage error'}</i> → <b>{err.correction or 'Practice suggestion'}</b>", card_style))
+                story.append(
+                    Paragraph(
+                        f"• <i>{err.detected_error or 'Usage error'}</i> → <b>{err.correction or 'Practice suggestion'}</b>",
+                        card_style,
+                    )
+                )
 
         doc.build(story)
         return pdf_path

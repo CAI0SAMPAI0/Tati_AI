@@ -26,7 +26,9 @@ class CloudinaryService:
                 cls._configured = True
 
     @classmethod
-    def upload_file(cls, file_content: bytes, filename: Optional[str] = "image.png") -> str:
+    def upload_file(
+        cls, file_content: bytes, filename: Optional[str] = "image.png"
+    ) -> str:
         cls.configure()
         try:
             res = cloudinary.uploader.upload(

@@ -4,8 +4,8 @@ import re
 import base64
 import logging
 import asyncio
-from typing import Optional, List
-from groq import AsyncGroq, Groq
+from typing import List
+from groq import AsyncGroq
 import edge_tts
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,9 @@ def clean_tts_text(text: str) -> str:
         clean = re.sub(r"\n?```$", "", clean.strip())
 
     clean = re.sub(r"\{[\s\S]*\}", "", clean).strip()
-    clean = re.sub(r"\"(reply|correction|drill|report)\"\s*:\s*(null|\"[^\"]*\")", "", clean).strip()
+    clean = re.sub(
+        r"\"(reply|correction|drill|report)\"\s*:\s*(null|\"[^\"]*\")", "", clean
+    ).strip()
     clean = (
         clean.replace("*", "")
         .replace("#", "")
@@ -49,7 +51,13 @@ def get_groq_keys() -> List[str]:
     keys = []
     if os.getenv("GROQ_KEYS"):
         keys.extend([k.strip() for k in os.getenv("GROQ_KEYS").split(",") if k.strip()])
-    for env_var in ["GROQ_API_KEY", "GROQ_API_KEY_1", "GROQ_API_KEY_2", "GROQ_API_KEY_3", "GROQ_API_KEY_4"]:
+    for env_var in [
+        "GROQ_API_KEY",
+        "GROQ_API_KEY_1",
+        "GROQ_API_KEY_2",
+        "GROQ_API_KEY_3",
+        "GROQ_API_KEY_4",
+    ]:
         val = os.getenv(env_var)
         if val and val.strip() and val.strip() not in keys:
             keys.append(val.strip())
@@ -89,6 +97,7 @@ class AudioService:
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 import nest_asyncio
+
                 nest_asyncio.apply()
                 return loop.run_until_complete(cls.text_to_speech_async(text, accent))
             else:
@@ -100,7 +109,9 @@ class AudioService:
             return ""
 
     @classmethod
-    async def transcribe_audio_async(cls, audio_data: str | bytes, prompt: str = "") -> str:
+    async def transcribe_audio_async(
+        cls, audio_data: str | bytes, prompt: str = ""
+    ) -> str:
         """
         Transcreve áudio com Groq Whisper de forma nativamente assíncrona e com failover multi-chaves.
         """
@@ -124,8 +135,8 @@ class AudioService:
             return ""
 
         noise_pattern = re.compile(
-            r'^(t+s+h+|s+h+|tsh+|t+c+h+|ps+h+|[.\s?!,-]+|\[.*\]|\(.*\)|\{.*\})+$',
-            re.IGNORECASE
+            r"^(t+s+h+|s+h+|tsh+|t+c+h+|ps+h+|[.\s?!,-]+|\[.*\]|\(.*\)|\{.*\})+$",
+            re.IGNORECASE,
         )
 
         for key in keys:
@@ -144,15 +155,27 @@ class AudioService:
                 resp = await client.audio.transcriptions.create(**create_kwargs)
                 if resp:
                     text = str(resp).strip()
-                    if (
-                        noise_pattern.match(text)
-                        or text.lower() in ("tshh", "tshh.", "tshhhhhh.", "shh", "shhh", "...", "you", "[blank_audio]", "thank you.", "thank you")
+                    if noise_pattern.match(text) or text.lower() in (
+                        "tshh",
+                        "tshh.",
+                        "tshhhhhh.",
+                        "shh",
+                        "shhh",
+                        "...",
+                        "you",
+                        "[blank_audio]",
+                        "thank you.",
+                        "thank you",
                     ):
-                        logger.info(f"[AudioService] Ignorando ruído de fundo/alucinação: {text}")
+                        logger.info(
+                            f"[AudioService] Ignorando ruído de fundo/alucinação: {text}"
+                        )
                         return ""
                     return text
             except Exception as e:
-                logger.warning(f"[AudioService] Whisper falhou na chave {key[:10]}: {e}")
+                logger.warning(
+                    f"[AudioService] Whisper falhou na chave {key[:10]}: {e}"
+                )
 
         return ""
 
@@ -165,8 +188,11 @@ class AudioService:
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 import nest_asyncio
+
                 nest_asyncio.apply()
-                return loop.run_until_complete(cls.transcribe_audio_async(audio_data, prompt))
+                return loop.run_until_complete(
+                    cls.transcribe_audio_async(audio_data, prompt)
+                )
             else:
                 return asyncio.run(cls.transcribe_audio_async(audio_data, prompt))
         except RuntimeError:

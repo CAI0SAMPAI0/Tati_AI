@@ -1,11 +1,7 @@
-import os
 import json
-import requests
-from urllib.parse import parse_qs, quote
+from urllib.parse import parse_qs
 from ninja import Router
-from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
-from django.core.cache import cache
-from django.conf import settings
+from django.http import HttpRequest
 from django.contrib.auth import get_user_model
 from ninja.errors import HttpError
 
@@ -30,6 +26,7 @@ profile_router = Router(tags=["Profile"])
 
 
 # ── AUTH ENDPOINTS ───────────────────────────────────────────────────
+
 
 @auth_router.post("/login", response=TokenResponse)
 @auth_router.post("/login/", response=TokenResponse)
@@ -56,11 +53,19 @@ def login(request: HttpRequest):
                 if body_str.startswith("{"):
                     data = json.loads(body_str)
                     if isinstance(data, dict):
-                        username = data.get("username") or data.get("identifier") or data.get("email")
+                        username = (
+                            data.get("username")
+                            or data.get("identifier")
+                            or data.get("email")
+                        )
                         password = data.get("password")
                 else:
                     parsed = parse_qs(body_str)
-                    u_list = parsed.get("username") or parsed.get("identifier") or parsed.get("email")
+                    u_list = (
+                        parsed.get("username")
+                        or parsed.get("identifier")
+                        or parsed.get("email")
+                    )
                     p_list = parsed.get("password")
                     if u_list:
                         username = u_list[0]
@@ -70,7 +75,9 @@ def login(request: HttpRequest):
             pass
 
     if not username or not password:
-        print(f"[Auth API] Credenciais incompletas recebidas: username={username}, has_password={bool(password)}")
+        print(
+            f"[Auth API] Credenciais incompletas recebidas: username={username}, has_password={bool(password)}"
+        )
         raise HttpError(422, "Credenciais não fornecidas ou formato inválido.")
 
     print(f"[Auth API] Processando login para '{username}'")
@@ -98,11 +105,20 @@ def google_auth(request: HttpRequest, payload: GoogleAuthInput):
 def _get_google_redirect_uri(request: HttpRequest) -> str:
     from django.conf import settings
     import os
-    backend_base = getattr(settings, 'BACKEND_BASE_URL', '') or os.getenv('BACKEND_BASE_URL', '')
+
+    backend_base = getattr(settings, "BACKEND_BASE_URL", "") or os.getenv(
+        "BACKEND_BASE_URL", ""
+    )
     if backend_base:
         return f"{backend_base.rstrip('/')}/auth/google/callback"
     host = request.headers.get("X-Forwarded-Host") or request.get_host()
-    proto = "https" if request.is_secure() or request.headers.get("X-Forwarded-Proto") == "https" or "hf.space" in host else "http"
+    proto = (
+        "https"
+        if request.is_secure()
+        or request.headers.get("X-Forwarded-Proto") == "https"
+        or "hf.space" in host
+        else "http"
+    )
     return f"{proto}://{host}/auth/google/callback"
 
 
@@ -114,12 +130,14 @@ def _build_google_auth_data(request: HttpRequest) -> tuple[str, str]:
     from django.core.cache import cache
 
     client_id = (
-        getattr(settings, 'GOOGLE_CLIENT_ID', '')
-        or os.getenv('GOOGLE_CLIENT_ID', '')
-        or os.getenv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', '')
+        getattr(settings, "GOOGLE_CLIENT_ID", "")
+        or os.getenv("GOOGLE_CLIENT_ID", "")
+        or os.getenv("NEXT_PUBLIC_GOOGLE_CLIENT_ID", "")
     )
     if not client_id:
-        raise HttpError(503, "Google OAuth não configurado no servidor. Configure GOOGLE_CLIENT_ID.")
+        raise HttpError(
+            503, "Google OAuth não configurado no servidor. Configure GOOGLE_CLIENT_ID."
+        )
 
     state = str(uuid.uuid4())
     cache.set(f"google_oauth_state_{state}", {"ready": False}, timeout=600)
@@ -154,12 +172,15 @@ def redirect_to_google_login(request: HttpRequest):
     Redireciona diretamente o navegador/app (HTTP 302) para a tela de login do Google OAuth.
     """
     from django.shortcuts import redirect
+
     auth_url, _ = _build_google_auth_data(request)
     return redirect(auth_url)
 
 
 @auth_router.get("/google/callback")
-def google_oauth_callback(request: HttpRequest, code: str = None, state: str = None, error: str = None):
+def google_oauth_callback(
+    request: HttpRequest, code: str = None, state: str = None, error: str = None
+):
     """
     Callback para o redirecionamento do Google OAuth2.
     """
@@ -170,16 +191,18 @@ def google_oauth_callback(request: HttpRequest, code: str = None, state: str = N
     from django.http import HttpResponse
 
     if error or not code or not state:
-        return HttpResponse("<h3>Erro na autenticação com o Google. Pode fechar esta janela.</h3>", status=400)
+        return HttpResponse(
+            "<h3>Erro na autenticação com o Google. Pode fechar esta janela.</h3>",
+            status=400,
+        )
 
     client_id = (
-        getattr(settings, 'GOOGLE_CLIENT_ID', '')
-        or os.getenv('GOOGLE_CLIENT_ID', '')
-        or os.getenv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', '')
+        getattr(settings, "GOOGLE_CLIENT_ID", "")
+        or os.getenv("GOOGLE_CLIENT_ID", "")
+        or os.getenv("NEXT_PUBLIC_GOOGLE_CLIENT_ID", "")
     )
-    client_secret = (
-        getattr(settings, 'GOOGLE_CLIENT_SECRET', '')
-        or os.getenv('GOOGLE_CLIENT_SECRET', '')
+    client_secret = getattr(settings, "GOOGLE_CLIENT_SECRET", "") or os.getenv(
+        "GOOGLE_CLIENT_SECRET", ""
     )
 
     redirect_uri = _get_google_redirect_uri(request)
@@ -194,28 +217,51 @@ def google_oauth_callback(request: HttpRequest, code: str = None, state: str = N
     }
     resp = requests.post(token_url, data=data, timeout=10)
     if not resp.ok:
-        return HttpResponse(f"<h3>Falha ao trocar código com o Google. Pode fechar esta janela.</h3>", status=400)
+        return HttpResponse(
+            f"<h3>Falha ao trocar código com o Google. Pode fechar esta janela.</h3>",
+            status=400,
+        )
 
     tokens = resp.json()
     id_token_str = tokens.get("id_token")
     if not id_token_str:
-        return HttpResponse("<h3>Token de identidade não retornado pelo Google. Pode fechar esta janela.</h3>", status=400)
+        return HttpResponse(
+            "<h3>Token de identidade não retornado pelo Google. Pode fechar esta janela.</h3>",
+            status=400,
+        )
 
     token_res = AuthService.google_login(id_token_str)
-    user_dict = token_res.user.dict() if hasattr(token_res.user, 'dict') else token_res.user.model_dump() if hasattr(token_res.user, 'model_dump') else token_res.user
+    user_dict = (
+        token_res.user.dict()
+        if hasattr(token_res.user, "dict")
+        else token_res.user.model_dump()
+        if hasattr(token_res.user, "model_dump")
+        else token_res.user
+    )
 
-    cache.set(f"google_oauth_state_{state}", {
-        "ready": True,
-        "jwt": token_res.access_token,
-        "user": user_dict,
-    }, timeout=600)
+    cache.set(
+        f"google_oauth_state_{state}",
+        {
+            "ready": True,
+            "jwt": token_res.access_token,
+            "user": user_dict,
+        },
+        timeout=600,
+    )
 
     import json
     from urllib.parse import quote
+
     user_json = json.dumps(user_dict)
     jwt_token = token_res.access_token
-    frontend_url = getattr(settings, 'FRONTEND_URL', '') or os.getenv('FRONTEND_URL', '') or 'https://tati-ai.vercel.app'
-    redirect_target = f"{frontend_url.rstrip('/')}/login?token={jwt_token}&user={quote(user_json)}"
+    frontend_url = (
+        getattr(settings, "FRONTEND_URL", "")
+        or os.getenv("FRONTEND_URL", "")
+        or "https://tati-ai.vercel.app"
+    )
+    redirect_target = (
+        f"{frontend_url.rstrip('/')}/login?token={jwt_token}&user={quote(user_json)}"
+    )
 
     html = f"""
     <!DOCTYPE html>
@@ -274,6 +320,7 @@ def poll_google_login(request: HttpRequest, state: str):
     Polling para o app mobile verificar se o login social do Google foi concluído.
     """
     from django.core.cache import cache
+
     data = cache.get(f"google_oauth_state_{state}")
     if not data:
         return {"ready": False}
@@ -289,6 +336,7 @@ def refresh_token(request: HttpRequest, payload: RefreshTokenInput):
 
 
 from pydantic import BaseModel
+
 
 class PasswordResetProfileInput(BaseModel):
     new_password: str
@@ -320,7 +368,11 @@ def reset_password_profile(request: HttpRequest, payload: PasswordResetProfileIn
         raise HttpError(400, "A senha deve conter no mínimo 6 caracteres.")
     user.set_password(payload.new_password)
     user.save()
-    return {"ok": True, "message": "Senha atualizada com sucesso.", "detail": "Senha alterada."}
+    return {
+        "ok": True,
+        "message": "Senha atualizada com sucesso.",
+        "detail": "Senha alterada.",
+    }
 
 
 @auth_router.get("/me", response=UserOut, auth=auth_required)
@@ -333,6 +385,7 @@ def get_me(request: HttpRequest):
 
 
 # ── PROFILE ENDPOINTS ─────────────────────────────────────────────────
+
 
 @profile_router.get("", response=UserOut, auth=auth_required)
 @profile_router.get("/", response=UserOut, auth=auth_required)
@@ -357,7 +410,15 @@ def update_profile(request: HttpRequest, payload: ProfileUpdateInput):
     profile_dict = user.profile if isinstance(user.profile, dict) else {}
 
     # Campos que residem dentro do JSON de perfil
-    for subfield in ["responsible_email", "whatsapp_number", "allow_whatsapp_notifications", "occupation", "focus", "preferred_accent", "accent"]:
+    for subfield in [
+        "responsible_email",
+        "whatsapp_number",
+        "allow_whatsapp_notifications",
+        "occupation",
+        "focus",
+        "preferred_accent",
+        "accent",
+    ]:
         if subfield in update_data and update_data[subfield] is not None:
             profile_dict[subfield] = update_data[subfield]
             if subfield == "accent":
@@ -369,7 +430,15 @@ def update_profile(request: HttpRequest, payload: ProfileUpdateInput):
     user.profile = profile_dict
 
     # Campos diretos no modelo
-    for field in ["name", "nickname", "email", "level", "avatar_url", "native_language", "timezone"]:
+    for field in [
+        "name",
+        "nickname",
+        "email",
+        "level",
+        "avatar_url",
+        "native_language",
+        "timezone",
+    ]:
         if field in update_data and update_data[field] is not None:
             if hasattr(user, field):
                 setattr(user, field, update_data[field])

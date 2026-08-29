@@ -3,7 +3,7 @@ import json
 import logging
 import httpx
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any
 from django.contrib.auth import get_user_model
 
 from .models import Notification, PushSubscription
@@ -15,9 +15,18 @@ logger = logging.getLogger(__name__)
 WAHA_API_URL = os.getenv("WAHA_API_URL", "")
 WAHA_API_KEY = os.getenv("WAHA_API_KEY", "")
 
+
 def get_brevo_api_key() -> Optional[str]:
     # Checa possíveis variáveis de ambiente para a chave do Brevo
-    for key_name in ["BREVO_API_KEY", "BREVO_API_KEY_TATY", "brevo_api_key", "BREVO_KEY", "brevo_smtp_key", "SMTP_PASSWORD", "smtp_password"]:
+    for key_name in [
+        "BREVO_API_KEY",
+        "BREVO_API_KEY_TATY",
+        "brevo_api_key",
+        "BREVO_KEY",
+        "brevo_smtp_key",
+        "SMTP_PASSWORD",
+        "smtp_password",
+    ]:
         val = os.getenv(key_name)
         if val and ("xkeysib-" in val or "xsmtpsib-" in val or len(val) > 20):
             return val.strip()
@@ -38,19 +47,29 @@ def get_verified_sender_email() -> str:
     for email in candidates:
         if email and isinstance(email, str):
             email_clean = email.strip()
-            if email_clean and not email_clean.endswith("@smtp-brevo.com") and "smtp-brevo" not in email_clean:
+            if (
+                email_clean
+                and not email_clean.endswith("@smtp-brevo.com")
+                and "smtp-brevo" not in email_clean
+            ):
                 return email_clean
     return "caio.matos@11607679.brevosend.com"
 
 
 class BrevoEmailService:
     @staticmethod
-    def send_email(to_email: str, subject: str, html_content: str, recipient_name: str = None) -> bool:
-        res = BrevoEmailService.send_email_detailed(to_email, subject, html_content, recipient_name)
+    def send_email(
+        to_email: str, subject: str, html_content: str, recipient_name: str = None
+    ) -> bool:
+        res = BrevoEmailService.send_email_detailed(
+            to_email, subject, html_content, recipient_name
+        )
         return res.get("success", False)
 
     @staticmethod
-    def send_email_detailed(to_email: str, subject: str, html_content: str, recipient_name: str = None) -> dict:
+    def send_email_detailed(
+        to_email: str, subject: str, html_content: str, recipient_name: str = None
+    ) -> dict:
         brevo_key = get_brevo_api_key()
         sender_email = get_verified_sender_email()
         sender_name = os.getenv("SMTP_FROM_NAME", "Teacher Tati")
@@ -81,36 +100,48 @@ class BrevoEmailService:
             try:
                 with httpx.Client(timeout=12.0) as client:
                     res = client.post(url, headers=headers, json=payload)
-                    diagnostics["attempts"].append({
-                        "provider": "Brevo HTTP API",
-                        "status_code": res.status_code,
-                        "response": res.text,
-                    })
+                    diagnostics["attempts"].append(
+                        {
+                            "provider": "Brevo HTTP API",
+                            "status_code": res.status_code,
+                            "response": res.text,
+                        }
+                    )
 
                     if res.status_code in (200, 201, 202):
-                        logger.info(f"[Brevo] E-mail enviado com sucesso para {to_email}")
+                        logger.info(
+                            f"[Brevo] E-mail enviado com sucesso para {to_email}"
+                        )
                         diagnostics["success"] = True
                         diagnostics["provider"] = "Brevo"
                         return diagnostics
                     else:
-                        logger.error(f"[Brevo] Erro status {res.status_code}: {res.text}. Tentando provedores alternativos...")
+                        logger.error(
+                            f"[Brevo] Erro status {res.status_code}: {res.text}. Tentando provedores alternativos..."
+                        )
             except Exception as e:
                 logger.error(f"[Brevo] Falha de conexão: {e}")
-                diagnostics["attempts"].append({
-                    "provider": "Brevo HTTP API",
-                    "error": str(e),
-                })
+                diagnostics["attempts"].append(
+                    {
+                        "provider": "Brevo HTTP API",
+                        "error": str(e),
+                    }
+                )
         else:
-            diagnostics["attempts"].append({
-                "provider": "Brevo HTTP API",
-                "skipped": "Chave do Brevo não encontrada nas variáveis de ambiente.",
-            })
+            diagnostics["attempts"].append(
+                {
+                    "provider": "Brevo HTTP API",
+                    "skipped": "Chave do Brevo não encontrada nas variáveis de ambiente.",
+                }
+            )
 
         # ── 2. RESEND HTTP API FALLBACK (Porta 443) ────────────────────────
         resend_key = os.getenv("RESEND_API_KEY")
         if resend_key and not resend_key.startswith("xkeysib-"):
             try:
-                resend_sender = os.getenv("RESEND_FROM", "Teacher Tati <onboarding@resend.dev>")
+                resend_sender = os.getenv(
+                    "RESEND_FROM", "Teacher Tati <onboarding@resend.dev>"
+                )
                 resend_payload = {
                     "from": resend_sender,
                     "to": [to_email],
@@ -122,23 +153,33 @@ class BrevoEmailService:
                     "Content-Type": "application/json",
                 }
                 with httpx.Client(timeout=12.0) as client:
-                    res = client.post("https://api.resend.com/emails", headers=resend_headers, json=resend_payload)
-                    diagnostics["attempts"].append({
-                        "provider": "Resend HTTP API",
-                        "status_code": res.status_code,
-                        "response": res.text,
-                    })
+                    res = client.post(
+                        "https://api.resend.com/emails",
+                        headers=resend_headers,
+                        json=resend_payload,
+                    )
+                    diagnostics["attempts"].append(
+                        {
+                            "provider": "Resend HTTP API",
+                            "status_code": res.status_code,
+                            "response": res.text,
+                        }
+                    )
                     if res.status_code in (200, 201, 202):
-                        logger.info(f"[Resend] E-mail enviado com sucesso para {to_email}")
+                        logger.info(
+                            f"[Resend] E-mail enviado com sucesso para {to_email}"
+                        )
                         diagnostics["success"] = True
                         diagnostics["provider"] = "Resend"
                         return diagnostics
             except Exception as e:
                 logger.error(f"[Resend] Falha de envio: {e}")
-                diagnostics["attempts"].append({
-                    "provider": "Resend HTTP API",
-                    "error": str(e),
-                })
+                diagnostics["attempts"].append(
+                    {
+                        "provider": "Resend HTTP API",
+                        "error": str(e),
+                    }
+                )
 
         # ── 3. SMTP FALLBACK (Gmail / Custom SMTP) ─────────────────────────
         smtp_host = os.getenv("SMTP_HOST")
@@ -167,7 +208,9 @@ class BrevoEmailService:
                         server.login(smtp_user, smtp_pass)
                         server.send_message(msg)
 
-                logger.info(f"[SMTP] E-mail enviado com sucesso via SMTP ({smtp_host}) para {to_email}")
+                logger.info(
+                    f"[SMTP] E-mail enviado com sucesso via SMTP ({smtp_host}) para {to_email}"
+                )
                 diagnostics["success"] = True
                 diagnostics["provider"] = "SMTP"
                 diagnostics["attempts"].append({"provider": "SMTP", "status": "sent"})
@@ -178,7 +221,9 @@ class BrevoEmailService:
 
         # Se nenhum provedor conseguiu enviar
         diagnostics["success"] = False
-        logger.warning(f"[EmailService] Nenhum provedor de e-mail conseguiu entregar a mensagem para {to_email}.")
+        logger.warning(
+            f"[EmailService] Nenhum provedor de e-mail conseguiu entregar a mensagem para {to_email}."
+        )
         return diagnostics
 
 
@@ -186,7 +231,9 @@ class WahaWhatsAppService:
     @staticmethod
     def send_message(phone_number: str, message: str) -> bool:
         if not WAHA_API_URL or not WAHA_API_KEY:
-            logger.warning(f"[WAHA] WAHA_API_URL/KEY não configuradas. Mensagem para {phone_number}: {message}")
+            logger.warning(
+                f"[WAHA] WAHA_API_URL/KEY não configuradas. Mensagem para {phone_number}: {message}"
+            )
             return True
 
         clean_number = "".join(c for c in phone_number if c.isdigit())
@@ -210,7 +257,9 @@ class WahaWhatsAppService:
             with httpx.Client(timeout=10.0) as client:
                 res = client.post(url, headers=headers, json=payload)
                 if res.status_code in (200, 201):
-                    logger.info(f"[WAHA] WhatsApp enviado com sucesso para {clean_number}")
+                    logger.info(
+                        f"[WAHA] WhatsApp enviado com sucesso para {clean_number}"
+                    )
                     return True
                 else:
                     logger.warning(f"[WAHA] Resposta {res.status_code}: {res.text}")
@@ -238,13 +287,20 @@ class NotificationService:
 
     @staticmethod
     def mark_all_as_read(user: User) -> dict:
-        Notification.objects.filter(username=user.username, is_read=False).update(is_read=True)
-        return {"ok": True, "message": "Todas as notificações foram marcadas como lidas."}
+        Notification.objects.filter(username=user.username, is_read=False).update(
+            is_read=True
+        )
+        return {
+            "ok": True,
+            "message": "Todas as notificações foram marcadas como lidas.",
+        }
 
     @staticmethod
     def mark_single_as_read(user: User, notif_id: str) -> dict:
         try:
-            Notification.objects.filter(id=notif_id, username=user.username).update(is_read=True)
+            Notification.objects.filter(id=notif_id, username=user.username).update(
+                is_read=True
+            )
         except Exception:
             pass
         return {"ok": True, "message": "Notificação marcada como lida."}
@@ -267,7 +323,10 @@ class NotificationService:
                 "is_active": True,
             },
         )
-        return {"ok": True, "message": "Dispositivo cadastrado para notificações WebPush."}
+        return {
+            "ok": True,
+            "message": "Dispositivo cadastrado para notificações WebPush.",
+        }
 
 
 class NotificationDispatcher:
@@ -277,8 +336,13 @@ class NotificationDispatcher:
 
     @staticmethod
     def get_vapid_keys() -> dict:
-        public_key = os.getenv("VAPID_PUBLIC_KEY", "BBOj7nBpIxJXxnmGQ-sIdBbDVGOL-m7cLb6-alvr2qf3dppPl1EgWO2-As6DZpXFKGCXTl-Vq72AWi7u_k622cw")
-        private_key = os.getenv("VAPID_PRIVATE_KEY", "b5TcMgeiUA9ZrM4tcTt-z-4PN-DMOXq0H1J_LR4VpX8")
+        public_key = os.getenv(
+            "VAPID_PUBLIC_KEY",
+            "BBOj7nBpIxJXxnmGQ-sIdBbDVGOL-m7cLb6-alvr2qf3dppPl1EgWO2-As6DZpXFKGCXTl-Vq72AWi7u_k622cw",
+        )
+        private_key = os.getenv(
+            "VAPID_PRIVATE_KEY", "b5TcMgeiUA9ZrM4tcTt-z-4PN-DMOXq0H1J_LR4VpX8"
+        )
         contact = os.getenv("VAPID_CONTACT", "mailto:caio.matos@aedb.br")
         return {
             "public_key": public_key,
@@ -286,7 +350,10 @@ class NotificationDispatcher:
             "contact": contact,
         }
 
-def _send_fcm_v1_admin_sdk(fcm_token: str, title: str, body: str, url: str) -> Optional[bool]:
+
+def _send_fcm_v1_admin_sdk(
+    fcm_token: str, title: str, body: str, url: str
+) -> Optional[bool]:
     """
     Tenta enviar via Firebase Admin SDK (HTTP v1) usando o arquivo de credenciais JSON.
     Retorna True se enviou com sucesso, False se o token do dispositivo expirou, ou None se o JSON não foi encontrado.
@@ -295,7 +362,9 @@ def _send_fcm_v1_admin_sdk(fcm_token: str, title: str, body: str, url: str) -> O
         import firebase_admin
         from firebase_admin import credentials, messaging
     except Exception as e:
-        logger.warning(f"[FCM Admin SDK] Pacote firebase_admin não pôde ser importado: {e}")
+        logger.warning(
+            f"[FCM Admin SDK] Pacote firebase_admin não pôde ser importado: {e}"
+        )
         return None
 
     try:
@@ -307,15 +376,22 @@ def _send_fcm_v1_admin_sdk(fcm_token: str, title: str, body: str, url: str) -> O
                     cred = credentials.Certificate(cred_dict)
                     firebase_admin.initialize_app(cred)
                 except Exception as err:
-                    logger.error(f"[FCM Admin SDK] Erro ao carregar FIREBASE_CREDENTIALS_JSON: {err}")
+                    logger.error(
+                        f"[FCM Admin SDK] Erro ao carregar FIREBASE_CREDENTIALS_JSON: {err}"
+                    )
 
             if not firebase_admin._apps:
-                root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+                root_dir = os.path.dirname(
+                    os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                )
                 json_candidates = [
                     os.getenv("FIREBASE_CREDENTIALS_PATH"),
                     os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
                     "device-streaming-fc45919f-firebase-adminsdk-fbsvc-1e7b2ed04e.json",
-                    os.path.join(root_dir, "device-streaming-fc45919f-firebase-adminsdk-fbsvc-1e7b2ed04e.json"),
+                    os.path.join(
+                        root_dir,
+                        "device-streaming-fc45919f-firebase-adminsdk-fbsvc-1e7b2ed04e.json",
+                    ),
                 ]
                 cred_path = None
                 for p in json_candidates:
@@ -337,7 +413,9 @@ def _send_fcm_v1_admin_sdk(fcm_token: str, title: str, body: str, url: str) -> O
             android=messaging.AndroidConfig(priority="high"),
         )
         response = messaging.send(message)
-        logger.info(f"[FCM Admin SDK] Notificação enviada com sucesso via HTTP v1 API: {response}")
+        logger.info(
+            f"[FCM Admin SDK] Notificação enviada com sucesso via HTTP v1 API: {response}"
+        )
         return True
     except Exception as exc:
         logger.warning(f"[FCM Admin SDK] Erro ao enviar via Admin SDK: {exc}")
@@ -354,8 +432,13 @@ class NotificationDispatcher:
 
     @staticmethod
     def get_vapid_keys() -> dict:
-        public_key = os.getenv("VAPID_PUBLIC_KEY", "BBOj7nBpIxJXxnmGQ-sIdBbDVGOL-m7cLb6-alvr2qf3dppPl1EgWO2-As6DZpXFKGCXTl-Vq72AWi7u_k622cw")
-        private_key = os.getenv("VAPID_PRIVATE_KEY", "b5TcMgeiUA9ZrM4tcTt-z-4PN-DMOXq0H1J_LR4VpX8")
+        public_key = os.getenv(
+            "VAPID_PUBLIC_KEY",
+            "BBOj7nBpIxJXxnmGQ-sIdBbDVGOL-m7cLb6-alvr2qf3dppPl1EgWO2-As6DZpXFKGCXTl-Vq72AWi7u_k622cw",
+        )
+        private_key = os.getenv(
+            "VAPID_PRIVATE_KEY", "b5TcMgeiUA9ZrM4tcTt-z-4PN-DMOXq0H1J_LR4VpX8"
+        )
         contact = os.getenv("VAPID_CONTACT", "mailto:caio.matos@aedb.br")
         return {
             "public_key": public_key,
@@ -377,11 +460,15 @@ class NotificationDispatcher:
         # 2. Fallback via Legacy HTTP API
         fcm_server_key = os.getenv("FCM_SERVER_KEY") or os.getenv("FIREBASE_SERVER_KEY")
         if not fcm_server_key:
-            logger.info(f"[FCM Native] Token detectado ({fcm_token[:15]}...). (Para envio em produção, configure FCM_SERVER_KEY no .env).")
+            logger.info(
+                f"[FCM Native] Token detectado ({fcm_token[:15]}...). (Para envio em produção, configure FCM_SERVER_KEY no .env)."
+            )
             return True
 
         if fcm_server_key.startswith("BBOj") or len(fcm_server_key) < 50:
-            logger.warning(f"[FCM Native] FCM_SERVER_KEY no .env parece inválida (detectada chave VAPID/curta de {len(fcm_server_key)} chars). Requer FCM Legacy Server Key (AAAA...).")
+            logger.warning(
+                f"[FCM Native] FCM_SERVER_KEY no .env parece inválida (detectada chave VAPID/curta de {len(fcm_server_key)} chars). Requer FCM Legacy Server Key (AAAA...)."
+            )
             # Retorna True para não desativar o dispositivo por erro de configuração de chave no servidor
             return True
 
@@ -409,10 +496,14 @@ class NotificationDispatcher:
             with httpx.Client(timeout=8.0) as client:
                 res = client.post(url_endpoint, headers=headers, json=payload)
                 if res.status_code == 200:
-                    logger.info(f"[FCM Native] Notificação entregue com sucesso para token {fcm_token[:15]}...")
+                    logger.info(
+                        f"[FCM Native] Notificação entregue com sucesso para token {fcm_token[:15]}..."
+                    )
                     return True
                 else:
-                    logger.warning(f"[FCM Native] Resposta FCM {res.status_code}: {res.text}")
+                    logger.warning(
+                        f"[FCM Native] Resposta FCM {res.status_code}: {res.text}"
+                    )
                     # Apenas desativa token se o Firebase disser explicitamente que o token no aparelho expirou
                     if "NotRegistered" in res.text or "InvalidRegistration" in res.text:
                         return False
@@ -422,7 +513,13 @@ class NotificationDispatcher:
             return True
 
     @staticmethod
-    def send_push_to_user(username: str, title: str, body: str, url: str = "/dashboard", tag: str = "tati-notif") -> dict:
+    def send_push_to_user(
+        username: str,
+        title: str,
+        body: str,
+        url: str = "/dashboard",
+        tag: str = "tati-notif",
+    ) -> dict:
         """
         Envia push notification para todos os dispositivos ativos cadastrados do usuário (PWA, Celular, PC, APK).
         """
@@ -440,20 +537,24 @@ class NotificationDispatcher:
         sent_count = 0
         failed_count = 0
 
-        data_payload = json.dumps({
-            "title": title,
-            "body": body,
-            "url": url,
-            "tag": tag,
-            "icon": "/icons/icon-192x192.png",
-        })
+        data_payload = json.dumps(
+            {
+                "title": title,
+                "body": body,
+                "url": url,
+                "tag": tag,
+                "icon": "/icons/icon-192x192.png",
+            }
+        )
 
         for sub in subs:
             endpoint = (sub.endpoint or "").strip()
             # 1. Dispositivo com token FCM nativo (Flutter / Android APK)
             if endpoint.startswith("fcm:") or sub.p256dh == "fcm":
                 token = endpoint.replace("fcm:", "")
-                success = NotificationDispatcher.send_fcm_native_push(token, title, body, url)
+                success = NotificationDispatcher.send_fcm_native_push(
+                    token, title, body, url
+                )
                 if success:
                     sent_count += 1
                 else:
@@ -481,16 +582,20 @@ class NotificationDispatcher:
                     data=data_payload,
                     vapid_private_key=vapid["private_key"],
                     vapid_claims={"sub": vapid["contact"]},
-                    ttl=60 * 60 * 24, # 24 horas
+                    ttl=60 * 60 * 24,  # 24 horas
                 )
                 sent_count += 1
             except WebPushException as exc:
                 failed_count += 1
-                status_code = getattr(getattr(exc, "response", None), "status_code", None)
+                status_code = getattr(
+                    getattr(exc, "response", None), "status_code", None
+                )
                 if status_code in (404, 410):
                     # Subscription expirada ou cancelada no navegador
                     PushSubscription.objects.filter(id=sub.id).update(is_active=False)
-                    logger.info(f"[Push] Inscrição expirada removida para {username} (status {status_code})")
+                    logger.info(
+                        f"[Push] Inscrição expirada removida para {username} (status {status_code})"
+                    )
             except Exception as e:
                 failed_count += 1
                 logger.warning(f"[Push] Falha ao enviar WebPush para {username}: {e}")
@@ -503,7 +608,7 @@ class NotificationDispatcher:
         title: str,
         levels: Any,
         is_published: bool = True,
-        url: str = "/activities"
+        url: str = "/activities",
     ) -> dict:
         """
         Dispara notificações para alunos estritamente pertencentes ao nível da atividade lançada.
@@ -514,7 +619,9 @@ class NotificationDispatcher:
         - Salva in-app (Notification) com o primeiro nome do aluno + envia Push Notification.
         """
         if not is_published:
-            logger.info(f"[NotificationDispatcher] Atividade '{title}' está em rascunho. Notificações ignoradas.")
+            logger.info(
+                f"[NotificationDispatcher] Atividade '{title}' está em rascunho. Notificações ignoradas."
+            )
             return {"sent": 0, "reason": "draft_ignored"}
 
         # Normalização dos níveis alvo
@@ -526,21 +633,32 @@ class NotificationDispatcher:
         else:
             raw_levels = ["ALL"]
 
-        is_all_levels = any(lvl in ["ALL", "ALL LEVELS", "*"] for lvl in raw_levels) or len(raw_levels) == 0
+        is_all_levels = (
+            any(lvl in ["ALL", "ALL LEVELS", "*"] for lvl in raw_levels)
+            or len(raw_levels) == 0
+        )
 
         # Filtra alunos ativos do nível alvo
         if is_all_levels:
-            students_qs = User.objects.exclude(role__in=["admin", "teacher", "buyer"]).exclude(is_staff=True)
+            students_qs = User.objects.exclude(
+                role__in=["admin", "teacher", "buyer"]
+            ).exclude(is_staff=True)
         else:
-            students_qs = User.objects.filter(level__in=raw_levels).exclude(role__in=["admin", "teacher", "buyer"])
+            students_qs = User.objects.filter(level__in=raw_levels).exclude(
+                role__in=["admin", "teacher", "buyer"]
+            )
 
         # Garante que os usuários de teste (programador, caio.sampaio) sempre recebam para validação
-        test_users = list(User.objects.filter(username__in=["programador", "caio.sampaio", "caio"]))
+        test_users = list(
+            User.objects.filter(username__in=["programador", "caio.sampaio", "caio"])
+        )
         students_dict = {u.username: u for u in list(students_qs) + test_users}
         students = list(students_dict.values())
 
         if not students:
-            logger.info(f"[NotificationDispatcher] Nenhum aluno elegível encontrado para os níveis {raw_levels}.")
+            logger.info(
+                f"[NotificationDispatcher] Nenhum aluno elegível encontrado para os níveis {raw_levels}."
+            )
             return {"sent": 0, "count": 0}
 
         sent_total = 0
@@ -551,10 +669,12 @@ class NotificationDispatcher:
         two_hours_ago = datetime.now(timezone.utc) - timedelta(hours=2)
 
         for s in students:
-            first_name = (s.name or s.username or "Student").strip().split()[0].capitalize()
+            first_name = (
+                (s.name or s.username or "Student").strip().split()[0].capitalize()
+            )
             student_level = s.level or level_tag
             notif_title = "New Activity from Teacher Tatiana!"
-            notif_body = f"Hello {first_name}! A new {activity_type} activity (\"{title}\") is now available for your level ({student_level}). Come practice!"
+            notif_body = f'Hello {first_name}! A new {activity_type} activity ("{title}") is now available for your level ({student_level}). Come practice!'
 
             try:
                 # Evita criar duplicata se já existir idêntica recente
@@ -586,24 +706,41 @@ class NotificationDispatcher:
                 sent_total += 1
 
                 # 3. WhatsApp (WAHA) se habilitado e o aluno tiver telefone
-                student_phone = getattr(s, 'phone', None) or (s.profile or {}).get('phone') if isinstance(s.profile, dict) else None
+                student_phone = (
+                    getattr(s, "phone", None) or (s.profile or {}).get("phone")
+                    if isinstance(s.profile, dict)
+                    else None
+                )
                 if send_whatsapp and student_phone:
-                    wa_msg = f"*Teacher Tatiana*\n\nHello *{first_name}*! A new *{activity_type}* activity (\"{title}\") is now available for your level *{student_level}*.\n\n👉 Practice now: https://tati-ai.com{url}"
+                    wa_msg = f'*Teacher Tatiana*\n\nHello *{first_name}*! A new *{activity_type}* activity ("{title}") is now available for your level *{student_level}*.\n\n👉 Practice now: https://tati-ai.com{url}'
                     if WahaWhatsAppService.send_message(student_phone, wa_msg):
                         whatsapp_sent += 1
 
             except Exception as e:
-                logger.error(f"[NotificationDispatcher] Erro ao notificar {s.username}: {e}")
+                logger.error(
+                    f"[NotificationDispatcher] Erro ao notificar {s.username}: {e}"
+                )
 
-        logger.info(f"[NotificationDispatcher] Notificações enviadas para {sent_total} alunos (Push/In-App) e {whatsapp_sent} (WhatsApp) no nível {raw_levels}.")
-        return {"success": True, "sent": sent_total, "whatsapp_sent": whatsapp_sent, "levels": raw_levels}
+        logger.info(
+            f"[NotificationDispatcher] Notificações enviadas para {sent_total} alunos (Push/In-App) e {whatsapp_sent} (WhatsApp) no nível {raw_levels}."
+        )
+        return {
+            "success": True,
+            "sent": sent_total,
+            "whatsapp_sent": whatsapp_sent,
+            "levels": raw_levels,
+        }
 
     @staticmethod
-    def notify_streak_risk(user: User, streak_count: int, send_whatsapp: bool = False) -> dict:
+    def notify_streak_risk(
+        user: User, streak_count: int, send_whatsapp: bool = False
+    ) -> dict:
         """
         Dispara alerta de ofensiva em risco para alunos que ainda não praticaram hoje (em inglês).
         """
-        first_name = (user.name or user.username or "Student").strip().split()[0].capitalize()
+        first_name = (
+            (user.name or user.username or "Student").strip().split()[0].capitalize()
+        )
         title = f"Your streak is at risk, {first_name}!"
         body = f"You have a {streak_count}-day streak! Complete 1 quick exercise today to keep your streak alive."
 
@@ -631,7 +768,11 @@ class NotificationDispatcher:
             tag="streak-risk",
         )
 
-        student_phone = getattr(user, 'phone', None) or (user.profile or {}).get('phone') if isinstance(user.profile, dict) else None
+        student_phone = (
+            getattr(user, "phone", None) or (user.profile or {}).get("phone")
+            if isinstance(user.profile, dict)
+            else None
+        )
         if send_whatsapp and student_phone:
             wa_msg = f"*Teacher Tatiana — Streak Alert*\n\nHello *{first_name}*! Your *{streak_count}-day study streak* is at risk today!\n\nDo a quick 3-minute exercise now to keep your streak: https://tati-ai.com/activities"
             WahaWhatsAppService.send_message(student_phone, wa_msg)
@@ -650,12 +791,14 @@ class NotificationSchedulerService:
         """
         Dispara todos os 6 tipos de notificação para um usuário específico (Email + Push + In-App).
         """
-        first_name = (user.name or user.username or "Student").strip().split()[0].capitalize()
+        first_name = (
+            (user.name or user.username or "Student").strip().split()[0].capitalize()
+        )
         email = user.email
         results = []
 
         # 1. Streak Reminder
-        streak_val = getattr(user, 'streak', None) or 5
+        streak_val = getattr(user, "streak", None) or 5
         title_1 = "Don't break your streak! 🔥"
         body_1 = f"Hello {first_name}! You're on a {streak_val}-day streak. Practice just 5 minutes today with Teacher Tati to keep it alive!"
         html_1 = f"""
@@ -669,14 +812,33 @@ class NotificationSchedulerService:
     <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Personalized English Coaching</p>
   </div>
 </body></html>"""
-        diag_1 = BrevoEmailService.send_email_detailed(email, title_1, html_1, first_name) if email else {}
-        push_1 = NotificationDispatcher.send_push_to_user(user.username, title_1, body_1, url="/activities", tag="streak-reminder")
-        Notification.objects.create(username=user.username, category="streaks", title=title_1, body=body_1)
-        results.append({"type": "streak_reminder", "email_sent": diag_1.get("success", False), "push": push_1})
+        diag_1 = (
+            BrevoEmailService.send_email_detailed(email, title_1, html_1, first_name)
+            if email
+            else {}
+        )
+        push_1 = NotificationDispatcher.send_push_to_user(
+            user.username, title_1, body_1, url="/activities", tag="streak-reminder"
+        )
+        Notification.objects.create(
+            username=user.username, category="streaks", title=title_1, body=body_1
+        )
+        results.append(
+            {
+                "type": "streak_reminder",
+                "email_sent": diag_1.get("success", False),
+                "push": push_1,
+            }
+        )
 
         # 2. Weekly Progress Report
         from apps.users.services import ProgressReportService
-        report_data = ProgressReportService.get_weekly_report(user) if hasattr(ProgressReportService, 'get_weekly_report') else {}
+
+        report_data = (
+            ProgressReportService.get_weekly_report(user)
+            if hasattr(ProgressReportService, "get_weekly_report")
+            else {}
+        )
         mins_studied = report_data.get("total_study_minutes", 75)
         acts_done = report_data.get("activities_completed", 8)
         vocab_learned = report_data.get("vocabulary_learned", 15)
@@ -697,10 +859,24 @@ class NotificationSchedulerService:
     <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Real Results.</p>
   </div>
 </body></html>"""
-        diag_2 = BrevoEmailService.send_email_detailed(email, title_2, html_2, first_name) if email else {}
-        push_2 = NotificationDispatcher.send_push_to_user(user.username, title_2, body_2, url="/dashboard", tag="weekly-report")
-        Notification.objects.create(username=user.username, category="weekly_report", title=title_2, body=body_2)
-        results.append({"type": "weekly_report", "email_sent": diag_2.get("success", False), "push": push_2})
+        diag_2 = (
+            BrevoEmailService.send_email_detailed(email, title_2, html_2, first_name)
+            if email
+            else {}
+        )
+        push_2 = NotificationDispatcher.send_push_to_user(
+            user.username, title_2, body_2, url="/dashboard", tag="weekly-report"
+        )
+        Notification.objects.create(
+            username=user.username, category="weekly_report", title=title_2, body=body_2
+        )
+        results.append(
+            {
+                "type": "weekly_report",
+                "email_sent": diag_2.get("success", False),
+                "push": push_2,
+            }
+        )
 
         # 3. Streak Broken Comeback
         title_3 = "A fresh start awaits! 🌅"
@@ -716,10 +892,24 @@ class NotificationSchedulerService:
     <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Continuous Progress.</p>
   </div>
 </body></html>"""
-        diag_3 = BrevoEmailService.send_email_detailed(email, title_3, html_3, first_name) if email else {}
-        push_3 = NotificationDispatcher.send_push_to_user(user.username, title_3, body_3, url="/chat", tag="streak-broken")
-        Notification.objects.create(username=user.username, category="streaks", title=title_3, body=body_3)
-        results.append({"type": "streak_broken", "email_sent": diag_3.get("success", False), "push": push_3})
+        diag_3 = (
+            BrevoEmailService.send_email_detailed(email, title_3, html_3, first_name)
+            if email
+            else {}
+        )
+        push_3 = NotificationDispatcher.send_push_to_user(
+            user.username, title_3, body_3, url="/chat", tag="streak-broken"
+        )
+        Notification.objects.create(
+            username=user.username, category="streaks", title=title_3, body=body_3
+        )
+        results.append(
+            {
+                "type": "streak_broken",
+                "email_sent": diag_3.get("success", False),
+                "push": push_3,
+            }
+        )
 
         # 4. Streak Milestone (7 Days)
         title_4 = "🏆 7-Day Streak Achieved! You're on fire!"
@@ -735,10 +925,24 @@ class NotificationSchedulerService:
     <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Celebrate every milestone.</p>
   </div>
 </body></html>"""
-        diag_4 = BrevoEmailService.send_email_detailed(email, title_4, html_4, first_name) if email else {}
-        push_4 = NotificationDispatcher.send_push_to_user(user.username, title_4, body_4, url="/achievements", tag="streak-milestone")
-        Notification.objects.create(username=user.username, category="achievements", title=title_4, body=body_4)
-        results.append({"type": "streak_milestone", "email_sent": diag_4.get("success", False), "push": push_4})
+        diag_4 = (
+            BrevoEmailService.send_email_detailed(email, title_4, html_4, first_name)
+            if email
+            else {}
+        )
+        push_4 = NotificationDispatcher.send_push_to_user(
+            user.username, title_4, body_4, url="/achievements", tag="streak-milestone"
+        )
+        Notification.objects.create(
+            username=user.username, category="achievements", title=title_4, body=body_4
+        )
+        results.append(
+            {
+                "type": "streak_milestone",
+                "email_sent": diag_4.get("success", False),
+                "push": push_4,
+            }
+        )
 
         # 5. New Activity Released
         title_5 = "📚 New Listening Activity: 'Mastering Everyday English'"
@@ -754,10 +958,24 @@ class NotificationSchedulerService:
     <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Real-world English practice.</p>
   </div>
 </body></html>"""
-        diag_5 = BrevoEmailService.send_email_detailed(email, title_5, html_5, first_name) if email else {}
-        push_5 = NotificationDispatcher.send_push_to_user(user.username, title_5, body_5, url="/activities", tag="new-activity")
-        Notification.objects.create(username=user.username, category="new_activity", title=title_5, body=body_5)
-        results.append({"type": "new_activity", "email_sent": diag_5.get("success", False), "push": push_5})
+        diag_5 = (
+            BrevoEmailService.send_email_detailed(email, title_5, html_5, first_name)
+            if email
+            else {}
+        )
+        push_5 = NotificationDispatcher.send_push_to_user(
+            user.username, title_5, body_5, url="/activities", tag="new-activity"
+        )
+        Notification.objects.create(
+            username=user.username, category="new_activity", title=title_5, body=body_5
+        )
+        results.append(
+            {
+                "type": "new_activity",
+                "email_sent": diag_5.get("success", False),
+                "push": push_5,
+            }
+        )
 
         # 6. Inactivity Nudge
         title_6 = "Tati is waiting for you! 🍎"
@@ -773,10 +991,24 @@ class NotificationSchedulerService:
     <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Always here for your learning journey.</p>
   </div>
 </body></html>"""
-        diag_6 = BrevoEmailService.send_email_detailed(email, title_6, html_6, first_name) if email else {}
-        push_6 = NotificationDispatcher.send_push_to_user(user.username, title_6, body_6, url="/chat", tag="inactivity-nudge")
-        Notification.objects.create(username=user.username, category="retention", title=title_6, body=body_6)
-        results.append({"type": "inactivity_nudge", "email_sent": diag_6.get("success", False), "push": push_6})
+        diag_6 = (
+            BrevoEmailService.send_email_detailed(email, title_6, html_6, first_name)
+            if email
+            else {}
+        )
+        push_6 = NotificationDispatcher.send_push_to_user(
+            user.username, title_6, body_6, url="/chat", tag="inactivity-nudge"
+        )
+        Notification.objects.create(
+            username=user.username, category="retention", title=title_6, body=body_6
+        )
+        results.append(
+            {
+                "type": "inactivity_nudge",
+                "email_sent": diag_6.get("success", False),
+                "push": push_6,
+            }
+        )
 
         return {
             "success": True,
@@ -784,5 +1016,3 @@ class NotificationSchedulerService:
             "email": email,
             "notifications_dispatched": results,
         }
-
-

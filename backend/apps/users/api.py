@@ -36,6 +36,7 @@ avatar_router = Router(tags=["Avatar & Customization"])
 
 # ── ACCESS CONTROL & PERMISSIONS ──────────────────────────────────────
 
+
 @users_router.get("/permissions/access", response=AccessControlOut, auth=auth_required)
 def get_access_control(request: HttpRequest):
     """
@@ -50,7 +51,11 @@ def get_subscription_permissions(request: HttpRequest):
     Retorna detalhes de validade da assinatura do aluno.
     """
     user = request.auth
-    is_active = bool(user.is_premium_active or user.is_exempt or user.role in ['admin', 'teacher', 'staff', 'programador', 'professor'])
+    is_active = bool(
+        user.is_premium_active
+        or user.is_exempt
+        or user.role in ["admin", "teacher", "staff", "programador", "professor"]
+    )
     return {
         "is_subscribed": is_active,
         "is_active": is_active,
@@ -61,6 +66,7 @@ def get_subscription_permissions(request: HttpRequest):
 
 
 # ── STREAK & DIAS CONSECUTIVOS ────────────────────────────────────────
+
 
 @users_router.get("/streak", response=StreakDataOut, auth=auth_required)
 @users_router.get("/streak/detail", response=StreakDataOut, auth=auth_required)
@@ -81,7 +87,9 @@ def record_streak(request: HttpRequest):
     return StreakService.record_activity(request.auth, tz)
 
 
-@users_router.post("/streak/purchase-freeze", response=PurchaseFreezeOut, auth=auth_required)
+@users_router.post(
+    "/streak/purchase-freeze", response=PurchaseFreezeOut, auth=auth_required
+)
 def purchase_streak_freeze(request: HttpRequest):
     """
     Compra uma proteção de Streak Freeze por 150 XP.
@@ -90,6 +98,7 @@ def purchase_streak_freeze(request: HttpRequest):
 
 
 # ── XP & NÍVEIS ───────────────────────────────────────────────────────
+
 
 @users_router.get("/xp", response=XPOut, auth=auth_required)
 def get_xp(request: HttpRequest):
@@ -108,6 +117,7 @@ def award_xp(request: HttpRequest, payload: XPAwardInput):
 
 
 # ── METAS DE ESTUDO (GOALS) ───────────────────────────────────────────
+
 
 @users_router.get("/goals", response=List[GoalOut], auth=auth_required)
 def list_goals(request: HttpRequest):
@@ -142,6 +152,7 @@ def delete_goal(request: HttpRequest, goal_id: str):
 
 
 # ── VOCABULÁRIO & DICIONÁRIO PESSOAL ──────────────────────────────────
+
 
 @users_router.get("/vocabulary", auth=auth_optional)
 def get_vocabulary(request: HttpRequest):
@@ -195,6 +206,7 @@ def get_due_vocabulary(request: HttpRequest):
 
 # ── PLANO SEMANAL DE ESTUDOS (WEEKLY PLAN) ────────────────────────────
 
+
 @users_router.get("/weekly-plan", auth=auth_optional)
 @users_router.get("/progress/weekly-plan", auth=auth_optional)
 def get_weekly_plan(request: HttpRequest):
@@ -237,6 +249,7 @@ def get_weekly_plan_progress(request: HttpRequest):
 
 # ── ONBOARDING ────────────────────────────────────────────────────────
 
+
 @users_router.get("/onboarding", response=OnboardingStatusOut, auth=auth_required)
 def get_onboarding(request: HttpRequest):
     """
@@ -250,10 +263,13 @@ def complete_onboarding(request: HttpRequest, payload: OnboardingDoneInput):
     """
     Marca o onboarding como concluído e define o nível CEFR inicial.
     """
-    return OnboardingService.mark_done(request.auth, payload.has_seen_onboarding, payload.initial_level)
+    return OnboardingService.mark_done(
+        request.auth, payload.has_seen_onboarding, payload.initial_level
+    )
 
 
 # ── PROGRESSO & RELATÓRIOS ────────────────────────────────────────────
+
 
 @users_router.get("/progress", auth=auth_required)
 @users_router.get("/progress/reports/weekly", auth=auth_required)
@@ -300,6 +316,7 @@ def get_ranking_by_level(request: HttpRequest):
     """
     user = request.auth if isinstance(request.auth, User) else None
     from apps.activities.services import RankingService
+
     return RankingService.get_ranking_by_level(user)
 
 
@@ -310,6 +327,7 @@ def get_ranking_top15(request: HttpRequest):
     """
     user = request.auth if isinstance(request.auth, User) else None
     from apps.activities.services import RankingService
+
     return RankingService.get_top15(user)
 
 
@@ -320,6 +338,7 @@ def get_ranking_position(request: HttpRequest):
     """
     user = request.auth if isinstance(request.auth, User) else None
     from apps.activities.services import RankingService
+
     return RankingService.get_user_position(user)
 
 
@@ -347,10 +366,16 @@ def download_progress_report(request: HttpRequest, lang: str = "pt-BR"):
     if not os.path.exists(pdf_path):
         raise HttpError(500, "Erro ao gerar arquivo PDF do relatório.")
 
-    return FileResponse(open(pdf_path, 'rb'), content_type="application/pdf", filename=f"TatiAI_Report_{username}.pdf")
+    return FileResponse(
+        open(pdf_path, "rb"),
+        content_type="application/pdf",
+        filename=f"TatiAI_Report_{username}.pdf",
+    )
 
 
-@users_router.get("/progress/daily-summary", response=DailySummaryOut, auth=auth_required)
+@users_router.get(
+    "/progress/daily-summary", response=DailySummaryOut, auth=auth_required
+)
 def get_daily_summary(request: HttpRequest):
     """
     Resumo leve de palavras aprendidas hoje e mensagens da semana para o badge flutuante.
@@ -365,6 +390,7 @@ def get_daily_summary(request: HttpRequest):
 
 
 # ── NOTIFICATION PREFERENCES ──────────────────────────────────────────
+
 
 @users_router.get("/notification-preferences", auth=auth_required)
 def get_notification_preferences(request: HttpRequest):
@@ -393,7 +419,9 @@ class NotificationPreferencesInput(BaseModel):
 
 
 @users_router.put("/notification-preferences", auth=auth_required)
-def update_notification_preferences(request: HttpRequest, payload: NotificationPreferencesInput):
+def update_notification_preferences(
+    request: HttpRequest, payload: NotificationPreferencesInput
+):
     """
     Atualiza as preferências de notificação do usuário.
     """
@@ -429,12 +457,14 @@ def update_notification_preferences(request: HttpRequest, payload: NotificationP
 
 # ── AVATAR FRAMES & VOICE ANIMATION ────────────────────────────────────
 
+
 @avatar_router.get("/frames", auth=auth_optional)
 def get_avatar_frames(request: HttpRequest):
     """
     Retorna os frames de animação facial e estados da Teacher Tatiana.
     """
     from .services import AvatarService
+
     return AvatarService.get_frames()
 
 

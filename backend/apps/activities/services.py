@@ -2,7 +2,7 @@ import logging
 import os
 import re
 import difflib
-from typing import Optional, List, Dict, Any
+from typing import Optional
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from django.contrib.auth import get_user_model
@@ -17,21 +17,13 @@ from .models import (
     Trophy,
     UserTrophy,
     PremiumContent,
-    Game,
-    NewsItem,
     ActivitySubmission,
 )
 from .schemas import (
-    FlashcardOut,
-    FlashcardReviewOut,
     PodcastOut,
     HubMaterialOut,
-    GameOut,
-    NewsOut,
     TrophyOut,
     RankingUserOut,
-    SubmissionInput,
-    SubmissionOut,
     PronunciationVerifyOut,
     WordResultOut,
 )
@@ -42,7 +34,9 @@ logger = logging.getLogger(__name__)
 
 
 def normalize_slug(s: str) -> str:
-    return re.sub(r"_+", "_", re.sub(r"[^a-zA-Z0-9]", "_", (s or "").lower())).strip("_")
+    return re.sub(r"_+", "_", re.sub(r"[^a-zA-Z0-9]", "_", (s or "").lower())).strip(
+        "_"
+    )
 
 
 def matches_level(user_lvl: str, target_lvl: str, target_levels: list = None) -> bool:
@@ -52,7 +46,10 @@ def matches_level(user_lvl: str, target_lvl: str, target_levels: list = None) ->
     t = str(target_lvl).upper().strip()
     if u in ("ALL", "ANY", "") or t in ("ALL", "ANY", "", u):
         return True
-    if target_levels and (u in [str(lvl).upper().strip() for lvl in target_levels] or "ALL" in [str(lvl).upper().strip() for lvl in target_levels]):
+    if target_levels and (
+        u in [str(lvl).upper().strip() for lvl in target_levels]
+        or "ALL" in [str(lvl).upper().strip() for lvl in target_levels]
+    ):
         return True
     return False
 
@@ -63,21 +60,28 @@ class FlashcardService:
         filtered = []
 
         # 1. Busca módulos que possuem flashcards
-        modules = Module.objects.filter(is_published=True).exclude(id="00000000-0000-0000-0000-000000000001")
+        modules = Module.objects.filter(is_published=True).exclude(
+            id="00000000-0000-0000-0000-000000000001"
+        )
         for m in modules:
             fc = m.flashcards
             if fc and isinstance(fc, list) and len(fc) > 0:
                 if matches_level(user_level, m.level, m.levels):
-                    filtered.append({
-                        "id": str(m.id),
-                        "title": m.title,
-                        "description": m.description or f"Deck com {len(fc)} flashcards",
-                        "card_count": len(fc),
-                        "level": m.level,
-                        "is_published": True,
-                        "image_url": m.image_url,
-                        "created_at": m.created_at.isoformat() if m.created_at else datetime.now(timezone.utc).isoformat(),
-                    })
+                    filtered.append(
+                        {
+                            "id": str(m.id),
+                            "title": m.title,
+                            "description": m.description
+                            or f"Deck com {len(fc)} flashcards",
+                            "card_count": len(fc),
+                            "level": m.level,
+                            "is_published": True,
+                            "image_url": m.image_url,
+                            "created_at": m.created_at.isoformat()
+                            if m.created_at
+                            else datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
 
         # 2. Busca CEFR Flashcards agrupados por tópico
         cefr_cards = Flashcard.objects.filter(is_published=True)
@@ -91,15 +95,19 @@ class FlashcardService:
         for (lvl, topic), cards in grouped.items():
             topic_slug = normalize_slug(topic)
             deck_id = f"cefr_fc_{lvl.lower()}_{topic_slug}"
-            filtered.append({
-                "id": deck_id,
-                "title": f"CEFR {lvl}: {topic}",
-                "description": f"Vocabulário essencial sobre {topic}.",
-                "card_count": len(cards),
-                "level": lvl,
-                "is_published": True,
-                "created_at": cards[0].created_at.isoformat() if cards[0].created_at else datetime.now(timezone.utc).isoformat(),
-            })
+            filtered.append(
+                {
+                    "id": deck_id,
+                    "title": f"CEFR {lvl}: {topic}",
+                    "description": f"Vocabulário essencial sobre {topic}.",
+                    "card_count": len(cards),
+                    "level": lvl,
+                    "is_published": True,
+                    "created_at": cards[0].created_at.isoformat()
+                    if cards[0].created_at
+                    else datetime.now(timezone.utc).isoformat(),
+                }
+            )
 
         filtered.sort(key=lambda x: x.get("created_at") or "", reverse=True)
         return filtered
@@ -112,7 +120,9 @@ class FlashcardService:
                 lvl = parts[2].upper()
                 target_slug = normalize_slug("_".join(parts[3:]))
 
-                cefr_cards = Flashcard.objects.filter(level__iexact=lvl, is_published=True)
+                cefr_cards = Flashcard.objects.filter(
+                    level__iexact=lvl, is_published=True
+                )
                 matched = []
                 matched_topic = ""
                 for c in cefr_cards:
@@ -160,7 +170,9 @@ class FlashcardService:
 
     @staticmethod
     def get_friday_review(username: str) -> dict:
-        progress_rows = UserFlashcardProgress.objects.filter(user_id=username, status__in=["wrong", "unknown"])
+        progress_rows = UserFlashcardProgress.objects.filter(
+            user_id=username, status__in=["wrong", "unknown"]
+        )
         review_cards = []
         for r in progress_rows:
             try:
@@ -183,7 +195,11 @@ class FlashcardService:
         status = payload.get("status", "correct")
 
         now = datetime.now(timezone.utc)
-        next_review = now + timedelta(days=2) if status == "wrong" else (now + timedelta(days=1) if status == "unknown" else None)
+        next_review = (
+            now + timedelta(days=2)
+            if status == "wrong"
+            else (now + timedelta(days=1) if status == "unknown" else None)
+        )
 
         UserFlashcardProgress.objects.update_or_create(
             user_id=username,
@@ -192,7 +208,7 @@ class FlashcardService:
                 "status": status,
                 "next_review_date": next_review,
                 "reviewed_at": now,
-            }
+            },
         )
         return {"ok": True}
 
@@ -203,18 +219,26 @@ class VocabularyService:
         vocab = UserVocabulary.objects.filter(username=username)
         words = []
         for v in vocab:
-            status = "new" if v.repetitions == 0 else ("learned" if v.repetitions >= 4 else "learning")
-            words.append({
-                "id": str(v.id),
-                "term": v.word,
-                "translation": v.definition,
-                "example": v.example_sentence,
-                "status": status,
-            })
+            status = (
+                "new"
+                if v.repetitions == 0
+                else ("learned" if v.repetitions >= 4 else "learning")
+            )
+            words.append(
+                {
+                    "id": str(v.id),
+                    "term": v.word,
+                    "translation": v.definition,
+                    "example": v.example_sentence,
+                    "status": status,
+                }
+            )
         return {"words": words, "total": len(words)}
 
     @staticmethod
-    def add_word(username: str, word: str, definition: str = "", example: str = "") -> dict:
+    def add_word(
+        username: str, word: str, definition: str = "", example: str = ""
+    ) -> dict:
         uname = username.username if hasattr(username, "username") else str(username)
         word_clean = (word or "").strip().lower()
         if not word_clean:
@@ -226,7 +250,7 @@ class VocabularyService:
             defaults={
                 "definition": definition or "Word added from conversation",
                 "example_sentence": example or "",
-            }
+            },
         )
         return {
             "ok": True,
@@ -284,9 +308,9 @@ class VocabularyService:
                     "meanings": [
                         {
                             "partOfSpeech": pos,
-                            "definitions": [{"definition": defn, "example": ex}]
+                            "definitions": [{"definition": defn, "example": ex}],
                         }
-                    ]
+                    ],
                 }
             except Exception:
                 continue
@@ -297,9 +321,11 @@ class VocabularyService:
             "meanings": [
                 {
                     "partOfSpeech": "word",
-                    "definitions": [{"definition": f"Definition for {word_clean}", "example": ""}]
+                    "definitions": [
+                        {"definition": f"Definition for {word_clean}", "example": ""}
+                    ],
                 }
-            ]
+            ],
         }
 
 
@@ -381,8 +407,24 @@ class PodcastService:
 
 
 class RankingService:
-    EXCLUDED_STAFF = {"tatiana", "tati", "programador", "admin", "professor", "professora"}
-    EXCLUDED_ROLES = {"admin", "administrator", "programmer", "programador", "teacher", "professor", "professora", "buyer"}
+    EXCLUDED_STAFF = {
+        "tatiana",
+        "tati",
+        "programador",
+        "admin",
+        "professor",
+        "professora",
+    }
+    EXCLUDED_ROLES = {
+        "admin",
+        "administrator",
+        "programmer",
+        "programador",
+        "teacher",
+        "professor",
+        "professora",
+        "buyer",
+    }
 
     ACTIVITY_POINTS = {
         "grammar": 12,
@@ -405,11 +447,11 @@ class RankingService:
         rows = list(ActivitySubmission.objects.all())
         for r in rows:
             meta = r.metadata if isinstance(r.metadata, dict) else {}
-            if r.score <= 0 or str(meta.get('status') or '').lower() == 'pending':
+            if r.score <= 0 or str(meta.get("status") or "").lower() == "pending":
                 continue
-            pts = meta.get('points_awarded')
+            pts = meta.get("points_awarded")
             if pts is None:
-                cat = str(meta.get('category') or r.activity_type or '').lower().strip()
+                cat = str(meta.get("category") or r.activity_type or "").lower().strip()
                 pts = cls.ACTIVITY_POINTS.get(cat, 0)
             pts = int(pts or 0)
             if pts:
@@ -417,7 +459,7 @@ class RankingService:
 
         for u in User.objects.all():
             xp_data = u.xp_data if isinstance(u.xp_data, dict) else {}
-            legacy = int(xp_data.get('legacy_competition_points', 0) or 0)
+            legacy = int(xp_data.get("legacy_competition_points", 0) or 0)
             if legacy:
                 scores[u.username] = scores.get(u.username, 0) + legacy
 
@@ -431,19 +473,24 @@ class RankingService:
 
         students = []
         for username, user in user_map.items():
-            if username.lower() in cls.EXCLUDED_STAFF or (user.role or '').lower() in cls.EXCLUDED_ROLES:
+            if (
+                username.lower() in cls.EXCLUDED_STAFF
+                or (user.role or "").lower() in cls.EXCLUDED_ROLES
+            ):
                 continue
             score = scores.get(username, 0)
             if score > 0:
-                students.append({
-                    "username": username,
-                    "name": user.name or username,
-                    "score": score,
-                    "total_xp": score,
-                    "level": (user.level or "A1").upper(),
-                    "avatar_url": user.avatar_url,
-                    "streak_count": user.streak_count,
-                })
+                students.append(
+                    {
+                        "username": username,
+                        "name": user.name or username,
+                        "score": score,
+                        "total_xp": score,
+                        "level": (user.level or "A1").upper(),
+                        "avatar_url": user.avatar_url,
+                        "streak_count": user.streak_count,
+                    }
+                )
 
         return sorted(students, key=lambda x: x["score"], reverse=True)
 
@@ -461,7 +508,9 @@ class RankingService:
                     level=u["level"],
                     avatar_url=u["avatar_url"],
                     streak_count=u["streak_count"],
-                    is_current_user=(u["username"] == getattr(current_user, 'username', '')),
+                    is_current_user=(
+                        u["username"] == getattr(current_user, "username", "")
+                    ),
                 )
             )
         return results
@@ -479,7 +528,9 @@ class RankingService:
                 "level": u["level"],
                 "avatar_url": u["avatar_url"],
                 "streak_count": u["streak_count"],
-                "is_current_user": (u["username"] == getattr(current_user, 'username', '')),
+                "is_current_user": (
+                    u["username"] == getattr(current_user, "username", "")
+                ),
             }
             for i, u in enumerate(students[:15])
         ]
@@ -495,21 +546,32 @@ class RankingService:
             if lvl not in result:
                 lvl = "A1"
             pos = len(result[lvl]) + 1
-            result[lvl].append({
-                "position": pos,
-                "username": u["username"],
-                "name": u["name"],
-                "score": u["score"],
-                "total_xp": u["score"],
-                "level": lvl,
-                "avatar_url": u["avatar_url"],
-                "streak_count": u["streak_count"],
-                "is_current_user": (u["username"] == getattr(current_user, 'username', '')),
-            })
+            result[lvl].append(
+                {
+                    "position": pos,
+                    "username": u["username"],
+                    "name": u["name"],
+                    "score": u["score"],
+                    "total_xp": u["score"],
+                    "level": lvl,
+                    "avatar_url": u["avatar_url"],
+                    "streak_count": u["streak_count"],
+                    "is_current_user": (
+                        u["username"] == getattr(current_user, "username", "")
+                    ),
+                }
+            )
 
-        user_level = (getattr(current_user, 'level', 'A1') or "A1").upper()
+        user_level = (getattr(current_user, "level", "A1") or "A1").upper()
         level_list = result.get(user_level, [])
-        my_pos = next((x["position"] for x in level_list if x["username"] == getattr(current_user, 'username', '')), 1)
+        my_pos = next(
+            (
+                x["position"]
+                for x in level_list
+                if x["username"] == getattr(current_user, "username", "")
+            ),
+            1,
+        )
 
         return {
             **result,
@@ -521,8 +583,22 @@ class RankingService:
     @classmethod
     def get_user_position(cls, current_user: User) -> dict:
         students = cls._get_students()
-        my_pos = next((i + 1 for i, x in enumerate(students) if x["username"] == getattr(current_user, 'username', '')), 0)
-        user_score = next((x["score"] for x in students if x["username"] == getattr(current_user, 'username', '')), 0)
+        my_pos = next(
+            (
+                i + 1
+                for i, x in enumerate(students)
+                if x["username"] == getattr(current_user, "username", "")
+            ),
+            0,
+        )
+        user_score = next(
+            (
+                x["score"]
+                for x in students
+                if x["username"] == getattr(current_user, "username", "")
+            ),
+            0,
+        )
         return {
             "position": my_pos,
             "score": user_score,
@@ -534,7 +610,11 @@ class TrophyService:
     @staticmethod
     def get_trophies(user: User) -> list[TrophyOut]:
         all_trophies = Trophy.objects.all()
-        unlocked_ids = set(UserTrophy.objects.filter(username=user.username).values_list('trophy_id', flat=True))
+        unlocked_ids = set(
+            UserTrophy.objects.filter(username=user.username).values_list(
+                "trophy_id", flat=True
+            )
+        )
 
         results = []
         for t in all_trophies:
@@ -554,7 +634,9 @@ class TrophyService:
 
 class HubService:
     @staticmethod
-    def list_materials(user: Optional[User], category: str = None) -> list[HubMaterialOut]:
+    def list_materials(
+        user: Optional[User], category: str = None
+    ) -> list[HubMaterialOut]:
         qs = PremiumContent.objects.filter(is_active=True)
         if category:
             qs = qs.filter(category__iexact=category)
@@ -563,27 +645,41 @@ class HubService:
         purchased_ids = set()
 
         if user and isinstance(user, User):
-            if user.role in ('programador', 'professor', 'admin', 'Admin') or user.username in ('programador', 'admin', 'professor', 'professora'):
+            if user.role in (
+                "programador",
+                "professor",
+                "admin",
+                "Admin",
+            ) or user.username in ("programador", "admin", "professor", "professora"):
                 can_access_all = True
             else:
                 try:
                     from apps.payments.models import PremiumPurchase, Order
+
                     purchased_ids.update(
-                        str(cid) for cid in PremiumPurchase.objects.filter(
-                            username=user.username, status='confirmed'
-                        ).values_list('content_id', flat=True)
+                        str(cid)
+                        for cid in PremiumPurchase.objects.filter(
+                            username=user.username, status="confirmed"
+                        ).values_list("content_id", flat=True)
                     )
-                    confirmed_orders = Order.objects.filter(username=user.username, status='confirmed').values_list('id', flat=True)
+                    confirmed_orders = Order.objects.filter(
+                        username=user.username, status="confirmed"
+                    ).values_list("id", flat=True)
                     if confirmed_orders:
                         from django.db import connection
+
                         with connection.cursor() as cursor:
                             cursor.execute(
                                 "SELECT content_id FROM order_items WHERE order_id = ANY(%s)",
-                                [list(confirmed_orders)]
+                                [list(confirmed_orders)],
                             )
-                            purchased_ids.update(str(row[0]) for row in cursor.fetchall())
+                            purchased_ids.update(
+                                str(row[0]) for row in cursor.fetchall()
+                            )
                 except Exception as e:
-                    logger.warning(f"[Hub] Erro ao buscar compras do usuário {user.username}: {e}")
+                    logger.warning(
+                        f"[Hub] Erro ao buscar compras do usuário {user.username}: {e}"
+                    )
 
         return [
             HubMaterialOut(
@@ -597,7 +693,9 @@ class HubService:
                 category=m.category or "materials",
                 is_featured=m.is_featured,
                 is_secure=m.is_secure,
-                has_access=can_access_all or (str(m.id) in purchased_ids) or float(m.price or 0.0) == 0.0,
+                has_access=can_access_all
+                or (str(m.id) in purchased_ids)
+                or float(m.price or 0.0) == 0.0,
             )
             for m in qs
         ]
@@ -610,20 +708,33 @@ class HubService:
 
         has_access = False
         if user and isinstance(user, User):
-            if user.role in ('programador', 'professor', 'admin', 'Admin') or user.username in ('programador', 'admin', 'professor', 'professora'):
+            if user.role in (
+                "programador",
+                "professor",
+                "admin",
+                "Admin",
+            ) or user.username in ("programador", "admin", "professor", "professora"):
                 has_access = True
             else:
                 try:
                     from apps.payments.models import PremiumPurchase, Order
-                    has_purchase = PremiumPurchase.objects.filter(username=user.username, content_id=content_id, status='confirmed').exists()
+
+                    has_purchase = PremiumPurchase.objects.filter(
+                        username=user.username,
+                        content_id=content_id,
+                        status="confirmed",
+                    ).exists()
                     has_order = False
-                    confirmed_orders = Order.objects.filter(username=user.username, status='confirmed').values_list('id', flat=True)
+                    confirmed_orders = Order.objects.filter(
+                        username=user.username, status="confirmed"
+                    ).values_list("id", flat=True)
                     if confirmed_orders:
                         from django.db import connection
+
                         with connection.cursor() as cursor:
                             cursor.execute(
                                 "SELECT 1 FROM order_items WHERE order_id = ANY(%s) AND content_id = %s LIMIT 1",
-                                [list(confirmed_orders), content_id]
+                                [list(confirmed_orders), content_id],
                             )
                             has_order = cursor.fetchone() is not None
                     has_access = has_purchase or has_order
@@ -634,19 +745,25 @@ class HubService:
                 has_access = True
 
         if not has_access and float(item.price or 0.0) > 0:
-            raise HttpError(403, "Acesso bloqueado. Adquira o material no Hub ou assine o plano.")
+            raise HttpError(
+                403, "Acesso bloqueado. Adquira o material no Hub ou assine o plano."
+            )
 
         # 1. Checa se o material é do tipo documento seguro com páginas
-        from apps.activities.secure_document_service import get_client, _RAW_IMAGE_CACHE
+        from apps.activities.secure_document_service import get_client
         import json
 
         secure_pages = []
-        raw_pages = getattr(item, 'secure_pages', None)
+        raw_pages = getattr(item, "secure_pages", None)
         if not raw_pages:
             try:
                 from django.db import connection
+
                 with connection.cursor() as cursor:
-                    cursor.execute("SELECT secure_pages, processing_status FROM premium_content WHERE id = %s", [content_id])
+                    cursor.execute(
+                        "SELECT secure_pages, processing_status FROM premium_content WHERE id = %s",
+                        [content_id],
+                    )
                     row = cursor.fetchone()
                     if row and row[0]:
                         raw_pages = row[0]
@@ -663,7 +780,11 @@ class HubService:
                 secure_pages = list(raw_pages)
 
         external_links = []
-        if secure_pages and isinstance(secure_pages[-1], str) and secure_pages[-1].startswith('{"external_links"'):
+        if (
+            secure_pages
+            and isinstance(secure_pages[-1], str)
+            and secure_pages[-1].startswith('{"external_links"')
+        ):
             try:
                 meta = json.loads(secure_pages.pop())
                 external_links = meta.get("external_links", [])
@@ -671,7 +792,9 @@ class HubService:
                 pass
 
         if secure_pages:
-            base_url = os.getenv("API_URL", "https://caio007-tati-ai-backend.hf.space").rstrip('/')
+            base_url = os.getenv(
+                "API_URL", "https://caio007-tati-ai-backend.hf.space"
+            ).rstrip("/")
             page_urls = [
                 f"{base_url}/activities/hub/{content_id}/pages/{i}"
                 for i in range(len(secure_pages))
@@ -713,9 +836,21 @@ class HubService:
         if not item:
             raise HttpError(404, "Material não encontrado.")
 
-        clean_email = (payload.get("email") or getattr(user, 'email', '') or '').strip().lower()
-        clean_name = (payload.get("name") or getattr(user, 'name', '') or '').strip()
-        raw_doc = "".join(filter(str.isdigit, str(payload.get("cpf") or getattr(user, 'cpf', '') or getattr(user, 'cpf_cnpj', '') or '')))
+        clean_email = (
+            (payload.get("email") or getattr(user, "email", "") or "").strip().lower()
+        )
+        clean_name = (payload.get("name") or getattr(user, "name", "") or "").strip()
+        raw_doc = "".join(
+            filter(
+                str.isdigit,
+                str(
+                    payload.get("cpf")
+                    or getattr(user, "cpf", "")
+                    or getattr(user, "cpf_cnpj", "")
+                    or ""
+                ),
+            )
+        )
         billing_type = str(payload.get("billingType") or "PIX").upper()
 
         if user and isinstance(user, User):
@@ -723,7 +858,7 @@ class HubService:
         else:
             target_user = User.objects.filter(email=clean_email).first()
             if not target_user:
-                base_username = clean_email.split('@')[0] if clean_email else "buyer"
+                base_username = clean_email.split("@")[0] if clean_email else "buyer"
                 username = f"hub_{base_username}_{datetime.now().strftime('%H%M%S')}"
                 target_user = User.objects.create(
                     username=username,
@@ -734,8 +869,8 @@ class HubService:
                     cpf_cnpj=raw_doc,
                 )
 
-        role = getattr(target_user, 'role', 'buyer')
-        if role != 'buyer':
+        role = getattr(target_user, "role", "buyer")
+        if role != "buyer":
             price = float(item.price_students or item.price or 0.0)
         else:
             price = float(item.price_buyers or item.price or 0.0)
@@ -744,11 +879,11 @@ class HubService:
             raise HttpError(400, "Material sem preço configurado para compra.")
 
         from apps.payments.services import MercadoPagoService
-        from apps.payments.models import Order
         import uuid
 
         if billing_type == "PIX":
             from apps.payments.schemas import CreatePixInput
+
             pix_in = CreatePixInput(
                 amount=price,
                 description=f"Material Hub: {item.title}",
@@ -756,17 +891,25 @@ class HubService:
                 target_type="hub",
             )
             pix_res = MercadoPagoService.create_pix_payment(target_user, pix_in)
-            
+
             order_id = uuid.uuid4()
             from django.db import connection
+
             with connection.cursor() as cursor:
                 cursor.execute(
                     "INSERT INTO orders (id, username, total_amount, status, payment_method, asaas_id, created_at) VALUES (%s, %s, %s, %s, %s, %s, NOW())",
-                    [order_id, target_user.username, price, 'pending', 'PIX', pix_res.payment_id]
+                    [
+                        order_id,
+                        target_user.username,
+                        price,
+                        "pending",
+                        "PIX",
+                        pix_res.payment_id,
+                    ],
                 )
                 cursor.execute(
                     "INSERT INTO order_items (id, order_id, content_id, price, created_at) VALUES (%s, %s, %s, %s, NOW())",
-                    [uuid.uuid4(), order_id, item.id, price]
+                    [uuid.uuid4(), order_id, item.id, price],
                 )
 
             return {
@@ -782,6 +925,7 @@ class HubService:
             }
         else:
             from apps.payments.schemas import CreatePreferenceInput
+
             pref_in = CreatePreferenceInput(
                 amount=price,
                 title=f"Material Hub: {item.title}",
@@ -792,14 +936,22 @@ class HubService:
 
             order_id = uuid.uuid4()
             from django.db import connection
+
             with connection.cursor() as cursor:
                 cursor.execute(
                     "INSERT INTO orders (id, username, total_amount, status, payment_method, asaas_id, created_at) VALUES (%s, %s, %s, %s, %s, %s, NOW())",
-                    [order_id, target_user.username, price, 'pending', 'DEBIT_CARD', pref_res.preference_id]
+                    [
+                        order_id,
+                        target_user.username,
+                        price,
+                        "pending",
+                        "DEBIT_CARD",
+                        pref_res.preference_id,
+                    ],
                 )
                 cursor.execute(
                     "INSERT INTO order_items (id, order_id, content_id, price, created_at) VALUES (%s, %s, %s, %s, NOW())",
-                    [uuid.uuid4(), order_id, item.id, price]
+                    [uuid.uuid4(), order_id, item.id, price],
                 )
 
             return {
@@ -814,30 +966,47 @@ class HubService:
     @classmethod
     def cancel_checkout(cls, payment_id: str) -> dict:
         from django.db import connection
+
         with connection.cursor() as cursor:
-            cursor.execute("UPDATE orders SET status = 'cancelled' WHERE asaas_id = %s", [payment_id])
-            cursor.execute("UPDATE premium_purchases SET status = 'revoked' WHERE asaas_payment_id = %s", [payment_id])
+            cursor.execute(
+                "UPDATE orders SET status = 'cancelled' WHERE asaas_id = %s",
+                [payment_id],
+            )
+            cursor.execute(
+                "UPDATE premium_purchases SET status = 'revoked' WHERE asaas_payment_id = %s",
+                [payment_id],
+            )
         return {"ok": True, "message": "Pedido cancelado com sucesso."}
 
     @classmethod
     def get_checkout_status(cls, payment_id: str) -> dict:
         from apps.payments.services import MercadoPagoService
         import uuid
+
         status_res = MercadoPagoService.get_payment_status(payment_id)
         if status_res.is_approved:
             from django.db import connection
+
             with connection.cursor() as cursor:
-                cursor.execute("UPDATE orders SET status = 'confirmed', confirmed_at = NOW() WHERE asaas_id = %s", [payment_id])
-                cursor.execute("SELECT username, id FROM orders WHERE asaas_id = %s LIMIT 1", [payment_id])
+                cursor.execute(
+                    "UPDATE orders SET status = 'confirmed', confirmed_at = NOW() WHERE asaas_id = %s",
+                    [payment_id],
+                )
+                cursor.execute(
+                    "SELECT username, id FROM orders WHERE asaas_id = %s LIMIT 1",
+                    [payment_id],
+                )
                 row = cursor.fetchone()
                 if row:
                     uname, o_id = row
-                    cursor.execute("SELECT content_id FROM order_items WHERE order_id = %s", [o_id])
+                    cursor.execute(
+                        "SELECT content_id FROM order_items WHERE order_id = %s", [o_id]
+                    )
                     for i_row in cursor.fetchall():
                         cid = i_row[0]
                         cursor.execute(
                             "INSERT INTO premium_purchases (id, username, content_id, status, asaas_payment_id, created_at) VALUES (%s, %s, %s, %s, %s, NOW()) ON CONFLICT DO NOTHING",
-                            [uuid.uuid4(), uname, cid, 'confirmed', payment_id]
+                            [uuid.uuid4(), uname, cid, "confirmed", payment_id],
                         )
         return {
             "status": "confirmed" if status_res.is_approved else status_res.status,
@@ -868,28 +1037,34 @@ class SpeechService:
                 logger.warning(f"Error transcribing pronunciation audio: {e}")
                 spoken_phrase = ""
 
-        clean_target = re.sub(r'[^\w\s]', '', target_phrase.lower()).strip()
-        clean_spoken = re.sub(r'[^\w\s]', '', spoken_phrase.lower()).strip()
+        clean_target = re.sub(r"[^\w\s]", "", target_phrase.lower()).strip()
+        clean_spoken = re.sub(r"[^\w\s]", "", spoken_phrase.lower()).strip()
 
-        target_words = target_phrase.split() if target_phrase else (spoken_phrase.split() if spoken_phrase else [])
+        target_words = (
+            target_phrase.split()
+            if target_phrase
+            else (spoken_phrase.split() if spoken_phrase else [])
+        )
         spoken_words = spoken_phrase.split() if spoken_phrase else []
 
         words_out = []
         for tw in target_words:
-            clean_tw = re.sub(r'[^\w\s]', '', tw.lower())
+            clean_tw = re.sub(r"[^\w\s]", "", tw.lower())
             best_match = 0.0
             for sw in spoken_words:
-                clean_sw = re.sub(r'[^\w\s]', '', sw.lower())
+                clean_sw = re.sub(r"[^\w\s]", "", sw.lower())
                 m = difflib.SequenceMatcher(None, clean_tw, clean_sw).ratio()
                 if m > best_match:
                     best_match = m
 
             w_score = round(best_match * 100, 1)
-            words_out.append(WordResultOut(
-                word=tw,
-                score=w_score,
-                accuracy="correct" if w_score >= 65.0 else "incorrect",
-            ))
+            words_out.append(
+                WordResultOut(
+                    word=tw,
+                    score=w_score,
+                    accuracy="correct" if w_score >= 65.0 else "incorrect",
+                )
+            )
 
         if clean_target and clean_spoken:
             ratio = difflib.SequenceMatcher(None, clean_target, clean_spoken).ratio()
@@ -902,7 +1077,9 @@ class SpeechService:
         is_correct = score >= threshold
 
         if score >= 85:
-            feedback = "Excellent pronunciation! Very clear, natural and well-articulated."
+            feedback = (
+                "Excellent pronunciation! Very clear, natural and well-articulated."
+            )
         elif score >= 60:
             feedback = "Good attempt! Keep practicing word stress and vowel sounds."
         else:
@@ -931,11 +1108,15 @@ class SpeechService:
 class SubmissionService:
     @staticmethod
     def get_user_submissions(username: str) -> list[dict]:
-        subs = list(ActivitySubmission.objects.filter(username=username).order_by('-created_at'))
+        subs = list(
+            ActivitySubmission.objects.filter(username=username).order_by("-created_at")
+        )
         return [
             {
                 "id": str(s.id),
-                "activity_id": s.metadata.get("activity_id") if isinstance(s.metadata, dict) else (str(s.module_id) if s.module_id else str(s.id)),
+                "activity_id": s.metadata.get("activity_id")
+                if isinstance(s.metadata, dict)
+                else (str(s.module_id) if s.module_id else str(s.id)),
                 "module_id": str(s.module_id) if s.module_id else None,
                 "activity_type": s.activity_type,
                 "score": s.score,
@@ -958,16 +1139,22 @@ class SubmissionService:
 
         target_url = metadata.get("url") or str(activity_id)
         target_slug = metadata.get("slug") or str(activity_id)
-        status_req = metadata.get("status") or data.get("status") or ("completed" if score > 0 else "pending")
+        status_req = (
+            metadata.get("status")
+            or data.get("status")
+            or ("completed" if score > 0 else "pending")
+        )
 
         # 1. Se for marcar como PENDENTE (Reverter)
         if status_req == "pending" or score <= 0:
             from django.db.models import Q
+
             ActivitySubmission.objects.filter(
-                Q(username=username) & (
-                    Q(metadata__activity_id=str(activity_id)) |
-                    Q(metadata__url=target_url) |
-                    Q(metadata__slug=target_slug)
+                Q(username=username)
+                & (
+                    Q(metadata__activity_id=str(activity_id))
+                    | Q(metadata__url=target_url)
+                    | Q(metadata__slug=target_slug)
                 )
             ).delete()
 
@@ -985,11 +1172,13 @@ class SubmissionService:
 
         # 2. Se for marcar como CONCLUÍDO
         from django.db.models import Q
+
         ActivitySubmission.objects.filter(
-            Q(username=username) & (
-                Q(metadata__activity_id=str(activity_id)) |
-                Q(metadata__url=target_url) |
-                Q(metadata__slug=target_slug)
+            Q(username=username)
+            & (
+                Q(metadata__activity_id=str(activity_id))
+                | Q(metadata__url=target_url)
+                | Q(metadata__slug=target_slug)
             )
         ).delete()
 
@@ -1022,15 +1211,23 @@ class SubmissionService:
 class ExternalContentService:
     DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
     TE_LEVELS = ["A1", "A2", "B1", "B1+", "B2", "C1"]
-    TE_CATEGORIES = {"grammar": "grammar-points", "vocabulary": "vocabulary", "listening": "listening", "reading": "reading"}
+    TE_CATEGORIES = {
+        "grammar": "grammar-points",
+        "vocabulary": "vocabulary",
+        "listening": "listening",
+        "reading": "reading",
+    }
 
     @classmethod
-    def get_test_english_content(cls, level: str = "A1", category: str = "grammar") -> dict:
+    def get_test_english_content(
+        cls, level: str = "A1", category: str = "grammar"
+    ) -> dict:
         data_file = os.path.join(cls.DATA_DIR, "te_english_data.json")
         if not os.path.exists(data_file):
             return {"success": True, "level": level, "category": category, "items": []}
 
         import json
+
         with open(data_file, "r", encoding="utf-8") as f:
             data = json.load(f)
 
@@ -1061,12 +1258,21 @@ class ExternalContentService:
         }
 
     @classmethod
-    def get_liveworksheets_content(cls, level: str = "A1", category: str = "general") -> dict:
+    def get_liveworksheets_content(
+        cls, level: str = "A1", category: str = "general"
+    ) -> dict:
         data_file = os.path.join(cls.DATA_DIR, "liveworksheets_data.json")
         if not os.path.exists(data_file):
-            return {"success": True, "level": level, "category": category, "items": [], "worksheets": []}
+            return {
+                "success": True,
+                "level": level,
+                "category": category,
+                "items": [],
+                "worksheets": [],
+            }
 
         import json
+
         with open(data_file, "r", encoding="utf-8") as f:
             data = json.load(f)
 

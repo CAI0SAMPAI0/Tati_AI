@@ -5,46 +5,60 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Notification',
+            name="Notification",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('username', models.CharField(db_index=True, max_length=150)),
-                ('category', models.CharField(default='general', max_length=50)),
-                ('title', models.CharField(max_length=255)),
-                ('body', models.TextField()),
-                ('is_read', models.BooleanField(default=False)),
-                ('created_at', models.DateTimeField(auto_now_add=True, null=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("username", models.CharField(db_index=True, max_length=150)),
+                ("category", models.CharField(default="general", max_length=50)),
+                ("title", models.CharField(max_length=255)),
+                ("body", models.TextField()),
+                ("is_read", models.BooleanField(default=False)),
+                ("created_at", models.DateTimeField(auto_now_add=True, null=True)),
             ],
             options={
-                'db_table': 'notifications',
-                'ordering': ['-created_at'],
-                'managed': False,
+                "db_table": "notifications",
+                "ordering": ["-created_at"],
+                "managed": False,
             },
         ),
         migrations.CreateModel(
-            name='PushSubscription',
+            name="PushSubscription",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('username', models.CharField(db_index=True, max_length=150)),
-                ('endpoint', models.TextField()),
-                ('p256dh', models.TextField()),
-                ('auth', models.TextField()),
-                ('user_agent', models.TextField(blank=True, default='')),
-                ('is_active', models.BooleanField(default=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True, null=True)),
-                ('updated_at', models.DateTimeField(auto_now=True, null=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("username", models.CharField(db_index=True, max_length=150)),
+                ("endpoint", models.TextField()),
+                ("p256dh", models.TextField()),
+                ("auth", models.TextField()),
+                ("user_agent", models.TextField(blank=True, default="")),
+                ("is_active", models.BooleanField(default=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True, null=True)),
+                ("updated_at", models.DateTimeField(auto_now=True, null=True)),
             ],
             options={
-                'db_table': 'push_subscriptions',
-                'managed': False,
+                "db_table": "push_subscriptions",
+                "managed": False,
             },
         ),
     ]

@@ -1,5 +1,4 @@
 import os
-import io
 import json
 import logging
 import httpx
@@ -15,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 from apps.authentication.security import auth_required, auth_optional
 from .schemas import (
-    FlashcardOut,
     FlashcardReviewInput,
     FlashcardReviewOut,
     PodcastOut,
@@ -25,7 +23,6 @@ from .schemas import (
     TrophyOut,
     RankingUserOut,
     SubmissionInput,
-    SubmissionOut,
     PronunciationVerifyInput,
     PronunciationVerifyOut,
     CheckoutInput,
@@ -38,7 +35,6 @@ from .services import (
     HubService,
     SpeechService,
     SubmissionService,
-    VocabularyService,
 )
 from .models import Game, NewsItem
 
@@ -51,6 +47,7 @@ speech_router = Router(tags=["Speech & Pronunciation"])
 
 
 # ── FLASHCARDS & REPETIÇÃO ESPAÇADA (SRS) ────────────────────────────
+
 
 @activities_router.get("/flashcards/my", auth=auth_required)
 def get_my_flashcards(request: HttpRequest, level: Optional[str] = None):
@@ -100,24 +97,35 @@ def get_all_modules(request: HttpRequest, level: Optional[str] = None):
     """
     Retorna todos os módulos pedagógicos disponíveis.
     """
-    user_level = level or (request.auth.level if isinstance(getattr(request, 'auth', None), User) else "A1")
+    user_level = level or (
+        request.auth.level if isinstance(getattr(request, "auth", None), User) else "A1"
+    )
     return FlashcardService.get_my_decks(user_level)
 
 
-@activities_router.post("/flashcards/review", response=FlashcardReviewOut, auth=auth_required)
+@activities_router.post(
+    "/flashcards/review", response=FlashcardReviewOut, auth=auth_required
+)
 def review_flashcard(request: HttpRequest, payload: FlashcardReviewInput):
     """
     Registra a avaliação do flashcard e computa o próximo intervalo SRS.
     """
     # Fallback endpoint
-    return FlashcardReviewOut(success=True, next_review_days=1, xp_earned=10, total_xp=request.auth.total_xp)
+    return FlashcardReviewOut(
+        success=True, next_review_days=1, xp_earned=10, total_xp=request.auth.total_xp
+    )
 
 
 # ── PODCASTS & TREINAMENTO AUDITIVO ───────────────────────────────────
 
+
 @activities_router.get("/podcasts", response=List[PodcastOut], auth=auth_optional)
-@activities_router.get("/podcasts/recommendations", response=List[PodcastOut], auth=auth_optional)
-def get_podcasts(request: HttpRequest, level: Optional[str] = None, category: Optional[str] = None):
+@activities_router.get(
+    "/podcasts/recommendations", response=List[PodcastOut], auth=auth_optional
+)
+def get_podcasts(
+    request: HttpRequest, level: Optional[str] = None, category: Optional[str] = None
+):
     """
     Lista podcasts recomendados e episódios com transcrições.
     """
@@ -141,7 +149,9 @@ def get_podcast_progress(request: HttpRequest):
     return {"completed": [], "in_progress": []}
 
 
-@activities_router.get("/podcasts/{podcast_id}", response=PodcastOut, auth=auth_optional)
+@activities_router.get(
+    "/podcasts/{podcast_id}", response=PodcastOut, auth=auth_optional
+)
 def get_podcast_detail(request: HttpRequest, podcast_id: str):
     """
     Retorna os detalhes e segmentos de transcrição de um podcast.
@@ -150,6 +160,7 @@ def get_podcast_detail(request: HttpRequest, podcast_id: str):
 
 
 # ── RANKING & COMPETIÇÕES ─────────────────────────────────────────────
+
 
 @activities_router.get("/ranking", response=List[RankingUserOut], auth=auth_optional)
 def get_ranking(request: HttpRequest):
@@ -161,6 +172,7 @@ def get_ranking(request: HttpRequest):
 
 
 # ── TROFÉUS & CONQUISTAS ──────────────────────────────────────────────
+
 
 @activities_router.get("/trophies", response=List[TrophyOut], auth=auth_optional)
 @activities_router.get("/achievements", response=List[TrophyOut], auth=auth_optional)
@@ -174,12 +186,15 @@ def get_trophies(request: HttpRequest):
 
 # ── GAMES & NEWS ──────────────────────────────────────────────────────
 
+
 @activities_router.get("/games", response=List[GameOut], auth=auth_optional)
 def get_games(request: HttpRequest):
     """
     Lista jogos educativos interativos (Wordwall).
     """
-    qs = Game.objects.filter(is_published=True).only("id", "title", "description", "wordwall_url", "levels")
+    qs = Game.objects.filter(is_published=True).only(
+        "id", "title", "description", "wordwall_url", "levels"
+    )
     return [
         GameOut(
             id=g.id,
@@ -197,7 +212,9 @@ def get_news(request: HttpRequest):
     """
     Lista notícias em inglês graduadas por nível CEFR.
     """
-    qs = NewsItem.objects.filter(is_published=True).only("id", "title", "url", "description", "levels", "thumbnail_url")
+    qs = NewsItem.objects.filter(is_published=True).only(
+        "id", "title", "url", "description", "levels", "thumbnail_url"
+    )
     return [
         NewsOut(
             id=n.id,
@@ -212,6 +229,7 @@ def get_news(request: HttpRequest):
 
 
 # ── SUBMISSÕES DE ATIVIDADES ──────────────────────────────────────────
+
 
 @activities_router.get("/submissions/my", auth=auth_optional)
 def list_my_submissions(request: HttpRequest):
@@ -241,6 +259,7 @@ def submit_activity(request: HttpRequest, payload: SubmissionInput):
 
 
 # ── HUB DE MATERIAIS & PREMIUM ────────────────────────────────────────
+
 
 @activities_router.get("/hub", response=List[HubMaterialOut], auth=auth_optional)
 @activities_router.get("/hub/public", response=List[HubMaterialOut], auth=auth_optional)
@@ -283,6 +302,7 @@ def get_hub_content_access(request: HttpRequest, content_id: str):
 
 # ── CATÁLOGO PÚBLICO & CHECKOUT DE MATERIAIS ─────────────────────────
 
+
 @catalog_router.get("", response=List[HubMaterialOut], auth=auth_optional)
 def public_catalog(request: HttpRequest, category: Optional[str] = None):
     """
@@ -320,14 +340,20 @@ def catalog_checkout_status(request: HttpRequest, payment_id: str):
 
 # ── GRAMÁTICA & EXERCÍCIOS ────────────────────────────────────────────
 
+
 @grammar_router.get("", auth=auth_optional)
 @activities_router.get("/grammar", auth=auth_optional)
-def get_grammar_topics(request: HttpRequest, topic: Optional[str] = None, level: Optional[str] = None):
+def get_grammar_topics(
+    request: HttpRequest, topic: Optional[str] = None, level: Optional[str] = None
+):
     """
     Tópicos gramaticais e guias de referência por nível CEFR (A1 a C1).
     """
     from .grammar_data import GrammarService
-    effective_level = level or (request.auth.level if isinstance(request.auth, User) else "ALL")
+
+    effective_level = level or (
+        request.auth.level if isinstance(request.auth, User) else "ALL"
+    )
     return GrammarService.get_grammar(topic, effective_level)
 
 
@@ -341,12 +367,14 @@ def clear_grammar_cache(request: HttpRequest):
 
 # ── READING & LISTENING ───────────────────────────────────────────────
 
+
 @activities_router.get("/reading", auth=auth_optional)
 def get_reading_materials(request: HttpRequest, level: str = "A1"):
     """
     Retorna materiais de leitura graduados (News + Test English Reading).
     """
     from .services import ExternalContentService
+
     return ExternalContentService.get_test_english_content(level, "reading")
 
 
@@ -356,12 +384,16 @@ def get_listening_materials(request: HttpRequest, level: str = "A1"):
     Retorna materiais de compreensão auditiva (Podcasts + Test English Listening).
     """
     from .services import ExternalContentService
+
     return ExternalContentService.get_test_english_content(level, "listening")
 
 
 # ── PRONÚNCIA & SPEECH ────────────────────────────────────────────────
 
-@speech_router.post("/verify-pronunciation", response=PronunciationVerifyOut, auth=auth_optional)
+
+@speech_router.post(
+    "/verify-pronunciation", response=PronunciationVerifyOut, auth=auth_optional
+)
 def verify_pronunciation(request: HttpRequest, payload: PronunciationVerifyInput):
     """
     Avalia a precisão fonética de uma frase falada pelo aluno.
@@ -381,6 +413,7 @@ def speech_transcribe(request: HttpRequest, payload: dict):
     Transcreve áudio enviado pelo aluno.
     """
     from apps.chat.audio_service import AudioService
+
     audio_data = payload.get("audio") or ""
     text = AudioService.transcribe_audio(audio_data)
     return {"text": text, "transcription": text}
@@ -392,6 +425,7 @@ def speech_tts(request: HttpRequest, payload: dict):
     Converte texto em áudio via Edge TTS.
     """
     from apps.chat.audio_service import AudioService
+
     text = payload.get("text") or ""
     accent = payload.get("accent") or "en-US"
     audio_b64 = AudioService.text_to_speech(text, accent=accent)
@@ -400,26 +434,34 @@ def speech_tts(request: HttpRequest, payload: dict):
 
 # ── EXTERNAL CONTENT: TEST ENGLISH & LIVEWORKSHEETS ───────────────────
 
+
 @activities_router.get("/test-english/content", auth=auth_optional)
-def test_english_content(request: HttpRequest, level: str = "A1", category: str = "grammar"):
+def test_english_content(
+    request: HttpRequest, level: str = "A1", category: str = "grammar"
+):
     """
     Retorna o catálogo indexado de exercícios do Test English.
     """
     from .services import ExternalContentService
+
     return ExternalContentService.get_test_english_content(level, category)
 
 
 @activities_router.get("/liveworksheets/content", auth=auth_optional)
-def liveworksheets_content(request: HttpRequest, level: str = "A1", category: str = "general"):
+def liveworksheets_content(
+    request: HttpRequest, level: str = "A1", category: str = "general"
+):
     """
     Retorna o catálogo indexado de exercícios do LiveWorksheets.
     """
     from .services import ExternalContentService
+
     return ExternalContentService.get_liveworksheets_content(level, category)
 
 
 # Cache em memória para os proxies de imagem das atividades
 _ACTIVITY_IMAGE_CACHE = {}
+
 
 @activities_router.get("/test-english/image-proxy", auth=auth_optional)
 @activities_router.get("/liveworksheets/image-proxy", auth=auth_optional)
@@ -429,11 +471,15 @@ def proxy_activity_image(request: HttpRequest, url: str):
     """
     if not url:
         return HttpResponse(status=400)
-    
+
     if url in _ACTIVITY_IMAGE_CACHE:
         body, content_type = _ACTIVITY_IMAGE_CACHE[url]
-        return HttpResponse(body, content_type=content_type, headers={"Cache-Control": "public, max-age=86400"})
-    
+        return HttpResponse(
+            body,
+            content_type=content_type,
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
@@ -441,27 +487,42 @@ def proxy_activity_image(request: HttpRequest, url: str):
         "Sec-Fetch-Dest": "image",
         "Sec-Fetch-Mode": "no-cors",
         "Sec-Fetch-Site": "cross-site",
-        "Referer": "https://www.liveworksheets.com/" if "liveworksheets" in url else "https://test-english.com/",
+        "Referer": "https://www.liveworksheets.com/"
+        if "liveworksheets" in url
+        else "https://test-english.com/",
     }
     try:
-        with httpx.Client(headers=headers, follow_redirects=True, timeout=10.0) as client:
+        with httpx.Client(
+            headers=headers, follow_redirects=True, timeout=10.0
+        ) as client:
             resp = client.get(url)
             if resp.status_code == 200:
-                ct = resp.headers.get("content-type", "image/webp" if "webp" in url else "image/jpeg")
+                ct = resp.headers.get(
+                    "content-type", "image/webp" if "webp" in url else "image/jpeg"
+                )
                 _ACTIVITY_IMAGE_CACHE[url] = (resp.content, ct)
                 if len(_ACTIVITY_IMAGE_CACHE) > 2000:
                     _ACTIVITY_IMAGE_CACHE.pop(next(iter(_ACTIVITY_IMAGE_CACHE)))
-                return HttpResponse(resp.content, content_type=ct, headers={"Cache-Control": "public, max-age=86400"})
+                return HttpResponse(
+                    resp.content,
+                    content_type=ct,
+                    headers={"Cache-Control": "public, max-age=86400"},
+                )
     except Exception as e:
         logger.warning(f"[ImageProxy] Erro ao buscar imagem {url}: {e}")
-    
+
     # Fallback transparente SVG para evitar erro quebrado no frontend
     fallback_svg = '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"><rect width="400" height="300" fill="#1e293b"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#94a3b8" font-family="sans-serif" font-size="16">Activity Worksheet</text></svg>'
-    return HttpResponse(fallback_svg, content_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
+    return HttpResponse(
+        fallback_svg,
+        content_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 def _generate_fallback_hub_page(title: str, page_number: int, email: str) -> bytes:
     import html
+
     safe_title = html.escape(title or "Material Didático Tati AI")
     safe_email = html.escape(email or "Aluno Tati AI")
     svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1131" viewBox="0 0 800 1131">
@@ -485,36 +546,55 @@ def _generate_fallback_hub_page(title: str, page_number: int, email: str) -> byt
 
 
 @activities_router.get("/hub/{content_id}/pages/{page_index}", auth=auth_optional)
-def get_hub_page(request: HttpRequest, content_id: str, page_index: int, token: Optional[str] = None):
+def get_hub_page(
+    request: HttpRequest, content_id: str, page_index: int, token: Optional[str] = None
+):
     """
     Retorna a página de um documento seguro do Hub com marca d'água do email.
     Garante que o arquivo sempre exista e nunca retorne 500 ou 404 quebrando o visualizador.
     """
-    email = 'Aluno Tati AI'
-    title = 'Material Didático'
+    email = "Aluno Tati AI"
+    title = "Material Didático"
     try:
         user = None
         if token:
             from apps.authentication.security import decode_jwt_token
+
             payload = decode_jwt_token(token)
             if payload:
                 user = User.objects.filter(username=payload.get("sub")).first()
-        if not user and getattr(request, 'auth', None) and isinstance(request.auth, User):
+        if (
+            not user
+            and getattr(request, "auth", None)
+            and isinstance(request.auth, User)
+        ):
             user = request.auth
-        if not user and getattr(request, 'user', None) and getattr(request.user, 'is_authenticated', False):
+        if (
+            not user
+            and getattr(request, "user", None)
+            and getattr(request.user, "is_authenticated", False)
+        ):
             user = request.user
 
         if user:
-            email = getattr(user, 'email', '') or getattr(user, 'username', 'Tati AI')
+            email = getattr(user, "email", "") or getattr(user, "username", "Tati AI")
 
-        from apps.activities.secure_document_service import get_client, apply_watermark, _RAW_IMAGE_CACHE
+        from apps.activities.secure_document_service import (
+            get_client,
+            apply_watermark,
+            _RAW_IMAGE_CACHE,
+        )
 
         raw_pages = []
         preview_path = None
         content_source = None
         from django.db import connection
+
         with connection.cursor() as cursor:
-            cursor.execute("SELECT secure_pages, title, preview_path, content_source FROM premium_content WHERE id = %s", [content_id])
+            cursor.execute(
+                "SELECT secure_pages, title, preview_path, content_source FROM premium_content WHERE id = %s",
+                [content_id],
+            )
             row = cursor.fetchone()
             if row:
                 if row[0]:
@@ -531,17 +611,25 @@ def get_hub_page(request: HttpRequest, content_id: str, page_index: int, token: 
                 if len(row) > 3 and row[3]:
                     content_source = str(row[3])
 
-        if raw_pages and isinstance(raw_pages[-1], str) and raw_pages[-1].startswith('{"'):
+        if (
+            raw_pages
+            and isinstance(raw_pages[-1], str)
+            and raw_pages[-1].startswith('{"')
+        ):
             raw_pages = raw_pages[:-1]
 
         file_data = None
-        storage_path = raw_pages[page_index] if 0 <= page_index < len(raw_pages) else f"{content_id}/page_{page_index+1}.webp"
+        storage_path = (
+            raw_pages[page_index]
+            if 0 <= page_index < len(raw_pages)
+            else f"{content_id}/page_{page_index + 1}.webp"
+        )
 
         # 1. Verifica no cache em memória
         file_data = _RAW_IMAGE_CACHE.get(storage_path)
 
         # 2. Verifica no disco local persistente (MEDIA_ROOT/hub_pages/{content_id}/page_{page_index+1}.webp)
-        media_root = getattr(settings, 'MEDIA_ROOT', '/app/media')
+        media_root = getattr(settings, "MEDIA_ROOT", "/app/media")
         local_dir = os.path.join(media_root, "hub_pages", content_id)
         local_file = os.path.join(local_dir, f"page_{page_index + 1}.webp")
         if not file_data and os.path.exists(local_file):
@@ -563,9 +651,15 @@ def get_hub_page(request: HttpRequest, content_id: str, page_index: int, token: 
                     with open(local_file, "wb") as f:
                         f.write(file_data)
             except Exception as err:
-                logger.info(f"[Hub] Download via client falhou ({err}), tentando via HTTP direto...")
+                logger.info(
+                    f"[Hub] Download via client falhou ({err}), tentando via HTTP direto..."
+                )
                 try:
-                    supa_url = getattr(settings, 'SUPABASE_URL', 'https://gkziqqjswecteekanwnv.supabase.co').rstrip('/')
+                    supa_url = getattr(
+                        settings,
+                        "SUPABASE_URL",
+                        "https://gkziqqjswecteekanwnv.supabase.co",
+                    ).rstrip("/")
                     public_img_url = f"{supa_url}/storage/v1/object/public/hub-secure-pages/{storage_path}"
                     with httpx.Client(timeout=10.0) as client:
                         resp = client.get(public_img_url)
@@ -576,13 +670,16 @@ def get_hub_page(request: HttpRequest, content_id: str, page_index: int, token: 
                             with open(local_file, "wb") as f:
                                 f.write(file_data)
                 except Exception as e2:
-                    logger.warning(f"[Hub] Erro ao baixar página do Supabase {storage_path}: {e2}")
+                    logger.warning(
+                        f"[Hub] Erro ao baixar página do Supabase {storage_path}: {e2}"
+                    )
 
         # 4. Se o Supabase falhou (ex: 402 Payment Required), tenta sincronizar/regerar a partir do content_source
         if not file_data and content_source:
             try:
                 from .tasks import sync_material_pages
                 from .models import PremiumContent
+
                 m = PremiumContent.objects.filter(id=content_id).first()
                 if m and sync_material_pages(m):
                     if os.path.exists(local_file):
@@ -590,13 +687,19 @@ def get_hub_page(request: HttpRequest, content_id: str, page_index: int, token: 
                             file_data = f.read()
                             _RAW_IMAGE_CACHE[storage_path] = file_data
             except Exception as sync_err:
-                logger.warning(f"[Hub] Erro no auto-sync de emergência para {content_id}: {sync_err}")
+                logger.warning(
+                    f"[Hub] Erro no auto-sync de emergência para {content_id}: {sync_err}"
+                )
 
         # 5. Fallback para preview caso a página específica não esteja disponível e seja a primeira página
         if not file_data and preview_path and page_index == 0:
             try:
-                supa_url = getattr(settings, 'SUPABASE_URL', 'https://gkziqqjswecteekanwnv.supabase.co').rstrip('/')
-                preview_img_url = f"{supa_url}/storage/v1/object/public/hub-previews/{preview_path}"
+                supa_url = getattr(
+                    settings, "SUPABASE_URL", "https://gkziqqjswecteekanwnv.supabase.co"
+                ).rstrip("/")
+                preview_img_url = (
+                    f"{supa_url}/storage/v1/object/public/hub-previews/{preview_path}"
+                )
                 with httpx.Client(timeout=8.0) as client:
                     resp = client.get(preview_img_url)
                     if resp.status_code == 200:
@@ -607,24 +710,43 @@ def get_hub_page(request: HttpRequest, content_id: str, page_index: int, token: 
         # 6. Se ainda assim não houver imagem física, gera dinamicamente a página com marca d'água evitando 404/500
         if not file_data:
             fallback_svg = _generate_fallback_hub_page(title, page_index + 1, email)
-            return HttpResponse(fallback_svg, content_type="image/svg+xml", headers={"Cache-Control": "public, max-age=60"})
+            return HttpResponse(
+                fallback_svg,
+                content_type="image/svg+xml",
+                headers={"Cache-Control": "public, max-age=60"},
+            )
 
         try:
             watermarked = apply_watermark(file_data, email)
-            return HttpResponse(watermarked, content_type="image/webp", headers={"Cache-Control": "private, max-age=3600"})
+            return HttpResponse(
+                watermarked,
+                content_type="image/webp",
+                headers={"Cache-Control": "private, max-age=3600"},
+            )
         except Exception as e:
             logger.warning(f"[Hub] Erro ao aplicar watermark: {e}")
-            return HttpResponse(file_data, content_type="image/webp", headers={"Cache-Control": "private, max-age=3600"})
+            return HttpResponse(
+                file_data,
+                content_type="image/webp",
+                headers={"Cache-Control": "private, max-age=3600"},
+            )
 
     except Exception as fatal_err:
-        logger.error(f"[Hub] Erro inesperado em get_hub_page para {content_id} pág {page_index}: {fatal_err}")
+        logger.error(
+            f"[Hub] Erro inesperado em get_hub_page para {content_id} pág {page_index}: {fatal_err}"
+        )
         fallback_svg = _generate_fallback_hub_page(title, page_index + 1, email)
-        return HttpResponse(fallback_svg, content_type="image/svg+xml", headers={"Cache-Control": "public, max-age=60"})
+        return HttpResponse(
+            fallback_svg,
+            content_type="image/svg+xml",
+            headers={"Cache-Control": "public, max-age=60"},
+        )
 
 
 # ── FLASHCARD ASSETS & CLOUDINARY UPLOAD ──────────────────────────────
 
 flashcard_assets_router = Router(tags=["Flashcard Assets"])
+
 
 @flashcard_assets_router.post("/upload-image", auth=auth_optional)
 def upload_flashcard_image(request: HttpRequest, file: UploadedFile = File(...)):
@@ -632,6 +754,7 @@ def upload_flashcard_image(request: HttpRequest, file: UploadedFile = File(...))
     Faz upload de imagem para o Cloudinary para os flashcards.
     """
     from .assets_service import CloudinaryService
+
     content = file.read()
     url = CloudinaryService.upload_file(content, file.name)
     return {"url": url}
@@ -643,6 +766,7 @@ def upload_flashcard_image_from_url(request: HttpRequest, payload: dict):
     Salva imagem no Cloudinary a partir de uma URL.
     """
     from .assets_service import CloudinaryService
+
     image_url = payload.get("url")
     if not image_url:
         raise HttpError(400, "URL é obrigatória.")
@@ -675,7 +799,8 @@ def list_admin_premium(request: HttpRequest):
     Lista todos os materiais do Hub e da Loja Premium para o painel da professora.
     """
     from .models import PremiumContent
-    materials = PremiumContent.objects.all().order_by('-created_at')
+
+    materials = PremiumContent.objects.all().order_by("-created_at")
     return [
         {
             "id": str(m.id),
@@ -702,6 +827,7 @@ def upload_premium_file(request: HttpRequest, file: UploadedFile = File(...)):
     Upload de material digital (PDF/DOC/Vídeo) para o Cloudinary.
     """
     from .assets_service import CloudinaryService
+
     content = file.read()
     url = CloudinaryService.upload_file(content, file.name)
     return {"file_path": url, "url": url}
@@ -713,6 +839,7 @@ def sync_all_premium_materials(request: HttpRequest):
     Sincroniza e garante o cache local em disco de todos os materiais do Hub.
     """
     from .tasks import sync_hub_materials_task
+
     result = sync_hub_materials_task()
     return {"success": True, "result": result}
 
@@ -721,6 +848,7 @@ def sync_all_premium_materials(request: HttpRequest):
 def create_admin_premium(request: HttpRequest, payload: AdminPremiumIn):
     from .models import PremiumContent
     import uuid
+
     title = (payload.title or "").strip()
     if not title:
         raise HttpError(400, "Title is required")
@@ -742,8 +870,11 @@ def create_admin_premium(request: HttpRequest, payload: AdminPremiumIn):
 
 
 @admin_premium_router.put("/{content_id}", auth=auth_optional)
-def update_admin_premium(request: HttpRequest, content_id: str, payload: AdminPremiumIn):
+def update_admin_premium(
+    request: HttpRequest, content_id: str, payload: AdminPremiumIn
+):
     from .models import PremiumContent
+
     m = PremiumContent.objects.filter(id=content_id).first()
     if not m:
         raise HttpError(404, "Material não encontrado.")
@@ -758,6 +889,7 @@ def update_admin_premium(request: HttpRequest, content_id: str, payload: AdminPr
 @admin_premium_router.delete("/{content_id}", auth=auth_optional)
 def delete_admin_premium(request: HttpRequest, content_id: str):
     from .models import PremiumContent
+
     m = PremiumContent.objects.filter(id=content_id).first()
     if m:
         m.delete()
@@ -769,12 +901,14 @@ def delete_admin_premium(request: HttpRequest, content_id: str):
 
 cefr_admin_router = Router(tags=["CEFR & Scheduler Admin"])
 
+
 @cefr_admin_router.get("/all", auth=auth_optional)
 def get_cefr_all(request: HttpRequest):
     from .models import Flashcard
     from apps.chat.models import CEFRSimulation
-    fc = list(Flashcard.objects.all().order_by('level', 'front'))
-    sims = list(CEFRSimulation.objects.all().order_by('level', 'topic'))
+
+    fc = list(Flashcard.objects.all().order_by("level", "front"))
+    sims = list(CEFRSimulation.objects.all().order_by("level", "topic"))
     return {
         "success": True,
         "flashcards": [
@@ -808,6 +942,7 @@ def get_cefr_all(request: HttpRequest):
 @cefr_admin_router.get("/references", auth=auth_optional)
 def get_cefr_references(request: HttpRequest):
     from .models import CEFRReference
+
     refs = list(CEFRReference.objects.all())
     return {
         "success": True,
@@ -822,13 +957,14 @@ def get_cefr_references(request: HttpRequest):
                 "chunks_indexed": r.chunks_indexed,
             }
             for r in refs
-        ]
+        ],
     }
 
 
 @cefr_admin_router.get("/schedules", auth=auth_optional)
 def get_cefr_schedules(request: HttpRequest):
     from .models import CEFRSchedule
+
     schedules = list(CEFRSchedule.objects.all())
     return {
         "success": True,
@@ -843,7 +979,7 @@ def get_cefr_schedules(request: HttpRequest):
                 "selected_types": s.selected_types or ["flashcards", "simulations"],
             }
             for s in schedules
-        ]
+        ],
     }
 
 
@@ -867,6 +1003,7 @@ class CEFRFlashcardGroupSaveSchema(BaseModel):
 @cefr_admin_router.post("/schedules", auth=auth_optional)
 def create_cefr_schedule(request: HttpRequest, payload: CEFRScheduleSchema):
     from .models import CEFRSchedule
+
     s = CEFRSchedule.objects.create(
         active=payload.active,
         weekdays=payload.weekdays,
@@ -879,8 +1016,11 @@ def create_cefr_schedule(request: HttpRequest, payload: CEFRScheduleSchema):
 
 
 @cefr_admin_router.put("/schedules/{schedule_id}", auth=auth_optional)
-def update_cefr_schedule(request: HttpRequest, schedule_id: str, payload: CEFRScheduleSchema):
+def update_cefr_schedule(
+    request: HttpRequest, schedule_id: str, payload: CEFRScheduleSchema
+):
     from .models import CEFRSchedule
+
     s = CEFRSchedule.objects.filter(id=schedule_id).first()
     if not s:
         raise HttpError(404, "Agendamento não encontrado.")
@@ -897,6 +1037,7 @@ def update_cefr_schedule(request: HttpRequest, schedule_id: str, payload: CEFRSc
 @cefr_admin_router.delete("/schedules/{schedule_id}", auth=auth_optional)
 def delete_cefr_schedule(request: HttpRequest, schedule_id: str):
     from .models import CEFRSchedule
+
     s = CEFRSchedule.objects.filter(id=schedule_id).first()
     if s:
         s.delete()
@@ -910,6 +1051,7 @@ def extract_cefr_topics(request: HttpRequest, reference_ids: Optional[str] = Non
     Extrai tópicos e subtemas pedagógicos dos materiais indexados usando IA e alinhados ao nível CEFR.
     """
     from .models import CEFRReference
+
     level = "A1"
     if reference_ids:
         ref_id_list = [r.strip() for r in reference_ids.split(",") if r.strip()]
@@ -920,28 +1062,191 @@ def extract_cefr_topics(request: HttpRequest, reference_ids: Optional[str] = Non
     lvl = level.upper()
     if lvl in ["B1", "B2"]:
         topics = [
-            {"topic": "Airport, Boarding and Flight Procedures", "items": ["boarding pass", "security checkpoint", "customs declaration", "carry-on luggage", "gate change", "departure lounge"], "count": 6},
-            {"topic": "Job Interviews and Professional Career", "items": ["work experience", "strengths and weaknesses", "career goals", "leadership skills", "salary expectations"], "count": 5},
-            {"topic": "Housing, Rent and Utilities", "items": ["lease agreement", "security deposit", "monthly rent", "utilities included", "landlord obligations"], "count": 5},
-            {"topic": "Technology and Digital Communication", "items": ["cloud storage", "data privacy", "software development", "cybersecurity", "remote collaboration"], "count": 5},
-            {"topic": "Environment and Sustainable Living", "items": ["renewable energy", "carbon footprint", "recycling policies", "global warming", "biodiversity"], "count": 5},
+            {
+                "topic": "Airport, Boarding and Flight Procedures",
+                "items": [
+                    "boarding pass",
+                    "security checkpoint",
+                    "customs declaration",
+                    "carry-on luggage",
+                    "gate change",
+                    "departure lounge",
+                ],
+                "count": 6,
+            },
+            {
+                "topic": "Job Interviews and Professional Career",
+                "items": [
+                    "work experience",
+                    "strengths and weaknesses",
+                    "career goals",
+                    "leadership skills",
+                    "salary expectations",
+                ],
+                "count": 5,
+            },
+            {
+                "topic": "Housing, Rent and Utilities",
+                "items": [
+                    "lease agreement",
+                    "security deposit",
+                    "monthly rent",
+                    "utilities included",
+                    "landlord obligations",
+                ],
+                "count": 5,
+            },
+            {
+                "topic": "Technology and Digital Communication",
+                "items": [
+                    "cloud storage",
+                    "data privacy",
+                    "software development",
+                    "cybersecurity",
+                    "remote collaboration",
+                ],
+                "count": 5,
+            },
+            {
+                "topic": "Environment and Sustainable Living",
+                "items": [
+                    "renewable energy",
+                    "carbon footprint",
+                    "recycling policies",
+                    "global warming",
+                    "biodiversity",
+                ],
+                "count": 5,
+            },
         ]
     elif lvl in ["C1", "C2"]:
         topics = [
-            {"topic": "Diplomatic Negotiations and Global Trade", "items": ["bilateral agreements", "tariff exemptions", "geopolitical diplomacy", "economic sanctions", "multilateral treaties"], "count": 5},
-            {"topic": "Advanced Academic Rhetoric and Research", "items": ["empirical methodology", "paradigm shift", "statistical validity", "peer review process", "hypothesis testing"], "count": 5},
-            {"topic": "Ethics in Artificial Intelligence", "items": ["algorithmic bias", "autonomous systems", "moral accountability", "data governance", "machine learning safety"], "count": 5},
+            {
+                "topic": "Diplomatic Negotiations and Global Trade",
+                "items": [
+                    "bilateral agreements",
+                    "tariff exemptions",
+                    "geopolitical diplomacy",
+                    "economic sanctions",
+                    "multilateral treaties",
+                ],
+                "count": 5,
+            },
+            {
+                "topic": "Advanced Academic Rhetoric and Research",
+                "items": [
+                    "empirical methodology",
+                    "paradigm shift",
+                    "statistical validity",
+                    "peer review process",
+                    "hypothesis testing",
+                ],
+                "count": 5,
+            },
+            {
+                "topic": "Ethics in Artificial Intelligence",
+                "items": [
+                    "algorithmic bias",
+                    "autonomous systems",
+                    "moral accountability",
+                    "data governance",
+                    "machine learning safety",
+                ],
+                "count": 5,
+            },
         ]
     else:
         topics = [
-            {"topic": "Family and Relationships", "items": ["father", "mother", "sister", "brother", "cousin", "grandparents"], "count": 6},
-            {"topic": "Hobbies and Free Time", "items": ["reading", "cycling", "cooking", "traveling", "listening to music"], "count": 5},
-            {"topic": "Work and Occupations", "items": ["teacher", "engineer", "doctor", "lawyer", "programmer", "manager"], "count": 6},
-            {"topic": "Daily Routine", "items": ["wake up", "take a shower", "have breakfast", "go to work", "study"], "count": 5},
-            {"topic": "Food and Dining", "items": ["breakfast", "lunch", "dinner", "vegetables", "fruit", "restaurant", "order"], "count": 7},
-            {"topic": "Shopping and Clothes", "items": ["shirt", "pants", "shoes", "jacket", "price", "size", "discount"], "count": 7},
-            {"topic": "Travel and Airport", "items": ["passport", "ticket", "hotel", "luggage", "vacation"], "count": 5},
-            {"topic": "Weather and Seasons", "items": ["sunny", "rainy", "cloudy", "winter", "summer", "spring", "autumn"], "count": 7},
+            {
+                "topic": "Family and Relationships",
+                "items": [
+                    "father",
+                    "mother",
+                    "sister",
+                    "brother",
+                    "cousin",
+                    "grandparents",
+                ],
+                "count": 6,
+            },
+            {
+                "topic": "Hobbies and Free Time",
+                "items": [
+                    "reading",
+                    "cycling",
+                    "cooking",
+                    "traveling",
+                    "listening to music",
+                ],
+                "count": 5,
+            },
+            {
+                "topic": "Work and Occupations",
+                "items": [
+                    "teacher",
+                    "engineer",
+                    "doctor",
+                    "lawyer",
+                    "programmer",
+                    "manager",
+                ],
+                "count": 6,
+            },
+            {
+                "topic": "Daily Routine",
+                "items": [
+                    "wake up",
+                    "take a shower",
+                    "have breakfast",
+                    "go to work",
+                    "study",
+                ],
+                "count": 5,
+            },
+            {
+                "topic": "Food and Dining",
+                "items": [
+                    "breakfast",
+                    "lunch",
+                    "dinner",
+                    "vegetables",
+                    "fruit",
+                    "restaurant",
+                    "order",
+                ],
+                "count": 7,
+            },
+            {
+                "topic": "Shopping and Clothes",
+                "items": [
+                    "shirt",
+                    "pants",
+                    "shoes",
+                    "jacket",
+                    "price",
+                    "size",
+                    "discount",
+                ],
+                "count": 7,
+            },
+            {
+                "topic": "Travel and Airport",
+                "items": ["passport", "ticket", "hotel", "luggage", "vacation"],
+                "count": 5,
+            },
+            {
+                "topic": "Weather and Seasons",
+                "items": [
+                    "sunny",
+                    "rainy",
+                    "cloudy",
+                    "winter",
+                    "summer",
+                    "spring",
+                    "autumn",
+                ],
+                "count": 7,
+            },
         ]
     return {"success": True, "level": lvl, "topics": topics}
 
@@ -968,7 +1273,11 @@ def generate_cefr_flashcards(
         title=title,
         reference_ids=reference_ids,
     )
-    return {"success": True, "task_id": str(uuid.uuid4()), "cards_generated": len(cards)}
+    return {
+        "success": True,
+        "task_id": str(uuid.uuid4()),
+        "cards_generated": len(cards),
+    }
 
 
 @cefr_admin_router.post("/generate-simulations", auth=auth_optional)
@@ -997,7 +1306,11 @@ def generate_cefr_simulations(
 
 
 @cefr_admin_router.post("/upload-material", auth=auth_optional)
-def upload_cefr_material(request: HttpRequest, files: List[UploadedFile] = File(...), level: Optional[str] = None):
+def upload_cefr_material(
+    request: HttpRequest,
+    files: List[UploadedFile] = File(...),
+    level: Optional[str] = None,
+):
     """
     Faz upload e indexação de arquivos de referência didática (PDF, DOCX, TXT).
     """
@@ -1018,12 +1331,14 @@ def upload_cefr_material(request: HttpRequest, files: List[UploadedFile] = File(
             file_size=len(content),
             chunks_indexed=3,
         )
-        results.append({
-            "filename": f.name,
-            "success": True,
-            "id": str(ref.id),
-            "url": storage_url,
-        })
+        results.append(
+            {
+                "filename": f.name,
+                "success": True,
+                "id": str(ref.id),
+                "url": storage_url,
+            }
+        )
     return {"success": True, "results": results}
 
 
@@ -1033,17 +1348,23 @@ def delete_cefr_reference(request: HttpRequest, reference_id: str):
     Exclui um documento de referência didática.
     """
     from .models import CEFRReference
+
     CEFRReference.objects.filter(id=reference_id).delete()
     return {"success": True, "message": "Reference deleted successfully."}
 
 
 @cefr_admin_router.put("/flashcards/group", auth=auth_optional)
-def toggle_publish_flashcard_group(request: HttpRequest, level: str, topic: str, is_published: bool):
+def toggle_publish_flashcard_group(
+    request: HttpRequest, level: str, topic: str, is_published: bool
+):
     """
     Aprova ou retorna para rascunho um baralho de flashcards do curador.
     """
     from .models import Flashcard
-    updated = Flashcard.objects.filter(level__iexact=level, topic__iexact=topic).update(is_published=is_published)
+
+    updated = Flashcard.objects.filter(level__iexact=level, topic__iexact=topic).update(
+        is_published=is_published
+    )
     return {"success": True, "updated": updated}
 
 
@@ -1053,7 +1374,10 @@ def delete_flashcard_group(request: HttpRequest, level: str, topic: str):
     Exclui um grupo inteiro de flashcards por nível e tópico.
     """
     from .models import Flashcard
-    deleted = Flashcard.objects.filter(level__iexact=level, topic__iexact=topic).delete()
+
+    deleted = Flashcard.objects.filter(
+        level__iexact=level, topic__iexact=topic
+    ).delete()
     return {"success": True, "message": f"Deleted group {topic}"}
 
 
@@ -1066,7 +1390,9 @@ def save_flashcard_group(request: HttpRequest, body: CEFRFlashcardGroupSaveSchem
     import uuid
 
     # Remove cards antigos
-    Flashcard.objects.filter(level__iexact=body.old_level, topic__iexact=body.old_topic).delete()
+    Flashcard.objects.filter(
+        level__iexact=body.old_level, topic__iexact=body.old_topic
+    ).delete()
 
     # Cria novos cards
     inserted = []
@@ -1090,6 +1416,7 @@ def save_flashcard_group(request: HttpRequest, body: CEFRFlashcardGroupSaveSchem
     if has_published:
         try:
             from apps.notifications.services import NotificationDispatcher
+
             NotificationDispatcher.notify_students_for_activity(
                 activity_type="Flashcards CEFR",
                 title=body.new_topic,
@@ -1098,7 +1425,9 @@ def save_flashcard_group(request: HttpRequest, body: CEFRFlashcardGroupSaveSchem
                 url="/activities",
             )
         except Exception as exc:
-            logger.warning(f"[CEFR Admin] Erro ao notificar alunos de flashcards: {exc}")
+            logger.warning(
+                f"[CEFR Admin] Erro ao notificar alunos de flashcards: {exc}"
+            )
 
     return {"success": True, "inserted": len(inserted)}
 
@@ -1109,6 +1438,7 @@ def update_cefr_simulation(request: HttpRequest, sim_id: str, payload: dict):
     Atualiza status, nível ou conteúdo de uma simulação CEFR.
     """
     from apps.chat.models import CEFRSimulation
+
     clean_id = sim_id.replace("cefr_sim_", "")
     cs = CEFRSimulation.objects.filter(id=clean_id).first()
     if not cs:
@@ -1131,6 +1461,7 @@ def update_cefr_simulation(request: HttpRequest, sim_id: str, payload: dict):
     if cs.is_published and not was_published:
         try:
             from apps.notifications.services import NotificationDispatcher
+
             NotificationDispatcher.notify_students_for_activity(
                 activity_type="Simulação CEFR",
                 title=cs.topic,
@@ -1150,6 +1481,7 @@ def delete_cefr_simulation(request: HttpRequest, sim_id: str):
     Exclui uma simulação CEFR.
     """
     from apps.chat.models import CEFRSimulation
+
     clean_id = sim_id.replace("cefr_sim_", "")
     CEFRSimulation.objects.filter(id=clean_id).delete()
     return {"success": True, "message": "Simulation deleted successfully."}
@@ -1159,12 +1491,14 @@ def delete_cefr_simulation(request: HttpRequest, sim_id: str):
 
 cefr_images_router = Router(tags=["CEFR Images"])
 
+
 @cefr_images_router.get("/resolve", auth=auth_optional)
 def resolve_cefr_image(request: HttpRequest, query: Optional[str] = "study"):
     """
     Resolve e retorna imagem ilustrativa real para palavras e tópicos CEFR via Unsplash/Pexels.
     """
     from .image_service import ImageResolverService
+
     term = query or "study"
     url = ImageResolverService.resolve_image(term)
     return {
@@ -1182,6 +1516,7 @@ def resolve_cefr_images_batch(request: HttpRequest, payload: Optional[dict] = No
     Resolve imagens em lote para flashcards via Unsplash/Pexels.
     """
     from .image_service import ImageResolverService
+
     terms = (payload or {}).get("terms", [])
     results = ImageResolverService.resolve_batch(terms)
     return {"success": True, "results": results}

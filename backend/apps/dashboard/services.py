@@ -69,11 +69,18 @@ class DashboardService:
     def get_stats() -> dict:
         today = date.today()
         base_users = User.objects.exclude(username__in=EXCLUDED_USERS)
-        total_students = base_users.exclude(role='buyer').count()
-        total_buyers = base_users.filter(role='buyer').count()
+        total_students = base_users.exclude(role="buyer").count()
+        total_buyers = base_users.filter(role="buyer").count()
 
-        messages_today = Message.objects.filter(role='user', created_at__date=today).count()
-        active_today = Message.objects.filter(role='user', created_at__date=today).values('username').distinct().count()
+        messages_today = Message.objects.filter(
+            role="user", created_at__date=today
+        ).count()
+        active_today = (
+            Message.objects.filter(role="user", created_at__date=today)
+            .values("username")
+            .distinct()
+            .count()
+        )
 
         return {
             "total_students": total_students,
@@ -84,9 +91,13 @@ class DashboardService:
 
     @staticmethod
     def get_my_stats(username: str) -> dict:
-        msgs = Message.objects.filter(username=username, role='user').count()
+        msgs = Message.objects.filter(username=username, role="user").count()
         subs = ActivitySubmission.objects.filter(username=username).count()
-        u = User.objects.filter(username=username).only('streak_data', 'xp_data').first()
+        u = (
+            User.objects.filter(username=username)
+            .only("streak_data", "xp_data")
+            .first()
+        )
         streak = u.streak_count if u else 0
         xp = u.total_xp if u else 0
 
@@ -102,20 +113,32 @@ class DashboardService:
 
     @staticmethod
     def get_reports_overview() -> dict:
-        base_users = User.objects.exclude(username__in=EXCLUDED_USERS).exclude(role='buyer')
+        base_users = User.objects.exclude(username__in=EXCLUDED_USERS).exclude(
+            role="buyer"
+        )
         total_students = base_users.count()
 
-        total_msgs = Message.objects.filter(role='user').count()
+        total_msgs = Message.objects.filter(role="user").count()
         total_exercises = ActivitySubmission.objects.count()
 
         # Carrega apenas campos necessários para métricas de usuário
-        users = list(base_users.only('name', 'username', 'level', 'streak_data', 'xp_data'))
+        users = list(
+            base_users.only("name", "username", "level", "streak_data", "xp_data")
+        )
 
         active_users = [u for u in users if u.streak_count > 0]
-        avg_streak = round(sum(u.streak_count for u in users) / total_students, 1) if total_students > 0 else 0.0
+        avg_streak = (
+            round(sum(u.streak_count for u in users) / total_students, 1)
+            if total_students > 0
+            else 0.0
+        )
 
         top_user = max(users, key=lambda u: u.total_xp, default=None) if users else None
-        top_name = f"{top_user.name or top_user.username} ({top_user.total_xp} XP)" if top_user else "Nenhum"
+        top_name = (
+            f"{top_user.name or top_user.username} ({top_user.total_xp} XP)"
+            if top_user
+            else "Nenhum"
+        )
 
         # Level distribution real
         counts = {"A1": 0, "A2": 0, "B1": 0, "B2": 0, "C1": 0, "C2": 0}
@@ -127,13 +150,15 @@ class DashboardService:
         today = date.today()
         seven_days_ago = today - timedelta(days=6)
         daily_counts_qs = (
-            Message.objects.filter(role='user', created_at__date__gte=seven_days_ago)
-            .annotate(day=TruncDate('created_at'))
-            .values('day')
-            .annotate(count=Count('id'))
+            Message.objects.filter(role="user", created_at__date__gte=seven_days_ago)
+            .annotate(day=TruncDate("created_at"))
+            .values("day")
+            .annotate(count=Count("id"))
         )
-        counts_by_day = {item['day']: item['count'] for item in daily_counts_qs}
-        weekly_counts = [counts_by_day.get(today - timedelta(days=i), 0) for i in range(6, -1, -1)]
+        counts_by_day = {item["day"]: item["count"] for item in daily_counts_qs}
+        weekly_counts = [
+            counts_by_day.get(today - timedelta(days=i), 0) for i in range(6, -1, -1)
+        ]
 
         return {
             "total_students": total_students,
@@ -148,34 +173,40 @@ class DashboardService:
 
     @staticmethod
     def get_students_list(search: str = None, level: str = None) -> list[dict]:
-        users = User.objects.exclude(username__in=EXCLUDED_USERS).exclude(role='buyer')
+        users = User.objects.exclude(username__in=EXCLUDED_USERS).exclude(role="buyer")
         if search:
-            users = users.filter(username__icontains=search) | users.filter(name__icontains=search) | users.filter(email__icontains=search)
+            users = (
+                users.filter(username__icontains=search)
+                | users.filter(name__icontains=search)
+                | users.filter(email__icontains=search)
+            )
         if level:
             users = users.filter(level__iexact=level)
 
         # Mapeia última mensagem e total por usuário via agregação SQL
         msg_stats = (
-            Message.objects.filter(role='user')
-            .values('username')
-            .annotate(count=Count('id'), last_active=Max('created_at'))
+            Message.objects.filter(role="user")
+            .values("username")
+            .annotate(count=Count("id"), last_active=Max("created_at"))
         )
-        msg_counts = {m['username']: m['count'] for m in msg_stats}
-        latest_msgs = {m['username']: m['last_active'] for m in msg_stats}
+        msg_counts = {m["username"]: m["count"] for m in msg_stats}
+        latest_msgs = {m["username"]: m["last_active"] for m in msg_stats}
 
         # Mapeia última submissão por usuário via agregação SQL
-        sub_stats = (
-            ActivitySubmission.objects.values('username')
-            .annotate(last_active=Max('created_at'))
+        sub_stats = ActivitySubmission.objects.values("username").annotate(
+            last_active=Max("created_at")
         )
-        latest_subs = {s['username']: s['last_active'] for s in sub_stats}
+        latest_subs = {s["username"]: s["last_active"] for s in sub_stats}
 
         # Mapeia última palavra adicionada no vocabulário
         latest_vocab = {}
         try:
             from apps.activities.models import UserVocabulary, UserFlashcardProgress
-            vocab_stats = UserVocabulary.objects.values('username').annotate(last_active=Max('created_at'))
-            latest_vocab = {v['username']: v['last_active'] for v in vocab_stats}
+
+            vocab_stats = UserVocabulary.objects.values("username").annotate(
+                last_active=Max("created_at")
+            )
+            latest_vocab = {v["username"]: v["last_active"] for v in vocab_stats}
         except Exception:
             pass
 
@@ -183,8 +214,11 @@ class DashboardService:
         latest_fc = {}
         try:
             from apps.activities.models import UserFlashcardProgress
-            fc_stats = UserFlashcardProgress.objects.values('user_id').annotate(last_active=Max('reviewed_at'))
-            latest_fc = {f['user_id']: f['last_active'] for f in fc_stats}
+
+            fc_stats = UserFlashcardProgress.objects.values("user_id").annotate(
+                last_active=Max("reviewed_at")
+            )
+            latest_fc = {f["user_id"]: f["last_active"] for f in fc_stats}
         except Exception:
             pass
 
@@ -202,7 +236,8 @@ class DashboardService:
 
             # Dates to compare
             dt_candidates = [
-                d for d in [
+                d
+                for d in [
                     parse_dt_to_sp(last_study_at),
                     parse_dt_to_sp(last_study_date),
                     parse_dt_to_sp(last_msg),
@@ -210,41 +245,47 @@ class DashboardService:
                     parse_dt_to_sp(last_v),
                     parse_dt_to_sp(last_f),
                     updated_at_dt,
-                    created_at_dt
+                    created_at_dt,
                 ]
                 if d is not None
             ]
             latest_dt = max(dt_candidates) if dt_candidates else None
 
-            focus_val = getattr(u, 'focus', None) or (u.profile or {}).get("focus") if isinstance(u.profile, dict) else "General Conversation"
+            focus_val = (
+                getattr(u, "focus", None) or (u.profile or {}).get("focus")
+                if isinstance(u.profile, dict)
+                else "General Conversation"
+            )
             if not focus_val or focus_val in ["—", "None", ""]:
                 focus_val = "General Conversation"
 
             last_active_iso = latest_dt.isoformat() if latest_dt else ""
             created_iso = created_at_dt.isoformat() if created_at_dt else ""
 
-            results.append({
-                "username": u.username,
-                "name": u.name or u.username,
-                "email": u.email or "",
-                "role": u.role or "student",
-                "level": u.level or "A1",
-                "focus": focus_val,
-                "total_xp": u.total_xp,
-                "streak_count": u.streak_count,
-                "is_exempt": bool(u.is_exempt),
-                "is_premium_active": bool(u.is_premium_active),
-                "last_active": last_active_iso,
-                "last_activity": last_active_iso,
-                "messages_count": msg_counts.get(u.username, 0),
-                "total_messages": msg_counts.get(u.username, 0),
-                "msgs": msg_counts.get(u.username, 0),
-                "risk_level": "active" if u.streak_count > 0 else "inactive",
-                "days_inactive": 0 if u.streak_count > 0 else 7,
-                "created_at": created_iso or format_sp_date(created_at_dt),
-                "joined": format_sp_date(created_at_dt),
-                "_sort_dt": latest_dt or datetime.min.replace(tzinfo=timezone.utc),
-            })
+            results.append(
+                {
+                    "username": u.username,
+                    "name": u.name or u.username,
+                    "email": u.email or "",
+                    "role": u.role or "student",
+                    "level": u.level or "A1",
+                    "focus": focus_val,
+                    "total_xp": u.total_xp,
+                    "streak_count": u.streak_count,
+                    "is_exempt": bool(u.is_exempt),
+                    "is_premium_active": bool(u.is_premium_active),
+                    "last_active": last_active_iso,
+                    "last_activity": last_active_iso,
+                    "messages_count": msg_counts.get(u.username, 0),
+                    "total_messages": msg_counts.get(u.username, 0),
+                    "msgs": msg_counts.get(u.username, 0),
+                    "risk_level": "active" if u.streak_count > 0 else "inactive",
+                    "days_inactive": 0 if u.streak_count > 0 else 7,
+                    "created_at": created_iso or format_sp_date(created_at_dt),
+                    "joined": format_sp_date(created_at_dt),
+                    "_sort_dt": latest_dt or datetime.min.replace(tzinfo=timezone.utc),
+                }
+            )
 
         results.sort(key=lambda x: x["_sort_dt"], reverse=True)
         for r in results:
@@ -253,7 +294,7 @@ class DashboardService:
 
     @staticmethod
     def get_difficulties_stats() -> dict:
-        users = User.objects.exclude(username__in=EXCLUDED_USERS).exclude(role='buyer')
+        users = User.objects.exclude(username__in=EXCLUDED_USERS).exclude(role="buyer")
         counts = {"A1": 0, "A2": 0, "B1": 0, "B2": 0, "C1": 0, "C2": 0}
         for u in users:
             lvl = (u.level or "A1").upper()
@@ -269,28 +310,32 @@ class DashboardService:
         from collections import defaultdict
 
         def normalize_slug(s: str) -> str:
-            return re.sub(r"_+", "_", re.sub(r"[^a-zA-Z0-9]", "_", (s or "").lower())).strip("_")
+            return re.sub(
+                r"_+", "_", re.sub(r"[^a-zA-Z0-9]", "_", (s or "").lower())
+            ).strip("_")
 
         decks = []
         modules = Module.objects.all()
         for m in modules:
             fc = m.flashcards if isinstance(m.flashcards, list) else []
-            decks.append({
-                "id": str(m.id),
-                "title": m.title,
-                "description": m.description or "No description provided.",
-                "level": m.level,
-                "card_count": len(fc),
-                "cards": fc,
-                "flashcards": fc,
-                "is_published": m.is_published,
-                "is_cefr": False,
-                "created_at": "",
-            })
+            decks.append(
+                {
+                    "id": str(m.id),
+                    "title": m.title,
+                    "description": m.description or "No description provided.",
+                    "level": m.level,
+                    "card_count": len(fc),
+                    "cards": fc,
+                    "flashcards": fc,
+                    "is_published": m.is_published,
+                    "is_cefr": False,
+                    "created_at": "",
+                }
+            )
 
         # Agrupa flashcards CEFR por (level, topic)
         try:
-            cf_cards = Flashcard.objects.all().order_by('-created_at')
+            cf_cards = Flashcard.objects.all().order_by("-created_at")
             grouped_cf = defaultdict(list)
             for row in cf_cards:
                 row_level = (row.level or "A1").upper()
@@ -312,18 +357,22 @@ class DashboardService:
                     for c in cards
                 ]
 
-                decks.append({
-                    "id": deck_id,
-                    "title": topic,
-                    "description": f"Vocabulary deck about {topic}.",
-                    "card_count": len(cards),
-                    "cards": card_list,
-                    "flashcards": card_list,
-                    "level": lvl,
-                    "is_published": is_pub,
-                    "is_cefr": True,
-                    "created_at": cards[0].created_at.isoformat() if cards[0].created_at else "",
-                })
+                decks.append(
+                    {
+                        "id": deck_id,
+                        "title": topic,
+                        "description": f"Vocabulary deck about {topic}.",
+                        "card_count": len(cards),
+                        "cards": card_list,
+                        "flashcards": card_list,
+                        "level": lvl,
+                        "is_published": is_pub,
+                        "is_cefr": True,
+                        "created_at": cards[0].created_at.isoformat()
+                        if cards[0].created_at
+                        else "",
+                    }
+                )
         except Exception as e:
             logger.warning(f"[DashboardService] Erro ao agrupar CEFR flashcards: {e}")
 
@@ -334,7 +383,11 @@ class DashboardService:
     def create_flashcard_deck(data: dict) -> dict:
         title = data.get("title", "Novo Baralho")
         val = data.get("level")
-        level = "all" if val and str(val).lower().strip() in ["all", "todos", "any"] else (val or "A1").upper()
+        level = (
+            "all"
+            if val and str(val).lower().strip() in ["all", "todos", "any"]
+            else (val or "A1").upper()
+        )
         cards = data.get("flashcards") or data.get("cards") or []
         description = data.get("description", "")
         is_published = data.get("is_published", True)
@@ -350,6 +403,7 @@ class DashboardService:
         if is_published:
             try:
                 from apps.notifications.services import NotificationDispatcher
+
                 NotificationDispatcher.notify_students_for_activity(
                     activity_type="Flashcards",
                     title=m.title,
@@ -358,15 +412,25 @@ class DashboardService:
                     url="/activities",
                 )
             except Exception as exc:
-                logger.warning(f"[Dashboard] Erro ao notificar alunos de flashcards: {exc}")
+                logger.warning(
+                    f"[Dashboard] Erro ao notificar alunos de flashcards: {exc}"
+                )
 
-        return {"success": True, "id": str(m.id), "title": m.title, "card_count": len(cards)}
+        return {
+            "success": True,
+            "id": str(m.id),
+            "title": m.title,
+            "card_count": len(cards),
+        }
 
     @staticmethod
     def update_flashcard_deck(deck_id: str, data: dict) -> dict:
         import re
+
         def normalize_slug(s: str) -> str:
-            return re.sub(r"_+", "_", re.sub(r"[^a-zA-Z0-9]", "_", (s or "").lower())).strip("_")
+            return re.sub(
+                r"_+", "_", re.sub(r"[^a-zA-Z0-9]", "_", (s or "").lower())
+            ).strip("_")
 
         if deck_id.startswith("cefr_fc_"):
             parts = deck_id.split("_")
@@ -374,24 +438,33 @@ class DashboardService:
                 level = parts[2].upper()
                 topic_slug = normalize_slug("_".join(parts[3:]))
                 cf_cards = list(Flashcard.objects.filter(level__iexact=level))
-                matched_cards = [c for c in cf_cards if normalize_slug(c.topic or "General Vocabulary") == topic_slug]
+                matched_cards = [
+                    c
+                    for c in cf_cards
+                    if normalize_slug(c.topic or "General Vocabulary") == topic_slug
+                ]
                 if not matched_cards:
                     raise HttpError(404, "Baralho CEFR não encontrado.")
-                
+
                 matched_ids = [c.id for c in matched_cards]
                 was_published = matched_cards[0].is_published
                 if "is_published" in data:
-                    Flashcard.objects.filter(id__in=matched_ids).update(is_published=data["is_published"])
+                    Flashcard.objects.filter(id__in=matched_ids).update(
+                        is_published=data["is_published"]
+                    )
                 if "title" in data and data["title"]:
                     new_title = re.sub(r"^CEFR\s+[A-Z0-9]+:\s*", "", data["title"])
                     Flashcard.objects.filter(id__in=matched_ids).update(topic=new_title)
                 if "level" in data and data["level"]:
-                    Flashcard.objects.filter(id__in=matched_ids).update(level=data["level"].upper())
+                    Flashcard.objects.filter(id__in=matched_ids).update(
+                        level=data["level"].upper()
+                    )
 
                 now_published = data.get("is_published", was_published)
                 if now_published and not was_published:
                     try:
                         from apps.notifications.services import NotificationDispatcher
+
                         NotificationDispatcher.notify_students_for_activity(
                             activity_type="Flashcards CEFR",
                             title=data.get("title", matched_cards[0].topic),
@@ -402,7 +475,12 @@ class DashboardService:
                     except Exception as exc:
                         logger.warning(f"[Dashboard] Erro ao notificar alunos: {exc}")
 
-                return {"success": True, "id": deck_id, "title": data.get("title", matched_cards[0].topic), "card_count": len(matched_cards)}
+                return {
+                    "success": True,
+                    "id": deck_id,
+                    "title": data.get("title", matched_cards[0].topic),
+                    "card_count": len(matched_cards),
+                }
             raise HttpError(400, "ID do baralho CEFR inválido.")
 
         m = Module.objects.filter(id=deck_id).first()
@@ -424,6 +502,7 @@ class DashboardService:
         if m.is_published and not was_published:
             try:
                 from apps.notifications.services import NotificationDispatcher
+
                 NotificationDispatcher.notify_students_for_activity(
                     activity_type="Flashcards",
                     title=m.title,
@@ -434,13 +513,21 @@ class DashboardService:
             except Exception as exc:
                 logger.warning(f"[Dashboard] Erro ao notificar alunos: {exc}")
 
-        return {"success": True, "id": str(m.id), "title": m.title, "card_count": len(m.flashcards or [])}
+        return {
+            "success": True,
+            "id": str(m.id),
+            "title": m.title,
+            "card_count": len(m.flashcards or []),
+        }
 
     @staticmethod
     def delete_flashcard_deck(deck_id: str) -> dict:
         import re
+
         def normalize_slug(s: str) -> str:
-            return re.sub(r"_+", "_", re.sub(r"[^a-zA-Z0-9]", "_", (s or "").lower())).strip("_")
+            return re.sub(
+                r"_+", "_", re.sub(r"[^a-zA-Z0-9]", "_", (s or "").lower())
+            ).strip("_")
 
         if deck_id.startswith("cefr_fc_"):
             parts = deck_id.split("_")
@@ -448,7 +535,11 @@ class DashboardService:
                 level = parts[2].upper()
                 topic_slug = normalize_slug("_".join(parts[3:]))
                 cf_cards = list(Flashcard.objects.filter(level__iexact=level))
-                matched_cards = [c for c in cf_cards if normalize_slug(c.topic or "General Vocabulary") == topic_slug]
+                matched_cards = [
+                    c
+                    for c in cf_cards
+                    if normalize_slug(c.topic or "General Vocabulary") == topic_slug
+                ]
                 if matched_cards:
                     matched_ids = [c.id for c in matched_cards]
                     Flashcard.objects.filter(id__in=matched_ids).delete()
@@ -467,20 +558,29 @@ class DashboardService:
     def get_all_simulations(limit: int = 200, offset: int = 0) -> list[dict]:
         sims = []
         for s in SimulationScenario.objects.all():
-            sims.append({
-                "id": str(s.id),
-                "name": s.name,
-                "name_en": s.name_en or s.name,
-                "description": s.description,
-                "difficulty": s.difficulty or "all",
-                "levels": s.levels or ([s.difficulty] if s.difficulty and s.difficulty != "all" else ["all"]),
-                "system_prompt": s.system_prompt,
-                "emoji": s.emoji or "🎭",
-                "is_active": s.is_active,
-                "is_published": s.is_active,
-                "initial_message": s.initial_message or s.greeting or "Hello! Let's start our scenario.",
-                "created_at": s.created_at.isoformat() if s.created_at else "",
-            })
+            sims.append(
+                {
+                    "id": str(s.id),
+                    "name": s.name,
+                    "name_en": s.name_en or s.name,
+                    "description": s.description,
+                    "difficulty": s.difficulty or "all",
+                    "levels": s.levels
+                    or (
+                        [s.difficulty]
+                        if s.difficulty and s.difficulty != "all"
+                        else ["all"]
+                    ),
+                    "system_prompt": s.system_prompt,
+                    "emoji": s.emoji or "🎭",
+                    "is_active": s.is_active,
+                    "is_published": s.is_active,
+                    "initial_message": s.initial_message
+                    or s.greeting
+                    or "Hello! Let's start our scenario.",
+                    "created_at": s.created_at.isoformat() if s.created_at else "",
+                }
+            )
 
         for cs in CEFRSimulation.objects.all():
             roles = cs.roles if isinstance(cs.roles, dict) else {}
@@ -488,23 +588,25 @@ class DashboardService:
             ai_role = roles.get("ai", "Assistant")
             sys_prompt = f"You are {ai_role}. The user is {student_role}. Goal: {cs.goal}. Scenario: {cs.scenario}"
 
-            sims.append({
-                "id": f"cefr_sim_{cs.id}",
-                "name": cs.topic,
-                "description": cs.scenario,
-                "difficulty": cs.level,
-                "levels": [cs.level],
-                "system_prompt": sys_prompt,
-                "emoji": "🎭",
-                "is_active": cs.is_published,
-                "is_published": cs.is_published,
-                "is_cefr": True,
-                "initial_message": f"Hello! We are starting the scenario: '{cs.topic}'.",
-                "created_at": cs.created_at.isoformat() if cs.created_at else "",
-            })
+            sims.append(
+                {
+                    "id": f"cefr_sim_{cs.id}",
+                    "name": cs.topic,
+                    "description": cs.scenario,
+                    "difficulty": cs.level,
+                    "levels": [cs.level],
+                    "system_prompt": sys_prompt,
+                    "emoji": "🎭",
+                    "is_active": cs.is_published,
+                    "is_published": cs.is_published,
+                    "is_cefr": True,
+                    "initial_message": f"Hello! We are starting the scenario: '{cs.topic}'.",
+                    "created_at": cs.created_at.isoformat() if cs.created_at else "",
+                }
+            )
 
         sims.sort(key=lambda x: x.get("created_at") or "", reverse=True)
-        return sims[offset:offset + limit]
+        return sims[offset : offset + limit]
 
     @staticmethod
     def get_simulation_detail(sim_id: str) -> dict:
@@ -565,6 +667,7 @@ class DashboardService:
         if is_published:
             try:
                 from apps.notifications.services import NotificationDispatcher
+
                 NotificationDispatcher.notify_students_for_activity(
                     activity_type="Simulação",
                     title=s.name,
@@ -573,7 +676,9 @@ class DashboardService:
                     url="/voice",
                 )
             except Exception as exc:
-                logger.warning(f"[Dashboard] Erro ao notificar alunos de simulação: {exc}")
+                logger.warning(
+                    f"[Dashboard] Erro ao notificar alunos de simulação: {exc}"
+                )
 
         return {"success": True, "id": str(s.id), "name": s.name}
 
@@ -596,6 +701,7 @@ class DashboardService:
             if cs.is_published and not was_published:
                 try:
                     from apps.notifications.services import NotificationDispatcher
+
                     NotificationDispatcher.notify_students_for_activity(
                         activity_type="Simulação CEFR",
                         title=cs.topic,
@@ -633,6 +739,7 @@ class DashboardService:
         if s.is_active and not was_published:
             try:
                 from apps.notifications.services import NotificationDispatcher
+
                 NotificationDispatcher.notify_students_for_activity(
                     activity_type="Simulação",
                     title=s.name,
@@ -658,7 +765,7 @@ class DashboardService:
 
     @staticmethod
     def get_games_admin() -> list[dict]:
-        games = Game.objects.all().order_by('-created_at')
+        games = Game.objects.all().order_by("-created_at")
         return [
             {
                 "id": str(g.id),
@@ -695,6 +802,7 @@ class DashboardService:
         if is_published:
             try:
                 from apps.notifications.services import NotificationDispatcher
+
                 NotificationDispatcher.notify_students_for_activity(
                     activity_type="Game",
                     title=g.title,
@@ -721,7 +829,11 @@ class DashboardService:
             g.wordwall_url = data["wordwall_url"]
         if "levels" in data:
             lvls = data["levels"]
-            g.levels = [l.strip().upper() for l in lvls.split(",")] if isinstance(lvls, str) else lvls
+            g.levels = (
+                [l.strip().upper() for l in lvls.split(",")]
+                if isinstance(lvls, str)
+                else lvls
+            )
         if "is_published" in data:
             g.is_published = data["is_published"]
         g.save()
@@ -729,6 +841,7 @@ class DashboardService:
         if g.is_published and not was_published:
             try:
                 from apps.notifications.services import NotificationDispatcher
+
                 NotificationDispatcher.notify_students_for_activity(
                     activity_type="Game",
                     title=g.title,
@@ -753,7 +866,7 @@ class DashboardService:
 
     @staticmethod
     def get_news_admin() -> list[dict]:
-        news = NewsItem.objects.all().order_by('-created_at')
+        news = NewsItem.objects.all().order_by("-created_at")
         return [
             {
                 "id": str(n.id),
@@ -792,6 +905,7 @@ class DashboardService:
         if is_published:
             try:
                 from apps.notifications.services import NotificationDispatcher
+
                 NotificationDispatcher.notify_students_for_activity(
                     activity_type="Artigo de Notícia",
                     title=n.title,
@@ -800,7 +914,9 @@ class DashboardService:
                     url="/activities",
                 )
             except Exception as exc:
-                logger.warning(f"[Dashboard] Erro ao notificar alunos de notícia: {exc}")
+                logger.warning(
+                    f"[Dashboard] Erro ao notificar alunos de notícia: {exc}"
+                )
 
         return {"success": True, "id": str(n.id), "title": n.title}
 
@@ -820,7 +936,11 @@ class DashboardService:
             n.thumbnail_url = data["thumbnail_url"]
         if "levels" in data:
             lvls = data["levels"]
-            n.levels = [l.strip().upper() for l in lvls.split(",")] if isinstance(lvls, str) else lvls
+            n.levels = (
+                [l.strip().upper() for l in lvls.split(",")]
+                if isinstance(lvls, str)
+                else lvls
+            )
         if "is_published" in data:
             n.is_published = data["is_published"]
         n.save()
@@ -828,6 +948,7 @@ class DashboardService:
         if n.is_published and not was_published:
             try:
                 from apps.notifications.services import NotificationDispatcher
+
                 NotificationDispatcher.notify_students_for_activity(
                     activity_type="Artigo de Notícia",
                     title=n.title,
@@ -836,7 +957,9 @@ class DashboardService:
                     url="/activities",
                 )
             except Exception as exc:
-                logger.warning(f"[Dashboard] Erro ao notificar alunos de notícia: {exc}")
+                logger.warning(
+                    f"[Dashboard] Erro ao notificar alunos de notícia: {exc}"
+                )
 
         return {"success": True, "id": str(n.id), "title": n.title}
 
@@ -853,7 +976,11 @@ class DashboardService:
             n.description = data["description"]
         if "levels" in data:
             lvls = data["levels"]
-            n.levels = [l.strip().upper() for l in lvls.split(",")] if isinstance(lvls, str) else lvls
+            n.levels = (
+                [l.strip().upper() for l in lvls.split(",")]
+                if isinstance(lvls, str)
+                else lvls
+            )
         if "thumbnail_url" in data:
             n.thumbnail_url = data["thumbnail_url"]
         if "is_published" in data:
@@ -876,10 +1003,10 @@ class DashboardService:
         u = User.objects.filter(username=username).first()
         if not u:
             raise HttpError(404, "Estudante não encontrado.")
-        
-        msgs_count = Message.objects.filter(username=username, role='user').count()
+
+        msgs_count = Message.objects.filter(username=username, role="user").count()
         subs_count = ActivitySubmission.objects.filter(username=username).count()
-        
+
         return {
             "username": u.username,
             "name": u.name or u.username,
@@ -894,7 +1021,9 @@ class DashboardService:
             "exercises_count": subs_count,
             "profile": u.profile or {},
             "study_goals": u.study_goals or [],
-            "custom_prompt": (u.profile or {}).get("custom_prompt", "") if isinstance(u.profile, dict) else "",
+            "custom_prompt": (u.profile or {}).get("custom_prompt", "")
+            if isinstance(u.profile, dict)
+            else "",
         }
 
     @staticmethod
@@ -904,9 +1033,9 @@ class DashboardService:
             raise HttpError(404, "Estudante não encontrado.")
 
         # 1. Progresso dos Módulos
-        modules = Module.objects.filter(is_published=True).order_by('order')
+        modules = Module.objects.filter(is_published=True).order_by("order")
         submissions = list(ActivitySubmission.objects.filter(username=username))
-        
+
         completed_mod_keys = set()
         for sub in submissions:
             if sub.module_id:
@@ -914,47 +1043,61 @@ class DashboardService:
             if sub.activity_type:
                 completed_mod_keys.add(sub.activity_type)
             if sub.metadata and isinstance(sub.metadata, dict):
-                if sub.metadata.get('slug'):
-                    completed_mod_keys.add(sub.metadata.get('slug'))
-                if sub.metadata.get('activity_id'):
-                    completed_mod_keys.add(str(sub.metadata.get('activity_id')))
+                if sub.metadata.get("slug"):
+                    completed_mod_keys.add(sub.metadata.get("slug"))
+                if sub.metadata.get("activity_id"):
+                    completed_mod_keys.add(str(sub.metadata.get("activity_id")))
 
         module_progress = []
         for idx, m in enumerate(modules):
             fc = m.flashcards if isinstance(m.flashcards, list) else []
             total_items = max(1, len(fc))
-            is_done = 1 if (str(m.id) in completed_mod_keys or m.title in completed_mod_keys or idx == 0) else 0
-            module_progress.append({
-                "module_id": str(m.id),
-                "title": m.title,
-                "order": m.order,
-                "level": m.level,
-                "total_quizzes": total_items,
-                "completed_quizzes": is_done * total_items,
-                "progress_pct": 100 if is_done else 0,
-                "type_label": "Cards" if fc else "Quizzes",
-            })
+            is_done = (
+                1
+                if (
+                    str(m.id) in completed_mod_keys
+                    or m.title in completed_mod_keys
+                    or idx == 0
+                )
+                else 0
+            )
+            module_progress.append(
+                {
+                    "module_id": str(m.id),
+                    "title": m.title,
+                    "order": m.order,
+                    "level": m.level,
+                    "total_quizzes": total_items,
+                    "completed_quizzes": is_done * total_items,
+                    "progress_pct": 100 if is_done else 0,
+                    "type_label": "Cards" if fc else "Quizzes",
+                }
+            )
 
         # 2. Tempo de Estudo Semanal e Gráfico dos 7 dias
         today = date.today()
         seven_days_ago = today - timedelta(days=6)
         day_names_en = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        
+
         daily_msgs = (
-            Message.objects.filter(username=username, role='user', created_at__date__gte=seven_days_ago)
-            .annotate(day=TruncDate('created_at'))
-            .values('day')
-            .annotate(count=Count('id'))
+            Message.objects.filter(
+                username=username, role="user", created_at__date__gte=seven_days_ago
+            )
+            .annotate(day=TruncDate("created_at"))
+            .values("day")
+            .annotate(count=Count("id"))
         )
-        msg_counts_by_day = {item['day']: item['count'] for item in daily_msgs}
+        msg_counts_by_day = {item["day"]: item["count"] for item in daily_msgs}
 
         daily_subs = (
-            ActivitySubmission.objects.filter(username=username, created_at__date__gte=seven_days_ago)
-            .annotate(day=TruncDate('created_at'))
-            .values('day')
-            .annotate(count=Count('id'))
+            ActivitySubmission.objects.filter(
+                username=username, created_at__date__gte=seven_days_ago
+            )
+            .annotate(day=TruncDate("created_at"))
+            .values("day")
+            .annotate(count=Count("id"))
         )
-        sub_counts_by_day = {item['day']: item['count'] for item in daily_subs}
+        sub_counts_by_day = {item["day"]: item["count"] for item in daily_subs}
 
         study_time_chart = []
         total_study_minutes_weekly = 0
@@ -965,18 +1108,20 @@ class DashboardService:
             d = today - timedelta(days=i)
             day_msgs = msg_counts_by_day.get(d, 0)
             day_acts = sub_counts_by_day.get(d, 0)
-            
+
             day_study_min = (day_msgs * 2) + (day_acts * 6)
             if day_study_min == 0 and (day_msgs > 0 or day_acts > 0):
                 day_study_min = 5
 
-            study_time_chart.append({
-                "day_name": day_names_en[d.weekday()],
-                "date": d.isoformat(),
-                "study_minutes": day_study_min,
-                "messages_sent": day_msgs,
-                "activities_done": day_acts,
-            })
+            study_time_chart.append(
+                {
+                    "day_name": day_names_en[d.weekday()],
+                    "date": d.isoformat(),
+                    "study_minutes": day_study_min,
+                    "messages_sent": day_msgs,
+                    "activities_done": day_acts,
+                }
+            )
 
             total_study_minutes_weekly += day_study_min
             total_messages_weekly += day_msgs
@@ -991,7 +1136,7 @@ class DashboardService:
             "total_activities_weekly": total_activities_weekly,
         }
 
-        total_msgs = Message.objects.filter(username=username, role='user').count()
+        total_msgs = Message.objects.filter(username=username, role="user").count()
         total_exercises = len(submissions)
 
         return {
@@ -1008,8 +1153,12 @@ class DashboardService:
 
     @staticmethod
     def get_student_activity_progress(username: str) -> dict:
-        subs = list(ActivitySubmission.objects.filter(username=username).order_by('-created_at')[:200])
-        
+        subs = list(
+            ActivitySubmission.objects.filter(username=username).order_by(
+                "-created_at"
+            )[:200]
+        )
+
         counts = {
             "grammar": 0,
             "vocabulary": 0,
@@ -1025,7 +1174,7 @@ class DashboardService:
         for s in subs:
             meta = s.metadata if isinstance(s.metadata, dict) else {}
             cat_raw = str(meta.get("category") or s.activity_type or "grammar").lower()
-            
+
             if "gramm" in cat_raw:
                 cat = "grammar"
             elif "vocab" in cat_raw:
@@ -1051,7 +1200,11 @@ class DashboardService:
             title = meta.get("title") or meta.get("slug")
             if not title:
                 if cat == "simulations":
-                    sim_id = meta.get("scenario_id") or meta.get("simulation_id") or meta.get("activity_id")
+                    sim_id = (
+                        meta.get("scenario_id")
+                        or meta.get("simulation_id")
+                        or meta.get("activity_id")
+                    )
                     if sim_id:
                         try:
                             sc = SimulationScenario.objects.filter(id=sim_id).first()
@@ -1066,23 +1219,33 @@ class DashboardService:
             if "test-english" in str(title).lower() or not title:
                 title = f"{cat.title()} Practice"
 
-            status = "completed" if (s.status in ("completed", "done") or (s.score and s.score > 0)) else "pending"
+            status = (
+                "completed"
+                if (s.status in ("completed", "done") or (s.score and s.score > 0))
+                else "pending"
+            )
 
-            mapped_submissions.append({
-                "id": str(s.id),
-                "category": cat,
-                "activity_type": cat,
-                "title": title,
-                "url": meta.get("url") or "",
-                "score": s.score or 100,
-                "status": status,
-                "created_at": s.created_at.isoformat() if s.created_at else "",
-            })
+            mapped_submissions.append(
+                {
+                    "id": str(s.id),
+                    "category": cat,
+                    "activity_type": cat,
+                    "title": title,
+                    "url": meta.get("url") or "",
+                    "score": s.score or 100,
+                    "status": status,
+                    "created_at": s.created_at.isoformat() if s.created_at else "",
+                }
+            )
 
         # Flashcards protegidos contra UUID error
         fc_progress = []
         try:
-            fc_progress = list(UserFlashcardProgress.objects.filter(user_id=username).order_by('-reviewed_at')[:30])
+            fc_progress = list(
+                UserFlashcardProgress.objects.filter(user_id=username).order_by(
+                    "-reviewed_at"
+                )[:30]
+            )
         except Exception:
             pass
         counts["flashcards"] += len(fc_progress)
@@ -1090,7 +1253,11 @@ class DashboardService:
         # Vocabulário aprendido
         vocab_learned = []
         try:
-            vocab_learned = list(UserVocabulary.objects.filter(username=username).order_by('-created_at')[:30])
+            vocab_learned = list(
+                UserVocabulary.objects.filter(username=username).order_by(
+                    "-created_at"
+                )[:30]
+            )
         except Exception:
             pass
         counts["vocabulary"] += len(vocab_learned)
@@ -1123,11 +1290,15 @@ class DashboardService:
 
     @staticmethod
     def get_student_insight(username: str, lang: str = "en-US") -> dict:
-        msgs = Message.objects.filter(username=username, role='user').order_by('-created_at')[:15]
+        msgs = Message.objects.filter(username=username, role="user").order_by(
+            "-created_at"
+        )[:15]
         user_texts = [m.content for m in msgs if m.content]
-        
+
         if not user_texts:
-            return {"insight": f"Student {username} has not sent enough messages yet to generate a full pedagogical analysis. Encourage them to practice conversation with Teacher Tati!"}
+            return {
+                "insight": f"Student {username} has not sent enough messages yet to generate a full pedagogical analysis. Encourage them to practice conversation with Teacher Tati!"
+            }
 
         summary = " | ".join(user_texts)[:1000]
         prompt = (
@@ -1136,7 +1307,10 @@ class DashboardService:
         )
         try:
             from apps.chat.services import AIService
-            insight_text = AIService.generate_reply_sync([{"role": "user", "content": prompt}], user=None)
+
+            insight_text = AIService.generate_reply_sync(
+                [{"role": "user", "content": prompt}], user=None
+            )
             if not insight_text:
                 raise ValueError("Empty reply")
             return {"insight": insight_text}
@@ -1162,10 +1336,22 @@ class DashboardService:
         return {
             "interests": ["Travel & Culture", "Daily Life", "Professional English"],
             "recommendations": [
-                {"title": f"Conversational Drill - Level {level}", "type": "Simulation", "topic": "Travel Situations"},
-                {"title": f"Vocabulary Flashcards - {level}", "type": "Flashcards", "topic": "Everyday Phrasal Verbs"},
-                {"title": "Listening Podcast", "type": "Podcast", "topic": "Weekend Routines"},
-            ]
+                {
+                    "title": f"Conversational Drill - Level {level}",
+                    "type": "Simulation",
+                    "topic": "Travel Situations",
+                },
+                {
+                    "title": f"Vocabulary Flashcards - {level}",
+                    "type": "Flashcards",
+                    "topic": "Everyday Phrasal Verbs",
+                },
+                {
+                    "title": "Listening Podcast",
+                    "type": "Podcast",
+                    "topic": "Weekend Routines",
+                },
+            ],
         }
 
     @staticmethod
@@ -1198,19 +1384,24 @@ class DashboardService:
     def nudge_student(username: str, message: str) -> dict:
         import os
         import uuid
+
         u = User.objects.filter(username=username).first()
         if not u:
             raise HttpError(404, "Estudante não encontrado.")
 
         # 1. Cria ou recupera uma conversa ativa do aluno e insere a mensagem da Teacher Tati
-        conv = Conversation.objects.filter(username=username).order_by('-updated_at').first()
+        conv = (
+            Conversation.objects.filter(username=username)
+            .order_by("-updated_at")
+            .first()
+        )
         if not conv:
             conv = Conversation.objects.create(
                 id=str(uuid.uuid4()),
                 username=username,
                 title="Mensagem da Teacher Tati",
             )
-        
+
         Message.objects.create(
             id=uuid.uuid4(),
             session_id=str(conv.id),
@@ -1221,6 +1412,7 @@ class DashboardService:
 
         # 2. Registra Notificação In-App
         from apps.notifications.models import Notification
+
         Notification.objects.create(
             id=uuid.uuid4(),
             username=username,
@@ -1232,11 +1424,16 @@ class DashboardService:
 
         # 3. Dispara E-mail via Brevo/Resend/SMTP
         from apps.notifications.services import BrevoEmailService, WahaWhatsAppService
+
         email_sent = False
         if u.email:
-            site_url = os.getenv("FRONTEND_URL") or os.getenv("NEXT_PUBLIC_APP_URL") or "https://tati-ai.vercel.app"
+            site_url = (
+                os.getenv("FRONTEND_URL")
+                or os.getenv("NEXT_PUBLIC_APP_URL")
+                or "https://tati-ai.vercel.app"
+            )
             chat_link = f"{site_url.rstrip('/')}/chat"
-            
+
             html_content = f"""
             <div style="font-family: Arial, sans-serif; max-width: 600px; color: #333; padding: 20px; line-height: 1.6;">
                 <div style="text-align: center; margin-bottom: 24px;">
@@ -1269,11 +1466,15 @@ class DashboardService:
         # 4. Dispara WhatsApp se o aluno tiver número cadastrado
         whatsapp_sent = False
         prof = u.profile if isinstance(u.profile, dict) else {}
-        phone = prof.get("whatsapp_number") or prof.get("phone") or getattr(u, "whatsapp_number", None)
+        phone = (
+            prof.get("whatsapp_number")
+            or prof.get("phone")
+            or getattr(u, "whatsapp_number", None)
+        )
         if phone:
             whatsapp_sent = WahaWhatsAppService.send_message(
                 phone_number=str(phone),
-                message=f"🍎 *Teacher Tati:*\n\n{message}\n\nAcesse para responder: https://tati-ai.vercel.app/chat"
+                message=f"🍎 *Teacher Tati:*\n\n{message}\n\nAcesse para responder: https://tati-ai.vercel.app/chat",
             )
 
         return {

@@ -41,10 +41,17 @@ class WahaService:
                     return {"success": True, "data": res.json()}
                 # Tenta criar antes se não existir
                 create_url = f"{cls._get_api_url()}/api/sessions"
-                res_create = client.post(create_url, json={"name": session_name}, headers=cls._get_headers())
+                res_create = client.post(
+                    create_url, json={"name": session_name}, headers=cls._get_headers()
+                )
                 if res_create.status_code in (200, 201, 422):
                     res_start = client.post(url, headers=cls._get_headers())
-                    return {"success": True, "data": res_start.json() if res_start.status_code in (200, 201) else {}}
+                    return {
+                        "success": True,
+                        "data": res_start.json()
+                        if res_start.status_code in (200, 201)
+                        else {},
+                    }
         except Exception as e:
             logger.warning(f"[WAHA] Error starting session: {e}")
         return {"success": True, "session": session_name, "status": "STARTING"}

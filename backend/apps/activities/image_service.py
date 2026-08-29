@@ -31,9 +31,13 @@ class ImageResolverService:
                 data = resp.json()
                 results = data.get("results", [])
                 if results:
-                    url = results[0].get("urls", {}).get("regular") or results[0].get("urls", {}).get("small")
+                    url = results[0].get("urls", {}).get("regular") or results[0].get(
+                        "urls", {}
+                    ).get("small")
                     if url:
-                        logger.info(f"[ImageResolver] Unsplash encontrado para '{query}': {url[:60]}...")
+                        logger.info(
+                            f"[ImageResolver] Unsplash encontrado para '{query}': {url[:60]}..."
+                        )
                         return url
         except Exception as e:
             logger.warning(f"[ImageResolver] Falha no Unsplash para '{query}': {e}")
@@ -55,9 +59,13 @@ class ImageResolverService:
                 data = resp.json()
                 photos = data.get("photos", [])
                 if photos:
-                    url = photos[0].get("src", {}).get("medium") or photos[0].get("src", {}).get("large")
+                    url = photos[0].get("src", {}).get("medium") or photos[0].get(
+                        "src", {}
+                    ).get("large")
                     if url:
-                        logger.info(f"[ImageResolver] Pexels encontrado para '{query}': {url[:60]}...")
+                        logger.info(
+                            f"[ImageResolver] Pexels encontrado para '{query}': {url[:60]}..."
+                        )
                         return url
         except Exception as e:
             logger.warning(f"[ImageResolver] Falha no Pexels para '{query}': {e}")
