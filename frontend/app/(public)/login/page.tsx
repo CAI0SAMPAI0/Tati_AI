@@ -151,36 +151,14 @@ export default function LoginPage() {
 
   const isHubAccess = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('access') === 'hub';
 
-  const handleGoogleLogin = useCallback(async () => {
+  const handleGoogleLogin = useCallback(() => {
     clearMessages();
     setLoading(true);
     setError('');
 
-    // 1. Se estiver rodando dentro do App Flutter nativo, tenta o handler nativo
-    if (typeof window !== 'undefined' && (window as any).flutter_inappwebview) {
-      (window as any).flutter_inappwebview.callHandler('googleLogin');
-      return;
-    }
-
-    // 2. Navega diretamente para a tela de autenticação do Google (accounts.google.com)
+    // Redireciona diretamente para o fluxo de autenticação do Google (302 Redirect)
     const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://caio007-tati-ai-backend.hf.space';
-    try {
-      const res = await fetch(`${apiBase}/auth/google/url`, {
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.url) {
-          window.location.href = data.url;
-          return;
-        }
-      }
-      window.location.href = `${apiBase}/auth/google/login`;
-    } catch {
-      window.location.href = `${apiBase}/auth/google/login`;
-    }
+    window.location.href = `${apiBase}/auth/google/login`;
   }, []);
 
   // Login
