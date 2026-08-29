@@ -2,7 +2,7 @@ import logging
 import httpx
 from typing import List, Optional, Any, Dict
 from pydantic import BaseModel
-from ninja import Router, File, UploadedFile
+from ninja import Router, File, UploadedFile, Schema
 from ninja.errors import HttpError
 from django.http import HttpRequest, HttpResponse
 from django.contrib.auth import get_user_model
