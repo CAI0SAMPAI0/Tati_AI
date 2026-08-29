@@ -147,10 +147,9 @@ class AudioService:
                     "model": "whisper-large-v3-turbo",
                     "response_format": "text",
                     "temperature": 0.0,
-                    "language": "en",
+                    "prompt": prompt
+                    or "English and Portuguese conversational practice session with Teacher Tatiana Duarte.",
                 }
-                if prompt:
-                    create_kwargs["prompt"] = prompt
 
                 resp = await client.audio.transcriptions.create(**create_kwargs)
                 if resp:
