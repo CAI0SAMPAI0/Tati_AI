@@ -49,12 +49,23 @@ def sync_material_pages(content: PremiumContent) -> bool:
             with httpx.Client(timeout=45.0, follow_redirects=True) as client:
                 resp = client.get(source_url)
                 if resp.status_code == 200:
-                    temp_pdf = os.path.join(local_dir, "source_temp.pdf")
-                    with open(temp_pdf, "wb") as f:
+                    ext = (
+                        os.path.splitext(source_url.split("?")[0])[1].lower() or ".pdf"
+                    )
+                    temp_input = os.path.join(local_dir, f"source_temp{ext}")
+                    with open(temp_input, "wb") as f:
                         f.write(resp.content)
 
+                    actual_pdf = temp_input
+                    if not ext.endswith(".pdf"):
+                        from .secure_document_service import _convert_to_pdf
+
+                        converted = _convert_to_pdf(temp_input, local_dir)
+                        if converted and os.path.exists(converted):
+                            actual_pdf = converted
+
                     poppler = os.getenv("POPPLER_PATH")
-                    pages = convert_from_path(temp_pdf, 200, poppler_path=poppler)
+                    pages = convert_from_path(actual_pdf, 200, poppler_path=poppler)
                     storage_paths = []
                     for i, page in enumerate(pages):
                         img_name = f"page_{i + 1}.webp"
@@ -65,7 +76,10 @@ def sync_material_pages(content: PremiumContent) -> bool:
                             _RAW_IMAGE_CACHE[f"{content_id}/{img_name}"] = f.read()
 
                     try:
-                        os.remove(temp_pdf)
+                        if os.path.exists(temp_input):
+                            os.remove(temp_input)
+                        if actual_pdf != temp_input and os.path.exists(actual_pdf):
+                            os.remove(actual_pdf)
                     except OSError:
                         pass
 

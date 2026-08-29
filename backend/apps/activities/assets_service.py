@@ -27,14 +27,28 @@ class CloudinaryService:
 
     @classmethod
     def upload_file(
-        cls, file_content: bytes, filename: Optional[str] = "image.png"
+        cls,
+        file_content: bytes,
+        filename: Optional[str] = "image.png",
+        folder: str = "tati_ai/materials",
     ) -> str:
         cls.configure()
         try:
+            ext = os.path.splitext(filename or "")[1].lower()
+            if ext in [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"]:
+                res_type = "image"
+            elif ext in [".mp4", ".mov", ".avi", ".webm", ".mp3", ".wav", ".m4a"]:
+                res_type = "video"
+            else:
+                # PDF, PPTX, PPT, DOCX, DOC, ZIP, etc.
+                res_type = "raw"
+
             res = cloudinary.uploader.upload(
                 file_content,
-                folder="tati_ai/flashcards",
-                resource_type="image",
+                folder=folder,
+                resource_type=res_type,
+                use_filename=True,
+                unique_filename=True,
             )
             return res.get("secure_url") or res.get("url") or ""
         except Exception as e:
