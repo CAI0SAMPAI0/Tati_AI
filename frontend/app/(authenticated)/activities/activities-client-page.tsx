@@ -125,7 +125,7 @@ export default function ActivitiesClientPage() {
 
   const isStaff = user?.role && ['professor', 'professora', 'programador', 'Tatiana', 'Tati', 'Professora', 'Programador', 'admin', 'Admin'].includes(user.role);
 
-  const effectiveLevel = !isStaff && user?.level && ['A1','A2','B1','B2','C1'].includes(user.level) ? user.level : filterLevel;
+  const effectiveLevel = !isStaff && user?.level && ['A1', 'A2', 'B1', 'B2', 'C1'].includes(user.level) ? user.level : filterLevel;
 
   useEffect(() => {
     setVisibleCount(10);
@@ -1003,8 +1003,8 @@ export default function ActivitiesClientPage() {
         isDone={
           selectedActivity
             ? completedActivityIds.has(selectedActivity.id) ||
-              completedActivityIds.has(selectedActivity.url) ||
-              completedActivityIds.has(selectedActivity.slug)
+            completedActivityIds.has(selectedActivity.url) ||
+            completedActivityIds.has(selectedActivity.slug)
             : false
         }
         onMarkDone={handleMarkDone}

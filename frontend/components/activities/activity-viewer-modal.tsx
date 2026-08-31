@@ -84,11 +84,17 @@ export function ActivityViewerModal({
 
   const sourceName =
     activity.source ||
-    (activity.url.includes('test-english')
+    (activity.url?.includes('test-english')
       ? 'test-english.com'
-      : activity.url.includes('liveworksheets')
+      : activity.url?.includes('liveworksheets')
       ? 'liveworksheets.com'
-      : 'WordWall');
+      : 'Online Exercise');
+
+  const targetUrl =
+    activity.url ||
+    (sourceName.includes('liveworksheets')
+      ? `https://www.liveworksheets.com/worksheet/en/esl-grammar/${activity.id || activity.slug || ''}`
+      : `https://test-english.com/grammar-points/${(activity.level || 'a1').toLowerCase()}/${activity.slug || ''}`);
 
   const modalContent = (
     <div
@@ -174,13 +180,28 @@ export function ActivityViewerModal({
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
-          <button
-            onClick={handleOpenLink}
-            className="flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-bg hover:bg-bg-secondary border border-border text-text font-bold text-sm transition-all shadow-sm group"
-          >
-            <ExternalLink size={18} className="text-primary group-hover:scale-110 transition-transform" />
-            1. Open on {sourceName}
-          </button>
+          {activity.route ? (
+            <button
+              onClick={() => {
+                router.push(activity.route!);
+                onClose();
+              }}
+              className="flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-bg hover:bg-bg-secondary border border-border text-text font-bold text-sm transition-all shadow-sm group"
+            >
+              <ExternalLink size={18} className="text-primary group-hover:scale-110 transition-transform" />
+              1. Open Activity
+            </button>
+          ) : (
+            <a
+              href={targetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-bg hover:bg-bg-secondary border border-border text-text font-bold text-sm transition-all shadow-sm group text-center"
+            >
+              <ExternalLink size={18} className="text-primary group-hover:scale-110 transition-transform" />
+              1. Open on {sourceName}
+            </a>
+          )}
 
           <button
             onClick={handleToggleDone}

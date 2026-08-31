@@ -18,6 +18,9 @@ const CLIENT_PREFETCHES: Record<string, { queryKey: string[], endpoint: string }
     { queryKey: ['activities-modules'], endpoint: ENDPOINTS.ACTIVITIES_MODULES },
     { queryKey: ['activities-podcasts'], endpoint: `${ENDPOINTS.ACTIVITIES_PODCASTS_RECOMMENDATIONS}?lang=en-US` },
   ],
+  history: [
+    { queryKey: ['my-submissions'], endpoint: '/activities/submissions/my' },
+  ],
   chat: [
     { queryKey: ['due-vocab'], endpoint: '/users/vocabulary/due' },
     { queryKey: ['payments-status'], endpoint: ENDPOINTS.PAYMENTS_STATUS },

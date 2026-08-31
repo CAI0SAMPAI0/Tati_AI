@@ -74,6 +74,7 @@ interface CardResult {
   card: Flashcard;
   status: CardStatus;
   userAnswer: string;
+  usedHint: boolean;
 }
 
 export default function FlashcardsClientPage() {
@@ -96,6 +97,7 @@ export default function FlashcardsClientPage() {
   const [finished, setFinished] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const submittedRef = useRef(false);
 
   const rawCards: any[] = Array.isArray(deck?.flashcards) ? deck!.flashcards : [];
   const cards: Flashcard[] = rawCards.map(normalizeCard).filter(c => c.front);
@@ -110,6 +112,39 @@ export default function FlashcardsClientPage() {
     setTimeout(() => inputRef.current?.focus(), 100);
   }, [currentIndex]);
 
+  // Submit activity progress to submissions history when session completes
+  useEffect(() => {
+    if (finished && cards.length > 0 && !submittedRef.current) {
+      submittedRef.current = true;
+      const cleanCorrect = results.filter(r => r.status === 'correct' && !r.usedHint).length;
+      const hintCorrect = results.filter(r => r.status === 'correct' && r.usedHint).length;
+      const wrong = results.filter(r => r.status === 'wrong').length;
+      const unknown = results.filter(r => r.status === 'unknown').length;
+      const totalPoints = (cleanCorrect * 1.0) + (hintCorrect * 0.5);
+      const scorePct = Math.round((totalPoints / cards.length) * 100);
+
+      apiPost('/activities/submissions', {
+        activity_id: deckId,
+        activity_type: 'flashcards',
+        score: scorePct,
+        status: 'completed',
+        metadata: {
+          title: deck?.title || 'Flashcards Deck',
+          deck_id: deckId,
+          total_cards: cards.length,
+          clean_correct: cleanCorrect,
+          hint_correct: hintCorrect,
+          wrong: wrong,
+          skipped: unknown,
+          score_points: totalPoints,
+          category: 'flashcards',
+          status: 'completed',
+          url: `/flashcards/${deckId}`,
+        },
+      }).catch(() => {});
+    }
+  }, [finished, deckId, deck?.title, cards.length, results]);
+
   // ── Handlers ──────────────────────────────────────────────────────────────────
 
   const handleCheck = () => {
@@ -118,23 +153,24 @@ export default function FlashcardsClientPage() {
     const status: CardStatus = match ? 'correct' : 'wrong';
     setCardStatus(status);
     setRevealed(true);
-    saveResult(status);
+    saveResult(status, showHint);
   };
 
   const handleIDontKnow = () => {
     if (revealed) return;
     setCardStatus('unknown');
     setRevealed(true);
-    saveResult('unknown');
+    saveResult('unknown', showHint);
   };
 
-  const saveResult = (status: CardStatus) => {
-    setResults(prev => [...prev, { card: currentCard, status, userAnswer: userInput }]);
-    // Save progress to backend (fire and forget)
+  const saveResult = (status: CardStatus, usedHint: boolean) => {
+    setResults(prev => [...prev, { card: currentCard, status, userAnswer: userInput, usedHint }]);
+    // Save progress to backend
     apiPost('/activities/flashcards/progress', {
       deck_id: deckId,
       card_front: currentCard.front,
       status,
+      used_hint: usedHint,
     }).catch(() => {});
   };
 
@@ -162,6 +198,7 @@ export default function FlashcardsClientPage() {
   };
 
   const handleRestart = () => {
+    submittedRef.current = false;
     setCurrentIndex(0);
     setResults([]);
     setFinished(false);
@@ -191,10 +228,17 @@ export default function FlashcardsClientPage() {
   // ── Summary Screen ────────────────────────────────────────────────────────────
 
   if (finished) {
-    const correct = results.filter(r => r.status === 'correct').length;
+    const cleanCorrect = results.filter(r => r.status === 'correct' && !r.usedHint).length;
+    const hintCorrect = results.filter(r => r.status === 'correct' && r.usedHint).length;
     const wrong = results.filter(r => r.status === 'wrong').length;
     const unknown = results.filter(r => r.status === 'unknown').length;
-    const pct = Math.round((correct / cards.length) * 100);
+    
+    // Regra:
+    // - Acerto sem dica = 1.0 (100%)
+    // - Acerto com dica = 0.5 (meio certo)
+    // - Pulou ou Errou = 0.0
+    const totalPoints = (cleanCorrect * 1.0) + (hintCorrect * 0.5);
+    const pct = cards.length > 0 ? Math.round((totalPoints / cards.length) * 100) : 0;
 
     return (
       <div className="min-h-screen bg-bg flex flex-col">
@@ -203,43 +247,55 @@ export default function FlashcardsClientPage() {
           <MotionDiv
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-lg bg-surface border border-border rounded-3xl p-10 text-center space-y-8 shadow-2xl"
+            className="w-full max-w-lg bg-surface border border-border rounded-3xl p-8 md:p-10 text-center space-y-7 shadow-2xl"
           >
-            <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto text-4xl font-bold
-              ${pct >= 70 ? 'bg-green-500/15 text-green-400' : pct >= 40 ? 'bg-yellow-500/15 text-yellow-400' : 'bg-red-500/15 text-red-400'}`}>
+            <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto text-3xl font-black
+              ${pct >= 70 ? 'bg-green-500/15 text-green-400 border-2 border-green-500/30' : pct >= 40 ? 'bg-yellow-500/15 text-yellow-400 border-2 border-yellow-500/30' : 'bg-red-500/15 text-red-400 border-2 border-red-500/30'}`}>
               {pct}%
             </div>
 
             <div>
-              <h2 className="text-2xl font-bold text-text mb-2">Session Complete!</h2>
+              <h2 className="text-2xl font-bold text-text mb-1">Session Complete!</h2>
               <p className="text-text-muted text-sm">{deck.title} · {cards.length} cards</p>
+              <p className="text-xs font-semibold text-primary mt-1">
+                Score: {totalPoints.toFixed(1)} / {cards.length} points
+              </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-4 text-center">
-                <div className="text-2xl font-bold text-green-400">{correct}</div>
-                <div className="text-xs text-green-400/70 font-bold mt-1">Correct</div>
+            {/* Grid com os 4 status detalhados */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+              <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-3">
+                <div className="text-xl font-bold text-green-400">{cleanCorrect}</div>
+                <div className="text-[0.65rem] text-green-400/80 font-bold mt-0.5">Correct (100%)</div>
               </div>
-              <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-center">
-                <div className="text-2xl font-bold text-red-400">{wrong}</div>
-                <div className="text-xs text-red-400/70 font-bold mt-1">Wrong</div>
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3">
+                <div className="text-xl font-bold text-amber-400">{hintCorrect}</div>
+                <div className="text-[0.65rem] text-amber-400/80 font-bold mt-0.5">With Hint (50%)</div>
               </div>
-              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-4 text-center">
-                <div className="text-2xl font-bold text-yellow-400">{unknown}</div>
-                <div className="text-xs text-yellow-400/70 font-bold mt-1">Skipped</div>
+              <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-3">
+                <div className="text-xl font-bold text-red-400">{wrong}</div>
+                <div className="text-[0.65rem] text-red-400/80 font-bold mt-0.5">Wrong (0%)</div>
+              </div>
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-3">
+                <div className="text-xl font-bold text-yellow-400">{unknown}</div>
+                <div className="text-[0.65rem] text-yellow-400/80 font-bold mt-0.5">Skipped (0%)</div>
               </div>
             </div>
 
             {/* Cards that need review */}
-            {(wrong + unknown) > 0 && (
+            {(wrong + unknown + hintCorrect) > 0 && (
               <div className="text-left space-y-2">
                 <p className="text-xs font-bold text-text-muted uppercase tracking-wider">To review next time:</p>
                 <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1 custom-scrollbar">
-                  {results.filter(r => r.status !== 'correct').map((r, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs bg-bg rounded-xl px-3 py-2">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${r.status === 'wrong' ? 'bg-red-400' : 'bg-yellow-400'}`} />
-                      <span className="font-bold text-text">{r.card.front}</span>
-                      {r.userAnswer && <span className="text-text-muted">· Your answer: "{r.userAnswer}"</span>}
+                  {results.filter(r => r.status !== 'correct' || r.usedHint).map((r, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs bg-bg rounded-xl px-3 py-2 border border-border/50">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${r.status === 'wrong' ? 'bg-red-400' : r.status === 'unknown' ? 'bg-yellow-400' : 'bg-amber-400'}`} />
+                        <span className="font-bold text-text truncate">{r.card.front}</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-text-muted shrink-0">
+                        {r.status === 'wrong' ? 'Wrong' : r.status === 'unknown' ? 'Skipped' : 'Used Hint'}
+                      </span>
                     </div>
                   ))}
                 </div>

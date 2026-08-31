@@ -2,7 +2,7 @@
   "grammar": {
     "A1": [
       {
-        "slug": "grammar-points",
+        "slug": "present-simple-forms-to-be",
         "title": "Present simple forms of 'to be': am/is/are",
         "image": "https://test-english.com/staging11/wp-content/uploads/A1-Grammar_Be-forms.png"
       },
@@ -189,7 +189,7 @@
     ],
     "A2": [
       {
-        "slug": "grammar-points",
+        "slug": "questions-forms-subject-object-questions",
         "title": "Asking questions in English: Question forms",
         "image": "https://test-english.com/staging11/wp-content/uploads/A2–Question-forms.png"
       },
@@ -401,7 +401,7 @@
     ],
     "B1": [
       {
-        "slug": "grammar-points",
+        "slug": "present-simple-present-continuous",
         "title": "Present simple or present continuous",
         "image": "https://test-english.com/staging11/wp-content/uploads/B1–Present-simple-Present-continuous.png"
       },
@@ -613,7 +613,7 @@
     ],
     "B1+": [
       {
-        "slug": "grammar-points",
+        "slug": "questions-different-types",
         "title": "Questions: Different types",
         "image": "https://test-english.com/staging11/wp-content/uploads/B2.1_Questions_Types.png"
       },
@@ -800,7 +800,7 @@
     ],
     "B2": [
       {
-        "slug": "grammar-points",
+        "slug": "have-auxiliary-or-main-verb",
         "title": "Have: Auxiliary or main verb",
         "image": "https://test-english.com/staging11/wp-content/uploads/B2_Have_auxiliary_main.png"
       },
@@ -972,7 +972,7 @@
     ],
     "C1": [
       {
-        "slug": "grammar-points",
+        "slug": "advanced-present-simple-and-present-continuous",
         "title": "Advanced present simple and present continuous",
         "image": "https://test-english.com/staging11/wp-content/uploads/C1–Grammar-Advanced-present-simple-and-continuous.webp"
       },
@@ -1006,7 +1006,7 @@
   "vocabulary": {
     "A1": [
       {
-        "slug": "vocabulary",
+        "slug": "common-things-a1-english-vocabulary",
         "title": "Common things – A1 English Vocabulary",
         "image": "https://test-english.com/staging11/wp-content/uploads/A1-English-Vocabulary_Common-things.jpg"
       },
@@ -1098,7 +1098,7 @@
     ],
     "A2": [
       {
-        "slug": "vocabulary",
+        "slug": "words-with-prepositions-a2-english-vocabulary",
         "title": "Words with prepositions – A2 English Vocabulary",
         "image": "https://test-english.com/staging11/wp-content/uploads/A2-English-Vocabulary_Words-with-prepositions.jpg"
       },
@@ -1190,7 +1190,7 @@
     ],
     "B1": [
       {
-        "slug": "vocabulary",
+        "slug": "more-daily-routines-b1-english-vocabulary",
         "title": "More daily routines – B1 English Vocabulary",
         "image": "https://test-english.com/staging11/wp-content/uploads/B1-English-Vocabulary_More-daily-routines.webp"
       },
@@ -1282,7 +1282,7 @@
     ],
     "B1+": [
       {
-        "slug": "vocabulary",
+        "slug": "the-weather-and-natural-disasters",
         "title": "The weather and natural disasters – B1+ English Vocabulary",
         "image": "https://test-english.com/staging11/wp-content/uploads/B1-B2-English-Vocabulary-The-weather-Natural-disasters.jpg"
       },
@@ -1374,7 +1374,7 @@
     ],
     "B2": [
       {
-        "slug": "vocabulary",
+        "slug": "relationships-b2-english-vocabulary",
         "title": "Relationships – B2 English Vocabulary",
         "image": "https://test-english.com/staging11/wp-content/uploads/B2-English-Vocabulary_Relationships.jpg"
       },
@@ -1471,7 +1471,7 @@
     ],
     "C1": [
       {
-        "slug": "vocabulary",
+        "slug": "feelings-and-reactions-c1-english-vocabulary",
         "title": "Feelings and reactions – C1 English Vocabulary",
         "image": "https://test-english.com/staging11/wp-content/uploads/C1-English-Vocabulary_Feelings-and-reacions.webp"
       },
@@ -1505,7 +1505,7 @@
   "listening": {
     "A1": [
       {
-        "slug": "listening",
+        "slug": "giving-personal-information-a1-english-listening-test",
         "title": "Giving personal information – A1 English Listening Test",
         "image": "https://test-english.com/staging11/wp-content/uploads/A1-English-Listening-Test_Giving-personal-information.jpg"
       },
@@ -1662,7 +1662,7 @@
     ],
     "A2": [
       {
-        "slug": "listening",
+        "slug": "what-are-your-roommates-like-a2-english-listening-test",
         "title": "What are your roommates like? – A2 English Listening Test",
         "image": "https://test-english.com/staging11/wp-content/uploads/A2–Listening-test_Describing-my-roommates.webp"
       },
@@ -1819,7 +1819,7 @@
     ],
     "B1": [
       {
-        "slug": "listening",
+        "slug": "working-while-travelling-the-world-b1-english-listening-test",
         "title": "Working while travelling the world – B1 English Listening Test",
         "image": "https://test-english.com/staging11/wp-content/uploads/Working-while-travelling-the-world_B1-listening-test.webp"
       },
@@ -1971,7 +1971,7 @@
     ],
     "B1+": [
       {
-        "slug": "listening",
+        "slug": "ravi-the-uncatchable-smuggler",
         "title": "Ravi, the uncatchable smuggler – B1+ Listening Test",
         "image": "https://test-english.com/staging11/wp-content/uploads/B1-B2-Listening-test_Ravi-the-smuggler.webp"
       },
@@ -2123,7 +2123,7 @@
     ],
     "B2": [
       {
-        "slug": "listening",
+        "slug": "relationship-dilemmas-b2-english-listening-test",
         "title": "Relationship dilemmas – B2 English Listening Test",
         "image": "https://test-english.com/staging11/wp-content/uploads/B2-Listening-test_Relationship-dilemmas.webp"
       },
@@ -2275,7 +2275,7 @@
     ],
     "C1": [
       {
-        "slug": "listening",
+        "slug": "when-i-completely-embarrassed-myself-c1-english-listening-test",
         "title": "When I completely embarrassed myself – C1 English Listening Test",
         "image": "https://test-english.com/staging11/wp-content/uploads/C1-Listening_When-I-embarrassed-myself.webp"
       },
@@ -2309,7 +2309,7 @@
   "reading": {
     "A1": [
       {
-        "slug": "reading",
+        "slug": "guess-who-a1-english-reading-test",
         "title": "Guess who? – A1 English Reading Test",
         "image": "https://test-english.com/staging11/wp-content/uploads/Guess-who_A1-Reading-test.webp"
       },
@@ -2441,7 +2441,7 @@
     ],
     "A2": [
       {
-        "slug": "reading",
+        "slug": "should-i-tell-my-neighbour-a2-english-reading-test",
         "title": "Should I tell my neighbour? – A2 English Reading Test",
         "image": "https://test-english.com/staging11/wp-content/uploads/A2_Reading-test_Shoud-I-tell-my-neighbour.webp"
       },
@@ -2573,7 +2573,7 @@
     ],
     "B1": [
       {
-        "slug": "reading",
+        "slug": "travel-around-europe-in-5-stops-b1-english-reading-test",
         "title": "Travel around Europe in 5 stops – B1 English Reading Test",
         "image": "https://test-english.com/staging11/wp-content/uploads/B1-reading-test_Travel-around-Europe-in-5-stops.webp"
       },
@@ -2700,7 +2700,7 @@
     ],
     "B1+": [
       {
-        "slug": "reading",
+        "slug": "why-we-sleep",
         "title": "Why we sleep – B1+ English Reading Test",
         "image": "https://test-english.com/staging11/wp-content/uploads/Why-we-sleep-B1-B2-reading-test.webp"
       },
@@ -2832,7 +2832,7 @@
     ],
     "B2": [
       {
-        "slug": "reading",
+        "slug": "is-overtourism-pricing-locals-out-b2-english-reading-test",
         "title": "Is overtourism pricing locals out? – B2 English Reading Test",
         "image": "https://test-english.com/staging11/wp-content/uploads/Is-overtourism-pricing-locals-out_B2-reading-test.webp"
       },
@@ -2959,7 +2959,7 @@
     ],
     "C1": [
       {
-        "slug": "reading",
+        "slug": "what-makes-us-laugh-c1-english-reading-test",
         "title": "What makes us laugh? – C1 English Reading Test",
         "image": "https://test-english.com/staging11/wp-content/uploads/What-makes-us-laugh_C1-reading-test.webp"
       },

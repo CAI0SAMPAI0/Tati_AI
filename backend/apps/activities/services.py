@@ -1108,8 +1108,19 @@ class SpeechService:
 class SubmissionService:
     @staticmethod
     def get_user_submissions(username: str) -> list[dict]:
+        from django.db.models import Q
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        user_obj = User.objects.filter(Q(username=username) | Q(email=username)).first()
+        query = Q(username=username)
+        if user_obj:
+            query = query | Q(username=user_obj.username)
+            if user_obj.email:
+                query = query | Q(username=user_obj.email)
+
         subs = list(
-            ActivitySubmission.objects.filter(username=username).order_by("-created_at")
+            ActivitySubmission.objects.filter(query).order_by("-created_at")
         )
         return [
             {
@@ -1238,15 +1249,21 @@ class ExternalContentService:
         enriched = []
         if level.lower() in ("all", "any"):
             for lvl in cls.TE_LEVELS:
+                lvl_path = lvl.lower().replace("+", "-plus") if "+" in lvl else lvl.lower()
                 for it in cat_data.get(lvl, []):
                     slug = it.get("slug", "")
-                    url = f"https://test-english.com/{cat_slug}/{lvl.lower()}/{slug}/"
+                    if slug in ("grammar-points", "vocabulary", "listening", "reading", ""):
+                        slug = it.get("title", "").lower().replace(":", "").replace("'", "").replace("?", "").replace(" ", "-")
+                    url = f"https://test-english.com/{cat_slug}/{lvl_path}/{slug}/"
                     enriched.append({**it, "url": url, "level": lvl})
         else:
             level_code = level.upper()
+            lvl_path = level.lower().replace("+", "-plus") if "+" in level else level.lower()
             for it in cat_data.get(level_code, []):
                 slug = it.get("slug", "")
-                url = f"https://test-english.com/{cat_slug}/{level.lower()}/{slug}/"
+                if slug in ("grammar-points", "vocabulary", "listening", "reading", ""):
+                    slug = it.get("title", "").lower().replace(":", "").replace("'", "").replace("?", "").replace(" ", "-")
+                url = f"https://test-english.com/{cat_slug}/{lvl_path}/{slug}/"
                 enriched.append({**it, "url": url, "level": level_code})
 
         return {
@@ -1284,11 +1301,31 @@ class ExternalContentService:
         if level.lower() in ("all", "any"):
             for lvl in lw_levels:
                 for it in cat_data.get(lvl, []):
-                    enriched.append({**it, "level": lvl})
+                    item_id = str(it.get("id") or it.get("slug") or "")
+                    url = it.get("url") or f"https://www.liveworksheets.com/w/en/english-as-a-second-language-esl/{item_id}"
+                    if "/worksheet/en/" in url:
+                        url = f"https://www.liveworksheets.com/w/en/english-as-a-second-language-esl/{item_id}"
+                    enriched.append({
+                        **it,
+                        "url": url,
+                        "level": lvl,
+                        "category": cat,
+                        "source": "liveworksheets.com",
+                    })
         else:
             level_code = level.upper()
             for it in cat_data.get(level_code, []):
-                enriched.append({**it, "level": level_code})
+                item_id = str(it.get("id") or it.get("slug") or "")
+                url = it.get("url") or f"https://www.liveworksheets.com/w/en/english-as-a-second-language-esl/{item_id}"
+                if "/worksheet/en/" in url:
+                    url = f"https://www.liveworksheets.com/w/en/english-as-a-second-language-esl/{item_id}"
+                enriched.append({
+                    **it,
+                    "url": url,
+                    "level": level_code,
+                    "category": cat,
+                    "source": "liveworksheets.com",
+                })
 
         return {
             "success": True,

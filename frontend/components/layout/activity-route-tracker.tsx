@@ -1,10 +1,11 @@
-﻿'use client';
+'use client';
 
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 
 const ACTIVITY_ROUTE_PREFIXES = [
   '/activities',
+  '/history',
   '/flashcards',
   '/listenings',
   '/voice',

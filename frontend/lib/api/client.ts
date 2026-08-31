@@ -32,10 +32,19 @@ interface RequestOptions extends Omit<RequestInit, 'headers'> {
 }
 
 const REFRESH_PATH = process.env.NEXT_PUBLIC_AUTH_REFRESH_PATH;
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
-export const WS_BASE = process.env.NEXT_PUBLIC_WS_BASE_URL ?? (
-  API_BASE ? API_BASE.replace(/^http/, 'ws') : ''
-);
+export const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://127.0.0.1:8000'
+    : '');
+
+export const WS_BASE =
+  process.env.NEXT_PUBLIC_WS_BASE_URL ||
+  (API_BASE
+    ? API_BASE.replace(/^http/, 'ws')
+    : typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'ws://127.0.0.1:8000'
+    : '');
 
 let onUnauthorized: (() => void) | null = null;
 
@@ -79,7 +88,12 @@ function resolvePath(path: string): string {
     return `${base}${path.startsWith('/') ? path : `/${path}`}`;
   }
 
-  return `${API_BASE.replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
+  const effectiveBase =
+    API_BASE ||
+    (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? 'http://127.0.0.1:8000'
+      : '');
+  return `${effectiveBase.replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
 function getToken(): string | null {
