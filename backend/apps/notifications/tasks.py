@@ -33,3 +33,18 @@ def send_weekly_progress_reports_task():
     except Exception as e:
         logger.error(f"[Celery Task] Erro ao enviar relatórios semanais: {e}")
         return {"error": str(e)}
+
+
+@shared_task(name="apps.notifications.tasks.send_inactivity_nudges_task")
+def send_inactivity_nudges_task():
+    """
+    Tarefa Celery agendada: Executa diariamente às 14:00 (Horário de Brasília).
+    Dispara incentivo de retorno para alunos inativos há mais de 3 dias.
+    """
+    logger.info("[Celery Task] Iniciando envio de lembretes para alunos inativos...")
+    try:
+        return NotificationSchedulerService.send_inactivity_nudges_to_all_inactive_students()
+    except Exception as e:
+        logger.error(f"[Celery Task] Erro ao enviar lembretes de inatividade: {e}")
+        return {"error": str(e)}
+

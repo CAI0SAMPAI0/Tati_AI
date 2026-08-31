@@ -1,11 +1,12 @@
-# Dockerfile de Produção para o Backend Django (ASGI / Daphne)
-FROM python:3.12-slim
+# Dockerfile de Produção para o Backend Django (ASGI / Gunicorn + Uvicorn Workers)
+FROM python:3.14-slim
 
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    DJANGO_SETTINGS_MODULE=app.settings.production
+    DJANGO_SETTINGS_MODULE=app.settings.production \
+    WORKERS=5
 
 # Instalar dependências de sistema para compilação e conversão de documentos
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -33,5 +34,5 @@ EXPOSE 7860
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD curl -f http://localhost:${PORT:-7860}/health || exit 1
 
-# Executa o Daphne na porta configurada pelo Hugging Face Spaces ($PORT ou 7860)
-CMD ["sh", "-c", "daphne -b 0.0.0.0 -p ${PORT:-7860} app.asgi:application"]
+# Executa Gunicorn com Uvicorn workers na porta configurada pelo Hugging Face Spaces ($PORT ou 7860)
+CMD ["sh", "-c", "gunicorn app.asgi:application -w ${WORKERS:-5} -k uvicorn.workers.UvicornWorker -b 0.0.0.0:${PORT:-7860} --timeout 120 --graceful-timeout 30 --access-logfile -"]

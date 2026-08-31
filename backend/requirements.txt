@@ -17,6 +17,7 @@ channels>=4.0.0
 channels-redis>=4.2.0
 daphne>=4.1.0
 uvicorn[standard]>=0.29.0
+gunicorn>=22.0.0
 
 # Celery, Results & Beat
 celery>=5.3.6

@@ -132,24 +132,57 @@ def get_email_status(request: HttpRequest):
     }
 
 
-@notifications_router.post("/send-all-test", auth=auth_optional)
-def send_all_test_notifications(request: HttpRequest, username: Optional[str] = None):
+def _validate_cron_access(request: HttpRequest) -> bool:
+    import os
+
+    cron_secret = os.getenv("CRON_SECRET", "tati-ai-cron-secret-2026")
+    header_secret = request.headers.get("X-Cron-Secret") or request.headers.get(
+        "x-cron-secret"
+    )
+    auth_header = request.headers.get("Authorization", "")
+    query_secret = request.GET.get("secret")
+
+    if (
+        (header_secret and header_secret == cron_secret)
+        or (auth_header and f"Bearer {cron_secret}" in auth_header)
+        or (query_secret and query_secret == cron_secret)
+    ):
+        return True
+
+    # Se estiver autenticado como staff/admin/programador
+    if (
+        request.auth
+        and hasattr(request.auth, "is_staff")
+        and (request.auth.is_staff or getattr(request.auth, "is_programmer", False))
+    ):
+        return True
+
+    return False
+
+
+@notifications_router.post("/test", auth=auth_required)
+@notifications_router.post("/send-all-test", auth=auth_required)
+def send_test_notification(
+    request: HttpRequest,
+    username: Optional[str] = None,
+    notification_type: str = "streak_reminder",
+):
     """
-    Dispara os 6 modelos de notificação de teste apenas para o usuário solicitado.
+    Dispara notificação de teste controlada.
+    Por padrão envia apenas 1 tipo solicitado ('streak_reminder', 'weekly_report', 'inactivity_nudge', 'streak_broken', 'streak_milestone', 'new_activity' ou 'all').
     """
     from django.contrib.auth import get_user_model
     from ninja.errors import HttpError
     from .services import NotificationSchedulerService
 
     User = get_user_model()
+    is_admin = getattr(request.auth, "is_staff", False) or getattr(
+        request.auth, "is_programmer", False
+    )
 
-    if username:
+    if username and is_admin:
         targets = list(User.objects.filter(username=username))
-    elif (
-        request.auth
-        and hasattr(request.auth, "username")
-        and isinstance(request.auth, User)
-    ):
+    elif request.auth and hasattr(request.auth, "username"):
         targets = [request.auth]
     else:
         targets = list(User.objects.filter(username="caio.sampaio")[:1])
@@ -159,13 +192,14 @@ def send_all_test_notifications(request: HttpRequest, username: Optional[str] = 
 
     all_results = {}
     for target_user in targets:
-        res = NotificationSchedulerService.send_all_test_notifications_to_user(
-            target_user
+        res = NotificationSchedulerService.send_test_notification_to_user(
+            target_user, notification_type=notification_type, force=True
         )
         all_results[target_user.username] = res
 
     return {
         "ok": True,
+        "notification_type": notification_type,
         "target_users": [u.username for u in targets],
         "results": all_results,
     }
@@ -174,7 +208,7 @@ def send_all_test_notifications(request: HttpRequest, username: Optional[str] = 
 @notifications_router.post("/trigger-streak-reminders", auth=auth_required)
 def trigger_streak_reminders(request: HttpRequest):
     """
-    Disparo manual dos lembretes de ofensiva (Streak) para todos os alunos ativos que ainda não praticaram hoje.
+    Disparo manual dos lembretes de ofensiva (Streak) para todos os alunos ativos que ainda não praticaram hoje (Horário de Brasília).
     """
     from .services import NotificationSchedulerService
 
@@ -191,6 +225,64 @@ def trigger_weekly_reports(request: HttpRequest):
     return NotificationSchedulerService.send_weekly_reports_to_all_active_students()
 
 
+@notifications_router.post("/trigger-inactivity-nudges", auth=auth_required)
+def trigger_inactivity_nudges(request: HttpRequest):
+    """
+    Disparo manual dos lembretes de inatividade (3 a 14 dias sem estudo).
+    """
+    from .services import NotificationSchedulerService
+
+    return NotificationSchedulerService.send_inactivity_nudges_to_all_inactive_students()
+
+
+# ── CRON WEBHOOKS SEGUROS (HORÁRIO DE BRASÍLIA / HUGGING FACE / VERCEL) ─
+
+
+@notifications_router.post("/cron/daily-streak", auth=auth_optional)
+@notifications_router.get("/cron/daily-streak", auth=auth_optional)
+def cron_daily_streak(request: HttpRequest):
+    """
+    Webhook seguro para execução cron diária às 20:00 (Horário de Brasília).
+    """
+    from ninja.errors import HttpError
+    from .services import NotificationSchedulerService
+
+    if not _validate_cron_access(request):
+        raise HttpError(403, "Acesso não autorizado ao webhook de cron.")
+
+    return NotificationSchedulerService.send_daily_streak_reminders_to_all_active_students()
+
+
+@notifications_router.post("/cron/weekly-reports", auth=auth_optional)
+@notifications_router.get("/cron/weekly-reports", auth=auth_optional)
+def cron_weekly_reports(request: HttpRequest):
+    """
+    Webhook seguro para execução cron semanal aos domingos às 19:00 (Horário de Brasília).
+    """
+    from ninja.errors import HttpError
+    from .services import NotificationSchedulerService
+
+    if not _validate_cron_access(request):
+        raise HttpError(403, "Acesso não autorizado ao webhook de cron.")
+
+    return NotificationSchedulerService.send_weekly_reports_to_all_active_students()
+
+
+@notifications_router.post("/cron/inactivity-nudges", auth=auth_optional)
+@notifications_router.get("/cron/inactivity-nudges", auth=auth_optional)
+def cron_inactivity_nudges(request: HttpRequest):
+    """
+    Webhook seguro para execução cron de inatividade às 14:00 (Horário de Brasília).
+    """
+    from ninja.errors import HttpError
+    from .services import NotificationSchedulerService
+
+    if not _validate_cron_access(request):
+        raise HttpError(403, "Acesso não autorizado ao webhook de cron.")
+
+    return NotificationSchedulerService.send_inactivity_nudges_to_all_inactive_students()
+
+
 # ── DISPARO DE WHATSAPP (WAHA) ────────────────────────────────────────
 
 
@@ -204,3 +296,4 @@ def send_whatsapp(request: HttpRequest, payload: SendWhatsAppInput):
         message=payload.message,
     )
     return {"ok": success}
+

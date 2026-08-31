@@ -169,7 +169,7 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "America/Sao_Paulo"
-CELERY_ENABLE_UTC = False
+CELERY_ENABLE_UTC = True
 CELERY_BEAT_SCHEDULE = {
     "sync-hub-materials-every-30-mins": {
         "task": "apps.activities.tasks.sync_hub_materials_task",
@@ -184,6 +184,10 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(
             hour=19, minute=0, day_of_week=0
         ),  # Domingo 19:00 Horário de Brasília
+    },
+    "inactivity-nudges-14h": {
+        "task": "apps.notifications.tasks.send_inactivity_nudges_task",
+        "schedule": crontab(hour=14, minute=0),  # 14:00 Horário de Brasília
     },
 }
 

@@ -3,6 +3,7 @@ import json
 import logging
 import httpx
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from typing import List, Optional, Any
 from django.contrib.auth import get_user_model
 
@@ -782,26 +783,97 @@ class NotificationDispatcher:
 
 class NotificationSchedulerService:
     """
-    Agendador inteligente de notificações (Streak, Relatório Semanal, Inatividade, Marcos)
-    Espelha a lógica do FastAPI com suporte a Email HTML (Brevo/Resend/SMTP), Push Notification e In-App.
+    Agendador inteligente e individual de notificações (Streak, Relatório Semanal, Inatividade, Marcos).
+    Garante execução pontual no Horário de Brasília (America/Sao_Paulo) e evita envios indevidos/duplicados.
     """
 
     @staticmethod
-    def send_all_test_notifications_to_user(user: User) -> dict:
+    def _get_brasilia_now() -> datetime:
+        return datetime.now(ZoneInfo("America/Sao_Paulo"))
+
+    @staticmethod
+    def _get_today_range_utc() -> tuple[datetime, datetime]:
         """
-        Dispara todos os 6 tipos de notificação para um usuário específico (Email + Push + In-App).
+        Retorna o início (00:00:00) e fim (23:59:59) do dia corrente de Brasília, convertidos para UTC.
         """
+        today_brt = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+        start_brt = datetime(
+            today_brt.year,
+            today_brt.month,
+            today_brt.day,
+            0,
+            0,
+            0,
+            tzinfo=ZoneInfo("America/Sao_Paulo"),
+        )
+        end_brt = datetime(
+            today_brt.year,
+            today_brt.month,
+            today_brt.day,
+            23,
+            59,
+            59,
+            999999,
+            tzinfo=ZoneInfo("America/Sao_Paulo"),
+        )
+        return start_brt.astimezone(timezone.utc), end_brt.astimezone(timezone.utc)
+
+    # ── 1. LEMBRETE DIÁRIO DE OFENSIVA (STREAK) — 20:00 BRT ─────────────
+    @staticmethod
+    def send_daily_streak_reminder_to_user(
+        user: User, force: bool = False
+    ) -> dict:
+        """
+        Dispara lembrete de streak para um aluno específico se ele NÃO tiver estudado hoje (Horário de Brasília)
+        e ainda não tiver recebido notificação hoje.
+        """
+        from apps.users.services import StreakService
+
         first_name = (
             (user.name or user.username or "Student").strip().split()[0].capitalize()
         )
         email = user.email
-        results = []
 
-        # 1. Streak Reminder
-        streak_val = getattr(user, "streak", None) or 5
-        title_1 = "Don't break your streak! 🔥"
-        body_1 = f"Hello {first_name}! You're on a {streak_val}-day streak. Practice just 5 minutes today with Teacher Tati to keep it alive!"
-        html_1 = f"""
+        # 1. Verifica se o aluno já estudou hoje no Horário de Brasília
+        streak_data = StreakService.get_streak_data(user, "America/Sao_Paulo")
+        if streak_data.has_studied_today and not force:
+            logger.info(
+                f"[StreakReminder] Aluno {user.username} já praticou hoje. Lembrete ignorado."
+            )
+            return {
+                "success": True,
+                "sent": False,
+                "skipped": True,
+                "reason": "already_studied_today",
+                "username": user.username,
+            }
+
+        # 2. Verifica se já recebeu notificação de streak hoje (janela do dia em Brasília)
+        start_today_utc, _ = NotificationSchedulerService._get_today_range_utc()
+        already_notified = Notification.objects.filter(
+            username=user.username,
+            category="streaks",
+            title__icontains="streak",
+            created_at__gte=start_today_utc,
+        ).exists()
+
+        if already_notified and not force:
+            logger.info(
+                f"[StreakReminder] Aluno {user.username} já foi notificado hoje. Lembrete ignorado."
+            )
+            return {
+                "success": True,
+                "sent": False,
+                "skipped": True,
+                "reason": "already_notified_today",
+                "username": user.username,
+            }
+
+        # 3. Dispara a notificação de streak
+        streak_val = user.streak_count or 1
+        title = "Don't break your streak! 🔥"
+        body = f"Hello {first_name}! You're on a {streak_val}-day streak. Practice just 5 minutes today with Teacher Tati to keep it alive!"
+        html = f"""
 <!DOCTYPE html><html><head><meta charset="utf-8"/></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
   <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
@@ -812,39 +884,117 @@ class NotificationSchedulerService:
     <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Personalized English Coaching</p>
   </div>
 </body></html>"""
-        diag_1 = (
-            BrevoEmailService.send_email_detailed(email, title_1, html_1, first_name)
+
+        email_diag = (
+            BrevoEmailService.send_email_detailed(email, title, html, first_name)
             if email
             else {}
         )
-        push_1 = NotificationDispatcher.send_push_to_user(
-            user.username, title_1, body_1, url="/activities", tag="streak-reminder"
+        push_diag = NotificationDispatcher.send_push_to_user(
+            user.username, title, body, url="/activities", tag="streak-reminder"
         )
         Notification.objects.create(
-            username=user.username, category="streaks", title=title_1, body=body_1
-        )
-        results.append(
-            {
-                "type": "streak_reminder",
-                "email_sent": diag_1.get("success", False),
-                "push": push_1,
-            }
+            username=user.username, category="streaks", title=title, body=body
         )
 
-        # 2. Weekly Progress Report
+        return {
+            "success": True,
+            "sent": True,
+            "username": user.username,
+            "type": "streak_reminder",
+            "email_sent": email_diag.get("success", False),
+            "push": push_diag,
+        }
+
+    @staticmethod
+    def send_daily_streak_reminders_to_all_active_students(
+        force: bool = False,
+    ) -> dict:
+        """
+        Executa às 20:00 (Horário de Brasília).
+        Dispara lembrete diário de streak APENAS para os alunos ativos que ainda NÃO estudaram hoje.
+        """
+        User = get_user_model()
+        students = list(
+            User.objects.filter(is_active=True)
+            .exclude(role__in=["admin", "teacher", "buyer", "programador"])
+            .exclude(is_staff=True)
+        )
+        if not students:
+            logger.info("[StreakReminder] Nenhum aluno ativo encontrado.")
+            return {"sent": 0, "total_students": 0, "skipped_already_studied": 0}
+
+        sent_count = 0
+        skipped_studied = 0
+        skipped_notified = 0
+
+        for s in students:
+            res = NotificationSchedulerService.send_daily_streak_reminder_to_user(
+                s, force=force
+            )
+            if res.get("sent"):
+                sent_count += 1
+            elif res.get("reason") == "already_studied_today":
+                skipped_studied += 1
+            elif res.get("reason") == "already_notified_today":
+                skipped_notified += 1
+
+        logger.info(
+            f"[StreakReminder] Concluído às {NotificationSchedulerService._get_brasilia_now().strftime('%H:%M:%S')} BRT: "
+            f"{sent_count} enviados, {skipped_studied} já estudaram hoje, {skipped_notified} já notificados (Total: {len(students)})."
+        )
+        return {
+            "success": True,
+            "sent": sent_count,
+            "skipped_already_studied": skipped_studied,
+            "skipped_already_notified": skipped_notified,
+            "total_students": len(students),
+        }
+
+    # ── 2. RELATÓRIO SEMANAL DE EVOLUÇÃO — DOMINGOS 19:00 BRT ─────────────
+    @staticmethod
+    def send_weekly_report_to_user(user: User, force: bool = False) -> dict:
+        """
+        Dispara o Relatório Semanal de Evolução com métricas reais para um usuário.
+        """
         from apps.users.services import ProgressReportService
+
+        first_name = (
+            (user.name or user.username or "Student").strip().split()[0].capitalize()
+        )
+        email = user.email
+
+        five_days_ago = datetime.now(timezone.utc) - timedelta(days=5)
+        already_sent = Notification.objects.filter(
+            username=user.username,
+            category="weekly_report",
+            created_at__gte=five_days_ago,
+        ).exists()
+
+        if already_sent and not force:
+            logger.info(
+                f"[WeeklyReport] Aluno {user.username} já recebeu relatório semanal nos últimos 5 dias."
+            )
+            return {
+                "success": True,
+                "sent": False,
+                "skipped": True,
+                "reason": "already_sent_this_week",
+                "username": user.username,
+            }
 
         report_data = (
             ProgressReportService.get_weekly_report(user)
             if hasattr(ProgressReportService, "get_weekly_report")
             else {}
         )
-        mins_studied = report_data.get("total_study_minutes", 75)
-        acts_done = report_data.get("activities_completed", 8)
-        vocab_learned = report_data.get("vocabulary_learned", 15)
-        title_2 = "📊 Your Weekly Progress Report - Teacher Tati AI"
-        body_2 = f"Hello {first_name}! Your weekly report is ready: {mins_studied} min practiced, {acts_done} activities completed, and +{vocab_learned} words learned!"
-        html_2 = f"""
+        mins_studied = report_data.get("study_time_minutes", 45)
+        acts_done = report_data.get("exercises_completed", 5)
+        vocab_learned = report_data.get("words_learned", 12)
+
+        title = "📊 Your Weekly Progress Report - Teacher Tati AI"
+        body = f"Hello {first_name}! Your weekly report is ready: {mins_studied} min practiced, {acts_done} activities completed, and +{vocab_learned} words learned!"
+        html = f"""
 <!DOCTYPE html><html><head><meta charset="utf-8"/></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
   <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
@@ -859,318 +1009,58 @@ class NotificationSchedulerService:
     <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Real Results.</p>
   </div>
 </body></html>"""
-        diag_2 = (
-            BrevoEmailService.send_email_detailed(email, title_2, html_2, first_name)
-            if email
-            else {}
-        )
-        push_2 = NotificationDispatcher.send_push_to_user(
-            user.username, title_2, body_2, url="/dashboard", tag="weekly-report"
-        )
-        Notification.objects.create(
-            username=user.username, category="weekly_report", title=title_2, body=body_2
-        )
-        results.append(
-            {
-                "type": "weekly_report",
-                "email_sent": diag_2.get("success", False),
-                "push": push_2,
-            }
-        )
 
-        # 3. Streak Broken Comeback
-        title_3 = "A fresh start awaits! 🌅"
-        body_3 = f"Hello {first_name}, your streak ended, but every champion has a comeback. Today is Day 1 of your next record!"
-        html_3 = f"""
-<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
-  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">💪 TIME FOR A COMEBACK</span></div>
-    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Streak lost... but not you, {first_name}!</h1>
-    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">Consistency isn't about never missing a day — it's about bouncing right back. Teacher Tati is ready for your next session!</p>
-    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/chat" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Start Day 1 Now →</a></div>
-    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Continuous Progress.</p>
-  </div>
-</body></html>"""
-        diag_3 = (
-            BrevoEmailService.send_email_detailed(email, title_3, html_3, first_name)
+        email_diag = (
+            BrevoEmailService.send_email_detailed(email, title, html, first_name)
             if email
             else {}
         )
-        push_3 = NotificationDispatcher.send_push_to_user(
-            user.username, title_3, body_3, url="/chat", tag="streak-broken"
+        push_diag = NotificationDispatcher.send_push_to_user(
+            user.username, title, body, url="/dashboard", tag="weekly-report"
         )
         Notification.objects.create(
-            username=user.username, category="streaks", title=title_3, body=body_3
-        )
-        results.append(
-            {
-                "type": "streak_broken",
-                "email_sent": diag_3.get("success", False),
-                "push": push_3,
-            }
-        )
-
-        # 4. Streak Milestone (7 Days)
-        title_4 = "🏆 7-Day Streak Achieved! You're on fire!"
-        body_4 = f"Congratulations {first_name}! You've reached a 7-day study streak. You are building a powerful English habit!"
-        html_4 = f"""
-<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
-  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">🏆 MILESTONE UNLOCKED</span></div>
-    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">7 Days in a Row, {first_name}!</h1>
-    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">One full week of consistency! You are now among the most dedicated English students. Teacher Tati is super proud!</p>
-    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/achievements" style="background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Claim Trophy & XP →</a></div>
-    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Celebrate every milestone.</p>
-  </div>
-</body></html>"""
-        diag_4 = (
-            BrevoEmailService.send_email_detailed(email, title_4, html_4, first_name)
-            if email
-            else {}
-        )
-        push_4 = NotificationDispatcher.send_push_to_user(
-            user.username, title_4, body_4, url="/achievements", tag="streak-milestone"
-        )
-        Notification.objects.create(
-            username=user.username, category="achievements", title=title_4, body=body_4
-        )
-        results.append(
-            {
-                "type": "streak_milestone",
-                "email_sent": diag_4.get("success", False),
-                "push": push_4,
-            }
-        )
-
-        # 5. New Activity Released
-        title_5 = "📚 New Listening Activity: 'Mastering Everyday English'"
-        body_5 = f"Hi {first_name}! Teacher Tatiana just published a brand-new activity designed for your level. Check it out and boost your listening skills!"
-        html_5 = f"""
-<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
-  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(124, 58, 237, 0.15); color: #c084fc; border: 1px solid rgba(124, 58, 237, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">📚 NEW ACTIVITY</span></div>
-    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">New Material from Teacher Tatiana!</h1>
-    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">A fresh exercise — <strong style="color: #ffffff;">"Mastering Everyday English"</strong> — is now open for your profile!</p>
-    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/activities" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Start Activity Now →</a></div>
-    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Real-world English practice.</p>
-  </div>
-</body></html>"""
-        diag_5 = (
-            BrevoEmailService.send_email_detailed(email, title_5, html_5, first_name)
-            if email
-            else {}
-        )
-        push_5 = NotificationDispatcher.send_push_to_user(
-            user.username, title_5, body_5, url="/activities", tag="new-activity"
-        )
-        Notification.objects.create(
-            username=user.username, category="new_activity", title=title_5, body=body_5
-        )
-        results.append(
-            {
-                "type": "new_activity",
-                "email_sent": diag_5.get("success", False),
-                "push": push_5,
-            }
-        )
-
-        # 6. Inactivity Nudge
-        title_6 = "Tati is waiting for you! 🍎"
-        body_6 = f"Hello {first_name}, it's been a few days since your last practice. Let's have a quick 3-minute conversation to keep your skills sharp!"
-        html_6 = f"""
-<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
-  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(236, 72, 153, 0.15); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">🍎 WE MISS YOU</span></div>
-    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Tati is waiting for you, {first_name}!</h1>
-    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">A quick 3-minute audio or text chat today will keep your English fluent and natural. Say hello to Teacher Tatiana!</p>
-    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/chat" style="background: linear-gradient(135deg, #ec4899, #d946ef); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Say Hello to Tati →</a></div>
-    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Always here for your learning journey.</p>
-  </div>
-</body></html>"""
-        diag_6 = (
-            BrevoEmailService.send_email_detailed(email, title_6, html_6, first_name)
-            if email
-            else {}
-        )
-        push_6 = NotificationDispatcher.send_push_to_user(
-            user.username, title_6, body_6, url="/chat", tag="inactivity-nudge"
-        )
-        Notification.objects.create(
-            username=user.username, category="retention", title=title_6, body=body_6
-        )
-        results.append(
-            {
-                "type": "inactivity_nudge",
-                "email_sent": diag_6.get("success", False),
-                "push": push_6,
-            }
+            username=user.username,
+            category="weekly_report",
+            title=title,
+            body=body,
         )
 
         return {
             "success": True,
+            "sent": True,
             "username": user.username,
-            "email": email,
-            "notifications_dispatched": results,
+            "type": "weekly_report",
+            "email_sent": email_diag.get("success", False),
+            "push": push_diag,
         }
 
     @staticmethod
-    def send_daily_streak_reminders_to_all_active_students() -> dict:
+    def send_weekly_reports_to_all_active_students(force: bool = False) -> dict:
         """
-        Dispara lembrete diário de ofensiva (Streak) para TODOS os alunos ativos que ainda não praticaram hoje.
-        Executa às 20:00 (Horário de Brasília) com janela de 18 horas para proteção contra duplicatas.
+        Executa aos domingos às 19:00 (Horário de Brasília).
+        Dispara o relatório semanal de evolução para todos os alunos ativos.
         """
         User = get_user_model()
         students = list(
-            User.objects.filter(is_active=True).exclude(
-                role__in=["admin", "teacher", "buyer"]
-            )
-        )
-        if not students:
-            logger.info("[StreakReminder] Nenhum aluno ativo encontrado.")
-            return {"sent": 0, "total_students": 0}
-
-        eighteen_hours_ago = datetime.now(timezone.utc) - timedelta(hours=18)
-        sent_count = 0
-        skipped_count = 0
-
-        for user in students:
-            first_name = (
-                (user.name or user.username or "Student")
-                .strip()
-                .split()[0]
-                .capitalize()
-            )
-            email = user.email
-
-            # Verifica se já recebeu notificação de streak nas últimas 18h
-            already_notified = Notification.objects.filter(
-                username=user.username,
-                category="streaks",
-                title__icontains="streak",
-                created_at__gte=eighteen_hours_ago,
-            ).exists()
-
-            if already_notified:
-                skipped_count += 1
-                continue
-
-            streak_val = getattr(user, "streak", None) or 1
-            title = "Don't break your streak! 🔥"
-            body = f"Hello {first_name}! You're on a {streak_val}-day streak. Practice just 5 minutes today with Teacher Tati to keep it alive!"
-            html = f"""
-<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
-  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-    <div style="text-align: center; margin-bottom: 24px;"><span style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">🔥 STREAK AT RISK</span></div>
-    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Don't break your streak, {first_name}!</h1>
-    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">You have worked hard to reach a <strong style="color: #f59e0b;">{streak_val}-day study streak</strong>. Don't let your progress slip away! Just 5 minutes of practice with Teacher Tati keeps your flame burning.</p>
-    <div style="text-align: center; margin: 32px 0;"><a href="https://tati-ai.vercel.app/activities" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Practice with Tati Now →</a></div>
-    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Personalized English Coaching</p>
-  </div>
-</body></html>"""
-            if email:
-                BrevoEmailService.send_email_detailed(email, title, html, first_name)
-            NotificationDispatcher.send_push_to_user(
-                user.username, title, body, url="/activities", tag="streak-reminder"
-            )
-            Notification.objects.create(
-                username=user.username, category="streaks", title=title, body=body
-            )
-            sent_count += 1
-
-        logger.info(
-            f"[StreakReminder] Concluído: {sent_count} alunos notificados, {skipped_count} já haviam sido notificados."
-        )
-        return {
-            "success": True,
-            "sent": sent_count,
-            "skipped": skipped_count,
-            "total_students": len(students),
-        }
-
-    @staticmethod
-    def send_weekly_reports_to_all_active_students() -> dict:
-        """
-        Dispara o Relatório Semanal de Evolução para TODOS os alunos ativos.
-        Executa aos domingos às 19:00 (Horário de Brasília) com janela de 5 dias contra duplicatas.
-        """
-        User = get_user_model()
-        from apps.users.services import ProgressReportService
-
-        students = list(
-            User.objects.filter(is_active=True).exclude(
-                role__in=["admin", "teacher", "buyer"]
-            )
+            User.objects.filter(is_active=True)
+            .exclude(role__in=["admin", "teacher", "buyer", "programador"])
+            .exclude(is_staff=True)
         )
         if not students:
             logger.info("[WeeklyReport] Nenhum aluno ativo encontrado.")
-            return {"sent": 0, "total_students": 0}
+            return {"sent": 0, "total_students": 0, "skipped": 0}
 
-        five_days_ago = datetime.now(timezone.utc) - timedelta(days=5)
         sent_count = 0
         skipped_count = 0
 
-        for user in students:
-            first_name = (
-                (user.name or user.username or "Student")
-                .strip()
-                .split()[0]
-                .capitalize()
+        for s in students:
+            res = NotificationSchedulerService.send_weekly_report_to_user(
+                s, force=force
             )
-            email = user.email
-
-            # Evita envio duplicado na mesma semana
-            already_sent = Notification.objects.filter(
-                username=user.username,
-                category="weekly_report",
-                created_at__gte=five_days_ago,
-            ).exists()
-
-            if already_sent:
+            if res.get("sent"):
+                sent_count += 1
+            else:
                 skipped_count += 1
-                continue
-
-            report_data = (
-                ProgressReportService.get_weekly_report(user)
-                if hasattr(ProgressReportService, "get_weekly_report")
-                else {}
-            )
-            mins_studied = report_data.get("total_study_minutes", 45)
-            acts_done = report_data.get("activities_completed", 5)
-            vocab_learned = report_data.get("vocabulary_learned", 12)
-            title = "📊 Your Weekly Progress Report - Teacher Tati AI"
-            body = f"Hello {first_name}! Your weekly report is ready: {mins_studied} min practiced, {acts_done} activities completed, and +{vocab_learned} words learned!"
-            html = f"""
-<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
-  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(124, 58, 237, 0.15); color: #a78bfa; border: 1px solid rgba(124, 58, 237, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">📊 WEEKLY EVOLUTION REPORT</span></div>
-    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Great progress this week, {first_name}!</h1>
-    <table style="width: 100%; border-collapse: collapse; margin: 24px 0;"><tr>
-      <td style="padding: 12px; background: #221b40; border-radius: 12px 0 0 12px; text-align: center; width: 33.3%;"><div style="font-size: 22px; font-weight: 800; color: #7c3aed;">{mins_studied} min</div><div style="font-size: 12px; color: #948aa8;">Study Time</div></td>
-      <td style="padding: 12px; background: #221b40; border-left: 1px solid #312759; border-right: 1px solid #312759; text-align: center; width: 33.3%;"><div style="font-size: 22px; font-weight: 800; color: #10b981;">{acts_done}</div><div style="font-size: 12px; color: #948aa8;">Activities</div></td>
-      <td style="padding: 12px; background: #221b40; border-radius: 0 12px 12px 0; text-align: center; width: 33.3%;"><div style="font-size: 22px; font-weight: 800; color: #f59e0b;">+{vocab_learned}</div><div style="font-size: 12px; color: #948aa8;">Words</div></td>
-    </tr></table>
-    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/dashboard" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 15px; display: inline-block;">View Full Report →</a></div>
-    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Real Results.</p>
-  </div>
-</body></html>"""
-            if email:
-                BrevoEmailService.send_email_detailed(email, title, html, first_name)
-            NotificationDispatcher.send_push_to_user(
-                user.username, title, body, url="/dashboard", tag="weekly-report"
-            )
-            Notification.objects.create(
-                username=user.username,
-                category="weekly_report",
-                title=title,
-                body=body,
-            )
-            sent_count += 1
 
         logger.info(
             f"[WeeklyReport] Concluído: {sent_count} relatórios enviados, {skipped_count} ignorados por duplicata."
@@ -1181,3 +1071,346 @@ class NotificationSchedulerService:
             "skipped": skipped_count,
             "total_students": len(students),
         }
+
+    # ── 3. INCENTIVO DE INATIVIDADE (NUDGE) — 14:00 BRT ───────────────────
+    @staticmethod
+    def send_inactivity_nudge_to_user(user: User, force: bool = False) -> dict:
+        """
+        Dispara incentivo de retorno para alunos inativos há 3+ dias.
+        """
+        first_name = (
+            (user.name or user.username or "Student").strip().split()[0].capitalize()
+        )
+        email = user.email
+
+        # Verifica se já recebeu incentivo de inatividade nos últimos 5 dias
+        five_days_ago = datetime.now(timezone.utc) - timedelta(days=5)
+        already_nudged = Notification.objects.filter(
+            username=user.username,
+            category="retention",
+            created_at__gte=five_days_ago,
+        ).exists()
+
+        if already_nudged and not force:
+            return {
+                "success": True,
+                "sent": False,
+                "skipped": True,
+                "reason": "already_nudged_recently",
+                "username": user.username,
+            }
+
+        title = "Tati is waiting for you! 🍎"
+        body = f"Hello {first_name}, it's been a few days since your last practice. Let's have a quick 3-minute conversation to keep your skills sharp!"
+        html = f"""
+<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
+  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(236, 72, 153, 0.15); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">🍎 WE MISS YOU</span></div>
+    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Tati is waiting for you, {first_name}!</h1>
+    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">A quick 3-minute audio or text chat today will keep your English fluent and natural. Say hello to Teacher Tatiana!</p>
+    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/chat" style="background: linear-gradient(135deg, #ec4899, #d946ef); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Say Hello to Tati →</a></div>
+    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Always here for your learning journey.</p>
+  </div>
+</body></html>"""
+
+        email_diag = (
+            BrevoEmailService.send_email_detailed(email, title, html, first_name)
+            if email
+            else {}
+        )
+        push_diag = NotificationDispatcher.send_push_to_user(
+            user.username, title, body, url="/chat", tag="inactivity-nudge"
+        )
+        Notification.objects.create(
+            username=user.username, category="retention", title=title, body=body
+        )
+
+        return {
+            "success": True,
+            "sent": True,
+            "username": user.username,
+            "type": "inactivity_nudge",
+            "email_sent": email_diag.get("success", False),
+            "push": push_diag,
+        }
+
+    @staticmethod
+    def send_inactivity_nudges_to_all_inactive_students(
+        force: bool = False,
+    ) -> dict:
+        """
+        Executa às 14:00 (Horário de Brasília).
+        Verifica alunos que não praticam há entre 3 e 14 dias e envia incentivo.
+        """
+        User = get_user_model()
+        students = list(
+            User.objects.filter(is_active=True)
+            .exclude(role__in=["admin", "teacher", "buyer", "programador"])
+            .exclude(is_staff=True)
+        )
+        if not students:
+            return {"sent": 0, "total_students": 0}
+
+        today_brt = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+        sent_count = 0
+        skipped_count = 0
+
+        for s in students:
+            streak_data = s.streak_data if isinstance(s.streak_data, dict) else {}
+            last_date_str = streak_data.get("last_study_date")
+            is_inactive = False
+
+            if last_date_str:
+                try:
+                    last_d = datetime.fromisoformat(last_date_str[:10]).date()
+                    diff = (today_brt - last_d).days
+                    if 3 <= diff <= 14:
+                        is_inactive = True
+                except Exception:
+                    pass
+            else:
+                # Aluno sem registro de estudo
+                is_inactive = True
+
+            if is_inactive:
+                res = NotificationSchedulerService.send_inactivity_nudge_to_user(
+                    s, force=force
+                )
+                if res.get("sent"):
+                    sent_count += 1
+                else:
+                    skipped_count += 1
+
+        return {
+            "success": True,
+            "sent": sent_count,
+            "skipped": skipped_count,
+            "total_students": len(students),
+        }
+
+    # ── 4. STREAK BROKEN (COMEBACK) ──────────────────────────────────────
+    @staticmethod
+    def send_streak_broken_to_user(user: User, force: bool = False) -> dict:
+        first_name = (
+            (user.name or user.username or "Student").strip().split()[0].capitalize()
+        )
+        email = user.email
+
+        seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+        already_notified = Notification.objects.filter(
+            username=user.username,
+            category="streaks",
+            title__icontains="fresh start",
+            created_at__gte=seven_days_ago,
+        ).exists()
+
+        if already_notified and not force:
+            return {
+                "success": True,
+                "sent": False,
+                "skipped": True,
+                "reason": "already_sent_recently",
+                "username": user.username,
+            }
+
+        title = "A fresh start awaits! 🌅"
+        body = f"Hello {first_name}, your streak ended, but every champion has a comeback. Today is Day 1 of your next record!"
+        html = f"""
+<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
+  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">💪 TIME FOR A COMEBACK</span></div>
+    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Streak lost... but not you, {first_name}!</h1>
+    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">Consistency isn't about never missing a day — it's about bouncing right back. Teacher Tati is ready for your next session!</p>
+    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/chat" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Start Day 1 Now →</a></div>
+    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Continuous Progress.</p>
+  </div>
+</body></html>"""
+
+        email_diag = (
+            BrevoEmailService.send_email_detailed(email, title, html, first_name)
+            if email
+            else {}
+        )
+        push_diag = NotificationDispatcher.send_push_to_user(
+            user.username, title, body, url="/chat", tag="streak-broken"
+        )
+        Notification.objects.create(
+            username=user.username, category="streaks", title=title, body=body
+        )
+
+        return {
+            "success": True,
+            "sent": True,
+            "username": user.username,
+            "type": "streak_broken",
+            "email_sent": email_diag.get("success", False),
+            "push": push_diag,
+        }
+
+    # ── 5. STREAK MILESTONE (7, 14, 30 DIAS) ─────────────────────────────
+    @staticmethod
+    def send_streak_milestone_to_user(
+        user: User, milestone: int = 7, force: bool = False
+    ) -> dict:
+        first_name = (
+            (user.name or user.username or "Student").strip().split()[0].capitalize()
+        )
+        email = user.email
+
+        title = f"🏆 {milestone}-Day Streak Achieved! You're on fire!"
+        already_notified = Notification.objects.filter(
+            username=user.username,
+            category="achievements",
+            title=title,
+        ).exists()
+
+        if already_notified and not force:
+            return {
+                "success": True,
+                "sent": False,
+                "skipped": True,
+                "reason": "already_awarded",
+                "username": user.username,
+            }
+
+        body = f"Congratulations {first_name}! You've reached a {milestone}-day study streak. You are building a powerful English habit!"
+        html = f"""
+<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
+  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">🏆 MILESTONE UNLOCKED</span></div>
+    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">{milestone} Days in a Row, {first_name}!</h1>
+    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">Consistency pays off! You are now among our most dedicated English students. Teacher Tati is super proud!</p>
+    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/achievements" style="background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Claim Trophy & XP →</a></div>
+    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Celebrate every milestone.</p>
+  </div>
+</body></html>"""
+
+        email_diag = (
+            BrevoEmailService.send_email_detailed(email, title, html, first_name)
+            if email
+            else {}
+        )
+        push_diag = NotificationDispatcher.send_push_to_user(
+            user.username, title, body, url="/achievements", tag="streak-milestone"
+        )
+        Notification.objects.create(
+            username=user.username, category="achievements", title=title, body=body
+        )
+
+        return {
+            "success": True,
+            "sent": True,
+            "username": user.username,
+            "type": "streak_milestone",
+            "email_sent": email_diag.get("success", False),
+            "push": push_diag,
+        }
+
+    # ── 6. DISPARO DE TESTE CONTROLADO (INDIVIDUAL OU GERAL) ──────────────
+    @staticmethod
+    def send_test_notification_to_user(
+        user: User, notification_type: str = "streak_reminder", force: bool = True
+    ) -> dict:
+        """
+        Dispara APENAS a notificação solicitada para validação técnica individual,
+        ou todas se explicitamente solicitado com notification_type='all'.
+        """
+        if notification_type == "streak_reminder":
+            return NotificationSchedulerService.send_daily_streak_reminder_to_user(
+                user, force=force
+            )
+        elif notification_type == "weekly_report":
+            return NotificationSchedulerService.send_weekly_report_to_user(
+                user, force=force
+            )
+        elif notification_type == "inactivity_nudge":
+            return NotificationSchedulerService.send_inactivity_nudge_to_user(
+                user, force=force
+            )
+        elif notification_type == "streak_broken":
+            return NotificationSchedulerService.send_streak_broken_to_user(
+                user, force=force
+            )
+        elif notification_type == "streak_milestone":
+            return NotificationSchedulerService.send_streak_milestone_to_user(
+                user, milestone=7, force=force
+            )
+        elif notification_type == "new_activity":
+            first_name = (
+                (user.name or user.username or "Student")
+                .strip()
+                .split()[0]
+                .capitalize()
+            )
+            title = "📚 New Listening Activity: 'Mastering Everyday English'"
+            body = f"Hi {first_name}! Teacher Tatiana just published a brand-new activity designed for your level. Check it out!"
+            email = user.email
+            email_diag = (
+                BrevoEmailService.send_email_detailed(
+                    email,
+                    title,
+                    f"<p>Hello {first_name}, a new activity is available!</p>",
+                    first_name,
+                )
+                if email
+                else {}
+            )
+            push_diag = NotificationDispatcher.send_push_to_user(
+                user.username, title, body, url="/activities", tag="new-activity"
+            )
+            Notification.objects.create(
+                username=user.username,
+                category="new_activity",
+                title=title,
+                body=body,
+            )
+            return {
+                "success": True,
+                "sent": True,
+                "type": "new_activity",
+                "email_sent": email_diag.get("success", False),
+                "push": push_diag,
+            }
+        elif notification_type == "all":
+            # Dispara os 6 modelos apenas quando explicitamente requisitado
+            results = [
+                NotificationSchedulerService.send_daily_streak_reminder_to_user(
+                    user, force=True
+                ),
+                NotificationSchedulerService.send_weekly_report_to_user(
+                    user, force=True
+                ),
+                NotificationSchedulerService.send_streak_broken_to_user(
+                    user, force=True
+                ),
+                NotificationSchedulerService.send_streak_milestone_to_user(
+                    user, milestone=7, force=True
+                ),
+                NotificationSchedulerService.send_inactivity_nudge_to_user(
+                    user, force=True
+                ),
+            ]
+            return {
+                "success": True,
+                "username": user.username,
+                "dispatched_count": len(results),
+                "details": results,
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"Tipo de notificação desconhecido: '{notification_type}'. Tipos válidos: streak_reminder, weekly_report, inactivity_nudge, streak_broken, streak_milestone, new_activity, all.",
+            }
+
+    @staticmethod
+    def send_all_test_notifications_to_user(user: User) -> dict:
+        """
+        Compatibilidade retroativa: dispara todos os testes explicitamente requisitados.
+        """
+        return NotificationSchedulerService.send_test_notification_to_user(
+            user, notification_type="all", force=True
+        )
+
