@@ -681,24 +681,40 @@ class HubService:
                         f"[Hub] Erro ao buscar compras do usuário {user.username}: {e}"
                     )
 
-        return [
-            HubMaterialOut(
-                id=str(m.id),
-                title=m.title,
-                description=m.description or "",
-                price=float(m.price or 0.0),
-                type=m.type or "book",
-                thumbnail_url=m.thumbnail_url,
-                emoji=m.emoji or "📚",
-                category=m.category or "materials",
-                is_featured=m.is_featured,
-                is_secure=m.is_secure,
-                has_access=can_access_all
-                or (str(m.id) in purchased_ids)
-                or float(m.price or 0.0) == 0.0,
+        base_url = os.getenv(
+            "API_URL", "https://caio007-tati-ai-backend.hf.space"
+        ).rstrip("/")
+        supa_storage = "https://gkziqqjswecteekanwnv.supabase.co/storage/v1/object/public/hub-secure-pages"
+
+        results = []
+        for m in qs:
+            thumb = m.thumbnail_url or ""
+            if thumb and not thumb.startswith("http"):
+                if thumb.endswith(".webp") and "/" in thumb:
+                    thumb = f"{base_url}/activities/hub/{m.id}/pages/0"
+                else:
+                    thumb = f"{supa_storage}/{thumb.lstrip('/')}"
+            elif not thumb and m.is_secure:
+                thumb = f"{base_url}/activities/hub/{m.id}/pages/0"
+
+            results.append(
+                HubMaterialOut(
+                    id=str(m.id),
+                    title=m.title,
+                    description=m.description or "",
+                    price=float(m.price or 0.0),
+                    type=m.type or "book",
+                    thumbnail_url=thumb or None,
+                    emoji=m.emoji or "📚",
+                    category=m.category or "materials",
+                    is_featured=m.is_featured,
+                    is_secure=m.is_secure,
+                    has_access=can_access_all
+                    or (str(m.id) in purchased_ids)
+                    or float(m.price or 0.0) == 0.0,
+                )
             )
-            for m in qs
-        ]
+        return results
 
     @staticmethod
     def get_content_access(user: Optional[User], content_id: str) -> dict:

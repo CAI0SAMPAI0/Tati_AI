@@ -1,4 +1,4 @@
-import type { ElementType } from 'react';
+import { useState, type ElementType } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import CheckoutFlow from '@/components/CheckoutFlow';
@@ -40,6 +40,7 @@ type ProductCardProps = {
 
 export default function ProductCard({ item, showOwned, onAccessGranted }: ProductCardProps) {
   const { user } = useAuth();
+  const [imageError, setImageError] = useState(false);
   const category = normalizeCategory(item.category);
   const styles = categoryStyles(category);
   const Icon = categoryIcons[category];
@@ -49,9 +50,13 @@ export default function ProductCard({ item, showOwned, onAccessGranted }: Produc
   const priceLabel = formatPrice(price);
 
   const rawPreview = item.preview_url || item.thumbnail_url;
-  const storageUrl = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_URL || '';
+  const storageUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_STORAGE_URL ||
+    'https://gkziqqjswecteekanwnv.supabase.co/storage/v1/object/public/hub-secure-pages';
   const preview = rawPreview
-    ? (rawPreview.startsWith('http') ? rawPreview : `${storageUrl}/${rawPreview}`)
+    ? rawPreview.startsWith('http')
+      ? rawPreview
+      : `${storageUrl}/${rawPreview.replace(/^\/+/, '')}`
     : null;
 
   return (
@@ -64,11 +69,13 @@ export default function ProductCard({ item, showOwned, onAccessGranted }: Produc
       {showOwned ? (
         <Link href={`/activities/hub/${item.id}/ler`} className="block">
           <div className="relative mx-4 mt-4 aspect-[4/3] overflow-hidden rounded-xl bg-primarySoft">
-            {preview ? (
+            {preview && !imageError ? (
               <Image
                 src={preview}
                 alt={item.title}
                 fill
+                unoptimized={true}
+                onError={() => setImageError(true)}
                 className="object-cover"
                 sizes="(max-width: 768px) 100vw, 33vw"
               />
@@ -88,11 +95,13 @@ export default function ProductCard({ item, showOwned, onAccessGranted }: Produc
       ) : (
         <div className="block cursor-default">
           <div className="relative mx-4 mt-4 aspect-[4/3] overflow-hidden rounded-xl bg-primarySoft">
-            {preview ? (
+            {preview && !imageError ? (
               <Image
                 src={preview}
                 alt={item.title}
                 fill
+                unoptimized={true}
+                onError={() => setImageError(true)}
                 className="object-cover"
                 sizes="(max-width: 768px) 100vw, 33vw"
               />

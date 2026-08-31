@@ -674,18 +674,18 @@ def get_hub_page(
                         f"[Hub] Erro ao baixar página do Supabase {storage_path}: {e2}"
                     )
 
-        # 4. Se o Supabase falhou (ex: 402 Payment Required), tenta sincronizar/regerar a partir do content_source
+        # 4. Se o Supabase falhou (ex: 402 Payment Required), dispara auto-sync em background para não travar a requisição HTTP
         if not file_data and content_source:
             try:
+                import threading
                 from .tasks import sync_material_pages
                 from .models import PremiumContent
 
                 m = PremiumContent.objects.filter(id=content_id).first()
-                if m and sync_material_pages(m):
-                    if os.path.exists(local_file):
-                        with open(local_file, "rb") as f:
-                            file_data = f.read()
-                            _RAW_IMAGE_CACHE[storage_path] = file_data
+                if m:
+                    threading.Thread(
+                        target=sync_material_pages, args=(m,), daemon=True
+                    ).start()
             except Exception as sync_err:
                 logger.warning(
                     f"[Hub] Erro no auto-sync de emergência para {content_id}: {sync_err}"

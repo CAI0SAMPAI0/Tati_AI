@@ -15,11 +15,26 @@ websocket_urlpatterns = [
     *chat_ws_patterns,
 ]
 
+async def lifespan_handler(scope, receive, send):
+    """
+    Tratador de eventos lifespan do ASGI para garantir compatibilidade
+    plena com UvicornWorker / Gunicorn e evitar erros de scope 'lifespan'.
+    """
+    while True:
+        message = await receive()
+        if message["type"] == "lifespan.startup":
+            await send({"type": "lifespan.startup.complete"})
+        elif message["type"] == "lifespan.shutdown":
+            await send({"type": "lifespan.shutdown.complete"})
+            return
+
+
 application = ProtocolTypeRouter(
     {
         "http": django_asgi_app,
         "websocket": AllowedHostsOriginValidator(
             AuthMiddlewareStack(URLRouter(websocket_urlpatterns))
         ),
+        "lifespan": lifespan_handler,
     }
 )
