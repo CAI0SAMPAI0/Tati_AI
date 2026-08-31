@@ -218,9 +218,7 @@ Tati_AI
 │   ├── main.py                            # Entry point da aplicação FastAPI
 │   ├── requirements.txt
 │   ├── Dockerfile
-│   ├── Dockerfile.api
-│   ├── Dockerfile.dev
-│   └── Dockerfile.worker
+│   └── Dockerfile.api
 │
 ├── frontend/                              # App principal do aluno (Next.js 14)
 │   ├── app/                               # Rotas e páginas (App Router)
