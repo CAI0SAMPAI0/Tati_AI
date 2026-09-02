@@ -66,3 +66,5 @@ firebase-admin>=6.5.0
 
 # Monitoring
 sentry-sdk[django]>=2.0.0
+
+# subindo para a HF atualizar
