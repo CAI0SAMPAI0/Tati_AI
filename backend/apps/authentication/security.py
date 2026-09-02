@@ -95,9 +95,9 @@ def create_access_token(
 
 def create_refresh_token(data: Dict[str, Any]) -> str:
     """
-    Gera token de atualização (Refresh Token) de longa duração (30 dias).
+    Gera token de atualização (Refresh Token) de longa duração (90 dias).
     """
-    expire = datetime.now(timezone.utc) + timedelta(days=30)
+    expire = datetime.now(timezone.utc) + timedelta(days=90)
     to_encode = data.copy()
     to_encode.update({"exp": expire, "type": "refresh"})
     return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
