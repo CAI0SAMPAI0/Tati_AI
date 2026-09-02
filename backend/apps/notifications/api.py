@@ -238,6 +238,35 @@ def trigger_inactivity_nudges(request: HttpRequest):
 # ── CRON WEBHOOKS SEGUROS (HORÁRIO DE BRASÍLIA / HUGGING FACE / VERCEL) ─
 
 
+def _validate_cron_access(request: HttpRequest) -> bool:
+    """
+    Valida token secreto do cron via header (X-Cron-Token ou Authorization) ou query param ?token=.
+    Também permite se o usuário logado for admin/programador/professor.
+    """
+    import os
+
+    expected = (os.getenv("CRON_TOKEN") or "cai0_based").strip()
+    token = (
+        request.headers.get("X-Cron-Token")
+        or request.GET.get("token")
+        or request.headers.get("x-cron-token")
+    )
+    if token and token.strip() == expected:
+        return True
+
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        bearer_token = auth_header[7:].strip()
+        if bearer_token == expected:
+            return True
+
+    user = getattr(request, "auth", None)
+    if user and hasattr(user, "role") and user.role in ("programador", "admin", "professor"):
+        return True
+
+    return False
+
+
 @notifications_router.post("/cron/daily-streak", auth=auth_optional)
 @notifications_router.get("/cron/daily-streak", auth=auth_optional)
 def cron_daily_streak(request: HttpRequest):
@@ -281,6 +310,56 @@ def cron_inactivity_nudges(request: HttpRequest):
         raise HttpError(403, "Acesso não autorizado ao webhook de cron.")
 
     return NotificationSchedulerService.send_inactivity_nudges_to_all_inactive_students()
+
+
+@notifications_router.post("/cron/monthly-competition", auth=auth_optional)
+@notifications_router.get("/cron/monthly-competition", auth=auth_optional)
+def cron_monthly_competition(
+    request: HttpRequest, year: Optional[int] = None, month: Optional[int] = None
+):
+    """
+    Webhook seguro executado no dia 1 de cada mês às 00:05 (Horário de Brasília).
+    Fecha a competição do mês anterior, calcula o Top 3 e envia relatório para o Admin por E-mail e WhatsApp.
+    """
+    from ninja.errors import HttpError
+    from apps.activities.services import MonthlyCompetitionService
+
+    if not _validate_cron_access(request):
+        raise HttpError(403, "Acesso não autorizado ao webhook de cron.")
+
+    return MonthlyCompetitionService.close_and_notify_admin(year=year, month=month)
+
+
+@notifications_router.post("/competition/monthly-close", auth=auth_required)
+def trigger_monthly_competition_close(
+    request: HttpRequest, year: Optional[int] = None, month: Optional[int] = None
+):
+    """
+    Disparo manual do fechamento mensal e envio do Top 3 para Administradores e Professora Tatiana.
+    """
+    from apps.activities.services import MonthlyCompetitionService
+
+    return MonthlyCompetitionService.close_and_notify_admin(year=year, month=month)
+
+
+@notifications_router.get("/competition/top3", auth=auth_optional)
+def get_monthly_top3(
+    request: HttpRequest, year: Optional[int] = None, month: Optional[int] = None
+):
+    """
+    Retorna o Top 3 de um mês específico ou do mês anterior.
+    """
+    from apps.activities.services import MonthlyCompetitionService
+
+    if year is None or month is None:
+        year, month = MonthlyCompetitionService.get_previous_month()
+
+    top3 = MonthlyCompetitionService.get_top3(year=year, month=month)
+    return {
+        "year": year,
+        "month": month,
+        "top3": top3,
+    }
 
 
 # ── DISPARO DE WHATSAPP (WAHA) ────────────────────────────────────────

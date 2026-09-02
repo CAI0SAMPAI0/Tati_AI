@@ -186,7 +186,15 @@ class XPService:
         current = xp_data.get("xp", 0) or 0
         current += amount
         xp_data["xp"] = current
-        xp_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+        now = datetime.now(timezone.utc)
+        current_month_key = f"{now.year}-{now.month:02d}"
+        monthly_xp = xp_data.get("monthly_xp")
+        if not isinstance(monthly_xp, dict):
+            monthly_xp = {}
+        monthly_xp[current_month_key] = int(monthly_xp.get(current_month_key, 0) or 0) + amount
+        xp_data["monthly_xp"] = monthly_xp
+        xp_data["updated_at"] = now.isoformat()
 
         user.xp_data = xp_data
         user.save(update_fields=["xp_data"])

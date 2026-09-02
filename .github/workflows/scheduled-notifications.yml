@@ -10,10 +10,12 @@ on:
     - cron: '30 0 * * *'
     # Domingo 20:00 BRT (23:00 UTC) - Relatório Semanal de Evolução
     - cron: '0 23 * * 0'
+    # Dia 1 de cada mês às 00:05 BRT (03:05 UTC) - Fechamento de Competição Mensal e Envio do Top 3
+    - cron: '5 3 1 * *'
   workflow_dispatch:
     inputs:
       notification_type:
-        description: 'Tipo de notificação (all, streak, weekly, inactivity)'
+        description: 'Tipo de notificação (all, streak, weekly, inactivity, monthly_competition)'
         required: true
         default: 'all'
 
@@ -24,9 +26,23 @@ jobs:
     steps:
       - name: Trigger Notification Endpoint on Hugging Face
         run: |
-          echo "Disparando notificações agendadas..."
+          echo "Disparando notificações agendadas e verificação de cron..."
+          
+          # 1. Notificações gerais e streak
           curl -X POST "https://caio007-tati-ai-backend.hf.space/api/v1/notifications/send-all-test" \
             -H "Content-Type: application/json" \
+            -H "X-Cron-Token: cai0_based" \
             --max-time 30 || true
-          echo "Disparo concluído."
+
+          # 2. Se for dia 1 do mês ou acionado manualmente para monthly_competition, fecha competição e envia Top 3
+          DAY=$(date +%-d)
+          if [ "$DAY" -eq 1 ] || [ "${{ github.event.inputs.notification_type }}" = "monthly_competition" ] || [ "${{ github.event.inputs.notification_type }}" = "all" ]; then
+            echo "Executando fechamento de competição mensal e envio do Top 3..."
+            curl -X POST "https://caio007-tati-ai-backend.hf.space/api/v1/notifications/cron/monthly-competition" \
+              -H "Content-Type: application/json" \
+              -H "X-Cron-Token: cai0_based" \
+              --max-time 30 || true
+          fi
+          
+          echo "Disparo concluído com sucesso."
 

@@ -347,7 +347,9 @@ def get_ranking_winners(request: HttpRequest):
     """
     Retorna o histórico de vencedores dos ciclos de competição.
     """
-    return []
+    from apps.activities.services import MonthlyCompetitionService
+
+    return MonthlyCompetitionService.get_past_winners()
 
 
 @users_router.get("/progress/report/download", auth=auth_optional)

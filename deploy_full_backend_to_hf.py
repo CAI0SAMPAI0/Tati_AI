@@ -19,32 +19,16 @@ repo_type = "space"
 
 backend_root = Path(r"c:\Users\CAIO\Projetos\Tati_AI\backend")
 
-files_to_sync = [
-    "requirements.txt",
-    "app/urls.py",
-    "app/api.py",
-    "apps/authentication/api.py",
-    "apps/authentication/services.py",
-    "apps/authentication/security.py",
-    "apps/notifications/api.py",
-    "apps/notifications/services.py",
-    "apps/notifications/schemas.py",
-    "apps/notifications/models.py",
-    "apps/notifications/apps.py",
-]
-
-for rel_path in files_to_sync:
-    local_path = backend_root / rel_path
-    if local_path.exists():
-        print(f"Uploading {rel_path} to HF Space...")
-        api.upload_file(
-            path_or_fileobj=str(local_path),
-            path_in_repo=rel_path.replace("\\", "/"),
-            repo_id=repo_id,
-            repo_type=repo_type,
-            commit_message=f"Update {rel_path} with google oauth auto-redirect and notification scheduler",
-        )
-        print(f"Uploaded {rel_path} successfully!")
+print(f"Enviando todos os arquivos do backend da Tati AI para o Space {repo_id}...")
+api.upload_folder(
+    folder_path=str(backend_root),
+    repo_id=repo_id,
+    repo_type=repo_type,
+    delete_patterns="*",
+    ignore_patterns=["*.sqlite3", "**/__pycache__/**", "**/*.pyc", ".env*", ".venv*"],
+    commit_message="Fechamento de competições mensais e envio do Top 3 para Admin",
+)
+print("Arquivos sincronizados com sucesso!")
 
 # Restart space to apply changes immediately
 try:

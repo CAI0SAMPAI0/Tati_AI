@@ -189,6 +189,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.notifications.tasks.send_inactivity_nudges_task",
         "schedule": crontab(hour=14, minute=0),  # 14:00 Horário de Brasília
     },
+    "monthly-competition-reset-day-1": {
+        "task": "apps.notifications.tasks.close_monthly_competition_task",
+        "schedule": crontab(
+            hour=0, minute=5, day_of_month=1
+        ),  # Todo dia 1 às 00:05 Horário de Brasília
+    },
 }
 
 # ── DJANGO CHANNELS (WEBSOCKETS LAYER) ────────────────────────────────

@@ -442,13 +442,44 @@ class RankingService:
     }
 
     @classmethod
-    def _activity_scores(cls) -> dict[str, int]:
+    def _activity_scores(
+        cls,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        all_time: bool = False,
+    ) -> dict[str, int]:
+        now = datetime.now(timezone.utc)
+        target_year = year if year is not None else now.year
+        target_month = month if month is not None else now.month
+        month_key = f"{target_year}-{target_month:02d}"
+
         scores = {}
         rows = list(ActivitySubmission.objects.all())
         for r in rows:
             meta = r.metadata if isinstance(r.metadata, dict) else {}
             if r.score <= 0 or str(meta.get("status") or "").lower() == "pending":
                 continue
+
+            # Filtra por mês e ano se não for all_time
+            if not all_time:
+                created_at = r.created_at
+                if created_at is not None:
+                    if hasattr(created_at, "year") and hasattr(created_at, "month"):
+                        if (
+                            created_at.year != target_year
+                            or created_at.month != target_month
+                        ):
+                            continue
+                    elif isinstance(created_at, str):
+                        try:
+                            dt = datetime.fromisoformat(
+                                created_at.replace("Z", "+00:00")
+                            )
+                            if dt.year != target_year or dt.month != target_month:
+                                continue
+                        except Exception:
+                            pass
+
             pts = meta.get("points_awarded")
             if pts is None:
                 cat = str(meta.get("category") or r.activity_type or "").lower().strip()
@@ -457,17 +488,30 @@ class RankingService:
             if pts:
                 scores[r.username] = scores.get(r.username, 0) + pts
 
+        # Inclui pontos do bucket mensal de XP nos usuários
         for u in User.objects.all():
             xp_data = u.xp_data if isinstance(u.xp_data, dict) else {}
-            legacy = int(xp_data.get("legacy_competition_points", 0) or 0)
-            if legacy:
-                scores[u.username] = scores.get(u.username, 0) + legacy
+            if all_time:
+                legacy = int(xp_data.get("legacy_competition_points", 0) or 0)
+                if legacy:
+                    scores[u.username] = scores.get(u.username, 0) + legacy
+            else:
+                monthly_xp_map = xp_data.get("monthly_xp")
+                if isinstance(monthly_xp_map, dict):
+                    pts = int(monthly_xp_map.get(month_key, 0) or 0)
+                    if pts:
+                        scores[u.username] = scores.get(u.username, 0) + pts
 
         return scores
 
     @classmethod
-    def _get_students(cls) -> list[dict]:
-        scores = cls._activity_scores()
+    def _get_students(
+        cls,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        all_time: bool = False,
+    ) -> list[dict]:
+        scores = cls._activity_scores(year=year, month=month, all_time=all_time)
         all_users = User.objects.all()
         user_map = {u.username: u for u in all_users}
 
@@ -489,14 +533,21 @@ class RankingService:
                         "level": (user.level or "A1").upper(),
                         "avatar_url": user.avatar_url,
                         "streak_count": user.streak_count,
+                        "email": user.email or "",
+                        "phone": getattr(user, "phone", "") or "",
                     }
                 )
 
         return sorted(students, key=lambda x: x["score"], reverse=True)
 
     @classmethod
-    def get_ranking(cls, current_user: User) -> list[RankingUserOut]:
-        students = cls._get_students()
+    def get_ranking(
+        cls,
+        current_user: User,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+    ) -> list[RankingUserOut]:
+        students = cls._get_students(year=year, month=month)
         results = []
         for rank, u in enumerate(students[:50], start=1):
             results.append(
@@ -516,8 +567,13 @@ class RankingService:
         return results
 
     @classmethod
-    def get_top15(cls, current_user: Optional[User] = None) -> list[dict]:
-        students = cls._get_students()
+    def get_top15(
+        cls,
+        current_user: Optional[User] = None,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+    ) -> list[dict]:
+        students = cls._get_students(year=year, month=month)
         return [
             {
                 "position": i + 1,
@@ -536,8 +592,13 @@ class RankingService:
         ]
 
     @classmethod
-    def get_ranking_by_level(cls, current_user: Optional[User] = None) -> dict:
-        students = cls._get_students()
+    def get_ranking_by_level(
+        cls,
+        current_user: Optional[User] = None,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+    ) -> dict:
+        students = cls._get_students(year=year, month=month)
         cefr_levels = ["A1", "A2", "B1", "B2", "C1", "C2"]
         result = {lvl: [] for lvl in cefr_levels}
 
@@ -577,12 +638,17 @@ class RankingService:
             **result,
             "user_level": user_level,
             "my_position": my_pos,
-            "top15": cls.get_top15(current_user),
+            "top15": cls.get_top15(current_user, year=year, month=month),
         }
 
     @classmethod
-    def get_user_position(cls, current_user: User) -> dict:
-        students = cls._get_students()
+    def get_user_position(
+        cls,
+        current_user: User,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+    ) -> dict:
+        students = cls._get_students(year=year, month=month)
         my_pos = next(
             (
                 i + 1
@@ -604,6 +670,411 @@ class RankingService:
             "score": user_score,
             "total_students": len(students),
         }
+
+
+class MonthlyCompetitionService:
+    """
+    Serviço responsável pelo gerenciamento de ciclos mensais de competição,
+    cálculo do Top 3 de cada mês e notificação automatizada da Professora Tatiana e Administradores.
+    """
+
+    MONTH_NAMES_PT = {
+        1: "Janeiro",
+        2: "Fevereiro",
+        3: "Março",
+        4: "Abril",
+        5: "Maio",
+        6: "Junho",
+        7: "Julho",
+        8: "Agosto",
+        9: "Setembro",
+        10: "Outubro",
+        11: "Novembro",
+        12: "Dezembro",
+    }
+
+    @classmethod
+    def get_previous_month(cls) -> tuple[int, int]:
+        now = datetime.now(timezone.utc)
+        if now.month == 1:
+            return now.year - 1, 12
+        return now.year, now.month - 1
+
+    @classmethod
+    def get_top3(cls, year: int, month: int) -> list[dict]:
+        students = RankingService._get_students(year=year, month=month)
+        top3 = []
+        medals = ["🥇", "🥈", "🥉"]
+        for i, s in enumerate(students[:3]):
+            top3.append(
+                {
+                    "position": i + 1,
+                    "medal": medals[i],
+                    "username": s["username"],
+                    "name": s["name"],
+                    "score": s["score"],
+                    "level": s["level"],
+                    "avatar_url": s["avatar_url"],
+                    "email": s.get("email", ""),
+                    "phone": s.get("phone", ""),
+                }
+            )
+        return top3
+
+    @classmethod
+    def get_past_winners(cls, limit_months: int = 6) -> list[dict]:
+        """
+        Retorna o histórico dos Top 3 vencedores dos últimos ciclos mensais.
+        """
+        now = datetime.now(timezone.utc)
+        cur_year, cur_month = now.year, now.month
+        history = []
+
+        y, m = cur_year, cur_month
+        for _ in range(limit_months):
+            if m == 1:
+                y -= 1
+                m = 12
+            else:
+                m -= 1
+
+            top3 = cls.get_top3(y, m)
+            if top3:
+                month_name = cls.MONTH_NAMES_PT.get(m, f"Mês {m}")
+                history.append(
+                    {
+                        "cycle": f"{y}-{m:02d}",
+                        "year": y,
+                        "month": m,
+                        "month_label": f"{month_name} de {y}",
+                        "winners": top3,
+                    }
+                )
+
+        return history
+
+    @classmethod
+    def close_and_notify_admin(
+        cls,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        force: bool = False,
+    ) -> dict:
+        """
+        Fecha a competição do mês anterior, extrai o Top 3 e notifica os Administradores e a Professora Tatiana por E-mail e WhatsApp.
+        """
+        if year is None or month is None:
+            year, month = cls.get_previous_month()
+
+        month_name = cls.MONTH_NAMES_PT.get(month, f"Mês {month}")
+        month_label = f"{month_name} de {year}"
+        cycle_key = f"{year}-{month:02d}"
+
+        logger.info(
+            f"[MonthlyCompetition] Fechando ciclo {cycle_key} ({month_label})..."
+        )
+
+        top3 = cls.get_top3(year=year, month=month)
+        all_participants = RankingService._get_students(year=year, month=month)
+        total_participants = len(all_participants)
+
+        # 1. Envia E-mail com o pódio do Top 3 para os administradores
+        email_result = cls._send_admin_email(
+            year, month, month_label, top3, total_participants
+        )
+
+        # 2. Envia WhatsApp para a Professora Tatiana / Admin
+        whatsapp_result = cls._send_admin_whatsapp(
+            year, month, month_label, top3, total_participants
+        )
+
+        # 3. Notifica e premia os 3 alunos vencedores no in-app
+        cls._award_and_notify_winners(month_label, top3)
+
+        # 4. Notifica administradores no in-app
+        cls._notify_admin_in_app(month_label, top3, total_participants)
+
+        return {
+            "ok": True,
+            "cycle": cycle_key,
+            "month_label": month_label,
+            "top3": top3,
+            "total_participants": total_participants,
+            "email_sent": email_result,
+            "whatsapp_sent": whatsapp_result,
+        }
+
+    @classmethod
+    def _send_admin_email(
+        cls,
+        year: int,
+        month: int,
+        month_label: str,
+        top3: list[dict],
+        total_participants: int,
+    ) -> dict:
+        from apps.notifications.services import BrevoEmailService
+        from django.conf import settings
+
+        recipients = set()
+        for e in getattr(settings, "SUPERADMIN_EMAILS", []):
+            if e and "@" in e:
+                recipients.add(e.strip().lower())
+
+        # Busca e-mails de admins/professores no banco
+        admin_users = User.objects.filter(
+            role__in=["professor", "admin", "programador"]
+        )
+        for u in admin_users:
+            if u.email and "@" in u.email:
+                recipients.add(u.email.strip().lower())
+
+        env_from = (
+            os.getenv("SMTP_FROM")
+            or os.getenv("SMTP_USER")
+            or os.getenv("login_smtp")
+            or os.getenv("BREVO_SENDER_EMAIL")
+        )
+        if env_from and "@" in env_from and not env_from.endswith("@smtp-brevo.com"):
+            recipients.add(env_from.strip().lower())
+
+        if not recipients:
+            recipients.add("caiosampaiov@gmail.com")
+
+        top1 = top3[0] if len(top3) > 0 else None
+        top2 = top3[1] if len(top3) > 1 else None
+        top3_item = top3[2] if len(top3) > 2 else None
+
+        def format_podium_card(item, medal, title, border_color, bg_color):
+            if not item:
+                return f"""
+                <div style="background-color: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 16px; padding: 20px; text-align: center; margin-bottom: 12px;">
+                    <div style="font-size: 28px;">{medal}</div>
+                    <div style="font-weight: bold; color: #94a3b8; margin-top: 6px;">{title}</div>
+                    <div style="color: #64748b; font-size: 13px;">Sem participante registrado</div>
+                </div>
+                """
+            return f"""
+            <div style="background-color: {bg_color}; border: 2px solid {border_color}; border-radius: 16px; padding: 20px; text-align: center; margin-bottom: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                <div style="font-size: 36px; line-height: 1;">{medal}</div>
+                <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: {border_color}; letter-spacing: 1px; margin-top: 6px;">{title}</div>
+                <div style="font-size: 18px; font-weight: 800; color: #0f172a; margin-top: 4px;">{item['name']}</div>
+                <div style="font-size: 13px; color: #64748b; margin-top: 2px;">@{item['username']} • Nível <strong>{item['level']}</strong></div>
+                <div style="display: inline-block; background-color: #ffffff; border: 1px solid {border_color}; border-radius: 20px; padding: 4px 14px; font-size: 14px; font-weight: 800; color: #0f172a; margin-top: 10px;">
+                    ⚡ {item['score']} XP Conquistados
+                </div>
+            </div>
+            """
+
+        frontend_url = os.getenv("FRONTEND_URL", "https://tati-ai.vercel.app")
+
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; color: #1e293b;">
+            <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.08);">
+                <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 36px 24px; text-align: center; color: #ffffff;">
+                    <div style="font-size: 44px; margin-bottom: 8px;">🏆</div>
+                    <h1 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Resultado da Competição Mensal</h1>
+                    <p style="margin: 8px 0 0 0; font-size: 15px; opacity: 0.9;">Teacher Tati AI • {month_label}</p>
+                </div>
+
+                <div style="padding: 32px 24px;">
+                    <p style="font-size: 16px; line-height: 1.6; margin-top: 0; color: #334155;">
+                        Olá, <strong>Professora Tatiana & Equipe</strong>! 👋<br/>
+                        A competição do mês de <strong>{month_label}</strong> foi oficialmente finalizada. Confira os <strong>3 alunos com maior pontuação</strong>:
+                    </p>
+
+                    <div style="margin: 24px 0;">
+                        {format_podium_card(top1, "🥇", "1º Lugar — Campeão", "#eab308", "#fefce8")}
+                        {format_podium_card(top2, "🥈", "2º Lugar — Vice-Campeão", "#94a3b8", "#f8fafc")}
+                        {format_podium_card(top3_item, "🥉", "3º Lugar — 3ª Posição", "#f97316", "#fff7ed")}
+                    </div>
+
+                    <div style="background-color: #f8fafc; border-radius: 16px; padding: 18px; margin: 24px 0; border: 1px solid #e2e8f0;">
+                        <h4 style="margin: 0 0 8px 0; font-size: 14px; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px;">Estatísticas do Ciclo:</h4>
+                        <p style="margin: 4px 0; font-size: 14px;">👥 <strong>Total de participantes ativos:</strong> {total_participants} alunos</p>
+                        <p style="margin: 4px 0; font-size: 14px;">🔄 <strong>Novo Ciclo:</strong> O ranking foi reiniciado para o mês corrente.</p>
+                    </div>
+
+                    <div style="text-align: center; margin-top: 30px;">
+                        <a href="{frontend_url}/competitions" 
+                           style="display: inline-block; background-color: #4f46e5; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 14px 28px; border-radius: 12px; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);">
+                            Ver Ranking Completo no App
+                        </a>
+                    </div>
+                </div>
+
+                <div style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px; text-align: center; font-size: 12px; color: #94a3b8;">
+                    Teacher Tati AI • Notificação Automática de Competição Mensal
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        results = {}
+        subject = f"🏆 Top 3 da Competição Mensal — Teacher Tati ({month_label})"
+        for email in recipients:
+            try:
+                res = BrevoEmailService.send_email(
+                    to_email=email,
+                    subject=subject,
+                    html_content=html_content,
+                    recipient_name="Equipe Teacher Tati",
+                )
+                results[email] = bool(res)
+                logger.info(
+                    f"[MonthlyCompetition] E-mail de Top 3 enviado para {email}: {res}"
+                )
+            except Exception as e:
+                results[email] = False
+                logger.error(
+                    f"[MonthlyCompetition] Erro ao enviar e-mail para {email}: {e}"
+                )
+
+        return {"sent_to": list(recipients), "results": results}
+
+    @classmethod
+    def _send_admin_whatsapp(
+        cls,
+        year: int,
+        month: int,
+        month_label: str,
+        top3: list[dict],
+        total_participants: int,
+    ) -> dict:
+        from apps.notifications.services import WahaWhatsAppService
+
+        target_phones = set()
+        admin_users = User.objects.filter(
+            role__in=["professor", "admin", "programador"]
+        )
+        for u in admin_users:
+            ph = getattr(u, "phone", "") or ""
+            if ph and len(ph) >= 10:
+                target_phones.add(ph.strip())
+
+        env_phones = (
+            os.getenv("ADMIN_PHONE")
+            or os.getenv("TATIANA_PHONE")
+            or os.getenv("SUPERADMIN_PHONES")
+        )
+        if env_phones:
+            for p in env_phones.split(","):
+                clean = "".join(c for c in p if c.isdigit())
+                if len(clean) >= 10:
+                    target_phones.add(clean)
+
+        if not target_phones:
+            return {
+                "status": "skipped",
+                "reason": "Nenhum telefone de admin configurado",
+            }
+
+        top1 = top3[0] if len(top3) > 0 else None
+        top2 = top3[1] if len(top3) > 1 else None
+        top3_item = top3[2] if len(top3) > 2 else None
+
+        t1_str = (
+            f"{top1['name']} ({top1['level']}) — {top1['score']} XP"
+            if top1
+            else "—"
+        )
+        t2_str = (
+            f"{top2['name']} ({top2['level']}) — {top2['score']} XP"
+            if top2
+            else "—"
+        )
+        t3_str = (
+            f"{top3_item['name']} ({top3_item['level']}) — {top3_item['score']} XP"
+            if top3_item
+            else "—"
+        )
+
+        msg = (
+            f"🏆 *Resultado da Competição Mensal — Teacher Tati*\n"
+            f"📅 *Ciclo:* {month_label}\n\n"
+            f"Confira os 3 alunos com maior pontuação no mês passado:\n\n"
+            f"🥇 *1º Lugar:* {t1_str}\n"
+            f"🥈 *2º Lugar:* {t2_str}\n"
+            f"🥉 *3º Lugar:* {t3_str}\n\n"
+            f"👥 *Total de participantes:* {total_participants} alunos\n"
+            f"🔄 O ranking foi reiniciado para o novo ciclo deste mês!"
+        )
+
+        results = {}
+        for phone in target_phones:
+            try:
+                res = WahaWhatsAppService.send_message(phone, msg)
+                results[phone] = res
+            except Exception as e:
+                results[phone] = False
+
+        return {"results": results}
+
+    @classmethod
+    def _award_and_notify_winners(cls, month_label: str, top3: list[dict]):
+        from apps.notifications.services import NotificationDispatcher
+
+        for item in top3:
+            pos = item["position"]
+            username = item["username"]
+            pts = item["score"]
+            medal = item["medal"]
+
+            title = f"{medal} Parabéns! Você conquistou o {pos}º Lugar na Competição Mensal!"
+            body = (
+                f"Incrível dedicação! Você ficou em {pos}º Lugar no Ranking Geral de {month_label} "
+                f"com {pts} pontos de XP. Continue brilhando no novo ciclo deste mês! 🚀"
+            )
+
+            try:
+                NotificationDispatcher.dispatch_to_user(
+                    username=username,
+                    title=title,
+                    body=body,
+                    category="trophy",
+                    send_push=True,
+                    send_whatsapp=True,
+                )
+            except Exception as e:
+                logger.error(
+                    f"[MonthlyCompetition] Falha ao notificar vencedor {username}: {e}"
+                )
+
+    @classmethod
+    def _notify_admin_in_app(
+        cls, month_label: str, top3: list[dict], total_participants: int
+    ):
+        from apps.notifications.services import NotificationDispatcher
+
+        admin_users = User.objects.filter(
+            role__in=["professor", "admin", "programador"]
+        )
+        top1_name = top3[0]["name"] if len(top3) > 0 else "—"
+
+        title = f"🏆 Competição de {month_label} Encerrada!"
+        body = (
+            f"O ciclo de {month_label} foi finalizado com {total_participants} alunos. "
+            f"1º Lugar: {top1_name}. O ranking do novo mês já está aberto!"
+        )
+
+        for admin in admin_users:
+            try:
+                NotificationDispatcher.dispatch_to_user(
+                    username=admin.username,
+                    title=title,
+                    body=body,
+                    category="general",
+                    send_push=True,
+                )
+            except Exception:
+                pass
 
 
 class TrophyService:
