@@ -430,10 +430,39 @@ def start_waha_session(request: HttpRequest):
     """
     require_staff_user(request)
     from apps.notifications.waha_service import WahaService
+    body = {}
+    if request.body:
+        try:
+            body = json.loads(request.body.decode("utf-8"))
+        except Exception:
+            pass
 
     user = request.auth
-    session_name = getattr(user, "username", "default") if user else "default"
+    session_name = body.get("session") or (
+        getattr(user, "username", "default") if user else "default"
+    )
     return WahaService.start_session(session_name)
+
+
+@dashboard_router.post("/waha/session/restart", auth=auth_required)
+def restart_waha_session(request: HttpRequest):
+    """
+    Reinicia forçadamente uma sessão do WhatsApp no WAHA para gerar novo QR Code limpo.
+    """
+    require_staff_user(request)
+    from apps.notifications.waha_service import WahaService
+    body = {}
+    if request.body:
+        try:
+            body = json.loads(request.body.decode("utf-8"))
+        except Exception:
+            pass
+
+    user = request.auth
+    session_name = body.get("session") or (
+        getattr(user, "username", "default") if user else "default"
+    )
+    return WahaService.restart_session(session_name)
 
 
 @dashboard_router.post("/waha/session/stop", auth=auth_required)
@@ -443,16 +472,24 @@ def stop_waha_session(request: HttpRequest):
     """
     require_staff_user(request)
     from apps.notifications.waha_service import WahaService
+    body = {}
+    if request.body:
+        try:
+            body = json.loads(request.body.decode("utf-8"))
+        except Exception:
+            pass
 
     user = request.auth
-    session_name = getattr(user, "username", "default") if user else "default"
+    session_name = body.get("session") or (
+        getattr(user, "username", "default") if user else "default"
+    )
     return WahaService.stop_session(session_name)
 
 
 @dashboard_router.get("/waha/session/qr", auth=auth_required)
 def get_waha_session_qr(request: HttpRequest, session: Optional[str] = None):
     """
-    Obtém a imagem do QRCode para autenticação no WhatsApp.
+    Obtém a imagem do QRCode para autenticação no WhatsApp sem cache.
     """
     require_staff_user(request)
     from apps.notifications.waha_service import WahaService
@@ -464,5 +501,9 @@ def get_waha_session_qr(request: HttpRequest, session: Optional[str] = None):
     )
     qr_bytes = WahaService.get_qr_image(session_name)
     if qr_bytes:
-        return HttpResponse(qr_bytes, content_type="image/png")
-    return HttpResponse(b"", content_type="image/png")
+        resp = HttpResponse(qr_bytes, content_type="image/png")
+        resp["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        resp["Pragma"] = "no-cache"
+        resp["Expires"] = "0"
+        return resp
+    return HttpResponse(b"", content_type="image/png", status=404)
