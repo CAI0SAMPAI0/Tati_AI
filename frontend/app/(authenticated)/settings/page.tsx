@@ -40,6 +40,7 @@ export default function SettingsPage() {
     audioSpeed: '1',
     wordTooltip: true,
     enterSend: true,
+    autoplayChatAudio: false,
   });
 
   const [prefs, setPrefs] = useState({
@@ -70,7 +71,7 @@ export default function SettingsPage() {
     const saved = localStorage.getItem('tati_settings');
     if (saved) {
       try {
-        setSettings(JSON.parse(saved));
+        setSettings((prev) => ({ ...prev, ...JSON.parse(saved) }));
       } catch (e) {}
     }
 
@@ -100,7 +101,7 @@ export default function SettingsPage() {
     setSelectedAccent(accentId);
     saveStoredAccent(accentId);
     const accentObj = ACCENTS.find((a) => a.id === accentId);
-    toast.success(`Sotaque alterado para ${accentObj?.label || accentId}`, { id: 'accent-sync' });
+    toast.success(`Voice accent changed to ${accentObj?.label || accentId}`, { id: 'accent-sync' });
 
     try {
       await apiPut('/profile', { preferred_accent: accentId, accent: accentId });
@@ -234,10 +235,23 @@ export default function SettingsPage() {
                   />
                </div>
 
+               <label className="flex items-center justify-between cursor-pointer group pb-6 border-b border-border">
+                  <div>
+                    <p className="text-sm font-bold text-text mb-0.5">Autoplay chat audio</p>
+                    <p className="text-xs text-text-muted">Automatically play voice messages when Teacher Tati replies in chat (Voice and Simulations are always automatic)</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    className="w-5 h-5 rounded-md border-border text-primary focus:ring-primary/20 transition-all accent-primary"
+                    checked={Boolean(settings.autoplayChatAudio)}
+                    onChange={(e) => setSettings({...settings, autoplayChatAudio: e.target.checked})}
+                  />
+               </label>
+
                <div>
                   <div className="mb-3">
                     <p className="text-sm font-bold text-text mb-0.5">Teacher Tati Voice Accent</p>
-                    <p className="text-xs text-text-muted">Sotaque padrão utilizado em todo o sistema (Chat, Voz, Flashcards e Atividades)</p>
+                    <p className="text-xs text-text-muted">Default accent used across the platform (Chat, Voice, Flashcards, and Activities)</p>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
                     {ACCENTS.map((accent) => {

@@ -7,7 +7,7 @@ import { cn, parseAIResponse } from '@/lib/utils';
 import { ClickableText } from './clickable-text';
 import { AudioPlayer } from './audio-player';
 import React, { useState, useMemo } from 'react';
-import { Pencil, Check, X, Copy, RotateCcw, FileText, Download, ExternalLink, Presentation, FileCode2 } from 'lucide-react';
+import { Pencil, Check, X, Copy, RotateCcw, FileText, Download, ExternalLink, Presentation, FileCode2, File } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface MessageBubbleProps {
@@ -54,6 +54,60 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
     }
     return null;
   }, [parsed.document, message]);
+
+  // Extrai anexos enviados pelo usuário para exibir em cards elegantes de pré-visualização
+  const userAttachmentData = useMemo(() => {
+    if (!isUser || !message.content) return { cleanText: message.content || '', attachments: [] };
+
+    let content = message.content;
+    const attachments: Array<{ name: string; type?: string }> = [];
+
+    const structuredMatches = content.matchAll(/\[USER_ATTACHMENT:(.*?)\]/g);
+    for (const m of structuredMatches) {
+      try {
+        const parsed = JSON.parse(m[1]);
+        if (parsed && parsed.name) {
+          attachments.push(parsed);
+        }
+      } catch {
+        if (m[1]) {
+          attachments.push({ name: m[1] });
+        }
+      }
+    }
+    content = content.replace(/\[USER_ATTACHMENT:.*?\]/g, '').trim();
+
+    // Padrão legado: 📎 [Arquivo: Nome.pdf] ou [Arquivo: Nome.pdf] ou [X arquivos anexados: ...]
+    const legacyMatch = content.match(/(?:📎\s*)?\[(?:Arquivo:\s*([^\]]+)|(?:\d+)\s*arquivos anexados:\s*([^\]]+))\]/);
+    if (legacyMatch) {
+      const single = legacyMatch[1];
+      const multiple = legacyMatch[2];
+      if (single) {
+        attachments.push({ name: single.trim() });
+      } else if (multiple) {
+        multiple.split(',').forEach(fn => attachments.push({ name: fn.trim() }));
+      }
+      content = content.replace(/(?:📎\s*)?\[(?:Arquivo:\s*[^\]]+|(?:\d+)\s*arquivos anexados:\s*[^\]]+)\]/, '').trim();
+    }
+
+    return {
+      cleanText: content,
+      attachments,
+    };
+  }, [isUser, message.content]);
+
+  // Verifica configuração de autoplay de áudio no chat
+  const isAutoplay = useMemo(() => {
+    if (isUser || typeof window === 'undefined') return false;
+    try {
+      const raw = localStorage.getItem('tati_settings');
+      if (raw) {
+        const s = JSON.parse(raw);
+        return Boolean(s.autoplayChatAudio);
+      }
+    } catch (_) {}
+    return false;
+  }, [isUser]);
 
   // Has a file attachment (PDF, DOCX, PPTX) — no audio for these messages
   const hasFile = !!docData;
@@ -144,7 +198,48 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
           ) : (
             <>
               {isUser ? (
-                <p className="whitespace-pre-wrap">{message.content}</p>
+                <div className="flex flex-col gap-2">
+                  {userAttachmentData.cleanText && (
+                    <p className="whitespace-pre-wrap">{userAttachmentData.cleanText}</p>
+                  )}
+                  {userAttachmentData.attachments.length > 0 && (
+                    <div className="flex flex-col gap-1.5 pt-1">
+                      {userAttachmentData.attachments.map((att, idx) => {
+                        const ext = att.name.split('.').pop()?.toLowerCase() || '';
+                        const isPdf = ext === 'pdf' || att.type?.includes('pdf');
+                        const isDoc = ['doc', 'docx'].includes(ext) || att.type?.includes('word') || att.type?.includes('officedocument');
+                        const isPpt = ['ppt', 'pptx'].includes(ext) || att.type?.includes('presentation') || att.type?.includes('powerpoint');
+
+                        return (
+                          <div
+                            key={idx}
+                            className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/15 border border-white/20 backdrop-blur-sm shadow-sm text-left max-w-full"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                              {isPdf ? (
+                                <FileText size={16} className="text-white" />
+                              ) : isDoc ? (
+                                <FileCode2 size={16} className="text-white" />
+                              ) : isPpt ? (
+                                <Presentation size={16} className="text-white" />
+                              ) : (
+                                <File size={16} className="text-white" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-white truncate" title={att.name}>
+                                {att.name}
+                              </p>
+                              <p className="text-[0.65rem] text-white/70 uppercase tracking-wider font-medium">
+                                {isPdf ? 'PDF Document' : isDoc ? 'Word Document' : isPpt ? 'Presentation' : ext ? `${ext.toUpperCase()} File` : 'Attachment'}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="flex flex-col gap-2">
                   {/* While streaming with no content yet, show animated dots */}
@@ -273,16 +368,16 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
                   className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-xl bg-primary text-white text-[0.75rem] font-bold hover:bg-primary/90 transition-all shadow-sm active:scale-98"
                 >
                   <ExternalLink size={12} />
-                  Abrir no navegador
+                  Open in browser
                 </button>
                 <a
                   href={docData.url}
                   download={docData.filename}
                   className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-bg-secondary border border-border hover:bg-surface text-text text-[0.75rem] font-bold transition-all active:scale-98"
-                  title="Baixar arquivo"
+                  title="Download file"
                 >
                   <Download size={12} />
-                  Baixar
+                  Download
                 </a>
               </div>
             </div>
@@ -291,7 +386,7 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
 
         {/* AudioPlayer shows automatically when audio is present, never for PDF messages */}
         {hasAudio && !isStreaming && (
-          <AudioPlayer url={message.audio_url || undefined} base64={message.audio_b64 || undefined} />
+          <AudioPlayer url={message.audio_url || undefined} base64={message.audio_b64 || undefined} autoPlay={isAutoplay} />
         )}
 
         <span className="text-[0.7rem] text-text-subtle px-1 mt-0.5 opacity-70">

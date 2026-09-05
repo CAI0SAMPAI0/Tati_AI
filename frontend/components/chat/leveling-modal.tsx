@@ -21,34 +21,34 @@ interface OptionCard {
 const QUESTION_OPTIONS: OptionCard[] = [
   {
     count: 4,
-    label: '4 Perguntas',
-    time: '~3 min',
-    desc: 'Express • 1 pergunta de cada nível (A1, A2, B1, B2)',
+    label: '4 Questions',
+    time: '~3 mins',
+    desc: 'Express • 1 question per level (A1, A2, B1, B2)',
   },
   {
     count: 8,
-    label: '8 Perguntas',
-    time: '~6 min',
-    desc: 'Rápido • 2 perguntas de cada nível (A1, A2, B1, B2)',
+    label: '8 Questions',
+    time: '~6 mins',
+    desc: 'Quick • 2 questions per level (A1, A2, B1, B2)',
     recommended: true,
   },
   {
     count: 12,
-    label: '12 Perguntas',
-    time: '~10 min',
-    desc: 'Padrão • 3 perguntas de cada nível (A1, A2, B1, B2)',
+    label: '12 Questions',
+    time: '~10 mins',
+    desc: 'Standard • 3 questions per level (A1, A2, B1, B2)',
   },
   {
     count: 16,
-    label: '16 Perguntas',
-    time: '~15 min',
-    desc: 'Completo • 4 perguntas de cada nível (A1, A2, B1, B2)',
+    label: '16 Questions',
+    time: '~15 mins',
+    desc: 'Full • 4 questions per level (A1, A2, B1, B2)',
   },
   {
     count: 20,
-    label: '20 Perguntas',
-    time: '~20 min',
-    desc: 'Aprofundado • 5 perguntas de cada nível (A1, A2, B1, B2)',
+    label: '20 Questions',
+    time: '~20 mins',
+    desc: 'In-depth • 5 questions per level (A1, A2, B1, B2)',
   },
 ];
 
@@ -93,10 +93,10 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
             </div>
             <div>
               <h2 className="text-lg font-bold text-text flex items-center gap-2">
-                Desafio de Nivelamento CEFR
+                CEFR English Leveling Challenge
               </h2>
               <p className="text-xs text-text-muted">
-                Avaliação oficial de proficiência (A1 a B2) com Teacher Tati
+                Official proficiency assessment (A1 to B2) with Teacher Tati
               </p>
             </div>
           </div>
@@ -113,10 +113,10 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
         <div className="p-6 overflow-y-auto space-y-5 custom-scrollbar">
           <div>
             <label className="block text-sm font-semibold text-text mb-1.5">
-              Quantas perguntas você deseja responder?
+              How many questions would you like to answer?
             </label>
             <p className="text-xs text-text-muted mb-3">
-              As perguntas serão sorteadas e distribuídas de forma equilibrada entre os níveis A1, A2, B1 e B2.
+              Questions will be randomly drawn and balanced across CEFR levels (A1, A2, B1, and B2).
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -135,7 +135,7 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
                   >
                     {opt.recommended && (
                       <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full text-[0.65rem] font-bold bg-primary text-white shadow-xs">
-                        Recomendado
+                        Recommended
                       </span>
                     )}
                     <div className="flex items-center justify-between gap-2 mb-1">
@@ -159,21 +159,21 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-sm text-text">Número personalizado</span>
-                  <span className="text-xs text-text-muted">4 a 24</span>
+                  <span className="font-bold text-sm text-text">Custom number</span>
+                  <span className="text-xs text-text-muted">4 to 24</span>
                 </div>
                 <div className="mt-1 flex items-center gap-2">
                   <input
                     type="number"
                     min={4}
                     max={24}
-                    placeholder="Ex: 10"
+                    placeholder="e.g. 10"
                     value={customValue}
                     onChange={handleCustomChange}
                     onFocus={() => setIsCustom(true)}
                     className="w-full px-3 py-1.5 text-xs rounded-lg border border-border bg-background text-text focus:outline-none focus:border-primary"
                   />
-                  <span className="text-xs text-text-muted shrink-0">perguntas</span>
+                  <span className="text-xs text-text-muted shrink-0">questions</span>
                 </div>
               </div>
             </div>
@@ -184,23 +184,23 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
             <div className="flex items-start gap-2.5 text-xs text-text">
               <CheckCircle2 size={16} className="text-primary shrink-0 mt-0.5" />
               <span>
-                <strong>Sem enrolação:</strong> A Teacher Tati avaliará sua resposta com dicas gramaticais rápidas e seguirá direto para as próximas perguntas.
+                <strong>Direct & focused:</strong> Teacher Tati will evaluate your answers with concise grammatical feedback and advance promptly to the next question.
               </span>
             </div>
             <div className="flex items-start gap-2.5 text-xs text-text">
               <AlertCircle size={16} className="text-amber-500 shrink-0 mt-0.5" />
               <span>
-                <strong>Comando /finish no chat:</strong> Quer parar antes? Basta digitar{' '}
+                <strong>/finish command in chat:</strong> Wish to conclude early? Simply type{' '}
                 <code className="px-1.5 py-0.5 rounded bg-background border border-border font-mono font-bold text-primary">
                   /finish
                 </code>{' '}
-                no chat a qualquer momento. A IA avaliará o que você respondeu e dará nota 0 nas que faltaram.
+                in chat at any time. Teacher Tati will grade your responses so far and record remaining questions as 0.
               </span>
             </div>
             <div className="flex items-start gap-2.5 text-xs text-text">
               <Sparkles size={16} className="text-primary shrink-0 mt-0.5" />
               <span>
-                <strong>Relatório em PDF por e-mail:</strong> Ao concluir, você receberá um diagnóstico detalhado com erros e correções no seu e-mail cadastrado.
+                <strong>Diagnostic PDF report by email:</strong> Upon completion, a detailed assessment breakdown with errors, corrections, and CEFR level will be delivered to your inbox.
               </span>
             </div>
           </div>
@@ -214,7 +214,7 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
             disabled={loading}
             className="px-4 py-2 text-xs font-semibold rounded-xl border border-border hover:bg-surface-hover text-text-muted hover:text-text transition-colors"
           >
-            Cancelar
+            Cancel
           </button>
           <button
             type="button"
@@ -225,12 +225,12 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
             {loading ? (
               <>
                 <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Iniciando...
+                Starting...
               </>
             ) : (
               <>
                 <Target size={15} />
-                Iniciar Desafio ({isCustom && customValue ? customValue : selectedCount} perguntas)
+                Start Challenge ({isCustom && customValue ? customValue : selectedCount} questions)
               </>
             )}
           </button>

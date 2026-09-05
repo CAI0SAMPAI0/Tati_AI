@@ -282,11 +282,14 @@ export function useChatSocket(conversationId: string | null) {
       convIdRef.current = overrideConvId;
     }
 
+    const currentAccent = typeof window !== 'undefined' ? localStorage.getItem('tati_voice_accent') || 'en-US' : 'en-US';
+
     const sent = socket.send({
       type: 'text',
       content: text,
       conversation_id: currentId,
       origin: 'chat',
+      accent: currentAccent,
     });
     if (!sent) return;
 
@@ -325,12 +328,14 @@ export function useChatSocket(conversationId: string | null) {
       convIdRef.current = overrideConvId;
     }
     
-    // We send 'audio' type as per the websocket protocol
+    const currentAccent = typeof window !== 'undefined' ? localStorage.getItem('tati_voice_accent') || 'en-US' : 'en-US';
+
     const sent = socket.send({
       type: 'audio',
       audio: base64,
       conversation_id: currentId,
       origin: 'chat',
+      accent: currentAccent,
     });
     
     if (sent) {
@@ -377,9 +382,12 @@ export function useChatSocket(conversationId: string | null) {
       type: f.type,
     }));
 
+    const attachmentsTag = safeFiles.map(f => `[USER_ATTACHMENT:{"name":"${f.filename.replace(/"/g, "'")}","type":"${f.type || ''}"}]`).join('\n');
     const displayContent = caption
-      ? `${caption}\n\n📎 [${safeFiles.length === 1 ? `Arquivo: ${safeFiles[0].filename}` : `${safeFiles.length} arquivos anexados: ${safeFiles.map(sf => sf.filename).join(', ')}`}]`
-      : `📎 [${safeFiles.length === 1 ? `Arquivo: ${safeFiles[0].filename}` : `${safeFiles.length} arquivos anexados: ${safeFiles.map(sf => sf.filename).join(', ')}`}]`;
+      ? `${caption}\n\n${attachmentsTag}`
+      : attachmentsTag;
+
+    const currentAccent = typeof window !== 'undefined' ? localStorage.getItem('tati_voice_accent') || 'en-US' : 'en-US';
 
     const sent = socket.send({
       type: 'files',
@@ -390,6 +398,7 @@ export function useChatSocket(conversationId: string | null) {
       caption: caption || '',
       content: caption || displayContent,
       origin: 'chat',
+      accent: currentAccent,
     });
 
     if (sent) {

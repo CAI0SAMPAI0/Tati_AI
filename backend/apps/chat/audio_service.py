@@ -97,7 +97,28 @@ class AudioService:
         if not cleaned:
             return ""
 
-        voice = VOICE_ACCENT_MAP.get(accent, "en-US-JennyNeural")
+        norm_accent = (accent or "en-US").strip()
+        if norm_accent.lower() in ["en-uk", "uk", "en_gb", "en-gb", "british"]:
+            norm_accent = "en-GB"
+        elif norm_accent.lower() in ["en-us", "us", "en_us", "american"]:
+            norm_accent = "en-US"
+        elif norm_accent.lower() in ["en-au", "au", "en_au", "australian"]:
+            norm_accent = "en-AU"
+        elif norm_accent.lower() in ["en-ca", "ca", "en_ca", "canadian"]:
+            norm_accent = "en-CA"
+        elif norm_accent.lower() in ["en-ie", "ie", "irish"]:
+            norm_accent = "en-IE"
+        elif norm_accent.lower() in ["en-in", "in", "indian"]:
+            norm_accent = "en-IN"
+
+        voice = VOICE_ACCENT_MAP.get(norm_accent)
+        if not voice:
+            for k, v in VOICE_ACCENT_MAP.items():
+                if k.lower() == norm_accent.lower():
+                    voice = v
+                    break
+        if not voice:
+            voice = "en-US-JennyNeural"
         try:
             communicate = edge_tts.Communicate(cleaned, voice)
             buf = io.BytesIO()

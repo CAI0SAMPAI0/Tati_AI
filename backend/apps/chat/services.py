@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -268,6 +269,7 @@ class AIService:
         user_text: str,
         difficulty: str = None,
         files: Optional[List[Dict[str, Any]]] = None,
+        accent: Optional[str] = None,
     ) -> dict:
         # Verifica se esta conversa é uma sessão de nivelamento ativa
         from .leveling_service import LevelingService
@@ -427,11 +429,18 @@ class AIService:
             })
             reply_text = f"{reply_text}\n\n[ATTACHED_DOCUMENT:{doc_meta_json}]"
 
-        # 8. Gera áudio via Edge TTS (com texto limpo de emojis e sem a tag de documento)
+        # 8. Gera áudio via Edge TTS (com texto limpo de emojis e com o sotaque selecionado)
         from .audio_service import AudioService
 
+        user_accent = accent
+        if not user_accent or user_accent.lower() in ["default", ""]:
+            if user and hasattr(user, "profile") and isinstance(user.profile, dict):
+                user_accent = user.profile.get("preferred_accent") or user.profile.get("accent") or "en-US"
+            else:
+                user_accent = "en-US"
+
         clean_tts_reply = re.sub(r"\[ATTACHED_DOCUMENT:.*?\]", "", reply_text, flags=re.DOTALL).strip()
-        audio_b64 = AudioService.text_to_speech(clean_tts_reply)
+        audio_b64 = AudioService.text_to_speech(clean_tts_reply, accent=user_accent)
 
         # 9. Salva resposta da Teacher Tati no banco de dados
         msg = Message.objects.create(

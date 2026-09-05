@@ -8,9 +8,10 @@ interface AudioPlayerProps {
   url?: string;
   base64?: string;
   className?: string;
+  autoPlay?: boolean;
 }
 
-export function AudioPlayer({ url, base64, className }: AudioPlayerProps) {
+export function AudioPlayer({ url, base64, className, autoPlay }: AudioPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [volume, setVolume] = useState(1);
@@ -20,6 +21,17 @@ export function AudioPlayer({ url, base64, className }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const audioSrc = base64 ? `data:audio/mp3;base64,${base64}` : url;
+
+  useEffect(() => {
+    if (autoPlay && audioRef.current && !isPlaying && audioSrc) {
+      audioRef.current
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch(() => {
+          // Navegadores podem bloquear autoplay sem interação prévia
+        });
+    }
+  }, [audioSrc, autoPlay]);
 
   useEffect(() => {
     const audio = audioRef.current;

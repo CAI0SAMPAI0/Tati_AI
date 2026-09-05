@@ -29,6 +29,7 @@ interface ChatTextPayload {
   content: string;
   conversation_id?: string | null;
   origin?: 'chat';
+  accent?: string;
 }
 
 interface ChatAudioPayload {
@@ -36,6 +37,7 @@ interface ChatAudioPayload {
   audio: string;
   conversation_id?: string | null;
   origin?: 'chat';
+  accent?: string;
 }
 
 interface ChatFilePayload {
@@ -45,6 +47,7 @@ interface ChatFilePayload {
   conversation_id?: string | null;
   caption?: string;
   origin?: 'chat';
+  accent?: string;
 }
 
 interface ChatFilesPayload {
@@ -56,6 +59,7 @@ interface ChatFilesPayload {
   conversation_id?: string | null;
   caption?: string;
   origin?: 'chat';
+  accent?: string;
 }
 
 type OutgoingPayload = ChatTextPayload | ChatAudioPayload | ChatFilePayload | ChatFilesPayload | { type: 'ping' };

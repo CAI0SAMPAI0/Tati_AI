@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { apiGet, apiPost, apiPatch } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
@@ -128,10 +128,10 @@ export default function ChatClientPage() {
   const handleExecuteStartLeveling = useCallback(async (totalQuestions: number) => {
     try {
       setIsStartingLeveling(true);
-      toast.loading('Iniciando seu Desafio de Nivelamento CEFR...', { id: 'start-leveling' });
+      toast.loading('Starting your CEFR Leveling Challenge...', { id: 'start-leveling' });
       const res = await apiPost<any>(ENDPOINTS.LEVELING_START, { total_questions: totalQuestions });
       if (res.ok && res.data?.conversation_id) {
-        toast.success(`Desafio Iniciado com ${res.data.total_questions || totalQuestions} perguntas! Responda em inglês.`, { id: 'start-leveling' });
+        toast.success(`Leveling Challenge started with ${res.data.total_questions || totalQuestions} questions! Please answer in English.`, { id: 'start-leveling' });
         const newConvId = res.data.conversation_id;
         setCurrentConvId(newConvId);
         setConvTitle(res.data.title || 'CEFR Leveling Challenge');
@@ -150,11 +150,11 @@ export default function ChatClientPage() {
           handleCloseSidebar();
         }
       } else {
-        toast.error('Não foi possível iniciar o teste de nivelamento agora.', { id: 'start-leveling' });
+        toast.error('Could not start leveling challenge right now.', { id: 'start-leveling' });
       }
     } catch (err) {
       console.error('Error starting leveling assessment:', err);
-      toast.error('Erro de conexão ao iniciar nivelamento.', { id: 'start-leveling' });
+      toast.error('Connection error when starting leveling assessment.', { id: 'start-leveling' });
     } finally {
       setIsStartingLeveling(false);
     }
@@ -295,7 +295,7 @@ export default function ChatClientPage() {
 
     if (!convId) {
       try {
-        const title = files.length === 1 ? `Arquivo: ${files[0].name}` : `${files.length} arquivos`;
+        const title = files.length === 1 ? `File: ${files[0].name}` : `${files.length} attached files`;
         const res = await apiPost<Conversation>(ENDPOINTS.CONVERSATIONS, {
           title
         });
@@ -337,15 +337,25 @@ export default function ChatClientPage() {
     }
   };
 
+  const isLevelingCompleted = useMemo(() => {
+    return messages.some((m) =>
+      m.content?.includes('Leveling Assessment Summary') ||
+      m.content?.includes('completed your Leveling Assessment') ||
+      m.content?.includes('finished the Leveling Assessment early') ||
+      m.content?.includes('Your Performance by Level:')
+    );
+  }, [messages]);
+
   const isLevelingActive = Boolean(
-    convTitle?.toLowerCase().includes('leveling') ||
-    (messages.length > 0 && messages[0]?.content?.includes('Leveling Challenge'))
+    (convTitle?.toLowerCase().includes('leveling') ||
+      (messages.length > 0 && messages[0]?.content?.includes('Leveling Challenge'))) &&
+    !isLevelingCompleted
   );
 
   const handleFinishEarly = useCallback(async () => {
     if (!currentConvId) return;
     const confirm = window.confirm(
-      'Deseja encerrar o Desafio de Nivelamento agora? A Teacher Tati avaliará as perguntas que você já respondeu e atribuirá nota 0 às restantes.'
+      'Do you wish to conclude your Leveling Assessment now? Teacher Tati will evaluate the questions answered so far and mark the remainder as 0.'
     );
     if (!confirm) return;
 
@@ -400,16 +410,16 @@ export default function ChatClientPage() {
                 <div className="flex items-center gap-2 text-text font-medium min-w-0">
                   <Target size={15} className="text-primary shrink-0" />
                   <span className="truncate">
-                    Desafio de Nivelamento CEFR em andamento. Digite <strong className="font-mono text-primary font-bold">/finish</strong> para encerrar.
+                    CEFR Leveling Challenge in progress. Type <strong className="font-mono text-primary font-bold">/finish</strong> to conclude at any time.
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={handleFinishEarly}
                   className="shrink-0 px-2.5 py-1 rounded-lg bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-600 dark:text-red-400 font-bold transition-all text-[0.72rem] active:scale-95 cursor-pointer"
-                  title="Encerrar teste e receber avaliação agora"
+                  title="Conclude assessment and calculate score now"
                 >
-                  Encerrar (/finish)
+                  Finish (/finish)
                 </button>
               </div>
             )}

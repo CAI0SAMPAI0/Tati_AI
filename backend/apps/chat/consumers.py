@@ -127,11 +127,19 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             from asgiref.sync import sync_to_async
             from apps.chat.audio_service import AudioService
 
+            accent = (
+                content.get("accent")
+                or (self.user.profile.get("preferred_accent") if self.user and isinstance(getattr(self.user, "profile", None), dict) else None)
+                or (self.user.profile.get("accent") if self.user and isinstance(getattr(self.user, "profile", None), dict) else None)
+                or "en-US"
+            )
+
             res = await sync_to_async(AIService.generate_reply)(
                 user=self.user,
                 conversation_id=conv_id,
                 user_text=text_content,
                 files=uploaded_files,
+                accent=accent,
             )
 
             reply_text = res.get("reply") if isinstance(res, dict) else str(res)
@@ -155,18 +163,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                     }
                 )
 
-            accent = content.get("accent")
-            if not accent or accent == "en-US":
-                if self.user and isinstance(getattr(self.user, "profile", None), dict):
-                    accent = (
-                        self.user.profile.get("preferred_accent")
-                        or self.user.profile.get("accent")
-                        or "en-US"
-                    )
-                else:
-                    accent = "en-US"
-
-            if not audio_b64 and is_audio:
+            if not audio_b64:
                 audio_b64 = await AudioService.text_to_speech_async(
                     reply_text, accent=accent
                 )
