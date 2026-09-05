@@ -325,15 +325,24 @@ class WahaWhatsAppService:
         # Escolhe a sessão correta
         if session:
             target_session = session
-        elif is_sender_programador or is_recipient_caio:
-            target_session = "programador"
+        elif is_sender_programador:
+            prog_active = any(
+                s.get("name") == "programador" and s.get("status") in ("WORKING", "CONNECTED")
+                for s in WahaService.get_sessions()
+            )
+            target_session = "programador" if prog_active else WahaService.get_active_session_name("professor")
         else:
             preferred = os.getenv("WAHA_SESSION", "professor")
             target_session = WahaService.get_active_session_name(preferred)
 
-        # Regra de Ouro de Segurança: Caio / Programador NUNCA usam a sessão 'professor' (Tatiana)
-        if (is_sender_programador or is_recipient_caio) and target_session == "professor":
-            target_session = "programador"
+        # Se o remetente for o programador e a sessão programador estiver ativa, garante ela
+        if is_sender_programador and target_session == "professor":
+            prog_active = any(
+                s.get("name") == "programador" and s.get("status") in ("WORKING", "CONNECTED")
+                for s in WahaService.get_sessions()
+            )
+            if prog_active:
+                target_session = "programador"
 
         clean_number = "".join(c for c in phone_number if c.isdigit())
         if not clean_number:
@@ -745,15 +754,11 @@ class NotificationDispatcher:
             or len(raw_levels) == 0
         )
 
-        # Filtra alunos ativos do nível alvo
+        # Filtra alunos do nível alvo
         if is_all_levels:
-            students_qs = User.objects.exclude(
-                role__in=["admin", "teacher", "buyer"]
-            ).exclude(is_staff=True)
+            students_qs = User.objects.filter(role="student")
         else:
-            students_qs = User.objects.filter(level__in=raw_levels).exclude(
-                role__in=["admin", "teacher", "buyer"]
-            )
+            students_qs = User.objects.filter(role="student", level__in=raw_levels)
 
         # Garante que os usuários de teste (programador, caio.sampaio) sempre recebam para validação
         test_users = list(
@@ -1040,11 +1045,7 @@ class NotificationSchedulerService:
         Dispara lembrete diário de streak APENAS para os alunos ativos que ainda NÃO estudaram hoje.
         """
         User = get_user_model()
-        students = list(
-            User.objects.filter(is_active=True)
-            .exclude(role__in=["admin", "teacher", "buyer", "programador"])
-            .exclude(is_staff=True)
-        )
+        students = list(User.objects.filter(role="student"))
         if not students:
             logger.info("[StreakReminder] Nenhum aluno ativo encontrado.")
             return {"sent": 0, "total_students": 0, "skipped_already_studied": 0}
@@ -1186,11 +1187,7 @@ class NotificationSchedulerService:
         Dispara o relatório semanal de evolução para todos os alunos ativos.
         """
         User = get_user_model()
-        students = list(
-            User.objects.filter(is_active=True)
-            .exclude(role__in=["admin", "teacher", "buyer", "programador"])
-            .exclude(is_staff=True)
-        )
+        students = list(User.objects.filter(role="student"))
         if not students:
             logger.info("[WeeklyReport] Nenhum aluno ativo encontrado.")
             return {"sent": 0, "total_students": 0, "skipped": 0}
@@ -1307,11 +1304,7 @@ class NotificationSchedulerService:
         Verifica alunos que não praticam há entre 3 e 14 dias e envia incentivo.
         """
         User = get_user_model()
-        students = list(
-            User.objects.filter(is_active=True)
-            .exclude(role__in=["admin", "teacher", "buyer", "programador"])
-            .exclude(is_staff=True)
-        )
+        students = list(User.objects.filter(role="student"))
         if not students:
             return {"sent": 0, "total_students": 0}
 

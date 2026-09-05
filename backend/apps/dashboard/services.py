@@ -1480,21 +1480,16 @@ class DashboardService:
                 if sender_user
                 else ""
             )
-            is_prog = (
-                sender_role == "programador" or sender_uname == "programador"
-            )
-
-            # Se quem está enviando for o programador, ou se o destinatário for o caio.sampaio,
-            # a sessão de disparo DEVE ser 'programador', NUNCA a sessão pessoal da Professora Tatiana!
-            target_session = (
-                "programador"
-                if (
-                    is_prog
-                    or username.lower()
-                    in ("caio.sampaio", "caiosampaio", "programador")
+            from apps.notifications.waha_service import WahaService
+            target_session = "professor"
+            if is_prog:
+                # Se o programador estiver com sua sessão conectada no WAHA, usa ela
+                prog_active = any(
+                    s.get("name") == "programador" and s.get("status") in ("WORKING", "CONNECTED")
+                    for s in WahaService.get_sessions()
                 )
-                else "professor"
-            )
+                if prog_active:
+                    target_session = "programador"
 
             whatsapp_sent = WahaWhatsAppService.send_message(
                 phone_number=str(phone),
