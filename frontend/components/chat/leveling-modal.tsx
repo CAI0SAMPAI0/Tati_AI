@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Target, Clock, CheckCircle2, AlertCircle, Sparkles, X, MessageSquare, Mic } from 'lucide-react';
 
 interface LevelingModalProps {
@@ -57,8 +58,13 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
   const [customValue, setCustomValue] = useState<string>('');
   const [isCustom, setIsCustom] = useState(false);
   const [mode, setMode] = useState<'chat' | 'voice'>('chat');
+  const [mounted, setMounted] = useState(false);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted || typeof document === 'undefined') return null;
 
   const handleSelect = (count: number) => {
     setSelectedCount(count);
@@ -80,10 +86,13 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
     onStart(safeCount, mode);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 animate-in fade-in duration-150">
+  const modalContent = (
+    <div 
+      className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={onClose}
+    >
       <div
-        className="relative w-full max-w-xl bg-surface border border-border/80 rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="relative w-full max-w-xl bg-surface border border-border/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] mx-auto animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -305,4 +314,7 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
+

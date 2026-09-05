@@ -237,7 +237,27 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
-CORS_ALLOW_HEADERS = ["*"]
+
+from corsheaders.defaults import default_headers
+
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "accept-encoding",
+    "accept-language",
+    "connection",
+    "host",
+    "origin",
+    "referer",
+    "sec-fetch-dest",
+    "sec-fetch-mode",
+    "sec-fetch-site",
+    "sec-websocket-key",
+    "sec-websocket-version",
+    "sec-websocket-protocol",
+    "x-cron-secret",
+    "x-cron-token",
+    "sentry-trace",
+    "baggage",
+]
 
 # Origens permitidas dinâmicas para Railway e Vercel
 CORS_ALLOWED_ORIGIN_REGEXES = [

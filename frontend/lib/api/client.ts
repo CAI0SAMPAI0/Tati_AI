@@ -68,18 +68,16 @@ function resolvePath(path: string): string {
        window.location.hostname === '127.0.0.1' || 
        window.location.hostname.includes('hf.space')));
 
-  // Materiais (Upload/Leitura/Processamento) e Pagamentos devem passar pelo Railway
-  const isRailwayOperation = 
-    !isBypassRedirect && (
-      path.includes('/admin/premium') || 
-      path.includes('/activities/premium') || 
-      path.includes('/activities/hub') ||
-      path.includes('/payments')
-    );
-    
-  if (isRailwayOperation) {
-    const railwayBase = 'https://tatiai-production.up.railway.app';
-    return `${railwayBase.replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
+  // Materiais e Pagamentos usam NEXT_PUBLIC_RAILWAY_API_URL se especificado; caso contrário usam o effectiveBase
+  if (
+    (path.includes('/admin/premium') || 
+     path.includes('/activities/premium') || 
+     path.includes('/activities/hub') ||
+     path.includes('/payments')) &&
+    process.env.NEXT_PUBLIC_RAILWAY_API_URL
+  ) {
+    const railwayBase = process.env.NEXT_PUBLIC_RAILWAY_API_URL.replace(/\/$/, '');
+    return `${railwayBase}${path.startsWith('/') ? path : `/${path}`}`;
   }
 
   // Se estiver rodando no servidor (SSR) dentro do Docker, usa o DNS interno
