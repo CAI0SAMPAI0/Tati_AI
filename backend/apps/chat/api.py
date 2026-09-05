@@ -42,10 +42,41 @@ def create_conversation(request: HttpRequest, payload: CreateConversationInput):
 def start_leveling_assessment(request: HttpRequest):
     """
     Inicia o Teste de Nivelamento CEFR oficial da Teacher Tati com base nos questionários diagnósticos.
+    Permite definir quantas perguntas o aluno deseja responder (total_questions).
     """
     from .leveling_service import LevelingService
+    body = {}
+    if request.body:
+        try:
+            body = json.loads(request.body.decode("utf-8"))
+        except Exception:
+            pass
 
-    return LevelingService.start_leveling_session(request.auth)
+    total_questions = body.get("total_questions")
+    count_per_level = body.get("count_per_level")
+
+    return LevelingService.start_leveling_session(
+        user=request.auth,
+        total_questions=total_questions,
+        count_per_level=count_per_level,
+    )
+
+
+@chat_router.post("/leveling/finish", auth=auth_required)
+def finish_leveling_assessment(request: HttpRequest):
+    """
+    Encerra antecipadamente o teste de nivelamento ativo (equivalente ao comando /finish).
+    """
+    from .leveling_service import LevelingService
+    body = {}
+    if request.body:
+        try:
+            body = json.loads(request.body.decode("utf-8"))
+        except Exception:
+            pass
+
+    conversation_id = body.get("conversation_id", "")
+    return LevelingService.finish_leveling_early(request.auth, conversation_id=conversation_id)
 
 
 @chat_router.get("/leveling/status", auth=auth_required)

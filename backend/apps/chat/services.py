@@ -273,6 +273,12 @@ class AIService:
         from .leveling_service import LevelingService
         from .document_service import DocumentService
 
+        # Verifica se o usuário digitou o comando /finish
+        clean_user_lower = user_text.strip().lower()
+        if clean_user_lower in ["/finish", "/fim", "/encerrar", "/end", "/stop"] or clean_user_lower.startswith("/finish"):
+            if LevelingService.is_leveling_conversation(user, conversation_id):
+                return LevelingService.finish_leveling_early(user, conversation_id)
+
         if LevelingService.is_leveling_conversation(user, conversation_id):
             return LevelingService.process_leveling_step(user, conversation_id, user_text)
 

@@ -6,7 +6,8 @@ import { apiGet, apiPost, apiPatch } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import type { Message, Conversation } from '@/lib/api/types';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { X } from 'lucide-react';
+import { X, Target } from 'lucide-react';
+import { LevelingModal } from '@/components/chat/leveling-modal';
 import toast from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
@@ -54,6 +55,8 @@ export default function ChatClientPage() {
   const [convTitle, setConvTitle] = useState('Teacher Tati');
   const { sidebarOpen, toggleSidebar: handleToggleSidebar, closeSidebar: handleCloseSidebar } = useSidebarState();
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+  const [isLevelingModalOpen, setIsLevelingModalOpen] = useState(false);
+  const [isStartingLeveling, setIsStartingLeveling] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const locale = 'en-US';
@@ -118,12 +121,17 @@ export default function ChatClientPage() {
     router.push('/chat');
   }, [router, setMessages, handleCloseSidebar]);
 
-  const handleStartLeveling = useCallback(async () => {
+  const handleStartLeveling = useCallback(() => {
+    setIsLevelingModalOpen(true);
+  }, []);
+
+  const handleExecuteStartLeveling = useCallback(async (totalQuestions: number) => {
     try {
-      toast.loading('Starting your CEFR Leveling Challenge...', { id: 'start-leveling' });
-      const res = await apiPost<any>(ENDPOINTS.LEVELING_START, {});
+      setIsStartingLeveling(true);
+      toast.loading('Iniciando seu Desafio de Nivelamento CEFR...', { id: 'start-leveling' });
+      const res = await apiPost<any>(ENDPOINTS.LEVELING_START, { total_questions: totalQuestions });
       if (res.ok && res.data?.conversation_id) {
-        toast.success('Leveling Challenge Started! Answer in English.', { id: 'start-leveling' });
+        toast.success(`Desafio Iniciado com ${res.data.total_questions || totalQuestions} perguntas! Responda em inglês.`, { id: 'start-leveling' });
         const newConvId = res.data.conversation_id;
         setCurrentConvId(newConvId);
         setConvTitle(res.data.title || 'CEFR Leveling Challenge');
@@ -136,16 +144,19 @@ export default function ChatClientPage() {
           created_at: new Date().toISOString(),
         };
         setMessages([initialMsg]);
+        setIsLevelingModalOpen(false);
         router.push(`/chat?conv_id=${newConvId}`);
         if (window.innerWidth < 768) {
           handleCloseSidebar();
         }
       } else {
-        toast.error('Could not start leveling challenge right now.', { id: 'start-leveling' });
+        toast.error('Não foi possível iniciar o teste de nivelamento agora.', { id: 'start-leveling' });
       }
     } catch (err) {
       console.error('Error starting leveling assessment:', err);
-      toast.error('Connection error while starting leveling.', { id: 'start-leveling' });
+      toast.error('Erro de conexão ao iniciar nivelamento.', { id: 'start-leveling' });
+    } finally {
+      setIsStartingLeveling(false);
     }
   }, [router, setMessages, handleCloseSidebar]);
 
@@ -326,6 +337,21 @@ export default function ChatClientPage() {
     }
   };
 
+  const isLevelingActive = Boolean(
+    convTitle?.toLowerCase().includes('leveling') ||
+    (messages.length > 0 && messages[0]?.content?.includes('Leveling Challenge'))
+  );
+
+  const handleFinishEarly = useCallback(async () => {
+    if (!currentConvId) return;
+    const confirm = window.confirm(
+      'Deseja encerrar o Desafio de Nivelamento agora? A Teacher Tati avaliará as perguntas que você já respondeu e atribuirá nota 0 às restantes.'
+    );
+    if (!confirm) return;
+
+    await handleSend('/finish');
+  }, [currentConvId, handleSend]);
+
   useEffect(() => {
     const receiptFlag = searchParams.get('receipt');
     if (receiptFlag === 'success' || receiptFlag === '1' || receiptFlag === 'true') {
@@ -369,6 +395,24 @@ export default function ChatClientPage() {
         </div>
         <div className="p-2 md:p-6 bg-gradient-to-t from-bg via-bg/80 to-transparent">
           <div className="max-w-4xl mx-auto w-full">
+            {isLevelingActive && (
+              <div className="mb-2.5 p-2.5 px-3.5 rounded-xl bg-primary/10 border border-primary/25 flex items-center justify-between gap-3 text-xs shadow-xs animate-in fade-in">
+                <div className="flex items-center gap-2 text-text font-medium min-w-0">
+                  <Target size={15} className="text-primary shrink-0" />
+                  <span className="truncate">
+                    Desafio de Nivelamento CEFR em andamento. Digite <strong className="font-mono text-primary font-bold">/finish</strong> para encerrar.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleFinishEarly}
+                  className="shrink-0 px-2.5 py-1 rounded-lg bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-600 dark:text-red-400 font-bold transition-all text-[0.72rem] active:scale-95 cursor-pointer"
+                  title="Encerrar teste e receber avaliação agora"
+                >
+                  Encerrar (/finish)
+                </button>
+              </div>
+            )}
             <ChatInput
               onSend={handleSend}
               onSendAudio={handleSendAudio}
@@ -437,6 +481,13 @@ export default function ChatClientPage() {
           </div>
         )}
       </AnimatePresence>
+
+      <LevelingModal
+        isOpen={isLevelingModalOpen}
+        onClose={() => setIsLevelingModalOpen(false)}
+        onStart={handleExecuteStartLeveling}
+        loading={isStartingLeveling}
+      />
     </div>
   );
 }

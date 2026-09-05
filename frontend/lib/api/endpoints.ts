@@ -44,6 +44,7 @@ export const ENDPOINTS = {
   CHAT_WS: '/chat/ws',
   LEVELING_START: '/chat/leveling/start',
   LEVELING_STATUS: '/chat/leveling/status',
+  LEVELING_FINISH: '/chat/leveling/finish',
   WORD_LOOKUP: '/chat/word-lookup',
 
   // Avatar

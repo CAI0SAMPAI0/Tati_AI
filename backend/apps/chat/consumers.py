@@ -122,8 +122,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json({"type": "stream_start", "conversation_id": conv_id})
 
         try:
-            if not self.user:
-                self.user = await aget_user_by_username(self.username)
+            self.user = await aget_user_by_username(self.username)
 
             from asgiref.sync import sync_to_async
             from apps.chat.audio_service import AudioService

@@ -50,37 +50,76 @@ QUESTIONS_PER_LEVEL_MAX = 5
 class LevelingService:
     @staticmethod
     def is_leveling_conversation(user: User, conversation_id: str) -> bool:
-        if not user or not hasattr(user, "profile") or not isinstance(user.profile, dict):
+        """
+        Verifica com seguranca se a conversa e uma sessao de nivelamento ativa.
+        Recarrega o perfil direto do banco para evitar instancias em memoria defasadas no WebSocket.
+        """
+        if not user or not conversation_id:
             return False
-        active = user.profile.get("active_leveling")
-        if isinstance(active, dict) and active.get("conversation_id") == conversation_id:
-            return not active.get("completed", False)
+        try:
+            # 1. Verifica se a conversa no banco existe e tem titulo de nivelamento
+            conv = Conversation.objects.filter(id=conversation_id).first()
+            if not conv or not (conv.title.startswith("CEFR Leveling") or "leveling" in conv.title.lower()):
+                return False
+
+            # 2. Busca perfil atualizado do banco de dados
+            user_profile = User.objects.filter(username=user.username).values_list("profile", flat=True).first()
+            if isinstance(user_profile, dict):
+                active = user_profile.get("active_leveling")
+                if isinstance(active, dict) and active.get("conversation_id") == conversation_id:
+                    return not active.get("completed", False)
+
+            # 3. Fallback no user em memoria
+            if hasattr(user, "profile") and isinstance(user.profile, dict):
+                active = user.profile.get("active_leveling")
+                if isinstance(active, dict) and active.get("conversation_id") == conversation_id:
+                    return not active.get("completed", False)
+        except Exception as e:
+            logger.error(f"[Leveling] Error checking is_leveling_conversation: {e}")
         return False
 
     @staticmethod
-    def start_leveling_session(user: User, count_per_level: Optional[int] = None) -> Dict[str, Any]:
+    def start_leveling_session(
+        user: User,
+        total_questions: Optional[int] = None,
+        count_per_level: Optional[int] = None,
+    ) -> Dict[str, Any]:
         """
-        Inicia uma nova sessão de nivelamento com Teacher Tati.
-        Seleciona de 3 a 5 perguntas aleatórias de cada nível CEFR (A1, A2, B1, B2) e as embaralha.
+        Inicia uma nova sessao de nivelamento com Teacher Tati.
+        Seleciona perguntas aleatorias equilibradas entre os niveis CEFR (A1, A2, B1, B2).
         """
         bank = LEVELING_QUESTIONS_BANK or load_leveling_questions()
         selected_questions = []
 
-        for lvl in ["A1", "A2", "B1", "B2"]:
+        # Determina a quantidade de perguntas por nivel
+        if total_questions:
+            total_q_target = max(4, min(24, int(total_questions)))
+            base_count = total_q_target // 4
+            remainder = total_q_target % 4
+        elif count_per_level:
+            base_count = max(1, min(6, int(count_per_level)))
+            remainder = 0
+            total_q_target = base_count * 4
+        else:
+            # Padrao rapido e amigavel: 8 perguntas (2 de cada nivel)
+            base_count = 2
+            remainder = 0
+            total_q_target = 8
+
+        levels = ["A1", "A2", "B1", "B2"]
+        extra_allocations = set(random.sample(levels, remainder)) if remainder > 0 else set()
+
+        for lvl in levels:
             pool = bank.get(lvl, [])
+            count = base_count + (1 if lvl in extra_allocations else 0)
             if pool:
-                if count_per_level and 1 <= count_per_level <= len(pool):
-                    sample_count = count_per_level
-                else:
-                    sample_count = random.randint(QUESTIONS_PER_LEVEL_MIN, min(QUESTIONS_PER_LEVEL_MAX, len(pool)))
-                sampled = random.sample(pool, sample_count)
+                sampled = random.sample(pool, min(count, len(pool)))
                 selected_questions.extend(sampled)
 
-        # Embaralha todas as perguntas selecionadas em ordem aleatória
+        # Embaralha todas as perguntas selecionadas em ordem aleatoria
         random.shuffle(selected_questions)
 
         if not selected_questions:
-            # Fallback caso os dados não estejam disponíveis
             selected_questions = [
                 {"id": "A1_1", "level": "A1", "question": "What's your name and where are you from?", "target": "Basic introduction"},
                 {"id": "A2_1", "level": "A2", "question": "What did you do last weekend?", "target": "Past simple tense"},
@@ -117,35 +156,41 @@ class LevelingService:
             "answers": [],
             "completed": False,
             "started_at": now_str,
+            "current_follow_ups": 0,
+            "current_answers": [],
         }
 
-        if not isinstance(user.profile, dict):
-            user.profile = {}
-        user.profile["active_leveling"] = session_data
-        user.save()
+        fresh_user = User.objects.filter(username=user.username).first() or user
+        if not isinstance(fresh_user.profile, dict):
+            fresh_user.profile = {}
+        fresh_user.profile = dict(fresh_user.profile)
+        fresh_user.profile["active_leveling"] = session_data
+        fresh_user.save(update_fields=["profile"])
 
-        # 2. Mensagem inicial da Teacher Tati com a Questão 1
+        # 2. Mensagem inicial da Teacher Tati com a Questao 1 (SEM EMOJIS)
         first_q = selected_questions[0]
-        student_name = user.name or user.username
-        
+        student_name = fresh_user.name or fresh_user.username
+
         opening_text = (
-            f"🌟 **Welcome to your CEFR English Leveling Challenge, {student_name}!** 🌟\n\n"
-            f"I'm Teacher Tati, your personal AI English tutor. Today we will discover your exact English level across the CEFR framework (A1, A2, B1, and B2).\n\n"
-            f"I will ask you **{total_q} questions** in random order. Answer naturally in English—feel free to type or use your microphone!\n\n"
-            f"✨ **At the end:**\n"
-            f"• Your system level will be automatically updated to the level where you performed best.\n"
-            f"• You will receive a complete diagnostic report in your email with your score per level, mistakes, and corrections.\n\n"
-            f"Let's begin with your first question!\n\n"
+            f"Welcome to your CEFR English Leveling Challenge, {student_name}!\n\n"
+            f"I am Teacher Tati, your personal AI English tutor. Today we will discover your exact English level across the CEFR framework (A1, A2, B1, and B2).\n\n"
+            f"You will answer {total_q} questions in random order. Please answer naturally in English—feel free to type or use your microphone.\n\n"
+            f"Important:\n"
+            f"• At the end, your system level will be automatically updated to the level where you performed best.\n"
+            f"• You will receive a complete diagnostic report in your email with your score per level, mistakes, and corrections.\n"
+            f"• If you wish to finish early at any point, simply type /finish in the chat to conclude and receive your immediate evaluation.\n\n"
+            f"Let's begin with your first question:\n\n"
             f"---\n"
             f"**Question 1/{total_q}**:\n"
-            f"👉 **{first_q['question']}**"
+            f"**{first_q['question']}**"
         )
+        opening_text = strip_emojis(opening_text)
 
         audio_b64 = AudioService.text_to_speech(opening_text)
 
-        msg = Message.objects.create(
+        Message.objects.create(
             session_id=conv_id,
-            username=user.username,
+            username=fresh_user.username,
             role="assistant",
             content=opening_text,
             audio_b64=audio_b64,
@@ -165,12 +210,180 @@ class LevelingService:
         }
 
     @staticmethod
+    def finish_leveling_early(user: User, conversation_id: str) -> Dict[str, Any]:
+        """
+        Encerra antecipadamente o teste de nivelamento quando o aluno envia /finish.
+        Avalia com base no que foi respondido ate o momento e pontua as restantes como 0 / nao respondidas.
+        Gera relatorio em PDF, envia e-mail e atualiza o nivel do aluno.
+        """
+        fresh_user = User.objects.filter(username=user.username).first() or user
+        profile = getattr(fresh_user, "profile", {}) or {}
+        session = profile.get("active_leveling")
+
+        if not isinstance(session, dict) or session.get("completed"):
+            return {
+                "ok": False,
+                "reply": "No active leveling assessment found to finish.",
+                "audio_b64": "",
+                "is_leveling": False,
+            }
+
+        questions = session.get("questions", [])
+        curr_idx = session.get("current_index", 0)
+        total_q = session.get("total_questions", len(questions))
+
+        # Registra todas as perguntas restantes como nao respondidas (pontuacao 0)
+        for i in range(curr_idx, total_q):
+            rem_q = questions[i] if i < len(questions) else {}
+            lvl = rem_q.get("level", "A1")
+            session["answers"].append({
+                "index": i + 1,
+                "question_id": rem_q.get("id", f"{lvl}_{i+1}"),
+                "level": lvl,
+                "question": rem_q.get("question", "N/A"),
+                "user_answer": "Not answered (Assessment finished early with /finish)",
+                "is_correct": False,
+                "mistakes": ["Not answered"],
+                "corrections": ["N/A"],
+                "feedback": "Question skipped by user using /finish (Score: 0).",
+            })
+
+        scores = session.get("scores", {})
+        old_level = fresh_user.level or "A1"
+
+        # Determina o nivel com base nas perguntas respondidas
+        best_level = "A1"
+        max_correct = -1
+        level_hierarchy = ["A1", "A2", "B1", "B2"]
+
+        for lvl in level_hierarchy:
+            c = scores.get(lvl, {}).get("correct", 0)
+            if c > 0 and c >= max_correct:
+                max_correct = c
+                best_level = lvl
+
+        if max_correct <= 0:
+            best_level = "A1"
+
+        # Atualiza o nivel do aluno no banco de dados
+        fresh_user.level = best_level
+
+        # Marca sessao como finalizada
+        now_iso = datetime.now(timezone.utc).isoformat()
+        session["completed"] = True
+        session["completed_at"] = now_iso
+        session["assigned_level"] = best_level
+        session["old_level"] = old_level
+        session["current_index"] = total_q
+        session["finished_early"] = True
+        session["answered_count"] = curr_idx
+
+        if "leveling_history" not in fresh_user.profile or not isinstance(fresh_user.profile.get("leveling_history"), list):
+            fresh_user.profile["leveling_history"] = []
+        fresh_user.profile["leveling_history"].append(session)
+        fresh_user.profile["active_leveling"] = None
+        fresh_user.save(update_fields=["level", "profile"])
+
+        # XP proporcional
+        xp_earned = max(10, curr_idx * 5)
+        XPService.award_xp(fresh_user, xp_earned, "Leveling Challenge (/finish)")
+        StreakService.record_activity(fresh_user)
+
+        # Geracao do relatorio em PDF
+        pdf_bytes = LevelingService.generate_pdf_report(
+            student_name=fresh_user.name or fresh_user.username,
+            date_str=datetime.now().strftime("%B %d, %Y"),
+            old_level=old_level,
+            new_level=best_level,
+            scores_by_level=scores,
+            qa_list=session.get("answers", []),
+        )
+
+        # Envio de e-mail com PDF
+        student_email = fresh_user.email
+        email_sent = False
+        if student_email and "@" in student_email:
+            try:
+                email_html = LevelingService.build_email_html(
+                    student_name=fresh_user.name or fresh_user.username,
+                    new_level=best_level,
+                    old_level=old_level,
+                    scores=scores,
+                    qa_list=session.get("answers", []),
+                )
+                pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
+                attachments = [{
+                    "name": f"Level_Assessment_Report_{fresh_user.username}.pdf",
+                    "content": pdf_b64,
+                }]
+                res = BrevoEmailService.send_email_detailed(
+                    to_email=student_email,
+                    subject="Your English Level Assessment Results - Teacher Tati",
+                    html_content=email_html,
+                    recipient_name=fresh_user.name or fresh_user.username,
+                    attachments=attachments,
+                )
+                email_sent = res.get("success", False)
+            except Exception as mail_err:
+                logger.error(f"[Leveling] Failed sending report email on early finish: {mail_err}")
+
+        email_notice = (
+            f"A detailed diagnostic PDF report has been sent to your email ({student_email}) with your scores, mistakes, and corrections in English."
+            if student_email
+            else "Update your email in your profile to receive diagnostic reports directly in your inbox."
+        )
+
+        final_reply = (
+            f"You have finished the Leveling Assessment early using /finish.\n\n"
+            f"---\n"
+            f"**Leveling Assessment Summary for {fresh_user.name or fresh_user.username}**:\n\n"
+            f"• Questions completed: {curr_idx} of {total_q}\n"
+            f"• Questions skipped: {total_q - curr_idx} (marked as 0)\n\n"
+            f"**Your Performance by Level:**\n"
+            f"• Level A1: {scores.get('A1', {}).get('correct', 0)}/{scores.get('A1', {}).get('total', 0)} correct\n"
+            f"• Level A2: {scores.get('A2', {}).get('correct', 0)}/{scores.get('A2', {}).get('total', 0)} correct\n"
+            f"• Level B1: {scores.get('B1', {}).get('correct', 0)}/{scores.get('B1', {}).get('total', 0)} correct\n"
+            f"• Level B2: {scores.get('B2', {}).get('correct', 0)}/{scores.get('B2', {}).get('total', 0)} correct\n\n"
+            f"**Your Assessed CEFR Level: {best_level}**\n"
+            f"Your profile in Teacher Tati AI has been updated to **{best_level}**.\n\n"
+            f"{email_notice}\n\n"
+            f"Good effort! You can practice in normal chat or take another assessment whenever you are ready."
+        )
+        final_reply = strip_emojis(final_reply)
+
+        audio_b64 = AudioService.text_to_speech(final_reply)
+
+        Message.objects.create(
+            session_id=conversation_id,
+            username=fresh_user.username,
+            role="assistant",
+            content=final_reply,
+            audio_b64=audio_b64,
+        )
+
+        Conversation.objects.filter(id=conversation_id).update(
+            updated_at=datetime.now(timezone.utc).isoformat()
+        )
+
+        return {
+            "ok": True,
+            "reply": final_reply,
+            "audio_b64": audio_b64,
+            "audio": audio_b64,
+            "is_leveling": True,
+            "completed": True,
+            "new_level": best_level,
+            "scores": scores,
+            "email_sent": email_sent,
+        }
+
+    @staticmethod
     def process_leveling_step(user: User, conversation_id: str, user_text: str) -> Dict[str, Any]:
         """
         Processa uma resposta do aluno no teste de nivelamento.
-        Avalia gramática/vocabulário com IA, pontua o nível e faz a pergunta seguinte ou conclui o teste.
+        Avalia gramatica/vocabulario com IA, pontua o nivel e faz a pergunta seguinte ou conclui o teste.
         """
-        # Salva mensagem do usuário
+        # Salva mensagem do usuario
         Message.objects.create(
             session_id=conversation_id,
             username=user.username,
@@ -178,20 +391,34 @@ class LevelingService:
             content=user_text,
         )
 
-        if not isinstance(user.profile, dict) or "active_leveling" not in user.profile:
+        fresh_user = User.objects.filter(username=user.username).first() or user
+        profile = getattr(fresh_user, "profile", {}) or {}
+
+        if not isinstance(profile, dict) or "active_leveling" not in profile:
             return {
                 "reply": "No active leveling session found. Starting a regular chat.",
                 "audio_b64": "",
                 "is_leveling": False,
             }
 
-        session = user.profile["active_leveling"]
+        session = profile["active_leveling"]
+        if not isinstance(session, dict) or session.get("completed"):
+            return {
+                "reply": "Your leveling test has already been completed! Great job!",
+                "audio_b64": "",
+                "is_leveling": False,
+            }
+
+        # 1. Verifica se o usuario solicitou o comando /finish
+        clean_input = user_text.strip().lower()
+        if clean_input in ["/finish", "/fim", "/encerrar", "/end", "/stop", "finish", "fim"] or clean_input.startswith("/finish"):
+            return LevelingService.finish_leveling_early(fresh_user, conversation_id)
+
         questions = session.get("questions", [])
         curr_idx = session.get("current_index", 0)
         total_q = session.get("total_questions", len(questions))
 
         if curr_idx >= len(questions):
-            # Teste já foi concluído anteriormente
             return {
                 "reply": "Your leveling test has already been completed! Great job!",
                 "audio_b64": "",
@@ -203,21 +430,77 @@ class LevelingService:
         q_text = curr_q.get("question", "")
         q_target = curr_q.get("target", "")
 
-        # 1. Avaliação via IA da resposta do aluno
+        # Coleta respostas acumuladas para a pergunta atual (caso tenha havido follow-up)
+        prev_answers = session.get("current_answers", [])
+        combined_answer = " ".join(prev_answers + [user_text]).strip()
+
+        # 2. Avaliacao via IA da resposta do aluno
         evaluation = LevelingService._evaluate_answer(
-            user_name=user.name or user.username,
+            user_name=fresh_user.name or fresh_user.username,
             question=q_text,
             question_level=q_level,
             target=q_target,
-            student_answer=user_text,
+            student_answer=combined_answer,
         )
 
         is_correct = evaluation.get("is_correct", False)
         mistakes = evaluation.get("mistakes", [])
         corrections = evaluation.get("corrections", [])
         feedback = evaluation.get("pedagogical_feedback", "")
+        needs_follow_up = evaluation.get("needs_follow_up", False)
+        follow_up_q = evaluation.get("follow_up_question", "")
 
-        # Atualiza contagem de acertos para o nível avaliado
+        current_follow_ups = session.get("current_follow_ups", 0)
+
+        # 3. Regra de follow-ups:
+        # "ela nao deve conversar tanto e sim ir direto nas perguntas, claro fazer 2 perguntas no maximo a mais"
+        # Se a resposta foi excessivamente curta (< 5 palavras) e precisa de mais detalhe, permite no maximo 2 perguntas extras
+        words_count = len(user_text.strip().split())
+        should_ask_follow_up = (
+            current_follow_ups < 2
+            and needs_follow_up
+            and bool(follow_up_q)
+            and words_count < 6
+        )
+
+        if should_ask_follow_up:
+            session["current_follow_ups"] = current_follow_ups + 1
+            session["current_answers"] = prev_answers + [user_text]
+            fresh_user.profile["active_leveling"] = session
+            fresh_user.save(update_fields=["profile"])
+
+            follow_up_reply = f"{feedback}\n\n{follow_up_q}".strip()
+            follow_up_reply = strip_emojis(follow_up_reply)
+
+            audio_b64 = AudioService.text_to_speech(follow_up_reply)
+            Message.objects.create(
+                session_id=conversation_id,
+                username=fresh_user.username,
+                role="assistant",
+                content=follow_up_reply,
+                audio_b64=audio_b64,
+            )
+            Conversation.objects.filter(id=conversation_id).update(
+                updated_at=datetime.now(timezone.utc).isoformat()
+            )
+
+            return {
+                "ok": True,
+                "reply": follow_up_reply,
+                "audio_b64": audio_b64,
+                "audio": audio_b64,
+                "is_leveling": True,
+                "completed": False,
+                "current_question": curr_idx + 1,
+                "total_questions": total_q,
+                "is_follow_up": True,
+            }
+
+        # Reseta follow-ups para a proxima pergunta
+        session["current_follow_ups"] = 0
+        session["current_answers"] = []
+
+        # Atualiza contagem de acertos para o nivel avaliado
         if is_correct:
             if q_level in session["scores"]:
                 session["scores"][q_level]["correct"] += 1
@@ -228,7 +511,7 @@ class LevelingService:
             "question_id": curr_q.get("id", f"{q_level}_{curr_idx+1}"),
             "level": q_level,
             "question": q_text,
-            "user_answer": user_text,
+            "user_answer": combined_answer,
             "is_correct": is_correct,
             "mistakes": mistakes,
             "corrections": corrections,
@@ -238,7 +521,7 @@ class LevelingService:
         next_idx = curr_idx + 1
         session["current_index"] = next_idx
 
-        # 2. Verifica se ainda há mais perguntas
+        # 4. Verifica se ainda ha mais perguntas
         if next_idx < total_q:
             next_q = questions[next_idx]
             reply_text = (
@@ -250,13 +533,13 @@ class LevelingService:
             reply_text = strip_emojis(reply_text)
 
             # Salva o estado atualizado no perfil
-            user.profile["active_leveling"] = session
-            user.save()
+            fresh_user.profile["active_leveling"] = session
+            fresh_user.save(update_fields=["profile"])
 
             audio_b64 = AudioService.text_to_speech(reply_text)
-            msg = Message.objects.create(
+            Message.objects.create(
                 session_id=conversation_id,
-                username=user.username,
+                username=fresh_user.username,
                 role="assistant",
                 content=reply_text,
                 audio_b64=audio_b64,
@@ -276,15 +559,11 @@ class LevelingService:
                 "current_question": next_idx + 1,
                 "total_questions": total_q,
             }
-
         else:
-            # ── 3. TESTE CONCLUÍDO! ─────────────────────────────────────
+            # ── 5. TESTE CONCLUIDO COM SUCESSO! ─────────────────────────
             scores = session.get("scores", {})
-            old_level = user.level or "A1"
+            old_level = fresh_user.level or "A1"
 
-            # Determina o novo nível:
-            # "O nível dele no sistema será ajustado para o nível que ele mais acertou as respostas."
-            # Critério de desempate: nível CEFR mais avançado entre os que tiveram maior pontuação
             best_level = "A1"
             max_correct = -1
             level_hierarchy = ["A1", "A2", "B1", "B2"]
@@ -295,33 +574,28 @@ class LevelingService:
                     max_correct = c
                     best_level = lvl
 
-            # Se errou tudo, mantém A1 como base inicial
             if max_correct == 0 and best_level != "A1":
                 best_level = "A1"
 
-            # Atualiza o nível do aluno no banco de dados
-            user.level = best_level
+            fresh_user.level = best_level
 
-            # Marca sessão como finalizada e salva histórico
             now_iso = datetime.now(timezone.utc).isoformat()
             session["completed"] = True
             session["completed_at"] = now_iso
             session["assigned_level"] = best_level
             session["old_level"] = old_level
 
-            if "leveling_history" not in user.profile or not isinstance(user.profile.get("leveling_history"), list):
-                user.profile["leveling_history"] = []
-            user.profile["leveling_history"].append(session)
-            user.profile["active_leveling"] = None
-            user.save()
+            if "leveling_history" not in fresh_user.profile or not isinstance(fresh_user.profile.get("leveling_history"), list):
+                fresh_user.profile["leveling_history"] = []
+            fresh_user.profile["leveling_history"].append(session)
+            fresh_user.profile["active_leveling"] = None
+            fresh_user.save(update_fields=["level", "profile"])
 
-            # Bonificação de XP e Streak
-            XPService.award_xp(user, 50, "Completed CEFR Leveling Challenge")
-            StreakService.record_activity(user)
+            XPService.award_xp(fresh_user, 50, "Completed CEFR Leveling Challenge")
+            StreakService.record_activity(fresh_user)
 
-            # 4. Geração do relatório em PDF (ReportLab)
             pdf_bytes = LevelingService.generate_pdf_report(
-                student_name=user.name or user.username,
+                student_name=fresh_user.name or fresh_user.username,
                 date_str=datetime.now().strftime("%B %d, %Y"),
                 old_level=old_level,
                 new_level=best_level,
@@ -329,13 +603,12 @@ class LevelingService:
                 qa_list=session.get("answers", []),
             )
 
-            # 5. Envio de E-mail em inglês com PDF anexado
-            student_email = user.email
+            student_email = fresh_user.email
             email_sent = False
             if student_email and "@" in student_email:
                 try:
                     email_html = LevelingService.build_email_html(
-                        student_name=user.name or user.username,
+                        student_name=fresh_user.name or fresh_user.username,
                         new_level=best_level,
                         old_level=old_level,
                         scores=scores,
@@ -343,24 +616,22 @@ class LevelingService:
                     )
                     pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
                     attachments = [{
-                        "name": f"Level_Assessment_Report_{user.username}.pdf",
+                        "name": f"Level_Assessment_Report_{fresh_user.username}.pdf",
                         "content": pdf_b64,
                     }]
                     res = BrevoEmailService.send_email_detailed(
                         to_email=student_email,
-                        subject="🎯 Your English Level Assessment Results & Report — Teacher Tati",
+                        subject="Your English Level Assessment Results - Teacher Tati",
                         html_content=email_html,
-                        recipient_name=user.name or user.username,
+                        recipient_name=fresh_user.name or fresh_user.username,
                         attachments=attachments,
                     )
                     email_sent = res.get("success", False)
-                    logger.info(f"[Leveling] Email sent to {student_email}: {email_sent}")
                 except Exception as mail_err:
                     logger.error(f"[Leveling] Failed sending report email: {mail_err}")
 
-            # 6. Mensagem final da Teacher Tati no chat
             email_notice = (
-                f"A detailed diagnostic PDF report has been sent to your email (**{student_email}**) with your scores, mistakes, and corrections in English!"
+                f"A detailed diagnostic PDF report has been sent to your email ({student_email}) with your scores, mistakes, and corrections in English."
                 if student_email
                 else "Update your email in your profile to receive diagnostic reports directly in your inbox."
             )
@@ -368,7 +639,7 @@ class LevelingService:
             final_reply = (
                 f"{feedback}\n\n"
                 f"---\n"
-                f"**Congratulations, {user.name or user.username}! You have completed your Leveling Assessment!**\n\n"
+                f"**Congratulations, {fresh_user.name or fresh_user.username}! You have completed your Leveling Assessment!**\n\n"
                 f"**Your Performance by Level:**\n"
                 f"• Level A1: {scores.get('A1', {}).get('correct', 0)}/{scores.get('A1', {}).get('total', 0)} correct\n"
                 f"• Level A2: {scores.get('A2', {}).get('correct', 0)}/{scores.get('A2', {}).get('total', 0)} correct\n"
@@ -383,9 +654,9 @@ class LevelingService:
 
             audio_b64 = AudioService.text_to_speech(final_reply)
 
-            msg = Message.objects.create(
+            Message.objects.create(
                 session_id=conversation_id,
-                username=user.username,
+                username=fresh_user.username,
                 role="assistant",
                 content=final_reply,
                 audio_b64=audio_b64,
@@ -417,6 +688,7 @@ class LevelingService:
     ) -> Dict[str, Any]:
         """
         Avalia a resposta do aluno com LLM (Groq / Gemini) retornando JSON estruturado.
+        Regra estrita: NENHUM emoji. Feedback conciso. Sem perguntas aleatorias de bate-papo.
         """
         prompt = (
             f"You are Teacher Tatiana Duarte (Teacher Tati), evaluating a student's answer in a CEFR English Leveling Assessment.\n"
@@ -424,13 +696,19 @@ class LevelingService:
             f"Target Skills / Grammar: {target}\n"
             f"Student's Answer: \"{student_answer}\"\n\n"
             f"Evaluate whether the student's answer demonstrates sufficient communicative ability and grammatical control for CEFR Level {question_level}.\n"
-            f"A minor slip should still pass if the meaning is clear and appropriate for {question_level}.\n"
+            f"A minor slip should still pass if the meaning is clear and appropriate for {question_level}.\n\n"
+            f"CRITICAL RULES:\n"
+            f"1. DO NOT ask conversational questions in 'pedagogical_feedback'. It must be 1-2 concise sentences giving a warm acknowledgment and a quick grammar/vocab tip.\n"
+            f"2. If the student's answer was too brief (fewer than 4 words or vague) and you need them to speak a bit more to properly judge CEFR {question_level}, set 'needs_follow_up': true and provide 1 short follow-up question in 'follow_up_question'. Otherwise set 'needs_follow_up': false and 'follow_up_question': \"\".\n"
+            f"3. Absolutely DO NOT use any emojis anywhere. No emojis permitted.\n\n"
             f"Respond ONLY with a valid JSON object matching this schema:\n"
             f"{{\n"
             f'  "is_correct": true,\n'
             f'  "mistakes": ["List specific grammatical or vocabulary mistakes in English, if any"],\n'
             f'  "corrections": ["Natural and correct English phrasing for the student\'s answer"],\n'
-            f'  "pedagogical_feedback": "1-2 warm, encouraging sentences in English from Teacher Tati directly to the student ({user_name}), acknowledging their response and offering a quick helpful tip."\n'
+            f'  "pedagogical_feedback": "1-2 concise sentences in English acknowledging the answer and giving a constructive tip. NO emojis. NO conversational chatter.",\n'
+            f'  "needs_follow_up": false,\n'
+            f'  "follow_up_question": ""\n'
             f"}}"
         )
 
@@ -471,14 +749,17 @@ class LevelingService:
             except Exception as e:
                 logger.warning(f"[Leveling AI] Gemini fallback failed: {e}")
 
-        # Fallback heurístico seguro caso todas as APIs falhem
+        # Fallback heuristico seguro caso todas as APIs falhem
         has_text = len(student_answer.strip()) > 3
         return {
             "is_correct": has_text,
             "mistakes": [] if has_text else ["Answer was too short or empty."],
             "corrections": [student_answer] if has_text else ["Please provide a complete sentence."],
             "pedagogical_feedback": "Well done! Thank you for sharing your answer with me." if has_text else "Keep going! Try to express yourself in a complete sentence.",
+            "needs_follow_up": False,
+            "follow_up_question": "",
         }
+
 
     @staticmethod
     def generate_pdf_report(
@@ -767,7 +1048,7 @@ class LevelingService:
                 </div>
                 
                 <div style="padding: 28px 24px;">
-                    <h2 style="color: #1e293b; font-size: 20px; margin-top: 0;">Hello, {student_name}! 🌟</h2>
+                    <h2 style="color: #1e293b; font-size: 20px; margin-top: 0;">Hello, {student_name}!</h2>
                     <p style="color: #475569; font-size: 14px; line-height: 1.6;">
                         You have successfully completed your diagnostic leveling assessment with Teacher Tati!
                         Based on your performance and mastery across different skill levels, your system profile has been updated.
