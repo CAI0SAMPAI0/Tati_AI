@@ -178,41 +178,41 @@ export function WhatsappSection() {
         return (
           <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
             <CheckCircle size={14} />
-            Conectado (WORKING)
+            Connected (WORKING)
           </span>
         );
       case 'SCAN_QR_CODE':
         return (
           <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
             <QrCode size={14} />
-            Aguardando Leitura (SCAN_QR_CODE)
+            Waiting for Scan (SCAN_QR_CODE)
           </span>
         );
       case 'STARTING':
         return (
           <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-blue-500/10 text-blue-500 border border-blue-500/20">
             <Loader2 size={14} className="animate-spin" />
-            Iniciando... (STARTING)
+            Starting... (STARTING)
           </span>
         );
       case 'FAILED':
         return (
           <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-rose-500/10 text-rose-500 border border-rose-500/20">
             <AlertCircle size={14} />
-            QR Expirado (FAILED)
+            QR Expired (FAILED)
           </span>
         );
       default:
         return (
           <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-danger/10 text-danger border border-danger/20">
             <AlertCircle size={14} />
-            Desconectado ({sessionStatus || 'STOPPED'})
+            Disconnected ({sessionStatus || 'STOPPED'})
           </span>
         );
     }
   };
 
-  // Lista de sessões conhecidas
+  // Known sessions list
   const sessionList = useMemo(() => {
     const defaultList = ['programador', 'professor'];
     if (sessions) {
@@ -233,15 +233,15 @@ export function WhatsappSection() {
           <div className="flex items-center gap-3">
             <FaWhatsapp size={22} className="text-emerald-500" />
             <div>
-              <h2 className="font-bold text-sm uppercase tracking-wider text-text">Sessões WhatsApp (WAHA)</h2>
-              <p className="text-xs text-text-muted">Gerencie a conexão do WhatsApp para disparo de notificações e lembretes</p>
+              <h2 className="font-bold text-sm uppercase tracking-wider text-text">WhatsApp Sessions (WAHA)</h2>
+              <p className="text-xs text-text-muted">Manage WhatsApp connection for automated notifications and reminders</p>
             </div>
           </div>
           <button
             onClick={() => refetch()}
             disabled={isLoading || isRefetching}
             className="p-2 rounded-xl border border-border hover:bg-surface-hover text-text-muted transition-colors"
-            title="Atualizar status"
+            title="Refresh status"
           >
             <RefreshCw size={16} className={isRefetching ? 'animate-spin' : ''} />
           </button>
@@ -249,7 +249,7 @@ export function WhatsappSection() {
 
         {/* Session Selector Tabs */}
         <div className="px-6 pt-6 pb-2 border-b border-border/50 bg-bg-secondary/10 flex flex-wrap gap-2 items-center">
-          <span className="text-xs font-bold text-text-muted uppercase tracking-wider mr-2">Sessão:</span>
+          <span className="text-xs font-bold text-text-muted uppercase tracking-wider mr-2">Session:</span>
           {sessionList.map((name) => {
             const sData = sessions?.find(s => s.name === name);
             const isWorking = sData?.status === 'WORKING';
@@ -273,12 +273,12 @@ export function WhatsappSection() {
                 <span className="capitalize">@{name}</span>
                 {name === 'professor' && (
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${isSelected ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'}`}>
-                    Produção
+                    Production
                   </span>
                 )}
                 {name === 'programador' && (
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${isSelected ? 'bg-white/20 text-white' : 'bg-emerald-500/10 text-emerald-600'}`}>
-                    Dev / Testes
+                    Dev / Tests
                   </span>
                 )}
                 {/* Status indicator dot */}
@@ -301,15 +301,15 @@ export function WhatsappSection() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 bg-bg-secondary/40 border border-border/50 rounded-2xl">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <p className="text-xs font-black uppercase tracking-wider text-text-subtle">Sessão Selecionada</p>
+                <p className="text-xs font-black uppercase tracking-wider text-text-subtle">Selected Session</p>
                 {activeSession === 'professor' && (
                   <span className="text-[10px] bg-emerald-500/10 text-emerald-600 font-bold px-2 py-0.5 rounded-full border border-emerald-500/20">
-                    Sessão Oficial (Tatiana)
+                    Official Session (Tatiana)
                   </span>
                 )}
                 {activeSession === 'programador' && (
                   <span className="text-[10px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full border border-primary/20">
-                    Sessão Desenvolvedor (Caio)
+                    Developer Session (Caio)
                   </span>
                 )}
               </div>
@@ -319,11 +319,11 @@ export function WhatsappSection() {
                 {getStatusBadge()}
               </div>
 
-              {/* Detalhes de quem está logado se estiver WORKING */}
+              {/* Logged in user info if WORKING */}
               {currentSessionData?.me && currentSessionData.status === 'WORKING' && (
                 <div className="text-xs text-text-muted bg-surface/60 p-2.5 rounded-xl border border-border/50 space-y-0.5">
                   <div className="font-semibold text-text">
-                    📱 WhatsApp Conectado: <span className="text-emerald-500 font-bold">{currentSessionData.me.pushName || 'WhatsApp'}</span>
+                    📱 WhatsApp Connected: <span className="text-emerald-500 font-bold">{currentSessionData.me.pushName || 'WhatsApp'}</span>
                   </div>
                   {currentSessionData.me.id && (
                     <div className="text-[11px] text-text-subtle font-mono">
@@ -335,12 +335,12 @@ export function WhatsappSection() {
 
               <p className="text-xs text-text-muted max-w-lg leading-relaxed">
                 {activeSession === 'professor'
-                  ? 'Esta sessão é a conexão principal da Professora Tatiana no Render. É utilizada pelo cron de notificações agendadas para disparar avisos e flashcards a todos os alunos.'
-                  : 'Sessão exclusiva para o desenvolvedor testar disparos e integrações. Dispara apenas para o número configurado do desenvolvedor.'}
+                  ? 'Main connection for Teacher Tatiana on Render. Used by the background scheduler to send automated reminders and flashcards to all students.'
+                  : "Developer testing session. Only sends notifications to the developer's registered phone number."}
               </p>
             </div>
 
-            {/* Ações da Sessão */}
+            {/* Session Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3">
               {sessionStatus === 'FAILED' && (
                 <Button
@@ -349,7 +349,7 @@ export function WhatsappSection() {
                   className="gap-2 font-bold px-6 py-2.5 rounded-xl bg-primary text-white shadow-sm hover:brightness-105"
                 >
                   <RotateCw size={16} className={isStartingOrStopping ? 'animate-spin' : ''} />
-                  Reiniciar e Gerar Novo QR
+                  Restart & Generate New QR
                 </Button>
               )}
 
@@ -362,7 +362,7 @@ export function WhatsappSection() {
                     className="gap-2 font-bold px-4 py-2.5 rounded-xl border-border hover:bg-surface-hover text-text"
                   >
                     <RotateCw size={16} className={isStartingOrStopping ? 'animate-spin' : ''} />
-                    Renovar QR Code
+                    Refresh QR Code
                   </Button>
                   <Button
                     onClick={handleStopSession}
@@ -371,7 +371,7 @@ export function WhatsappSection() {
                     className="gap-2 font-bold px-4 py-2.5 rounded-xl text-danger border-danger/20 hover:bg-danger/10"
                   >
                     <Power size={16} />
-                    Cancelar
+                    Cancel
                   </Button>
                 </>
               )}
@@ -383,7 +383,7 @@ export function WhatsappSection() {
                   className="gap-2 font-bold px-6 py-2.5 rounded-xl bg-[#8A0303] hover:bg-[#6b0202] text-white border-none shadow-sm"
                 >
                   <Power size={16} />
-                  Desconectar Sessão
+                  Disconnect Session
                 </Button>
               )}
 
@@ -394,21 +394,21 @@ export function WhatsappSection() {
                   className="gap-2 font-bold px-6 py-2.5 rounded-xl bg-primary text-white shadow-sm"
                 >
                   <Power size={16} />
-                  Iniciar Sessão
+                  Start Session
                 </Button>
               )}
             </div>
           </div>
 
-          {/* Banner de Sessão FAILED */}
+          {/* Banner for FAILED Session */}
           {sessionStatus === 'FAILED' && (
             <div className="p-5 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-start gap-3">
                 <AlertCircle size={20} className="text-rose-500 shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="font-bold text-sm text-text">O QR Code expirou por inatividade</h4>
+                  <h4 className="font-bold text-sm text-text">QR code expired due to inactivity</h4>
                   <p className="text-xs text-text-muted mt-0.5">
-                    O WhatsApp encerra o pareamento se nenhum aparelho escanear dentro do tempo limite. Clique em reiniciar para gerar um código novo em folha.
+                    WhatsApp closes the pairing session if no device scans before timeout. Click restart to generate a fresh QR code.
                   </p>
                 </div>
               </div>
@@ -418,7 +418,7 @@ export function WhatsappSection() {
                 className="gap-2 font-bold px-5 py-2 rounded-xl bg-primary text-white shrink-0"
               >
                 <RotateCw size={14} className={isStartingOrStopping ? 'animate-spin' : ''} />
-                Gerar Novo Código
+                Generate New QR Code
               </Button>
             </div>
           )}
@@ -429,14 +429,14 @@ export function WhatsappSection() {
               <div className="space-y-2 max-w-sm">
                 <h3 className="text-lg font-black text-text flex items-center justify-center gap-2">
                   <QrCode size={20} className="text-primary" />
-                  Escanear QR Code no WhatsApp
+                  Scan WhatsApp QR Code
                 </h3>
                 <p className="text-xs text-text-muted leading-relaxed">
-                  Abra o WhatsApp no seu celular, acesse <strong>Aparelhos Conectados</strong> &gt; <strong>Conectar um aparelho</strong> e aponte para a imagem abaixo.
+                  Open WhatsApp on your phone, go to <strong>Linked Devices</strong> &gt; <strong>Link a device</strong>, and point your camera at the QR code below.
                 </p>
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-[11px] font-bold border border-emerald-500/20">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                  Atualização em tempo real ativa (renovado a cada 4s)
+                  Real-time auto-refresh active (renewed every 4s)
                 </div>
               </div>
 
@@ -450,18 +450,18 @@ export function WhatsappSection() {
                 ) : (
                   <div className="text-center p-4 space-y-3">
                     <p className="text-xs text-text-muted">
-                      {qrError || 'Carregando novo código...'}
+                      {qrError || 'QR code expired or session timed out.'}
                     </p>
                     <Button onClick={() => handleRestartSession()} variant="secondary" className="text-[0.7rem] px-3 py-1.5 h-auto gap-1">
                       <RotateCw size={12} />
-                      Gerar Novo QR Code
+                      Generate New QR Code
                     </Button>
                   </div>
                 )}
               </div>
 
               <p className="text-[11px] text-text-subtle max-w-xs">
-                Não saia desta tela até escanear. Assim que a conexão for concluída, o status mudará automaticamente para <strong>Conectado</strong>.
+                Please stay on this screen until scanned. Once pairing is complete, the status will automatically change to <strong>Connected</strong>.
               </p>
             </div>
           )}
