@@ -253,10 +253,18 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
     "sec-websocket-key",
     "sec-websocket-version",
     "sec-websocket-protocol",
+    "sec-ch-ua",
+    "sec-ch-ua-mobile",
+    "sec-ch-ua-platform",
+    "x-timezone",
     "x-cron-secret",
     "x-cron-token",
     "sentry-trace",
     "baggage",
+    "cache-control",
+    "pragma",
+    "if-modified-since",
+    "if-none-match",
 ]
 
 # Origens permitidas dinâmicas para Railway e Vercel
@@ -264,6 +272,8 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://.*\.railway\.app$",
     r"^https://.*\.up\.railway\.app$",
     r"^https://.*\.vercel\.app$",
+    r"^http://localhost(:\d+)?$",
+    r"^http://127\.0\.0\.1(:\d+)?$",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
