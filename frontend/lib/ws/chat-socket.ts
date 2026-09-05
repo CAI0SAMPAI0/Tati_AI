@@ -47,7 +47,18 @@ interface ChatFilePayload {
   origin?: 'chat';
 }
 
-type OutgoingPayload = ChatTextPayload | ChatAudioPayload | ChatFilePayload | { type: 'ping' };
+interface ChatFilesPayload {
+  type: 'files';
+  files: Array<{ filename: string; base64: string; type?: string }>;
+  file?: string;
+  filename?: string;
+  content?: string;
+  conversation_id?: string | null;
+  caption?: string;
+  origin?: 'chat';
+}
+
+type OutgoingPayload = ChatTextPayload | ChatAudioPayload | ChatFilePayload | ChatFilesPayload | { type: 'ping' };
 
 export class ChatSocket {
   private ws: WebSocket | null = null;

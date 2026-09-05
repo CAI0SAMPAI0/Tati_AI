@@ -5,8 +5,10 @@ from datetime import datetime, timezone
 from typing import List
 import warnings
 
-warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+except Exception:
+    genai = None
 from groq import Groq
 
 from .models import Conversation, Message
@@ -260,15 +262,45 @@ class ConversationService:
 class AIService:
     @classmethod
     def generate_reply(
-        cls, user: User, conversation_id: str, user_text: str, difficulty: str = None
+        cls,
+        user: User,
+        conversation_id: str,
+        user_text: str,
+        difficulty: str = None,
+        files: Optional[List[Dict[str, Any]]] = None,
     ) -> dict:
         # Verifica se esta conversa é uma sessão de nivelamento ativa
         from .leveling_service import LevelingService
+        from .document_service import DocumentService
 
         if LevelingService.is_leveling_conversation(user, conversation_id):
             return LevelingService.process_leveling_step(user, conversation_id, user_text)
 
         clean_user_text = strip_emojis(user_text.strip())
+
+        # Processamento e leitura integral de arquivos enviados (máximo 3)
+        files_extracted_text = ""
+        generated_doc = None
+        if files:
+            files_extracted_text = DocumentService.read_uploaded_files(files)
+
+        # Determina se deve gerar um documento formatado (PDF, DOCX, PPTX)
+        should_gen, target_format = DocumentService.should_generate_document(
+            user_text=user_text,
+            num_files=len(files or []),
+        )
+
+        if should_gen:
+            try:
+                student_name = getattr(user, "name", None) or getattr(user, "username", "there")
+                generated_doc = DocumentService.generate_document_from_instruction(
+                    user_text=user_text,
+                    files_extracted_text=files_extracted_text,
+                    student_name=student_name,
+                    target_format=target_format,
+                )
+            except Exception as doc_err:
+                logger.error(f"[AIService] Erro ao gerar documento formatado: {doc_err}")
 
         # 1. Salva mensagem do usuário
         Message.objects.create(
@@ -282,16 +314,33 @@ class AIService:
         memory_summary, active_dialog = build_conversation_context(conversation_id, max_recent=8)
 
         sys_prompt = get_tati_system_prompt(user, difficulty, memory_summary=memory_summary)
+        
+        if generated_doc:
+            sys_prompt += (
+                f"\n\n=== NOTIFICAÇÃO DE DOCUMENTO GERADO ===\n"
+                f"Você acabou de gerar e formatar com sucesso o arquivo '{generated_doc['filename']}' no formato {generated_doc['format'].upper()}.\n"
+                f"Avise o aluno de forma calorosa e natural que o documento está pronto para abrir no navegador ou baixar logo abaixo."
+            )
+
         messages_payload = [{"role": "system", "content": sys_prompt}]
 
         for m in active_dialog:
             messages_payload.append({"role": m["role"], "content": m["content"]})
 
+        # Se houver arquivos lidos nesta rodada, anexa ao conteúdo do prompt do usuário
+        current_user_turn = clean_user_text
+        if files_extracted_text:
+            current_user_turn = f"{clean_user_text}\n\n{files_extracted_text}"
+
+        if messages_payload and messages_payload[-1]["role"] == "user":
+            messages_payload[-1]["content"] = current_user_turn
+        else:
+            messages_payload.append({"role": "user", "content": current_user_turn})
+
         reply_text = ""
 
         # 3. Modelos em cascata com rotação de chaves e proteção contra Rate Limits (429)
         keys = get_groq_keys()
-        # Modelo principal solicitado: openai/gpt-oss-20b, com failover para 120b e qwen
         groq_models = [
             "openai/gpt-oss-20b",
             "openai/gpt-oss-120b",
@@ -317,18 +366,17 @@ class AIService:
                         reply_text = candidate
                         break
                 except Exception as mod_err:
-                    # Captura 429 Too Many Requests ou timeout e segue imediatamente para a próxima chave
                     logger.warning(
                         f"[AI] Groq model {g_model} failed with key {key[:10]}: {mod_err}"
                     )
 
         # 4. Fallback: Gemini (caso Groq esteja sob limite ou indisponível)
-        if not reply_text and GEMINI_API_KEY:
+        if not reply_text and GEMINI_API_KEY and genai:
             gemini_models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]
             for gem_model in gemini_models:
                 try:
                     model = genai.GenerativeModel(gem_model)
-                    prompt_full = f"{sys_prompt}\n\nUser: {clean_user_text}\nTeacher Tati:"
+                    prompt_full = f"{sys_prompt}\n\nUser: {current_user_turn}\nTeacher Tati:"
                     response = model.generate_content(prompt_full)
                     candidate = strip_emojis(response.text.strip())
                     if candidate:
@@ -341,7 +389,12 @@ class AIService:
         if not reply_text:
             student_first_name = (user.name or user.username or "there").split()[0]
             level = getattr(user, "level", "A1") or "A1"
-            if level in ("A1", "A2"):
+            if generated_doc:
+                reply_text = (
+                    f"Here is your formatted {generated_doc['format'].upper()} document, {student_first_name}! "
+                    f"I processed your request and organized everything. You can open it in your browser or download it below."
+                )
+            elif level in ("A1", "A2"):
                 reply_text = (
                     f"I hear you, {student_first_name}! Let us keep practicing together. "
                     f"Could you tell me a little bit more about that?"
@@ -355,12 +408,26 @@ class AIService:
         # 6. Garante remoção total de emojis no texto final
         reply_text = strip_emojis(reply_text)
 
-        # 7. Gera áudio via Edge TTS (com texto limpo de emojis)
+        # 7. Anexa a tag de documento para persistência perene no histórico do banco
+        if generated_doc:
+            doc_meta_json = json.dumps({
+                "id": generated_doc["id"],
+                "filename": generated_doc["filename"],
+                "format": generated_doc["format"],
+                "url": generated_doc["url"],
+                "preview_url": generated_doc.get("preview_url", generated_doc["url"]),
+                "size": generated_doc["size"],
+                "title": generated_doc["title"],
+            })
+            reply_text = f"{reply_text}\n\n[ATTACHED_DOCUMENT:{doc_meta_json}]"
+
+        # 8. Gera áudio via Edge TTS (com texto limpo de emojis e sem a tag de documento)
         from .audio_service import AudioService
 
-        audio_b64 = AudioService.text_to_speech(reply_text)
+        clean_tts_reply = re.sub(r"\[ATTACHED_DOCUMENT:.*?\]", "", reply_text, flags=re.DOTALL).strip()
+        audio_b64 = AudioService.text_to_speech(clean_tts_reply)
 
-        # 8. Salva resposta da Teacher Tati
+        # 9. Salva resposta da Teacher Tati no banco de dados
         msg = Message.objects.create(
             session_id=conversation_id,
             username=user.username,
@@ -369,7 +436,7 @@ class AIService:
             audio_b64=audio_b64,
         )
 
-        # 8. Atualiza XP e Streak
+        # 10. Atualiza XP e Streak
         XPService.award_xp(user, 5, "Conversação no Chat da Teacher Tati")
         StreakService.record_activity(user)
 
@@ -383,4 +450,6 @@ class AIService:
             "audio_b64": audio_b64,
             "audio": audio_b64,
             "id": str(msg.id),
+            "document": generated_doc,
+            "pdf_b64": generated_doc.get("pdf_b64", "") if generated_doc else "",
         }

@@ -136,6 +136,8 @@ google-services.json
 temp/
 backend/assets/reports/
 /tmp/tati_files/
+media/
+backend/media/
  
 # Cache Python
 __pycache__/

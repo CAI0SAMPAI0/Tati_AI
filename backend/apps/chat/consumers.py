@@ -74,9 +74,21 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         else:
             conv_id = str(conv_id)
 
-        # 2. Processamento de Áudio (Voice Message)
+        # 2. Processamento de Áudio, Arquivos ou Texto
         text_content = ""
         is_audio = msg_type == "audio" or bool(content.get("audio"))
+
+        # Extração de anexos (suporte a até 3 arquivos enviados pelo chat)
+        uploaded_files = content.get("files") or []
+        if not uploaded_files and content.get("file"):
+            uploaded_files = [
+                {
+                    "filename": content.get("filename") or "documento.pdf",
+                    "base64": content.get("file"),
+                }
+            ]
+        # Garante limite máximo de 3 arquivos
+        uploaded_files = uploaded_files[:3]
 
         if is_audio:
             from apps.chat.audio_service import AudioService
@@ -92,14 +104,21 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             text_content = (
                 content.get("content")
                 or content.get("text")
+                or content.get("caption")
                 or content.get("message")
                 or ""
             )
+            if not text_content and uploaded_files:
+                text_content = (
+                    f"Enviei o arquivo: {uploaded_files[0].get('filename')}"
+                    if len(uploaded_files) == 1
+                    else f"Enviei {len(uploaded_files)} arquivos para análise"
+                )
 
-        if not text_content:
+        if not text_content and not uploaded_files:
             return
 
-        # 3. Inicia streaming de resposta
+        # 3. Inicia streaming de resposta (exibe animação das ... imediatamente)
         await self.send_json({"type": "stream_start", "conversation_id": conv_id})
 
         try:
@@ -113,10 +132,29 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                 user=self.user,
                 conversation_id=conv_id,
                 user_text=text_content,
+                files=uploaded_files,
             )
 
             reply_text = res.get("reply") if isinstance(res, dict) else str(res)
             audio_b64 = res.get("audio_b64") if isinstance(res, dict) else ""
+            doc = res.get("document") if isinstance(res, dict) else None
+
+            # Notifica o frontend sobre o documento gerado para exibição instantânea
+            if doc:
+                await self.send_json(
+                    {
+                        "type": "document_generated",
+                        "conversation_id": conv_id,
+                        "document": doc,
+                        "filename": doc.get("filename"),
+                        "format": doc.get("format"),
+                        "url": doc.get("url"),
+                        "preview_url": doc.get("preview_url", doc.get("url")),
+                        "size": doc.get("size"),
+                        "pdf_b64": doc.get("pdf_b64", ""),
+                        "text": reply_text,
+                    }
+                )
 
             accent = content.get("accent")
             if not accent or accent == "en-US":

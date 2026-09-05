@@ -55,6 +55,11 @@ export interface Message {
   audio_b64?: string | null;
   pdf_b64?: string | null;
   pdf_filename?: string | null;
+  document_url?: string | null;
+  document_filename?: string | null;
+  document_format?: 'pdf' | 'docx' | 'pptx' | 'doc' | 'ppt' | string | null;
+  document_size?: string | null;
+  preview_url?: string | null;
 }
 
 export interface AccessControl {

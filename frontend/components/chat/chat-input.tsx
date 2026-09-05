@@ -10,15 +10,18 @@ interface ChatInputProps {
   onSend: (text: string) => void;
   onSendAudio?: (base64: string) => void;
   onSendFile?: (filename: string, base64: string, caption?: string) => void;
+  onSendFiles?: (files: Array<{ name: string; base64: string; type?: string }>, caption?: string) => void;
   disabled?: boolean;
   isStreaming?: boolean;
 }
 
-export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFile, disabled, isStreaming }: ChatInputProps) {
+const MAX_ATTACHMENTS = 3;
+
+export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFile, onSendFiles, disabled, isStreaming }: ChatInputProps) {
   const [text, setText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  const [attachments, setAttachments] = useState<{name: string, base64: string}[]>([]);
+  const [attachments, setAttachments] = useState<{name: string, base64: string, type?: string}[]>([]);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -63,12 +66,14 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
     const trimmedText = text.trim();
     if ((!trimmedText && attachments.length === 0) || disabled || isStreaming) return;
     
-    if (attachments.length > 0 && onSendFile) {
-      // Send files
-      attachments.forEach((att, index) => {
-        // Only attach caption to the first file to avoid duplicating the text message
-        onSendFile(att.name, att.base64, index === 0 ? trimmedText || undefined : undefined);
-      });
+    if (attachments.length > 0) {
+      if (onSendFiles) {
+        onSendFiles(attachments.slice(0, MAX_ATTACHMENTS), trimmedText || undefined);
+      } else if (onSendFile) {
+        attachments.forEach((att, index) => {
+          onSendFile(att.name, att.base64, index === 0 ? trimmedText || undefined : undefined);
+        });
+      }
       setAttachments([]);
     } else if (trimmedText) {
       onSend(trimmedText);
@@ -132,25 +137,41 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  // --- File Attachment Logic ---
+  // --- File Attachment Logic (Máximo 3 arquivos) ---
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = (reader.result as string).split(',')[1];
-      if (base64) {
-        setAttachments(prev => [...prev, { name: file.name, base64 }]);
-      }
-    };
-    reader.onerror = () => toast.error('Error reading file');
-    reader.readAsDataURL(file);
+    if (attachments.length + files.length > MAX_ATTACHMENTS) {
+      toast.error(`Você pode anexar no máximo ${MAX_ATTACHMENTS} arquivos por vez.`);
+    }
+
+    const availableSlots = Math.max(0, MAX_ATTACHMENTS - attachments.length);
+    const filesToRead = files.slice(0, availableSlots);
+
+    filesToRead.forEach((file) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = (reader.result as string).split(',')[1];
+        if (base64) {
+          setAttachments(prev => {
+            if (prev.length >= MAX_ATTACHMENTS) return prev;
+            return [...prev, { name: file.name, base64, type: file.type }];
+          });
+        }
+      };
+      reader.onerror = () => toast.error(`Erro ao ler ${file.name}`);
+      reader.readAsDataURL(file);
+    });
     
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleAttachClick = () => {
+    if (attachments.length >= MAX_ATTACHMENTS) {
+      toast.error(`Limite de ${MAX_ATTACHMENTS} arquivos atingido.`);
+      return;
+    }
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
@@ -176,23 +197,35 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
     e.preventDefault();
     setIsDragging(false);
     
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      const file = files[0];
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length === 0) return;
+
+    if (attachments.length + files.length > MAX_ATTACHMENTS) {
+      toast.error(`Você pode anexar no máximo ${MAX_ATTACHMENTS} arquivos por vez.`);
+    }
+
+    const availableSlots = Math.max(0, MAX_ATTACHMENTS - attachments.length);
+    const filesToRead = files.slice(0, availableSlots);
+
+    filesToRead.forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64 = (reader.result as string).split(',')[1];
         if (base64) {
-          setAttachments(prev => [...prev, { name: file.name, base64 }]);
-          toast.success(`File ${file.name} added!`);
+          setAttachments(prev => {
+            if (prev.length >= MAX_ATTACHMENTS) return prev;
+            return [...prev, { name: file.name, base64, type: file.type }];
+          });
+          toast.success(`Arquivo ${file.name} adicionado!`);
         }
       };
-      reader.onerror = () => toast.error('Error reading dropped file');
+      reader.onerror = () => toast.error(`Erro ao ler ${file.name}`);
       reader.readAsDataURL(file);
-    }
+    });
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
+    if (attachments.length >= MAX_ATTACHMENTS) return;
     const items = e.clipboardData?.items;
     if (!items) return;
     
@@ -206,12 +239,15 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
         reader.onloadend = () => {
           const base64 = (reader.result as string).split(',')[1];
           if (base64) {
-            const filename = `pasted_image_${Date.now()}.png`;
-            setAttachments(prev => [...prev, { name: filename, base64 }]);
-            toast.success('Image pasted from clipboard!');
+            const filename = `imagem_colada_${Date.now()}.png`;
+            setAttachments(prev => {
+              if (prev.length >= MAX_ATTACHMENTS) return prev;
+              return [...prev, { name: filename, base64, type: 'image/png' }];
+            });
+            toast.success('Imagem colada adicionada!');
           }
         };
-        reader.onerror = () => toast.error('Error reading pasted image');
+        reader.onerror = () => toast.error('Erro ao ler imagem colada');
         reader.readAsDataURL(file);
         
         e.preventDefault();
@@ -225,17 +261,21 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
       <div className="max-w-4xl mx-auto relative">
         
         {attachments.length > 0 && (
-          <div className="flex gap-2 p-2 px-3 bg-surface border border-border border-b-0 rounded-t-xl overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-2 p-2 px-3 bg-surface border border-border border-b-0 rounded-t-xl overflow-x-auto scrollbar-none">
+            <span className="text-[0.68rem] font-bold text-text-muted uppercase tracking-wider shrink-0 mr-1">
+              Arquivos ({attachments.length}/{MAX_ATTACHMENTS}):
+            </span>
             {attachments.map((att, i) => (
-              <div key={i} className="flex items-center gap-2 bg-primary/10 text-primary px-3 py-1.5 rounded-lg text-[0.85rem] whitespace-nowrap shadow-sm">
-                <Paperclip size={14} className="shrink-0" />
-                <span className="truncate max-w-[120px] font-medium">{att.name}</span>
+              <div key={i} className="flex items-center gap-2 bg-primary/10 text-primary px-3 py-1.5 rounded-lg text-[0.82rem] whitespace-nowrap shadow-sm border border-primary/20">
+                <Paperclip size={13} className="shrink-0" />
+                <span className="truncate max-w-[140px] font-medium">{att.name}</span>
                 <button 
                   type="button" 
                   onClick={() => removeAttachment(i)} 
-                  className="hover:bg-primary/20 p-1 rounded-full ml-1 transition-colors"
+                  className="hover:bg-primary/20 p-0.5 rounded-full ml-1 transition-colors text-primary"
+                  title="Remover anexo"
                 >
-                  <X size={14} />
+                  <X size={13} />
                 </button>
               </div>
             ))}
@@ -256,6 +296,8 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
             type="file" 
             ref={fileInputRef} 
             className="hidden" 
+            multiple
+            accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.csv,.md,image/*"
             onChange={handleFileChange}
           />
           

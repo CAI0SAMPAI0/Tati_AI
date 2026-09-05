@@ -11,6 +11,7 @@ export type WsMessageType =
   | 'free_warning'
   | 'new_title'
   | 'pdf_generated'
+  | 'document_generated'
   | 'simulation_state'
   | 'message_id_update'
   | 'error';
@@ -26,6 +27,20 @@ export interface WsIncomingMessage {
   audio?: string; // base64
   pdf_b64?: string; // base64
   filename?: string;
+  document?: {
+    id: string;
+    title: string;
+    filename: string;
+    format: string;
+    url: string;
+    preview_url?: string;
+    size: string;
+    pdf_b64?: string;
+  };
+  format?: string;
+  url?: string;
+  preview_url?: string;
+  size?: string;
   result?: unknown;
   message?: string;
   completed_objectives?: string[];
@@ -34,10 +49,12 @@ export interface WsIncomingMessage {
 }
 
 export interface WsOutgoingMessage {
-  type: 'text' | 'message' | 'audio' | 'file' | 'ping' | 'stop';
+  type: 'text' | 'message' | 'audio' | 'file' | 'files' | 'ping' | 'stop';
   content?: string;
   audio?: string; // base64
   filename?: string;
+  files?: Array<{ filename: string; base64: string; type?: string }>;
+  file?: string;
   caption?: string;
   origin?: WsOrigin;
   conv_id?: string | null;

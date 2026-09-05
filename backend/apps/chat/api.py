@@ -189,3 +189,35 @@ async def transcribe_chat_voice(request: HttpRequest, payload: TranscribeInput):
 
     text = await AudioService.transcribe_audio_async(payload.audio or "")
     return {"text": text, "transcription": text}
+
+
+class WordLookupInput(BaseModel):
+    word: str
+    context: str | None = None
+
+
+# ── DICIONÁRIO & TRADUÇÃO BILÍNGUE ────────────────────────────────────
+
+
+@chat_router.get("/word-lookup", auth=auth_optional)
+async def get_word_lookup(request: HttpRequest, word: str):
+    """
+    Busca tradução em português, definição pedagógica em inglês,
+    fonética e áudio da Teacher Tati para qualquer palavra ou expressão.
+    """
+    from asgiref.sync import sync_to_async
+    from .word_service import WordLookupService
+
+    return await sync_to_async(WordLookupService.lookup)(word)
+
+
+@chat_router.post("/word-lookup", auth=auth_optional)
+async def post_word_lookup(request: HttpRequest, payload: WordLookupInput):
+    """
+    Busca tradução em português, definição pedagógica em inglês,
+    fonética e áudio da Teacher Tati via POST.
+    """
+    from asgiref.sync import sync_to_async
+    from .word_service import WordLookupService
+
+    return await sync_to_async(WordLookupService.lookup)(payload.word)

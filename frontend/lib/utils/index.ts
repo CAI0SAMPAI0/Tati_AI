@@ -121,10 +121,38 @@ export function canAccessDashboard(
   return isStaff(user);
 }
 
-export function parseAIResponse(content: string): { reply: string; correction?: string | null; drill?: string | null; report?: string | null } {
-  if (!content || typeof content !== 'string') return { reply: content || '' };
+export interface AttachedDocMeta {
+  id: string;
+  filename: string;
+  format: 'pdf' | 'docx' | 'pptx' | 'doc' | 'ppt' | string;
+  url: string;
+  preview_url?: string;
+  size?: string;
+  title?: string;
+}
+
+export function parseAIResponse(content: string): { 
+  reply: string; 
+  correction?: string | null; 
+  drill?: string | null; 
+  report?: string | null;
+  document?: AttachedDocMeta | null;
+} {
+  if (!content || typeof content !== 'string') return { reply: content || '', document: null };
   
   let raw = content.trim();
+  let extractedDoc: AttachedDocMeta | null = null;
+
+  // Extrai anexo permanente de documento gerado [ATTACHED_DOCUMENT:{...}]
+  const docMatch = raw.match(/\[ATTACHED_DOCUMENT:([\s\S]*?)\]/);
+  if (docMatch) {
+    try {
+      extractedDoc = JSON.parse(docMatch[1]);
+      raw = raw.replace(docMatch[0], '').trim();
+    } catch (e) {
+      // Ignora erro de JSON e mantém texto
+    }
+  }
 
   // 1. Remove markdown code blocks if wrapped
   if (raw.startsWith('```')) {
@@ -157,6 +185,7 @@ export function parseAIResponse(content: string): { reply: string; correction?: 
           correction: data.correction || null,
           drill: data.drill || null,
           report: data.report || null,
+          document: extractedDoc,
         };
       }
     } catch (e) {
@@ -191,10 +220,10 @@ export function parseAIResponse(content: string): { reply: string; correction?: 
       }
     }
 
-    return { reply: finalReply };
+    return { reply: finalReply, document: extractedDoc };
   }
 
   // 4. Fallback: If text contains raw JSON leak like { "reply": ... }, strip trailing JSON
   const cleaned = raw.replace(/\{?\s*"(reply|correction|drill|report)"\s*:[\s\S]*$/i, '').trim();
-  return { reply: cleaned || raw };
+  return { reply: cleaned || raw, document: extractedDoc };
 }

@@ -25,6 +25,14 @@ export function useChatSocket(conversationId: string | null) {
   
   const convIdRef = useRef<string | null>(conversationId);
   const pendingPdfRef = useRef<{ pdf_b64: string; filename: string } | null>(null);
+  const pendingDocRef = useRef<{
+    document_url?: string | null;
+    document_filename?: string | null;
+    document_format?: string | null;
+    document_size?: string | null;
+    preview_url?: string | null;
+    pdf_b64?: string | null;
+  } | null>(null);
   const pendingAudioRef = useRef<string | null>(null);
 
   // Sync ref with state
@@ -104,9 +112,16 @@ export function useChatSocket(conversationId: string | null) {
             content: finalContent,
             audio_b64: pendingAudioRef.current || null,
             created_at: new Date().toISOString(),
-            pdf_b64: pendingPdfRef.current?.pdf_b64 || null,
-            pdf_filename: pendingPdfRef.current?.filename || null,
+            pdf_b64: pendingDocRef.current?.pdf_b64 || pendingPdfRef.current?.pdf_b64 || null,
+            pdf_filename: pendingDocRef.current?.document_filename || pendingPdfRef.current?.filename || null,
+            document_url: pendingDocRef.current?.document_url || null,
+            document_filename: pendingDocRef.current?.document_filename || null,
+            document_format: pendingDocRef.current?.document_format || null,
+            document_size: pendingDocRef.current?.document_size || null,
+            preview_url: pendingDocRef.current?.preview_url || null,
           };
+          pendingDocRef.current = null;
+          pendingPdfRef.current = null;
           pendingAudioRef.current = null;
           
           setMessages((prev) => {
@@ -175,6 +190,26 @@ export function useChatSocket(conversationId: string | null) {
             }
             return last;
           });
+        }
+        break;
+      case 'document_generated':
+        pendingDocRef.current = {
+          document_url: msg.document?.url || msg.url || null,
+          document_filename: msg.document?.filename || msg.filename || 'Documento',
+          document_format: msg.document?.format || msg.format || 'pdf',
+          document_size: msg.document?.size || msg.size || null,
+          preview_url: msg.document?.preview_url || msg.preview_url || msg.url || null,
+          pdf_b64: msg.document?.pdf_b64 || msg.pdf_b64 || null,
+        };
+        if (msg.document?.pdf_b64 || msg.pdf_b64) {
+          pendingPdfRef.current = {
+            pdf_b64: msg.document?.pdf_b64 || msg.pdf_b64 || '',
+            filename: msg.document?.filename || msg.filename || 'Documento.pdf',
+          };
+        }
+        if (msg.text) {
+          streamingRef.current = msg.text;
+          setStreamingContent(msg.text);
         }
         break;
       case 'pdf_generated':
@@ -314,10 +349,16 @@ export function useChatSocket(conversationId: string | null) {
     }
   }, [socket]);
 
-  const sendFile = useCallback(async (filename: string, base64: string, caption?: string, overrideConvId?: string) => {
-    if (!socket) return;
+  const sendFiles = useCallback(async (
+    files: Array<{ name: string; base64: string; type?: string }>,
+    caption?: string,
+    overrideConvId?: string
+  ) => {
+    if (!socket || files.length === 0) return;
 
     pendingPdfRef.current = null;
+    pendingDocRef.current = null;
+
     try {
       await socket.waitUntilOpen();
     } catch (e) {
@@ -329,27 +370,35 @@ export function useChatSocket(conversationId: string | null) {
     if (overrideConvId) {
       convIdRef.current = overrideConvId;
     }
-    
+
+    const safeFiles = files.slice(0, 3).map(f => ({
+      filename: f.name,
+      base64: f.base64,
+      type: f.type,
+    }));
+
+    const displayContent = caption
+      ? `${caption}\n\n📎 [${safeFiles.length === 1 ? `Arquivo: ${safeFiles[0].filename}` : `${safeFiles.length} arquivos anexados: ${safeFiles.map(sf => sf.filename).join(', ')}`}]`
+      : `📎 [${safeFiles.length === 1 ? `Arquivo: ${safeFiles[0].filename}` : `${safeFiles.length} arquivos anexados: ${safeFiles.map(sf => sf.filename).join(', ')}`}]`;
+
     const sent = socket.send({
-      type: 'file',
-      filename,
-      content: base64, // backend expects base64 content in 'content' field
-      caption,
+      type: 'files',
       conversation_id: currentId,
+      files: safeFiles,
+      file: safeFiles[0]?.base64,
+      filename: safeFiles[0]?.filename,
+      caption: caption || '',
+      content: caption || displayContent,
       origin: 'chat',
     });
-    
+
     if (sent) {
       setIsStreaming(true);
       setStreamingContent('');
       streamingRef.current = '';
 
-      const displayContent = caption 
-        ? `${caption}\n\n📎 [Arquivo: ${filename}]` 
-        : `📎 [Arquivo: ${filename}]`;
-        
       const newUserMsg: Message = {
-        id: `user-file-${Date.now()}`,
+        id: `user-files-${Date.now()}`,
         conversation_id: currentId || '',
         role: 'user',
         content: displayContent,
@@ -358,6 +407,10 @@ export function useChatSocket(conversationId: string | null) {
       setMessages((prev) => [...prev, newUserMsg]);
     }
   }, [socket]);
+
+  const sendFile = useCallback(async (filename: string, base64: string, caption?: string, overrideConvId?: string) => {
+    return sendFiles([{ name: filename, base64 }], caption, overrideConvId);
+  }, [sendFiles]);
 
   return {
     messages,
@@ -368,5 +421,6 @@ export function useChatSocket(conversationId: string | null) {
     sendMessage,
     sendAudio,
     sendFile,
+    sendFiles,
   };
 }

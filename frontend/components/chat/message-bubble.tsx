@@ -7,7 +7,7 @@ import { cn, parseAIResponse } from '@/lib/utils';
 import { ClickableText } from './clickable-text';
 import { AudioPlayer } from './audio-player';
 import React, { useState, useMemo } from 'react';
-import { Pencil, Check, X, Copy, RotateCcw } from 'lucide-react';
+import { Pencil, Check, X, Copy, RotateCcw, FileText, Download, ExternalLink, Presentation, FileCode2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface MessageBubbleProps {
@@ -27,8 +27,36 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
 
   const parsed = useMemo(() => parseAIResponse(message.content), [message.content]);
 
-  // Has a file attachment (PDF) — no audio for these messages
-  const hasFile = !!(message.pdf_b64);
+  // Metadados de documento gerado (persistido na mensagem ou recebido via stream)
+  const docData = useMemo(() => {
+    if (parsed.document) return parsed.document;
+    if (message.document_url) {
+      return {
+        id: message.id,
+        filename: message.document_filename || 'Teacher_Tati_Document',
+        format: message.document_format || 'pdf',
+        url: message.document_url,
+        preview_url: message.preview_url || message.document_url,
+        size: message.document_size || '',
+        title: message.document_filename || 'Material de Estudo',
+      };
+    }
+    if (message.pdf_b64) {
+      return {
+        id: message.id,
+        filename: message.pdf_filename || 'Teacher_Tati_Document.pdf',
+        format: 'pdf',
+        url: `data:application/pdf;base64,${message.pdf_b64}`,
+        preview_url: `data:application/pdf;base64,${message.pdf_b64}`,
+        size: '',
+        title: message.pdf_filename || 'Documento PDF',
+      };
+    }
+    return null;
+  }, [parsed.document, message]);
+
+  // Has a file attachment (PDF, DOCX, PPTX) — no audio for these messages
+  const hasFile = !!docData;
   // Has audio from the message itself (e.g. voice mode responses)
   const hasAudio = !hasFile && !!(message.audio_url || message.audio_b64);
 
@@ -191,25 +219,73 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
           )}
         </div>
 
-        {message.pdf_b64 && !isStreaming && (
-          <div className="mt-1 w-full max-w-[280px]">
-            <a
-              href={`data:application/pdf;base64,${message.pdf_b64}`}
-              download={message.pdf_filename || 'Teacher_Tati_Document.pdf'}
-              className="flex items-center gap-3 bg-surface border border-border hover:border-primary/50 hover:bg-primary/5 rounded-xl p-3 text-text transition-all group/pdf"
-            >
-              <div className="w-10 h-10 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /><path d="M8 13h2" /><path d="M8 17h2" /><path d="M14 13h2" /><path d="M14 17h2" /></svg>
+        {docData && !isStreaming && (
+          <div className="mt-2 w-full max-w-[340px]">
+            <div className="bg-surface border border-border rounded-2xl p-3.5 shadow-md flex flex-col gap-2.5 hover:border-primary/40 transition-all group/doc">
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm font-black text-xs uppercase",
+                  docData.format.toLowerCase() === 'pdf'
+                    ? "bg-red-500/10 text-red-500 border border-red-500/20"
+                    : (docData.format.toLowerCase().includes('doc') || docData.format.toLowerCase().includes('word'))
+                      ? "bg-blue-500/10 text-blue-500 border border-blue-500/20"
+                      : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                )}>
+                  {docData.format.toLowerCase() === 'pdf' ? (
+                    <FileText size={20} />
+                  ) : (docData.format.toLowerCase().includes('doc') || docData.format.toLowerCase().includes('word')) ? (
+                    <FileCode2 size={20} />
+                  ) : (
+                    <Presentation size={20} />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className={cn(
+                      "text-[0.6rem] font-black px-1.5 py-0.5 rounded uppercase tracking-wider",
+                      docData.format.toLowerCase() === 'pdf'
+                        ? "bg-red-500/15 text-red-600 dark:text-red-400"
+                        : (docData.format.toLowerCase().includes('doc') || docData.format.toLowerCase().includes('word'))
+                          ? "bg-blue-500/15 text-blue-600 dark:text-blue-400"
+                          : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                    )}>
+                      {docData.format.toUpperCase()}
+                    </span>
+                    {docData.size && (
+                      <span className="text-[0.66rem] text-text-subtle font-mono">
+                        {docData.size}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[0.85rem] font-bold text-text truncate mt-0.5 group-hover/doc:text-primary transition-colors">
+                    {docData.filename}
+                  </p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold truncate group-hover/pdf:text-primary transition-colors">
-                  {message.pdf_filename || 'Teacher_Tati_Document.pdf'}
-                </p>
-                <p className="text-xs text-text-muted mt-0.5 font-medium">
-                  Click to download
-                </p>
+
+              <div className="flex items-center gap-2 pt-2 border-t border-border/60">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const viewUrl = docData.preview_url || docData.url;
+                    window.open(viewUrl, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-xl bg-primary text-white text-[0.75rem] font-bold hover:bg-primary/90 transition-all shadow-sm active:scale-98"
+                >
+                  <ExternalLink size={12} />
+                  Abrir no navegador
+                </button>
+                <a
+                  href={docData.url}
+                  download={docData.filename}
+                  className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-bg-secondary border border-border hover:bg-surface text-text text-[0.75rem] font-bold transition-all active:scale-98"
+                  title="Baixar arquivo"
+                >
+                  <Download size={12} />
+                  Baixar
+                </a>
               </div>
-            </a>
+            </div>
           </div>
         )}
 

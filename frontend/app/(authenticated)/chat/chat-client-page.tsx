@@ -71,6 +71,7 @@ export default function ChatClientPage() {
     sendMessage,
     sendAudio,
     sendFile,
+    sendFiles,
   } = useChatSocket(currentConvId);
 
   useEffect(() => {
@@ -278,6 +279,35 @@ export default function ChatClientPage() {
     }
   };
 
+  const handleSendFiles = async (files: Array<{ name: string; base64: string; type?: string }>, caption?: string) => {
+    let convId = currentConvId;
+
+    if (!convId) {
+      try {
+        const title = files.length === 1 ? `Arquivo: ${files[0].name}` : `${files.length} arquivos`;
+        const res = await apiPost<Conversation>(ENDPOINTS.CONVERSATIONS, {
+          title
+        });
+        if (res.ok) {
+          convId = res.data.id;
+          setCurrentConvId(convId);
+          setConvTitle(res.data.title);
+          router.replace(`/chat?conv_id=${convId}`, { scroll: false });
+        } else {
+          toast.error('Could not create conversation for files.');
+          return;
+        }
+      } catch (err) {
+        console.error('Error creating conversation for files:', err);
+        return;
+      }
+    }
+
+    if (convId) {
+      sendFiles(files, caption, convId);
+    }
+  };
+
   const handleOpenSummary = async () => {
     if (!currentConvId) return;
     setIsSummaryOpen(true);
@@ -343,6 +373,7 @@ export default function ChatClientPage() {
               onSend={handleSend}
               onSendAudio={handleSendAudio}
               onSendFile={handleSendFile}
+              onSendFiles={handleSendFiles}
               disabled={false}
               isStreaming={isStreaming}
             />
