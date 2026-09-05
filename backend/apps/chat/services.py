@@ -452,11 +452,11 @@ class AIService:
             audio_b64=audio_b64,
         )
 
-        # 10. Atualiza XP e Streak (10 XP para modo voz, 5 XP para chat)
+        # 10. Atualiza XP e Streak (30 XP para modo voz, 15 XP para chat)
         if origin == "voice":
-            XPService.award_xp(user, 10, "Conversação no Modo Voz com a Teacher Tati")
+            XPService.award_xp(user, 30, "Conversação no Modo Voz com a Teacher Tati")
         else:
-            XPService.award_xp(user, 5, "Conversação no Chat da Teacher Tati")
+            XPService.award_xp(user, 15, "Conversação no Chat da Teacher Tati")
         StreakService.record_activity(user)
 
         # Atualiza timestamp da conversa

@@ -249,13 +249,13 @@ export default function CompetitionsClientPage() {
                     <Mic size={18} />
                   </div>
                   <span className="px-2.5 py-1 rounded-full text-xs font-black bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/20">
-                    +10 XP / message
+                    +30 XP / message
                   </span>
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-text mb-1">Voice Mode Conversation</h3>
                   <p className="text-xs text-text-muted leading-relaxed">
-                    Practice spoken English with Teacher Tati. Every spoken voice response earns instant points.
+                    Practice spoken English with Teacher Tati. Every spoken voice interaction awards 30 XP.
                   </p>
                 </div>
               </div>
@@ -266,13 +266,13 @@ export default function CompetitionsClientPage() {
                     <MessageSquare size={18} />
                   </div>
                   <span className="px-2.5 py-1 rounded-full text-xs font-black bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                    +5 XP / message
+                    +15 XP / message
                   </span>
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-text mb-1">Interactive Chat</h3>
                   <p className="text-xs text-text-muted leading-relaxed">
-                    Send messages, ask questions, and practice grammar corrections in the chat with Teacher Tati.
+                    Send messages, ask questions, and practice grammar corrections with Teacher Tati. Awards 15 XP.
                   </p>
                 </div>
               </div>
@@ -283,13 +283,13 @@ export default function CompetitionsClientPage() {
                     <Target size={18} />
                   </div>
                   <span className="px-2.5 py-1 rounded-full text-xs font-black bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                    +50 XP / challenge
+                    +25 XP / day (1x)
                   </span>
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-text mb-1">CEFR Leveling Challenge</h3>
                   <p className="text-xs text-text-muted leading-relaxed">
-                    Test your proficiency from A1 to B2. Earn +10 XP per question answered plus 50 XP upon completion.
+                    Discover and update your proficiency level (A1 to B2). Awards 25 XP once per day upon completion.
                   </p>
                 </div>
               </div>

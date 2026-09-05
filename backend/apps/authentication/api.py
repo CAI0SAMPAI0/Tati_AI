@@ -106,19 +106,23 @@ def _get_google_redirect_uri(request: HttpRequest) -> str:
     from django.conf import settings
     import os
 
-    backend_base = getattr(settings, "BACKEND_BASE_URL", "") or os.getenv(
-        "BACKEND_BASE_URL", ""
+    backend_base = (
+        getattr(settings, "BACKEND_BASE_URL", "")
+        or os.getenv("BACKEND_BASE_URL", "")
+        or getattr(settings, "BACKEND_URL", "")
+        or os.getenv("BACKEND_URL", "")
     )
     if backend_base:
-        return f"{backend_base.rstrip('/')}/auth/google/callback"
+        url = backend_base.rstrip("/")
+        if not url.startswith("http://") and not url.startswith("https://"):
+            url = f"https://{url}"
+        if "localhost" not in url and not url.startswith("https://"):
+            url = url.replace("http://", "https://")
+        return f"{url}/auth/google/callback"
+
     host = request.headers.get("X-Forwarded-Host") or request.get_host()
-    proto = (
-        "https"
-        if request.is_secure()
-        or request.headers.get("X-Forwarded-Proto") == "https"
-        or "hf.space" in host
-        else "http"
-    )
+    is_local = "localhost" in host or "127.0.0.1" in host
+    proto = "http" if is_local else "https"
     return f"{proto}://{host}/auth/google/callback"
 
 
@@ -256,6 +260,7 @@ def google_oauth_callback(
         }
         resp = requests.post(token_url, data=data, timeout=10)
         if not resp.ok:
+            logger.error(f"[Google OAuth] Falha ao trocar código ({resp.status_code}): {resp.text}")
             # Segunda chance de leitura do cache caso tenha ocorrido corrida de requisições
             retry_cache = cache.get(f"google_oauth_state_{state}")
             if retry_cache and retry_cache.get("ready") and retry_cache.get("jwt"):

@@ -766,10 +766,7 @@ function VoicePageContent() {
 
   return (
     <div className="fixed inset-0 bg-[#f4f7ff] dark:bg-[#05060b] flex flex-col md:flex-row font-sans overflow-hidden">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-[-15%] left-[-10%] w-[80%] h-[80%] rounded-full bg-primary/10 dark:bg-primary/5 blur-[140px] animate-pulse duration-[15s]" />
-        <div className="absolute bottom-[-10%] right-[-5%] w-[60%] h-[60%] rounded-full bg-accent/15 dark:bg-accent/5 blur-[120px] animate-pulse duration-[20s] [animation-delay:5s]" />
-      </div>
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 bg-gradient-to-b from-primary/[0.03] to-transparent" />
 
       <audio 
         ref={audioRef} 
@@ -795,9 +792,9 @@ function VoicePageContent() {
         }} 
       />
 
-      <MotionDiv initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} className="w-full md:w-[42%] lg:w-[38%] h-[38vh] sm:h-[40vh] md:h-full relative flex flex-col items-center justify-center p-4 sm:p-8 bg-white/40 dark:bg-[#0f1120]/60 backdrop-blur-3xl border-b md:border-b-0 md:border-r border-white/40 dark:border-white/10 z-20 shadow-2xl transition-all">
+      <MotionDiv initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} className="w-full md:w-[42%] lg:w-[38%] h-[38vh] sm:h-[40vh] md:h-full relative flex flex-col items-center justify-center p-4 sm:p-8 bg-white/95 dark:bg-[#0f1120]/95 border-b md:border-b-0 md:border-r border-border z-20 shadow-xl transition-all">
         <div className="absolute top-4 sm:top-6 left-4 sm:left-6 flex items-center gap-4">
-          <button onClick={() => router.back()} className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-white/50 dark:bg-[#1a1c2e]/60 border border-white/60 dark:border-white/10 text-text hover:text-primary transition-all active:scale-95 shadow-xl backdrop-blur-xl group">
+          <button onClick={() => router.back()} className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-white dark:bg-[#1a1c2e] border border-border text-text hover:text-primary transition-all active:scale-95 shadow-sm group">
             <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
             <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">Back</span>
           </button>
@@ -809,7 +806,7 @@ function VoicePageContent() {
               onClick={() => isLiveMode ? stopLiveMode() : startLiveMode()} 
               className={cn(
                 "px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-xl flex items-center gap-2",
-                isLiveMode ? "text-white" : "bg-white/50 dark:bg-[#1a1c2e]/60 border border-white/60 dark:border-white/10 text-text"
+                isLiveMode ? "text-white" : "bg-white dark:bg-[#1a1c2e] border border-border text-text"
               )}
               style={isLiveMode ? { backgroundColor: 'var(--accent)' } : undefined}
             >
@@ -832,7 +829,7 @@ function VoicePageContent() {
               <span>Finish Test</span>
             </button>
           )}
-          <button onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')} className="p-1.5 sm:p-2.5 rounded-xl bg-white/50 dark:bg-[#1a1c2e]/60 border border-white/60 dark:border-white/10 text-text-muted hover:text-primary transition-all active:scale-95 shadow-xl backdrop-blur-xl">
+          <button onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')} className="p-1.5 sm:p-2.5 rounded-xl bg-white dark:bg-[#1a1c2e] border border-border text-text-muted hover:text-primary transition-all active:scale-95 shadow-sm">
              {resolvedTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
         </div>
@@ -860,7 +857,7 @@ function VoicePageContent() {
             </h1>
             <div className="flex flex-col items-center gap-2 w-full">
               <div className="flex items-center justify-center gap-2 flex-wrap">
-                <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-0.5 sm:py-1.5 rounded-full bg-success/10 border border-success/30 shadow-lg backdrop-blur-2xl">
+                <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-0.5 sm:py-1.5 rounded-full bg-success/10 border border-success/30 shadow-sm">
                   <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
                   <span className="text-[8px] sm:text-[10px] font-black text-success uppercase tracking-widest">{'Online'}</span>
                 </div>
@@ -869,7 +866,7 @@ function VoicePageContent() {
                   onClick={handleCycleAccent}
                   onWheel={handleWheelAccent}
                   title="Clique para alternar ou use a roda do mouse para trocar de sotaque"
-                  className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-0.5 sm:py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 border border-primary/30 shadow-lg backdrop-blur-2xl text-[9px] sm:text-[11px] font-bold text-primary transition-all active:scale-95 cursor-pointer group select-none"
+                  className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-0.5 sm:py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 border border-primary/30 shadow-sm text-[9px] sm:text-[11px] font-bold text-primary transition-all active:scale-95 cursor-pointer group select-none"
                 >
                   {isChangingAccent ? (
                     <RotateCcw className="animate-spin text-primary shrink-0" size={12} />
@@ -981,8 +978,8 @@ function VoicePageContent() {
           {!convId && simulationId ? (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-8 p-6">
                 <div className="relative">
-                    <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full animate-pulse" />
-                    <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-surface border border-border flex items-center justify-center shadow-2xl">
+                    <div className="absolute inset-0 bg-primary/10 rounded-full animate-pulse" />
+                    <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-surface border border-border flex items-center justify-center shadow-xl">
                         <Sparkles size={40} className="text-primary animate-bounce" />
                     </div>
                 </div>
@@ -1004,13 +1001,13 @@ function VoicePageContent() {
           ) : (
             <AnimatePresence mode="popLayout" initial={false}>
               {simulationId && objectives.length > 0 && (
-                <MotionDiv key="simulation-objectives" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white/40 dark:bg-white/5 border border-white/40 dark:border-white/10 p-4 rounded-3xl mb-6 space-y-3 animate-fade-in shadow-xl backdrop-blur-xl">
+                <MotionDiv key="simulation-objectives" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white dark:bg-[#111224] border border-border p-4 rounded-3xl mb-6 space-y-3 shadow-md">
                   <p className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest">Mission Objectives</p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {objectives.map(obj => {
                       const isCompleted = completedObjectives.includes(obj.id);
                       return (
-                        <div key={obj.id} className={cn("flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl border text-[0.7rem] transition-all font-bold tracking-tight", isCompleted ? "bg-success/15 border-success/30 text-success line-through" : "bg-white/60 dark:bg-[#111224]/80 border-white/60 dark:border-white/5 text-text-muted")}>
+                        <div key={obj.id} className={cn("flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl border text-[0.7rem] transition-all font-bold tracking-tight", isCompleted ? "bg-success/15 border-success/30 text-success line-through" : "bg-surface dark:bg-[#111224]/80 border-border text-text-muted")}>
                           {isCompleted ? <CheckCircle2 size={14} className="shrink-0 text-success" /> : <Circle size={14} className="shrink-0 text-text-subtle" />}
                           <span className="truncate" title={obj.text}>{obj.text}</span>
                         </div>
@@ -1053,7 +1050,7 @@ function VoicePageContent() {
           )}
         </div>
 
-        <footer className="p-2 sm:p-4 md:p-6 bg-white/60 dark:bg-[#0a0b14]/95 backdrop-blur-3xl border-t border-white/60 dark:border-white/10 shrink-0 pb-safe">
+        <footer className="p-2 sm:p-4 md:p-6 bg-white/95 dark:bg-[#0a0b14]/95 border-t border-border shrink-0 pb-safe">
           <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center gap-4 md:gap-8">
             <div className="flex-1 w-full bg-white/30 dark:bg-white/5 rounded-2xl sm:rounded-3xl p-2 sm:p-4 space-y-2 shadow-lg border border-white/20">
               {isLiveMode ? (

@@ -1,5 +1,7 @@
 import logging
 import urllib.parse
+from asgiref.sync import sync_to_async
+from django.db import close_old_connections
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from apps.authentication.security import decode_token
 from apps.chat.services import AIService
@@ -45,7 +47,10 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             return
 
         self.username = payload["sub"]
-        self.user = await aget_user_by_username(self.username)
+        try:
+            self.user = await aget_user_by_username(self.username)
+        finally:
+            await sync_to_async(close_old_connections)()
 
         # Aceita a conexão WebSocket com o subprotocol negociado
         await self.accept(subprotocol=subprotocol)
@@ -55,8 +60,18 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         logger.info(
             f"[ChatWS] Desconectado: {getattr(self, 'username', 'anon')} (Code: {close_code})"
         )
+        try:
+            await sync_to_async(close_old_connections)()
+        except Exception:
+            pass
 
     async def receive_json(self, content):
+        try:
+            await self._handle_receive_json(content)
+        finally:
+            await sync_to_async(close_old_connections)()
+
+    async def _handle_receive_json(self, content):
         msg_type = content.get("type", "message")
 
         # 1. Ping / Pong para manter conexão ativa (Heartbeat)

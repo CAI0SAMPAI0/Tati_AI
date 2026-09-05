@@ -168,7 +168,12 @@ def sync_material_pages(content: PremiumContent, force: bool = False) -> bool:
     except Exception as e:
         logger.warning(f"[HubSync] Supabase download falhou para {content.title}: {e}")
 
-    return False
+    finally:
+        try:
+            from django.db import close_old_connections
+            close_old_connections()
+        except Exception:
+            pass
 
 
 @shared_task(name="apps.activities.tasks.sync_hub_materials_task")
@@ -176,13 +181,21 @@ def sync_hub_materials_task():
     """
     Tarefa periódica que verifica e sincroniza todos os materiais premium do Hub.
     """
-    logger.info("[HubSync] Iniciando sincronização periódica dos materiais do Hub...")
-    materials = PremiumContent.objects.filter(is_active=True)
-    count = 0
-    for m in materials:
-        if sync_material_pages(m):
-            count += 1
-    logger.info(
-        f"[HubSync] Sincronização concluída: {count}/{materials.count()} materiais persistidos localmente."
-    )
-    return {"total": materials.count(), "synced": count}
+    try:
+        logger.info("[HubSync] Iniciando sincronização periódica dos materiais do Hub...")
+        materials = PremiumContent.objects.filter(is_active=True)
+        count = 0
+        for m in materials:
+            if sync_material_pages(m):
+                count += 1
+        logger.info(
+            f"[HubSync] Sincronização concluída: {count}/{materials.count()} materiais persistidos localmente."
+        )
+        return {"total": materials.count(), "synced": count}
+    finally:
+        try:
+            from django.db import close_old_connections
+            close_old_connections()
+        except Exception:
+            pass
+

@@ -5,6 +5,8 @@ import random
 import logging
 import base64
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+from django.core.cache import cache
 from io import BytesIO
 from typing import List, Dict, Any, Optional
 
@@ -172,14 +174,8 @@ class LevelingService:
         student_name = fresh_user.name or fresh_user.username
 
         opening_text = (
-            f"Welcome to your CEFR English Leveling Challenge, {student_name}!\n\n"
-            f"I am Teacher Tati, your personal AI English tutor. Today we will discover your exact English level across the CEFR framework (A1, A2, B1, and B2).\n\n"
-            f"You will answer {total_q} questions in random order. Please answer naturally in English—feel free to type or use your microphone.\n\n"
-            f"Important:\n"
-            f"• At the end, your system level will be automatically updated to the level where you performed best.\n"
-            f"• You will receive a complete diagnostic report in your email with your score per level, mistakes, and corrections.\n"
-            f"• If you wish to finish early at any point, simply type /finish in the chat to conclude and receive your immediate evaluation.\n\n"
-            f"Let's begin with your first question:\n\n"
+            f"Hello {student_name}! Welcome to your CEFR English Leveling Challenge.\n\n"
+            f"I have prepared {total_q} questions to discover your exact proficiency level (A1 to B2). Answer naturally in English! (Type /finish anytime to conclude).\n\n"
             f"---\n"
             f"**Question 1/{total_q}**:\n"
             f"**{first_q['question']}**"
@@ -210,6 +206,25 @@ class LevelingService:
         }
 
     @staticmethod
+    def _award_daily_leveling_xp(user: User) -> bool:
+        """
+        O usuário pode ganhar pontos apenas 1 vez ao dia fazendo o teste CEFR (25 XP).
+        """
+        try:
+            today_str = datetime.now(ZoneInfo("America/Sao_Paulo")).date().isoformat()
+            daily_key = f"daily_cefr_xp_{user.username}_{today_str}"
+            if cache.add(daily_key, "1", timeout=86400):
+                XPService.award_xp(user, 25, "Desafio de Nivelamento CEFR (Diário)")
+                logger.info(f"[Leveling XP] +25 XP concedido a {user.username} pelo Desafio CEFR.")
+                return True
+            else:
+                logger.info(f"[Leveling XP] Aluno {user.username} já recebeu os 25 XP do Desafio CEFR hoje.")
+                return False
+        except Exception as e:
+            logger.error(f"[Leveling XP] Erro ao pontuar XP diário do CEFR: {e}")
+            return False
+
+    @staticmethod
     def finish_leveling_early(user: User, conversation_id: str) -> Dict[str, Any]:
         """
         Encerra antecipadamente o teste de nivelamento quando o aluno envia /finish.
@@ -228,54 +243,50 @@ class LevelingService:
                 "is_leveling": False,
             }
 
+        total_q = session.get("total_questions", 8)
         questions = session.get("questions", [])
         curr_idx = session.get("current_index", 0)
-        total_q = session.get("total_questions", len(questions))
-
-        # Registra todas as perguntas restantes como nao respondidas (pontuacao 0)
-        for i in range(curr_idx, total_q):
-            rem_q = questions[i] if i < len(questions) else {}
-            lvl = rem_q.get("level", "A1")
-            session["answers"].append({
-                "index": i + 1,
-                "question_id": rem_q.get("id", f"{lvl}_{i+1}"),
-                "level": lvl,
-                "question": rem_q.get("question", "N/A"),
-                "user_answer": "Not answered (Assessment finished early with /finish)",
-                "is_correct": False,
-                "mistakes": ["Not answered"],
-                "corrections": ["N/A"],
-                "feedback": "Question skipped by user using /finish (Score: 0).",
-            })
-
-        scores = session.get("scores", {})
         old_level = fresh_user.level or "A1"
+        scores = session.get("scores", {})
 
-        # Determina o nivel com base nas perguntas respondidas
+        # As perguntas restantes nao respondidas contam como erro (0 pontos)
+        for rem_idx in range(curr_idx, total_q):
+            if rem_idx < len(questions):
+                rem_q = questions[rem_idx]
+                session["answers"].append({
+                    "index": rem_idx + 1,
+                    "question_id": rem_q.get("id", f"Q_{rem_idx+1}"),
+                    "level": rem_q.get("level", "A1"),
+                    "question": rem_q.get("question", ""),
+                    "user_answer": "[Not answered - Finished early via /finish]",
+                    "is_correct": False,
+                    "mistakes": ["Question skipped due to early conclusion."],
+                    "corrections": [],
+                    "feedback": "Skipped.",
+                })
+
+        # Calcula o melhor nivel
         best_level = "A1"
         max_correct = -1
         level_hierarchy = ["A1", "A2", "B1", "B2"]
 
         for lvl in level_hierarchy:
             c = scores.get(lvl, {}).get("correct", 0)
-            if c > 0 and c >= max_correct:
+            if c >= max_correct:
                 max_correct = c
                 best_level = lvl
 
-        if max_correct <= 0:
+        if max_correct == 0 and best_level != "A1":
             best_level = "A1"
 
-        # Atualiza o nivel do aluno no banco de dados
         fresh_user.level = best_level
 
-        # Marca sessao como finalizada
         now_iso = datetime.now(timezone.utc).isoformat()
         session["completed"] = True
         session["completed_at"] = now_iso
         session["assigned_level"] = best_level
         session["old_level"] = old_level
-        session["current_index"] = total_q
-        session["finished_early"] = True
+        session["early_finish"] = True
         session["answered_count"] = curr_idx
 
         if "leveling_history" not in fresh_user.profile or not isinstance(fresh_user.profile.get("leveling_history"), list):
@@ -284,9 +295,8 @@ class LevelingService:
         fresh_user.profile["active_leveling"] = None
         fresh_user.save(update_fields=["level", "profile"])
 
-        # XP proporcional
-        xp_earned = max(10, curr_idx * 5)
-        XPService.award_xp(fresh_user, xp_earned, "Leveling Challenge (/finish)")
+        # Pontua 25 XP apenas uma vez ao dia no CEFR
+        LevelingService._award_daily_leveling_xp(fresh_user)
         StreakService.record_activity(fresh_user)
 
         # Geracao do relatorio em PDF
@@ -505,8 +515,7 @@ class LevelingService:
             if q_level in session["scores"]:
                 session["scores"][q_level]["correct"] += 1
 
-        # Pontua XP por resposta dada no Desafio de Nivelamento
-        XPService.award_xp(fresh_user, 10, f"Resposta no Nivelamento ({curr_idx + 1}/{total_q})")
+        # Registra atividade de ofensiva (XP do teste e concedido 1x ao dia na conclusao)
         StreakService.record_activity(fresh_user)
 
         # Registra resposta detalhada
@@ -595,7 +604,8 @@ class LevelingService:
             fresh_user.profile["active_leveling"] = None
             fresh_user.save(update_fields=["level", "profile"])
 
-            XPService.award_xp(fresh_user, 50, "Completed CEFR Leveling Challenge")
+            # Pontua 25 XP apenas 1 vez ao dia no CEFR
+            LevelingService._award_daily_leveling_xp(fresh_user)
             StreakService.record_activity(fresh_user)
 
             pdf_bytes = LevelingService.generate_pdf_report(

@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { loginWithCredentials, loginWithGoogle, registerUser, requestPasswordReset, resetPasswordWithToken } from '@/lib/api/auth';
 import { LEVEL_OPTIONS } from '@/lib/constants/levels';
+import { API_BASE } from '@/lib/api/client';
 import { Capacitor } from '@capacitor/core';
 
 
@@ -174,11 +175,12 @@ export default function LoginPage() {
     setError('');
 
     // Redireciona diretamente para o fluxo de autenticação do Google (302 Redirect)
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://caio007-tati-ai-backend.hf.space';
+    const base = API_BASE || process.env.NEXT_PUBLIC_API_BASE_URL || '';
     const origin = typeof window !== 'undefined' ? encodeURIComponent(window.location.origin) : '';
     const isHub = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('access') === 'hub';
     const hubParam = isHub ? '&access=hub' : '';
-    window.location.href = `${apiBase}/auth/google/login?origin=${origin}${hubParam}`;
+    const targetUrl = `${base.replace(/\/+$/, '')}/auth/google/login?origin=${origin}${hubParam}`;
+    window.location.href = targetUrl;
   }, []);
 
   // Login

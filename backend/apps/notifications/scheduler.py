@@ -5,6 +5,7 @@ import threading
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from django.core.cache import cache
+from django.db import close_old_connections
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,11 @@ class BackgroundNotificationRunner:
 
             except Exception as e:
                 logger.error(f"[Scheduler] Erro no loop de agendamento: {e}", exc_info=True)
+            finally:
+                try:
+                    close_old_connections()
+                except Exception:
+                    pass
 
             # Dorme por 60 segundos antes da próxima checagem
             time.sleep(60)
