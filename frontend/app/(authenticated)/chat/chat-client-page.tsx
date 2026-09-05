@@ -129,7 +129,8 @@ export default function ChatClientPage() {
     try {
       setIsStartingLeveling(true);
       toast.loading(`Starting your CEFR Leveling Challenge in ${mode === 'voice' ? 'Voice Mode' : 'Chat Mode'}...`, { id: 'start-leveling' });
-      const res = await apiPost<any>(ENDPOINTS.LEVELING_START, { total_questions: totalQuestions });
+      const currentAccent = typeof window !== 'undefined' ? localStorage.getItem('tati_voice_accent') || 'en-US' : 'en-US';
+      const res = await apiPost<any>(ENDPOINTS.LEVELING_START, { total_questions: totalQuestions, accent: currentAccent });
       if (res.ok && res.data?.conversation_id) {
         toast.success(`Leveling Challenge started with ${res.data.total_questions || totalQuestions} questions! Please answer in English.`, { id: 'start-leveling' });
         const newConvId = res.data.conversation_id;

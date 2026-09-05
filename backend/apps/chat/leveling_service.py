@@ -85,6 +85,7 @@ class LevelingService:
         user: User,
         total_questions: Optional[int] = None,
         count_per_level: Optional[int] = None,
+        accent: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Inicia uma nova sessao de nivelamento com Teacher Tati.
@@ -132,6 +133,15 @@ class LevelingService:
         now_str = datetime.now(timezone.utc).isoformat()
         conv_id = str(uuid.uuid4())
 
+        fresh_user = User.objects.filter(username=user.username).first() or user
+        user_accent = accent
+        if not user_accent or str(user_accent).lower() in ["default", ""]:
+            if fresh_user and hasattr(fresh_user, "profile") and isinstance(fresh_user.profile, dict):
+                user_accent = fresh_user.profile.get("preferred_accent") or fresh_user.profile.get("accent") or "en-US"
+            else:
+                user_accent = "en-US"
+        user_accent = user_accent or "en-US"
+
         # 1. Cria a conversa dedicada no banco
         conv = Conversation.objects.create(
             id=conv_id,
@@ -160,9 +170,9 @@ class LevelingService:
             "started_at": now_str,
             "current_follow_ups": 0,
             "current_answers": [],
+            "accent": user_accent,
         }
 
-        fresh_user = User.objects.filter(username=user.username).first() or user
         if not isinstance(fresh_user.profile, dict):
             fresh_user.profile = {}
         fresh_user.profile = dict(fresh_user.profile)
@@ -182,7 +192,7 @@ class LevelingService:
         )
         opening_text = strip_emojis(opening_text)
 
-        audio_b64 = AudioService.text_to_speech(opening_text)
+        audio_b64 = AudioService.text_to_speech(opening_text, accent=user_accent)
 
         Message.objects.create(
             session_id=conv_id,
@@ -199,6 +209,7 @@ class LevelingService:
             "reply": opening_text,
             "audio_b64": audio_b64,
             "audio": audio_b64,
+            "accent": user_accent,
             "is_leveling": True,
             "current_question": 1,
             "total_questions": total_q,
@@ -225,7 +236,7 @@ class LevelingService:
             return False
 
     @staticmethod
-    def finish_leveling_early(user: User, conversation_id: str) -> Dict[str, Any]:
+    def finish_leveling_early(user: User, conversation_id: str, accent: Optional[str] = None) -> Dict[str, Any]:
         """
         Encerra antecipadamente o teste de nivelamento quando o aluno envia /finish.
         Avalia com base no que foi respondido ate o momento e pontua as restantes como 0 / nao respondidas.
@@ -235,11 +246,29 @@ class LevelingService:
         profile = getattr(fresh_user, "profile", {}) or {}
         session = profile.get("active_leveling")
 
+        session_accent = accent
+        if not session_accent or str(session_accent).lower() in ["default", ""]:
+            session_accent = (
+                session.get("accent")
+                if isinstance(session, dict)
+                else None
+            ) or (
+                fresh_user.profile.get("preferred_accent")
+                if isinstance(getattr(fresh_user, "profile", None), dict)
+                else None
+            ) or (
+                fresh_user.profile.get("accent")
+                if isinstance(getattr(fresh_user, "profile", None), dict)
+                else None
+            ) or "en-US"
+        session_accent = session_accent or "en-US"
+
         if not isinstance(session, dict) or session.get("completed"):
             return {
                 "ok": False,
                 "reply": "No active leveling assessment found to finish.",
                 "audio_b64": "",
+                "accent": session_accent,
                 "is_leveling": False,
             }
 
@@ -361,7 +390,7 @@ class LevelingService:
         )
         final_reply = strip_emojis(final_reply)
 
-        audio_b64 = AudioService.text_to_speech(final_reply)
+        audio_b64 = AudioService.text_to_speech(final_reply, accent=session_accent)
 
         Message.objects.create(
             session_id=conversation_id,
@@ -380,6 +409,7 @@ class LevelingService:
             "reply": final_reply,
             "audio_b64": audio_b64,
             "audio": audio_b64,
+            "accent": session_accent,
             "is_leveling": True,
             "completed": True,
             "new_level": best_level,
@@ -388,7 +418,12 @@ class LevelingService:
         }
 
     @staticmethod
-    def process_leveling_step(user: User, conversation_id: str, user_text: str) -> Dict[str, Any]:
+    def process_leveling_step(
+        user: User,
+        conversation_id: str,
+        user_text: str,
+        accent: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Processa uma resposta do aluno no teste de nivelamento.
         Avalia gramatica/vocabulario com IA, pontua o nivel e faz a pergunta seguinte ou conclui o teste.
@@ -412,17 +447,37 @@ class LevelingService:
             }
 
         session = profile["active_leveling"]
+        session_accent = accent
+        if not session_accent or str(session_accent).lower() in ["default", ""]:
+            session_accent = (
+                session.get("accent")
+                if isinstance(session, dict)
+                else None
+            ) or (
+                fresh_user.profile.get("preferred_accent")
+                if isinstance(getattr(fresh_user, "profile", None), dict)
+                else None
+            ) or (
+                fresh_user.profile.get("accent")
+                if isinstance(getattr(fresh_user, "profile", None), dict)
+                else None
+            ) or "en-US"
+        session_accent = session_accent or "en-US"
+        if isinstance(session, dict):
+            session["accent"] = session_accent
+
         if not isinstance(session, dict) or session.get("completed"):
             return {
                 "reply": "Your leveling test has already been completed! Great job!",
                 "audio_b64": "",
+                "accent": session_accent,
                 "is_leveling": False,
             }
 
         # 1. Verifica se o usuario solicitou o comando /finish
         clean_input = user_text.strip().lower()
         if clean_input in ["/finish", "/fim", "/encerrar", "/end", "/stop", "finish", "fim"] or clean_input.startswith("/finish"):
-            return LevelingService.finish_leveling_early(fresh_user, conversation_id)
+            return LevelingService.finish_leveling_early(fresh_user, conversation_id, accent=session_accent)
 
         questions = session.get("questions", [])
         curr_idx = session.get("current_index", 0)
@@ -482,7 +537,7 @@ class LevelingService:
             follow_up_reply = f"{feedback}\n\n{follow_up_q}".strip()
             follow_up_reply = strip_emojis(follow_up_reply)
 
-            audio_b64 = AudioService.text_to_speech(follow_up_reply)
+            audio_b64 = AudioService.text_to_speech(follow_up_reply, accent=session_accent)
             Message.objects.create(
                 session_id=conversation_id,
                 username=fresh_user.username,
@@ -499,6 +554,7 @@ class LevelingService:
                 "reply": follow_up_reply,
                 "audio_b64": audio_b64,
                 "audio": audio_b64,
+                "accent": session_accent,
                 "is_leveling": True,
                 "completed": False,
                 "current_question": curr_idx + 1,
@@ -549,7 +605,7 @@ class LevelingService:
             fresh_user.profile["active_leveling"] = session
             fresh_user.save(update_fields=["profile"])
 
-            audio_b64 = AudioService.text_to_speech(reply_text)
+            audio_b64 = AudioService.text_to_speech(reply_text, accent=session_accent)
             Message.objects.create(
                 session_id=conversation_id,
                 username=fresh_user.username,
@@ -567,6 +623,7 @@ class LevelingService:
                 "reply": reply_text,
                 "audio_b64": audio_b64,
                 "audio": audio_b64,
+                "accent": session_accent,
                 "is_leveling": True,
                 "completed": False,
                 "current_question": next_idx + 1,
@@ -666,7 +723,7 @@ class LevelingService:
             )
             final_reply = strip_emojis(final_reply)
 
-            audio_b64 = AudioService.text_to_speech(final_reply)
+            audio_b64 = AudioService.text_to_speech(final_reply, accent=session_accent)
 
             Message.objects.create(
                 session_id=conversation_id,
@@ -685,6 +742,7 @@ class LevelingService:
                 "reply": final_reply,
                 "audio_b64": audio_b64,
                 "audio": audio_b64,
+                "accent": session_accent,
                 "is_leveling": True,
                 "completed": True,
                 "new_level": best_level,
@@ -702,7 +760,7 @@ class LevelingService:
     ) -> Dict[str, Any]:
         """
         Avalia a resposta do aluno com LLM (Groq / Gemini) retornando JSON estruturado.
-        Regra estrita: NENHUM emoji. Feedback conciso. Sem perguntas aleatorias de bate-papo.
+        Regra estrita: NENHUM emoji. Feedback conciso de no maximo 2 linhas citando o que o aluno falou.
         """
         prompt = (
             f"You are Teacher Tatiana Duarte (Teacher Tati), evaluating a student's answer in a CEFR English Leveling Assessment.\n"
@@ -712,7 +770,7 @@ class LevelingService:
             f"Evaluate whether the student's answer demonstrates sufficient communicative ability and grammatical control for CEFR Level {question_level}.\n"
             f"A minor slip should still pass if the meaning is clear and appropriate for {question_level}.\n\n"
             f"CRITICAL RULES:\n"
-            f"1. DO NOT ask conversational questions in 'pedagogical_feedback'. It must be 1-2 concise sentences giving a warm acknowledgment and a quick grammar/vocab tip.\n"
+            f"1. In 'pedagogical_feedback', write AT MOST 2 LINES in English. You MUST specifically acknowledge or reference what the student said in their sentence (e.g. quote words or topics they mentioned like a place, food, activity, noise, feeling, etc.) and give a brief natural tip or phrasing correction. DO NOT ask conversational questions in 'pedagogical_feedback'.\n"
             f"2. If the student's answer was too brief (fewer than 4 words or vague) and you need them to speak a bit more to properly judge CEFR {question_level}, set 'needs_follow_up': true and provide 1 short follow-up question in 'follow_up_question'. Otherwise set 'needs_follow_up': false and 'follow_up_question': \"\".\n"
             f"3. Absolutely DO NOT use any emojis anywhere. No emojis permitted.\n\n"
             f"Respond ONLY with a valid JSON object matching this schema:\n"
@@ -720,28 +778,30 @@ class LevelingService:
             f'  "is_correct": true,\n'
             f'  "mistakes": ["List specific grammatical or vocabulary mistakes in English, if any"],\n'
             f'  "corrections": ["Natural and correct English phrasing for the student\'s answer"],\n'
-            f'  "pedagogical_feedback": "1-2 concise sentences in English acknowledging the answer and giving a constructive tip. NO emojis. NO conversational chatter.",\n'
+            f'  "pedagogical_feedback": "At most 2 lines in English specifically acknowledging what the user said with a constructive tip. NO emojis.",\n'
             f'  "needs_follow_up": false,\n'
             f'  "follow_up_question": ""\n'
             f"}}"
         )
 
         keys = get_groq_keys()
-        for g_model in ["openai/gpt-oss-20b", "openai/gpt-oss-120b"]:
+        for g_model in ["openai/gpt-oss-20b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"]:
             for key in keys:
                 try:
                     from groq import Groq
-                    client = Groq(api_key=key, timeout=10.0)
+                    client = Groq(api_key=key, timeout=12.0)
                     res = client.chat.completions.create(
                         model=g_model,
                         messages=[{"role": "user", "content": prompt}],
                         temperature=0.2,
                         response_format={"type": "json_object"},
-                        max_tokens=400,
+                        max_tokens=1000,
                     )
                     raw_json = res.choices[0].message.content
                     data = json.loads(raw_json)
                     if isinstance(data, dict):
+                        if data.get("pedagogical_feedback"):
+                            data["pedagogical_feedback"] = strip_emojis(data["pedagogical_feedback"]).strip()
                         return data
                 except Exception as e:
                     logger.warning(f"[Leveling AI] Model {g_model} with key {key[:10]} failed: {e}")
@@ -759,19 +819,33 @@ class LevelingService:
                     raw_text = raw_text.split("```json")[1].split("```")[0].strip()
                 elif "```" in raw_text:
                     raw_text = raw_text.split("```")[1].split("```")[0].strip()
-                return json.loads(raw_text)
+                data = json.loads(raw_text)
+                if isinstance(data, dict):
+                    if data.get("pedagogical_feedback"):
+                        data["pedagogical_feedback"] = strip_emojis(data["pedagogical_feedback"]).strip()
+                    return data
             except Exception as e:
                 logger.warning(f"[Leveling AI] Gemini fallback failed: {e}")
 
-        # Fallback heuristico seguro caso todas as APIs falhem
-        has_text = len(student_answer.strip()) > 3
+        # Fallback heuristico seguro caso todas as APIs falhem (refere-se explicitamente ao que o aluno falou)
+        clean_ans = student_answer.strip()
+        words = clean_ans.split()
+        has_text = len(clean_ans) > 3 and len(words) >= 2
+        snippet = " ".join(words[:6])
+        if has_text:
+            pedagogical = f'You mentioned "{snippet}"—good effort! Try phrasing it in a complete sentence to sound even more natural.'
+        elif snippet:
+            pedagogical = f'You said "{snippet}". Try to answer with a full English sentence so I can better assess your level.'
+        else:
+            pedagogical = "Try to answer with a complete sentence in English so I can evaluate your level."
+
         return {
             "is_correct": has_text,
-            "mistakes": [] if has_text else ["Answer was too short or empty."],
-            "corrections": [student_answer] if has_text else ["Please provide a complete sentence."],
-            "pedagogical_feedback": "Well done! Thank you for sharing your answer with me." if has_text else "Keep going! Try to express yourself in a complete sentence.",
-            "needs_follow_up": False,
-            "follow_up_question": "",
+            "mistakes": [] if has_text else ["Answer was too short or incomplete."],
+            "corrections": [clean_ans] if has_text else ["Please provide a complete sentence in English."],
+            "pedagogical_feedback": strip_emojis(pedagogical),
+            "needs_follow_up": not has_text,
+            "follow_up_question": "Could you tell me a little more about that?" if not has_text else "",
         }
 
 

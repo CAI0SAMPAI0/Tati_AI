@@ -280,10 +280,10 @@ class AIService:
         clean_user_lower = user_text.strip().lower()
         if clean_user_lower in ["/finish", "/fim", "/encerrar", "/end", "/stop"] or clean_user_lower.startswith("/finish"):
             if LevelingService.is_leveling_conversation(user, conversation_id):
-                return LevelingService.finish_leveling_early(user, conversation_id)
+                return LevelingService.finish_leveling_early(user, conversation_id, accent=accent)
 
         if LevelingService.is_leveling_conversation(user, conversation_id):
-            return LevelingService.process_leveling_step(user, conversation_id, user_text)
+            return LevelingService.process_leveling_step(user, conversation_id, user_text, accent=accent)
 
         clean_user_text = strip_emojis(user_text.strip())
 

@@ -54,11 +54,13 @@ def start_leveling_assessment(request: HttpRequest):
 
     total_questions = body.get("total_questions")
     count_per_level = body.get("count_per_level")
+    accent = body.get("accent")
 
     return LevelingService.start_leveling_session(
         user=request.auth,
         total_questions=total_questions,
         count_per_level=count_per_level,
+        accent=accent,
     )
 
 
@@ -76,7 +78,8 @@ def finish_leveling_assessment(request: HttpRequest):
             pass
 
     conversation_id = body.get("conversation_id", "")
-    return LevelingService.finish_leveling_early(request.auth, conversation_id=conversation_id)
+    accent = body.get("accent")
+    return LevelingService.finish_leveling_early(request.auth, conversation_id=conversation_id, accent=accent)
 
 
 @chat_router.get("/leveling/status", auth=auth_required)
@@ -197,7 +200,7 @@ async def synthesize_voice(request: HttpRequest, payload: TTSInput):
             and hasattr(request.auth, "profile")
             and isinstance(request.auth.profile, dict)
         ):
-            accent = request.auth.profile.get("preferred_accent") or accent or "en-US"
+            accent = request.auth.profile.get("preferred_accent") or request.auth.profile.get("accent") or accent or "en-US"
     accent = accent or "en-US"
     audio_b64 = await AudioService.text_to_speech_async(text, accent=accent)
     return {
@@ -225,13 +228,14 @@ async def transcribe_chat_voice(request: HttpRequest, payload: TranscribeInput):
 class WordLookupInput(BaseModel):
     word: str
     context: str | None = None
+    accent: str | None = None
 
 
 # ── DICIONÁRIO & TRADUÇÃO BILÍNGUE ────────────────────────────────────
 
 
 @chat_router.get("/word-lookup", auth=auth_optional)
-async def get_word_lookup(request: HttpRequest, word: str):
+async def get_word_lookup(request: HttpRequest, word: str, accent: Optional[str] = None):
     """
     Busca tradução em português, definição pedagógica em inglês,
     fonética e áudio da Teacher Tati para qualquer palavra ou expressão.
@@ -239,7 +243,11 @@ async def get_word_lookup(request: HttpRequest, word: str):
     from asgiref.sync import sync_to_async
     from .word_service import WordLookupService
 
-    return await sync_to_async(WordLookupService.lookup)(word)
+    resolved_accent = accent
+    if not resolved_accent and hasattr(request, "auth") and request.auth and hasattr(request.auth, "profile") and isinstance(request.auth.profile, dict):
+        resolved_accent = request.auth.profile.get("preferred_accent") or request.auth.profile.get("accent")
+
+    return await sync_to_async(WordLookupService.lookup)(word, accent=resolved_accent or "en-US")
 
 
 @chat_router.post("/word-lookup", auth=auth_optional)
@@ -251,4 +259,8 @@ async def post_word_lookup(request: HttpRequest, payload: WordLookupInput):
     from asgiref.sync import sync_to_async
     from .word_service import WordLookupService
 
-    return await sync_to_async(WordLookupService.lookup)(payload.word)
+    resolved_accent = payload.accent
+    if not resolved_accent and hasattr(request, "auth") and request.auth and hasattr(request.auth, "profile") and isinstance(request.auth.profile, dict):
+        resolved_accent = request.auth.profile.get("preferred_accent") or request.auth.profile.get("accent")
+
+    return await sync_to_async(WordLookupService.lookup)(payload.word, accent=resolved_accent or "en-US")

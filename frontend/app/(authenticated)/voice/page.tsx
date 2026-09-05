@@ -105,14 +105,25 @@ function VoicePageContent() {
     { id: 'en-NZ', label: '🇳🇿 New Zealand', shortLabel: 'NZ', desc: 'New Zealand' },
   ];
 
-  const [accentIndex, setAccentIndex] = useState(0);
+  const [accentIndex, setAccentIndex] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('tati_voice_accent');
+      if (stored) {
+        const found = ACCENTS.findIndex(a => a.id === stored);
+        if (found !== -1) return found;
+      }
+    }
+    return 0;
+  });
   const [isChangingAccent, setIsChangingAccent] = useState(false);
   const [isAccentMenuOpen, setIsAccentMenuOpen] = useState(false);
   const accentMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
-      const preferred = user?.profile?.preferred_accent || localStorage.getItem('tati_voice_accent');
+      const stored = typeof window !== 'undefined' ? localStorage.getItem('tati_voice_accent') : null;
+      const userProfileAccent = user?.profile?.preferred_accent || user?.profile?.accent;
+      const preferred = stored || userProfileAccent;
       if (preferred) {
         const found = ACCENTS.findIndex(a => a.id === preferred);
         if (found !== -1) {
@@ -120,7 +131,7 @@ function VoicePageContent() {
         }
       }
     } catch (_) {}
-  }, [user]);
+  }, [user?.profile?.preferred_accent, user?.profile?.accent]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {

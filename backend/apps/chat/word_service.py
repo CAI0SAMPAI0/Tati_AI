@@ -27,7 +27,7 @@ class WordLookupService:
     """
 
     @classmethod
-    def lookup(cls, raw_word: str) -> Dict[str, Any]:
+    def lookup(cls, raw_word: str, accent: Optional[str] = "en-US") -> Dict[str, Any]:
         if not raw_word or not raw_word.strip():
             return {"error": "Nenhuma palavra fornecida."}
 
@@ -36,20 +36,23 @@ class WordLookupService:
         if not cleaned_alpha:
             cleaned_alpha = cleaned
 
-        cache_key = f"tati_word_def_{cleaned_alpha}"
+        resolved_accent = accent or "en-US"
+        cache_key = f"tati_word_def_{cleaned_alpha}_{resolved_accent}"
 
         # 1. Checa cache local e Redis
         if cleaned_alpha in _LOCAL_WORD_CACHE:
             cached = _LOCAL_WORD_CACHE[cleaned_alpha]
-            if not cached.get("audio_b64"):
-                cached["audio_b64"] = AudioService.text_to_speech(cleaned_alpha)
+            if not cached.get("audio_b64") or cached.get("accent") != resolved_accent:
+                cached["audio_b64"] = AudioService.text_to_speech(cleaned_alpha, accent=resolved_accent)
+                cached["accent"] = resolved_accent
             return cached
 
         try:
             cached_data = cache.get(cache_key)
             if cached_data and isinstance(cached_data, dict):
-                if not cached_data.get("audio_b64"):
-                    cached_data["audio_b64"] = AudioService.text_to_speech(cleaned_alpha)
+                if not cached_data.get("audio_b64") or cached_data.get("accent") != resolved_accent:
+                    cached_data["audio_b64"] = AudioService.text_to_speech(cleaned_alpha, accent=resolved_accent)
+                    cached_data["accent"] = resolved_accent
                 _LOCAL_WORD_CACHE[cleaned_alpha] = cached_data
                 return cached_data
         except Exception:
@@ -59,9 +62,10 @@ class WordLookupService:
         word_info = cls._fetch_ai_definition(cleaned_alpha)
 
         # 3. Gera áudio da pronúncia com voz da Teacher Tati
-        audio_b64 = AudioService.text_to_speech(cleaned_alpha)
+        audio_b64 = AudioService.text_to_speech(cleaned_alpha, accent=resolved_accent)
         word_info["audio_b64"] = audio_b64
         word_info["audio"] = audio_b64
+        word_info["accent"] = resolved_accent
 
         # 4. Salva em cache por 7 dias (604800s)
         _LOCAL_WORD_CACHE[cleaned_alpha] = word_info

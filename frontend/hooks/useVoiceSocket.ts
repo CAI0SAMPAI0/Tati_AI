@@ -290,7 +290,7 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
     socketRef.current.send(msg);
   }, [ensureConversation]);
 
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = useCallback(async (text: string, accent?: string) => {
     if (!socketRef.current) return;
 
     let convId = convIdRef.current;
@@ -320,11 +320,14 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
     };
     setMessages((prev) => [...prev, userMsg]);
 
+    const resolvedAccent = accent || (typeof window !== 'undefined' ? localStorage.getItem('tati_voice_accent') || 'en-US' : 'en-US');
+
     const msg: WsOutgoingMessage = {
       type: 'text',
       content: text,
       conversation_id: convId,
       origin: 'voice',
+      accent: resolvedAccent,
     } as any;
     socketRef.current.send(msg);
   }, [ensureConversation]);
