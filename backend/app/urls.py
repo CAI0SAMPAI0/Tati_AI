@@ -1,10 +1,20 @@
-from django.contrib import admin
-from django.urls import path, re_path, include
 from django.conf import settings
+from django.contrib import admin
+from django.http import HttpResponse
+from django.urls import include, path, re_path
 from django.views.static import serve
+
 from app.api import api
 
+
+def favicon_view(request):
+    """Retorna 204 No Content para requisições de favicon.ico dos navegadores."""
+    return HttpResponse(status=204)
+
+
 urlpatterns = [
+    # Favicon rápido para evitar 404 em logs
+    path("favicon.ico", favicon_view),
     # Painel Administrativo Nativo do Django
     path("django-admin/", admin.site.urls),
     # Django Debug Toolbar (apenas se habilitado nas settings)

@@ -1,16 +1,24 @@
+import asyncio
+import logging
 import os
 import time
-import logging
-from django.db import connection
+
+from asgiref.sync import iscoroutinefunction, markcoroutinefunction
 from django.core.cache import cache
+from django.db import connection
 from django.http import JsonResponse
 
 logger = logging.getLogger("performance")
 
 
 class PerformanceMiddleware:
+    sync_capable = True
+    async_capable = True
+
     def __init__(self, get_response):
         self.get_response = get_response
+        if iscoroutinefunction(self.get_response):
+            markcoroutinefunction(self)
 
     def __call__(self, request):
         start_time = time.perf_counter()
@@ -19,14 +27,28 @@ class PerformanceMiddleware:
         response = self.get_response(request)
 
         duration_ms = (time.perf_counter() - start_time) * 1000
-        num_queries = len(connection.queries) - initial_queries
-
-        # Loga desempenho das requisições de API no terminal
         if not request.path.startswith("/static") and not request.path.startswith(
             "/media"
         ):
             print(
-                f"[PERF] {request.method} {request.path} -> {response.status_code} ({duration_ms:.1f}ms)"
+                f"[PERF] {request.method} {request.path} -> {getattr(response, 'status_code', 'unknown')} ({duration_ms:.1f}ms)"
+            )
+
+        return response
+
+    async def __acall__(self, request):
+        start_time = time.perf_counter()
+        try:
+            response = await self.get_response(request)
+        except asyncio.CancelledError:
+            raise
+
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        if not request.path.startswith("/static") and not request.path.startswith(
+            "/media"
+        ):
+            print(
+                f"[PERF] {request.method} {request.path} -> {getattr(response, 'status_code', 'unknown')} ({duration_ms:.1f}ms)"
             )
 
         return response
@@ -36,15 +58,21 @@ class RateLimitMiddleware:
     """
     Middleware de Rate Limiting baseado em cache (Redis ou LocMemCache).
     Protege endpoints críticos contra brute-force, abusos e requisições excessivas.
+    Suporta execução nativa síncrona (WSGI) e assíncrona (ASGI/Uvicorn).
     """
+
+    sync_capable = True
+    async_capable = True
 
     def __init__(self, get_response):
         self.get_response = get_response
         self.enabled = os.getenv("ENABLE_RATE_LIMIT", "true").lower() in ("true", "1")
+        if iscoroutinefunction(self.get_response):
+            markcoroutinefunction(self)
 
-    def __call__(self, request):
+    def _check_rate_limit(self, request):
         if not self.enabled:
-            return self.get_response(request)
+            return None
 
         path = request.path.rstrip("/")
 
@@ -55,7 +83,7 @@ class RateLimitMiddleware:
             or "/ws/" in path
             or request.headers.get("Upgrade") == "websocket"
         ):
-            return self.get_response(request)
+            return None
 
         ip = self._get_client_ip(request)
 
@@ -104,7 +132,22 @@ class RateLimitMiddleware:
         except Exception as e:
             logger.debug(f"[RateLimit] Erro no cache: {e}")
 
+        return None
+
+    def __call__(self, request):
+        blocked = self._check_rate_limit(request)
+        if blocked is not None:
+            return blocked
         return self.get_response(request)
+
+    async def __acall__(self, request):
+        blocked = self._check_rate_limit(request)
+        if blocked is not None:
+            return blocked
+        try:
+            return await self.get_response(request)
+        except asyncio.CancelledError:
+            raise
 
     def _get_client_ip(self, request):
         x_forwarded = request.META.get("HTTP_X_FORWARDED_FOR")

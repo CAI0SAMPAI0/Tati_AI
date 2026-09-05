@@ -6,10 +6,12 @@ from datetime import datetime, timezone
 from typing import List
 import warnings
 
-try:
-    import google.generativeai as genai
-except Exception:
-    genai = None
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", category=FutureWarning)
+    try:
+        import google.generativeai as genai
+    except Exception:
+        genai = None
 from groq import Groq
 
 from .models import Conversation, Message

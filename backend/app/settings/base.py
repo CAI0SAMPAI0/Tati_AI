@@ -1,7 +1,12 @@
 import os
+import warnings
 from pathlib import Path
-from dotenv import load_dotenv
+
 import dj_database_url
+from dotenv import load_dotenv
+
+# Suprime aviso de descontinuação da biblioteca legada google-generativeai
+warnings.filterwarnings("ignore", category=FutureWarning, message=r"(?s).*google\.generativeai.*")
 
 # Carrega variáveis de ambiente do .env na raiz do projeto
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
