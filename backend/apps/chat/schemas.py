@@ -23,7 +23,7 @@ class ConversationOut(BaseModel):
 
 class CreateConversationInput(BaseModel):
     title: Optional[str] = "Nova Conversa"
-    model: Optional[str] = "groq/llama-3.3-70b-versatile"
+    model: Optional[str] = "groq/openai/gpt-oss-20b"
     is_simulation: bool = False
     simulation_id: Optional[uuid.UUID] = None
 

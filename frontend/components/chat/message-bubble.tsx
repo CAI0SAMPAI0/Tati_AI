@@ -121,11 +121,11 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
                 <div className="flex flex-col gap-2">
                   {/* While streaming with no content yet, show animated dots */}
                   {isStreaming && !parsed.reply ? (
-                    <span className="flex gap-1 items-center py-0.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary/50 animate-bounce [animation-delay:-0.3s]" />
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary/50 animate-bounce [animation-delay:-0.15s]" />
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary/50 animate-bounce" />
-                    </span>
+                    <div className="flex items-center gap-1.5 py-1 px-1">
+                      <span className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce [animation-delay:-0.32s]" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce [animation-delay:-0.16s]" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce" />
+                    </div>
                   ) : (
                     <>
                       <ClickableText
@@ -134,10 +134,10 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
                       />
                       {/* Show animated dots at the end of text while streaming */}
                       {isStreaming && (
-                        <span className="inline-flex gap-1 items-center ml-1">
-                          <span className="w-1 h-1 rounded-full bg-text-subtle animate-bounce [animation-delay:-0.3s]" />
-                          <span className="w-1 h-1 rounded-full bg-text-subtle animate-bounce [animation-delay:-0.15s]" />
-                          <span className="w-1 h-1 rounded-full bg-text-subtle animate-bounce" />
+                        <span className="inline-flex gap-1 items-center ml-1.5 align-middle">
+                          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.32s]" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.16s]" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" />
                         </span>
                       )}
                     </>

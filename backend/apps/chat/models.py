@@ -8,7 +8,7 @@ class Conversation(models.Model):
     id = models.CharField(primary_key=True, max_length=255, default=uuid.uuid4)
     username = models.CharField(max_length=150, db_index=True)
     title = models.CharField(max_length=255, default="Nova Conversa com a Teacher Tati")
-    model = models.CharField(max_length=100, default="groq/llama-3.3-70b-versatile")
+    model = models.CharField(max_length=100, default="groq/openai/gpt-oss-20b")
     is_simulation = models.BooleanField(default=False, null=True, blank=True)
     simulation_id = models.UUIDField(null=True, blank=True)
     created_at = models.CharField(max_length=100, default=django_timezone.now)

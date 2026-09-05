@@ -255,6 +255,11 @@ export function useChatSocket(conversationId: string | null) {
     });
     if (!sent) return;
 
+    // Ativa animação das reticências (...) imediatamente ao enviar a mensagem
+    setIsStreaming(true);
+    setStreamingContent('');
+    streamingRef.current = '';
+
     const newUserMsg: Message = {
       id: `user-sent-${Date.now()}`,
       conversation_id: currentId || '',
@@ -294,6 +299,10 @@ export function useChatSocket(conversationId: string | null) {
     });
     
     if (sent) {
+      setIsStreaming(true);
+      setStreamingContent('');
+      streamingRef.current = '';
+
       const newUserMsg: Message = {
         id: `user-audio-temp`,
         conversation_id: currentId || '',
@@ -331,6 +340,10 @@ export function useChatSocket(conversationId: string | null) {
     });
     
     if (sent) {
+      setIsStreaming(true);
+      setStreamingContent('');
+      streamingRef.current = '';
+
       const displayContent = caption 
         ? `${caption}\n\n📎 [Arquivo: ${filename}]` 
         : `📎 [Arquivo: ${filename}]`;

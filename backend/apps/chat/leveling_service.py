@@ -24,7 +24,7 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 from apps.authentication.models import User
 from apps.chat.models import Conversation, Message
-from apps.chat.audio_service import AudioService, get_groq_keys
+from apps.chat.audio_service import AudioService, get_groq_keys, strip_emojis
 from apps.notifications.services import BrevoEmailService
 from apps.users.services import XPService, StreakService
 
@@ -95,8 +95,8 @@ class LevelingService:
         conv = Conversation.objects.create(
             id=conv_id,
             username=user.username,
-            title="🎯 CEFR Leveling Assessment • Teacher Tati",
-            model="groq/llama-3.3-70b-versatile",
+            title="CEFR Leveling Assessment - Teacher Tati",
+            model="groq/openai/gpt-oss-20b",
             is_simulation=False,
             created_at=now_str,
             updated_at=now_str,
@@ -245,8 +245,9 @@ class LevelingService:
                 f"{feedback}\n\n"
                 f"---\n"
                 f"**Question {next_idx + 1}/{total_q}**:\n"
-                f"👉 **{next_q['question']}**"
+                f"**{next_q['question']}**"
             )
+            reply_text = strip_emojis(reply_text)
 
             # Salva o estado atualizado no perfil
             user.profile["active_leveling"] = session
@@ -359,25 +360,26 @@ class LevelingService:
 
             # 6. Mensagem final da Teacher Tati no chat
             email_notice = (
-                f"📧 A detailed diagnostic PDF report has been sent to your email (**{student_email}**) with your scores, mistakes, and corrections in English!"
+                f"A detailed diagnostic PDF report has been sent to your email (**{student_email}**) with your scores, mistakes, and corrections in English!"
                 if student_email
-                else "💡 Update your email in your profile to receive diagnostic reports directly in your inbox!"
+                else "Update your email in your profile to receive diagnostic reports directly in your inbox."
             )
 
             final_reply = (
                 f"{feedback}\n\n"
                 f"---\n"
-                f"🎉 **Congratulations, {user.name or user.username}! You have completed your Leveling Assessment!** 🎉\n\n"
-                f"📊 **Your Performance by Level:**\n"
-                f"• **Level A1**: {scores.get('A1', {}).get('correct', 0)}/{scores.get('A1', {}).get('total', 0)} correct\n"
-                f"• **Level A2**: {scores.get('A2', {}).get('correct', 0)}/{scores.get('A2', {}).get('total', 0)} correct\n"
-                f"• **Level B1**: {scores.get('B1', {}).get('correct', 0)}/{scores.get('B1', {}).get('total', 0)} correct\n"
-                f"• **Level B2**: {scores.get('B2', {}).get('correct', 0)}/{scores.get('B2', {}).get('total', 0)} correct\n\n"
-                f"🏆 **Your new CEFR Level is: {best_level}**!\n"
+                f"**Congratulations, {user.name or user.username}! You have completed your Leveling Assessment!**\n\n"
+                f"**Your Performance by Level:**\n"
+                f"• Level A1: {scores.get('A1', {}).get('correct', 0)}/{scores.get('A1', {}).get('total', 0)} correct\n"
+                f"• Level A2: {scores.get('A2', {}).get('correct', 0)}/{scores.get('A2', {}).get('total', 0)} correct\n"
+                f"• Level B1: {scores.get('B1', {}).get('correct', 0)}/{scores.get('B1', {}).get('total', 0)} correct\n"
+                f"• Level B2: {scores.get('B2', {}).get('correct', 0)}/{scores.get('B2', {}).get('total', 0)} correct\n\n"
+                f"**Your new CEFR Level is: {best_level}**\n"
                 f"Your profile in Teacher Tati AI has been updated to **{best_level}**.\n\n"
                 f"{email_notice}\n\n"
-                f"I'm so proud of your dedication! Keep practicing with me every day to reach your next fluency goal! 🚀"
+                f"I am so proud of your dedication! Keep practicing with me every day to reach your next fluency goal."
             )
+            final_reply = strip_emojis(final_reply)
 
             audio_b64 = AudioService.text_to_speech(final_reply)
 
@@ -433,23 +435,24 @@ class LevelingService:
         )
 
         keys = get_groq_keys()
-        for key in keys:
-            try:
-                from groq import Groq
-                client = Groq(api_key=key)
-                res = client.chat.completions.create(
-                    model="openai/gpt-oss-120b",
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.2,
-                    response_format={"type": "json_object"},
-                    max_tokens=400,
-                )
-                raw_json = res.choices[0].message.content
-                data = json.loads(raw_json)
-                if isinstance(data, dict):
-                    return data
-            except Exception as e:
-                logger.warning(f"[Leveling AI] Groq key failed: {e}")
+        for g_model in ["openai/gpt-oss-20b", "openai/gpt-oss-120b"]:
+            for key in keys:
+                try:
+                    from groq import Groq
+                    client = Groq(api_key=key, timeout=10.0)
+                    res = client.chat.completions.create(
+                        model=g_model,
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.2,
+                        response_format={"type": "json_object"},
+                        max_tokens=400,
+                    )
+                    raw_json = res.choices[0].message.content
+                    data = json.loads(raw_json)
+                    if isinstance(data, dict):
+                        return data
+                except Exception as e:
+                    logger.warning(f"[Leveling AI] Model {g_model} with key {key[:10]} failed: {e}")
 
         # Fallback Gemini
         gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY_1")

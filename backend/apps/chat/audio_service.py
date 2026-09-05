@@ -25,10 +25,33 @@ VOICE_ACCENT_MAP = {
 }
 
 
+EMOJI_REGEX = re.compile(
+    "["
+    "\U00010000-\U0010ffff"
+    "\u2600-\u27bf"
+    "\u2300-\u23ff"
+    "\u2b50\u2b55\u2934\u2935"
+    "\u200d\ufe0f"
+    "]+",
+    flags=re.UNICODE,
+)
+
+
+def strip_emojis(text: str) -> str:
+    """
+    Remove todos os emojis, símbolos pictográficos e dingbats do texto
+    para evitar que o TTS (Edge-TTS) tente lê-los ou pronunciá-los.
+    """
+    if not text:
+        return ""
+    cleaned = EMOJI_REGEX.sub("", text)
+    return re.sub(r" {2,}", " ", cleaned).strip()
+
+
 def clean_tts_text(text: str) -> str:
     if not text:
         return ""
-    clean = text.strip()
+    clean = strip_emojis(text.strip())
     if clean.startswith("```"):
         clean = re.sub(r"^```[\w]*\n?", "", clean)
         clean = re.sub(r"\n?```$", "", clean.strip())
@@ -44,7 +67,7 @@ def clean_tts_text(text: str) -> str:
         .replace("{", "")
         .replace("}", "")
     )
-    return clean.strip()
+    return strip_emojis(clean.strip())
 
 
 def get_groq_keys() -> List[str]:
