@@ -19,11 +19,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY requirements.txt* backend/requirements.txt* ./
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+
+# Se o build context foi a raiz (/), move o conteudo de backend/ para /app
+RUN if [ -d "backend/app" ]; then \
+      cp -r backend/. . && rm -rf backend; \
+    fi
 
 # Coleta arquivos estáticos
 RUN python manage.py collectstatic --noinput || true
