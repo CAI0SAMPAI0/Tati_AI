@@ -3,15 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "description": "Teacher Tati - Plataforma de Aprendizado de Inglês com IA",
-  "main": "backend/main.py",
+  "main": "backend/app/asgi.py",
   "workspaces": [
     "frontend",
     "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "start": "python backend/main.py",
-    "dev": "python backend/main.py",
+    "start": "gunicorn --chdir backend app.asgi:application -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT:-8000}",
+    "dev": "python backend/manage.py runserver",
     "dev:frontend": "npm run dev --workspace frontend",
     "dev:frontend:clean": "npm run dev:clean --workspace frontend",
     "dev:hub": "npm run dev --workspace @tati/hub-site",

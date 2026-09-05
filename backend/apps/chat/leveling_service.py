@@ -43,7 +43,8 @@ def load_leveling_questions() -> Dict[str, List[Dict[str, Any]]]:
     return {}
 
 LEVELING_QUESTIONS_BANK = load_leveling_questions()
-QUESTIONS_PER_LEVEL = 2  # 2 from each level: A1, A2, B1, B2 -> 8 questions total
+QUESTIONS_PER_LEVEL_MIN = 3
+QUESTIONS_PER_LEVEL_MAX = 5
 
 
 class LevelingService:
@@ -57,10 +58,10 @@ class LevelingService:
         return False
 
     @staticmethod
-    def start_leveling_session(user: User) -> Dict[str, Any]:
+    def start_leveling_session(user: User, count_per_level: Optional[int] = None) -> Dict[str, Any]:
         """
         Inicia uma nova sessão de nivelamento com Teacher Tati.
-        Seleciona perguntas aleatórias de cada nível CEFR (A1, A2, B1, B2) e as embaralha.
+        Seleciona de 3 a 5 perguntas aleatórias de cada nível CEFR (A1, A2, B1, B2) e as embaralha.
         """
         bank = LEVELING_QUESTIONS_BANK or load_leveling_questions()
         selected_questions = []
@@ -68,7 +69,10 @@ class LevelingService:
         for lvl in ["A1", "A2", "B1", "B2"]:
             pool = bank.get(lvl, [])
             if pool:
-                sample_count = min(QUESTIONS_PER_LEVEL, len(pool))
+                if count_per_level and 1 <= count_per_level <= len(pool):
+                    sample_count = count_per_level
+                else:
+                    sample_count = random.randint(QUESTIONS_PER_LEVEL_MIN, min(QUESTIONS_PER_LEVEL_MAX, len(pool)))
                 sampled = random.sample(pool, sample_count)
                 selected_questions.extend(sampled)
 
