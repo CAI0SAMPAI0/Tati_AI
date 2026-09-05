@@ -267,11 +267,12 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
     "if-none-match",
 ]
 
-# Origens permitidas dinâmicas para Railway e Vercel
+# Origens permitidas dinâmicas para Railway, Hugging Face Spaces e Vercel
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://.*\.railway\.app$",
     r"^https://.*\.up\.railway\.app$",
     r"^https://.*\.vercel\.app$",
+    r"^https://.*\.hf\.space$",
     r"^http://localhost(:\d+)?$",
     r"^http://127\.0\.0\.1(:\d+)?$",
 ]
@@ -280,6 +281,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://*.railway.app",
     "https://*.up.railway.app",
     "https://*.vercel.app",
+    "https://*.hf.space",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
