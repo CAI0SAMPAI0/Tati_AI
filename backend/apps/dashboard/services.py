@@ -1476,6 +1476,9 @@ class DashboardService:
                 if sender_user
                 else ""
             )
+            is_prog = (
+                sender_role == "programador" or sender_uname == "programador"
+            )
             from apps.notifications.waha_service import WahaService
             target_session = "professor"
             if is_prog:
