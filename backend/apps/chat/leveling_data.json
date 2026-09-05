@@ -1,0 +1,727 @@
+{
+  "A1": [
+    {
+      "id": "A1_1",
+      "level": "A1",
+      "question": "What's your name?",
+      "follow_ups": [
+        "How do you spell it?",
+        "What's your last name?"
+      ],
+      "category": "Personal Information",
+      "target": "Basic introduction, spelling, family name"
+    },
+    {
+      "id": "A1_2",
+      "level": "A1",
+      "question": "Where are you from?",
+      "follow_ups": [
+        "Is it a big city or a small town?",
+        "Do you like your city or neighborhood?"
+      ],
+      "category": "Origin & Hometown",
+      "target": "Verb to be, origin, simple adjectives"
+    },
+    {
+      "id": "A1_3",
+      "level": "A1",
+      "question": "How old are you?",
+      "follow_ups": [
+        "When is your birthday?",
+        "What do you do on your birthday?"
+      ],
+      "category": "Age & Dates",
+      "target": "Numbers, dates, simple present habits"
+    },
+    {
+      "id": "A1_4",
+      "level": "A1",
+      "question": "What's your favorite color?",
+      "follow_ups": [
+        "What's your favorite animal or sport?",
+        "What's your favorite food?"
+      ],
+      "category": "Preferences",
+      "target": "Expressing likes and simple preferences"
+    },
+    {
+      "id": "A1_5",
+      "level": "A1",
+      "question": "Do you have brothers or sisters?",
+      "follow_ups": [
+        "What are their names? How old are they?",
+        "What do they do?"
+      ],
+      "category": "Family & Friends",
+      "target": "Have/has, family vocabulary, 3rd person singular"
+    },
+    {
+      "id": "A1_6",
+      "level": "A1",
+      "question": "What time do you wake up?",
+      "follow_ups": [
+        "What time do you go to bed?",
+        "Do you have breakfast every day?"
+      ],
+      "category": "Daily Routine",
+      "target": "Telling time, routine verbs in simple present"
+    },
+    {
+      "id": "A1_7",
+      "level": "A1",
+      "question": "What do you do after school or work?",
+      "follow_ups": [
+        "Do you like your school or job?",
+        "What do you usually do in the evening?"
+      ],
+      "category": "Work & Routine",
+      "target": "Adverbs of frequency, simple activities"
+    },
+    {
+      "id": "A1_8",
+      "level": "A1",
+      "question": "Look around you. What is one object you can see right now? What color is it and is it yours?",
+      "follow_ups": [
+        "Where is it located?",
+        "What do you use it for?"
+      ],
+      "category": "Demonstratives & Objects",
+      "target": "Demonstratives (this/that), colors, possessives"
+    },
+    {
+      "id": "A1_9",
+      "level": "A1",
+      "question": "What are you wearing today?",
+      "follow_ups": [
+        "What color is your shirt?",
+        "Are you wearing shoes? What color are they?"
+      ],
+      "category": "Clothes & Present Continuous",
+      "target": "Present continuous (wearing), clothing items, colors"
+    },
+    {
+      "id": "A1_10",
+      "level": "A1",
+      "question": "What do you like to do in your free time?",
+      "follow_ups": [
+        "Do you play sports?",
+        "What sport or activity do you like?"
+      ],
+      "category": "Hobbies & Free Time",
+      "target": "Like + ing / verb, leisure activities"
+    },
+    {
+      "id": "A1_11",
+      "level": "A1",
+      "question": "Do you like pizza?",
+      "follow_ups": [
+        "What's your favorite drink?",
+        "Do you prefer coffee or tea?"
+      ],
+      "category": "Food & Preferences",
+      "target": "Simple questions with do/does, prefer"
+    },
+    {
+      "id": "A1_12",
+      "level": "A1",
+      "question": "Imagine you are in a café. I'm the attendant. You want coffee and something to eat. I'll start: \"Hello! What would you like to order?\"",
+      "follow_ups": [
+        "Would you like something to eat with that?"
+      ],
+      "category": "Roleplay: Café",
+      "target": "Ordering food, I would like, can I have"
+    },
+    {
+      "id": "A1_13",
+      "level": "A1",
+      "question": "Imagine you are in a clothing shop and you want a t-shirt. I'm the salesperson: \"Hello! Can I help you?\"",
+      "follow_ups": [
+        "What size do you want?",
+        "What color would you like?"
+      ],
+      "category": "Roleplay: Shopping",
+      "target": "Shopping phrases, sizes, colors"
+    },
+    {
+      "id": "A1_14",
+      "level": "A1",
+      "question": "Imagine you are in a pharmacy because you have a headache. I'm the pharmacist: \"Hello! How can I help you today?\"",
+      "follow_ups": [
+        "Do you have any other symptoms?"
+      ],
+      "category": "Roleplay: Health & Pharmacy",
+      "target": "Describing simple ailments, I have a headache"
+    },
+    {
+      "id": "A1_15",
+      "level": "A1",
+      "question": "What's the weather like today where you are?",
+      "follow_ups": [
+        "What is your favorite season?",
+        "What do you do on a rainy day?"
+      ],
+      "category": "Weather & Seasons",
+      "target": "Weather adjectives (sunny, rainy, hot, cold)"
+    },
+    {
+      "id": "A1_16",
+      "level": "A1",
+      "question": "Imagine you are filling out a form. What's your address and phone number?",
+      "follow_ups": [
+        "What is your email address?"
+      ],
+      "category": "Personal Details & Contact",
+      "target": "Providing address, contact numbers, email formatting"
+    },
+    {
+      "id": "A1_17",
+      "level": "A1",
+      "question": "Imagine your teacher gives you an instruction in English but you didn't understand. What do you say?",
+      "follow_ups": [
+        "How would you ask to repeat?"
+      ],
+      "category": "Classroom English & Clarification",
+      "target": "Sorry, can you repeat? I don't understand"
+    }
+  ],
+  "A2": [
+    {
+      "id": "A2_1",
+      "level": "A2",
+      "question": "What do you usually do on weekends?",
+      "follow_ups": [
+        "Do you go out or stay at home?",
+        "What time do you usually wake up and go to bed?"
+      ],
+      "category": "Weekend Routines",
+      "target": "Frequency adverbs, routines, contrasting activities"
+    },
+    {
+      "id": "A2_2",
+      "level": "A2",
+      "question": "Do you have any responsibilities at home or at work/school?",
+      "follow_ups": [
+        "What do you have to do every day?",
+        "Do you help with household tasks?"
+      ],
+      "category": "Obligations & Chores",
+      "target": "Have to / need to, household chores"
+    },
+    {
+      "id": "A2_3",
+      "level": "A2",
+      "question": "What are you doing these days?",
+      "follow_ups": [
+        "Are you studying anything new?",
+        "Are you working on a special project?"
+      ],
+      "category": "Current Activities & Projects",
+      "target": "Present continuous for temporary situations / these days"
+    },
+    {
+      "id": "A2_4",
+      "level": "A2",
+      "question": "Tell me about someone in your family.",
+      "follow_ups": [
+        "What does he or she do?",
+        "What is he or she like?"
+      ],
+      "category": "Describing People",
+      "target": "Physical description and personality adjectives"
+    },
+    {
+      "id": "A2_5",
+      "level": "A2",
+      "question": "What should people do to stay healthy?",
+      "follow_ups": [
+        "Do you do any of those things?",
+        "What do you usually eat or drink?"
+      ],
+      "category": "Health & Advice",
+      "target": "Modal should/shouldn't, healthy habits"
+    },
+    {
+      "id": "A2_6",
+      "level": "A2",
+      "question": "Do you prefer eating at home or in restaurants?",
+      "follow_ups": [
+        "Why?",
+        "What's your favorite dish?"
+      ],
+      "category": "Preferences & Reasons",
+      "target": "Comparatives, giving simple reasons (because...)"
+    },
+    {
+      "id": "A2_7",
+      "level": "A2",
+      "question": "Tell me about your last weekend.",
+      "follow_ups": [
+        "What did you do? Where did you go?"
+      ],
+      "category": "Past Events",
+      "target": "Past simple regular and irregular verbs"
+    },
+    {
+      "id": "A2_8",
+      "level": "A2",
+      "question": "Have you ever traveled to another city or country?",
+      "follow_ups": [
+        "Where did you go?",
+        "What did you do there?"
+      ],
+      "category": "Life Experiences",
+      "target": "Have you ever + past participle, switching to simple past"
+    },
+    {
+      "id": "A2_9",
+      "level": "A2",
+      "question": "What's the best movie you've ever seen?",
+      "follow_ups": [
+        "Why did you like it?",
+        "Who did you watch it with?"
+      ],
+      "category": "Superlatives & Reviews",
+      "target": "Superlatives (the best, the most exciting), simple storytelling"
+    },
+    {
+      "id": "A2_10",
+      "level": "A2",
+      "question": "What are your plans for next weekend?",
+      "follow_ups": [
+        "Are you doing anything special?",
+        "Are you meeting anyone?"
+      ],
+      "category": "Future Plans",
+      "target": "Going to / Present continuous for future arrangements"
+    },
+    {
+      "id": "A2_11",
+      "level": "A2",
+      "question": "Can you give directions from your house to the nearest supermarket or bakery?",
+      "follow_ups": [
+        "What street is it on?",
+        "How long does it take to get there?"
+      ],
+      "category": "Giving Directions",
+      "target": "Imperatives (turn left, go straight, cross), prepositions of place"
+    },
+    {
+      "id": "A2_12",
+      "level": "A2",
+      "question": "Imagine someone wants to visit your city. What places do you recommend?",
+      "follow_ups": [
+        "Why do you recommend them?",
+        "What can people do there?"
+      ],
+      "category": "Recommendations & Tourism",
+      "target": "Suggestions (You can visit..., I recommend...)"
+    },
+    {
+      "id": "A2_13",
+      "level": "A2",
+      "question": "What's your opinion about social media?",
+      "follow_ups": [
+        "Do you use it a lot?",
+        "What do you like or dislike about it?"
+      ],
+      "category": "Opinions & Habits",
+      "target": "Expressing opinion (In my opinion, I think), frequency"
+    },
+    {
+      "id": "A2_14",
+      "level": "A2",
+      "question": "You want to invite a friend to go out. Imagine I'm your friend: invite me to a place and suggest a day!",
+      "follow_ups": [
+        "Ask for more details: where, what time, how we get there"
+      ],
+      "category": "Social Invitations",
+      "target": "Inviting (Do you want to..., Would you like to...), making arrangements"
+    },
+    {
+      "id": "A2_15",
+      "level": "A2",
+      "question": "What's the weather like in your city in the summer compared to the winter?",
+      "follow_ups": [
+        "What do people usually wear in each season?"
+      ],
+      "category": "Comparisons & Weather",
+      "target": "Comparative adjectives (hotter, colder), seasons"
+    },
+    {
+      "id": "A2_16",
+      "level": "A2",
+      "question": "Imagine you're in a restaurant. How would you ask for the menu in a polite way, and how would you order a drink?",
+      "follow_ups": [
+        "What can you say if you want to call the waiter?"
+      ],
+      "category": "Polite Requests & Restaurant",
+      "target": "Could I have..., Excuse me, I'd like to order..."
+    }
+  ],
+  "B1": [
+    {
+      "id": "B1_1",
+      "level": "B1",
+      "question": "Tell me about your background: your work, school, family, and hobbies in some detail.",
+      "follow_ups": [
+        "How has your lifestyle changed over the past few years?"
+      ],
+      "category": "Detailed Background",
+      "target": "Connected narrative, linking words (although, because, while)"
+    },
+    {
+      "id": "B1_2",
+      "level": "B1",
+      "question": "What's something you used to do when you were younger but don't do anymore?",
+      "follow_ups": [
+        "Why did that change?",
+        "Do you miss doing that? Do you think you will do it again?"
+      ],
+      "category": "Past Habits & Changes",
+      "target": "Used to + infinitive, comparing past and present"
+    },
+    {
+      "id": "B1_3",
+      "level": "B1",
+      "question": "Tell me about a place (restaurant, city, or park) you've been to recently.",
+      "follow_ups": [
+        "What did you do there?",
+        "Would you like to go back? Why or why not?"
+      ],
+      "category": "Recent Experiences & Descriptions",
+      "target": "Present perfect vs simple past, detailed descriptions"
+    },
+    {
+      "id": "B1_4",
+      "level": "B1",
+      "question": "Where would you go if you won a free trip anywhere in the world?",
+      "follow_ups": [
+        "Why would you choose that place?",
+        "Who would go with you and what would you do?"
+      ],
+      "category": "Hypothetical Scenarios",
+      "target": "Second conditional (If I won... I would go...)"
+    },
+    {
+      "id": "B1_5",
+      "level": "B1",
+      "question": "What do you think is better: working from home or working in an office?",
+      "follow_ups": [
+        "Why do you think that?",
+        "Are there any disadvantages to both?"
+      ],
+      "category": "Pros & Cons / Discussion",
+      "target": "Weighing pros and cons, contrast connectors (on the other hand)"
+    },
+    {
+      "id": "B1_6",
+      "level": "B1",
+      "question": "What is your favorite dish or drink, and how is it made?",
+      "follow_ups": [
+        "What ingredients do you need?",
+        "How often do you make it or eat it?"
+      ],
+      "category": "Processes & Passive Voice",
+      "target": "Passive voice / sequence markers (first, then, after that, it is prepared)"
+    },
+    {
+      "id": "B1_7",
+      "level": "B1",
+      "question": "Imagine I tell you I'm really tired and I can't focus during the day. What advice would you give me?",
+      "follow_ups": [
+        "What could I try?",
+        "What do you think I should change in my routine?"
+      ],
+      "category": "Giving Advice & Suggestions",
+      "target": "Modals (ought to, might want to, why don't you, you should)"
+    },
+    {
+      "id": "B1_8",
+      "level": "B1",
+      "question": "Can you think of a situation when something simple went wrong? Like missing a bus or forgetting something important.",
+      "follow_ups": [
+        "What happened?",
+        "How did you feel and what did you do next?"
+      ],
+      "category": "Narrating Past Mishaps",
+      "target": "Past continuous + past simple (I was walking when...), feelings"
+    },
+    {
+      "id": "B1_9",
+      "level": "B1",
+      "question": "Can you describe a product, app, or place that impressed you recently?",
+      "follow_ups": [
+        "What made it special or different?",
+        "Would you recommend it to others?"
+      ],
+      "category": "Product / Experience Evaluation",
+      "target": "Expressing impressions, evaluative vocabulary"
+    },
+    {
+      "id": "B1_10",
+      "level": "B1",
+      "question": "What do you think might happen to workplaces or schools in the next 10 years?",
+      "follow_ups": [
+        "Why do you think that?",
+        "Is that a good or bad thing in your opinion?"
+      ],
+      "category": "Predictions & Future Trends",
+      "target": "Future predictions (might, will probably, could)"
+    },
+    {
+      "id": "B1_11",
+      "level": "B1",
+      "question": "My friend Ana stayed up all night before her exam and then fell asleep during the test. What should she have done?",
+      "follow_ups": [
+        "What could she have done differently?",
+        "What would you have done in her place?"
+      ],
+      "category": "Past Regrets & Third Conditional",
+      "target": "Should have + participle, would have done"
+    },
+    {
+      "id": "B1_12",
+      "level": "B1",
+      "question": "What do you usually do when you need to make a difficult decision?",
+      "follow_ups": [
+        "Do you ask for advice?",
+        "Who do you talk to?"
+      ],
+      "category": "Decision Making & Strategies",
+      "target": "Explaining reasoning, strategies, complex sentences"
+    },
+    {
+      "id": "B1_13",
+      "level": "B1",
+      "question": "Tell me about something important you're planning or hoping to do this year.",
+      "follow_ups": [
+        "Why is it important to you and what steps are you taking?"
+      ],
+      "category": "Goals & Ambitions",
+      "target": "Hoping to, planning to, intend to, timeframes"
+    },
+    {
+      "id": "B1_14",
+      "level": "B1",
+      "question": "Can you describe a habit you changed recently?",
+      "follow_ups": [
+        "What made you change it?",
+        "Has it been easy or difficult to maintain?"
+      ],
+      "category": "Habits & Self-development",
+      "target": "Present perfect continuous / simple, contrast"
+    },
+    {
+      "id": "B1_15",
+      "level": "B1",
+      "question": "What's something you think people should try at least once in life?",
+      "follow_ups": [
+        "Why do you recommend it?",
+        "Have you convinced anyone to try it?"
+      ],
+      "category": "Persuasion & Recommendations",
+      "target": "Persuasive language, justification"
+    },
+    {
+      "id": "B1_16",
+      "level": "B1",
+      "question": "What's something that people often complain about where you live?",
+      "follow_ups": [
+        "Do you agree with those complaints?",
+        "What could make the situation better?"
+      ],
+      "category": "Social Issues & Solutions",
+      "target": "Stating agreement/disagreement, proposing solutions"
+    },
+    {
+      "id": "B1_17",
+      "level": "B1",
+      "question": "What would you say if someone offered you a job in another country?",
+      "follow_ups": [
+        "Why would you accept or refuse the offer?",
+        "Have you ever thought about living abroad?"
+      ],
+      "category": "Hypothetical Career Moves",
+      "target": "Second conditional, expressing conditions and doubts"
+    }
+  ],
+  "B2": [
+    {
+      "id": "B2_1",
+      "level": "B2",
+      "question": "Do you prefer spending time alone or with other people, and how has that preference evolved over time?",
+      "follow_ups": [
+        "What kind of situation makes you feel that way?",
+        "How do you recharge your energy?"
+      ],
+      "category": "Self-Reflection & Evolution",
+      "target": "Nuanced expression, introspection, complex tenses"
+    },
+    {
+      "id": "B2_2",
+      "level": "B2",
+      "question": "Tell me about a hobby or activity you've recently started or gotten back to. What made you interested?",
+      "follow_ups": [
+        "Do you think you'll still be doing it in 10 years? Why?"
+      ],
+      "category": "Future Continuous / Perfect & Interests",
+      "target": "Will still be doing, long-term outlook, motivation"
+    },
+    {
+      "id": "B2_3",
+      "level": "B2",
+      "question": "Think of a time when you had to explain how something worked or teach someone a skill. How did you do it?",
+      "follow_ups": [
+        "Did the person understand? Would you explain it the same way today or change something?"
+      ],
+      "category": "Pedagogy & Communication",
+      "target": "Complex storytelling, conditional reflection (would change)"
+    },
+    {
+      "id": "B2_4",
+      "level": "B2",
+      "question": "Do you think people today are more impatient than before? Why does that happen?",
+      "follow_ups": [
+        "What irritates you personally? Is there anything you find particularly annoying in modern life?"
+      ],
+      "category": "Social Trends & Psychology",
+      "target": "Abstract analysis, societal observation, expressing annoyance"
+    },
+    {
+      "id": "B2_5",
+      "level": "B2",
+      "question": "Can you remember a time when you had to make a quick choice or decision under pressure?",
+      "follow_ups": [
+        "What was happening? What do you think might have happened if you had chosen something else?"
+      ],
+      "category": "Past Hypotheticals & Pressure",
+      "target": "Third conditional (might have happened if I had chosen...)"
+    },
+    {
+      "id": "B2_6",
+      "level": "B2",
+      "question": "Where do you get your news, and do you think it's important to keep up with current events?",
+      "follow_ups": [
+        "What are some trends in technology or society that you've been following recently?"
+      ],
+      "category": "Media & Technology Trends",
+      "target": "Critical thinking, media literacy, present perfect continuous"
+    },
+    {
+      "id": "B2_7",
+      "level": "B2",
+      "question": "Have you ever seen how something is made or done behind the scenes? Describe what was happening.",
+      "follow_ups": [
+        "What surprised you about the process?",
+        "Would you like to try doing it yourself?"
+      ],
+      "category": "Behind-the-Scenes & Process",
+      "target": "Technical description, passive forms, expressive details"
+    },
+    {
+      "id": "B2_8",
+      "level": "B2",
+      "question": "What do you think makes someone a truly effective communicator or leader?",
+      "follow_ups": [
+        "Can you think of a time when you witnessed a bad example of communication?"
+      ],
+      "category": "Communication Theory & Leadership",
+      "target": "Abstract qualities, exemplification, critique"
+    },
+    {
+      "id": "B2_9",
+      "level": "B2",
+      "question": "Is there something in your life or society that you wish were different right now?",
+      "follow_ups": [
+        "What would you change if you could?",
+        "What difference would that make in daily life?"
+      ],
+      "category": "Wishes & Hypothetical Reform",
+      "target": "I wish + past subjunctive / would, social commentary"
+    },
+    {
+      "id": "B2_10",
+      "level": "B2",
+      "question": "What's a common complaint people have in your city or country, and what realistic solution would you propose?",
+      "follow_ups": [
+        "Do you agree with the criticism?",
+        "Why haven't authorities solved it yet?"
+      ],
+      "category": "Public Policy & Problem Solving",
+      "target": "Debating, presenting realistic actionable solutions"
+    },
+    {
+      "id": "B2_11",
+      "level": "B2",
+      "question": "Think about your life 5 or 10 years ago. What was something you were convinced was going to happen in the future?",
+      "follow_ups": [
+        "What happened instead?",
+        "What might have happened if things had gone according to plan?"
+      ],
+      "category": "Past Expectations vs Reality",
+      "target": "Future in the past (was going to), mixed conditionals"
+    },
+    {
+      "id": "B2_12",
+      "level": "B2",
+      "question": "Describe a place you visited that was completely different from what you had expected.",
+      "follow_ups": [
+        "What had you imagined beforehand?",
+        "Did the experience change your perspective?"
+      ],
+      "category": "Contrasting Expectations",
+      "target": "Past perfect (had imagined, had expected), sensory vocabulary"
+    },
+    {
+      "id": "B2_13",
+      "level": "B2",
+      "question": "Have you ever had to get something repaired or done for you? Was the job done well?",
+      "follow_ups": [
+        "Would you attempt to do it yourself next time?"
+      ],
+      "category": "Causative Verbs & Services",
+      "target": "Causative (have/get something done), evaluating service"
+    },
+    {
+      "id": "B2_14",
+      "level": "B2",
+      "question": "Do you consider yourself someone who gives up easily when facing obstacles? Tell me about a challenge you overcame.",
+      "follow_ups": [
+        "What strategies helped you keep going?"
+      ],
+      "category": "Resilience & Overcoming Challenges",
+      "target": "Complex narrative, psychological reflection, strategies"
+    },
+    {
+      "id": "B2_15",
+      "level": "B2",
+      "question": "What's something people often find hard to get used to when moving or changing routines?",
+      "follow_ups": [
+        "Why does that happen?",
+        "Does it eventually become natural?"
+      ],
+      "category": "Adaptation & Cultural Adjustment",
+      "target": "Be used to / get used to + ing, discussing adaptation"
+    },
+    {
+      "id": "B2_16",
+      "level": "B2",
+      "question": "Can you remember a piece of advice someone gave you that really stuck with you? Who told you and what did they say?",
+      "follow_ups": [
+        "Have you ever passed that wisdom on to someone else?"
+      ],
+      "category": "Reported Speech & Wisdom",
+      "target": "Reported speech, philosophical reflection"
+    },
+    {
+      "id": "B2_17",
+      "level": "B2",
+      "question": "What are your major goals for the next few years? What will you have achieved by then and what might still be in progress?",
+      "follow_ups": [
+        "How are you actively preparing for them?"
+      ],
+      "category": "Future Perfect & Ambitions",
+      "target": "Future perfect (will have achieved), future continuous"
+    }
+  ]
+}

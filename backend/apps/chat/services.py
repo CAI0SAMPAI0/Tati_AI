@@ -7,6 +7,7 @@ import warnings
 
 warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
 import google.generativeai as genai
+from groq import Groq
 
 from .models import Conversation, Message
 from .schemas import (
@@ -177,6 +178,12 @@ class AIService:
     def generate_reply(
         cls, user: User, conversation_id: str, user_text: str, difficulty: str = None
     ) -> dict:
+        # Verifica se esta conversa é uma sessão de nivelamento ativa
+        from .leveling_service import LevelingService
+
+        if LevelingService.is_leveling_conversation(user, conversation_id):
+            return LevelingService.process_leveling_step(user, conversation_id, user_text)
+
         # 1. Salva mensagem do usuário
         Message.objects.create(
             session_id=conversation_id,

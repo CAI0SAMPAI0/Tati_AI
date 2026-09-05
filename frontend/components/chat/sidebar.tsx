@@ -12,6 +12,7 @@ import {
   LogOut,
   X,
   ChevronRight,
+  Target,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePrefetch } from '@/hooks/usePrefetch';
@@ -29,6 +30,7 @@ interface SidebarProps {
   currentConvId: string | null;
   onSelectConv: (id: string, title: string) => void;
   onNewChat: () => void;
+  onStartLeveling?: () => void;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -37,6 +39,7 @@ export function Sidebar({
   currentConvId,
   onSelectConv,
   onNewChat,
+  onStartLeveling,
   isOpen,
   onClose,
 }: SidebarProps) {
@@ -157,11 +160,23 @@ export function Sidebar({
         {/* New Chat Button */}
         <button
           onClick={onNewChat}
-          className="mx-3 mb-2 flex items-center gap-2.5 px-3.5 py-2.5 bg-primary/15 border border-primary/30 rounded-lg text-primary text-[0.85rem] font-bold hover:bg-primary/25 hover:border-primary transition-all active:translate-y-[1px]"
+          className="mx-3 mb-1.5 flex items-center gap-2.5 px-3.5 py-2.5 bg-primary/15 border border-primary/30 rounded-lg text-primary text-[0.85rem] font-bold hover:bg-primary/25 hover:border-primary transition-all active:translate-y-[1px]"
         >
           <Plus size={16} strokeWidth={2.5} />
           <span>{'New conversation'}</span>
         </button>
+
+        {/* Leveling Test Button */}
+        {onStartLeveling && (
+          <button
+            onClick={onStartLeveling}
+            className="mx-3 mb-2 flex items-center gap-2.5 px-3.5 py-2 bg-gradient-to-r from-purple-500/10 via-primary/15 to-purple-500/10 border border-primary/40 rounded-lg text-primary text-[0.82rem] font-bold hover:bg-primary/25 hover:border-primary transition-all active:translate-y-[1px] shadow-sm"
+            title="Start your CEFR English Leveling Challenge"
+          >
+            <Target size={15} className="text-primary shrink-0" strokeWidth={2.2} />
+            <span className="truncate">🎯 Leveling Assessment</span>
+          </button>
+        )}
 
         <div className="h-px bg-border mx-3 my-2 shrink-0" />
 

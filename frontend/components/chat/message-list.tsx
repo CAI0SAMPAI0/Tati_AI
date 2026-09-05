@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Target, ArrowRight } from 'lucide-react';
 import type { Message } from '@/lib/api/types';
 import { MessageBubble } from './message-bubble';
 
@@ -14,9 +14,10 @@ interface MessageListProps {
   onEdit?: (messageId: string, newContent: string) => Promise<void>;
   onResend?: (content: string) => void;
   onSendMessage?: (text: string) => void;
+  onStartLeveling?: () => void;
 }
 
-export function MessageList({ messages, isStreaming, streamingContent, onEdit, onResend, onSendMessage }: MessageListProps) {
+export function MessageList({ messages, isStreaming, streamingContent, onEdit, onResend, onSendMessage, onStartLeveling }: MessageListProps) {
   const router = useRouter();
   
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -87,6 +88,29 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit, o
           <p className="text-sm text-text-muted max-w-[320px] mb-6">
             Your AI English teacher. Let's practice together?
           </p>
+
+          {onStartLeveling && (
+            <div className="w-full max-w-sm mb-5 p-4 bg-gradient-to-br from-primary/15 via-surface to-purple-500/10 border border-primary/40 rounded-2xl text-left shadow-lg hover:border-primary transition-all">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="p-1.5 rounded-lg bg-primary/20 text-primary">
+                  <Target size={16} />
+                </span>
+                <span className="font-bold text-sm text-text">CEFR Leveling Test</span>
+                <span className="ml-auto text-[0.65rem] font-black uppercase px-2 py-0.5 rounded-full bg-primary text-white">New</span>
+              </div>
+              <p className="text-xs text-text-muted mb-3 leading-relaxed">
+                Discover your exact English level (A1 to B2) in a quick conversational challenge with Teacher Tati. You'll receive your score and diagnostic report by email!
+              </p>
+              <button
+                onClick={onStartLeveling}
+                className="w-full py-2.5 px-4 rounded-xl bg-primary text-white text-xs font-bold shadow-md shadow-primary/25 hover:bg-primary/90 active:scale-98 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span>Start Leveling Challenge</span>
+                <ArrowRight size={14} />
+              </button>
+            </div>
+          )}
+
           <div className="bg-surface border border-border px-3 py-2 rounded-lg text-xs text-text-subtle mb-6">
             💡 Click any English word to see the translation and hear the pronunciation
           </div>

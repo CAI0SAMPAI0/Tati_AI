@@ -117,6 +117,37 @@ export default function ChatClientPage() {
     router.push('/chat');
   }, [router, setMessages, handleCloseSidebar]);
 
+  const handleStartLeveling = useCallback(async () => {
+    try {
+      toast.loading('Starting your CEFR Leveling Challenge...', { id: 'start-leveling' });
+      const res = await apiPost<any>(ENDPOINTS.LEVELING_START, {});
+      if (res.ok && res.data?.conversation_id) {
+        toast.success('Leveling Challenge Started! Answer in English.', { id: 'start-leveling' });
+        const newConvId = res.data.conversation_id;
+        setCurrentConvId(newConvId);
+        setConvTitle(res.data.title || 'CEFR Leveling Challenge');
+        const initialMsg: Message = {
+          id: `leveling-init-${Date.now()}`,
+          conversation_id: newConvId,
+          role: 'assistant',
+          content: res.data.reply || res.data.message || '',
+          audio_b64: res.data.audio_b64,
+          created_at: new Date().toISOString(),
+        };
+        setMessages([initialMsg]);
+        router.push(`/chat?conv_id=${newConvId}`);
+        if (window.innerWidth < 768) {
+          handleCloseSidebar();
+        }
+      } else {
+        toast.error('Could not start leveling challenge right now.', { id: 'start-leveling' });
+      }
+    } catch (err) {
+      console.error('Error starting leveling assessment:', err);
+      toast.error('Connection error while starting leveling.', { id: 'start-leveling' });
+    }
+  }, [router, setMessages, handleCloseSidebar]);
+
   const handleSend = async (text: string) => {
     let convId = currentConvId;
 
@@ -281,6 +312,7 @@ export default function ChatClientPage() {
         currentConvId={currentConvId}
         onSelectConv={handleSelectConv}
         onNewChat={handleNewChat}
+        onStartLeveling={handleStartLeveling}
         isOpen={sidebarOpen}
         onClose={handleCloseSidebar}
       />
@@ -302,6 +334,7 @@ export default function ChatClientPage() {
             onEdit={handleEditMessage}
             onResend={handleResend}
             onSendMessage={handleSend}
+            onStartLeveling={handleStartLeveling}
           />
         </div>
         <div className="p-2 md:p-6 bg-gradient-to-t from-bg via-bg/80 to-transparent">

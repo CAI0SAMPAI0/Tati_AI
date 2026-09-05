@@ -124,8 +124,11 @@ export default function ActivitiesClientPage() {
   const [visibleCount, setVisibleCount] = useState(10);
 
   const isStaff = user?.role && ['professor', 'professora', 'programador', 'Tatiana', 'Tati', 'Professora', 'Programador', 'admin', 'Admin'].includes(user.role);
+  const userLevelNormalized = (user?.level || '').toUpperCase().trim();
+  const isB1OrAbove = ['B1', 'B2', 'C1', 'C2'].includes(userLevelNormalized);
+  const canFilterLevels = Boolean(isStaff || isB1OrAbove);
 
-  const effectiveLevel = !isStaff && user?.level && ['A1', 'A2', 'B1', 'B2', 'C1'].includes(user.level) ? user.level : filterLevel;
+  const effectiveLevel = canFilterLevels ? filterLevel : (['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].includes(userLevelNormalized) ? userLevelNormalized : 'A1');
 
   useEffect(() => {
     setVisibleCount(10);
@@ -620,7 +623,7 @@ export default function ActivitiesClientPage() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-stretch sm:items-center flex-wrap">
-              {isStaff && (
+              {canFilterLevels && (
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-text-subtle uppercase tracking-wider whitespace-nowrap">Level:</span>
                   <select

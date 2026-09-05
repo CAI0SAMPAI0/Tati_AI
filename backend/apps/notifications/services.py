@@ -60,16 +60,24 @@ def get_verified_sender_email() -> str:
 class BrevoEmailService:
     @staticmethod
     def send_email(
-        to_email: str, subject: str, html_content: str, recipient_name: str = None
+        to_email: str,
+        subject: str,
+        html_content: str,
+        recipient_name: str = None,
+        attachments: Optional[List[dict]] = None,
     ) -> bool:
         res = BrevoEmailService.send_email_detailed(
-            to_email, subject, html_content, recipient_name
+            to_email, subject, html_content, recipient_name, attachments=attachments
         )
         return res.get("success", False)
 
     @staticmethod
     def send_email_detailed(
-        to_email: str, subject: str, html_content: str, recipient_name: str = None
+        to_email: str,
+        subject: str,
+        html_content: str,
+        recipient_name: str = None,
+        attachments: Optional[List[dict]] = None,
     ) -> dict:
         brevo_key = get_brevo_api_key()
         sender_email = get_verified_sender_email()
@@ -97,6 +105,11 @@ class BrevoEmailService:
                 "subject": subject,
                 "htmlContent": html_content,
             }
+            if attachments:
+                payload["attachment"] = [
+                    {"content": att.get("content", ""), "name": att.get("name", "attachment.pdf")}
+                    for att in attachments
+                ]
 
             try:
                 with httpx.Client(timeout=12.0) as client:
@@ -149,6 +162,11 @@ class BrevoEmailService:
                     "subject": subject,
                     "html": html_content,
                 }
+                if attachments:
+                    resend_payload["attachments"] = [
+                        {"content": att.get("content", ""), "filename": att.get("name", "attachment.pdf")}
+                        for att in attachments
+                    ]
                 resend_headers = {
                     "Authorization": f"Bearer {resend_key}",
                     "Content-Type": "application/json",
@@ -189,15 +207,31 @@ class BrevoEmailService:
         if smtp_host and smtp_user and smtp_pass:
             try:
                 import smtplib
+                import base64
                 from email.mime.text import MIMEText
                 from email.mime.multipart import MIMEMultipart
+                from email.mime.application import MIMEApplication
 
                 smtp_port = int(os.getenv("SMTP_PORT", "587"))
-                msg = MIMEMultipart("alternative")
+                msg = MIMEMultipart("mixed")
                 msg["Subject"] = subject
                 msg["From"] = f"{sender_name} <{smtp_user}>"
                 msg["To"] = to_email
-                msg.attach(MIMEText(html_content, "html"))
+
+                html_part = MIMEText(html_content, "html")
+                msg.attach(html_part)
+
+                if attachments:
+                    for att in attachments:
+                        content_b64 = att.get("content", "")
+                        att_name = att.get("name", "attachment.pdf")
+                        try:
+                            raw_bytes = base64.b64decode(content_b64)
+                            part = MIMEApplication(raw_bytes, Name=att_name)
+                            part["Content-Disposition"] = f'attachment; filename="{att_name}"'
+                            msg.attach(part)
+                        except Exception as att_err:
+                            logger.warning(f"[SMTP] Error attaching file {att_name}: {att_err}")
 
                 if smtp_port == 465:
                     with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:

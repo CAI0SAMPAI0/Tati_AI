@@ -35,6 +35,41 @@ def create_conversation(request: HttpRequest, payload: CreateConversationInput):
     return ConversationService.create_conversation(request.auth, payload)
 
 
+# ── TESTE DE NIVELAMENTO CEFR (DIAGNÓSTICO) ──────────────────────────
+
+
+@chat_router.post("/leveling/start", auth=auth_required)
+def start_leveling_assessment(request: HttpRequest):
+    """
+    Inicia o Teste de Nivelamento CEFR oficial da Teacher Tati com base nos questionários diagnósticos.
+    """
+    from .leveling_service import LevelingService
+
+    return LevelingService.start_leveling_session(request.auth)
+
+
+@chat_router.get("/leveling/status", auth=auth_required)
+def get_leveling_status(request: HttpRequest):
+    """
+    Retorna o status atual da sessão de nivelamento do aluno, se houver.
+    """
+    user = request.auth
+    active = (
+        getattr(user, "profile", {}).get("active_leveling")
+        if isinstance(getattr(user, "profile", None), dict)
+        else None
+    )
+    if isinstance(active, dict) and not active.get("completed", False):
+        return {
+            "active": True,
+            "conversation_id": active.get("conversation_id"),
+            "current_index": active.get("current_index", 0),
+            "total_questions": active.get("total_questions", 0),
+            "started_at": active.get("started_at"),
+        }
+    return {"active": False}
+
+
 @chat_router.get(
     "/conversations/{conversation_id}/messages",
     response=List[MessageOut],
