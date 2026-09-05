@@ -58,6 +58,57 @@ def get_verified_sender_email() -> str:
 
 
 class BrevoEmailService:
+    @classmethod
+    def build_standard_email_html(
+        cls,
+        recipient_name: str,
+        body_paragraphs: list[str],
+        action_url: str,
+        action_label: str,
+        highlight_card_html: str = "",
+        title_header: str = "Teacher Tatiana Duarte",
+        subtitle_header: str = "Your personal AI English tutor",
+    ) -> str:
+        body_paragraphs_html = "".join(
+            f'<p style="font-size: 15px; color: #334155; margin: 12px 0; line-height: 1.6;">{p}</p>'
+            for p in body_paragraphs
+        )
+        highlight_section = (
+            f'<div style="margin-bottom: 24px;">{highlight_card_html}</div>'
+            if highlight_card_html.strip()
+            else ""
+        )
+        return f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #333333; line-height: 1.6;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; padding: 32px 24px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);">
+        <div style="text-align: center; margin-bottom: 24px;">
+            <h2 style="color: #6366f1; margin: 0 0 4px 0; font-size: 22px; font-weight: 700;">{title_header}</h2>
+            <p style="color: #64748b; font-size: 14px; margin: 0;">{subtitle_header}</p>
+        </div>
+
+        {highlight_section}
+
+        <p style="font-size: 16px; color: #1e293b; margin: 16px 0 12px 0;">Hello, <strong>{recipient_name}</strong>!</p>
+        {body_paragraphs_html}
+
+        <div style="text-align: center; margin: 32px 0;">
+            <a href="{action_url}" style="background-color: #6366f1; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px; display: inline-block; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);">
+                {action_label}
+            </a>
+        </div>
+
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 32px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+            Tati AI — English Learning Experience. All rights reserved.
+        </p>
+    </div>
+</body>
+</html>"""
+
     @staticmethod
     def send_email(
         to_email: str,
@@ -982,19 +1033,26 @@ class NotificationSchedulerService:
 
         # 3. Dispara a notificação de streak
         streak_val = user.streak_count or 1
-        title = "Don't break your streak"
+        title = "Keep Your Study Streak Alive - Teacher Tati"
         body = f"Hello {first_name}! You are on a {streak_val}-day streak. Practice 5 minutes today with Teacher Tati to keep your progress on track."
-        html = f"""
-<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
-  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-    <div style="text-align: center; margin-bottom: 24px;"><span style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">STREAK AT RISK</span></div>
-    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Don't break your streak, {first_name}!</h1>
-    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">You have worked hard to reach a <strong style="color: #f59e0b;">{streak_val}-day study streak</strong>. Don't let your progress slip away. Just 5 minutes of practice with Teacher Tati keeps your momentum strong.</p>
-    <div style="text-align: center; margin: 32px 0;"><a href="https://tati-ai.vercel.app/activities" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Practice with Tati Now</a></div>
-    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Personalized English Coaching</p>
-  </div>
-</body></html>"""
+        
+        highlight_html = f"""
+        <div style="background-color: #f8fafc; border-left: 4px solid #6366f1; padding: 16px; border-radius: 8px; margin-bottom: 24px; text-align: center;">
+            <div style="font-size: 12px; font-weight: 800; color: #6366f1; text-transform: uppercase; letter-spacing: 1px;">Current Streak</div>
+            <div style="font-size: 32px; font-weight: 900; color: #1e293b; margin: 4px 0;">{streak_val} Days</div>
+            <div style="font-size: 13px; color: #64748b;">Practice 5 minutes today to keep your streak alive</div>
+        </div>
+        """
+        html = BrevoEmailService.build_standard_email_html(
+            recipient_name=first_name,
+            body_paragraphs=[
+                f"You have worked hard to build a study streak of <strong>{streak_val} days</strong>. Don't let your progress slip away!",
+                "Just 5 minutes of practice with Teacher Tati keeps your momentum strong and your English sharp."
+            ],
+            action_url="https://tati-ai.vercel.app/activities",
+            action_label="Practice with Tati Now",
+            highlight_card_html=highlight_html,
+        )
 
         email_diag = (
             BrevoEmailService.send_email_detailed(email, title, html, first_name)
@@ -1118,23 +1176,39 @@ class NotificationSchedulerService:
         acts_done = report_data.get("exercises_completed", 5)
         vocab_learned = report_data.get("words_learned", 12)
 
-        title = "Your Weekly Progress Report - Teacher Tati AI"
+        title = "Your Weekly English Progress Report - Teacher Tati"
         body = f"Hello {first_name}! Your weekly report is ready: {mins_studied} min practiced, {acts_done} activities completed, and +{vocab_learned} words learned."
-        html = f"""
-<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
-  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(124, 58, 237, 0.15); color: #a78bfa; border: 1px solid rgba(124, 58, 237, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">WEEKLY EVOLUTION REPORT</span></div>
-    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Great progress this week, {first_name}!</h1>
-    <table style="width: 100%; border-collapse: collapse; margin: 24px 0;"><tr>
-      <td style="padding: 12px; background: #221b40; border-radius: 12px 0 0 12px; text-align: center; width: 33.3%;"><div style="font-size: 22px; font-weight: 800; color: #7c3aed;">{mins_studied} min</div><div style="font-size: 12px; color: #948aa8;">Study Time</div></td>
-      <td style="padding: 12px; background: #221b40; border-left: 1px solid #312759; border-right: 1px solid #312759; text-align: center; width: 33.3%;"><div style="font-size: 22px; font-weight: 800; color: #10b981;">{acts_done}</div><div style="font-size: 12px; color: #948aa8;">Activities</div></td>
-      <td style="padding: 12px; background: #221b40; border-radius: 0 12px 12px 0; text-align: center; width: 33.3%;"><div style="font-size: 22px; font-weight: 800; color: #f59e0b;">+{vocab_learned}</div><div style="font-size: 12px; color: #948aa8;">Words</div></td>
-    </tr></table>
-    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/dashboard" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 15px; display: inline-block;">View Full Report</a></div>
-    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Real Results.</p>
-  </div>
-</body></html>"""
+        
+        stats_card_html = f"""
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+            <table style="width: 100%; border-collapse: collapse; text-align: center;">
+                <tr>
+                    <td style="padding: 10px; width: 33.3%;">
+                        <div style="font-size: 22px; font-weight: 800; color: #6366f1;">{mins_studied} min</div>
+                        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Study Time</div>
+                    </td>
+                    <td style="padding: 10px; width: 33.3%; border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;">
+                        <div style="font-size: 22px; font-weight: 800; color: #16a34a;">{acts_done}</div>
+                        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Activities</div>
+                    </td>
+                    <td style="padding: 10px; width: 33.3%;">
+                        <div style="font-size: 22px; font-weight: 800; color: #eab308;">+{vocab_learned}</div>
+                        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Words Learned</div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        """
+        html = BrevoEmailService.build_standard_email_html(
+            recipient_name=first_name,
+            body_paragraphs=[
+                "Here is your weekly summary of your English learning journey.",
+                "Consistency is the key to fluency, and every session brings you closer to your goals. Keep up the great work!"
+            ],
+            action_url="https://tati-ai.vercel.app/dashboard",
+            action_label="View Full Evolution Report",
+            highlight_card_html=stats_card_html,
+        )
 
         email_diag = (
             BrevoEmailService.send_email_detailed(email, title, html, first_name)
@@ -1242,19 +1316,24 @@ class NotificationSchedulerService:
                 "username": user.username,
             }
 
-        title = "Teacher Tatiana is waiting for you"
+        title = "Teacher Tatiana is Waiting for You - Let's Practice"
         body = f"Hello {first_name}, it has been a few days since your last practice. A quick 3-minute conversation keeps your English skills sharp."
-        html = f"""
-<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
-  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(236, 72, 153, 0.15); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">PRACTICE REMINDER</span></div>
-    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Teacher Tatiana is waiting for you, {first_name}!</h1>
-    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">A quick 3-minute conversation today will keep your English fluent and natural. Say hello to Teacher Tatiana!</p>
-    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/chat" style="background: linear-gradient(135deg, #ec4899, #d946ef); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Say Hello to Teacher Tati</a></div>
-    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Always here for your learning journey.</p>
-  </div>
-</body></html>"""
+        
+        highlight_html = f"""
+        <div style="background-color: #f8fafc; border-left: 4px solid #6366f1; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+            <p style="margin: 0; font-size: 15px; font-style: italic; color: #1e293b;">"A quick 3-minute conversation today will keep your English fluent and natural."</p>
+        </div>
+        """
+        html = BrevoEmailService.build_standard_email_html(
+            recipient_name=first_name,
+            body_paragraphs=[
+                "It has been a few days since your last practice session. Your vocabulary and confidence grow when you practice regularly.",
+                "Teacher Tati is ready whenever you are. Let's do a quick session today!"
+            ],
+            action_url="https://tati-ai.vercel.app/chat",
+            action_label="Start Quick Practice",
+            highlight_card_html=highlight_html,
+        )
 
         email_diag = (
             BrevoEmailService.send_email_detailed(email, title, html, first_name)
@@ -1370,19 +1449,25 @@ class NotificationSchedulerService:
                 "username": user.username,
             }
 
-        title = "A fresh start awaits"
+        title = "A Fresh Start Awaits You - Teacher Tati"
         body = f"Hello {first_name}, your streak ended, but consistency is about bouncing right back. Today is Day 1 of your next streak!"
-        html = f"""
-<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
-  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">TIME FOR A COMEBACK</span></div>
-    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Streak ended, but your journey continues, {first_name}!</h1>
-    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">Consistency is about bouncing right back. Teacher Tati is ready for your next session!</p>
-    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/chat" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Start Day 1 Now</a></div>
-    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Continuous Progress.</p>
-  </div>
-</body></html>"""
+        
+        highlight_html = f"""
+        <div style="background-color: #f8fafc; border-left: 4px solid #6366f1; padding: 16px; border-radius: 8px; margin-bottom: 24px; text-align: center;">
+            <div style="font-size: 12px; font-weight: 800; color: #6366f1; text-transform: uppercase; letter-spacing: 1px;">Time for a Comeback</div>
+            <div style="font-size: 20px; font-weight: 800; color: #1e293b; margin: 4px 0;">Today is Day 1 of Your Next Streak</div>
+        </div>
+        """
+        html = BrevoEmailService.build_standard_email_html(
+            recipient_name=first_name,
+            body_paragraphs=[
+                "Your previous study streak ended, but consistency isn't about never missing a day — it's about bouncing right back.",
+                "Teacher Tati is ready for your next session. Start Day 1 today!"
+            ],
+            action_url="https://tati-ai.vercel.app/chat",
+            action_label="Start Day 1 Now",
+            highlight_card_html=highlight_html,
+        )
 
         email_diag = (
             BrevoEmailService.send_email_detailed(email, title, html, first_name)
@@ -1415,7 +1500,7 @@ class NotificationSchedulerService:
         )
         email = user.email
 
-        title = f"{milestone}-Day Streak Achieved - Congratulations!"
+        title = f"Milestone Achieved: {milestone} Days in a Row - Teacher Tati"
         already_notified = Notification.objects.filter(
             username=user.username,
             category="achievements",
@@ -1432,17 +1517,24 @@ class NotificationSchedulerService:
             }
 
         body = f"Congratulations {first_name}! You have reached a {milestone}-day study streak. You are building a powerful English habit."
-        html = f"""
-<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
-  <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">MILESTONE ACHIEVED</span></div>
-    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">{milestone} Days in a Row, {first_name}!</h1>
-    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">Consistency pays off. You are now among our most dedicated English students. Keep up the great work!</p>
-    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/achievements" style="background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">View Achievements</a></div>
-    <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Celebrate every milestone.</p>
-  </div>
-</body></html>"""
+        
+        highlight_html = f"""
+        <div style="background-color: #f8fafc; border-left: 4px solid #16a34a; padding: 16px; border-radius: 8px; margin-bottom: 24px; text-align: center;">
+            <div style="font-size: 12px; font-weight: 800; color: #16a34a; text-transform: uppercase; letter-spacing: 1px;">Milestone Achieved</div>
+            <div style="font-size: 32px; font-weight: 900; color: #1e293b; margin: 4px 0;">{milestone} Days in a Row</div>
+            <div style="font-size: 13px; color: #64748b;">Outstanding dedication to your English learning</div>
+        </div>
+        """
+        html = BrevoEmailService.build_standard_email_html(
+            recipient_name=first_name,
+            body_paragraphs=[
+                f"Congratulations! You have reached an incredible milestone of <strong>{milestone} consecutive days</strong> of studying English with Teacher Tati.",
+                "Consistency pays off. You are now among our most dedicated English students. Keep up the great work!"
+            ],
+            action_url="https://tati-ai.vercel.app/achievements",
+            action_label="View Achievements",
+            highlight_card_html=highlight_html,
+        )
 
         email_diag = (
             BrevoEmailService.send_email_detailed(email, title, html, first_name)
@@ -1501,14 +1593,31 @@ class NotificationSchedulerService:
                 .split()[0]
                 .capitalize()
             )
-            title = "📚 New Listening Activity: 'Mastering Everyday English'"
-            body = f"Hi {first_name}! Teacher Tatiana just published a brand-new activity designed for your level. Check it out!"
+            title = "New Activity Available: Everyday English Practice"
+            body = f"Hello {first_name}! Teacher Tatiana just published a new activity designed for your level. Check it out!"
+            highlight_html = f"""
+            <div style="background-color: #f8fafc; border-left: 4px solid #6366f1; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+                <div style="font-size: 12px; font-weight: 800; color: #6366f1; text-transform: uppercase; letter-spacing: 1px;">New Activity</div>
+                <div style="font-size: 18px; font-weight: 800; color: #1e293b; margin: 4px 0;">Mastering Everyday English</div>
+                <div style="font-size: 13px; color: #64748b;">Interactive exercise designed for your current level</div>
+            </div>
+            """
+            html = BrevoEmailService.build_standard_email_html(
+                recipient_name=first_name,
+                body_paragraphs=[
+                    "Teacher Tatiana just published a brand-new interactive exercise tailored for your English level.",
+                    "Practice now to expand your vocabulary, improve your listening skills, and gain more confidence speaking English!"
+                ],
+                action_url="https://tati-ai.vercel.app/activities",
+                action_label="Start Activity Now",
+                highlight_card_html=highlight_html,
+            )
             email = user.email
             email_diag = (
                 BrevoEmailService.send_email_detailed(
                     email,
                     title,
-                    f"<p>Hello {first_name}, a new activity is available!</p>",
+                    html,
                     first_name,
                 )
                 if email

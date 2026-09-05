@@ -848,81 +848,60 @@ class MonthlyCompetitionService:
         def format_podium_card(item, medal, title, border_color, bg_color):
             if not item:
                 return f"""
-                <div style="background-color: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 16px; padding: 20px; text-align: center; margin-bottom: 12px;">
-                    <div style="font-weight: bold; color: #94a3b8; margin-top: 6px;">{title}</div>
-                    <div style="color: #64748b; font-size: 13px;">Sem participante registrado</div>
+                <div style="background-color: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 12px; padding: 16px; text-align: center; margin-bottom: 12px;">
+                    <div style="font-weight: bold; color: #94a3b8; font-size: 13px;">{title}</div>
+                    <div style="color: #64748b; font-size: 13px; margin-top: 4px;">No student registered</div>
                 </div>
                 """
             return f"""
-            <div style="background-color: {bg_color}; border: 2px solid {border_color}; border-radius: 16px; padding: 20px; text-align: center; margin-bottom: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-                <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: {border_color}; letter-spacing: 1px; margin-top: 6px;">{title}</div>
-                <div style="font-size: 18px; font-weight: 800; color: #0f172a; margin-top: 4px;">{item['name']}</div>
-                <div style="font-size: 13px; color: #64748b; margin-top: 2px;">@{item['username']} • Nível <strong>{item['level']}</strong></div>
-                <div style="display: inline-block; background-color: #ffffff; border: 1px solid {border_color}; border-radius: 20px; padding: 4px 14px; font-size: 14px; font-weight: 800; color: #0f172a; margin-top: 10px;">
-                    {item['score']} XP Conquistados
+            <div style="background-color: {bg_color}; border: 1px solid {border_color}; border-radius: 12px; padding: 16px; text-align: center; margin-bottom: 12px;">
+                <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: {border_color}; letter-spacing: 1px;">{title}</div>
+                <div style="font-size: 17px; font-weight: 800; color: #0f172a; margin-top: 4px;">{item['name']}</div>
+                <div style="font-size: 13px; color: #64748b; margin-top: 2px;">@{item['username']} • Level <strong>{item['level']}</strong></div>
+                <div style="display: inline-block; background-color: #ffffff; border: 1px solid {border_color}; border-radius: 16px; padding: 4px 14px; font-size: 13px; font-weight: 800; color: #0f172a; margin-top: 8px;">
+                    {item['score']} XP Earned
                 </div>
             </div>
             """
 
         frontend_url = os.getenv("FRONTEND_URL", "https://tati-ai.vercel.app")
 
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; color: #1e293b;">
-            <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.08);">
-                <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 36px 24px; text-align: center; color: #ffffff;">
-                    <h1 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Resultado da Competição Mensal</h1>
-                    <p style="margin: 8px 0 0 0; font-size: 15px; opacity: 0.9;">Teacher Tati AI • {month_label}</p>
-                </div>
-
-                <div style="padding: 32px 24px;">
-                    <p style="font-size: 16px; line-height: 1.6; margin-top: 0; color: #334155;">
-                        Olá, <strong>Professora Tatiana & Equipe</strong>!<br/>
-                        A competição do mês de <strong>{month_label}</strong> foi oficialmente finalizada. Confira os <strong>3 alunos com maior pontuação</strong>:
-                    </p>
-
-                    <div style="margin: 24px 0;">
-                        {format_podium_card(top1, "", "1º Lugar — Campeão", "#eab308", "#fefce8")}
-                        {format_podium_card(top2, "", "2º Lugar — Vice-Campeão", "#94a3b8", "#f8fafc")}
-                        {format_podium_card(top3_item, "", "3º Lugar — 3ª Posição", "#f97316", "#fff7ed")}
-                    </div>
-
-                    <div style="background-color: #f8fafc; border-radius: 16px; padding: 18px; margin: 24px 0; border: 1px solid #e2e8f0;">
-                        <h4 style="margin: 0 0 8px 0; font-size: 14px; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px;">Estatísticas do Ciclo:</h4>
-                        <p style="margin: 4px 0; font-size: 14px;"><strong>Total de participantes ativos:</strong> {total_participants} alunos</p>
-                        <p style="margin: 4px 0; font-size: 14px;"><strong>Novo Ciclo:</strong> O ranking foi reiniciado para o mês corrente.</p>
-                    </div>
-
-                    <div style="text-align: center; margin-top: 30px;">
-                        <a href="{frontend_url}/competitions" 
-                           style="display: inline-block; background-color: #4f46e5; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 14px 28px; border-radius: 12px; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);">
-                            Ver Ranking Completo no App
-                        </a>
-                    </div>
-                </div>
-
-                <div style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px; text-align: center; font-size: 12px; color: #94a3b8;">
-                    Teacher Tati AI • Notificação Automática de Competição Mensal
-                </div>
-            </div>
-        </body>
-        </html>
+        highlight_content = f"""
+        <div style="background-color: #f8fafc; border-left: 4px solid #6366f1; padding: 16px; border-radius: 8px; margin-bottom: 24px; text-align: center;">
+            <div style="font-size: 12px; font-weight: 800; color: #6366f1; text-transform: uppercase; letter-spacing: 1px;">Monthly Competition</div>
+            <div style="font-size: 22px; font-weight: 800; color: #1e293b; margin: 4px 0;">Final Results • {month_label}</div>
+        </div>
+        <div style="margin: 20px 0;">
+            {format_podium_card(top1, "1st", "1st Place — Champion", "#eab308", "#fefce8")}
+            {format_podium_card(top2, "2nd", "2nd Place — Runner-Up", "#94a3b8", "#f8fafc")}
+            {format_podium_card(top3_item, "3rd", "3rd Place — 3rd Position", "#f97316", "#fff7ed")}
+        </div>
+        <div style="background-color: #f8fafc; border-radius: 12px; padding: 16px; margin: 20px 0; border: 1px solid #e2e8f0;">
+            <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; margin-bottom: 8px;">Cycle Statistics</div>
+            <p style="margin: 4px 0; font-size: 14px; color: #334155;"><strong>Total active participants:</strong> {total_participants} students</p>
+            <p style="margin: 4px 0; font-size: 14px; color: #334155;"><strong>New Cycle:</strong> Leaderboard has been reset for the current month.</p>
+        </div>
         """
 
+        html_content = BrevoEmailService.build_standard_email_html(
+            recipient_name="Teacher Tatiana & Team",
+            body_paragraphs=[
+                f"The monthly English learning competition for <strong>{month_label}</strong> has officially concluded. Here are the 3 highest scoring students for the cycle:"
+            ],
+            action_url=f"{frontend_url}/competitions",
+            action_label="View Full Leaderboard in App",
+            highlight_card_html=highlight_content,
+        )
+
         results = {}
-        subject = f"Top 3 da Competição Mensal — Teacher Tati ({month_label})"
+        subject = f"Monthly Competition Top 3 - Teacher Tati ({month_label})"
         for email in recipients:
             try:
                 res = BrevoEmailService.send_email(
                     to_email=email,
                     subject=subject,
                     html_content=html_content,
-                    recipient_name="Equipe Teacher Tati",
+                    recipient_name="Teacher Tatiana & Team",
                 )
                 results[email] = bool(res)
                 logger.info(

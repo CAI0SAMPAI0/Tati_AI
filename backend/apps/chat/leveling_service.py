@@ -1126,65 +1126,69 @@ class LevelingService:
         <html>
         <head>
             <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Leveling Assessment Report</title>
         </head>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; padding: 24px; margin: 0;">
-            <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
-                <div style="background: linear-gradient(135deg, #7c3aed, #4f46e5); padding: 32px 24px; text-align: center; color: #ffffff;">
-                    <h1 style="margin: 0; font-size: 24px; font-weight: 800;">TEACHER TATI AI</h1>
-                    <p style="margin: 6px 0 0 0; font-size: 14px; opacity: 0.9;">CEFR English Diagnostic Assessment Results</p>
+        <body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 24px; margin: 0; color: #333333; line-height: 1.6;">
+            <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; padding: 32px 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+                <div style="text-align: center; margin-bottom: 24px;">
+                    <h2 style="color: #6366f1; margin: 0 0 4px 0; font-size: 22px; font-weight: 700;">Teacher Tatiana Duarte</h2>
+                    <p style="color: #64748b; font-size: 14px; margin: 0;">Your personal AI English tutor</p>
                 </div>
-                
-                <div style="padding: 28px 24px;">
-                    <h2 style="color: #1e293b; font-size: 20px; margin-top: 0;">Hello, {student_name}!</h2>
-                    <p style="color: #475569; font-size: 14px; line-height: 1.6;">
-                        You have successfully completed your diagnostic leveling assessment with Teacher Tati!
-                        Based on your performance and mastery across different skill levels, your system profile has been updated.
+
+                <div style="background-color: #f8fafc; border-left: 4px solid #6366f1; padding: 16px; border-radius: 8px; margin-bottom: 24px; text-align: center;">
+                    <div style="font-size: 12px; font-weight: 800; color: #6366f1; text-transform: uppercase; letter-spacing: 1px;">Diagnostic Assessment Complete</div>
+                    <div style="font-size: 20px; font-weight: 800; color: #1e293b; margin: 4px 0;">CEFR English Diagnostic Results</div>
+                </div>
+
+                <p style="font-size: 16px; color: #1e293b; margin: 16px 0 12px 0;">Hello, <strong>{student_name}</strong>!</p>
+                <p style="font-size: 15px; color: #334155; line-height: 1.6; margin: 12px 0;">
+                    You have successfully completed your diagnostic leveling assessment with Teacher Tati.
+                    Based on your performance across all levels, your profile has been updated.
+                </p>
+
+                <div style="background: #f8fafc; border: 2px solid #6366f1; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0;">
+                    <span style="font-size: 12px; font-weight: 800; color: #6366f1; text-transform: uppercase; letter-spacing: 1px;">Your Placed CEFR Level</span>
+                    <div style="font-size: 38px; font-weight: 900; color: #6366f1; margin: 6px 0;">{new_level}</div>
+                    <span style="font-size: 13px; color: #64748b;">Previous level: {old_level}</span>
+                </div>
+
+                <h3 style="color: #1e293b; font-size: 16px; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; margin-top: 24px;">
+                    Score Breakdown by Level
+                </h3>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 14px;">
+                    <thead>
+                        <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0; text-align: left;">
+                            <th style="padding: 10px 14px; color: #475569;">Level</th>
+                            <th style="padding: 10px 14px; text-align: center; color: #475569;">Correct</th>
+                            <th style="padding: 10px 14px; text-align: center; color: #475569;">Accuracy</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows_html}
+                    </tbody>
+                </table>
+
+                <h3 style="color: #1e293b; font-size: 16px; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; margin-top: 24px;">
+                    Detailed Questions, Mistakes & Corrections
+                </h3>
+                {qa_html}
+
+                <div style="background: #f8fafc; border-radius: 8px; padding: 14px; margin-top: 24px; text-align: center; border: 1px solid #e2e8f0;">
+                    <p style="margin: 0; font-size: 13px; color: #64748b;">
+                        <b>Official PDF Report Attached</b>: We have attached your complete diagnostic report as a PDF to this email for your records.
                     </p>
-
-                    <div style="background: #f5f3ff; border: 2px solid #7c3aed; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0;">
-                        <span style="font-size: 13px; font-weight: bold; color: #6b21a8; text-transform: uppercase; letter-spacing: 1px;">Your Placed CEFR Level</span>
-                        <div style="font-size: 40px; font-weight: 900; color: #7c3aed; margin: 8px 0;">{new_level}</div>
-                        <span style="font-size: 13px; color: #64748b;">Previous level: {old_level}</span>
-                    </div>
-
-                    <h3 style="color: #1e293b; font-size: 16px; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; margin-top: 24px;">
-                        Score Breakdown by Level
-                    </h3>
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 14px;">
-                        <thead>
-                            <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0; text-align: left;">
-                                <th style="padding: 10px 14px; color: #475569;">Level</th>
-                                <th style="padding: 10px 14px; text-align: center; color: #475569;">Correct</th>
-                                <th style="padding: 10px 14px; text-align: center; color: #475569;">Accuracy</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {rows_html}
-                        </tbody>
-                    </table>
-
-                    <h3 style="color: #1e293b; font-size: 16px; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; margin-top: 24px;">
-                        Detailed Questions, Mistakes & Corrections
-                    </h3>
-                    {qa_html}
-
-                    <div style="background: #f8fafc; border-radius: 8px; padding: 16px; margin-top: 24px; text-align: center;">
-                        <p style="margin: 0; font-size: 13px; color: #64748b;">
-                            📎 <b>Official PDF Report Attached</b>: We have attached your complete diagnostic report as a PDF to this email for your records.
-                        </p>
-                    </div>
-
-                    <div style="text-align: center; margin-top: 32px;">
-                        <a href="https://tati-ai.vercel.app/chat" style="display: inline-block; background: #7c3aed; color: #ffffff; padding: 12px 28px; font-weight: bold; text-decoration: none; border-radius: 10px; font-size: 14px;">
-                            Continue Practicing in Chat
-                        </a>
-                    </div>
                 </div>
 
-                <div style="background: #f8fafc; padding: 16px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
-                    Teacher Tati AI • Expert English Tutoring • All rights reserved
+                <div style="text-align: center; margin: 32px 0;">
+                    <a href="https://tati-ai.vercel.app/chat" style="display: inline-block; background: #6366f1; color: #ffffff; padding: 14px 28px; font-weight: 700; text-decoration: none; border-radius: 10px; font-size: 15px; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);">
+                        Continue Practicing in Chat
+                    </a>
                 </div>
+
+                <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 32px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+                    Tati AI — English Learning Experience. All rights reserved.
+                </p>
             </div>
         </body>
         </html>
