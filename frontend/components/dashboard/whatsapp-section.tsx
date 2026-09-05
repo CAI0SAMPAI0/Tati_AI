@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { RefreshCw, Power, CheckCircle, AlertCircle, QrCode, Loader2, RotateCw } from 'lucide-react';
 import { FaWhatsapp } from 'react-icons/fa';
-import { apiGet, apiPost, API_BASE } from '@/lib/api/client';
+import { apiGet, apiPost, apiFetch } from '@/lib/api/client';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import toast from 'react-hot-toast';
@@ -23,13 +23,12 @@ interface SessionData {
 export function WhatsappSection() {
   const { user } = useAuth();
   
-  // Define a sessão padrão com base no perfil do usuário
+  // Define a sessão padrão com base no perfil do usuário (somente 'professor' ou 'programador')
   const defaultSession = useMemo(() => {
     const role = user?.role?.toLowerCase();
     const uname = user?.username?.toLowerCase();
     if (role === 'professor' || uname === 'professor') return 'professor';
-    if (role === 'programador' || uname === 'programador') return 'programador';
-    return user?.username || 'programador';
+    return 'programador';
   }, [user]);
 
   const [activeSession, setActiveSession] = useState<string>(defaultSession);
@@ -37,6 +36,7 @@ export function WhatsappSection() {
   const [loadingQr, setLoadingQr] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
   const [isStartingOrStopping, setIsStartingOrStopping] = useState(false);
+  const isFetchingQrRef = useRef(false);
 
   useEffect(() => {
     if (defaultSession && !activeSession) {
@@ -65,13 +65,16 @@ export function WhatsappSection() {
   const currentSessionData = sessions?.find(s => s.name === activeSession);
   const sessionStatus = currentSessionData ? currentSessionData.status : 'DISCONNECTED';
 
-  // Carrega QR Code via fetch para passar header Authorization e evitar cache
+  // Carrega QR Code via apiFetch (resolve path sem double-slash e injeta Bearer token automaticamente)
   const loadQrCode = useCallback(async (isSilent = false) => {
+    if (isFetchingQrRef.current) return;
+    isFetchingQrRef.current = true;
     if (!isSilent && !qrBlobUrl) setLoadingQr(true);
     try {
-      const response = await fetch(`${API_BASE}/dashboard/waha/session/qr?session=${activeSession}&t=${Date.now()}`, {
+      const sessionParam = encodeURIComponent(activeSession || 'programador');
+      const response = await apiFetch(`/dashboard/waha/session/qr?session=${sessionParam}&t=${Date.now()}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
+          Accept: 'image/png, image/*',
         },
       });
       if (response.ok) {
@@ -84,8 +87,10 @@ export function WhatsappSection() {
           });
           setQrError(null);
         } else {
-          setQrError('QR code expired or empty.');
+          setQrError('Generating QR code... Please wait a moment.');
         }
+      } else if (response.status === 404) {
+        setQrError('Generating QR code... Please wait a moment.');
       } else {
         setQrError('QR code expired or session timed out.');
       }
@@ -93,6 +98,7 @@ export function WhatsappSection() {
       console.error('[WAHA] Error loading QR code:', e);
       setQrError('Connection error loading QR.');
     } finally {
+      isFetchingQrRef.current = false;
       if (!isSilent) setLoadingQr(false);
     }
   }, [activeSession, qrBlobUrl]);

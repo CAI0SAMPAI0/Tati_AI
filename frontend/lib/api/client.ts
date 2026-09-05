@@ -290,6 +290,10 @@ export async function apiGetCached<T = unknown>(path: string): Promise<T> {
   return apiGet<T>(path);
 }
 
+export async function apiFetch(path: string, options: RequestOptions = {}): Promise<Response> {
+  return request(path, options);
+}
+
 export function invalidateCache(): void {
   // Mantido para compatibilidade com código legado durante migração para TanStack Query.
 }

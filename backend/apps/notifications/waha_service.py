@@ -120,7 +120,7 @@ class WahaService:
     def get_qr_image(cls, session_name: str = "default") -> Optional[bytes]:
         url = f"{cls._get_api_url()}/api/{session_name}/auth/qr"
         try:
-            with httpx.Client(timeout=6.0) as client:
+            with httpx.Client(timeout=12.0) as client:
                 res = client.get(url, headers=cls._get_headers())
                 if res.status_code == 200 and res.content and len(res.content) > 100:
                     return res.content
