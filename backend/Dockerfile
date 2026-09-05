@@ -33,11 +33,11 @@ RUN if [ -d "backend/app" ]; then \
 # Coleta arquivos estáticos
 RUN python manage.py collectstatic --noinput || true
 
-EXPOSE 8000
+EXPOSE 8080
 
 # Healthcheck para Railway / HF Spaces
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
+  CMD curl -f -L http://localhost:${PORT:-8080}/health || exit 1
 
-# Executa Gunicorn com Uvicorn workers na porta configurada pelo Railway ($PORT ou 8000)
-CMD ["sh", "-c", "gunicorn app.asgi:application -w ${WORKERS:-2} -k uvicorn.workers.UvicornWorker -b 0.0.0.0:${PORT:-8000} --forwarded-allow-ips '*' --timeout 120 --graceful-timeout 30 --access-logfile -"]
+# Executa Gunicorn com Uvicorn workers na porta configurada pelo Railway ($PORT ou 8080)
+CMD ["sh", "-c", "gunicorn app.asgi:application -w ${WORKERS:-2} -k uvicorn.workers.UvicornWorker -b 0.0.0.0:${PORT:-8080} --forwarded-allow-ips '*' --timeout 120 --graceful-timeout 30 --access-logfile -"]

@@ -2,9 +2,10 @@ from .base import *
 
 DEBUG = False
 
-# Força HTTPS em produção
+# Força HTTPS em produção (exceto health check para não quebrar healthcheck do Railway/Docker)
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-SECURE_SSL_REDIRECT = True
+SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "True").lower() in ("true", "1")
+SECURE_REDIRECT_EXEMPT = [r"^health/?$", r"^api/health/?$"]
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_HSTS_SECONDS = 31536000

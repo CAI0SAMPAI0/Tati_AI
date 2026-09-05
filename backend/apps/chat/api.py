@@ -1,16 +1,16 @@
-from typing import List, Optional
-from ninja import Router
-from django.http import HttpRequest
 from django.contrib.auth import get_user_model
+from django.http import HttpRequest
+from ninja import Router
 
-from apps.authentication.security import auth_required, auth_optional
+from apps.authentication.security import auth_optional, auth_required
+
 from .schemas import (
     ConversationOut,
     CreateConversationInput,
     MessageOut,
     SendMessageInput,
 )
-from .services import ConversationService, AIService
+from .services import AIService, ConversationService
 
 User = get_user_model()
 chat_router = Router(tags=["Teacher Tati AI Chat"])
@@ -19,7 +19,7 @@ chat_router = Router(tags=["Teacher Tati AI Chat"])
 # ── CONVERSAS & HISTÓRICO ─────────────────────────────────────────────
 
 
-@chat_router.get("/conversations", response=List[ConversationOut], auth=auth_required)
+@chat_router.get("/conversations", response=list[ConversationOut], auth=auth_required)
 def list_conversations(request: HttpRequest):
     """
     Lista todas as conversas do aluno com a Teacher Tati.
@@ -72,7 +72,7 @@ def get_leveling_status(request: HttpRequest):
 
 @chat_router.get(
     "/conversations/{conversation_id}/messages",
-    response=List[MessageOut],
+    response=list[MessageOut],
     auth=auth_required,
 )
 def get_messages(request: HttpRequest, conversation_id: str):
@@ -92,7 +92,7 @@ def delete_conversation(request: HttpRequest, conversation_id: str):
 
 @chat_router.get("/conversations/{conversation_id}/summary", auth=auth_required)
 async def get_conversation_summary(
-    request: HttpRequest, conversation_id: str, lang: Optional[str] = "pt"
+    request: HttpRequest, conversation_id: str, lang: str | None = "pt"
 ):
     """
     Gera um resumo pedagógico detalhado da sessão de conversa em inglês de forma assíncrona.
@@ -137,13 +137,13 @@ from pydantic import BaseModel
 
 
 class TTSInput(BaseModel):
-    text: Optional[str] = ""
-    message: Optional[str] = ""
-    accent: Optional[str] = "en-US"
+    text: str | None = ""
+    message: str | None = ""
+    accent: str | None = "en-US"
 
 
 class TranscribeInput(BaseModel):
-    audio: Optional[str] = ""
+    audio: str | None = ""
 
 
 # ── SÍNTESE DE VOZ & TTS ──────────────────────────────────────────────
