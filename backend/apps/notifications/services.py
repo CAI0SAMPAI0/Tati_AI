@@ -79,13 +79,19 @@ class BrevoEmailService:
         recipient_name: str = None,
         attachments: Optional[List[dict]] = None,
     ) -> dict:
+        from apps.chat.audio_service import strip_emojis
+
+        # Remove emojis do assunto e corpo para manter padrão 100% profissional
+        clean_subject = strip_emojis(subject) if subject else ""
+        clean_html = strip_emojis(html_content) if html_content else ""
+
         brevo_key = get_brevo_api_key()
         sender_email = get_verified_sender_email()
         sender_name = os.getenv("SMTP_FROM_NAME", "Teacher Tati")
 
         diagnostics = {
             "to_email": to_email,
-            "subject": subject,
+            "subject": clean_subject,
             "sender_email": sender_email,
             "brevo_key_configured": bool(brevo_key),
             "attempts": [],
@@ -102,8 +108,8 @@ class BrevoEmailService:
             payload = {
                 "sender": {"name": sender_name, "email": sender_email},
                 "to": [{"email": to_email, "name": recipient_name or to_email}],
-                "subject": subject,
-                "htmlContent": html_content,
+                "subject": clean_subject,
+                "htmlContent": clean_html,
             }
             if attachments:
                 payload["attachment"] = [
@@ -159,8 +165,8 @@ class BrevoEmailService:
                 resend_payload = {
                     "from": resend_sender,
                     "to": [to_email],
-                    "subject": subject,
-                    "html": html_content,
+                    "subject": clean_subject,
+                    "html": clean_html,
                 }
                 if attachments:
                     resend_payload["attachments"] = [
@@ -214,11 +220,11 @@ class BrevoEmailService:
 
                 smtp_port = int(os.getenv("SMTP_PORT", "587"))
                 msg = MIMEMultipart("mixed")
-                msg["Subject"] = subject
+                msg["Subject"] = clean_subject
                 msg["From"] = f"{sender_name} <{smtp_user}>"
                 msg["To"] = to_email
 
-                html_part = MIMEText(html_content, "html")
+                html_part = MIMEText(clean_html, "html")
                 msg.attach(html_part)
 
                 if attachments:
@@ -295,16 +301,21 @@ class WahaWhatsAppService:
             if sender_role == "programador" or sender_name == "programador":
                 is_sender_programador = True
 
+        recip_user = (
+            getattr(recipient_user, "username", "") if recipient_user else ""
+        ).lower()
+        recip_email = (
+            getattr(recipient_user, "email", "") if recipient_user else ""
+        ).lower()
+        allowed = ["programador", "caio.sampaio", "caiosampaio", "caio"]
+        is_recipient_caio = (
+            recip_user in allowed
+            or "caio.sampaio" in recip_email
+            or "caio" in recip_user
+        )
+
         if is_sender_programador and recipient_user:
-            recip_user = getattr(recipient_user, "username", "").lower()
-            recip_email = getattr(recipient_user, "email", "").lower()
-            allowed = ["programador", "caio.sampaio", "caiosampaio", "caio"]
-            is_caio = (
-                recip_user in allowed
-                or "caio.sampaio" in recip_email
-                or "caio" in recip_user
-            )
-            if not is_caio:
+            if not is_recipient_caio:
                 logger.warning(
                     f"[WAHA Permissão] Usuário programador tentou enviar para '{recip_user}'. "
                     f"Permitido apenas para caio.sampaio."
@@ -314,11 +325,15 @@ class WahaWhatsAppService:
         # Escolhe a sessão correta
         if session:
             target_session = session
-        elif is_sender_programador:
+        elif is_sender_programador or is_recipient_caio:
             target_session = "programador"
         else:
-            preferred = os.getenv("WAHA_SESSION", "default")
+            preferred = os.getenv("WAHA_SESSION", "professor")
             target_session = WahaService.get_active_session_name(preferred)
+
+        # Regra de Ouro de Segurança: Caio / Programador NUNCA usam a sessão 'professor' (Tatiana)
+        if (is_sender_programador or is_recipient_caio) and target_session == "professor":
+            target_session = "programador"
 
         clean_number = "".join(c for c in phone_number if c.isdigit())
         if not clean_number:
@@ -962,16 +977,16 @@ class NotificationSchedulerService:
 
         # 3. Dispara a notificação de streak
         streak_val = user.streak_count or 1
-        title = "Don't break your streak! 🔥"
-        body = f"Hello {first_name}! You're on a {streak_val}-day streak. Practice just 5 minutes today with Teacher Tati to keep it alive!"
+        title = "Don't break your streak"
+        body = f"Hello {first_name}! You are on a {streak_val}-day streak. Practice 5 minutes today with Teacher Tati to keep your progress on track."
         html = f"""
 <!DOCTYPE html><html><head><meta charset="utf-8"/></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
   <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-    <div style="text-align: center; margin-bottom: 24px;"><span style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">🔥 STREAK AT RISK</span></div>
+    <div style="text-align: center; margin-bottom: 24px;"><span style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">STREAK AT RISK</span></div>
     <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Don't break your streak, {first_name}!</h1>
-    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">You have worked hard to reach a <strong style="color: #f59e0b;">{streak_val}-day study streak</strong>. Don't let your progress slip away! Just 5 minutes of practice with Teacher Tati keeps your flame burning.</p>
-    <div style="text-align: center; margin: 32px 0;"><a href="https://tati-ai.vercel.app/activities" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Practice with Tati Now →</a></div>
+    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">You have worked hard to reach a <strong style="color: #f59e0b;">{streak_val}-day study streak</strong>. Don't let your progress slip away. Just 5 minutes of practice with Teacher Tati keeps your momentum strong.</p>
+    <div style="text-align: center; margin: 32px 0;"><a href="https://tati-ai.vercel.app/activities" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Practice with Tati Now</a></div>
     <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Personalized English Coaching</p>
   </div>
 </body></html>"""
@@ -995,10 +1010,10 @@ class NotificationSchedulerService:
         wa_sent = False
         if student_phone and allow_wa:
             wa_msg = (
-                f"Hello {first_name}! Don't break your streak! 🔥\n\n"
-                f"You're on a {streak_val}-day study streak with Teacher Tati. "
-                f"Practice just 5 minutes today to keep your streak alive!\n\n"
-                f"👉 https://stunning-tranquility-production-4c54.up.railway.app/activities"
+                f"Hello {first_name}! Don't break your streak.\n\n"
+                f"You are on a {streak_val}-day study streak with Teacher Tati. "
+                f"Practice 5 minutes today to keep your streak alive!\n\n"
+                f"Practice now: https://tati-ai.vercel.app/activities"
             )
             wa_sent = WahaWhatsAppService.send_message(
                 phone_number=student_phone,
@@ -1102,20 +1117,20 @@ class NotificationSchedulerService:
         acts_done = report_data.get("exercises_completed", 5)
         vocab_learned = report_data.get("words_learned", 12)
 
-        title = "📊 Your Weekly Progress Report - Teacher Tati AI"
-        body = f"Hello {first_name}! Your weekly report is ready: {mins_studied} min practiced, {acts_done} activities completed, and +{vocab_learned} words learned!"
+        title = "Your Weekly Progress Report - Teacher Tati AI"
+        body = f"Hello {first_name}! Your weekly report is ready: {mins_studied} min practiced, {acts_done} activities completed, and +{vocab_learned} words learned."
         html = f"""
 <!DOCTYPE html><html><head><meta charset="utf-8"/></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
   <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(124, 58, 237, 0.15); color: #a78bfa; border: 1px solid rgba(124, 58, 237, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">📊 WEEKLY EVOLUTION REPORT</span></div>
+    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(124, 58, 237, 0.15); color: #a78bfa; border: 1px solid rgba(124, 58, 237, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">WEEKLY EVOLUTION REPORT</span></div>
     <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Great progress this week, {first_name}!</h1>
     <table style="width: 100%; border-collapse: collapse; margin: 24px 0;"><tr>
       <td style="padding: 12px; background: #221b40; border-radius: 12px 0 0 12px; text-align: center; width: 33.3%;"><div style="font-size: 22px; font-weight: 800; color: #7c3aed;">{mins_studied} min</div><div style="font-size: 12px; color: #948aa8;">Study Time</div></td>
       <td style="padding: 12px; background: #221b40; border-left: 1px solid #312759; border-right: 1px solid #312759; text-align: center; width: 33.3%;"><div style="font-size: 22px; font-weight: 800; color: #10b981;">{acts_done}</div><div style="font-size: 12px; color: #948aa8;">Activities</div></td>
       <td style="padding: 12px; background: #221b40; border-radius: 0 12px 12px 0; text-align: center; width: 33.3%;"><div style="font-size: 22px; font-weight: 800; color: #f59e0b;">+{vocab_learned}</div><div style="font-size: 12px; color: #948aa8;">Words</div></td>
     </tr></table>
-    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/dashboard" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 15px; display: inline-block;">View Full Report →</a></div>
+    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/dashboard" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 15px; display: inline-block;">View Full Report</a></div>
     <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Real Results.</p>
   </div>
 </body></html>"""
@@ -1142,12 +1157,11 @@ class NotificationSchedulerService:
         wa_sent = False
         if student_phone and allow_wa:
             wa_msg = (
-                f"Hello {first_name}! 📊 Your Weekly Progress Report is ready!\n\n"
-                f"⏱️ Study time: {mins_studied} min\n"
-                f"📝 Completed activities: {acts_done}\n"
-                f"📚 New words: +{vocab_learned}\n\n"
-                f"Check your full report here:\n"
-                f"👉 https://stunning-tranquility-production-4c54.up.railway.app/dashboard"
+                f"Hello {first_name}! Your Weekly Progress Report is ready.\n\n"
+                f"Study time: {mins_studied} min\n"
+                f"Completed activities: {acts_done}\n"
+                f"New words: +{vocab_learned}\n\n"
+                f"Check your full report here: https://tati-ai.vercel.app/dashboard"
             )
             wa_sent = WahaWhatsAppService.send_message(
                 phone_number=student_phone,
@@ -1231,16 +1245,16 @@ class NotificationSchedulerService:
                 "username": user.username,
             }
 
-        title = "Tati is waiting for you! 🍎"
-        body = f"Hello {first_name}, it's been a few days since your last practice. Let's have a quick 3-minute conversation to keep your skills sharp!"
+        title = "Teacher Tatiana is waiting for you"
+        body = f"Hello {first_name}, it has been a few days since your last practice. A quick 3-minute conversation keeps your English skills sharp."
         html = f"""
 <!DOCTYPE html><html><head><meta charset="utf-8"/></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
   <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(236, 72, 153, 0.15); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">🍎 WE MISS YOU</span></div>
-    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Tati is waiting for you, {first_name}!</h1>
-    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">A quick 3-minute audio or text chat today will keep your English fluent and natural. Say hello to Teacher Tatiana!</p>
-    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/chat" style="background: linear-gradient(135deg, #ec4899, #d946ef); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Say Hello to Tati →</a></div>
+    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(236, 72, 153, 0.15); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">PRACTICE REMINDER</span></div>
+    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Teacher Tatiana is waiting for you, {first_name}!</h1>
+    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">A quick 3-minute conversation today will keep your English fluent and natural. Say hello to Teacher Tatiana!</p>
+    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/chat" style="background: linear-gradient(135deg, #ec4899, #d946ef); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Say Hello to Teacher Tati</a></div>
     <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Always here for your learning journey.</p>
   </div>
 </body></html>"""
@@ -1264,10 +1278,9 @@ class NotificationSchedulerService:
         wa_sent = False
         if student_phone and allow_wa:
             wa_msg = (
-                f"Hello {first_name}! Teacher Tati misses you! 👋\n\n"
+                f"Hello {first_name}! Teacher Tati misses you.\n\n"
                 f"A quick 5-minute practice session today will help you retain your English vocabulary.\n\n"
-                f"Let's practice now:\n"
-                f"👉 https://stunning-tranquility-production-4c54.up.railway.app/chat"
+                f"Practice now: https://tati-ai.vercel.app/chat"
             )
             wa_sent = WahaWhatsAppService.send_message(
                 phone_number=student_phone,
@@ -1364,16 +1377,16 @@ class NotificationSchedulerService:
                 "username": user.username,
             }
 
-        title = "A fresh start awaits! 🌅"
-        body = f"Hello {first_name}, your streak ended, but every champion has a comeback. Today is Day 1 of your next record!"
+        title = "A fresh start awaits"
+        body = f"Hello {first_name}, your streak ended, but consistency is about bouncing right back. Today is Day 1 of your next streak!"
         html = f"""
 <!DOCTYPE html><html><head><meta charset="utf-8"/></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
   <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">💪 TIME FOR A COMEBACK</span></div>
-    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Streak lost... but not you, {first_name}!</h1>
-    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">Consistency isn't about never missing a day — it's about bouncing right back. Teacher Tati is ready for your next session!</p>
-    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/chat" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Start Day 1 Now →</a></div>
+    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">TIME FOR A COMEBACK</span></div>
+    <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">Streak ended, but your journey continues, {first_name}!</h1>
+    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">Consistency is about bouncing right back. Teacher Tati is ready for your next session!</p>
+    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/chat" style="background: linear-gradient(135deg, #7c3aed, #9333ea); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Start Day 1 Now</a></div>
     <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Continuous Progress.</p>
   </div>
 </body></html>"""
@@ -1409,7 +1422,7 @@ class NotificationSchedulerService:
         )
         email = user.email
 
-        title = f"🏆 {milestone}-Day Streak Achieved! You're on fire!"
+        title = f"{milestone}-Day Streak Achieved - Congratulations!"
         already_notified = Notification.objects.filter(
             username=user.username,
             category="achievements",
@@ -1425,15 +1438,15 @@ class NotificationSchedulerService:
                 "username": user.username,
             }
 
-        body = f"Congratulations {first_name}! You've reached a {milestone}-day study streak. You are building a powerful English habit!"
+        body = f"Congratulations {first_name}! You have reached a {milestone}-day study streak. You are building a powerful English habit."
         html = f"""
 <!DOCTYPE html><html><head><meta charset="utf-8"/></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f0b1e; color: #ffffff; padding: 20px; margin: 0;">
   <div style="max-width: 560px; margin: 0 auto; background: #18132e; border: 1px solid #3b2d6a; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">🏆 MILESTONE UNLOCKED</span></div>
+    <div style="text-align: center; margin-bottom: 20px;"><span style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 13px;">MILESTONE ACHIEVED</span></div>
     <h1 style="color: #ffffff; font-size: 24px; text-align: center; margin: 0 0 12px 0;">{milestone} Days in a Row, {first_name}!</h1>
-    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">Consistency pays off! You are now among our most dedicated English students. Teacher Tati is super proud!</p>
-    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/achievements" style="background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">Claim Trophy & XP →</a></div>
+    <p style="color: #a79fc2; font-size: 16px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">Consistency pays off. You are now among our most dedicated English students. Keep up the great work!</p>
+    <div style="text-align: center; margin: 30px 0;"><a href="https://tati-ai.vercel.app/achievements" style="background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; display: inline-block;">View Achievements</a></div>
     <hr style="border: 0; border-top: 1px solid #2e2456; margin: 28px 0;" /><p style="color: #6b628a; font-size: 12px; text-align: center; margin: 0;">Teacher Tatiana AI — Celebrate every milestone.</p>
   </div>
 </body></html>"""

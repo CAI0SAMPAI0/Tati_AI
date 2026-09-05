@@ -1,22 +1,22 @@
 import logging
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
-from typing import Optional
+
 from django.db.models import Count, Max
 from django.db.models.functions import TruncDate
 from ninja.errors import HttpError
 
-from apps.authentication.models import User
-from apps.chat.models import Message, SimulationScenario, CEFRSimulation, Conversation
 from apps.activities.models import (
     ActivitySubmission,
-    Module,
-    Game,
-    NewsItem,
     Flashcard,
-    UserVocabulary,
+    Game,
+    Module,
+    NewsItem,
     UserFlashcardProgress,
+    UserVocabulary,
 )
+from apps.authentication.models import User
+from apps.chat.models import CEFRSimulation, Conversation, Message, SimulationScenario
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ EXCLUDED_USERS = ["programador", "admin", "professor", "professora"]
 SP_TZ = ZoneInfo("America/Sao_Paulo")
 
 
-def parse_dt_to_sp(val) -> Optional[datetime]:
+def parse_dt_to_sp(val) -> datetime | None:
     if not val:
         return None
     if isinstance(val, datetime):
@@ -47,13 +47,13 @@ def parse_dt_to_sp(val) -> Optional[datetime]:
     return dt.astimezone(SP_TZ)
 
 
-def format_sp_datetime(dt_obj: Optional[datetime]) -> str:
+def format_sp_datetime(dt_obj: datetime | None) -> str:
     if not dt_obj:
         return "—"
     return dt_obj.strftime("%m/%d/%Y, %I:%M %p")
 
 
-def format_sp_date(dt_obj: Optional[datetime]) -> str:
+def format_sp_date(dt_obj: datetime | None) -> str:
     if not dt_obj:
         return "—"
     return dt_obj.strftime("%m/%d/%Y")
@@ -201,7 +201,7 @@ class DashboardService:
         # Mapeia última palavra adicionada no vocabulário
         latest_vocab = {}
         try:
-            from apps.activities.models import UserVocabulary, UserFlashcardProgress
+            from apps.activities.models import UserFlashcardProgress, UserVocabulary
 
             vocab_stats = UserVocabulary.objects.values("username").annotate(
                 last_active=Max("created_at")
@@ -452,10 +452,10 @@ class DashboardService:
                     Flashcard.objects.filter(id__in=matched_ids).update(
                         is_published=data["is_published"]
                     )
-                if "title" in data and data["title"]:
+                if data.get("title"):
                     new_title = re.sub(r"^CEFR\s+[A-Z0-9]+:\s*", "", data["title"])
                     Flashcard.objects.filter(id__in=matched_ids).update(topic=new_title)
-                if "level" in data and data["level"]:
+                if data.get("level"):
                     Flashcard.objects.filter(id__in=matched_ids).update(
                         level=data["level"].upper()
                     )
@@ -1359,7 +1359,7 @@ class DashboardService:
         u = User.objects.filter(username=username).first()
         if not u:
             raise HttpError(404, "Estudante não encontrado.")
-        if "level" in data and data["level"]:
+        if data.get("level"):
             u.level = str(data["level"]).upper()
         if "custom_prompt" in data:
             prof = u.profile or {}
@@ -1381,7 +1381,9 @@ class DashboardService:
         return {"success": True, "deleted": username}
 
     @staticmethod
-    def nudge_student(username: str, message: str) -> dict:
+    def nudge_student(
+        username: str, message: str, sender_user: Optional[User] = None
+    ) -> dict:
         import os
         import uuid
 
@@ -1417,7 +1419,7 @@ class DashboardService:
             id=uuid.uuid4(),
             username=username,
             category="nudge",
-            title="Teacher Tati 🍎",
+            title="Teacher Tati",
             body=message,
             is_read=False,
         )
@@ -1447,7 +1449,7 @@ class DashboardService:
                 <p>Estou passando para te lembrar da importância de manter a consistência nos seus estudos de inglês. Um pouquinho por dia faz toda a diferença para destravar a sua fluência!</p>
                 <div style="text-align: center; margin: 32px 0;">
                     <a href="{chat_link}" style="background-color: #6366f1; color: white; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 15px; display: inline-block; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);">
-                        💬 Responder à Teacher Tati Agora
+                        Responder à Teacher Tati Agora
                     </a>
                 </div>
                 <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 32px; border-top: 1px solid #e2e8f0; pt: 16px;">
@@ -1472,9 +1474,34 @@ class DashboardService:
             or getattr(u, "whatsapp_number", None)
         )
         if phone:
+            sender_role = getattr(sender_user, "role", "") if sender_user else ""
+            sender_uname = (
+                getattr(sender_user, "username", "").lower()
+                if sender_user
+                else ""
+            )
+            is_prog = (
+                sender_role == "programador" or sender_uname == "programador"
+            )
+
+            # Se quem está enviando for o programador, ou se o destinatário for o caio.sampaio,
+            # a sessão de disparo DEVE ser 'programador', NUNCA a sessão pessoal da Professora Tatiana!
+            target_session = (
+                "programador"
+                if (
+                    is_prog
+                    or username.lower()
+                    in ("caio.sampaio", "caiosampaio", "programador")
+                )
+                else "professor"
+            )
+
             whatsapp_sent = WahaWhatsAppService.send_message(
                 phone_number=str(phone),
-                message=f"🍎 *Teacher Tati:*\n\n{message}\n\nAcesse para responder: https://tati-ai.vercel.app/chat",
+                message=f"*Teacher Tati:*\n\n{message}\n\nAcesse para responder: https://tati-ai.vercel.app/chat",
+                sender_user=sender_user,
+                recipient_user=u,
+                session=target_session,
             )
 
         return {

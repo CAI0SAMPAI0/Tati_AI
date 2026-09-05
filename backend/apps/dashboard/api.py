@@ -186,7 +186,7 @@ def nudge_student(request: HttpRequest, username: str, payload: StudentNudgeInpu
     Envia aviso de engajamento para o estudante (chat, email, whatsapp e in-app).
     """
     require_staff_user(request)
-    return DashboardService.nudge_student(username, payload.message)
+    return DashboardService.nudge_student(username, payload.message, sender_user=request.auth)
 
 
 @dashboard_router.delete("/students/{username}", auth=auth_required)

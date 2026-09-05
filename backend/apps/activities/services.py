@@ -849,19 +849,17 @@ class MonthlyCompetitionService:
             if not item:
                 return f"""
                 <div style="background-color: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 16px; padding: 20px; text-align: center; margin-bottom: 12px;">
-                    <div style="font-size: 28px;">{medal}</div>
                     <div style="font-weight: bold; color: #94a3b8; margin-top: 6px;">{title}</div>
                     <div style="color: #64748b; font-size: 13px;">Sem participante registrado</div>
                 </div>
                 """
             return f"""
             <div style="background-color: {bg_color}; border: 2px solid {border_color}; border-radius: 16px; padding: 20px; text-align: center; margin-bottom: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-                <div style="font-size: 36px; line-height: 1;">{medal}</div>
                 <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: {border_color}; letter-spacing: 1px; margin-top: 6px;">{title}</div>
                 <div style="font-size: 18px; font-weight: 800; color: #0f172a; margin-top: 4px;">{item['name']}</div>
                 <div style="font-size: 13px; color: #64748b; margin-top: 2px;">@{item['username']} • Nível <strong>{item['level']}</strong></div>
                 <div style="display: inline-block; background-color: #ffffff; border: 1px solid {border_color}; border-radius: 20px; padding: 4px 14px; font-size: 14px; font-weight: 800; color: #0f172a; margin-top: 10px;">
-                    ⚡ {item['score']} XP Conquistados
+                    {item['score']} XP Conquistados
                 </div>
             </div>
             """
@@ -878,27 +876,26 @@ class MonthlyCompetitionService:
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; color: #1e293b;">
             <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.08);">
                 <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 36px 24px; text-align: center; color: #ffffff;">
-                    <div style="font-size: 44px; margin-bottom: 8px;">🏆</div>
                     <h1 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Resultado da Competição Mensal</h1>
                     <p style="margin: 8px 0 0 0; font-size: 15px; opacity: 0.9;">Teacher Tati AI • {month_label}</p>
                 </div>
 
                 <div style="padding: 32px 24px;">
                     <p style="font-size: 16px; line-height: 1.6; margin-top: 0; color: #334155;">
-                        Olá, <strong>Professora Tatiana & Equipe</strong>! 👋<br/>
+                        Olá, <strong>Professora Tatiana & Equipe</strong>!<br/>
                         A competição do mês de <strong>{month_label}</strong> foi oficialmente finalizada. Confira os <strong>3 alunos com maior pontuação</strong>:
                     </p>
 
                     <div style="margin: 24px 0;">
-                        {format_podium_card(top1, "🥇", "1º Lugar — Campeão", "#eab308", "#fefce8")}
-                        {format_podium_card(top2, "🥈", "2º Lugar — Vice-Campeão", "#94a3b8", "#f8fafc")}
-                        {format_podium_card(top3_item, "🥉", "3º Lugar — 3ª Posição", "#f97316", "#fff7ed")}
+                        {format_podium_card(top1, "", "1º Lugar — Campeão", "#eab308", "#fefce8")}
+                        {format_podium_card(top2, "", "2º Lugar — Vice-Campeão", "#94a3b8", "#f8fafc")}
+                        {format_podium_card(top3_item, "", "3º Lugar — 3ª Posição", "#f97316", "#fff7ed")}
                     </div>
 
                     <div style="background-color: #f8fafc; border-radius: 16px; padding: 18px; margin: 24px 0; border: 1px solid #e2e8f0;">
                         <h4 style="margin: 0 0 8px 0; font-size: 14px; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px;">Estatísticas do Ciclo:</h4>
-                        <p style="margin: 4px 0; font-size: 14px;">👥 <strong>Total de participantes ativos:</strong> {total_participants} alunos</p>
-                        <p style="margin: 4px 0; font-size: 14px;">🔄 <strong>Novo Ciclo:</strong> O ranking foi reiniciado para o mês corrente.</p>
+                        <p style="margin: 4px 0; font-size: 14px;"><strong>Total de participantes ativos:</strong> {total_participants} alunos</p>
+                        <p style="margin: 4px 0; font-size: 14px;"><strong>Novo Ciclo:</strong> O ranking foi reiniciado para o mês corrente.</p>
                     </div>
 
                     <div style="text-align: center; margin-top: 30px;">
@@ -918,7 +915,7 @@ class MonthlyCompetitionService:
         """
 
         results = {}
-        subject = f"🏆 Top 3 da Competição Mensal — Teacher Tati ({month_label})"
+        subject = f"Top 3 da Competição Mensal — Teacher Tati ({month_label})"
         for email in recipients:
             try:
                 res = BrevoEmailService.send_email(
