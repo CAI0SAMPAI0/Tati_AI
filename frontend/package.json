@@ -8,7 +8,7 @@
     "dev": "npm run sync-assets && next dev --port 3000",
     "dev:clean": "npm run clean && next dev --port 3000",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -H 0.0.0.0 -p ${PORT:-3000}",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
   },
