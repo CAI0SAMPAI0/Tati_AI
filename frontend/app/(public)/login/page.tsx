@@ -51,6 +51,21 @@ export default function LoginPage() {
   // Handle Google OAuth and Token query params
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    const handleGoogleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'GOOGLE_AUTH_SUCCESS' && event.data.token) {
+        const isHub = new URLSearchParams(window.location.search).get('access') === 'hub';
+        saveSession(event.data.token, event.data.user || { username: 'student' }).then(() => {
+          if (isHub || event.data.user?.is_hub_only) {
+            window.location.href = process.env.NEXT_PUBLIC_HUB_SITE_URL || 'http://localhost:3001/materiais';
+          } else {
+            router.replace('/chat');
+          }
+        });
+      }
+    };
+    window.addEventListener('message', handleGoogleMessage);
+
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     const userParam = params.get('user');
@@ -72,7 +87,7 @@ export default function LoginPage() {
           router.replace('/chat');
         }
       });
-      return;
+      return () => window.removeEventListener('message', handleGoogleMessage);
     }
 
     const credential = params.get('credential');
@@ -80,6 +95,8 @@ export default function LoginPage() {
       handleGoogleCredential({ credential });
       window.history.replaceState({}, '', window.location.pathname);
     }
+
+    return () => window.removeEventListener('message', handleGoogleMessage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saveSession, router]);
 
@@ -158,7 +175,10 @@ export default function LoginPage() {
 
     // Redireciona diretamente para o fluxo de autenticação do Google (302 Redirect)
     const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://caio007-tati-ai-backend.hf.space';
-    window.location.href = `${apiBase}/auth/google/login`;
+    const origin = typeof window !== 'undefined' ? encodeURIComponent(window.location.origin) : '';
+    const isHub = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('access') === 'hub';
+    const hubParam = isHub ? '&access=hub' : '';
+    window.location.href = `${apiBase}/auth/google/login?origin=${origin}${hubParam}`;
   }, []);
 
   // Login

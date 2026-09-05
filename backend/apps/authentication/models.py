@@ -47,6 +47,11 @@ class UserManager(BaseUserManager):
         return self.create_user(username, email, password, **extra_fields)
 
 
+DEFAULT_AVATAR_URL = (
+    "https://img.magnific.com/premium-vector/account-icon-user-icon-vector-graphics_292645-552.jpg?semt=ais_hybrid&w=740&q=80"
+)
+
+
 class User(AbstractBaseUser):
     last_login = None
 
@@ -145,8 +150,10 @@ class User(AbstractBaseUser):
     @property
     def avatar_url(self) -> str:
         if isinstance(self.profile, dict):
-            return self.profile.get("avatar_url") or ""
-        return ""
+            url = self.profile.get("avatar_url")
+            if url and str(url).strip():
+                return url
+        return DEFAULT_AVATAR_URL
 
     @avatar_url.setter
     def avatar_url(self, val: str):

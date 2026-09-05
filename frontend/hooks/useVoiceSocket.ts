@@ -290,6 +290,45 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
     socketRef.current.send(msg);
   }, [ensureConversation]);
 
+  const sendMessage = useCallback(async (text: string) => {
+    if (!socketRef.current) return;
+
+    let convId = convIdRef.current;
+    if (!convId) {
+      convId = await ensureConversation();
+      if (!convId) {
+        console.error('[VoiceSocket] Could not create conversation');
+        return;
+      }
+    }
+
+    try {
+      await socketRef.current.waitUntilOpen();
+    } catch (e) {
+      console.error('[VoiceSocket] Socket not ready for text message:', e);
+      return;
+    }
+
+    setState('processing');
+
+    const userMsg: Message = {
+      id: `user-${Date.now()}`,
+      conversation_id: convId,
+      role: 'user',
+      content: text,
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, userMsg]);
+
+    const msg: WsOutgoingMessage = {
+      type: 'text',
+      content: text,
+      conversation_id: convId,
+      origin: 'voice',
+    } as any;
+    socketRef.current.send(msg);
+  }, [ensureConversation]);
+
   return {
     messages,
     setMessages,
@@ -298,6 +337,7 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
     lastAudio,
     transcription,
     sendAudio,
+    sendMessage,
     activeConvId,
     completedObjectives,
     setCompletedObjectives

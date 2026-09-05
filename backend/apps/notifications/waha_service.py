@@ -78,3 +78,34 @@ class WahaService:
         except Exception as e:
             logger.warning(f"[WAHA] Error fetching QR: {e}")
         return None
+
+    @classmethod
+    def ping_keepalive(cls) -> bool:
+        """
+        Envia um ping ao WAHA (Render) para impedir que o serviço gratuito
+        da Render entre em modo sleep/hibernação.
+        """
+        api_url = cls._get_api_url()
+        if not api_url or "localhost" in api_url:
+            return False
+        try:
+            with httpx.Client(timeout=10.0) as client:
+                res = client.get(f"{api_url}/api/sessions", headers=cls._get_headers())
+                logger.info(f"[WAHA KeepAlive] Render WAHA ping response: {res.status_code}")
+                return res.status_code == 200
+        except Exception as e:
+            logger.debug(f"[WAHA KeepAlive] Falha no ping de keepalive: {e}")
+            return False
+
+    @classmethod
+    def get_active_session_name(cls, preferred: str = "default") -> str:
+        """
+        Retorna o nome da sessão em estado WORKING no WAHA.
+        """
+        sessions = cls.get_sessions()
+        working = [s.get("name") for s in sessions if s.get("status") in ("WORKING", "CONNECTED")]
+        if preferred in working:
+            return preferred
+        if working:
+            return working[0]
+        return preferred

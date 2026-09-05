@@ -125,10 +125,10 @@ export default function ChatClientPage() {
     setIsLevelingModalOpen(true);
   }, []);
 
-  const handleExecuteStartLeveling = useCallback(async (totalQuestions: number) => {
+  const handleExecuteStartLeveling = useCallback(async (totalQuestions: number, mode: 'chat' | 'voice' = 'chat') => {
     try {
       setIsStartingLeveling(true);
-      toast.loading('Starting your CEFR Leveling Challenge...', { id: 'start-leveling' });
+      toast.loading(`Starting your CEFR Leveling Challenge in ${mode === 'voice' ? 'Voice Mode' : 'Chat Mode'}...`, { id: 'start-leveling' });
       const res = await apiPost<any>(ENDPOINTS.LEVELING_START, { total_questions: totalQuestions });
       if (res.ok && res.data?.conversation_id) {
         toast.success(`Leveling Challenge started with ${res.data.total_questions || totalQuestions} questions! Please answer in English.`, { id: 'start-leveling' });
@@ -145,7 +145,11 @@ export default function ChatClientPage() {
         };
         setMessages([initialMsg]);
         setIsLevelingModalOpen(false);
-        router.push(`/chat?conv_id=${newConvId}`);
+        if (mode === 'voice') {
+          router.push(`/voice?conv_id=${newConvId}`);
+        } else {
+          router.push(`/chat?conv_id=${newConvId}`);
+        }
         if (window.innerWidth < 768) {
           handleCloseSidebar();
         }

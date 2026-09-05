@@ -26,13 +26,12 @@ import {
   saveStoredSession,
   syncAuthTokenCookieFromStorage,
 } from '@/lib/api/auth';
+import { DEFAULT_AVATAR_URL } from '@/lib/constants/user';
 
 function normalizeUserAvatar(source: User): User {
   const profileAvatar = (source as User & { profile?: { avatar_url?: string } })?.profile?.avatar_url;
-  if (!source.avatar_url && profileAvatar) {
-    return { ...source, avatar_url: profileAvatar };
-  }
-  return source;
+  const chosenAvatar = source.avatar_url || profileAvatar || DEFAULT_AVATAR_URL;
+  return { ...source, avatar_url: chosenAvatar };
 }
 
 interface AuthState {

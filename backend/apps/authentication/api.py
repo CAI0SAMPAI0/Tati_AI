@@ -140,7 +140,18 @@ def _build_google_auth_data(request: HttpRequest) -> tuple[str, str]:
         )
 
     state = str(uuid.uuid4())
+    origin = (
+        request.GET.get("origin", "").strip()
+        or request.headers.get("Origin", "").strip()
+        or request.headers.get("Referer", "").strip()
+    )
+    access = request.GET.get("access", "").strip()
     cache.set(f"google_oauth_state_{state}", {"ready": False}, timeout=600)
+    cache.set(
+        f"google_oauth_origin_{state}",
+        {"origin": origin, "access": access},
+        timeout=600,
+    )
 
     redirect_uri = _get_google_redirect_uri(request)
     params = {
@@ -198,6 +209,7 @@ def google_oauth_callback(
 ):
     """
     Callback para o redirecionamento do Google OAuth2.
+    Suporta reutilização de state caso o usuário recarregue a página ou ocorra dupla requisição.
     """
     import os
     import requests
@@ -205,77 +217,102 @@ def google_oauth_callback(
     from django.core.cache import cache
     from django.http import HttpResponse
 
-    if error or not code or not state:
+    if error or not state:
         return HttpResponse(
             "<h3>Erro na autenticação com o Google. Pode fechar esta janela.</h3>",
             status=400,
         )
 
-    client_id = (
-        getattr(settings, "GOOGLE_CLIENT_ID", "")
-        or os.getenv("GOOGLE_CLIENT_ID", "")
-        or os.getenv("NEXT_PUBLIC_GOOGLE_CLIENT_ID", "")
-    )
-    client_secret = getattr(settings, "GOOGLE_CLIENT_SECRET", "") or os.getenv(
-        "GOOGLE_CLIENT_SECRET", ""
-    )
+    # 1. Verifica se esta sessão/state já foi processada com sucesso anteriormente
+    cached_state = cache.get(f"google_oauth_state_{state}")
+    if cached_state and cached_state.get("ready") and cached_state.get("jwt"):
+        jwt_token = cached_state["jwt"]
+        user_dict = cached_state["user"]
+    else:
+        if not code:
+            return HttpResponse(
+                "<h3>Código de autorização não fornecido pelo Google.</h3>",
+                status=400,
+            )
 
-    redirect_uri = _get_google_redirect_uri(request)
-
-    token_url = "https://oauth2.googleapis.com/token"
-    data = {
-        "code": code,
-        "client_id": client_id,
-        "client_secret": client_secret,
-        "redirect_uri": redirect_uri,
-        "grant_type": "authorization_code",
-    }
-    resp = requests.post(token_url, data=data, timeout=10)
-    if not resp.ok:
-        return HttpResponse(
-            f"<h3>Falha ao trocar código com o Google. Pode fechar esta janela.</h3>",
-            status=400,
+        client_id = (
+            getattr(settings, "GOOGLE_CLIENT_ID", "")
+            or os.getenv("GOOGLE_CLIENT_ID", "")
+            or os.getenv("NEXT_PUBLIC_GOOGLE_CLIENT_ID", "")
+        )
+        client_secret = getattr(settings, "GOOGLE_CLIENT_SECRET", "") or os.getenv(
+            "GOOGLE_CLIENT_SECRET", ""
         )
 
-    tokens = resp.json()
-    id_token_str = tokens.get("id_token")
-    if not id_token_str:
-        return HttpResponse(
-            "<h3>Token de identidade não retornado pelo Google. Pode fechar esta janela.</h3>",
-            status=400,
-        )
+        redirect_uri = _get_google_redirect_uri(request)
 
-    token_res = AuthService.google_login(id_token_str)
-    user_dict = (
-        token_res.user.dict()
-        if hasattr(token_res.user, "dict")
-        else token_res.user.model_dump()
-        if hasattr(token_res.user, "model_dump")
-        else token_res.user
-    )
+        token_url = "https://oauth2.googleapis.com/token"
+        data = {
+            "code": code,
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code",
+        }
+        resp = requests.post(token_url, data=data, timeout=10)
+        if not resp.ok:
+            # Segunda chance de leitura do cache caso tenha ocorrido corrida de requisições
+            retry_cache = cache.get(f"google_oauth_state_{state}")
+            if retry_cache and retry_cache.get("ready") and retry_cache.get("jwt"):
+                jwt_token = retry_cache["jwt"]
+                user_dict = retry_cache["user"]
+            else:
+                return HttpResponse(
+                    "<h3>Falha ao trocar código com o Google. Pode fechar esta janela ou tentar novamente.</h3>",
+                    status=400,
+                )
+        else:
+            tokens = resp.json()
+            id_token_str = tokens.get("id_token")
+            if not id_token_str:
+                return HttpResponse(
+                    "<h3>Token de identidade não retornado pelo Google. Pode fechar esta janela.</h3>",
+                    status=400,
+                )
 
-    cache.set(
-        f"google_oauth_state_{state}",
-        {
-            "ready": True,
-            "jwt": token_res.access_token,
-            "user": user_dict,
-        },
-        timeout=600,
-    )
+            token_res = AuthService.google_login(id_token_str)
+            user_dict = (
+                token_res.user.dict()
+                if hasattr(token_res.user, "dict")
+                else token_res.user.model_dump()
+                if hasattr(token_res.user, "model_dump")
+                else token_res.user
+            )
+            jwt_token = token_res.access_token
+
+            cache.set(
+                f"google_oauth_state_{state}",
+                {
+                    "ready": True,
+                    "jwt": jwt_token,
+                    "user": user_dict,
+                },
+                timeout=600,
+            )
 
     import json
     from urllib.parse import quote
 
+    origin_meta = cache.get(f"google_oauth_origin_{state}") or {}
+    frontend_origin = origin_meta.get("origin")
+    is_hub = origin_meta.get("access") == "hub"
+
+    if not frontend_origin or "accounts.google.com" in frontend_origin or "google.com" in frontend_origin:
+        frontend_origin = (
+            getattr(settings, "FRONTEND_URL", "")
+            or os.getenv("FRONTEND_URL", "")
+            or "https://stunning-tranquility-production-4c54.up.railway.app"
+        )
+
     user_json = json.dumps(user_dict)
-    jwt_token = token_res.access_token
-    frontend_url = (
-        getattr(settings, "FRONTEND_URL", "")
-        or os.getenv("FRONTEND_URL", "")
-        or "https://tati-ai.vercel.app"
-    )
+    hub_param = "&access=hub" if is_hub else ""
     redirect_target = (
-        f"{frontend_url.rstrip('/')}/login?token={jwt_token}&user={quote(user_json)}"
+        f"{frontend_origin.rstrip('/')}/login?token={jwt_token}&user={quote(user_json)}{hub_param}"
     )
 
     username_val = user_dict.get("username", "") if isinstance(user_dict, dict) else ""
@@ -285,6 +322,7 @@ def google_oauth_callback(
     <html>
     <head>
         <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
         <title>Autenticado com sucesso</title>
         <style>
             body {{
@@ -297,23 +335,43 @@ def google_oauth_callback(
                 justify-content: center;
                 height: 100vh;
                 margin: 0;
+                padding: 16px;
+                box-sizing: border-box;
+                text-align: center;
             }}
             .spinner {{
                 border: 3px solid rgba(139, 92, 246, 0.2);
                 border-top-color: #8b5cf6;
                 border-radius: 50%;
-                width: 36px;
-                height: 36px;
+                width: 42px;
+                height: 42px;
                 animation: spin 0.8s linear infinite;
-                margin-bottom: 16px;
+                margin-bottom: 20px;
             }}
             @keyframes spin {{ to {{ transform: rotate(360deg); }} }}
+            .btn {{
+                display: inline-block;
+                margin-top: 18px;
+                padding: 12px 24px;
+                background-color: #8b5cf6;
+                color: #ffffff;
+                text-decoration: none;
+                border-radius: 12px;
+                font-size: 15px;
+                font-weight: 600;
+                box-shadow: 0 4px 14px rgba(139, 92, 246, 0.4);
+                transition: transform 0.1s ease;
+            }}
+            .btn:active {{
+                transform: scale(0.97);
+            }}
         </style>
     </head>
     <body>
         <div class="spinner"></div>
-        <h2>Autenticado com sucesso!</h2>
-        <p style="color: #9ca3af;">Redirecionando para o aplicativo...</p>
+        <h2 style="margin: 0 0 8px 0;">Autenticado com sucesso!</h2>
+        <p style="color: #9ca3af; margin: 0 0 12px 0;">Redirecionando para o aplicativo...</p>
+        <a class="btn" href="{redirect_target}">Entrar Agora</a>
         <script>
             // 1. Salva credenciais imediatamente no localStorage e cookie
             try {{
@@ -340,10 +398,10 @@ def google_oauth_callback(
                 }}
             }} catch(e) {{}}
 
-            // 4. Redireciona suavemente para a rota da aplicação
+            // 4. Redireciona imediatamente substituindo o histórico para evitar reenvio de código
             setTimeout(function() {{
-                window.location.href = '{redirect_target}';
-            }}, 200);
+                window.location.replace('{redirect_target}');
+            }}, 50);
         </script>
     </body>
     </html>

@@ -11,6 +11,8 @@ import { apiGet } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import { NotificationsDropdown } from './notifications-dropdown';
 
+import { DEFAULT_AVATAR_URL } from '@/lib/constants/user';
+
 interface MainHeaderProps {
   onToggleMenu?: () => void;
 }
@@ -24,7 +26,7 @@ interface StreakData {
 
 export function MainHeader({ onToggleMenu }: MainHeaderProps) {
   const { user } = useAuth();
-  const avatarUrl = user?.avatar_url || (user as any)?.profile?.avatar_url || null;
+  const avatarUrl = user?.avatar_url || (user as any)?.profile?.avatar_url || DEFAULT_AVATAR_URL;
 
   // Use TanStack Query to fetch streak and trophy data
   const { data: streakData } = useQuery<StreakData>({
@@ -96,11 +98,14 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
               {user?.name || user?.username}
             </span>
             <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-[0.7rem] font-bold text-primary overflow-hidden">
-              {avatarUrl ? (
-                <Image src={avatarUrl} alt="Avatar" width={32} height={32} className="w-full h-full object-cover" />
-              ) : (
-                (user?.name || user?.username || '?').charAt(0).toUpperCase()
-              )}
+              <img
+                src={avatarUrl}
+                alt="Avatar"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = DEFAULT_AVATAR_URL;
+                }}
+              />
             </div>
           </Link>
         </div>

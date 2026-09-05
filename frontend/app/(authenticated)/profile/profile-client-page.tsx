@@ -22,9 +22,11 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { MainHeader } from '@/components/layout/main-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { DEFAULT_AVATAR_URL } from '@/lib/constants/user';
 import { apiGet, apiPut, apiPost, apiUpload } from '@/lib/api/client';
 import { User } from '@/lib/api/types';
 import { useQuery } from '@tanstack/react-query';
@@ -178,11 +180,14 @@ export default function ProfileClientPage() {
               <div className="flex flex-col items-center sm:items-start sm:flex-row gap-6 mb-8">
                 <div className="relative group cursor-pointer">
                   <div className="w-24 h-24 rounded-full bg-surface-hover border-2 border-border overflow-hidden flex items-center justify-center">
-                    {user?.avatar_url ? (
-                      <img src={user.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                    ) : (
-                      <UserIcon size={40} className="text-text-muted" />
-                    )}
+                    <img
+                      src={user?.avatar_url || DEFAULT_AVATAR_URL}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = DEFAULT_AVATAR_URL;
+                      }}
+                    />
                   </div>
                   <label className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center rounded-full transition-opacity cursor-pointer">
                     <Camera size={20} />

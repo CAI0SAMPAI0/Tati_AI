@@ -264,43 +264,100 @@ class BrevoEmailService:
 
 class WahaWhatsAppService:
     @staticmethod
-    def send_message(phone_number: str, message: str) -> bool:
-        if not WAHA_API_URL or not WAHA_API_KEY:
+    def send_message(
+        phone_number: str,
+        message: str,
+        sender_user: Optional[Any] = None,
+        recipient_user: Optional[Any] = None,
+        session: Optional[str] = None,
+    ) -> bool:
+        """
+        Envia mensagem via WhatsApp usando o serviço WAHA no Render.
+        Regras de permissão:
+        - Programador só pode enviar para 'caio.sampaio' (ou Caio).
+        - Professor (Teacher Tati) e notificações agendadas enviam para todos os estudantes.
+        - Sessões: 'programador' usa sua própria sessão conectada; 'professor'/sistema usa a sessão ativa da Tati.
+        """
+        from apps.notifications.waha_service import WahaService
+
+        api_url = os.getenv("WAHA_API_URL", "").rstrip("/")
+        if not api_url:
             logger.warning(
-                f"[WAHA] WAHA_API_URL/KEY não configuradas. Mensagem para {phone_number}: {message}"
+                f"[WAHA] WAHA_API_URL não configurada no ambiente. Mensagem para {phone_number}: {message}"
             )
-            return True
+            return False
+
+        # Regra de Permissão: Programador só pode enviar para Caio
+        is_sender_programador = False
+        if sender_user:
+            sender_role = getattr(sender_user, "role", "")
+            sender_name = getattr(sender_user, "username", "").lower()
+            if sender_role == "programador" or sender_name == "programador":
+                is_sender_programador = True
+
+        if is_sender_programador and recipient_user:
+            recip_user = getattr(recipient_user, "username", "").lower()
+            recip_email = getattr(recipient_user, "email", "").lower()
+            allowed = ["programador", "caio.sampaio", "caiosampaio", "caio"]
+            is_caio = (
+                recip_user in allowed
+                or "caio.sampaio" in recip_email
+                or "caio" in recip_user
+            )
+            if not is_caio:
+                logger.warning(
+                    f"[WAHA Permissão] Usuário programador tentou enviar para '{recip_user}'. "
+                    f"Permitido apenas para caio.sampaio."
+                )
+                return False
+
+        # Escolhe a sessão correta
+        if session:
+            target_session = session
+        elif is_sender_programador:
+            target_session = "programador"
+        else:
+            preferred = os.getenv("WAHA_SESSION", "default")
+            target_session = WahaService.get_active_session_name(preferred)
 
         clean_number = "".join(c for c in phone_number if c.isdigit())
-        if not clean_number.endswith("@c.us"):
-            chat_id = f"{clean_number}@c.us"
-        else:
-            chat_id = clean_number
+        if not clean_number:
+            logger.warning(f"[WAHA] Número inválido: '{phone_number}'")
+            return False
 
-        url = f"{WAHA_API_URL.rstrip('/')}/api/sendText"
-        headers = {
-            "X-Api-Key": WAHA_API_KEY,
-            "Content-Type": "application/json",
-        }
+        # Se número brasileiro sem código do país (DDI 55)
+        if len(clean_number) in (10, 11) and not clean_number.startswith("55"):
+            clean_number = f"55{clean_number}"
+
+        chat_id = f"{clean_number}@c.us" if not clean_number.endswith("@c.us") else clean_number
+
+        url = f"{api_url}/api/sendText"
+        headers = {"Content-Type": "application/json"}
+        api_key = os.getenv("WAHA_API_KEY", "").strip()
+        if api_key:
+            headers["X-Api-Key"] = api_key
+
         payload = {
-            "session": "default",
+            "session": target_session,
             "chatId": chat_id,
             "text": message,
         }
 
         try:
-            with httpx.Client(timeout=10.0) as client:
+            with httpx.Client(timeout=15.0) as client:
                 res = client.post(url, headers=headers, json=payload)
                 if res.status_code in (200, 201):
                     logger.info(
-                        f"[WAHA] WhatsApp enviado com sucesso para {clean_number}"
+                        f"[WAHA] WhatsApp enviado com sucesso para {clean_number} (Sessão: {target_session})"
                     )
                     return True
                 else:
-                    logger.warning(f"[WAHA] Resposta {res.status_code}: {res.text}")
+                    logger.warning(
+                        f"[WAHA] Falha ao enviar para {clean_number} (Sessão: {target_session}, Status: {res.status_code}): {res.text}"
+                    )
                     return False
         except Exception as e:
-            logger.error(f"[WAHA] Erro de comunicação com o WhatsApp: {e}")
+            logger.error(f"[WAHA] Erro de comunicação com o WhatsApp ({api_url}): {e}")
             return False
 
 
@@ -931,12 +988,31 @@ class NotificationSchedulerService:
             username=user.username, category="streaks", title=title, body=body
         )
 
+        # WhatsApp Dispatch
+        user_prof = user.profile if isinstance(user.profile, dict) else {}
+        student_phone = user_prof.get("whatsapp_number") or getattr(user, "whatsapp_number", None)
+        allow_wa = user_prof.get("allow_whatsapp_notifications", True)
+        wa_sent = False
+        if student_phone and allow_wa:
+            wa_msg = (
+                f"Hello {first_name}! Don't break your streak! 🔥\n\n"
+                f"You're on a {streak_val}-day study streak with Teacher Tati. "
+                f"Practice just 5 minutes today to keep your streak alive!\n\n"
+                f"👉 https://stunning-tranquility-production-4c54.up.railway.app/activities"
+            )
+            wa_sent = WahaWhatsAppService.send_message(
+                phone_number=student_phone,
+                message=wa_msg,
+                recipient_user=user,
+            )
+
         return {
             "success": True,
             "sent": True,
             "username": user.username,
             "type": "streak_reminder",
             "email_sent": email_diag.get("success", False),
+            "whatsapp_sent": wa_sent,
             "push": push_diag,
         }
 
@@ -1059,12 +1135,33 @@ class NotificationSchedulerService:
             body=body,
         )
 
+        # WhatsApp Dispatch
+        user_prof = user.profile if isinstance(user.profile, dict) else {}
+        student_phone = user_prof.get("whatsapp_number") or getattr(user, "whatsapp_number", None)
+        allow_wa = user_prof.get("allow_whatsapp_notifications", True)
+        wa_sent = False
+        if student_phone and allow_wa:
+            wa_msg = (
+                f"Hello {first_name}! 📊 Your Weekly Progress Report is ready!\n\n"
+                f"⏱️ Study time: {mins_studied} min\n"
+                f"📝 Completed activities: {acts_done}\n"
+                f"📚 New words: +{vocab_learned}\n\n"
+                f"Check your full report here:\n"
+                f"👉 https://stunning-tranquility-production-4c54.up.railway.app/dashboard"
+            )
+            wa_sent = WahaWhatsAppService.send_message(
+                phone_number=student_phone,
+                message=wa_msg,
+                recipient_user=user,
+            )
+
         return {
             "success": True,
             "sent": True,
             "username": user.username,
             "type": "weekly_report",
             "email_sent": email_diag.get("success", False),
+            "whatsapp_sent": wa_sent,
             "push": push_diag,
         }
 
@@ -1160,12 +1257,31 @@ class NotificationSchedulerService:
             username=user.username, category="retention", title=title, body=body
         )
 
+        # WhatsApp Dispatch
+        user_prof = user.profile if isinstance(user.profile, dict) else {}
+        student_phone = user_prof.get("whatsapp_number") or getattr(user, "whatsapp_number", None)
+        allow_wa = user_prof.get("allow_whatsapp_notifications", True)
+        wa_sent = False
+        if student_phone and allow_wa:
+            wa_msg = (
+                f"Hello {first_name}! Teacher Tati misses you! 👋\n\n"
+                f"A quick 5-minute practice session today will help you retain your English vocabulary.\n\n"
+                f"Let's practice now:\n"
+                f"👉 https://stunning-tranquility-production-4c54.up.railway.app/chat"
+            )
+            wa_sent = WahaWhatsAppService.send_message(
+                phone_number=student_phone,
+                message=wa_msg,
+                recipient_user=user,
+            )
+
         return {
             "success": True,
             "sent": True,
             "username": user.username,
             "type": "inactivity_nudge",
             "email_sent": email_diag.get("success", False),
+            "whatsapp_sent": wa_sent,
             "push": push_diag,
         }
 

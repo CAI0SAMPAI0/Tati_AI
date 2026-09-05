@@ -134,12 +134,15 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                 or "en-US"
             )
 
+            origin = content.get("origin") or ("voice" if is_audio else "chat")
+
             res = await sync_to_async(AIService.generate_reply)(
                 user=self.user,
                 conversation_id=conv_id,
                 user_text=text_content,
                 files=uploaded_files,
                 accent=accent,
+                origin=origin,
             )
 
             reply_text = res.get("reply") if isinstance(res, dict) else str(res)

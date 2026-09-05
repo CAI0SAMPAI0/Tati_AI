@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Target, Clock, CheckCircle2, AlertCircle, Sparkles, X } from 'lucide-react';
+import { Target, Clock, CheckCircle2, AlertCircle, Sparkles, X, MessageSquare, Mic } from 'lucide-react';
 
 interface LevelingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onStart: (totalQuestions: number) => Promise<void> | void;
+  onStart: (totalQuestions: number, mode: 'chat' | 'voice') => Promise<void> | void;
   loading?: boolean;
 }
 
@@ -56,6 +56,7 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
   const [selectedCount, setSelectedCount] = useState<number>(8);
   const [customValue, setCustomValue] = useState<string>('');
   const [isCustom, setIsCustom] = useState(false);
+  const [mode, setMode] = useState<'chat' | 'voice'>('chat');
 
   if (!isOpen) return null;
 
@@ -76,7 +77,7 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
   const handleConfirm = () => {
     const finalCount = isCustom && customValue ? parseInt(customValue, 10) : selectedCount;
     const safeCount = Math.max(4, Math.min(24, isNaN(finalCount) ? 8 : finalCount));
-    onStart(safeCount);
+    onStart(safeCount, mode);
   };
 
   return (
@@ -111,6 +112,72 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
 
         {/* Content */}
         <div className="p-6 overflow-y-auto space-y-5 custom-scrollbar">
+          {/* Assessment Mode Selection */}
+          <div>
+            <label className="block text-sm font-semibold text-text mb-1.5">
+              Choose your assessment format
+            </label>
+            <p className="text-xs text-text-muted mb-3">
+              Select whether you prefer typing in the chat or speaking live via voice mode.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => setMode('chat')}
+                className={`relative text-left p-3.5 rounded-xl border transition-all flex items-start gap-3 cursor-pointer ${
+                  mode === 'chat'
+                    ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40'
+                    : 'border-border/70 bg-surface hover:bg-surface-hover hover:border-border'
+                }`}
+              >
+                <div className={`p-2 rounded-lg shrink-0 ${mode === 'chat' ? 'bg-primary text-white' : 'bg-surface-hover text-text-muted'}`}>
+                  <MessageSquare size={18} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm text-text">Chat Mode</span>
+                    {mode === 'chat' && (
+                      <span className="text-[0.65rem] font-bold px-1.5 py-0.5 bg-primary/20 text-primary rounded-full">
+                        Selected
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-text-muted mt-1 leading-relaxed">
+                    Interactive chat with text and audio recording support.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMode('voice')}
+                className={`relative text-left p-3.5 rounded-xl border transition-all flex items-start gap-3 cursor-pointer ${
+                  mode === 'voice'
+                    ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40'
+                    : 'border-border/70 bg-surface hover:bg-surface-hover hover:border-border'
+                }`}
+              >
+                <div className={`p-2 rounded-lg shrink-0 ${mode === 'voice' ? 'bg-primary text-white' : 'bg-surface-hover text-text-muted'}`}>
+                  <Mic size={18} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm text-text">Voice Mode</span>
+                    {mode === 'voice' && (
+                      <span className="text-[0.65rem] font-bold px-1.5 py-0.5 bg-primary/20 text-primary rounded-full">
+                        Selected
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-text-muted mt-1 leading-relaxed">
+                    Live speech conversation with real-time audio interaction.
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-semibold text-text mb-1.5">
               How many questions would you like to answer?
@@ -190,11 +257,11 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
             <div className="flex items-start gap-2.5 text-xs text-text">
               <AlertCircle size={16} className="text-amber-500 shrink-0 mt-0.5" />
               <span>
-                <strong>/finish command in chat:</strong> Wish to conclude early? Simply type{' '}
+                <strong>/finish command:</strong> Wish to conclude early? Simply say or type{' '}
                 <code className="px-1.5 py-0.5 rounded bg-background border border-border font-mono font-bold text-primary">
                   /finish
                 </code>{' '}
-                in chat at any time. Teacher Tati will grade your responses so far and record remaining questions as 0.
+                at any time. Teacher Tati will grade your responses so far and record remaining questions as 0.
               </span>
             </div>
             <div className="flex items-start gap-2.5 text-xs text-text">
@@ -229,8 +296,8 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
               </>
             ) : (
               <>
-                <Target size={15} />
-                Start Challenge ({isCustom && customValue ? customValue : selectedCount} questions)
+                {mode === 'voice' ? <Mic size={15} /> : <Target size={15} />}
+                Start in {mode === 'voice' ? 'Voice Mode' : 'Chat Mode'} ({isCustom && customValue ? customValue : selectedCount} questions)
               </>
             )}
           </button>

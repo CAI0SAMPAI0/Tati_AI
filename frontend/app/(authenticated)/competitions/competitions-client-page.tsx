@@ -9,12 +9,21 @@ import {
   Medal,
   TrendingUp,
   Globe,
-  Calendar
+  Calendar,
+  Mic,
+  MessageSquare,
+  Flame,
+  Target,
+  Sparkles,
+  BookOpen,
+  Headphones,
+  Zap
 } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
 import { useSidebarState } from '@/hooks/useSidebarState';
 import { apiGet } from '@/lib/api/client';
+import { DEFAULT_AVATAR_URL } from '@/lib/constants/user';
 
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
@@ -109,9 +118,16 @@ export default function CompetitionsClientPage() {
           <div className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
              <div className="grid grid-cols-3 p-6 md:p-10 bg-gradient-to-b from-primary/10 to-transparent items-end border-b border-border">
                 <div className="flex flex-col items-center gap-3">
-                   <div className="w-14 h-14 md:w-20 md:h-20 rounded-full border-4 border-slate-300 relative">
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-slate-300 flex items-center justify-center text-slate-800 font-bold text-xs shadow-sm">2</div>
-                      <div className="w-full h-full rounded-full bg-bg-secondary overflow-hidden flex items-center justify-center text-xl">🥈</div>
+                   <div className="w-14 h-14 md:w-20 md:h-20 rounded-full border-4 border-slate-300 relative bg-bg-secondary overflow-hidden">
+                      <img
+                        src={currentRanking[1]?.avatar_url || DEFAULT_AVATAR_URL}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR_URL; }}
+                      />
+                      <div className="absolute -top-1 -right-1 w-6 h-6 md:w-7 md:h-7 rounded-full bg-slate-200 border-2 border-slate-400 flex items-center justify-center text-slate-800 font-black text-xs shadow-sm">
+                        2
+                      </div>
                    </div>
                    <div className="text-center">
                      <p className="text-xs font-bold text-text truncate max-w-[80px] md:max-w-none">{currentRanking[1]?.name || currentRanking[1]?.username || '—'}</p>
@@ -120,9 +136,16 @@ export default function CompetitionsClientPage() {
                 </div>
 
                 <div className="flex flex-col items-center gap-4">
-                   <div className="w-20 h-20 md:w-28 md:h-28 rounded-full border-4 border-yellow-400 relative shadow-glow shadow-yellow-400/25 scale-110">
-                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center text-yellow-900 font-black">1</div>
-                      <div className="w-full h-full rounded-full bg-bg-secondary overflow-hidden flex items-center justify-center text-4xl">🥇</div>
+                   <div className="w-20 h-20 md:w-28 md:h-28 rounded-full border-4 border-yellow-400 relative shadow-glow shadow-yellow-400/25 scale-110 bg-bg-secondary overflow-hidden">
+                      <img
+                        src={currentRanking[0]?.avatar_url || DEFAULT_AVATAR_URL}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR_URL; }}
+                      />
+                      <div className="absolute -top-1 -right-1 w-7 h-7 md:w-8 md:h-8 rounded-full bg-yellow-400 border-2 border-yellow-500 flex items-center justify-center text-yellow-950 font-black text-xs shadow-sm">
+                        1
+                      </div>
                    </div>
                    <div className="text-center">
                      <p className="text-sm font-black text-text truncate max-w-[100px] md:max-w-none">{currentRanking[0]?.name || currentRanking[0]?.username || '—'}</p>
@@ -131,9 +154,16 @@ export default function CompetitionsClientPage() {
                 </div>
 
                 <div className="flex flex-col items-center gap-3">
-                   <div className="w-12 h-12 md:w-16 md:h-16 rounded-full border-4 border-orange-400 relative">
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-orange-400 flex items-center justify-center text-orange-900 font-bold text-xs shadow-sm">3</div>
-                      <div className="w-full h-full rounded-full bg-bg-secondary overflow-hidden flex items-center justify-center text-lg">🥉</div>
+                   <div className="w-12 h-12 md:w-16 md:h-16 rounded-full border-4 border-orange-400 relative bg-bg-secondary overflow-hidden">
+                      <img
+                        src={currentRanking[2]?.avatar_url || DEFAULT_AVATAR_URL}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR_URL; }}
+                      />
+                      <div className="absolute -top-1 -right-1 w-6 h-6 md:w-7 md:h-7 rounded-full bg-orange-300 border-2 border-orange-500 flex items-center justify-center text-orange-950 font-black text-xs shadow-sm">
+                        3
+                      </div>
                    </div>
                    <div className="text-center">
                      <p className="text-xs font-bold text-text truncate max-w-[80px] md:max-w-none">{currentRanking[2]?.name || currentRanking[2]?.username || '—'}</p>
@@ -165,7 +195,14 @@ export default function CompetitionsClientPage() {
                             <td className="px-6 py-4">
                                <div className="flex items-center gap-3">
                                   <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary border border-primary/20 overflow-hidden shrink-0">
-                                     {r.avatar_url ? <img src={r.avatar_url} alt="" className="w-full h-full object-cover" /> : (r.name || r.username || '?').charAt(0).toUpperCase()}
+                                     <img
+                                       src={r.avatar_url || DEFAULT_AVATAR_URL}
+                                       alt=""
+                                       className="w-full h-full object-cover"
+                                       onError={(e) => {
+                                         e.currentTarget.src = DEFAULT_AVATAR_URL;
+                                       }}
+                                     />
                                   </div>
                                   <div className="min-w-0">
                                      <p className="text-sm font-bold text-text truncate max-w-[150px] md:max-w-xs">{r.name || r.username} {r.username === user?.username && <span className="text-[0.6rem] ml-2 text-primary font-black uppercase tracking-tighter">(You)</span>}</p>
@@ -186,6 +223,146 @@ export default function CompetitionsClientPage() {
                 </table>
              </div>
           </div>
+
+          {/* XP Scoring Guide Section */}
+          <section className="bg-surface border border-border rounded-3xl p-6 md:p-8 space-y-6 shadow-sm">
+            <div className="flex items-center justify-between border-b border-border pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+                  <Zap size={22} className="fill-primary/20" />
+                </div>
+                <div>
+                  <h2 className="text-lg md:text-xl font-bold font-display text-text">
+                    How to Earn Points & Climb the Ranking
+                  </h2>
+                  <p className="text-xs text-text-muted">
+                    Every interaction with Teacher Tati earns you XP towards the monthly competition.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="p-4 rounded-2xl bg-bg-secondary/40 border border-border/80 flex flex-col justify-between gap-3 hover:border-primary/40 transition-all group">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <Mic size={18} />
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-xs font-black bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                    +10 XP / message
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-text mb-1">Voice Mode Conversation</h3>
+                  <p className="text-xs text-text-muted leading-relaxed">
+                    Practice spoken English with Teacher Tati. Every spoken voice response earns instant points.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-bg-secondary/40 border border-border/80 flex flex-col justify-between gap-3 hover:border-primary/40 transition-all group">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <MessageSquare size={18} />
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-xs font-black bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                    +5 XP / message
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-text mb-1">Interactive Chat</h3>
+                  <p className="text-xs text-text-muted leading-relaxed">
+                    Send messages, ask questions, and practice grammar corrections in the chat with Teacher Tati.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-bg-secondary/40 border border-border/80 flex flex-col justify-between gap-3 hover:border-primary/40 transition-all group">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <Target size={18} />
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-xs font-black bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    +50 XP / challenge
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-text mb-1">CEFR Leveling Challenge</h3>
+                  <p className="text-xs text-text-muted leading-relaxed">
+                    Test your proficiency from A1 to B2. Earn +10 XP per question answered plus 50 XP upon completion.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-bg-secondary/40 border border-border/80 flex flex-col justify-between gap-3 hover:border-primary/40 transition-all group">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <Flame size={18} />
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-xs font-black bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    +20 XP / day
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-text mb-1">Daily Study Streak</h3>
+                  <p className="text-xs text-text-muted leading-relaxed">
+                    Study consistently every single day. Daily practice awards streak retention bonus points.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-bg-secondary/40 border border-border/80 flex flex-col justify-between gap-3 hover:border-primary/40 transition-all group">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <Sparkles size={18} />
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-xs font-black bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                    +25 XP / scenario
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-text mb-1">Real-World Simulations</h3>
+                  <p className="text-xs text-text-muted leading-relaxed">
+                    Practice airports, job interviews, restaurants, and business meetings in realistic simulations.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-bg-secondary/40 border border-border/80 flex flex-col justify-between gap-3 hover:border-primary/40 transition-all group">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-pink-500/10 border border-pink-500/20 text-pink-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <BookOpen size={18} />
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-xs font-black bg-pink-500/15 text-pink-600 dark:text-pink-400 border border-pink-500/20">
+                    +15 XP / review
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-text mb-1">SRS Vocabulary Reviews</h3>
+                  <p className="text-xs text-text-muted leading-relaxed">
+                    Review flashcards with spaced repetition and lock new vocabulary into long-term memory.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-bg-secondary/40 border border-border/80 flex flex-col justify-between gap-3 hover:border-primary/40 transition-all group">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <Headphones size={18} />
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-xs font-black bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                    +20 XP / activity
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-text mb-1">Listening & Hub Materials</h3>
+                  <p className="text-xs text-text-muted leading-relaxed">
+                    Listen to pedagogical podcasts and study exclusive guided materials created by Teacher Tati.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
         </main>
       </div>
     </div>

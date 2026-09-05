@@ -19,7 +19,8 @@ import {
   Activity,
   CheckCircle2,
   Circle,
-  Globe
+  Globe,
+  Target
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -244,6 +245,7 @@ function VoicePageContent() {
     lastAudio: normalLastAudio,
     transcription: normalTranscription,
     sendAudio,
+    sendMessage,
     activeConvId,
     completedObjectives,
     setCompletedObjectives
@@ -324,8 +326,32 @@ function VoicePageContent() {
         .catch(() => {
           setSimulationTitle('Simulation');
         });
+    } else if (convId) {
+      apiGet<any>('/chat/conversations')
+        .then(res => {
+          const list = Array.isArray(res) ? res : res?.results || [];
+          const current = list.find((c: any) => c.id === convId);
+          if (current?.title) {
+            setSimulationTitle(current.title);
+          }
+        })
+        .catch(() => {});
     }
-  }, [simulationId]);
+  }, [simulationId, convId]);
+
+  const isLeveling = Boolean(
+    simulationTitle?.toLowerCase().includes('leveling') ||
+    messages.some(m => m.content?.includes('Leveling Challenge') || m.content?.includes('CEFR English Leveling'))
+  );
+
+  const handleFinishLeveling = async () => {
+    if (typeof window !== 'undefined' && !window.confirm('Do you want to finish the Leveling assessment now? Remaining questions will be recorded as 0, and Teacher Tati will calculate your CEFR level from your answers so far.')) {
+      return;
+    }
+    toast.loading('Finishing Leveling Challenge...', { id: 'finish-leveling' });
+    await sendMessage('/finish');
+    toast.success('Submitted /finish! Grading your assessment...', { id: 'finish-leveling' });
+  };
 
   const handleStartSimulation = async () => {
     if (!simulationId || isStarting) return;
@@ -794,6 +820,16 @@ function VoicePageContent() {
           {simulationId && (
             <button onClick={handleFinishSimulation} className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-success text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-success/90 transition-all active:scale-95 shadow-xl">
               Finish
+            </button>
+          )}
+          {isLeveling && (
+            <button
+              onClick={handleFinishLeveling}
+              className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-primary text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 transition-all active:scale-95 shadow-xl flex items-center gap-1.5 cursor-pointer"
+              title="Finish assessment and receive grade report"
+            >
+              <Target size={14} />
+              <span>Finish Test</span>
             </button>
           )}
           <button onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')} className="p-1.5 sm:p-2.5 rounded-xl bg-white/50 dark:bg-[#1a1c2e]/60 border border-white/60 dark:border-white/10 text-text-muted hover:text-primary transition-all active:scale-95 shadow-xl backdrop-blur-xl">

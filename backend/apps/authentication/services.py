@@ -326,11 +326,11 @@ class AuthService:
             user.save()
             logger.info(f"[Auth] Novo usuário Google criado: {user.username}")
         else:
-            # Atualiza avatar se não tiver
-            if picture and not user.avatar_url:
-                prof = user.profile if isinstance(user.profile, dict) else {}
-                prof["avatar_url"] = picture
-                user.profile = prof
+            # Atualiza avatar se não tiver foto configurada ainda
+            user_prof = user.profile if isinstance(user.profile, dict) else {}
+            if picture and not user_prof.get("avatar_url"):
+                user_prof["avatar_url"] = picture
+                user.profile = user_prof
                 user.save(update_fields=["profile"])
 
         return cls.build_token_response(user)

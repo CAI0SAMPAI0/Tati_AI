@@ -505,6 +505,10 @@ class LevelingService:
             if q_level in session["scores"]:
                 session["scores"][q_level]["correct"] += 1
 
+        # Pontua XP por resposta dada no Desafio de Nivelamento
+        XPService.award_xp(fresh_user, 10, f"Resposta no Nivelamento ({curr_idx + 1}/{total_q})")
+        StreakService.record_activity(fresh_user)
+
         # Registra resposta detalhada
         session["answers"].append({
             "index": curr_idx + 1,

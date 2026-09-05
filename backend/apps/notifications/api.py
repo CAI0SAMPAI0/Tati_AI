@@ -373,6 +373,7 @@ def send_whatsapp(request: HttpRequest, payload: SendWhatsAppInput):
     success = WahaWhatsAppService.send_message(
         phone_number=payload.phone_number,
         message=payload.message,
+        sender_user=request.auth,
     )
     return {"ok": success}
 

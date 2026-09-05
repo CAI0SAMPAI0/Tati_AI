@@ -270,6 +270,7 @@ class AIService:
         difficulty: str = None,
         files: Optional[List[Dict[str, Any]]] = None,
         accent: Optional[str] = None,
+        origin: Optional[str] = "chat",
     ) -> dict:
         # Verifica se esta conversa é uma sessão de nivelamento ativa
         from .leveling_service import LevelingService
@@ -451,8 +452,11 @@ class AIService:
             audio_b64=audio_b64,
         )
 
-        # 10. Atualiza XP e Streak
-        XPService.award_xp(user, 5, "Conversação no Chat da Teacher Tati")
+        # 10. Atualiza XP e Streak (10 XP para modo voz, 5 XP para chat)
+        if origin == "voice":
+            XPService.award_xp(user, 10, "Conversação no Modo Voz com a Teacher Tati")
+        else:
+            XPService.award_xp(user, 5, "Conversação no Chat da Teacher Tati")
         StreakService.record_activity(user)
 
         # Atualiza timestamp da conversa
