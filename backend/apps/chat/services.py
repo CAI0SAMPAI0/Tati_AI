@@ -5,7 +5,7 @@ import re
 import uuid
 import warnings
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import httpx
 
@@ -25,7 +25,7 @@ from .schemas import (
 )
 from apps.authentication.models import User
 from apps.users.services import XPService, StreakService
-from .audio_service import strip_emojis
+from .audio_service import strip_emojis, EMOJI_REGEX
 
 logger = logging.getLogger(__name__)
 
@@ -48,10 +48,14 @@ if GEMINI_API_KEY:
 
 
 def call_meta_llama(
-    messages_payload: list, temperature: float = 0.7, max_tokens: int = 500
+    messages_payload: list,
+    temperature: float = 0.7,
+    max_tokens: int = 500,
+    on_token: Optional[Callable[[str], None]] = None,
 ) -> Optional[str]:
     """
     Executa a chamada prioritária ao modelo Meta Llama 3.1 8B Instruct via Hugging Face Router API.
+    Suporta streaming em tempo real token-a-token se on_token for fornecido.
     Tenta primeiro via InferenceClient e possui fallback HTTP nativo via httpx.
     """
     token = (
@@ -70,19 +74,38 @@ def call_meta_llama(
         client = InferenceClient(
             base_url="https://router.huggingface.co/v1",
             api_key=token,
-            timeout=15.0,
+            timeout=20.0,
         )
-        completion = client.chat.completions.create(
-            model=LLAMA_MODEL_NAME,
-            messages=messages_payload,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
-        if completion and completion.choices and completion.choices[0].message:
-            candidate = completion.choices[0].message.content or ""
-            candidate = strip_emojis(candidate.strip())
+        if on_token:
+            stream = client.chat.completions.create(
+                model=LLAMA_MODEL_NAME,
+                messages=messages_payload,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=True,
+            )
+            tokens = []
+            for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                    tok = EMOJI_REGEX.sub("", chunk.choices[0].delta.content)
+                    if tok:
+                        tokens.append(tok)
+                        on_token(tok)
+            candidate = "".join(tokens).strip()
             if candidate:
                 return candidate
+        else:
+            completion = client.chat.completions.create(
+                model=LLAMA_MODEL_NAME,
+                messages=messages_payload,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            if completion and completion.choices and completion.choices[0].message:
+                candidate = completion.choices[0].message.content or ""
+                candidate = strip_emojis(candidate.strip())
+                if candidate:
+                    return candidate
     except Exception as hf_err:
         logger.warning(
             f"[AI] Meta Llama via InferenceClient falhou: {hf_err}. Tentando via router httpx..."
@@ -101,20 +124,47 @@ def call_meta_llama(
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
-        with httpx.Client(timeout=15.0) as http_client:
-            resp = http_client.post(url, headers=headers, json=data)
-            if resp.status_code == 200:
-                body = resp.json()
-                choices = body.get("choices") or []
-                if choices:
-                    candidate = choices[0].get("message", {}).get("content", "")
-                    candidate = strip_emojis(candidate.strip())
-                    if candidate:
-                        return candidate
-            else:
-                logger.warning(
-                    f"[AI] Meta Llama via httpx retornou status {resp.status_code}: {resp.text[:200]}"
-                )
+        if on_token:
+            data["stream"] = True
+            with httpx.Client(timeout=20.0) as http_client:
+                with http_client.stream("POST", url, headers=headers, json=data) as resp:
+                    if resp.status_code == 200:
+                        tokens = []
+                        for line in resp.iter_lines():
+                            line = line.strip()
+                            if not line or not line.startswith("data:"):
+                                continue
+                            data_str = line[5:].strip()
+                            if data_str == "[DONE]":
+                                break
+                            try:
+                                chunk_json = json.loads(data_str)
+                                delta = chunk_json.get("choices", [{}])[0].get("delta", {})
+                                raw_c = delta.get("content", "")
+                                tok = EMOJI_REGEX.sub("", raw_c)
+                                if tok:
+                                    tokens.append(tok)
+                                    on_token(tok)
+                            except Exception:
+                                continue
+                        candidate = "".join(tokens).strip()
+                        if candidate:
+                            return candidate
+        else:
+            with httpx.Client(timeout=20.0) as http_client:
+                resp = http_client.post(url, headers=headers, json=data)
+                if resp.status_code == 200:
+                    body = resp.json()
+                    choices = body.get("choices") or []
+                    if choices:
+                        candidate = choices[0].get("message", {}).get("content", "")
+                        candidate = strip_emojis(candidate.strip())
+                        if candidate:
+                            return candidate
+                else:
+                    logger.warning(
+                        f"[AI] Meta Llama via httpx retornou status {resp.status_code}: {resp.text[:200]}"
+                    )
     except Exception as http_err:
         logger.warning(f"[AI] Meta Llama via httpx falhou: {http_err}")
 
@@ -357,6 +407,8 @@ class AIService:
         files: Optional[List[Dict[str, Any]]] = None,
         accent: Optional[str] = None,
         origin: Optional[str] = "chat",
+        on_token: Optional[Callable[[str], None]] = None,
+        on_doc: Optional[Callable[[dict], None]] = None,
     ) -> dict:
         # Verifica se esta conversa é uma sessão de nivelamento ativa
         from .leveling_service import LevelingService
@@ -366,10 +418,18 @@ class AIService:
         clean_user_lower = user_text.strip().lower()
         if clean_user_lower in ["/finish", "/fim", "/encerrar", "/end", "/stop"] or clean_user_lower.startswith("/finish"):
             if LevelingService.is_leveling_conversation(user, conversation_id):
-                return LevelingService.finish_leveling_early(user, conversation_id, accent=accent)
+                res = LevelingService.finish_leveling_early(user, conversation_id, accent=accent)
+                if on_token and isinstance(res, dict) and res.get("reply"):
+                    for w in res["reply"].split(" "):
+                        on_token(w + " ")
+                return res
 
         if LevelingService.is_leveling_conversation(user, conversation_id):
-            return LevelingService.process_leveling_step(user, conversation_id, user_text, accent=accent)
+            res = LevelingService.process_leveling_step(user, conversation_id, user_text, accent=accent)
+            if on_token and isinstance(res, dict) and res.get("reply"):
+                for w in res["reply"].split(" "):
+                    on_token(w + " ")
+            return res
 
         clean_user_text = strip_emojis(user_text.strip())
 
@@ -394,6 +454,11 @@ class AIService:
                     student_name=student_name,
                     target_format=target_format,
                 )
+                if generated_doc and on_doc:
+                    try:
+                        on_doc(generated_doc)
+                    except Exception as doc_cb_err:
+                        logger.warning(f"[AIService] Erro no callback on_doc: {doc_cb_err}")
             except Exception as doc_err:
                 logger.error(f"[AIService] Erro ao gerar documento formatado: {doc_err}")
 
@@ -437,7 +502,9 @@ class AIService:
 
         # 3. Tentativa prioritária: Meta Llama 3.1-8B-Instruct via Hugging Face Router
         try:
-            candidate = call_meta_llama(messages_payload, temperature=0.7, max_tokens=500)
+            candidate = call_meta_llama(
+                messages_payload, temperature=0.7, max_tokens=500, on_token=on_token
+            )
             if candidate:
                 reply_text = candidate
                 model_used = LLAMA_MODEL_NAME
@@ -465,21 +532,45 @@ class AIService:
                     break
                 for key in keys:
                     try:
-                        client = Groq(api_key=key, timeout=12.0)
-                        chat_completion = client.chat.completions.create(
-                            messages=messages_payload,
-                            model=g_model,
-                            temperature=0.7,
-                            max_tokens=500,
-                        )
-                        candidate = chat_completion.choices[0].message.content or ""
-                        candidate = strip_emojis(candidate.strip())
-                        if candidate:
-                            reply_text = candidate
-                            model_used = f"groq/{g_model}"
-                            print(f"[AI Model] Resposta gerada via Groq: {g_model}")
-                            logger.info(f"[AI Model] Resposta gerada via Groq: {g_model}")
-                            break
+                        client = Groq(api_key=key, timeout=15.0)
+                        if on_token:
+                            stream = client.chat.completions.create(
+                                messages=messages_payload,
+                                model=g_model,
+                                temperature=0.7,
+                                max_tokens=500,
+                                stream=True,
+                                extra_body={"reasoning_format": "hidden"},
+                            )
+                            tokens = []
+                            for chunk in stream:
+                                if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                                    tok = EMOJI_REGEX.sub("", chunk.choices[0].delta.content)
+                                    if tok:
+                                        tokens.append(tok)
+                                        on_token(tok)
+                            candidate = "".join(tokens).strip()
+                            if candidate:
+                                reply_text = candidate
+                                model_used = f"groq/{g_model}"
+                                print(f"[AI Model] Resposta gerada via Groq: {g_model}")
+                                logger.info(f"[AI Model] Resposta gerada via Groq: {g_model}")
+                                break
+                        else:
+                            chat_completion = client.chat.completions.create(
+                                messages=messages_payload,
+                                model=g_model,
+                                temperature=0.7,
+                                max_tokens=500,
+                            )
+                            candidate = chat_completion.choices[0].message.content or ""
+                            candidate = strip_emojis(candidate.strip())
+                            if candidate:
+                                reply_text = candidate
+                                model_used = f"groq/{g_model}"
+                                print(f"[AI Model] Resposta gerada via Groq: {g_model}")
+                                logger.info(f"[AI Model] Resposta gerada via Groq: {g_model}")
+                                break
                     except Exception as mod_err:
                         logger.warning(
                             f"[AI] Groq model {g_model} failed with key {key[:10]}: {mod_err}"
@@ -494,14 +585,31 @@ class AIService:
                 try:
                     model = genai.GenerativeModel(gem_model)
                     prompt_full = f"{sys_prompt}\n\nUser: {current_user_turn}\nTeacher Tati:"
-                    response = model.generate_content(prompt_full)
-                    candidate = strip_emojis(response.text.strip())
-                    if candidate:
-                        reply_text = candidate
-                        model_used = f"gemini/{gem_model}"
-                        print(f"[AI Model] Resposta gerada via Gemini: {gem_model}")
-                        logger.info(f"[AI Model] Resposta gerada via Gemini: {gem_model}")
-                        break
+                    if on_token:
+                        response = model.generate_content(prompt_full, stream=True)
+                        tokens = []
+                        for chunk in response:
+                            if hasattr(chunk, "text") and chunk.text:
+                                tok = EMOJI_REGEX.sub("", chunk.text)
+                                if tok:
+                                    tokens.append(tok)
+                                    on_token(tok)
+                        candidate = "".join(tokens).strip()
+                        if candidate:
+                            reply_text = candidate
+                            model_used = f"gemini/{gem_model}"
+                            print(f"[AI Model] Resposta gerada via Gemini: {gem_model}")
+                            logger.info(f"[AI Model] Resposta gerada via Gemini: {gem_model}")
+                            break
+                    else:
+                        response = model.generate_content(prompt_full)
+                        candidate = strip_emojis(response.text.strip())
+                        if candidate:
+                            reply_text = candidate
+                            model_used = f"gemini/{gem_model}"
+                            print(f"[AI Model] Resposta gerada via Gemini: {gem_model}")
+                            logger.info(f"[AI Model] Resposta gerada via Gemini: {gem_model}")
+                            break
                 except Exception as e:
                     logger.warning(f"[AI] Gemini model {gem_model} failed: {e}")
 
@@ -527,6 +635,11 @@ class AIService:
                     f"That is a great point, {student_first_name}. "
                     f"How does that usually work out in your experience?"
                 )
+            if on_token:
+                import time
+                for word in reply_text.split(" "):
+                    on_token(word + " ")
+                    time.sleep(0.02)
 
         # 6. Garante remoção total de emojis no texto final
         reply_text = strip_emojis(reply_text)

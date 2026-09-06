@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 import urllib.parse
@@ -140,7 +141,6 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         try:
             self.user = await aget_user_by_username(self.username)
 
-            from asgiref.sync import sync_to_async
             from apps.chat.audio_service import AudioService
 
             accent = (
@@ -152,61 +152,106 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
 
             origin = content.get("origin") or ("voice" if is_audio else "chat")
 
-            res = await sync_to_async(AIService.generate_reply)(
-                user=self.user,
-                conversation_id=conv_id,
-                user_text=text_content,
-                files=uploaded_files,
-                accent=accent,
-                origin=origin,
-            )
+            loop = asyncio.get_running_loop()
+            token_queue = asyncio.Queue()
+
+            def on_token(token_str: str):
+                if token_str:
+                    loop.call_soon_threadsafe(
+                        token_queue.put_nowait,
+                        {"type": "token", "content": token_str}
+                    )
+
+            def on_doc(doc_data: dict):
+                if doc_data:
+                    loop.call_soon_threadsafe(
+                        token_queue.put_nowait,
+                        {"type": "doc", "document": doc_data}
+                    )
+
+            def run_generation():
+                close_old_connections()
+                try:
+                    result = AIService.generate_reply(
+                        user=self.user,
+                        conversation_id=conv_id,
+                        user_text=text_content,
+                        files=uploaded_files,
+                        accent=accent,
+                        origin=origin,
+                        on_token=on_token,
+                        on_doc=on_doc,
+                    )
+                    loop.call_soon_threadsafe(
+                        token_queue.put_nowait,
+                        {"type": "done", "result": result}
+                    )
+                except Exception as err:
+                    logger.error(f"[ChatWS] Erro na thread de geração: {err}", exc_info=True)
+                    loop.call_soon_threadsafe(
+                        token_queue.put_nowait,
+                        {"type": "error", "error": err}
+                    )
+                finally:
+                    close_old_connections()
+
+            worker_task = asyncio.create_task(asyncio.to_thread(run_generation))
+
+            res = None
+
+            while True:
+                msg_item = await token_queue.get()
+                item_type = msg_item.get("type")
+
+                if item_type == "token":
+                    await self.send_json(
+                        {
+                            "type": "stream_token",
+                            "content": msg_item.get("content", ""),
+                        }
+                    )
+                elif item_type == "doc":
+                    doc_item = msg_item.get("document", {})
+                    await self.send_json(
+                        {
+                            "type": "document_generated",
+                            "conversation_id": conv_id,
+                            "document": doc_item,
+                            "filename": doc_item.get("filename"),
+                            "format": doc_item.get("format"),
+                            "url": doc_item.get("url"),
+                            "preview_url": doc_item.get("preview_url", doc_item.get("url")),
+                            "size": doc_item.get("size"),
+                            "pdf_b64": doc_item.get("pdf_b64", ""),
+                        }
+                    )
+                elif item_type == "done":
+                    res = msg_item.get("result", {})
+                    break
+                elif item_type == "error":
+                    raise msg_item.get("error")
+
+            await worker_task
 
             reply_text = res.get("reply") if isinstance(res, dict) else str(res)
             audio_b64 = res.get("audio_b64") if isinstance(res, dict) else ""
-            doc = res.get("document") if isinstance(res, dict) else None
             model_used = res.get("model", "unknown") if isinstance(res, dict) else "unknown"
 
             print(
-                f"[ChatWS] Resposta gerada para o aluno '{self.username}' | Modelo: {model_used} | Modo: {origin}"
+                f"[ChatWS] Resposta concluída para '{self.username}' | Modelo: {model_used} | Modo: {origin}"
             )
             logger.info(
-                f"[ChatWS] Resposta gerada para o aluno '{self.username}' | Modelo: {model_used} | Modo: {origin}"
+                f"[ChatWS] Resposta concluída para '{self.username}' | Modelo: {model_used} | Modo: {origin}"
             )
 
-            # Notifica o frontend sobre o documento gerado para exibição instantânea
-            if doc:
-                await self.send_json(
-                    {
-                        "type": "document_generated",
-                        "conversation_id": conv_id,
-                        "document": doc,
-                        "filename": doc.get("filename"),
-                        "format": doc.get("format"),
-                        "url": doc.get("url"),
-                        "preview_url": doc.get("preview_url", doc.get("url")),
-                        "size": doc.get("size"),
-                        "pdf_b64": doc.get("pdf_b64", ""),
-                    }
-                )
-
-            # Remove tags internas de anexos do texto para streaming limpo na interface
-            clean_reply_text = re.sub(r"\[ATTACHED_DOCUMENT:.*?\]", "", reply_text, flags=re.DOTALL).strip()
-
-            if not audio_b64:
+            # Se for modo de voz e não tiver áudio gerado, gera áudio via Edge TTS
+            if not audio_b64 and origin == "voice":
+                clean_reply_text = re.sub(r"\[ATTACHED_DOCUMENT:.*?\]", "", reply_text, flags=re.DOTALL).strip()
                 audio_b64 = await AudioService.text_to_speech_async(
                     clean_reply_text, accent=accent
                 )
 
-            # Envia o texto da resposta limpo
-            await self.send_json(
-                {
-                    "type": "stream_token",
-                    "content": clean_reply_text,
-                    "model": model_used,
-                }
-            )
-
-            # Se for modo de voz ou tiver áudio gerado, envia o payload de áudio
+            # Se tiver áudio gerado, envia o payload de áudio
             if audio_b64:
                 await self.send_json(
                     {
