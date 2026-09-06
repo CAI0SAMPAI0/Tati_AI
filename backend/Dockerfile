@@ -25,6 +25,11 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 COPY . .
 
+# Se o build context foi a raiz (/), move o conteudo de backend/ para /app
+RUN if [ -d "backend/app" ]; then \
+      cp -r backend/. . && rm -rf backend; \
+    fi
+
 # Coleta arquivos estáticos
 RUN python manage.py collectstatic --noinput || true
 
