@@ -423,10 +423,13 @@ class DocumentService:
             if companion_pdf:
                 preview_url = f"/media/generated_docs/{os.path.basename(companion_pdf)}"
 
-        # 5. Base64 para download instantâneo se for PDF
+        # 5. Base64 para download instantâneo se for PDF (ou DOCX/PPTX convertido)
         pdf_b64 = ""
         if actual_format == "pdf" and os.path.exists(file_path):
             with open(file_path, "rb") as pf:
+                pdf_b64 = base64.b64encode(pf.read()).decode("utf-8")
+        elif actual_format in ["docx", "pptx"] and "companion_pdf" in locals() and companion_pdf and os.path.exists(companion_pdf):
+            with open(companion_pdf, "rb") as pf:
                 pdf_b64 = base64.b64encode(pf.read()).decode("utf-8")
 
         return {

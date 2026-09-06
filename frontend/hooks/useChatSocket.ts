@@ -207,7 +207,7 @@ export function useChatSocket(conversationId: string | null) {
             filename: msg.document?.filename || msg.filename || 'Documento.pdf',
           };
         }
-        if (msg.text) {
+        if (msg.text && !streamingRef.current) {
           streamingRef.current = msg.text;
           setStreamingContent(msg.text);
         }
@@ -217,7 +217,7 @@ export function useChatSocket(conversationId: string | null) {
           pdf_b64: msg.pdf_b64 || '',
           filename: msg.filename || 'Documento.pdf',
         };
-        if (msg.text) {
+        if (msg.text && !streamingRef.current) {
           streamingRef.current = msg.text;
           setStreamingContent(msg.text);
         }

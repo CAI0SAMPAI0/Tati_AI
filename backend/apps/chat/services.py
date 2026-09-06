@@ -533,7 +533,7 @@ class AIService:
 
         # 7. Anexa a tag de documento para persistência perene no histórico do banco
         if generated_doc:
-            doc_meta_json = json.dumps({
+            doc_dict = {
                 "id": generated_doc["id"],
                 "filename": generated_doc["filename"],
                 "format": generated_doc["format"],
@@ -541,7 +541,12 @@ class AIService:
                 "preview_url": generated_doc.get("preview_url", generated_doc["url"]),
                 "size": generated_doc["size"],
                 "title": generated_doc["title"],
-            })
+            }
+            # Se houver pdf_b64 de tamanho razoável (< 400KB), armazena para exibição offline perene
+            if generated_doc.get("pdf_b64") and len(generated_doc["pdf_b64"]) < 400000:
+                doc_dict["pdf_b64"] = generated_doc["pdf_b64"]
+
+            doc_meta_json = json.dumps(doc_dict)
             reply_text = f"{reply_text}\n\n[ATTACHED_DOCUMENT:{doc_meta_json}]"
 
         # 8. Gera áudio via Edge TTS (com texto limpo de emojis e com o sotaque selecionado)

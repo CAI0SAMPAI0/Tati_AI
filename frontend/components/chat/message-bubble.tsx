@@ -29,7 +29,12 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
 
   // Metadados de documento gerado (persistido na mensagem ou recebido via stream)
   const docData = useMemo(() => {
-    if (parsed.document) return parsed.document;
+    if (parsed.document) {
+      return {
+        ...parsed.document,
+        pdf_b64: parsed.document.pdf_b64 || message.pdf_b64 || '',
+      };
+    }
     if (message.document_url) {
       return {
         id: message.id,
@@ -39,6 +44,7 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
         preview_url: message.preview_url || message.document_url,
         size: message.document_size || '',
         title: message.document_filename || 'Material de Estudo',
+        pdf_b64: message.pdf_b64 || '',
       };
     }
     if (message.pdf_b64) {
@@ -50,6 +56,7 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
         preview_url: `data:application/pdf;base64,${message.pdf_b64}`,
         size: '',
         title: message.pdf_filename || 'Documento PDF',
+        pdf_b64: message.pdf_b64,
       };
     }
     return null;
@@ -137,6 +144,78 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Helper para resolver URLs de documentos (evita 404 em URLs relativas no domínio do frontend)
+  const resolveDocUrl = (url?: string | null) => {
+    if (!url) return '';
+    if (url.startsWith('data:') || url.startsWith('blob:') || /^https?:\/\//i.test(url)) {
+      return url;
+    }
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+    if (apiBase) {
+      return `${apiBase.replace(/\/$/, '')}${url.startsWith('/') ? url : `/${url}`}`;
+    }
+    return url;
+  };
+
+  const handleOpenDoc = () => {
+    if (!docData) return;
+    if (docData.pdf_b64) {
+      try {
+        const cleanB64 = docData.pdf_b64.replace(/^data:application\/pdf;base64,/, '').trim();
+        const byteCharacters = atob(cleanB64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/pdf' });
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank', 'noopener,noreferrer');
+        return;
+      } catch (err) {
+        console.error('Error opening base64 PDF:', err);
+      }
+    }
+    const targetUrl = resolveDocUrl(docData.preview_url || docData.url);
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleDownloadDoc = () => {
+    if (!docData) return;
+    if (docData.pdf_b64) {
+      try {
+        const cleanB64 = docData.pdf_b64.replace(/^data:application\/pdf;base64,/, '').trim();
+        const byteCharacters = atob(cleanB64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/pdf' });
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        const fn = docData.filename.toLowerCase().endsWith('.pdf') ? docData.filename : `${docData.filename}.pdf`;
+        a.download = fn;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 15000);
+        return;
+      } catch (err) {
+        console.error('Error downloading base64 PDF:', err);
+      }
+    }
+    const targetUrl = resolveDocUrl(docData.url);
+    const a = document.createElement('a');
+    a.href = targetUrl;
+    a.download = docData.filename;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   return (
@@ -361,24 +440,21 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
               <div className="flex items-center gap-2 pt-2 border-t border-border/60">
                 <button
                   type="button"
-                  onClick={() => {
-                    const viewUrl = docData.preview_url || docData.url;
-                    window.open(viewUrl, '_blank', 'noopener,noreferrer');
-                  }}
+                  onClick={handleOpenDoc}
                   className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-xl bg-primary text-white text-[0.75rem] font-bold hover:bg-primary/90 transition-all shadow-sm active:scale-98"
                 >
                   <ExternalLink size={12} />
                   Open in browser
                 </button>
-                <a
-                  href={docData.url}
-                  download={docData.filename}
+                <button
+                  type="button"
+                  onClick={handleDownloadDoc}
                   className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-bg-secondary border border-border hover:bg-surface text-text text-[0.75rem] font-bold transition-all active:scale-98"
                   title="Download file"
                 >
                   <Download size={12} />
                   Download
-                </a>
+                </button>
               </div>
             </div>
           </div>

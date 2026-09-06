@@ -52,6 +52,22 @@ const nextConfig = {
     ],
   },
 
+  async rewrites() {
+    const backendUrl =
+      process.env.NEXT_PUBLIC_API_BASE_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      process.env.INTERNAL_API_URL;
+
+    if (!backendUrl) return [];
+
+    return [
+      {
+        source: '/media/:path*',
+        destination: `${backendUrl.replace(/\/$/, '')}/media/:path*`,
+      },
+    ];
+  },
+
   async headers() {
     return [
       {

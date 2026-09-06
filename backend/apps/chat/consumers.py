@@ -1,4 +1,5 @@
 import logging
+import re
 import urllib.parse
 from asgiref.sync import sync_to_async
 from django.db import close_old_connections
@@ -185,20 +186,22 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                         "preview_url": doc.get("preview_url", doc.get("url")),
                         "size": doc.get("size"),
                         "pdf_b64": doc.get("pdf_b64", ""),
-                        "text": reply_text,
                     }
                 )
 
+            # Remove tags internas de anexos do texto para streaming limpo na interface
+            clean_reply_text = re.sub(r"\[ATTACHED_DOCUMENT:.*?\]", "", reply_text, flags=re.DOTALL).strip()
+
             if not audio_b64:
                 audio_b64 = await AudioService.text_to_speech_async(
-                    reply_text, accent=accent
+                    clean_reply_text, accent=accent
                 )
 
-            # Envia o texto da resposta
+            # Envia o texto da resposta limpo
             await self.send_json(
                 {
                     "type": "stream_token",
-                    "content": reply_text,
+                    "content": clean_reply_text,
                     "model": model_used,
                 }
             )

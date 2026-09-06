@@ -129,6 +129,7 @@ export interface AttachedDocMeta {
   preview_url?: string;
   size?: string;
   title?: string;
+  pdf_b64?: string;
 }
 
 export function parseAIResponse(content: string): { 
@@ -148,11 +149,12 @@ export function parseAIResponse(content: string): {
   if (docMatch) {
     try {
       extractedDoc = JSON.parse(docMatch[1]);
-      raw = raw.replace(docMatch[0], '').trim();
     } catch (e) {
       // Ignora erro de JSON e mantém texto
     }
   }
+  // Garante a remoção global de todas as ocorrências de [ATTACHED_DOCUMENT:...] do texto exibido
+  raw = raw.replace(/\[ATTACHED_DOCUMENT:[\s\S]*?\]/g, '').trim();
 
   // 1. Remove markdown code blocks if wrapped
   if (raw.startsWith('```')) {
