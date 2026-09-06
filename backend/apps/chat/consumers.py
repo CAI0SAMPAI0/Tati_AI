@@ -163,6 +163,14 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             reply_text = res.get("reply") if isinstance(res, dict) else str(res)
             audio_b64 = res.get("audio_b64") if isinstance(res, dict) else ""
             doc = res.get("document") if isinstance(res, dict) else None
+            model_used = res.get("model", "unknown") if isinstance(res, dict) else "unknown"
+
+            print(
+                f"[ChatWS] Resposta gerada para o aluno '{self.username}' | Modelo: {model_used} | Modo: {origin}"
+            )
+            logger.info(
+                f"[ChatWS] Resposta gerada para o aluno '{self.username}' | Modelo: {model_used} | Modo: {origin}"
+            )
 
             # Notifica o frontend sobre o documento gerado para exibição instantânea
             if doc:
@@ -191,6 +199,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                 {
                     "type": "stream_token",
                     "content": reply_text,
+                    "model": model_used,
                 }
             )
 
@@ -201,11 +210,12 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                         "type": "audio_response",
                         "audio": audio_b64,
                         "audio_b64": audio_b64,
+                        "model": model_used,
                     }
                 )
 
             # Finaliza stream
-            await self.send_json({"type": "stream_end"})
+            await self.send_json({"type": "stream_end", "model": model_used})
 
         except Exception as e:
             logger.error(f"[ChatWS] Erro ao processar mensagem: {e}")
