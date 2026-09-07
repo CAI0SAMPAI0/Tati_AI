@@ -54,23 +54,23 @@ class BackgroundNotificationRunner:
                 tick += 1
                 now_brt = datetime.now(BRT_ZONE)
 
-                # 1. Keepalive do WAHA na Render (a cada 10 minutos / 20 ticks de 30s)
+                # 1. Manter o WAHA na Render (a cada 10 minutos / 20 ticks de 30s)
                 if tick % 20 == 1:
                     cls._ping_waha()
 
-                # 2. Lembrete diário de ofensiva (Janela das 20:00 BRT)
+                # 2. Lembrete diário de ofensiva (Janela das 20h BR)
                 if now_brt.hour == 20:
                     cls._run_daily_streak(now_brt)
 
-                # 3. Incentivo de inatividade (Janela das 14:00 BRT)
+                # 3. Incentivo de inatividade (Janela das 14h BR)
                 if now_brt.hour == 14:
                     cls._run_inactivity_nudges(now_brt)
 
-                # 4. Relatório semanal de evolução (Domingos na janela das 19:00 BRT)
+                # 4. Relatório semanal de evolução (Domingos na janela das 19h BR)
                 if now_brt.weekday() == 6 and now_brt.hour == 19:
                     cls._run_weekly_report(now_brt)
 
-                # 5. Competição mensal (Dia 1 na janela das 09:00 BRT)
+                # 5. Competição mensal (Dia 1 na janela das 9h BR)
                 if now_brt.day == 1 and now_brt.hour == 9:
                     cls._run_monthly_competition(now_brt)
 

@@ -40,4 +40,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD curl -f -L http://localhost:${PORT:-7860}/health || curl -f -L http://localhost:8080/health || exit 1
 
 # Executa Gunicorn com Uvicorn workers suportando Hugging Face Spaces (7860) e Railway/Docker Compose ($PORT ou 8080)
-CMD ["sh", "-c", "BIND_ARGS=\"-b 0.0.0.0:7860\"; if [ -n \"$PORT\" ] && [ \"$PORT\" != \"7860\" ]; then BIND_ARGS=\"-b 0.0.0.0:${PORT} -b 0.0.0.0:7860\"; elif [ -z \"$PORT\" ]; then BIND_ARGS=\"-b 0.0.0.0:7860 -b 0.0.0.0:8080\"; fi; exec gunicorn app.asgi:application -w ${WORKERS:-2} -k uvicorn.workers.UvicornWorker $BIND_ARGS --forwarded-allow-ips '*' --timeout 120 --graceful-timeout 30 --access-logfile -"]
+CMD ["sh", "-c", "BIND_ARGS=\"-b 0.0.0.0:7860\"; if [ -n \"$PORT\" ] && [ \"$PORT\" != \"7860\" ]; then BIND_ARGS=\"-b 0.0.0.0:${PORT} -b 0.0.0.0:7860\"; elif [ -z \"$PORT\" ]; then BIND_ARGS=\"-b 0.0.0.0:7860 -b 0.0.0.0:8080\"; fi; exec gunicorn app.asgi:application -w ${WORKERS:-1} -k uvicorn.workers.UvicornWorker $BIND_ARGS --forwarded-allow-ips '*' --timeout 120 --graceful-timeout 30 --access-logfile -"]

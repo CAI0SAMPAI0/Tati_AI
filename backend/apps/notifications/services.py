@@ -132,7 +132,6 @@ class BrevoEmailService:
     ) -> dict:
         from apps.chat.audio_service import strip_emojis
 
-        # Remove emojis do assunto e corpo para manter padrão 100% profissional
         clean_subject = strip_emojis(subject) if subject else ""
         clean_html = strip_emojis(html_content) if html_content else ""
 
