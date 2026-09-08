@@ -427,18 +427,20 @@ class RankingService:
     }
 
     ACTIVITY_POINTS = {
-        "grammar": 12,
-        "vocabulary": 10,
-        "listening": 10,
-        "reading": 8,
-        "flashcards": 8,
-        "simulations": 8,
-        "games": 8,
-        "news": 6,
-        "quiz": 7,
-        "flashcard": 3,
-        "message": 8,
-        "simulation": 10,
+        "grammar": 25,
+        "vocabulary": 25,
+        "listening": 25,
+        "listenings": 25,
+        "reading": 25,
+        "flashcards": 25,
+        "simulations": 25,
+        "games": 25,
+        "news": 25,
+        "quiz": 25,
+        "flashcard": 25,
+        "simulation": 25,
+        "exercise": 25,
+        "external": 25,
     }
 
     @classmethod
@@ -454,8 +456,28 @@ class RankingService:
         month_key = f"{target_year}-{target_month:02d}"
 
         scores = {}
+
+        # 1. Base consolidada: bucket mensal de XP do usuário (já agrega chat, voz, CEFR e atividades de forma unificada)
+        for u in User.objects.all():
+            xp_data = u.xp_data if isinstance(u.xp_data, dict) else {}
+            if all_time:
+                legacy = int(xp_data.get("legacy_competition_points", 0) or 0)
+                total = int(xp_data.get("xp", 0) or 0)
+                scores[u.username] = max(total, legacy)
+            else:
+                monthly_xp_map = xp_data.get("monthly_xp")
+                if isinstance(monthly_xp_map, dict):
+                    pts = int(monthly_xp_map.get(month_key, 0) or 0)
+                    if pts:
+                        scores[u.username] = pts
+
+        # 2. Para alunos legados ou registros sem bucket monthly_xp, computa a partir de ActivitySubmission
         rows = list(ActivitySubmission.objects.all())
         for r in rows:
+            if r.username in scores and scores[r.username] > 0:
+                # Evita dupla contagem: pontuação do usuário já está consolidada no bucket mensal
+                continue
+
             meta = r.metadata if isinstance(r.metadata, dict) else {}
             if r.score <= 0 or str(meta.get("status") or "").lower() == "pending":
                 continue
@@ -483,24 +505,10 @@ class RankingService:
             pts = meta.get("points_awarded")
             if pts is None:
                 cat = str(meta.get("category") or r.activity_type or "").lower().strip()
-                pts = cls.ACTIVITY_POINTS.get(cat, 0)
+                pts = cls.ACTIVITY_POINTS.get(cat, 25)
             pts = int(pts or 0)
             if pts:
                 scores[r.username] = scores.get(r.username, 0) + pts
-
-        # Inclui pontos do bucket mensal de XP nos usuários
-        for u in User.objects.all():
-            xp_data = u.xp_data if isinstance(u.xp_data, dict) else {}
-            if all_time:
-                legacy = int(xp_data.get("legacy_competition_points", 0) or 0)
-                if legacy:
-                    scores[u.username] = scores.get(u.username, 0) + legacy
-            else:
-                monthly_xp_map = xp_data.get("monthly_xp")
-                if isinstance(monthly_xp_map, dict):
-                    pts = int(monthly_xp_map.get(month_key, 0) or 0)
-                    if pts:
-                        scores[u.username] = scores.get(u.username, 0) + pts
 
         return scores
 
@@ -1647,6 +1655,17 @@ class SubmissionService:
         # 2. Se for marcar como CONCLUÍDO
         from django.db.models import Q
 
+        # Verifica se esta atividade já havia sido marcada como concluída anteriormente
+        already_completed = ActivitySubmission.objects.filter(
+            Q(username=username)
+            & (
+                Q(metadata__activity_id=str(activity_id))
+                | Q(metadata__url=target_url)
+                | Q(metadata__slug=target_slug)
+            )
+            & Q(status="completed")
+        ).exists()
+
         ActivitySubmission.objects.filter(
             Q(username=username)
             & (
@@ -1656,9 +1675,15 @@ class SubmissionService:
             )
         ).delete()
 
-        xp_earned = 15 if score >= 70 else 5
+        # Diretriz Teacher Tatiana: 25 pontos para cada atividade concluída
+        # (grammar, listening, vocabulary, reading, flashcards, simulations, games e news)
+        xp_earned = 25 if score >= 70 else 5
+        metadata["points_awarded"] = xp_earned
+
         if user and isinstance(user, User):
-            XPService.award_xp(user, xp_earned, f"Atividade {activity_type}")
+            # Apenas concede novos XP se o aluno ainda não havia concluído esta atividade antes
+            if not already_completed:
+                XPService.award_xp(user, xp_earned, f"Atividade {activity_type}")
             StreakService.record_activity(user)
 
         submission = ActivitySubmission.objects.create(
@@ -1669,7 +1694,7 @@ class SubmissionService:
             metadata=metadata,
         )
 
-        total_xp = user.total_xp if user and isinstance(user, User) else 15
+        total_xp = user.total_xp if user and isinstance(user, User) else 25
         streak_count = user.streak_count if user and isinstance(user, User) else 1
 
         return {

@@ -558,28 +558,28 @@ export default function ProgressClientPage() {
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
-                    <span className="text-sm font-black text-primary leading-none">+10 XP</span>
-                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Chat message sent</span>
+                    <span className="text-sm font-black text-blue-500 leading-none">+15 XP</span>
+                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Chat with Teacher Tati</span>
+                  </div>
+                  <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
+                    <span className="text-sm font-black text-purple-500 leading-none">+30 XP</span>
+                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Voice mode conversation</span>
                   </div>
                   <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
                     <span className="text-sm font-black text-emerald-500 leading-none">+25 XP</span>
-                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Correct quiz answer</span>
+                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">CEFR Leveling (daily)</span>
                   </div>
                   <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
-                    <span className="text-sm font-black text-orange-500 leading-none">+50 XP</span>
-                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Simulation or Podcast</span>
+                    <span className="text-sm font-black text-primary leading-none">+25 XP</span>
+                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Each completed activity</span>
                   </div>
                   <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
-                    <span className="text-sm font-black text-blue-500 leading-none">+15 XP</span>
-                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Add word to SRS</span>
+                    <span className="text-sm font-black text-amber-500 leading-none">+20 XP</span>
+                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Daily study streak</span>
                   </div>
                   <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
-                    <span className="text-sm font-black text-violet-500 leading-none">+10 XP</span>
-                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Vocabulary review</span>
-                  </div>
-                  <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
-                    <span className="text-sm font-black text-pink-500 leading-none">+30 XP</span>
-                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Reaching study goal</span>
+                    <span className="text-sm font-black text-pink-500 leading-none">+25 XP</span>
+                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Simulations & Flashcards</span>
                   </div>
                 </div>
               </div>

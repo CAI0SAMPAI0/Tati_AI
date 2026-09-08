@@ -355,7 +355,6 @@ async def send_simulation_message(request: HttpRequest, payload: SimMessageInput
             pass
 
         if user and isinstance(user, User):
-            XPService.award_xp(user, 5, "Fala em Simulação")
             StreakService.record_activity(user)
 
     await sync_to_async(_save_assistant_msg_and_award_xp)()
@@ -380,8 +379,17 @@ async def evaluate_simulation(request: HttpRequest, payload: SimEvaluateInput):
         username = user.username if user else "aluno"
         scenario_id = payload.scenario_id or "general_simulation"
 
+        from django.db.models import Q
+        already_completed = ActivitySubmission.objects.filter(
+            Q(username=username)
+            & Q(activity_type="simulation")
+            & (Q(metadata__scenario_id=scenario_id) | Q(metadata__simulation_id=scenario_id))
+            & Q(status="completed")
+        ).exists()
+
         if user and isinstance(user, User):
-            XPService.award_xp(user, 25, f"Avaliação de Simulação ({scenario_id})")
+            if not already_completed:
+                XPService.award_xp(user, 25, f"Avaliação de Simulação ({scenario_id})")
             StreakService.record_activity(user)
 
         sub = ActivitySubmission.objects.create(
@@ -453,8 +461,17 @@ async def mark_simulation_complete(
         username = user.username if user else "aluno"
         score = int((payload or {}).get("score", 100))
 
+        from django.db.models import Q
+        already_completed = ActivitySubmission.objects.filter(
+            Q(username=username)
+            & Q(activity_type="simulation")
+            & (Q(metadata__scenario_id=scenario_id) | Q(metadata__simulation_id=scenario_id) | Q(metadata__activity_id=scenario_id))
+            & Q(status="completed")
+        ).exists()
+
         if user and isinstance(user, User):
-            XPService.award_xp(user, 25, f"Conclusão de Simulação ({scenario_id})")
+            if not already_completed:
+                XPService.award_xp(user, 25, f"Conclusão de Simulação ({scenario_id})")
             StreakService.record_activity(user)
 
         sub = ActivitySubmission.objects.create(

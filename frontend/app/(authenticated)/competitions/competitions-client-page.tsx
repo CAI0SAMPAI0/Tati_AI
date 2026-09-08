@@ -334,7 +334,7 @@ export default function CompetitionsClientPage() {
                     <BookOpen size={18} />
                   </div>
                   <span className="px-2.5 py-1 rounded-full text-xs font-black bg-pink-500/15 text-pink-600 dark:text-pink-400 border border-pink-500/20">
-                    +15 XP / review
+                    +25 XP / review
                   </span>
                 </div>
                 <div>
@@ -351,7 +351,7 @@ export default function CompetitionsClientPage() {
                     <Headphones size={18} />
                   </div>
                   <span className="px-2.5 py-1 rounded-full text-xs font-black bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
-                    +20 XP / activity
+                    +25 XP / activity
                   </span>
                 </div>
                 <div>
