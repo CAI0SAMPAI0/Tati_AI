@@ -136,11 +136,21 @@ else:
 UPSTASH_REDIS_URL = os.getenv("UPSTASH_REDIS_URL")
 REDIS_URL = os.getenv("REDIS_URL", UPSTASH_REDIS_URL)
 
-if (
+# Verifica se a URL do Redis é válida e não contém templates Railway não resolvidos (ex: ${{REDISHOST}})
+IS_VALID_REDIS_URL = bool(
     REDIS_URL
     and REDIS_URL.startswith(("redis://", "rediss://"))
-    and os.getenv("USE_REDIS_CACHE", "false").lower() in ("true", "1")
-):
+    and "${{" not in REDIS_URL
+)
+
+# Ativa Redis automaticamente se uma URL válida for fornecida, exceto se desativado explicitamente
+USE_REDIS_CACHE_ENV = os.getenv("USE_REDIS_CACHE")
+if USE_REDIS_CACHE_ENV is not None:
+    SHOULD_USE_REDIS_CACHE = USE_REDIS_CACHE_ENV.lower() in ("true", "1")
+else:
+    SHOULD_USE_REDIS_CACHE = IS_VALID_REDIS_URL
+
+if IS_VALID_REDIS_URL and SHOULD_USE_REDIS_CACHE:
     CACHES = {
         "default": {
             "BACKEND": "django_redis.cache.RedisCache",
@@ -166,7 +176,8 @@ else:
 from celery.schedules import crontab
 
 CELERY_BROKER_URL = os.getenv(
-    "CELERY_BROKER_URL", REDIS_URL or "redis://localhost:6379/0"
+    "CELERY_BROKER_URL",
+    REDIS_URL if IS_VALID_REDIS_URL else "redis://localhost:6379/0"
 )
 CELERY_RESULT_BACKEND = "django-db"
 CELERY_CACHE_BACKEND = "django-cache"
@@ -181,9 +192,9 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.activities.tasks.sync_hub_materials_task",
         "schedule": 1800.0,
     },
-    "daily-streak-reminders-20h": {
+    "daily-streak-reminders-17h": {
         "task": "apps.notifications.tasks.send_daily_streak_reminders_task",
-        "schedule": crontab(hour=20, minute=0),  # 20:00 Horário de Brasília
+        "schedule": crontab(hour=17, minute=0),  # 17:00 Horário de Brasília
     },
     "weekly-progress-reports-sunday-19h": {
         "task": "apps.notifications.tasks.send_weekly_progress_reports_task",
@@ -207,8 +218,7 @@ CELERY_BEAT_SCHEDULE = {
 # Em containers autônomos (HF Spaces), InMemoryChannelLayer garante latência zero e 0 falhas de conexão de rede
 if (
     os.getenv("USE_REDIS_CHANNELS", "false").lower() in ("true", "1")
-    and REDIS_URL
-    and REDIS_URL.startswith(("redis://", "rediss://"))
+    and IS_VALID_REDIS_URL
 ):
     CHANNEL_LAYERS = {
         "default": {

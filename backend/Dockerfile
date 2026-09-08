@@ -6,7 +6,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DJANGO_SETTINGS_MODULE=app.settings.production \
-    WORKERS=2
+    WORKERS=1
 
 # Instalar dependências de sistema para compilação e conversão de documentos
 RUN apt-get update && apt-get install -y --no-install-recommends \

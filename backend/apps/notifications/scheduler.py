@@ -10,8 +10,9 @@ try:
 except Exception:
     BRT_ZONE = timezone(timedelta(hours=-3))
 
+import zlib
 from django.core.cache import cache
-from django.db import close_old_connections
+from django.db import connection, close_old_connections
 
 logger = logging.getLogger(__name__)
 
@@ -19,12 +20,43 @@ _scheduler_started = False
 _scheduler_lock = threading.Lock()
 
 
+def _acquire_db_advisory_lock(lock_key: str) -> bool:
+    """
+    Tenta obter um advisory lock a nível de banco de dados PostgreSQL.
+    Garante que mesmo com múltiplos workers (Gunicorn) ou containers (Railway),
+    apenas UM único processo consiga executar a rotina de envio.
+    """
+    if connection.vendor != "postgresql":
+        return True
+    try:
+        lock_id = zlib.crc32(lock_key.encode("utf-8"))
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_try_advisory_lock(%s);", [lock_id])
+            row = cursor.fetchone()
+            return bool(row and row[0])
+    except Exception as e:
+        logger.warning(f"[Scheduler] Erro ao tentar obter advisory lock '{lock_key}': {e}")
+        return True
+
+
+def _release_db_advisory_lock(lock_key: str) -> None:
+    """Libera o advisory lock obtido no PostgreSQL."""
+    if connection.vendor != "postgresql":
+        return
+    try:
+        lock_id = zlib.crc32(lock_key.encode("utf-8"))
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_advisory_unlock(%s);", [lock_id])
+    except Exception as e:
+        logger.warning(f"[Scheduler] Erro ao liberar advisory lock '{lock_key}': {e}")
+
+
 class BackgroundNotificationRunner:
     """
     Executa um daemon leve em segundo plano no processo do Django para:
     1. Manter o WAHA (Render) acordado com ping periódico (evita suspensão no Render).
     2. Disparar notificações agendadas pontualmente no Horário de Brasília (BRT):
-       - 20:00 BRT: Lembrete diário de ofensiva (Streak) via Email, Push e WhatsApp.
+       - 17:00 BRT: Lembrete diário de ofensiva (Streak) via Email, Push e WhatsApp.
        - 14:00 BRT: Lembrete de inatividade para alunos ausentes.
        - Domingos 19:00 BRT: Relatório semanal de evolução.
        - Dia 1 de cada mês 09:00 BRT: Fechamento da competição mensal e premiação.
@@ -58,8 +90,8 @@ class BackgroundNotificationRunner:
                 if tick % 20 == 1:
                     cls._ping_waha()
 
-                # 2. Lembrete diário de ofensiva (Janela das 20h BR)
-                if now_brt.hour == 20:
+                # 2. Lembrete diário de ofensiva (Janela das 17h BR)
+                if now_brt.hour == 17:
                     cls._run_daily_streak(now_brt)
 
                 # 3. Incentivo de inatividade (Janela das 14h BR)
@@ -99,6 +131,10 @@ class BackgroundNotificationRunner:
         if not cache.add(lock_key, "locked", timeout=86400):
             return
 
+        if not _acquire_db_advisory_lock(lock_key):
+            logger.info(f"[Scheduler] Tarefa {lock_key} já possui lock de banco ativo em outro worker. Pulando.")
+            return
+
         try:
             from apps.notifications.services import NotificationSchedulerService
             from apps.notifications.models import Notification
@@ -112,16 +148,22 @@ class BackgroundNotificationRunner:
                 logger.info("[Scheduler] Lembretes de streak já foram processados hoje no banco. Pulando.")
                 return
 
-            logger.info("[Scheduler] Disparando lembretes de streak das 20:00 BRT...")
+            logger.info("[Scheduler] Disparando lembretes de streak das 17:00 BRT...")
             res = NotificationSchedulerService.send_daily_streak_reminders_to_all_active_students()
             logger.info(f"[Scheduler] Streak concluído: {res}")
         except Exception as e:
             logger.error(f"[Scheduler] Erro ao enviar lembretes de streak: {e}")
+        finally:
+            _release_db_advisory_lock(lock_key)
 
     @classmethod
     def _run_inactivity_nudges(cls, now_brt):
         lock_key = f"cron_lock_inactivity_{now_brt.date().isoformat()}"
         if not cache.add(lock_key, "locked", timeout=86400):
+            return
+
+        if not _acquire_db_advisory_lock(lock_key):
+            logger.info(f"[Scheduler] Tarefa {lock_key} já possui lock de banco ativo em outro worker. Pulando.")
             return
 
         try:
@@ -141,11 +183,17 @@ class BackgroundNotificationRunner:
             logger.info(f"[Scheduler] Inatividade concluído: {res}")
         except Exception as e:
             logger.error(f"[Scheduler] Erro ao enviar avisos de inatividade: {e}")
+        finally:
+            _release_db_advisory_lock(lock_key)
 
     @classmethod
     def _run_weekly_report(cls, now_brt):
         lock_key = f"cron_lock_weekly_{now_brt.date().isoformat()}"
         if not cache.add(lock_key, "locked", timeout=86400):
+            return
+
+        if not _acquire_db_advisory_lock(lock_key):
+            logger.info(f"[Scheduler] Tarefa {lock_key} já possui lock de banco ativo em outro worker. Pulando.")
             return
 
         try:
@@ -165,11 +213,17 @@ class BackgroundNotificationRunner:
             logger.info(f"[Scheduler] Relatórios semanais concluídos: {res}")
         except Exception as e:
             logger.error(f"[Scheduler] Erro ao enviar relatórios semanais: {e}")
+        finally:
+            _release_db_advisory_lock(lock_key)
 
     @classmethod
     def _run_monthly_competition(cls, now_brt):
         lock_key = f"cron_lock_monthly_comp_{now_brt.year}_{now_brt.month}"
         if not cache.add(lock_key, "locked", timeout=86400):
+            return
+
+        if not _acquire_db_advisory_lock(lock_key):
+            logger.info(f"[Scheduler] Tarefa {lock_key} já possui lock de banco ativo em outro worker. Pulando.")
             return
 
         try:
@@ -179,3 +233,5 @@ class BackgroundNotificationRunner:
             logger.info(f"[Scheduler] Competição mensal concluída: {res}")
         except Exception as e:
             logger.error(f"[Scheduler] Erro ao processar competição mensal: {e}")
+        finally:
+            _release_db_advisory_lock(lock_key)
