@@ -2,13 +2,30 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { RefreshCw, Power, CheckCircle, AlertCircle, QrCode, Loader2, RotateCw } from 'lucide-react';
+import {
+  RefreshCw,
+  Power,
+  CheckCircle,
+  AlertCircle,
+  QrCode,
+  Loader2,
+  RotateCw,
+  Search,
+  Phone,
+  Check,
+  X,
+  Edit2,
+  Send,
+  Bell,
+  BellOff,
+  UserCheck,
+  Users,
+} from 'lucide-react';
 import { FaWhatsapp } from 'react-icons/fa';
-import { apiGet, apiPost, apiFetch } from '@/lib/api/client';
+import { apiGet, apiPost, apiFetch, apiPut } from '@/lib/api/client';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import toast from 'react-hot-toast';
-import { useAuth } from '@/providers/auth-provider';
 
 interface SessionData {
   name: string;
@@ -20,29 +37,44 @@ interface SessionData {
   } | null;
 }
 
-export function WhatsappSection() {
-  const { user } = useAuth();
-  
-  // Define a sessão padrão com base no perfil do usuário (somente 'professor' ou 'programador')
-  const defaultSession = useMemo(() => {
-    const role = user?.role?.toLowerCase();
-    const uname = user?.username?.toLowerCase();
-    if (role === 'professor' || uname === 'professor') return 'professor';
-    return 'programador';
-  }, [user]);
+interface StudentWhatsAppData {
+  username: string;
+  name: string;
+  email: string;
+  role: string;
+  level: string;
+  streak_count: number;
+  total_xp: number;
+  whatsapp_number: string;
+  formatted_phone: string;
+  allow_whatsapp_notifications: boolean;
+  whatsapp_status: 'active' | 'missing' | 'disabled';
+}
 
-  const [activeSession, setActiveSession] = useState<string>(defaultSession);
+interface WhatsAppStudentsResponse {
+  students: StudentWhatsAppData[];
+  total_students: number;
+  active_count: number;
+  missing_count: number;
+  disabled_count: number;
+}
+
+export function WhatsappSection() {
+  // Conexão oficial da Teacher Tatiana (sessão 'professor')
+  const [activeSession, setActiveSession] = useState<string>('professor');
   const [qrBlobUrl, setQrBlobUrl] = useState<string>('');
   const [loadingQr, setLoadingQr] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
   const [isStartingOrStopping, setIsStartingOrStopping] = useState(false);
   const isFetchingQrRef = useRef(false);
 
-  useEffect(() => {
-    if (defaultSession && !activeSession) {
-      setActiveSession(defaultSession);
-    }
-  }, [defaultSession, activeSession]);
+  // Student WhatsApp Management State
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'missing' | 'disabled'>('all');
+  const [editingUsername, setEditingUsername] = useState<string | null>(null);
+  const [inputNumber, setInputNumber] = useState('');
+  const [savingStudent, setSavingStudent] = useState<string | null>(null);
+  const [testingStudent, setTestingStudent] = useState<string | null>(null);
 
   // Consulta status das sessões do WAHA com polling adaptativo
   const { data: sessions, isLoading, refetch, isRefetching } = useQuery<SessionData[]>({
@@ -71,7 +103,7 @@ export function WhatsappSection() {
     isFetchingQrRef.current = true;
     if (!isSilent && !qrBlobUrl) setLoadingQr(true);
     try {
-      const sessionParam = encodeURIComponent(activeSession || 'programador');
+      const sessionParam = encodeURIComponent(activeSession || 'professor');
       const response = await apiFetch(`/dashboard/waha/session/qr?session=${sessionParam}&t=${Date.now()}`, {
         headers: {
           Accept: 'image/png, image/*',
@@ -178,6 +210,103 @@ export function WhatsappSection() {
     }
   };
 
+  // Consulta lista de alunos e status do WhatsApp
+  const {
+    data: studentsData,
+    isLoading: loadingStudents,
+    refetch: refetchStudents,
+    isRefetching: isRefetchingStudents,
+  } = useQuery<WhatsAppStudentsResponse>({
+    queryKey: ['whatsapp-students', searchTerm, statusFilter],
+    queryFn: () =>
+      apiGet<WhatsAppStudentsResponse>(
+        `/dashboard/whatsapp/students?search=${encodeURIComponent(searchTerm)}&status=${statusFilter}`
+      ),
+  });
+
+  const handleStartEdit = (student: StudentWhatsAppData) => {
+    setEditingUsername(student.username);
+    setInputNumber(student.whatsapp_number || '');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingUsername(null);
+    setInputNumber('');
+  };
+
+  const handleSaveNumber = async (username: string, allow: boolean) => {
+    setSavingStudent(username);
+    try {
+      const res = await apiPut<any>(`/dashboard/whatsapp/students/${encodeURIComponent(username)}`, {
+        whatsapp_number: inputNumber,
+        allow_whatsapp_notifications: allow,
+      });
+      if (res.ok) {
+        toast.success(`WhatsApp de @${username} atualizado com sucesso!`);
+        setEditingUsername(null);
+        setInputNumber('');
+        await refetchStudents();
+      } else {
+        toast.error((res.data as any)?.detail || 'Erro ao salvar número.');
+      }
+    } catch {
+      toast.error('Erro de comunicação ao salvar número.');
+    } finally {
+      setSavingStudent(null);
+    }
+  };
+
+  const handleToggleNotifications = async (student: StudentWhatsAppData) => {
+    const newStatus = !student.allow_whatsapp_notifications;
+    setSavingStudent(student.username);
+    try {
+      const res = await apiPut<any>(`/dashboard/whatsapp/students/${encodeURIComponent(student.username)}`, {
+        whatsapp_number: student.whatsapp_number,
+        allow_whatsapp_notifications: newStatus,
+      });
+      if (res.ok) {
+        toast.success(
+          newStatus
+            ? `Notificações ativadas para @${student.username}!`
+            : `Notificações desativadas para @${student.username}.`
+        );
+        await refetchStudents();
+      } else {
+        toast.error((res.data as any)?.detail || 'Erro ao alterar permissão.');
+      }
+    } catch {
+      toast.error('Erro de comunicação.');
+    } finally {
+      setSavingStudent(null);
+    }
+  };
+
+  const handleSendTestMessage = async (student: StudentWhatsAppData) => {
+    if (sessionStatus !== 'WORKING') {
+      toast.error('A sessão oficial do WhatsApp (@professor) precisa estar conectada no status WORKING para enviar.');
+      return;
+    }
+    if (!student.whatsapp_number) {
+      toast.error('O aluno não possui número de WhatsApp cadastrado. Insira um número primeiro.');
+      return;
+    }
+
+    setTestingStudent(student.username);
+    const toastId = toast.loading(`Disparando teste para @${student.username}...`);
+    try {
+      const res = await apiPost<any>(`/dashboard/whatsapp/students/${encodeURIComponent(student.username)}/test`, {});
+      if (res.ok) {
+        toast.success(res.data?.message || 'Mensagem de teste enviada com sucesso!', { id: toastId });
+      } else {
+        toast.error((res.data as any)?.detail || 'Falha ao enviar mensagem de teste.', { id: toastId });
+      }
+    } catch {
+      toast.error('Erro de comunicação ao disparar teste.', { id: toastId });
+    } finally {
+      setTestingStudent(null);
+    }
+  };
+
   const getStatusBadge = () => {
     switch (sessionStatus) {
       case 'WORKING':
@@ -218,12 +347,12 @@ export function WhatsappSection() {
     }
   };
 
-  // Known sessions list
+  // Known sessions list (apenas sessão oficial da Teacher Tatiana)
   const sessionList = useMemo(() => {
-    const defaultList = ['programador', 'professor'];
+    const defaultList = ['professor'];
     if (sessions) {
-      sessions.forEach(s => {
-        if (!defaultList.includes(s.name)) {
+      sessions.forEach((s) => {
+        if (s.name !== 'programador' && !defaultList.includes(s.name)) {
           defaultList.push(s.name);
         }
       });
@@ -233,91 +362,78 @@ export function WhatsappSection() {
 
   return (
     <div className="space-y-8 pb-12 animate-fade-in">
+      {/* WAHA Session Connection Card */}
       <div className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
         {/* Header */}
         <div className="p-6 border-b border-border bg-bg-secondary/30 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <FaWhatsapp size={22} className="text-emerald-500" />
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+              <FaWhatsapp size={22} />
+            </div>
             <div>
-              <h2 className="font-bold text-sm uppercase tracking-wider text-text">WhatsApp Sessions (WAHA)</h2>
-              <p className="text-xs text-text-muted">Manage WhatsApp connection for automated notifications and reminders</p>
+              <h2 className="font-bold text-sm uppercase tracking-wider text-text">Conexão WhatsApp (WAHA)</h2>
+              <p className="text-xs text-text-muted">Conexão oficial da Teacher Tatiana para disparo automático de lembretes e notificações</p>
             </div>
           </div>
           <button
             onClick={() => refetch()}
             disabled={isLoading || isRefetching}
             className="p-2 rounded-xl border border-border hover:bg-surface-hover text-text-muted transition-colors"
-            title="Refresh status"
+            title="Atualizar status"
           >
             <RefreshCw size={16} className={isRefetching ? 'animate-spin' : ''} />
           </button>
         </div>
 
-        {/* Session Selector Tabs */}
-        <div className="px-6 pt-6 pb-2 border-b border-border/50 bg-bg-secondary/10 flex flex-wrap gap-2 items-center">
-          <span className="text-xs font-bold text-text-muted uppercase tracking-wider mr-2">Session:</span>
-          {sessionList.map((name) => {
-            const sData = sessions?.find(s => s.name === name);
-            const isWorking = sData?.status === 'WORKING';
-            const isScan = sData?.status === 'SCAN_QR_CODE';
-            const isSelected = activeSession === name;
+        {/* Session Selector (apenas se houver mais de uma sessão cadastrada) */}
+        {sessionList.length > 1 && (
+          <div className="px-6 pt-6 pb-2 border-b border-border/50 bg-bg-secondary/10 flex flex-wrap gap-2 items-center">
+            <span className="text-xs font-bold text-text-muted uppercase tracking-wider mr-2">Sessão:</span>
+            {sessionList.map((name) => {
+              const sData = sessions?.find((s) => s.name === name);
+              const isWorking = sData?.status === 'WORKING';
+              const isScan = sData?.status === 'SCAN_QR_CODE';
+              const isSelected = activeSession === name;
 
-            return (
-              <button
-                key={name}
-                onClick={() => {
-                  setActiveSession(name);
-                  setQrBlobUrl('');
-                  setQrError(null);
-                }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
-                  isSelected
-                    ? 'bg-primary text-white border-primary shadow-md shadow-primary/20'
-                    : 'bg-surface border-border hover:border-primary/40 text-text-muted hover:text-text'
-                }`}
-              >
-                <span className="capitalize">@{name}</span>
-                {name === 'professor' && (
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${isSelected ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'}`}>
-                    Production
-                  </span>
-                )}
-                {name === 'programador' && (
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${isSelected ? 'bg-white/20 text-white' : 'bg-emerald-500/10 text-emerald-600'}`}>
-                    Dev / Tests
-                  </span>
-                )}
-                {/* Status indicator dot */}
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    isWorking
-                      ? 'bg-emerald-400 animate-pulse'
-                      : isScan
-                      ? 'bg-amber-400 animate-ping'
-                      : 'bg-neutral-400'
+              return (
+                <button
+                  key={name}
+                  onClick={() => {
+                    setActiveSession(name);
+                    setQrBlobUrl('');
+                    setQrError(null);
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                    isSelected
+                      ? 'bg-primary text-white border-primary shadow-md shadow-primary/20'
+                      : 'bg-surface border-border hover:border-primary/40 text-text-muted hover:text-text'
                   }`}
-                />
-              </button>
-            );
-          })}
-        </div>
+                >
+                  <span className="capitalize">@{name}</span>
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      isWorking
+                        ? 'bg-emerald-400 animate-pulse'
+                        : isScan
+                        ? 'bg-amber-400 animate-ping'
+                        : 'bg-neutral-400'
+                    }`}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Status Card */}
         <div className="p-6 md:p-8 space-y-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 bg-bg-secondary/40 border border-border/50 rounded-2xl">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <p className="text-xs font-black uppercase tracking-wider text-text-subtle">Selected Session</p>
-                {activeSession === 'professor' && (
-                  <span className="text-[10px] bg-emerald-500/10 text-emerald-600 font-bold px-2 py-0.5 rounded-full border border-emerald-500/20">
-                    Official Session (Tatiana)
-                  </span>
-                )}
-                {activeSession === 'programador' && (
-                  <span className="text-[10px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full border border-primary/20">
-                    Developer Session (Caio)
-                  </span>
-                )}
+                <p className="text-xs font-black uppercase tracking-wider text-text-subtle">Sessão Ativa</p>
+                <span className="text-[10px] bg-emerald-500/10 text-emerald-600 font-bold px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  Teacher Tatiana (Produção)
+                </span>
               </div>
 
               <div className="flex items-center gap-3 flex-wrap">
@@ -329,7 +445,7 @@ export function WhatsappSection() {
               {currentSessionData?.me && currentSessionData.status === 'WORKING' && (
                 <div className="text-xs text-text-muted bg-surface/60 p-2.5 rounded-xl border border-border/50 space-y-0.5">
                   <div className="font-semibold text-text">
-                    📱 WhatsApp Connected: <span className="text-emerald-500 font-bold">{currentSessionData.me.pushName || 'WhatsApp'}</span>
+                    📱 WhatsApp Conectado: <span className="text-emerald-500 font-bold">{currentSessionData.me.pushName || 'Teacher Tatiana'}</span>
                   </div>
                   {currentSessionData.me.id && (
                     <div className="text-[11px] text-text-subtle font-mono">
@@ -340,9 +456,7 @@ export function WhatsappSection() {
               )}
 
               <p className="text-xs text-text-muted max-w-lg leading-relaxed">
-                {activeSession === 'professor'
-                  ? 'Main connection for Teacher Tatiana on Render. Used by the background scheduler to send automated reminders and flashcards to all students.'
-                  : "Developer testing session. Only sends notifications to the developer's registered phone number."}
+                Conexão da Teacher Tatiana no Render (WAHA). Utilizada pelos agendadores em segundo plano para envio de lembretes diários de ofensiva, relatórios semanais e incentivos a todos os alunos com número configurado.
               </p>
             </div>
 
@@ -471,6 +585,356 @@ export function WhatsappSection() {
               </p>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Student WhatsApp Management Card */}
+      <div className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
+        {/* Header */}
+        <div className="p-6 border-b border-border bg-bg-secondary/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+              <Users size={22} />
+            </div>
+            <div>
+              <h2 className="font-bold text-sm uppercase tracking-wider text-text">Notificações WhatsApp dos Alunos</h2>
+              <p className="text-xs text-text-muted">
+                Cadastre e gerencie o número dos alunos para envio de lembretes diários, ofensiva e relatórios semanais.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => refetchStudents()}
+            disabled={loadingStudents || isRefetchingStudents}
+            className="self-start sm:self-auto p-2.5 rounded-xl border border-border hover:bg-surface-hover text-text-muted transition-colors flex items-center gap-2 text-xs font-semibold"
+            title="Atualizar lista de alunos"
+          >
+            <RefreshCw size={14} className={isRefetchingStudents ? 'animate-spin' : ''} />
+            <span>Atualizar</span>
+          </button>
+        </div>
+
+        {/* Metrics Grid */}
+        <div className="p-6 border-b border-border/60 bg-bg-secondary/10 grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="p-4 rounded-2xl bg-surface border border-border flex flex-col justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Total de Alunos</span>
+            <div className="text-2xl font-black text-text mt-2">{studentsData?.total_students ?? 0}</div>
+          </div>
+          <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">WhatsApp Ativo</span>
+              <CheckCircle size={14} className="text-emerald-500" />
+            </div>
+            <div className="text-2xl font-black text-emerald-600 mt-2">{studentsData?.active_count ?? 0}</div>
+          </div>
+          <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600">Sem Número</span>
+              <AlertCircle size={14} className="text-amber-500" />
+            </div>
+            <div className="text-2xl font-black text-amber-600 mt-2">{studentsData?.missing_count ?? 0}</div>
+          </div>
+          <div className="p-4 rounded-2xl bg-surface border border-border flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-text-subtle">Notif. Desativada</span>
+              <BellOff size={14} className="text-text-subtle" />
+            </div>
+            <div className="text-2xl font-black text-text-subtle mt-2">{studentsData?.disabled_count ?? 0}</div>
+          </div>
+        </div>
+
+        {/* Filters and Search Bar */}
+        <div className="p-6 border-b border-border flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between bg-bg-secondary/20">
+          {/* Search Box */}
+          <div className="relative flex-1 max-w-md">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-subtle pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Buscar aluno por nome, @username ou telefone..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface border border-border text-xs text-text placeholder:text-text-subtle focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-subtle hover:text-text"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Status Filter Tabs */}
+          <div className="flex items-center gap-1.5 p-1 bg-surface border border-border rounded-xl overflow-x-auto">
+            <button
+              onClick={() => setStatusFilter('all')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                statusFilter === 'all'
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'text-text-muted hover:text-text hover:bg-surface-hover'
+              }`}
+            >
+              Todos ({studentsData?.total_students ?? 0})
+            </button>
+            <button
+              onClick={() => setStatusFilter('active')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                statusFilter === 'active'
+                  ? 'bg-emerald-500 text-white shadow-sm'
+                  : 'text-text-muted hover:text-emerald-500 hover:bg-emerald-500/10'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              Ativos ({studentsData?.active_count ?? 0})
+            </button>
+            <button
+              onClick={() => setStatusFilter('missing')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                statusFilter === 'missing'
+                  ? 'bg-amber-500 text-white shadow-sm'
+                  : 'text-text-muted hover:text-amber-500 hover:bg-amber-500/10'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-400" />
+              Sem Número ({studentsData?.missing_count ?? 0})
+            </button>
+            <button
+              onClick={() => setStatusFilter('disabled')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                statusFilter === 'disabled'
+                  ? 'bg-zinc-600 text-white shadow-sm'
+                  : 'text-text-muted hover:text-text hover:bg-surface-hover'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-zinc-400" />
+              Desativados ({studentsData?.disabled_count ?? 0})
+            </button>
+          </div>
+        </div>
+
+        {/* Students Table */}
+        <div className="overflow-x-auto">
+          {loadingStudents ? (
+            <div className="p-16 flex flex-col items-center justify-center gap-3 text-text-muted">
+              <Loader2 size={32} className="animate-spin text-primary" />
+              <p className="text-xs font-medium">Carregando lista de alunos...</p>
+            </div>
+          ) : !studentsData?.students || studentsData.students.length === 0 ? (
+            <div className="p-16 text-center text-text-muted space-y-2">
+              <UserCheck size={36} className="mx-auto text-text-subtle opacity-40" />
+              <p className="text-sm font-bold text-text">Nenhum aluno encontrado</p>
+              <p className="text-xs text-text-subtle">
+                Tente ajustar a busca ou o filtro de status selecionado.
+              </p>
+            </div>
+          ) : (
+            <table className="w-full text-left text-xs">
+              <thead className="text-[0.65rem] font-black text-text-subtle uppercase tracking-wider border-b border-border bg-bg-secondary/40">
+                <tr>
+                  <th className="px-6 py-3.5">Aluno</th>
+                  <th className="px-6 py-3.5">Nível / Streak</th>
+                  <th className="px-6 py-3.5">WhatsApp</th>
+                  <th className="px-6 py-3.5">Status</th>
+                  <th className="px-6 py-3.5">Notificações</th>
+                  <th className="px-6 py-3.5 text-right">Disparo de Teste</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {studentsData.students.map((student) => {
+                  const isEditing = editingUsername === student.username;
+                  const isSaving = savingStudent === student.username;
+                  const isTesting = testingStudent === student.username;
+
+                  return (
+                    <tr key={student.username} className="hover:bg-bg-secondary/20 transition-colors">
+                      {/* Aluno info */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-black text-xs uppercase shrink-0">
+                            {(student.name || student.username || '?').charAt(0)}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-bold text-text truncate">
+                              {student.name || student.username}
+                            </div>
+                            <div className="text-[11px] text-text-subtle truncate flex items-center gap-1.5">
+                              <span>@{student.username}</span>
+                              {student.email && <span>• {student.email}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Level & Streak */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 uppercase">
+                            {student.level || 'A1'}
+                          </span>
+                          <span className="flex items-center gap-1 text-[11px] font-bold text-amber-500">
+                            🔥 {student.streak_count || 0}d
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* WhatsApp Phone editable field */}
+                      <td className="px-6 py-4">
+                        {isEditing ? (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              value={inputNumber}
+                              onChange={(e) => setInputNumber(e.target.value)}
+                              placeholder="Ex: 5511999999999"
+                              className="w-36 sm:w-44 px-2.5 py-1 rounded-lg bg-surface border border-primary text-xs font-mono text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleSaveNumber(student.username, student.allow_whatsapp_notifications);
+                                } else if (e.key === 'Escape') {
+                                  handleCancelEdit();
+                                }
+                              }}
+                            />
+                            <button
+                              onClick={() => handleSaveNumber(student.username, student.allow_whatsapp_notifications)}
+                              disabled={isSaving}
+                              title="Salvar"
+                              className="p-1.5 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-colors disabled:opacity-50"
+                            >
+                              {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                            </button>
+                            <button
+                              onClick={handleCancelEdit}
+                              disabled={isSaving}
+                              title="Cancelar"
+                              className="p-1.5 rounded-lg border border-border text-text-muted hover:bg-surface-hover transition-colors"
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 group">
+                            {student.whatsapp_number ? (
+                              <span className="font-mono text-xs font-bold text-text flex items-center gap-1.5">
+                                <Phone size={12} className="text-emerald-500" />
+                                {student.formatted_phone || student.whatsapp_number}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-text-subtle italic">Não cadastrado</span>
+                            )}
+                            <button
+                              onClick={() => handleStartEdit(student)}
+                              title="Editar número"
+                              className="opacity-60 group-hover:opacity-100 p-1 rounded-md hover:bg-surface-hover text-primary transition-all"
+                            >
+                              <Edit2 size={12} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-6 py-4">
+                        {student.whatsapp_status === 'active' && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                            <CheckCircle size={12} />
+                            Ativo
+                          </span>
+                        )}
+                        {student.whatsapp_status === 'missing' && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                            <AlertCircle size={12} />
+                            Sem Número
+                          </span>
+                        )}
+                        {student.whatsapp_status === 'disabled' && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
+                            <BellOff size={12} />
+                            Desativado
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Notifications Toggle */}
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => handleToggleNotifications(student)}
+                          disabled={isSaving}
+                          title={
+                            student.allow_whatsapp_notifications
+                              ? 'Clique para desativar o envio de mensagens automáticas'
+                              : 'Clique para ativar o envio de mensagens automáticas'
+                          }
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[11px] font-bold border transition-all ${
+                            student.allow_whatsapp_notifications
+                              ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20'
+                              : 'bg-surface text-text-subtle border-border hover:text-text hover:bg-surface-hover'
+                          }`}
+                        >
+                          {student.allow_whatsapp_notifications ? (
+                            <>
+                              <Bell size={12} />
+                              Habilitado
+                            </>
+                          ) : (
+                            <>
+                              <BellOff size={12} />
+                              Desabilitado
+                            </>
+                          )}
+                        </button>
+                      </td>
+
+                      {/* Test Action */}
+                      <td className="px-6 py-4 text-right">
+                        <Button
+                          onClick={() => handleSendTestMessage(student)}
+                          disabled={
+                            isTesting ||
+                            sessionStatus !== 'WORKING' ||
+                            !student.whatsapp_number
+                          }
+                          variant="secondary"
+                          className="text-xs px-3 py-1.5 h-auto rounded-xl gap-1.5 font-bold border-border hover:border-primary/40 disabled:opacity-40"
+                          title={
+                            sessionStatus !== 'WORKING'
+                              ? 'Conecte a sessão do WhatsApp (@professor) antes de testar'
+                              : !student.whatsapp_number
+                              ? 'Cadastre um número antes de disparar o teste'
+                              : `Enviar mensagem de teste para ${student.name || student.username}`
+                          }
+                        >
+                          {isTesting ? (
+                            <>
+                              <Loader2 size={12} className="animate-spin text-primary" />
+                              <span>Enviando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Send size={12} className="text-emerald-500" />
+                              <span>Enviar Teste</span>
+                            </>
+                          )}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Footer info note */}
+        <div className="p-4 border-t border-border bg-bg-secondary/30 text-[11px] text-text-subtle flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+          <span>
+            💡 Dica: Para números brasileiros, o DDI 55 é inserido automaticamente se você preencher apenas o DDD + número (ex: 11999999999).
+          </span>
+          <span className="font-semibold text-text-muted">
+            Sessão de envio atual: <strong className="text-emerald-500">@{activeSession}</strong>
+          </span>
         </div>
       </div>
     </div>

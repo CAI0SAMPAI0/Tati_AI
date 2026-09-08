@@ -2,7 +2,7 @@ import logging
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from django.db.models import Count, Max
+from django.db.models import Count, Max, Q
 from django.db.models.functions import TruncDate
 from ninja.errors import HttpError
 
@@ -262,6 +262,14 @@ class DashboardService:
             last_active_iso = latest_dt.isoformat() if latest_dt else ""
             created_iso = created_at_dt.isoformat() if created_at_dt else ""
 
+            from apps.notifications.services import WahaWhatsAppService
+
+            clean_wa = WahaWhatsAppService.extract_student_phone(u) or ""
+            allow_wa = WahaWhatsAppService.is_whatsapp_allowed(u)
+            wa_status = "missing"
+            if clean_wa:
+                wa_status = "active" if allow_wa else "disabled"
+
             results.append(
                 {
                     "username": u.username,
@@ -283,6 +291,10 @@ class DashboardService:
                     "days_inactive": 0 if u.streak_count > 0 else 7,
                     "created_at": created_iso or format_sp_date(created_at_dt),
                     "joined": format_sp_date(created_at_dt),
+                    "whatsapp_number": clean_wa,
+                    "phone": clean_wa,
+                    "allow_whatsapp_notifications": allow_wa,
+                    "whatsapp_status": wa_status,
                     "_sort_dt": latest_dt or datetime.min.replace(tzinfo=timezone.utc),
                 }
             )
@@ -1361,12 +1373,166 @@ class DashboardService:
             raise HttpError(404, "Estudante não encontrado.")
         if data.get("level"):
             u.level = str(data["level"]).upper()
+        prof = u.profile if isinstance(u.profile, dict) else {}
         if "custom_prompt" in data:
-            prof = u.profile or {}
             prof["custom_prompt"] = data["custom_prompt"]
-            u.profile = prof
+        if "whatsapp_number" in data or "phone" in data:
+            raw_phone = data.get("whatsapp_number") if "whatsapp_number" in data else data.get("phone")
+            clean = "".join(c for c in str(raw_phone or "") if c.isdigit())
+            if len(clean) in (10, 11) and not clean.startswith("55"):
+                clean = f"55{clean}"
+            prof["whatsapp_number"] = clean
+            u.phone = clean
+        if "allow_whatsapp_notifications" in data and data["allow_whatsapp_notifications"] is not None:
+            prof["allow_whatsapp_notifications"] = bool(data["allow_whatsapp_notifications"])
+        u.profile = prof
         u.save()
-        return {"success": True, "username": u.username, "level": u.level}
+
+        from apps.notifications.services import WahaWhatsAppService
+
+        clean_wa = WahaWhatsAppService.extract_student_phone(u) or ""
+        allow_wa = WahaWhatsAppService.is_whatsapp_allowed(u)
+        wa_status = "missing"
+        if clean_wa:
+            wa_status = "active" if allow_wa else "disabled"
+
+        return {
+            "success": True,
+            "username": u.username,
+            "level": u.level,
+            "whatsapp_number": clean_wa,
+            "phone": clean_wa,
+            "allow_whatsapp_notifications": allow_wa,
+            "whatsapp_status": wa_status,
+        }
+
+    @staticmethod
+    def get_whatsapp_students(
+        search: Optional[str] = None, status_filter: Optional[str] = None
+    ) -> dict:
+        """
+        Retorna a lista de alunos com status do WhatsApp para o painel administrativo.
+        """
+        from apps.notifications.services import WahaWhatsAppService
+
+        users = (
+            User.objects.exclude(username__in=EXCLUDED_USERS)
+            .exclude(role="buyer")
+            .order_by("name", "username")
+        )
+        if search:
+            s_clean = search.strip()
+            users = users.filter(
+                Q(name__icontains=s_clean)
+                | Q(username__icontains=s_clean)
+                | Q(email__icontains=s_clean)
+                | Q(phone__icontains=s_clean)
+            )
+
+        students_list = []
+        total_students = 0
+        active_count = 0
+        missing_count = 0
+        disabled_count = 0
+
+        for u in users:
+            clean_wa = WahaWhatsAppService.extract_student_phone(u) or ""
+            allow_wa = WahaWhatsAppService.is_whatsapp_allowed(u)
+            wa_status = "missing"
+            if clean_wa:
+                wa_status = "active" if allow_wa else "disabled"
+
+            total_students += 1
+            if wa_status == "active":
+                active_count += 1
+            elif wa_status == "disabled":
+                disabled_count += 1
+            else:
+                missing_count += 1
+
+            if status_filter and status_filter != "all":
+                if status_filter != wa_status:
+                    continue
+
+            # Formata telefone para exibição humana (ex: +55 (11) 98765-4321)
+            formatted = clean_wa
+            if len(clean_wa) == 13 and clean_wa.startswith("55"):
+                formatted = f"+55 ({clean_wa[2:4]}) {clean_wa[4:9]}-{clean_wa[9:]}"
+            elif len(clean_wa) == 12 and clean_wa.startswith("55"):
+                formatted = f"+55 ({clean_wa[2:4]}) {clean_wa[4:8]}-{clean_wa[8:]}"
+            elif len(clean_wa) == 11:
+                formatted = f"({clean_wa[0:2]}) {clean_wa[2:7]}-{clean_wa[7:]}"
+
+            students_list.append(
+                {
+                    "username": u.username,
+                    "name": u.name or u.username,
+                    "email": u.email or "",
+                    "role": u.role or "student",
+                    "level": u.level or "A1",
+                    "streak_count": u.streak_count,
+                    "total_xp": u.total_xp,
+                    "whatsapp_number": clean_wa,
+                    "formatted_phone": formatted,
+                    "allow_whatsapp_notifications": allow_wa,
+                    "whatsapp_status": wa_status,
+                }
+            )
+
+        return {
+            "students": students_list,
+            "total_students": total_students,
+            "active_count": active_count,
+            "missing_count": missing_count,
+            "disabled_count": disabled_count,
+        }
+
+    @staticmethod
+    def send_test_whatsapp_to_student(
+        username: str, sender_user: Optional[User] = None
+    ) -> dict:
+        """
+        Envia mensagem de teste direto da Teacher Tatiana para o WhatsApp do aluno.
+        """
+        from apps.notifications.services import WahaWhatsAppService
+
+        u = User.objects.filter(username=username).first()
+        if not u:
+            raise HttpError(404, "Estudante não encontrado.")
+
+        phone = WahaWhatsAppService.extract_student_phone(u)
+        if not phone:
+            raise HttpError(
+                400,
+                f"O estudante '{u.name or u.username}' não possui número de WhatsApp cadastrado.",
+            )
+
+        first_name = (u.name or u.username or "Student").strip().split()[0].capitalize()
+        test_msg = (
+            f"👋 *Teacher Tatiana*\n\n"
+            f"Hello *{first_name}*! This is a test notification from Teacher Tati.\n\n"
+            f"Your WhatsApp notifications are connected and working! 🚀\n\n"
+            f"Practice now: https://tati-ai.vercel.app/chat"
+        )
+        sent = WahaWhatsAppService.send_message(
+            phone_number=phone,
+            message=test_msg,
+            sender_user=sender_user,
+            recipient_user=u,
+            session="professor",
+        )
+        if not sent:
+            raise HttpError(
+                502,
+                "Falha ao enviar mensagem pelo WAHA. Verifique se a sessão @professor está conectada no painel.",
+            )
+
+        return {
+            "success": True,
+            "username": u.username,
+            "phone": phone,
+            "message": f"Mensagem de teste enviada com sucesso para {u.name or u.username} ({phone})!",
+        }
 
     @staticmethod
     def delete_student(username: str) -> dict:

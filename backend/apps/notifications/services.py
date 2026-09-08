@@ -320,6 +320,42 @@ class BrevoEmailService:
 
 class WahaWhatsAppService:
     @staticmethod
+    def extract_student_phone(user: Any) -> Optional[str]:
+        """
+        Extrai e sanitiza o número de WhatsApp do usuário a partir do model ou do JSON de perfil.
+        Garante que números brasileiros possuam o DDI 55.
+        """
+        if not user:
+            return None
+        prof = getattr(user, "profile", None)
+        if not isinstance(prof, dict):
+            prof = {}
+        phone = (
+            prof.get("whatsapp_number")
+            or getattr(user, "phone", None)
+            or getattr(user, "whatsapp_number", None)
+            or prof.get("phone")
+        )
+        if not phone:
+            return None
+        clean = "".join(c for c in str(phone) if c.isdigit())
+        if len(clean) in (10, 11) and not clean.startswith("55"):
+            clean = f"55{clean}"
+        return clean if clean else None
+
+    @staticmethod
+    def is_whatsapp_allowed(user: Any) -> bool:
+        """
+        Verifica se o aluno permite o recebimento de notificações no WhatsApp.
+        """
+        if not user:
+            return False
+        prof = getattr(user, "profile", None)
+        if not isinstance(prof, dict):
+            prof = {}
+        return bool(prof.get("allow_whatsapp_notifications", True))
+
+    @staticmethod
     def send_message(
         phone_number: str,
         message: str,
@@ -329,10 +365,7 @@ class WahaWhatsAppService:
     ) -> bool:
         """
         Envia mensagem via WhatsApp usando o serviço WAHA no Render.
-        Regras de permissão:
-        - Programador só pode enviar para 'caio.sampaio' (ou Caio).
-        - Professor (Teacher Tati) e notificações agendadas enviam para todos os estudantes.
-        - Sessões: 'programador' usa sua própria sessão conectada; 'professor'/sistema usa a sessão ativa da Tati.
+        Utiliza a sessão ativa da Teacher Tatiana ('professor') para notificações e comunicações com alunos.
         """
         from apps.notifications.waha_service import WahaService
 
@@ -343,56 +376,12 @@ class WahaWhatsAppService:
             )
             return False
 
-        # Regra de Permissão: Programador só pode enviar para Caio
-        is_sender_programador = False
-        if sender_user:
-            sender_role = getattr(sender_user, "role", "")
-            sender_name = getattr(sender_user, "username", "").lower()
-            if sender_role == "programador" or sender_name == "programador":
-                is_sender_programador = True
-
-        recip_user = (
-            getattr(recipient_user, "username", "") if recipient_user else ""
-        ).lower()
-        recip_email = (
-            getattr(recipient_user, "email", "") if recipient_user else ""
-        ).lower()
-        allowed = ["programador", "caio.sampaio", "caiosampaio", "caio"]
-        is_recipient_caio = (
-            recip_user in allowed
-            or "caio.sampaio" in recip_email
-            or "caio" in recip_user
-        )
-
-        if is_sender_programador and recipient_user:
-            if not is_recipient_caio:
-                logger.warning(
-                    f"[WAHA Permissão] Usuário programador tentou enviar para '{recip_user}'. "
-                    f"Permitido apenas para caio.sampaio."
-                )
-                return False
-
-        # Escolhe a sessão correta
+        # Escolhe a sessão correta (padrão 'professor' - Teacher Tatiana)
         if session:
             target_session = session
-        elif is_sender_programador:
-            prog_active = any(
-                s.get("name") == "programador" and s.get("status") in ("WORKING", "CONNECTED")
-                for s in WahaService.get_sessions()
-            )
-            target_session = "programador" if prog_active else WahaService.get_active_session_name("professor")
         else:
             preferred = os.getenv("WAHA_SESSION", "professor")
             target_session = WahaService.get_active_session_name(preferred)
-
-        # Se o remetente for o programador e a sessão programador estiver ativa, garante ela
-        if is_sender_programador and target_session == "professor":
-            prog_active = any(
-                s.get("name") == "programador" and s.get("status") in ("WORKING", "CONNECTED")
-                for s in WahaService.get_sessions()
-            )
-            if prog_active:
-                target_session = "programador"
 
         clean_number = "".join(c for c in phone_number if c.isdigit())
         if not clean_number:
@@ -868,14 +857,11 @@ class NotificationDispatcher:
                 sent_total += 1
 
                 # 3. WhatsApp (WAHA) se habilitado e o aluno tiver telefone
-                student_phone = (
-                    getattr(s, "phone", None) or (s.profile or {}).get("phone")
-                    if isinstance(s.profile, dict)
-                    else None
-                )
-                if send_whatsapp and student_phone:
+                student_phone = WahaWhatsAppService.extract_student_phone(s)
+                allow_wa = WahaWhatsAppService.is_whatsapp_allowed(s)
+                if send_whatsapp and student_phone and allow_wa:
                     wa_msg = f'*Teacher Tatiana*\n\nHello *{first_name}*! A new *{activity_type}* activity ("{title}") is now available for your level *{student_level}*.\n\n👉 Practice now: https://tati-ai.com{url}'
-                    if WahaWhatsAppService.send_message(student_phone, wa_msg):
+                    if WahaWhatsAppService.send_message(student_phone, wa_msg, recipient_user=s):
                         whatsapp_sent += 1
 
             except Exception as e:
@@ -930,14 +916,11 @@ class NotificationDispatcher:
             tag="streak-risk",
         )
 
-        student_phone = (
-            getattr(user, "phone", None) or (user.profile or {}).get("phone")
-            if isinstance(user.profile, dict)
-            else None
-        )
-        if send_whatsapp and student_phone:
+        student_phone = WahaWhatsAppService.extract_student_phone(user)
+        allow_wa = WahaWhatsAppService.is_whatsapp_allowed(user)
+        if send_whatsapp and student_phone and allow_wa:
             wa_msg = f"*Teacher Tatiana — Streak Alert*\n\nHello *{first_name}*! Your *{streak_count}-day study streak* is at risk today!\n\nDo a quick 3-minute exercise now to keep your streak: https://tati-ai.com/activities"
-            WahaWhatsAppService.send_message(student_phone, wa_msg)
+            WahaWhatsAppService.send_message(student_phone, wa_msg, recipient_user=user)
 
         return {"success": True, "push": push_res}
 
@@ -1066,9 +1049,8 @@ class NotificationSchedulerService:
         )
 
         # WhatsApp Dispatch
-        user_prof = user.profile if isinstance(user.profile, dict) else {}
-        student_phone = user_prof.get("whatsapp_number") or getattr(user, "whatsapp_number", None)
-        allow_wa = user_prof.get("allow_whatsapp_notifications", True)
+        student_phone = WahaWhatsAppService.extract_student_phone(user)
+        allow_wa = WahaWhatsAppService.is_whatsapp_allowed(user)
         wa_sent = False
         if student_phone and allow_wa:
             wa_msg = (
@@ -1225,9 +1207,8 @@ class NotificationSchedulerService:
         )
 
         # WhatsApp Dispatch
-        user_prof = user.profile if isinstance(user.profile, dict) else {}
-        student_phone = user_prof.get("whatsapp_number") or getattr(user, "whatsapp_number", None)
-        allow_wa = user_prof.get("allow_whatsapp_notifications", True)
+        student_phone = WahaWhatsAppService.extract_student_phone(user)
+        allow_wa = WahaWhatsAppService.is_whatsapp_allowed(user)
         wa_sent = False
         if student_phone and allow_wa:
             wa_msg = (
@@ -1347,9 +1328,8 @@ class NotificationSchedulerService:
         )
 
         # WhatsApp Dispatch
-        user_prof = user.profile if isinstance(user.profile, dict) else {}
-        student_phone = user_prof.get("whatsapp_number") or getattr(user, "whatsapp_number", None)
-        allow_wa = user_prof.get("allow_whatsapp_notifications", True)
+        student_phone = WahaWhatsAppService.extract_student_phone(user)
+        allow_wa = WahaWhatsAppService.is_whatsapp_allowed(user)
         wa_sent = False
         if student_phone and allow_wa:
             wa_msg = (

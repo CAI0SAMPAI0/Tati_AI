@@ -165,6 +165,9 @@ def get_student_recommendations(
 class StudentUpdateInput(BaseModel):
     level: Optional[str] = None
     custom_prompt: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    phone: Optional[str] = None
+    allow_whatsapp_notifications: Optional[bool] = None
 
 
 class StudentNudgeInput(BaseModel):
@@ -507,3 +510,46 @@ def get_waha_session_qr(request: HttpRequest, session: Optional[str] = None):
         resp["Expires"] = "0"
         return resp
     return HttpResponse(b"", content_type="image/png", status=404)
+
+
+# ── GERENCIAMENTO DE WHATSAPP DE ALUNOS ──────────────────────────────
+
+
+class StudentWhatsAppUpdateInput(BaseModel):
+    whatsapp_number: Optional[str] = ""
+    allow_whatsapp_notifications: Optional[bool] = True
+
+
+@dashboard_router.get("/whatsapp/students", auth=auth_required)
+def get_whatsapp_students(
+    request: HttpRequest,
+    search: Optional[str] = None,
+    status: Optional[str] = None,
+):
+    """
+    Lista estudantes com seus números de WhatsApp e status de notificações.
+    """
+    require_staff_user(request)
+    return DashboardService.get_whatsapp_students(search=search, status_filter=status)
+
+
+@dashboard_router.put("/whatsapp/students/{username}", auth=auth_required)
+def update_student_whatsapp(
+    request: HttpRequest, username: str, payload: StudentWhatsAppUpdateInput
+):
+    """
+    Atualiza número de WhatsApp e preferência de notificações do estudante.
+    """
+    require_staff_user(request)
+    return DashboardService.update_student(username, payload.dict())
+
+
+@dashboard_router.post("/whatsapp/students/{username}/test", auth=auth_required)
+def test_student_whatsapp(request: HttpRequest, username: str):
+    """
+    Dispara mensagem de teste para o WhatsApp do estudante via sessão @professor.
+    """
+    require_staff_user(request)
+    return DashboardService.send_test_whatsapp_to_student(
+        username, sender_user=request.auth
+    )
