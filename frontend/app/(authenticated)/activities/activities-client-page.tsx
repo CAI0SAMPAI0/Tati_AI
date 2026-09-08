@@ -434,10 +434,10 @@ export default function ActivitiesClientPage() {
           category: item.category,
         },
       });
-      toast.success("Atividade concluída com sucesso!", { id: 'act-status' });
+      toast.success("Activity completed successfully!", { id: 'act-status' });
       await refetchSubmissions();
     } catch (e) {
-      toast.error("Erro ao concluir atividade.");
+      toast.error("Error completing activity.");
     }
   };
 
@@ -457,10 +457,10 @@ export default function ActivitiesClientPage() {
           category: item.category,
         },
       });
-      toast.success("Atividade revertida para pendente!", { id: 'act-status' });
+      toast.success("Activity reverted to pending!", { id: 'act-status' });
       await refetchSubmissions();
     } catch (e) {
-      toast.error("Erro ao reverter atividade.");
+      toast.error("Error reverting activity.");
     }
   };
 

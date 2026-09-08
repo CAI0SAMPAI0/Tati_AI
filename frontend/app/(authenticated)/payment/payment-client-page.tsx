@@ -64,7 +64,7 @@ export default function PaymentClientPage() {
         }
       }
     },
-    onError: () => toast.error('Erro ao processar assinatura. Tente novamente.'),
+    onError: () => toast.error('Error processing subscription. Please try again.'),
   });
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-bg"><Spinner size="lg" /></div>;
@@ -160,7 +160,7 @@ export default function PaymentClientPage() {
           paymentId={pixData.paymentId}
           onClose={() => setPixData(null)}
           onSuccess={() => {
-            toast.success('Assinatura confirmada!');
+            toast.success('Subscription confirmed!');
             router.push('/chat');
           }}
         />

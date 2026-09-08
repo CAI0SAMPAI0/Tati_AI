@@ -144,16 +144,16 @@ export function FlashcardsSection() {
   const handleBulkPublish = async (publish: boolean) => {
     if (selectedDeckIds.length === 0) return;
     setIsBulkProcessing(true);
-    const toastId = toast.loading(publish ? 'Publicando decks selecionados...' : 'Movendo para rascunho...');
+    const toastId = toast.loading(publish ? 'Publishing selected decks...' : 'Moving to drafts...');
     try {
       await Promise.all(
         selectedDeckIds.map((id) => apiPut(`/dashboard/flashcards/${id}`, { is_published: publish }))
       );
-      toast.success(publish ? `${selectedDeckIds.length} decks publicados com sucesso!` : `${selectedDeckIds.length} decks movidos para rascunho!`, { id: toastId });
+      toast.success(publish ? `${selectedDeckIds.length} decks published successfully!` : `${selectedDeckIds.length} decks moved to drafts!`, { id: toastId });
       setSelectedDeckIds([]);
       invalidateDecks();
     } catch {
-      toast.error('Erro ao atualizar decks em lote.', { id: toastId });
+      toast.error('Error updating decks in bulk.', { id: toastId });
     } finally {
       setIsBulkProcessing(false);
     }
@@ -161,16 +161,16 @@ export function FlashcardsSection() {
 
   const handleBulkDelete = async () => {
     if (selectedDeckIds.length === 0) return;
-    if (!window.confirm(`Tem certeza que deseja excluir permanentemente ${selectedDeckIds.length} deck(s) selecionado(s)?`)) return;
+    if (!window.confirm(`Are you sure you want to permanently delete ${selectedDeckIds.length} selected deck(s)?`)) return;
     setIsBulkProcessing(true);
-    const toastId = toast.loading('Excluindo decks selecionados...');
+    const toastId = toast.loading('Deleting selected decks...');
     try {
       await Promise.all(selectedDeckIds.map((id) => apiDelete(`/dashboard/flashcards/${id}`)));
-      toast.success(`${selectedDeckIds.length} deck(s) excluído(s) com sucesso.`, { id: toastId });
+      toast.success(`${selectedDeckIds.length} deck(s) deleted successfully.`, { id: toastId });
       setSelectedDeckIds([]);
       invalidateDecks();
     } catch {
-      toast.error('Erro ao excluir decks selecionados.', { id: toastId });
+      toast.error('Error deleting selected decks.', { id: toastId });
     } finally {
       setIsBulkProcessing(false);
     }

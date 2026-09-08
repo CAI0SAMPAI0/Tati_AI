@@ -59,7 +59,7 @@ export default function VocabReviewClientPage() {
         queryClient.invalidateQueries({ queryKey: ['due-vocab'] });
       }
     } catch (err) {
-      toast.error('Erro ao salvar revisão.');
+      toast.error('Error saving review.');
     }
   };
 

@@ -27,7 +27,7 @@ export function PixModal({ qrCode, payload, value, title, paymentId, invoiceUrl,
     if (paymentId && data.payment_id !== paymentId) return;
     
     setPaymentConfirmed(true);
-    toast.success('Pagamento confirmado com sucesso!');
+    toast.success('Payment confirmed successfully!');
     
     // Auto-close after success animation
     setTimeout(() => {
@@ -35,7 +35,7 @@ export function PixModal({ qrCode, payload, value, title, paymentId, invoiceUrl,
       onClose();
     }, 3000);
   }, (data) => {
-    toast.error('Pagamento recusado: ' + (data.reason || 'Erro desconhecido'));
+    toast.error('Payment declined: ' + (data.reason || 'Unknown error'));
   });
 
   const copyToClipboard = () => {

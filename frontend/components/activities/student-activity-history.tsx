@@ -30,14 +30,14 @@ export function StudentActivityHistory({ onSelectActivity }: { onSelectActivity?
   });
 
   const categories = [
-    { id: 'all', label: 'Todas' },
-    { id: 'grammar', label: 'Gramática' },
-    { id: 'vocabulary', label: 'Vocabulário' },
+    { id: 'all', label: 'All' },
+    { id: 'grammar', label: 'Grammar' },
+    { id: 'vocabulary', label: 'Vocabulary' },
     { id: 'listening', label: 'Listening' },
     { id: 'reading', label: 'Reading' },
-    { id: 'simulations', label: 'Simulações' },
-    { id: 'games', label: 'Jogos' },
-    { id: 'news', label: 'Notícias' },
+    { id: 'simulations', label: 'Simulations' },
+    { id: 'games', label: 'Games' },
+    { id: 'news', label: 'News' },
   ];
 
   const filtered = useMemo(() => {
@@ -59,7 +59,7 @@ export function StudentActivityHistory({ onSelectActivity }: { onSelectActivity?
 
   return (
     <div className="space-y-6">
-      {/* Cards de Resumo */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-surface border border-border rounded-2xl p-5 shadow-sm">
           <div className="flex items-center gap-3">
@@ -67,7 +67,7 @@ export function StudentActivityHistory({ onSelectActivity }: { onSelectActivity?
               <CheckCircle2 size={24} />
             </div>
             <div>
-              <p className="text-xs font-semibold text-text-muted">Total Concluídas</p>
+              <p className="text-xs font-semibold text-text-muted">Total Completed</p>
               <p className="text-2xl font-black text-text mt-0.5">{stats.total}</p>
             </div>
           </div>
@@ -79,7 +79,7 @@ export function StudentActivityHistory({ onSelectActivity }: { onSelectActivity?
               <Award size={24} />
             </div>
             <div>
-              <p className="text-xs font-semibold text-text-muted">Precisão / Média</p>
+              <p className="text-xs font-semibold text-text-muted">Accuracy / Average</p>
               <p className="text-2xl font-black text-text mt-0.5">{stats.avg}%</p>
             </div>
           </div>
@@ -91,18 +91,18 @@ export function StudentActivityHistory({ onSelectActivity }: { onSelectActivity?
               <Calendar size={24} />
             </div>
             <div>
-              <p className="text-xs font-semibold text-text-muted">Última Atividade</p>
+              <p className="text-xs font-semibold text-text-muted">Last Activity</p>
               <p className="text-sm font-bold text-text mt-1 truncate">
                 {submissions[0]?.created_at 
-                  ? new Date(submissions[0].created_at).toLocaleDateString('pt-BR') 
-                  : 'Nenhuma ainda'}
+                  ? new Date(submissions[0].created_at).toLocaleDateString('en-US') 
+                  : 'None yet'}
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Controles de Busca e Filtro */}
+      {/* Search and Filter Controls */}
       <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
         <div className="relative w-full sm:w-80">
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
@@ -110,7 +110,7 @@ export function StudentActivityHistory({ onSelectActivity }: { onSelectActivity?
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar atividade realizada..."
+            placeholder="Search completed activity..."
             className="w-full pl-10 pr-4 py-2.5 bg-surface border border-border rounded-xl text-sm text-text focus:outline-none focus:border-primary transition-all"
           />
         </div>
@@ -133,7 +133,7 @@ export function StudentActivityHistory({ onSelectActivity }: { onSelectActivity?
         </div>
       </div>
 
-      {/* Lista de Atividades */}
+      {/* Activity List */}
       {isLoading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
@@ -142,15 +142,15 @@ export function StudentActivityHistory({ onSelectActivity }: { onSelectActivity?
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-12 bg-surface rounded-2xl border border-dashed border-border">
-          <p className="text-sm font-bold text-text">Nenhuma atividade encontrada</p>
-          <p className="text-xs text-text-muted mt-1">Conclua atividades para construir seu histórico!</p>
+          <p className="text-sm font-bold text-text">No activities found</p>
+          <p className="text-xs text-text-muted mt-1">Complete exercises and activities to build your study history!</p>
         </div>
       ) : (
         <div className="space-y-2.5">
           {filtered.map((item: any) => {
             const Icon = CATEGORY_ICONS[item.activity_type] || BookOpen;
             const formattedDate = item.created_at
-              ? new Date(item.created_at).toLocaleDateString('pt-BR', {
+              ? new Date(item.created_at).toLocaleDateString('en-US', {
                   day: '2-digit',
                   month: 'short',
                   hour: '2-digit',
@@ -191,7 +191,7 @@ export function StudentActivityHistory({ onSelectActivity }: { onSelectActivity?
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-2 text-text-muted hover:text-primary rounded-xl hover:bg-bg-secondary transition-colors"
-                      title="Abrir link original"
+                      title="Open original link"
                     >
                       <ExternalLink size={18} />
                     </a>
@@ -202,7 +202,7 @@ export function StudentActivityHistory({ onSelectActivity }: { onSelectActivity?
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-xl text-xs font-bold transition-all"
                     >
                       <RotateCcw size={14} />
-                      Refazer
+                      Redo
                     </button>
                   )}
                 </div>

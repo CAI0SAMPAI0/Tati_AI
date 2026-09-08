@@ -244,10 +244,10 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
               if (prev.length >= MAX_ATTACHMENTS) return prev;
               return [...prev, { name: filename, base64, type: 'image/png' }];
             });
-            toast.success('Imagem colada adicionada!');
+            toast.success('Pasted image added!');
           }
         };
-        reader.onerror = () => toast.error('Erro ao ler imagem colada');
+        reader.onerror = () => toast.error('Failed to read pasted image');
         reader.readAsDataURL(file);
         
         e.preventDefault();
