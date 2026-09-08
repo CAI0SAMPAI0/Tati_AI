@@ -305,7 +305,11 @@ def google_oauth_callback(
 
     origin_meta = cache.get(f"google_oauth_origin_{state}") or {}
     frontend_origin = origin_meta.get("origin")
-    is_hub = origin_meta.get("access") == "hub"
+    is_hub = (
+        origin_meta.get("access") == "hub"
+        or bool(user_dict.get("is_hub_only"))
+        or user_dict.get("role") == "buyer"
+    )
 
     if not frontend_origin or "accounts.google.com" in frontend_origin or "google.com" in frontend_origin:
         frontend_origin = (
@@ -314,13 +318,32 @@ def google_oauth_callback(
             or "https://stunning-tranquility-production-4c54.up.railway.app"
         )
 
-    user_json = json.dumps(user_dict)
+    # Objeto de usuário enxuto e seguro para transferência via URL / bridge
+    # NUNCA incluir campos pesados como profile (leveling_history, logs, áudio) na URL
+    # para evitar erro HTTP 414 URI_TOO_LONG nos proxies/CDNs (Vercel Edge, Cloudflare).
+    safe_user = {
+        "id": str(user_dict.get("id") or user_dict.get("username") or ""),
+        "username": str(user_dict.get("username") or ""),
+        "email": str(user_dict.get("email") or ""),
+        "name": str(user_dict.get("name") or user_dict.get("username") or ""),
+        "role": str(user_dict.get("role") or "student"),
+        "level": str(user_dict.get("level") or "A1"),
+        "is_hub_only": bool(user_dict.get("is_hub_only", False)),
+    }
+    safe_user_json = json.dumps(safe_user)
     hub_param = "&access=hub" if is_hub else ""
     redirect_target = (
-        f"{frontend_origin.rstrip('/')}/login?token={jwt_token}&user={quote(user_json)}{hub_param}"
+        f"{frontend_origin.rstrip('/')}/login?token={jwt_token}&user={quote(safe_user_json)}{hub_param}"
     )
 
-    username_val = user_dict.get("username", "") if isinstance(user_dict, dict) else ""
+    username_val = safe_user["username"]
+
+    # Prepara valores serializados para injeção segura no JavaScript (evita quebra por aspas/newlines)
+    jwt_token_js = json.dumps(jwt_token)
+    safe_user_json_js = json.dumps(safe_user_json)
+    safe_user_obj_js = safe_user_json
+    username_val_js = json.dumps(username_val)
+    redirect_target_js = json.dumps(redirect_target)
 
     html = f"""
     <!DOCTYPE html>
@@ -380,17 +403,17 @@ def google_oauth_callback(
         <script>
             // 1. Salva credenciais imediatamente no localStorage e cookie
             try {{
-                localStorage.setItem('token', '{jwt_token}');
-                localStorage.setItem('user', '{user_json}');
-                document.cookie = 'token={jwt_token}; path=/; max-age=2592000; SameSite=Lax';
+                localStorage.setItem('token', {jwt_token_js});
+                localStorage.setItem('user', {safe_user_json_js});
+                document.cookie = 'token=' + encodeURIComponent({jwt_token_js}) + '; path=/; max-age=2592000; SameSite=Lax';
             }} catch(e) {{}}
 
             // 2. Notifica o app Flutter nativo caso esteja embutido no InAppWebView
             try {{
                 if (window.flutter_inappwebview) {{
                     window.flutter_inappwebview.callHandler('onUserLogin', {{
-                        username: '{username_val}',
-                        token: '{jwt_token}'
+                        username: {username_val_js},
+                        token: {jwt_token_js}
                     }});
                 }}
             }} catch(e) {{}}
@@ -398,14 +421,14 @@ def google_oauth_callback(
             // 3. Notifica janela pai caso seja popup Web
             try {{
                 if (window.opener) {{
-                    window.opener.postMessage({{ type: 'GOOGLE_AUTH_SUCCESS', token: '{jwt_token}', user: {user_json} }}, '*');
+                    window.opener.postMessage({{ type: 'GOOGLE_AUTH_SUCCESS', token: {jwt_token_js}, user: {safe_user_obj_js} }}, '*');
                     window.close();
                 }}
             }} catch(e) {{}}
 
             // 4. Redireciona imediatamente substituindo o histórico para evitar reenvio de código
             setTimeout(function() {{
-                window.location.replace('{redirect_target}');
+                window.location.replace({redirect_target_js});
             }}, 50);
         </script>
     </body>

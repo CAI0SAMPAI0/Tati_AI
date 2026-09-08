@@ -39,7 +39,7 @@ interface AuthState {
   user: User | null;
   isLoaded: boolean;
   isBootstrappingProfile: boolean;
-  saveSession: (token: string, user: User) => Promise<void>;
+  saveSession: (token: string, user: User) => Promise<User>;
   updateProfile: (user: User) => void;
   refreshUser: () => Promise<void>;
   logout: () => void;
@@ -50,7 +50,7 @@ const AuthContext = createContext<AuthState>({
   user: null,
   isLoaded: false,
   isBootstrappingProfile: false,
-  saveSession: async () => {},
+  saveSession: async () => ({} as User),
   updateProfile: () => {},
   refreshUser: async () => {},
   logout: () => {},
@@ -79,22 +79,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [token]);
 
-  const saveSession = useCallback(async (newToken: string, newUser: User) => {
+  const saveSession = useCallback(async (newToken: string, newUser: User): Promise<User> => {
     setIsBootstrappingProfile(true);
     // Reiniciar o cache do React Query ao entrar/logar
     queryClient.clear();
+    let savedUser = normalizeUserAvatar(newUser);
     // Persist token first so /profile can authenticate immediately.
-    saveStoredSession({ token: newToken, user: normalizeUserAvatar(newUser) });
+    saveStoredSession({ token: newToken, user: savedUser });
     try {
       const freshUser = await apiGet<User>(ENDPOINTS.PROFILE);
-      const normalizedUser = normalizeUserAvatar(freshUser);
-      setUser(normalizedUser);
-      saveStoredSession({ token: newToken, user: normalizedUser });
+      savedUser = normalizeUserAvatar(freshUser);
+      setUser(savedUser);
+      saveStoredSession({ token: newToken, user: savedUser });
     } catch {
       // Keep login resilient: fallback to user from login payload.
-      const normalizedUser = normalizeUserAvatar(newUser);
-      setUser(normalizedUser);
-      saveStoredSession({ token: newToken, user: normalizedUser });
+      savedUser = normalizeUserAvatar(newUser);
+      setUser(savedUser);
+      saveStoredSession({ token: newToken, user: savedUser });
     } finally {
       setToken(newToken);
       setIsBootstrappingProfile(false);
@@ -110,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         queryFn: () => apiGet(ENDPOINTS.PAYMENTS_STATUS),
       });
     }
+    return savedUser;
   }, [queryClient]);
 
   const updateProfile = useCallback((newUser: User) => {

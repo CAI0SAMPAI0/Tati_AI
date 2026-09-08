@@ -56,8 +56,8 @@ export default function LoginPage() {
     const handleGoogleMessage = (event: MessageEvent) => {
       if (event.data && event.data.type === 'GOOGLE_AUTH_SUCCESS' && event.data.token) {
         const isHub = new URLSearchParams(window.location.search).get('access') === 'hub';
-        saveSession(event.data.token, event.data.user || { username: 'student' }).then(() => {
-          if (isHub || event.data.user?.is_hub_only) {
+        saveSession(event.data.token, event.data.user || { username: 'student' }).then((savedUser) => {
+          if (isHub || event.data.user?.is_hub_only || (savedUser as any)?.is_hub_only) {
             window.location.href = process.env.NEXT_PUBLIC_HUB_SITE_URL || 'http://localhost:3001/materiais';
           } else {
             router.replace('/chat');
@@ -75,14 +75,20 @@ export default function LoginPage() {
     if (token) {
       let userObj: any = null;
       try {
-        if (userParam) userObj = JSON.parse(decodeURIComponent(userParam));
+        if (userParam) {
+          try {
+            userObj = JSON.parse(userParam);
+          } catch {
+            userObj = JSON.parse(decodeURIComponent(userParam));
+          }
+        }
       } catch (_) {}
 
       // Limpa os parâmetros da URL
       window.history.replaceState({}, '', window.location.pathname);
 
-      saveSession(token, userObj || { username: 'student' }).then(() => {
-        if (isHub || userObj?.is_hub_only) {
+      saveSession(token, userObj || { username: 'student' }).then((savedUser) => {
+        if (isHub || userObj?.is_hub_only || (savedUser as any)?.is_hub_only) {
           window.location.href = process.env.NEXT_PUBLIC_HUB_SITE_URL || 'http://localhost:3001/materiais';
         } else {
           router.replace('/chat');
