@@ -525,6 +525,16 @@ class RankingService:
         month: Optional[int] = None,
         all_time: bool = False,
     ) -> list[dict]:
+        from django.core.cache import cache
+
+        cache_key = f"ranking:students:{year or 'cur'}:{month or 'cur'}:{all_time}"
+        try:
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return cached
+        except Exception:
+            pass
+
         scores = cls._activity_scores(year=year, month=month, all_time=all_time)
         all_users = User.objects.all()
         user_map = {u.username: u for u in all_users}
@@ -552,7 +562,12 @@ class RankingService:
                     }
                 )
 
-        return sorted(students, key=lambda x: x["score"], reverse=True)
+        result = sorted(students, key=lambda x: x["score"], reverse=True)
+        try:
+            cache.set(cache_key, result, timeout=60)
+        except Exception:
+            pass
+        return result
 
     @classmethod
     def get_ranking(
