@@ -63,8 +63,8 @@ class StudentUser(HttpUser):
         if not StudentUser.shared_token and not StudentUser._auth_lock:
             StudentUser._auth_lock = True
             try:
-                username = os.getenv("LOCUST_USER") or "caio.sampaio"
-                password = os.getenv("LOCUST_PASSWORD") or "caio123"
+                username = os.getenv("LOCUST_USER")
+                password = os.getenv("LOCUST_PASSWORD")
 
                 res = self.client.post(
                     "/auth/login",
