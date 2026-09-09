@@ -80,6 +80,12 @@ class StudentUser(HttpUser):
             finally:
                 StudentUser._auth_lock = False
 
+        # Aguarda a thread principal concluir o login para que nenhum usuário inicie sem token
+        wait_attempts = 0
+        while not StudentUser.shared_token and wait_attempts < 30:
+            time.sleep(0.3)
+            wait_attempts += 1
+
         # Atribui o token compartilhado à instância
         if StudentUser.shared_token:
             self.token = StudentUser.shared_token
