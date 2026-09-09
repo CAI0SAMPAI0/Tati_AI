@@ -56,10 +56,10 @@ export interface StoredSession {
 
 export function getStoredSession(): StoredSession | null {
   if (typeof window === 'undefined') return null;
-  const token = localStorage.getItem(TOKEN_KEY);
-  const rawUser = localStorage.getItem(USER_KEY);
-  if (!token || !rawUser) return null;
   try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const rawUser = localStorage.getItem(USER_KEY);
+    if (!token || !rawUser) return null;
     const user = JSON.parse(rawUser) as User;
     const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
     return { token, user, refreshToken };
@@ -70,19 +70,23 @@ export function getStoredSession(): StoredSession | null {
 
 export function saveStoredSession(session: StoredSession): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(TOKEN_KEY, session.token);
-  localStorage.setItem(USER_KEY, JSON.stringify(session.user));
-  if (session.refreshToken) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, session.refreshToken);
-  }
+  try {
+    localStorage.setItem(TOKEN_KEY, session.token);
+    localStorage.setItem(USER_KEY, JSON.stringify(session.user));
+    if (session.refreshToken) {
+      localStorage.setItem(REFRESH_TOKEN_KEY, session.refreshToken);
+    }
+  } catch {}
   setAuthTokenCookie(session.token);
 }
 
 export function clearStoredSession(): void {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+  } catch {}
   clearAuthTokenCookie();
 }
 

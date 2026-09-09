@@ -10,31 +10,36 @@ function getDB(): Promise<IDBDatabase> {
   if (dbInstance) return Promise.resolve(dbInstance);
 
   return new Promise((resolve, reject) => {
-    if (typeof window === 'undefined') {
+    if (typeof window === 'undefined' || typeof indexedDB === 'undefined') {
       reject(new Error('IndexedDB is only available in browser environment'));
       return;
     }
 
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    try {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onerror = () => {
-      console.error('IndexedDB open error:', request.error);
-      reject(request.error);
-    };
+      request.onerror = () => {
+        console.error('IndexedDB open error:', request.error);
+        reject(request.error);
+      };
 
-    request.onsuccess = () => {
-      dbInstance = request.result;
-      resolve(request.result);
-    };
+      request.onsuccess = () => {
+        dbInstance = request.result;
+        resolve(request.result);
+      };
 
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-        store.createIndex('conversation_id', 'conversation_id', { unique: false });
-        store.createIndex('created_at', 'created_at', { unique: false });
-      }
-    };
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+          store.createIndex('conversation_id', 'conversation_id', { unique: false });
+          store.createIndex('created_at', 'created_at', { unique: false });
+        }
+      };
+    } catch (err) {
+      console.error('IndexedDB open threw error:', err);
+      reject(err);
+    }
   });
 }
 

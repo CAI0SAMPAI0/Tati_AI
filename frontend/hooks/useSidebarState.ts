@@ -8,16 +8,23 @@ export function useSidebarState() {
   // Initialize state based on localStorage and window size
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const collapsed = localStorage.getItem('tati_sidebar_collapsed') === 'true';
-      const isMobile = window.innerWidth < 768;
-      setSidebarOpen(isMobile ? false : !collapsed);
+      try {
+        const collapsed = localStorage.getItem('tati_sidebar_collapsed') === 'true';
+        const isMobile = window.innerWidth < 768;
+        setSidebarOpen(isMobile ? false : !collapsed);
+      } catch {
+        const isMobile = window.innerWidth < 768;
+        setSidebarOpen(isMobile ? false : true);
+      }
     }
   }, []);
 
   const handleToggle = useCallback(() => {
     setSidebarOpen(prev => {
       const next = !prev;
-      localStorage.setItem('tati_sidebar_collapsed', String(!next));
+      try {
+        localStorage.setItem('tati_sidebar_collapsed', String(!next));
+      } catch {}
       return next;
     });
   }, []);
@@ -25,14 +32,18 @@ export function useSidebarState() {
   const handleClose = useCallback(() => {
     setSidebarOpen(false);
     if (typeof window !== 'undefined' && window.innerWidth >= 768) {
-      localStorage.setItem('tati_sidebar_collapsed', 'true');
+      try {
+        localStorage.setItem('tati_sidebar_collapsed', 'true');
+      } catch {}
     }
   }, []);
 
   const handleOpen = useCallback(() => {
     setSidebarOpen(true);
     if (typeof window !== 'undefined' && window.innerWidth >= 768) {
-      localStorage.setItem('tati_sidebar_collapsed', 'false');
+      try {
+        localStorage.setItem('tati_sidebar_collapsed', 'false');
+      } catch {}
     }
   }, []);
 
