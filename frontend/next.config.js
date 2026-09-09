@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const { withSentryConfig } = require('@sentry/nextjs/config');
+
 const nextConfig = {
   reactStrictMode: true,
 
@@ -148,6 +150,8 @@ const nextConfig = {
 
 // IMPORTANTE: productionBrowserSourceMaps removido — infla bundles 2-3x em produção.
 // Para depurar erros em produção, use error tracking (ex: Sentry) em vez de source maps inline.
-module.exports = {
-  ...nextConfig,
-}
+module.exports = withSentryConfig(nextConfig, {
+  silent: true,
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+});
