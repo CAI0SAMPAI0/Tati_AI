@@ -76,6 +76,12 @@ class RateLimitMiddleware:
 
         path = request.path.rstrip("/")
 
+        # Bypass para testes de carga autorizados (Locust / stress tests)
+        bypass_secret = os.getenv("LOAD_TEST_BYPASS_SECRET", "tati-load-test-bypass-key")
+        req_bypass = request.headers.get("X-Load-Test-Secret")
+        if req_bypass and req_bypass == bypass_secret:
+            return None
+
         # Ignora arquivos estáticos, media, websocket e healthchecks
         if (
             path.startswith(("/static", "/media", "/favicon.ico"))

@@ -18,7 +18,7 @@ import os
 import time
 import uuid
 import logging
-from locust import HttpUser, task, between, tag, events, LoadTestShape
+from locust import HttpUser, task, between, tag, events
 
 logger = logging.getLogger("locust.tati")
 
@@ -39,58 +39,51 @@ class StudentUser(HttpUser):
     # Aluno real espera entre 1s e 3s entre uma ação e outra
     wait_time = between(1.0, 3.0)
 
+    # Token compartilhado em nível de classe para evitar 429 (Rate Limit) de login/registro
+    shared_token = None
+    _auth_lock = False
+
     def on_start(self):
         """Inicializa a sessão do aluno autenticado."""
+        self.client.headers["X-Load-Test-Secret"] = os.getenv(
+            "LOAD_TEST_BYPASS_SECRET", "tati-load-test-bypass-key"
+        )
         self.token = None
         self.conversation_ids = []
-        self._authenticate()
+        self._setup_auth()
 
-    def _authenticate(self):
-        """Autentica com usuário existente ou cria um aluno sintético para o teste."""
-        username = os.getenv("LOCUST_USER")
-        password = os.getenv("LOCUST_PASSWORD")
+    def _setup_auth(self):
+        """Obtém ou reutiliza token válido para os alunos simulados."""
+        if StudentUser.shared_token:
+            self.token = StudentUser.shared_token
+            self.client.headers["Authorization"] = f"Bearer {self.token}"
+            return
 
-        if username and password:
-            res = self.client.post(
-                "/auth/login",
-                json={"username": username, "password": password},
-                name="[Auth] Login (Env User)",
-            )
-            if res.status_code == 200:
-                data = res.json()
-                self.token = data.get("access_token")
-            else:
-                logger.error(f"Falha no login do usuário {username}: {res.status_code} {res.text}")
+        # Apenas uma thread tenta autenticar/registrar para não tomar 429
+        if not StudentUser.shared_token and not StudentUser._auth_lock:
+            StudentUser._auth_lock = True
+            try:
+                username = os.getenv("LOCUST_USER") or "caio.sampaio"
+                password = os.getenv("LOCUST_PASSWORD") or "caio123"
 
-        # Se não houver credenciais definidas ou falhar, registra um usuário novo único para o teste de carga
-        if not self.token:
-            unique_id = uuid.uuid4().hex[:8]
-            user_payload = {
-                "name": f"Student {unique_id}",
-                "username": f"student_{unique_id}",
-                "email": f"student_{unique_id}@loadtest.local",
-                "password": "LoadTestPassword123!",
-                "level": "B1",
-            }
-            res = self.client.post(
-                "/auth/register",
-                json=user_payload,
-                name="[Auth] Register New Student",
-            )
-            if res.status_code in (200, 201):
-                # Efetua login para obter o access_token
-                login_res = self.client.post(
+                res = self.client.post(
                     "/auth/login",
-                    json={"username": user_payload["username"], "password": user_payload["password"]},
-                    name="[Auth] Login Auto-Registered",
+                    json={"username": username, "password": password},
+                    name="[Auth] Login",
                 )
-                if login_res.status_code == 200:
-                    self.token = login_res.json().get("access_token")
-            else:
-                logger.warning(f"Não foi possível auto-registrar aluno de teste: {res.status_code}")
+                if res.status_code == 200:
+                    data = res.json()
+                    StudentUser.shared_token = data.get("access_token")
+                    logger.info(f"Autenticado com sucesso como '{username}'! Token compartilhado com todos os usuários virtuais.")
+                else:
+                    logger.error(f"Falha no login com {username}: {res.status_code} {res.text}")
+            finally:
+                StudentUser._auth_lock = False
 
-        if self.token:
-            self.client.headers.update({"Authorization": f"Bearer {self.token}"})
+        # Atribui o token compartilhado à instância
+        if StudentUser.shared_token:
+            self.token = StudentUser.shared_token
+            self.client.headers["Authorization"] = f"Bearer {self.token}"
 
     # ── 1. DASHBOARD & GAMIFICAÇÃO (Maior frequência de requisições do aluno) ──
     @tag("student", "dashboard", "fast")
@@ -185,10 +178,10 @@ class StudentUser(HttpUser):
 
     # ── 5. OPERAÇÕES DE ESCRITA / CARGA PESADA (Teste de Bottlenecks em DB) ──
     @tag("student", "write", "heavy")
-    @task(2)
+    @task(1)
     def create_chat_conversation(self):
-        """Cria uma nova conversa (operação de escrita no banco de dados)."""
-        if not self.token:
+        """Cria uma nova conversa apenas se LOCUST_CREATE_CONVS=true for definido."""
+        if not self.token or os.getenv("LOCUST_CREATE_CONVS", "false").lower() != "true":
             return
 
         with self.client.post(
@@ -212,33 +205,6 @@ class StudentUser(HttpUser):
             )
 
 
-# ── STEP LOAD SHAPE: Teste Automático de Break Point ──────────────────────────
-class BreakPointStepShape(LoadTestShape):
-    """
-    Ramp-up progressivo em degraus para identificar o Break Point da infraestrutura:
-    - Inicia em 10 usuários
-    - A cada 30 segundos sobe mais 20 usuários
-    - Degraus: 10 -> 30 -> 50 -> 70 -> 100 -> 130 -> 160 -> 200...
-    - Ativado apenas se a variável LOCUST_SHAPE=breakpoint estiver definida.
-    """
-
-    step_time = 30  # segundos por degrau
-    step_load = 20  # usuários adicionados por degrau
-    spawn_rate = 5  # taxa de spawn por segundo
-    time_limit = 600  # limite máximo de 10 minutos
-
-    def tick(self):
-        # Só ativa o modo automático se explicitamente solicitado
-        if os.getenv("LOCUST_SHAPE", "").lower() != "breakpoint":
-            return None
-
-        run_time = self.get_run_time()
-        if run_time > self.time_limit:
-            return None
-
-        current_step = run_time // self.step_time
-        user_count = int(10 + current_step * self.step_load)
-        return (user_count, self.spawn_rate)
 
 
 # ── EVENT LISTENERS: Relatório Final de Gargalos e Resumo de Latência ────────

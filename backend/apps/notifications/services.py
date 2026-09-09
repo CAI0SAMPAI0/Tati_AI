@@ -786,18 +786,17 @@ class NotificationDispatcher:
             or len(raw_levels) == 0
         )
 
-        # Filtra alunos do nível alvo
+        # Filtra alunos do nível alvo estritamente
         if is_all_levels:
             students_qs = User.objects.filter(role="student")
         else:
-            students_qs = User.objects.filter(role="student", level__in=raw_levels)
+            from django.db.models import Q
+            level_q = Q()
+            for lvl in raw_levels:
+                level_q |= Q(level__iexact=lvl)
+            students_qs = User.objects.filter(role="student").filter(level_q)
 
-        # Garante que os usuários de teste (programador, caio.sampaio) sempre recebam para validação
-        test_users = list(
-            User.objects.filter(username__in=["programador", "caio.sampaio", "caio"])
-        )
-        students_dict = {u.username: u for u in list(students_qs) + test_users}
-        students = list(students_dict.values())
+        students = list(students_qs)
 
         if not students:
             logger.info(
@@ -816,9 +815,9 @@ class NotificationDispatcher:
             first_name = (
                 (s.name or s.username or "Student").strip().split()[0].capitalize()
             )
-            student_level = s.level or level_tag
+            target_level_str = "practice" if is_all_levels else f"your level ({level_tag})"
             notif_title = "New Activity from Teacher Tatiana!"
-            notif_body = f'Hello {first_name}! A new {activity_type} activity ("{title}") is now available for your level ({student_level}). Come practice!'
+            notif_body = f'Hello {first_name}! A new {activity_type} activity ("{title}") is now available for {target_level_str}. Come practice!'
 
             try:
                 # Evita criar duplicata se já existir idêntica recente
@@ -853,7 +852,11 @@ class NotificationDispatcher:
                 student_phone = WahaWhatsAppService.extract_student_phone(s)
                 allow_wa = WahaWhatsAppService.is_whatsapp_allowed(s)
                 if send_whatsapp and student_phone and allow_wa:
-                    wa_msg = f'*Teacher Tatiana*\n\nHello *{first_name}*! A new *{activity_type}* activity ("{title}") is now available for your level *{student_level}*.\n\n👉 Practice now: https://tati-ai.com{url}'
+                    wa_msg = (
+                        f'*Teacher Tatiana*\n\nHello *{first_name}*! A new *{activity_type}* activity ("{title}") is now available for your level *{level_tag}*.\n\n👉 Practice now: https://tati-ai.com{url}'
+                        if not is_all_levels else
+                        f'*Teacher Tatiana*\n\nHello *{first_name}*! A new *{activity_type}* activity ("{title}") is now available for practice.\n\n👉 Practice now: https://tati-ai.com{url}'
+                    )
                     if WahaWhatsAppService.send_message(student_phone, wa_msg, recipient_user=s):
                         whatsapp_sent += 1
 
@@ -861,6 +864,53 @@ class NotificationDispatcher:
                 logger.error(
                     f"[NotificationDispatcher] Erro ao notificar {s.username}: {e}"
                 )
+
+        # 4. Envio de E-mails em segundo plano (Brevo / Resend / SMTP)
+        def _send_activity_emails(recipients_list, act_type, act_title, target_lvl, act_url, is_all):
+            for rec in recipients_list:
+                rec_email = getattr(rec, "email", None)
+                if not rec_email or "@" not in rec_email:
+                    continue
+                first_n = (
+                    (rec.name or rec.username or "Student").strip().split()[0].capitalize()
+                )
+                try:
+                    level_desc = "all levels" if is_all else target_lvl
+                    body_paras = [
+                        f'A new <strong>{act_type}</strong> activity ("{act_title}") is now available for your level (<strong>{level_desc}</strong>).'
+                        if not is_all else
+                        f'A new <strong>{act_type}</strong> activity ("{act_title}") is now available for you to practice.',
+                        "Consistent daily practice is key to developing fluency. Tap the button below to start practicing now with Teacher Tatiana!",
+                    ]
+                    html = BrevoEmailService.build_standard_email_html(
+                        recipient_name=first_n,
+                        body_paragraphs=body_paras,
+                        action_url=f"https://tati-ai.com{act_url}",
+                        action_label="Practice Now",
+                        title_header="Teacher Tatiana Duarte",
+                        subtitle_header="New Activity Alert",
+                    )
+                    email_subj = f"New {act_type}: {act_title} ({level_desc})" if not is_all else f"New {act_type}: {act_title}"
+                    BrevoEmailService.send_email_detailed(
+                        to_email=rec_email,
+                        subject=email_subj,
+                        html_content=html,
+                        recipient_name=first_n,
+                    )
+                    logger.info(
+                        f"[NotificationDispatcher] E-mail de nova atividade ({act_title}) enviado para {rec_email}"
+                    )
+                except Exception as mail_err:
+                    logger.warning(
+                        f"[NotificationDispatcher] Erro ao enviar e-mail de nova atividade para {rec_email}: {mail_err}"
+                    )
+
+        import threading
+        threading.Thread(
+            target=_send_activity_emails,
+            args=(students, activity_type, title, level_tag, url, is_all_levels),
+            daemon=True,
+        ).start()
 
         logger.info(
             f"[NotificationDispatcher] Notificações enviadas para {sent_total} alunos (Push/In-App) e {whatsapp_sent} (WhatsApp) no nível {raw_levels}."
