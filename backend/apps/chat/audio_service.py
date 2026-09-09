@@ -4,6 +4,7 @@ import re
 import base64
 import logging
 import asyncio
+from asgiref.sync import async_to_sync
 from typing import List
 from groq import AsyncGroq
 import edge_tts
@@ -138,19 +139,25 @@ class AudioService:
         Fallback síncrono para conversão de texto em áudio.
         """
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                import nest_asyncio
-
-                nest_asyncio.apply()
-                return loop.run_until_complete(cls.text_to_speech_async(text, accent))
-            else:
-                return asyncio.run(cls.text_to_speech_async(text, accent))
-        except RuntimeError:
-            return asyncio.run(cls.text_to_speech_async(text, accent))
+            return async_to_sync(cls.text_to_speech_async)(text, accent)
         except Exception as e:
             logger.error(f"[AudioService] Erro no TTS síncrono: {e}")
             return ""
+        # causava erro de Event loop is closed, portanto troquei pelo async to sync
+        # try:
+        #     loop = asyncio.get_event_loop()
+        #     if loop.is_running():
+        #         import nest_asyncio
+
+        #         nest_asyncio.apply()
+        #         return loop.run_until_complete(cls.text_to_speech_async(text, accent))
+        #     else:
+        #         return asyncio.run(cls.text_to_speech_async(text, accent))
+        # except RuntimeError:
+        #     return asyncio.run(cls.text_to_speech_async(text, accent))
+        # except Exception as e:
+        #     logger.error(f"[AudioService] Erro no TTS síncrono: {e}")
+        #     return ""
 
     @classmethod
     async def transcribe_audio_async(
@@ -185,37 +192,37 @@ class AudioService:
 
         for key in keys:
             try:
-                client = AsyncGroq(api_key=key)
-                create_kwargs = {
+                async with AsyncGroq (api_key=key) as client:
+                    create_kwargs = {
                     "file": ("input.webm", audio_bytes),
                     "model": "whisper-large-v3-turbo",
                     "response_format": "text",
                     "temperature": 0.0,
                     "language": "en",
-                }
-                if prompt:
-                    create_kwargs["prompt"] = prompt
+                    }
+                    if prompt:
+                        create_kwargs["prompt"] = prompt
 
-                resp = await client.audio.transcriptions.create(**create_kwargs)
-                if resp:
-                    text = str(resp).strip()
-                    if noise_pattern.match(text) or text.lower() in (
-                        "tshh",
-                        "tshh.",
-                        "tshhhhhh.",
-                        "shh",
-                        "shhh",
-                        "...",
-                        "you",
-                        "[blank_audio]",
-                        "thank you.",
-                        "thank you",
-                    ):
-                        logger.info(
-                            f"[AudioService] Ignorando ruído de fundo/alucinação: {text}"
-                        )
-                        return ""
-                    return text
+                    resp = await client.audio.transcriptions.create(**create_kwargs)
+                    if resp:
+                        text = str(resp).strip()
+                        if noise_pattern.match(text) or text.lower() in (
+                            "tshh",
+                            "tshh.",
+                            "tshhhhhh.",
+                            "shh",
+                            "shhh",
+                            "...",
+                            "you",
+                            "[blank_audio]",
+                            "thank you.",
+                            "thank you",
+                        ):
+                            logger.info(
+                                f"[AudioService] Ignorando ruído de fundo/alucinação: {text}"
+                            )
+                            return ""
+                        return text
             except Exception as e:
                 logger.warning(
                     f"[AudioService] Whisper falhou na chave {key[:10]}: {e}"
@@ -229,18 +236,24 @@ class AudioService:
         Fallback síncrono para transcrição.
         """
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                import nest_asyncio
-
-                nest_asyncio.apply()
-                return loop.run_until_complete(
-                    cls.transcribe_audio_async(audio_data, prompt)
-                )
-            else:
-                return asyncio.run(cls.transcribe_audio_async(audio_data, prompt))
-        except RuntimeError:
-            return asyncio.run(cls.transcribe_audio_async(audio_data, prompt))
+            return async_to_sync(cls.transcribe_audio_async)(audio_data, prompt)
         except Exception as e:
             logger.error(f"[AudioService] Erro no STT síncrono: {e}")
             return ""
+        # causava erro de Event loop is closed, portanto troquei pelo async to sync
+        # try:
+        #     loop = asyncio.get_event_loop()
+        #     if loop.is_running():
+        #         import nest_asyncio
+
+        #         nest_asyncio.apply()
+        #         return loop.run_until_complete(
+        #             cls.transcribe_audio_async(audio_data, prompt)
+        #         )
+        #     else:
+        #         return asyncio.run(cls.transcribe_audio_async(audio_data, prompt))
+        # except RuntimeError:
+        #     return asyncio.run(cls.transcribe_audio_async(audio_data, prompt))
+        # except Exception as e:
+        #     logger.error(f"[AudioService] Erro no STT síncrono: {e}")
+        #     return ""

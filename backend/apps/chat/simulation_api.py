@@ -204,22 +204,22 @@ async def start_simulation(request: HttpRequest, payload: SimStartInput):
     keys = get_groq_keys()
     for key in keys:
         try:
-            client = AsyncGroq(api_key=key)
-            res = await client.chat.completions.create(
-                model="openai/gpt-oss-120b",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": f"{sys_prompt}\nCRITICAL: Respond ENTIRELY in English. Introduce yourself in character and greet the user to start the conversation.",
-                    },
-                    {
-                        "role": "user",
-                        "content": "Hello! I am ready to start the scenario.",
-                    },
-                ],
-                max_tokens=150,
-                temperature=0.6,
-            )
+            async with AsyncGroq(api_key=key) as client:
+                res = await client.chat.completions.create(
+                    model="openai/gpt-oss-120b",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": f"{sys_prompt}\nCRITICAL: Respond ENTIRELY in English. Introduce yourself in character and greet the user to start the conversation.",
+                        },
+                        {
+                            "role": "user",
+                            "content": "Hello! I am ready to start the scenario.",
+                        },
+                    ],
+                    max_tokens=150,
+                    temperature=0.6,
+                )
             generated_text = res.choices[0].message.content.strip()
             if generated_text:
                 initial_text = generated_text
@@ -327,13 +327,13 @@ async def send_simulation_message(request: HttpRequest, payload: SimMessageInput
     keys = get_groq_keys()
     for key in keys:
         try:
-            client = AsyncGroq(api_key=key)
-            res = await client.chat.completions.create(
-                model="openai/gpt-oss-120b",
-                messages=messages_payload,
-                max_tokens=250,
-                temperature=0.6,
-            )
+            async with AsyncGroq(api_key=key) as client:
+                res = await client.chat.completions.create(
+                    model="openai/gpt-oss-120b",
+                    messages=messages_payload,
+                    max_tokens=250,
+                    temperature=0.6,
+                )
             reply_text = res.choices[0].message.content.strip()
             if reply_text:
                 break

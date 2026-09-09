@@ -56,7 +56,7 @@ def health_check(request):
 @api.get("/metrics", tags=["System"])
 def metrics(request):
     """
-    Endpoint de métricas de uptime e integridade para Prometheus/HuggingFace/Railway.
+    Endpoint de métricas de uptime e integridade para HuggingFace/Railway.
     """
     return {"status": "healthy", "service": "tati-ai-django", "uptime": "ok"}
 

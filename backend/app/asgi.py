@@ -23,9 +23,18 @@ async def lifespan_handler(scope, receive, send):
     while True:
         message = await receive()
         if message["type"] == "lifespan.startup":
-            await send({"type": "lifespan.startup.complete"})
+            try:
+                await send({"type": "lifespan.startup.complete"})
+            except Exception as exc:
+                await send({"type": "lifespan.startup.failed", "message": str(exc)})
+                return
         elif message["type"] == "lifespan.shutdown":
-            await send({"type": "lifespan.shutdown.complete"})
+            try:
+                from django.db import connections
+                connections.close_all()
+                await send({"type": "lifespan.shutdown.complete"})
+            except Exception as exc:
+                await send({"type": "lifespan.shutdown.failed", "message": str(exc)})
             return
 
 

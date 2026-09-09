@@ -19,6 +19,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         headers = dict(self.scope.get("headers", []))
         query_string = self.scope.get("query_string", b"").decode("utf-8")
         query_params = urllib.parse.parse_qs(query_string)
+        self._active_tasks: set[asyncio.Task] = set()
 
         token = query_params.get("token", [None])[0]
         subprotocol = None
@@ -62,6 +63,13 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         logger.info(
             f"[ChatWS] Desconectado: {getattr(self, 'username', 'anon')} (Code: {close_code})"
         )
+
+        if hasattr(self, "_active_tasks") and self._active_tasks:
+            for task in self._active_tasks:
+                task.cancel()
+            await asyncio.gather(*self._active_tasks, return_exceptions=True)
+            self._active_tasks.clear()
+
         try:
             await sync_to_async(close_old_connections)()
         except Exception:
@@ -196,6 +204,8 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                     close_old_connections()
 
             worker_task = asyncio.create_task(asyncio.to_thread(run_generation))
+            self._active_tasks.add(worker_task)
+            worker_task.add_done_callback(self._active_tasks.discard)
 
             res = None
 

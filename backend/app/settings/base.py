@@ -209,8 +209,8 @@ CELERY_BEAT_SCHEDULE = {
     "monthly-competition-reset-day-1": {
         "task": "apps.notifications.tasks.close_monthly_competition_task",
         "schedule": crontab(
-            hour=0, minute=5, day_of_month=1
-        ),  # Todo dia 1 às 00:05 Horário de Brasília
+            hour=9, minute=0, day_of_month=1
+        ),  # Todo dia 1 às 09:00 Horário de Brasília
     },
 }
 

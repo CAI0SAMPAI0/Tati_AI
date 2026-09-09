@@ -43,7 +43,6 @@ def get_verified_sender_email() -> str:
         os.getenv("RESEND_FROM"),
         os.getenv("login_smtp"),
         "caio.matos@11607679.brevosend.com",
-        "caio.matos@aedb.br",
     ]
     for email in candidates:
         if email and isinstance(email, str):
@@ -108,6 +107,18 @@ class BrevoEmailService:
     </div>
 </body>
 </html>"""
+
+    @staticmethod
+    def is_email_allowed(user: Any) -> bool:
+        """
+        Verificando se o aluno permitiu o recebimento de emails
+        """
+        if not user:
+            return False
+        prof = getattr(user, 'profile', None)
+        if not isinstance(prof, dict):
+            prof = {}
+        return bool(prof.get('allow_email_notifications', True))
 
     @staticmethod
     def send_email(
@@ -483,29 +494,6 @@ class NotificationService:
             "message": "Dispositivo cadastrado para notificações WebPush.",
         }
 
-
-class NotificationDispatcher:
-    """
-    Despachador central de notificações in-app e WebPush/FCM para o sistema operacional.
-    """
-
-    @staticmethod
-    def get_vapid_keys() -> dict:
-        public_key = os.getenv(
-            "VAPID_PUBLIC_KEY",
-            "BBOj7nBpIxJXxnmGQ-sIdBbDVGOL-m7cLb6-alvr2qf3dppPl1EgWO2-As6DZpXFKGCXTl-Vq72AWi7u_k622cw",
-        )
-        private_key = os.getenv(
-            "VAPID_PRIVATE_KEY", "b5TcMgeiUA9ZrM4tcTt-z-4PN-DMOXq0H1J_LR4VpX8"
-        )
-        contact = os.getenv("VAPID_CONTACT", "mailto:caio.matos@aedb.br")
-        return {
-            "public_key": public_key,
-            "private_key": private_key,
-            "contact": contact,
-        }
-
-
 def _send_fcm_v1_admin_sdk(
     fcm_token: str, title: str, body: str, url: str
 ) -> Optional[bool]:
@@ -589,12 +577,11 @@ class NotificationDispatcher:
     def get_vapid_keys() -> dict:
         public_key = os.getenv(
             "VAPID_PUBLIC_KEY",
-            "BBOj7nBpIxJXxnmGQ-sIdBbDVGOL-m7cLb6-alvr2qf3dppPl1EgWO2-As6DZpXFKGCXTl-Vq72AWi7u_k622cw",
         )
         private_key = os.getenv(
-            "VAPID_PRIVATE_KEY", "b5TcMgeiUA9ZrM4tcTt-z-4PN-DMOXq0H1J_LR4VpX8"
+            "VAPID_PRIVATE_KEY"
         )
-        contact = os.getenv("VAPID_CONTACT", "mailto:caio.matos@aedb.br")
+        contact = os.getenv("VAPID_CONTACT")
         return {
             "public_key": public_key,
             "private_key": private_key,
@@ -756,6 +743,67 @@ class NotificationDispatcher:
                 logger.warning(f"[Push] Falha ao enviar WebPush para {username}: {e}")
 
         return {"sent": sent_count, "failed": failed_count}
+    
+    @staticmethod
+    def dispatch_to_user(
+        username: str,
+        title: str,
+        body: str,
+        category: str = "general",
+        url: str = "/dashboard",
+        send_push: bool = True,
+        send_whatsapp: bool = False,
+    ) -> dict:
+        """Enviando notificação para um user específico"""
+        results = {
+            "username": username,
+            "in_app": False,
+            "push": None,
+            "whatsapp": {"status": "not_requested"},
+        }
+        
+        # In-app salvando no DB
+        try:
+            Notification.objects.create(
+                username=username,
+                category=category,
+                title=title,
+                body=body,
+                is_read=False
+            )
+            results['in_app'] = True
+        except Exception as e:
+            logger.error(f"[Dispatcher] Erro ao salvar notificação in-app para {username}: {e}")
+
+        # WebPush
+        if send_push:
+            try:
+                results['push'] = NotificationDispatcher.send_push_to_user(
+                    username=username,
+                    title=title,
+                    body=body,
+                    url=url,
+                    tag=f"tati-{category}",
+                )
+            except Exception as e:
+                results['push'] = {'error': str(e)}
+
+        # 3. WhatsApp via WAHA
+        if send_whatsapp:
+            user = User.objects.filter(username=username).first()
+            if not user:
+                results["whatsapp"] = {"status": "missing_recipient"}
+            elif not WahaWhatsAppService.is_whatsapp_allowed(user):
+                results["whatsapp"] = {"status": "disabled_by_preferences"}
+            else:
+                phone = WahaWhatsAppService.extract_student_phone(user)
+                if not phone:
+                    results["whatsapp"] = {"status": "missing_phone"}
+                else:
+                    wa_msg = f"*{title}*\n\n{body}\n\n https://tati-ai.com{url}"
+                    success = WahaWhatsAppService.send_message(phone, wa_msg, recipient_user=user)
+                    results["whatsapp"] = {"status": "sent" if success else "failed"}
+        return results
 
     @staticmethod
     def notify_students_for_activity(
@@ -764,6 +812,7 @@ class NotificationDispatcher:
         levels: Any,
         is_published: bool = True,
         url: str = "/activities",
+        send_whatsapp: bool = True,
     ) -> dict:
         """
         Dispara notificações para alunos estritamente pertencentes ao nível da atividade lançada.
@@ -772,6 +821,7 @@ class NotificationDispatcher:
         - Se levels contiver 'ALL' ou for vazio, todos os alunos ativos serão notificados.
         - Se levels for específico (ex: ['B1']), apenas alunos com level 'B1' serão notificados.
         - Salva in-app (Notification) com o primeiro nome do aluno + envia Push Notification.
+        - Envia WhatsApp quando habilitado e houver número configurado.
         """
         if not is_published:
             logger.info(
@@ -795,9 +845,9 @@ class NotificationDispatcher:
 
         # Filtra alunos do nível alvo
         if is_all_levels:
-            students_qs = User.objects.filter(role="student")
+            students_qs = User.objects.filter(role="student", is_active=True)
         else:
-            students_qs = User.objects.filter(role="student", level__in=raw_levels)
+            students_qs = User.objects.filter(role="student", level__in=raw_levels, is_active=True)
 
         # Garante que os usuários de teste (programador, caio.sampaio) sempre recebam para validação
         test_users = list(
@@ -1036,10 +1086,14 @@ class NotificationSchedulerService:
             highlight_card_html=highlight_html,
         )
 
+        allow_email = BrevoEmailService.is_email_allowed(user)
         email_diag = (
             BrevoEmailService.send_email_detailed(email, title, html, first_name)
-            if email
-            else {}
+            if (email and allow_email)
+            else {
+                "success": False,
+                "reason": "disabled_by_preferences" if not allow_email else "missing_email"
+            }
         )
         push_diag = NotificationDispatcher.send_push_to_user(
             user.username, title, body, url="/activities", tag="streak-reminder"
@@ -1084,7 +1138,7 @@ class NotificationSchedulerService:
         Dispara lembrete diário de streak APENAS para os alunos ativos que ainda NÃO estudaram hoje.
         """
         User = get_user_model()
-        students = list(User.objects.filter(role="student"))
+        students = list(User.objects.filter(role="student", is_active=True))
         if not students:
             logger.info("[StreakReminder] Nenhum aluno ativo encontrado.")
             return {"sent": 0, "total_students": 0, "skipped_already_studied": 0}
@@ -1191,10 +1245,14 @@ class NotificationSchedulerService:
             highlight_card_html=stats_card_html,
         )
 
+        allow_email = BrevoEmailService.is_email_allowed(user)
         email_diag = (
             BrevoEmailService.send_email_detailed(email, title, html, first_name)
-            if email
-            else {}
+            if (email and allow_email)
+            else {
+                "success": False,
+                "reason": "disabled_by_preferences" if not allow_email else "missing_email",
+            }
         )
         push_diag = NotificationDispatcher.send_push_to_user(
             user.username, title, body, url="/dashboard", tag="weekly-report"
@@ -1241,7 +1299,7 @@ class NotificationSchedulerService:
         Dispara o relatório semanal de evolução para todos os alunos ativos.
         """
         User = get_user_model()
-        students = list(User.objects.filter(role="student"))
+        students = list(User.objects.filter(role="student", is_active=True))
         if not students:
             logger.info("[WeeklyReport] Nenhum aluno ativo encontrado.")
             return {"sent": 0, "total_students": 0, "skipped": 0}
@@ -1315,10 +1373,14 @@ class NotificationSchedulerService:
             highlight_card_html=highlight_html,
         )
 
+        allow_email = BrevoEmailService.is_email_allowed(user)
         email_diag = (
             BrevoEmailService.send_email_detailed(email, title, html, first_name)
-            if email
-            else {}
+            if (email and allow_email)
+            else {
+                "success": False,
+                "reason": "disabled_by_preferences" if not allow_email else "missing_email",
+            }
         )
         push_diag = NotificationDispatcher.send_push_to_user(
             user.username, title, body, url="/chat", tag="inactivity-nudge"
@@ -1362,7 +1424,7 @@ class NotificationSchedulerService:
         Verifica alunos que não praticam há entre 3 e 14 dias e envia incentivo.
         """
         User = get_user_model()
-        students = list(User.objects.filter(role="student"))
+        students = list(User.objects.filter(role="student", is_active=True))
         if not students:
             return {"sent": 0, "total_students": 0}
 
@@ -1448,10 +1510,14 @@ class NotificationSchedulerService:
             highlight_card_html=highlight_html,
         )
 
+        allow_email = BrevoEmailService.is_email_allowed(user)
         email_diag = (
             BrevoEmailService.send_email_detailed(email, title, html, first_name)
-            if email
-            else {}
+            if (email and allow_email)
+            else {
+                "success": False,
+                "reason": "disabled_by_preferences" if not allow_email else "missing_email",
+            }
         )
         push_diag = NotificationDispatcher.send_push_to_user(
             user.username, title, body, url="/chat", tag="streak-broken"
@@ -1515,10 +1581,14 @@ class NotificationSchedulerService:
             highlight_card_html=highlight_html,
         )
 
+        allow_email = BrevoEmailService.is_email_allowed(user)
         email_diag = (
             BrevoEmailService.send_email_detailed(email, title, html, first_name)
-            if email
-            else {}
+            if (email and allow_email)
+            else {
+                "success": False,
+                "reason": "disabled_by_preferences" if not allow_email else "missing_email",
+            }
         )
         push_diag = NotificationDispatcher.send_push_to_user(
             user.username, title, body, url="/achievements", tag="streak-milestone"
@@ -1592,6 +1662,7 @@ class NotificationSchedulerService:
                 highlight_card_html=highlight_html,
             )
             email = user.email
+            allow_email = BrevoEmailService.is_email_allowed(user)
             email_diag = (
                 BrevoEmailService.send_email_detailed(
                     email,
@@ -1599,8 +1670,11 @@ class NotificationSchedulerService:
                     html,
                     first_name,
                 )
-                if email
-                else {}
+                if (email and allow_email)
+                else {
+                    "success": False,
+                    "reason": "disabled_by_preferences" if not allow_email else "missing_email",
+                }
             )
             push_diag = NotificationDispatcher.send_push_to_user(
                 user.username, title, body, url="/activities", tag="new-activity"
