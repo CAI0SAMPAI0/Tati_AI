@@ -105,7 +105,7 @@ const nextConfig = {
     ];
   },
 
-  webpack(config, { dev }) {
+  webpack(config) {
     config.module.rules.push({
       test: /\.m?js$/,
       include: /node_modules/,
@@ -114,44 +114,20 @@ const nextConfig = {
       },
     });
 
-    // Em produção, otimiza o split de chunks para carregar menos JS por página
-    if (!dev) {
-      config.optimization = {
-        ...config.optimization,
-        splitChunks: {
-          chunks: 'async',
-          cacheGroups: {
-            vendor: {
-              test: /[\\/]node_modules[\\/]/,
-              name: 'vendors',
-              chunks: 'async',
-              priority: 10,
-            },
-            framerMotion: {
-              test: /[\\/]node_modules[\\/]framer-motion[\\/]/,
-              name: 'framer-motion',
-              chunks: 'async',
-              priority: 20,
-            },
-            recharts: {
-              test: /[\\/]node_modules[\\/]recharts[\\/]/,
-              name: 'recharts',
-              chunks: 'async',
-              priority: 20,
-            },
-          },
-        },
-      };
-    }
-
     return config;
   },
 };
 
-// IMPORTANTE: productionBrowserSourceMaps removido — infla bundles 2-3x em produção.
-// Para depurar erros em produção, use error tracking (ex: Sentry) em vez de source maps inline.
+// IMPORTANTE:
+// 1. O App Router do Next.js gerencia chunks automaticamente via optimizePackageImports.
+// 2. Se SENTRY_AUTH_TOKEN não estiver definido, desativa upload de sourcemaps para evitar que o build trave no Vercel.
 module.exports = withSentryConfig(nextConfig, {
   silent: true,
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+  },
+  telemetry: false,
 });

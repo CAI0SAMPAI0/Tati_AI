@@ -68,3 +68,6 @@ firebase-admin>=6.5.0
 
 # Monitoring
 sentry-sdk[django]>=2.0.0
+
+# Teste de carga
+locust>=2.46.5

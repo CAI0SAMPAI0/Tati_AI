@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import difflib
+import uuid
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
