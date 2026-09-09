@@ -152,8 +152,13 @@ class FlashcardService:
                         "lessons": [],
                     }
 
-        # Busca módulo físico
-        m = Module.objects.filter(id=deck_id).first()
+        # Busca módulo físico somente quando o identificador possui formato UUID.
+        try:
+            module_id = uuid.UUID(str(deck_id))
+        except (ValueError, TypeError, AttributeError):
+            raise HttpError(404, "Deck de flashcards não encontrado.")
+
+        m = Module.objects.filter(id=module_id).first()
         if m:
             fc = m.flashcards if isinstance(m.flashcards, list) else []
             return {

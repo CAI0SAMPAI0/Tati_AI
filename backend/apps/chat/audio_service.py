@@ -175,7 +175,7 @@ class AudioService:
             if "," in audio_data:
                 audio_data = audio_data.split(",")[-1]
             try:
-                audio_bytes = base64.b64decode(audio_data)
+                audio_bytes = base64.b64decode(audio_data, validate=True)
             except Exception as e:
                 logger.error(f"[AudioService] Erro ao decodificar base64: {e}")
                 return ""
@@ -183,6 +183,15 @@ class AudioService:
             audio_bytes = audio_data
 
         if not audio_bytes or len(audio_bytes) < 200:
+            return ""
+
+        if len(audio_bytes) > 10 * 1024 * 1024:
+            logger.warning("[AudioService] Áudio rejeitado por exceder 10 MB")
+            return ""
+
+        known_audio_headers = (b"\x1a\x45\xdf\xa3", b"OggS", b"RIFF", b"\x00\x00\x00")
+        if not audio_bytes.startswith(known_audio_headers):
+            logger.warning("[AudioService] Áudio rejeitado por formato inválido")
             return ""
 
         noise_pattern = re.compile(

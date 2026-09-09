@@ -20,6 +20,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         query_string = self.scope.get("query_string", b"").decode("utf-8")
         query_params = urllib.parse.parse_qs(query_string)
         self._active_tasks: set[asyncio.Task] = set()
+        self._disconnected = False
 
         token = query_params.get("token", [None])[0]
         subprotocol = None
@@ -60,6 +61,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         logger.info(f"[ChatWS] Conexão WebSocket aceita para o aluno: {self.username}")
 
     async def disconnect(self, close_code):
+        self._disconnected = True
         logger.info(
             f"[ChatWS] Desconectado: {getattr(self, 'username', 'anon')} (Code: {close_code})"
         )
@@ -163,19 +165,21 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             loop = asyncio.get_running_loop()
             token_queue = asyncio.Queue()
 
+            def queue_event(event):
+                if self._disconnected or loop.is_closed():
+                    return
+                try:
+                    loop.call_soon_threadsafe(token_queue.put_nowait, event)
+                except RuntimeError:
+                    logger.debug("[ChatWS] Loop encerrado antes de enfileirar evento")
+
             def on_token(token_str: str):
                 if token_str:
-                    loop.call_soon_threadsafe(
-                        token_queue.put_nowait,
-                        {"type": "token", "content": token_str}
-                    )
+                    queue_event({"type": "token", "content": token_str})
 
             def on_doc(doc_data: dict):
                 if doc_data:
-                    loop.call_soon_threadsafe(
-                        token_queue.put_nowait,
-                        {"type": "doc", "document": doc_data}
-                    )
+                    queue_event({"type": "doc", "document": doc_data})
 
             def run_generation():
                 close_old_connections()
@@ -190,16 +194,10 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                         on_token=on_token,
                         on_doc=on_doc,
                     )
-                    loop.call_soon_threadsafe(
-                        token_queue.put_nowait,
-                        {"type": "done", "result": result}
-                    )
+                    queue_event({"type": "done", "result": result})
                 except Exception as err:
                     logger.error(f"[ChatWS] Erro na thread de geração: {err}", exc_info=True)
-                    loop.call_soon_threadsafe(
-                        token_queue.put_nowait,
-                        {"type": "error", "error": err}
-                    )
+                    queue_event({"type": "error", "error": err})
                 finally:
                     close_old_connections()
 
@@ -275,14 +273,20 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             # Finaliza stream
             await self.send_json({"type": "stream_end", "model": model_used})
 
-        except Exception as e:
-            logger.error(f"[ChatWS] Erro ao processar mensagem: {e}")
-            await self.send_json(
-                {
-                    "type": "error",
-                    "message": "Desculpe, tive um problema ao responder. Por favor, tente novamente.",
-                }
-            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.error("[ChatWS] Erro ao processar mensagem", exc_info=True)
+            if not self._disconnected:
+                try:
+                    await self.send_json(
+                        {
+                            "type": "error",
+                            "message": "Desculpe, tive um problema ao responder. Por favor, tente novamente.",
+                        }
+                    )
+                except Exception:
+                    logger.debug("[ChatWS] Não foi possível enviar erro ao cliente", exc_info=True)
 
 
 class LiveChatConsumer(AsyncJsonWebsocketConsumer):
