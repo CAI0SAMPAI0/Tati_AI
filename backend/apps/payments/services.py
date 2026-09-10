@@ -44,7 +44,7 @@ class MercadoPagoService:
             "payment_method_id": "pix",
             "external_reference": external_reference,
             "payer": {
-                "email": user.email or f"{user.username}@tati-ai.com",
+                "email": user.email or f"{user.username}@tati-ai.vercel.app",
                 "first_name": user.name or user.username,
             },
         }
@@ -95,7 +95,7 @@ class MercadoPagoService:
                 }
             ],
             "payer": {
-                "email": user.email or f"{user.username}@tati-ai.com",
+                "email": user.email or f"{user.username}@tati-ai.vercel.app",
                 "name": user.name or user.username,
             },
             "external_reference": external_reference,

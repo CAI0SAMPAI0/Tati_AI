@@ -853,9 +853,9 @@ class NotificationDispatcher:
                 allow_wa = WahaWhatsAppService.is_whatsapp_allowed(s)
                 if send_whatsapp and student_phone and allow_wa:
                     wa_msg = (
-                        f'*Teacher Tatiana*\n\nHello *{first_name}*! A new *{activity_type}* activity ("{title}") is now available for your level *{level_tag}*.\n\n👉 Practice now: https://tati-ai.com{url}'
+                        f'*Teacher Tatiana*\n\nHello *{first_name}*! A new *{activity_type}* activity ("{title}") is now available for your level *{level_tag}*.\n\n👉 Practice now: https://tati-ai.vercel.app{url}'
                         if not is_all_levels else
-                        f'*Teacher Tatiana*\n\nHello *{first_name}*! A new *{activity_type}* activity ("{title}") is now available for practice.\n\n👉 Practice now: https://tati-ai.com{url}'
+                        f'*Teacher Tatiana*\n\nHello *{first_name}*! A new *{activity_type}* activity ("{title}") is now available for practice.\n\n👉 Practice now: https://tati-ai.vercel.app{url}'
                     )
                     if WahaWhatsAppService.send_message(student_phone, wa_msg, recipient_user=s):
                         whatsapp_sent += 1
@@ -885,7 +885,7 @@ class NotificationDispatcher:
                     html = BrevoEmailService.build_standard_email_html(
                         recipient_name=first_n,
                         body_paragraphs=body_paras,
-                        action_url=f"https://tati-ai.com{act_url}",
+                        action_url=f"https://tati-ai.vercel.app{act_url}",
                         action_label="Practice Now",
                         title_header="Teacher Tatiana Duarte",
                         subtitle_header="New Activity Alert",
@@ -962,7 +962,7 @@ class NotificationDispatcher:
         student_phone = WahaWhatsAppService.extract_student_phone(user)
         allow_wa = WahaWhatsAppService.is_whatsapp_allowed(user)
         if send_whatsapp and student_phone and allow_wa:
-            wa_msg = f"*Teacher Tatiana — Streak Alert*\n\nHello *{first_name}*! Your *{streak_count}-day study streak* is at risk today!\n\nDo a quick 3-minute exercise now to keep your streak: https://tati-ai.com/activities"
+            wa_msg = f"*Teacher Tatiana — Streak Alert*\n\nHello *{first_name}*! Your *{streak_count}-day study streak* is at risk today!\n\nDo a quick 3-minute exercise now to keep your streak: https://tati-ai.vercel.app/activities"
             WahaWhatsAppService.send_message(student_phone, wa_msg, recipient_user=user)
 
         return {"success": True, "push": push_res}
