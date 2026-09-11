@@ -1,19 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { 
-  ArrowLeft, 
-  Smartphone, 
-  Apple, 
-  Laptop, 
-  Download, 
-  Info,
-  CheckCircle2,
-  AlertTriangle
-} from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { MainHeader } from '@/components/layout/main-header';
 import { Button } from '@/components/ui/button';
+import {
+  AlertTriangle,
+  Apple,
+  ArrowLeft,
+  Download,
+  Info,
+  Laptop,
+  Smartphone
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 export default function InstallPage() {
   const router = useRouter();
@@ -41,7 +40,7 @@ export default function InstallPage() {
           </button>
           <div>
             <h1 className="text-2xl font-bold font-display">Install Tati AI</h1>
-            <p className="text-xs text-text-muted font-bold uppercase tracking-widest">Get the best experience on any device</p>  
+            <p className="text-xs text-text-muted font-bold uppercase tracking-widest">Get the best experience on any device</p>
           </div>
         </header>
 
@@ -97,7 +96,7 @@ export default function InstallPage() {
               <p className="text-sm text-text-muted">
                 Baixe o aplicativo nativo para Android com suporte a notificações e funcionamento offline.
               </p>
-              
+
               {device === 'ios' ? (
                 <div className="flex items-start gap-2.5 p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-600 dark:text-amber-400">
                   <AlertTriangle size={18} className="shrink-0 mt-0.5" />
@@ -154,21 +153,21 @@ export default function InstallPage() {
           {/* PC / Desktop */}
           <section className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
             <div className="p-6 border-b border-border bg-bg-secondary/30 flex items-center gap-3">
-               <Laptop size={20} className="text-primary" />
-               <h2 className="font-bold text-sm uppercase tracking-wider">Windows / Mac / Linux</h2>
+              <Laptop size={20} className="text-primary" />
+              <h2 className="font-bold text-sm uppercase tracking-wider">Windows / Mac / Linux</h2>
             </div>
             <div className="p-6 space-y-4">
-               <p className="text-sm text-text-muted">
-                 Use Tati AI directly in your browser or install it as a desktop app.
-               </p>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                 <Button variant="secondary" className="gap-2 font-bold" onClick={() => window.open('https://tati-ai.vercel.app', '_blank')}>
-                   Open Web Version
-                 </Button>
-                 <Button className="gap-2 font-bold opacity-50 cursor-not-allowed">
-                   Desktop App (Coming Soon)
-                 </Button>
-               </div>
+              <p className="text-sm text-text-muted">
+                Use Tati AI directly in your browser or install it as a desktop app.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Button variant="secondary" className="gap-2 font-bold" onClick={() => window.open('https://tati-ai.vercel.app', '_blank')}>
+                  Open Web Version
+                </Button>
+                <Button className="gap-2 font-bold opacity-50 cursor-not-allowed">
+                  Desktop App (Coming Soon)
+                </Button>
+              </div>
             </div>
           </section>
         </div>
