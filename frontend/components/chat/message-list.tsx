@@ -39,6 +39,8 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit, o
   }, [messages.length]);
 
   useEffect(() => {
+    // bloqueando o scroll automático se não tiver mensagens
+    if (messages.length === 0 && !isStreaming) return;
     if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
     scrollTimerRef.current = setTimeout(() => {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -83,7 +85,7 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit, o
             <Image src="/images/tati_logo.jpg" alt="Tati" width={28} height={28} className="w-full h-full object-cover" />
           </div>
           <h2 className="font-display text-xl font-bold mb-2">
-            Hi! I'm Teacher Tati 👋
+            Hi! I'm Teacher Tati
           </h2>
           <p className="text-sm text-text-muted max-w-[320px] mb-6">
             Your AI English teacher. Let's practice together?
