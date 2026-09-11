@@ -317,7 +317,7 @@ export default function CompetitionsClientPage() {
                     <Sparkles size={18} />
                   </div>
                   <span className="px-2.5 py-1 rounded-full text-xs font-black bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                    +25 XP / scenario
+                    +25 XP / exercise done
                   </span>
                 </div>
                 <div>
@@ -334,7 +334,7 @@ export default function CompetitionsClientPage() {
                     <BookOpen size={18} />
                   </div>
                   <span className="px-2.5 py-1 rounded-full text-xs font-black bg-pink-500/15 text-pink-600 dark:text-pink-400 border border-pink-500/20">
-                    +25 XP / review
+                    +25 XP / exercise done
                   </span>
                 </div>
                 <div>
