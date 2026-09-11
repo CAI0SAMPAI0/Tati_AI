@@ -31,6 +31,12 @@ jobs:
         working-directory: mobile
         run: flutter pub get
 
+      - name: Ensure google-services.json exists
+        run: |
+          if [ ! -f mobile/android/app/google-services.json ]; then
+            echo '{"project_info":{"project_number":"123456789012","project_id":"tatichatbot-491215","storage_bucket":"tatichatbot-491215.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:123456789012:android:abcdef0123456789","android_client_info":{"package_name":"com.tati.ai"}},"oauth_client":[],"api_key":[{"current_key":"AIzaSyDummyKeyForBuild123456789"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}' > mobile/android/app/google-services.json
+          fi
+
       - name: Build Android Release APK
         working-directory: mobile
         run: flutter build apk --release --android-skip-build-dependency-validation
