@@ -272,7 +272,7 @@ export default function CompetitionsClientPage() {
                 <div>
                   <h3 className="text-sm font-bold text-text mb-1">Interactive Chat</h3>
                   <p className="text-xs text-text-muted leading-relaxed">
-                    Send messages, ask questions, and practice grammar corrections with Teacher Tati. Awards 15 XP.
+                    Send messages, ask questions, and practice grammar corrections with Teacher Tati.
                   </p>
                 </div>
               </div>
@@ -321,9 +321,9 @@ export default function CompetitionsClientPage() {
                   </span>
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-text mb-1">Real-World Simulations</h3>
+                  <h3 className="text-sm font-bold text-text mb-1">Simulations, Games and News</h3>
                   <p className="text-xs text-text-muted leading-relaxed">
-                    Practice airports, job interviews, restaurants, and business meetings in realistic simulations.
+                    Do the simulations, games and news to earn points.
                   </p>
                 </div>
               </div>
@@ -338,26 +338,9 @@ export default function CompetitionsClientPage() {
                   </span>
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-text mb-1">SRS Vocabulary Reviews</h3>
+                  <h3 className="text-sm font-bold text-text mb-1">Grammar, Listening, Reading and Flashcards</h3>
                   <p className="text-xs text-text-muted leading-relaxed">
-                    Review flashcards with spaced repetition and lock new vocabulary into long-term memory.
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-bg-secondary/40 border border-border/80 flex flex-col justify-between gap-3 hover:border-primary/40 transition-all group">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                    <Headphones size={18} />
-                  </div>
-                  <span className="px-2.5 py-1 rounded-full text-xs font-black bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
-                    +25 XP / activity
-                  </span>
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-text mb-1">Listening & Hub Materials</h3>
-                  <p className="text-xs text-text-muted leading-relaxed">
-                    Listen to pedagogical podcasts and study exclusive guided materials created by Teacher Tati.
+                    Do the lessons and flashcards to earn points.
                   </p>
                 </div>
               </div>
