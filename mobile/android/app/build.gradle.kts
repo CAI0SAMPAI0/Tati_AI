@@ -8,7 +8,6 @@ plugins {
 android {
     namespace = "com.tatiana.tati_ai_mobile"
     compileSdk = 34
-    ndkVersion = "30.0.16138531"
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
