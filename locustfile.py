@@ -222,7 +222,7 @@ def on_test_stop(environment, **kwargs):
     total_fails = stats.total.num_failures
 
     print("\n" + "=" * 60)
-    print(" 📊 RESUMO DO TESTE DE CARGA - TEACHER TATI AI")
+    print(" 📊 RESUMO DO TESTE DE CARGA - Teacher Tati AI")
     print("=" * 60)
     print(f"Total de Requisições: {total_reqs}")
     print(f"Total de Falhas:       {total_fails} ({(total_fails / max(1, total_reqs)) * 100:.2f}%)")

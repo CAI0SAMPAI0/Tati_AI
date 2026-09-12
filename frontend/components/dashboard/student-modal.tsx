@@ -1,27 +1,27 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import {
-  User,
-  Trash2,
-  Save,
-  Brain,
-  Target,
-  AlertCircle,
-  Sparkles,
-  RefreshCw,
-  Clock,
-  Send,
-  BarChart2,
-  CheckCircle
-} from 'lucide-react';
-import { DialogModal } from '@/components/ui/dialog-modal';
 import { Button } from '@/components/ui/button';
+import { DialogModal } from '@/components/ui/dialog-modal';
+import {
+  AlertCircle,
+  BarChart2,
+  Brain,
+  CheckCircle,
+  Clock,
+  RefreshCw,
+  Save,
+  Send,
+  Sparkles,
+  Target,
+  Trash2,
+  User
+} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
-import { apiPut, apiPost, apiDelete, apiGet, API_BASE } from '@/lib/api/client';
-import toast from 'react-hot-toast';
-import { cn, formatDateTime } from '@/lib/utils/index';
+import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api/client';
 import { CEFR_LEVELS, normalizeLevel } from '@/lib/constants/levels';
+import { cn, formatDateTime } from '@/lib/utils/index';
+import toast from 'react-hot-toast';
 
 interface StudentModalProps {
   isOpen: boolean;
@@ -71,7 +71,7 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
     setAnalytics(null);
     setActivityProgress(null);
     if (student) {
-      setNudgeMessage(`Hi ${student.name || student.username}! Teacher Tati here. I noticed you haven't practiced English lately. Let's do a quick chat session today?`);
+      setNudgeMessage(`Hi ${student.name || student.username}! Taty's Hub here. I noticed you haven't practiced English lately. Let's do a quick chat session today?`);
     }
   }, [student]);
 

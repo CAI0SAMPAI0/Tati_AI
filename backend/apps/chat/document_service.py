@@ -619,7 +619,7 @@ class DocumentService:
         story = []
 
         # Cabeçalho da Teacher Tati
-        story.append(Paragraph("TEACHER TATI AI • PEDAGOGICAL MATERIAL", meta_style))
+        story.append(Paragraph("Teacher Tati AI • PEDAGOGICAL MATERIAL", meta_style))
         title = strip_emojis(data.get("title") or "Material de Estudo")
         story.append(Paragraph(title, title_style))
         subtitle = strip_emojis(data.get("subtitle") or f"Preparado especialmente para {student_name}")
@@ -685,7 +685,7 @@ class DocumentService:
 
         # Header da instituição
         header_para = doc.add_paragraph()
-        r_head = header_para.add_run("TEACHER TATI AI • PEDAGOGICAL MATERIAL")
+        r_head = header_para.add_run("Teacher Tati AI • PEDAGOGICAL MATERIAL")
         r_head.font.size = Pt(8.5)
         r_head.font.bold = True
         r_head.font.color.rgb = primary_rgb
@@ -774,7 +774,7 @@ class DocumentService:
         tf.word_wrap = True
 
         p_pre = tf.paragraphs[0]
-        p_pre.text = "TEACHER TATI AI • PEDAGOGICAL PRESENTATION"
+        p_pre.text = "Teacher Tati AI • PEDAGOGICAL PRESENTATION"
         p_pre.font.size = Pt(12)
         p_pre.font.bold = True
         p_pre.font.color.rgb = RGBColor(129, 140, 248)

@@ -32,7 +32,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const request = event.request;
-  
+
   // Ignora esquemas não-HTTP (ex: ws://, wss://, capacitor://, chrome-extension://, etc.)
   if (!request.url.startsWith('http:') && !request.url.startsWith('https:')) {
     return;
@@ -43,11 +43,11 @@ self.addEventListener('fetch', (event) => {
   // Nunca cachear requests autenticadas/sensíveis.
   if (request.headers.has('authorization')) return;
   if (request.method !== 'GET') return;
-  
+
   // Ignora chamadas de API, auth, chat e outros serviços dinâmicos
   if (
-    url.pathname.startsWith('/api') || 
-    url.pathname.startsWith('/auth') || 
+    url.pathname.startsWith('/api') ||
+    url.pathname.startsWith('/auth') ||
     url.pathname.startsWith('/chat')
   ) {
     return;
@@ -75,7 +75,7 @@ self.addEventListener('fetch', (event) => {
               <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Offline - Teacher Tati AI</title>
+                <title>Offline - Taty's Hub AI</title>
                 <style>
                   body {
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -159,7 +159,7 @@ self.addEventListener('fetch', (event) => {
       if (cached) return cached;
       return fetch(request).then((response) => {
         if (!response || response.status !== 200 || response.type !== 'basic') return response;
-        
+
         // Evita cachear respostas HTML que possam vir como fetch (ex: data/HTML dinâmico)
         const contentType = response.headers.get('content-type') || '';
         if (contentType.includes('text/html')) {
@@ -195,7 +195,7 @@ self.addEventListener('push', (event) => {
   const iconUrl = rawIcon.startsWith('http') ? rawIcon : `${origin}${rawIcon.startsWith('/') ? '' : '/'}${rawIcon}`;
   const badgeUrl = `${origin}/icons/badge-96x96.png`;
 
-  const title = data.title || 'Teacher Tatiana';
+  const title = data.title || 'Taty's Hubana';
   const options = {
     body: data.body || data.message || 'You have a new study notification!',
     icon: iconUrl,

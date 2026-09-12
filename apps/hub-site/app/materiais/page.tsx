@@ -9,34 +9,34 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'Catálogo | Tati Hub',
   description:
-    'Explore o catálogo completo de materiais premium da Teacher Tati — e-books, guias de estudo e recursos selecionados para alunos de inglês.',
-  keywords: [
-    'Tati Hub',
-    'Catálogo',
-    'English Class',
-    'Materiais',
-    'Exercícios',
-    'Guias',
-    'Livros',
-    'Gramática',
-    'Vocabulário',
-    'Inglês Online',
-    'Cursos de Inglês',
-  ],
+    'Explore o catálogo completo de materiais premium da Taty's Hub — e- books, guias de estudo e recursos selecionados para alunos de inglês.',
+keywords: [
+  'Tati Hub',
+  'Catálogo',
+  'English Class',
+  'Materiais',
+  'Exercícios',
+  'Guias',
+  'Livros',
+  'Gramática',
+  'Vocabulário',
+  'Inglês Online',
+  'Cursos de Inglês',
+],
   alternates: {
-    canonical: 'https://tati-hub.vercel.app/materiais',
+  canonical: 'https://tati-hub.vercel.app/materiais',
   },
-  openGraph: {
-    title: 'Catálogo | Tati Hub',
-    description: 'Explore o catálogo completo de materiais premium da Teacher Tati.',
-    images: '/images/tati_logo.jpg',
+openGraph: {
+  title: 'Catálogo | Tati Hub',
+    description: 'Explore o catálogo completo de materiais premium da Taty's Hub.',
+  images: '/images/tati_logo.jpg',
     url: 'https://tati-hub.vercel.app/materiais',
   },
-  twitter: {
-    card: 'summary_large_image',
+twitter: {
+  card: 'summary_large_image',
     title: 'Catálogo | Tati Hub',
-    description: 'Explore o catálogo completo de materiais premium da Teacher Tati.',
-    images: '/images/tati_logo.jpg',
+      description: 'Explore o catálogo completo de materiais premium da Taty's Hub.',
+  images: '/images/tati_logo.jpg',
   },
 };
 

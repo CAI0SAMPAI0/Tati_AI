@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
 import * as Sentry from '@sentry/nextjs';
+import { Home, RotateCcw } from 'lucide-react';
 import Image from 'next/image';
-import { RotateCcw, Home } from 'lucide-react';
+import { useEffect } from 'react';
 
 export default function RootError({
   error,

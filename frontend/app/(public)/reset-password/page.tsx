@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { resetPasswordWithToken } from '@/lib/api/auth';
+import Image from 'next/image';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 export default function ResetPasswordPage() {
   const searchParams = useSearchParams();
@@ -76,13 +76,13 @@ export default function ResetPasswordPage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <Image
               src="/images/tati_logo.jpg"
-              alt="Teacher Tati"
+              alt="Taty's Hub"
               width={104}
               height={104}
               priority
               className="rounded-full object-cover object-top border-[3px] border-white/30 shadow-[0_0_40px_rgba(0,0,0,0.3),0_0_0_8px_rgba(255,255,255,0.06)] mb-5 mx-auto"
             />
-            <h1 className="font-display text-2xl font-extrabold mb-2 tracking-tight">Teacher Tati</h1>
+            <h1 className="font-display text-2xl font-extrabold mb-2 tracking-tight">Taty's Hub</h1>
             <p className="text-[0.83rem] opacity-75 max-w-[13rem] leading-relaxed mx-auto">Your AI English teacher. Practice whenever you want, at your own pace.</p>
             <div className="flex gap-1.5 mt-7 justify-center">
               <span className="w-[1.125rem] h-[0.4375rem] rounded bg-white/80" />

@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { AlertCircle, CheckCircle2, Clock, MessageSquare, Mic, Sparkles, Target, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Target, Clock, CheckCircle2, AlertCircle, Sparkles, X, MessageSquare, Mic } from 'lucide-react';
 
 interface LevelingModalProps {
   isOpen: boolean;
@@ -87,7 +87,7 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
   };
 
   const modalContent = (
-    <div 
+    <div
       className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={onClose}
     >
@@ -106,7 +106,7 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
                 CEFR English Leveling Challenge
               </h2>
               <p className="text-xs text-text-muted">
-                Official proficiency assessment (A1 to B2) with Teacher Tati
+                Official proficiency assessment (A1 to B2) with Taty's Hub
               </p>
             </div>
           </div>
@@ -134,11 +134,10 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
               <button
                 type="button"
                 onClick={() => setMode('chat')}
-                className={`relative text-left p-3.5 rounded-xl border transition-all flex items-start gap-3 cursor-pointer ${
-                  mode === 'chat'
+                className={`relative text-left p-3.5 rounded-xl border transition-all flex items-start gap-3 cursor-pointer ${mode === 'chat'
                     ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40'
                     : 'border-border/70 bg-surface hover:bg-surface-hover hover:border-border'
-                }`}
+                  }`}
               >
                 <div className={`p-2 rounded-lg shrink-0 ${mode === 'chat' ? 'bg-primary text-white' : 'bg-surface-hover text-text-muted'}`}>
                   <MessageSquare size={18} />
@@ -161,11 +160,10 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
               <button
                 type="button"
                 onClick={() => setMode('voice')}
-                className={`relative text-left p-3.5 rounded-xl border transition-all flex items-start gap-3 cursor-pointer ${
-                  mode === 'voice'
+                className={`relative text-left p-3.5 rounded-xl border transition-all flex items-start gap-3 cursor-pointer ${mode === 'voice'
                     ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40'
                     : 'border-border/70 bg-surface hover:bg-surface-hover hover:border-border'
-                }`}
+                  }`}
               >
                 <div className={`p-2 rounded-lg shrink-0 ${mode === 'voice' ? 'bg-primary text-white' : 'bg-surface-hover text-text-muted'}`}>
                   <Mic size={18} />
@@ -203,11 +201,10 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
                     key={opt.count}
                     type="button"
                     onClick={() => handleSelect(opt.count)}
-                    className={`relative text-left p-3.5 rounded-xl border transition-all flex flex-col justify-between ${
-                      isSelected
+                    className={`relative text-left p-3.5 rounded-xl border transition-all flex flex-col justify-between ${isSelected
                         ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40'
                         : 'border-border/70 bg-surface hover:bg-surface-hover hover:border-border'
-                    }`}
+                      }`}
                   >
                     {opt.recommended && (
                       <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full text-[0.65rem] font-bold bg-primary text-white shadow-xs">
@@ -228,11 +225,10 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
               {/* Custom option */}
               <div
                 onClick={() => setIsCustom(true)}
-                className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between cursor-pointer ${
-                  isCustom
+                className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between cursor-pointer ${isCustom
                     ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40'
                     : 'border-border/70 bg-surface hover:bg-surface-hover hover:border-border'
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-bold text-sm text-text">Custom number</span>
@@ -260,7 +256,7 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
             <div className="flex items-start gap-2.5 text-xs text-text">
               <CheckCircle2 size={16} className="text-primary shrink-0 mt-0.5" />
               <span>
-                <strong>Direct & focused:</strong> Teacher Tati will evaluate your answers with concise grammatical feedback and advance promptly to the next question.
+                <strong>Direct & focused:</strong> Taty's Hub will evaluate your answers with concise grammatical feedback and advance promptly to the next question.
               </span>
             </div>
             <div className="flex items-start gap-2.5 text-xs text-text">
@@ -270,7 +266,7 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
                 <code className="px-1.5 py-0.5 rounded bg-background border border-border font-mono font-bold text-primary">
                   /finish
                 </code>{' '}
-                at any time. Teacher Tati will grade your responses so far and record remaining questions as 0.
+                at any time. Taty's Hub will grade your responses so far and record remaining questions as 0.
               </span>
             </div>
             <div className="flex items-start gap-2.5 text-xs text-text">

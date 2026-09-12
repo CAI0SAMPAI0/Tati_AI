@@ -1,8 +1,8 @@
-import Image from 'next/image';
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { BookOpen, Target, ArrowRight } from 'lucide-react';
 import type { Message } from '@/lib/api/types';
+import { ArrowRight, BookOpen, Target } from 'lucide-react';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { MessageBubble } from './message-bubble';
 
 import WordTooltip from './word-tooltip';
@@ -19,10 +19,10 @@ interface MessageListProps {
 
 export function MessageList({ messages, isStreaming, streamingContent, onEdit, onResend, onSendMessage, onStartLeveling }: MessageListProps) {
   const router = useRouter();
-  
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   const [activeWord, setActiveWord] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
@@ -53,17 +53,17 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit, o
 
     if (scrollTop < 10 && visibleCount < messages.length) {
       const scrollHeightBefore = containerRef.current.scrollHeight;
-      
+
       setVisibleCount((prev) => {
         const next = Math.min(messages.length, prev + 20);
-        
+
         setTimeout(() => {
           if (containerRef.current) {
             const diff = containerRef.current.scrollHeight - scrollHeightBefore;
             containerRef.current.scrollTop = diff;
           }
         }, 0);
-        
+
         return next;
       });
     }
@@ -85,7 +85,7 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit, o
             <Image src="/images/tati_logo.jpg" alt="Tati" width={28} height={28} className="w-full h-full object-cover" />
           </div>
           <h2 className="font-display text-xl font-bold mb-2">
-            Hi! I'm Teacher Tati
+            Hi! I'm Taty's Hub
           </h2>
           <p className="text-sm text-text-muted max-w-[320px] mb-6">
             Your AI English teacher. Let's practice together?
@@ -101,7 +101,7 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit, o
                 <span className="ml-auto text-[0.65rem] font-black uppercase px-2 py-0.5 rounded-full bg-primary text-white">New</span>
               </div>
               <p className="text-xs text-text-muted mb-3 leading-relaxed">
-                Discover your exact English level (A1 to B2) in a quick conversational challenge with Teacher Tati. You'll receive your score and diagnostic report by email!
+                Discover your exact English level (A1 to B2) in a quick conversational challenge with Taty's Hub. You'll receive your score and diagnostic report by email!
               </p>
               <button
                 onClick={onStartLeveling}
@@ -149,9 +149,9 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit, o
       )}
 
       {paginatedMessages.map((m, i) => (
-        <MessageBubble 
-          key={`${m.id}-${i}`} 
-          message={m} 
+        <MessageBubble
+          key={`${m.id}-${i}`}
+          message={m}
           onWordClick={handleWordClick}
           onEdit={onEdit}
           onResend={onResend}
@@ -175,10 +175,10 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit, o
       <div ref={bottomRef} className="h-2" />
 
       {/* Global Word Tooltip */}
-      <WordTooltip 
-        word={activeWord} 
-        position={tooltipPos} 
-        onClose={() => setActiveWord(null)} 
+      <WordTooltip
+        word={activeWord}
+        position={tooltipPos}
+        onClose={() => setActiveWord(null)}
       />
     </div>
   );

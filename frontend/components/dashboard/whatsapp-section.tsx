@@ -61,7 +61,7 @@ interface WhatsAppStudentsResponse {
 }
 
 export function WhatsappSection() {
-  // Conexão oficial da Teacher Tatiana (sessão 'professor')
+  // Conexão oficial da Taty's Hubana (sessão 'professor')
   const [activeSession, setActiveSession] = useState<string>('professor');
   const [qrBlobUrl, setQrBlobUrl] = useState<string>('');
   const [loadingQr, setLoadingQr] = useState(false);
@@ -348,7 +348,7 @@ export function WhatsappSection() {
     }
   };
 
-  // Known sessions list (apenas sessão oficial da Teacher Tatiana)
+  // Known sessions list (apenas sessão oficial da Taty's Hubana)
   const sessionList = useMemo(() => {
     const defaultList = ['professor'];
     if (sessions) {
@@ -373,7 +373,7 @@ export function WhatsappSection() {
             </div>
             <div>
               <h2 className="font-bold text-sm uppercase tracking-wider text-text">WhatsApp Connection (WAHA)</h2>
-              <p className="text-xs text-text-muted">Official Teacher Tatiana connection for automated streak reminders and student notifications</p>
+              <p className="text-xs text-text-muted">Official Taty's Hubana connection for automated streak reminders and student notifications</p>
             </div>
           </div>
           <button
@@ -404,21 +404,19 @@ export function WhatsappSection() {
                     setQrBlobUrl('');
                     setQrError(null);
                   }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
-                    isSelected
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${isSelected
                       ? 'bg-primary text-white border-primary shadow-md shadow-primary/20'
                       : 'bg-surface border-border hover:border-primary/40 text-text-muted hover:text-text'
-                  }`}
+                    }`}
                 >
                   <span className="capitalize">@{name}</span>
                   <span
-                    className={`w-2 h-2 rounded-full ${
-                      isWorking
+                    className={`w-2 h-2 rounded-full ${isWorking
                         ? 'bg-emerald-400 animate-pulse'
                         : isScan
-                        ? 'bg-amber-400 animate-ping'
-                        : 'bg-neutral-400'
-                    }`}
+                          ? 'bg-amber-400 animate-ping'
+                          : 'bg-neutral-400'
+                      }`}
                   />
                 </button>
               );
@@ -433,7 +431,7 @@ export function WhatsappSection() {
               <div className="flex items-center gap-2">
                 <p className="text-xs font-black uppercase tracking-wider text-text-subtle">Active Session</p>
                 <span className="text-[10px] bg-emerald-500/10 text-emerald-600 font-bold px-2 py-0.5 rounded-full border border-emerald-500/20">
-                  Teacher Tatiana (Production)
+                  Taty's Hubana (Production)
                 </span>
               </div>
 
@@ -446,7 +444,7 @@ export function WhatsappSection() {
               {currentSessionData?.me && currentSessionData.status === 'WORKING' && (
                 <div className="text-xs text-text-muted bg-surface/60 p-2.5 rounded-xl border border-border/50 space-y-0.5">
                   <div className="font-semibold text-text">
-                    📱 WhatsApp Connected: <span className="text-emerald-500 font-bold">{currentSessionData.me.pushName || 'Teacher Tatiana'}</span>
+                    📱 WhatsApp Connected: <span className="text-emerald-500 font-bold">{currentSessionData.me.pushName || 'Taty's Hubana'}</span>
                   </div>
                   {currentSessionData.me.id && (
                     <div className="text-[11px] text-text-subtle font-mono">
@@ -457,7 +455,7 @@ export function WhatsappSection() {
               )}
 
               <p className="text-xs text-text-muted max-w-lg leading-relaxed">
-                Teacher Tatiana&apos;s connection on Render (WAHA). Utilized by automated background tasks to dispatch daily streak alerts, weekly progress reports, and personalized encouragement to all students with a configured phone number.
+                Taty's Hubana&apos;s connection on Render (WAHA). Utilized by automated background tasks to dispatch daily streak alerts, weekly progress reports, and personalized encouragement to all students with a configured phone number.
               </p>
             </div>
 
@@ -670,43 +668,39 @@ export function WhatsappSection() {
           <div className="flex items-center gap-1.5 p-1 bg-surface border border-border rounded-xl overflow-x-auto max-w-full">
             <button
               onClick={() => setStatusFilter('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-                statusFilter === 'all'
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${statusFilter === 'all'
                   ? 'bg-primary text-white shadow-sm'
                   : 'text-text-muted hover:text-text hover:bg-surface-hover'
-              }`}
+                }`}
             >
               All ({studentsData?.total_students ?? 0})
             </button>
             <button
               onClick={() => setStatusFilter('active')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                statusFilter === 'active'
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${statusFilter === 'active'
                   ? 'bg-emerald-500 text-white shadow-sm'
                   : 'text-text-muted hover:text-emerald-500 hover:bg-emerald-500/10'
-              }`}
+                }`}
             >
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
               Active ({studentsData?.active_count ?? 0})
             </button>
             <button
               onClick={() => setStatusFilter('missing')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                statusFilter === 'missing'
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${statusFilter === 'missing'
                   ? 'bg-amber-500 text-white shadow-sm'
                   : 'text-text-muted hover:text-amber-500 hover:bg-amber-500/10'
-              }`}
+                }`}
             >
               <span className="w-2 h-2 rounded-full bg-amber-400" />
               Missing ({studentsData?.missing_count ?? 0})
             </button>
             <button
               onClick={() => setStatusFilter('disabled')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                statusFilter === 'disabled'
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${statusFilter === 'disabled'
                   ? 'bg-zinc-600 text-white shadow-sm'
                   : 'text-text-muted hover:text-text hover:bg-surface-hover'
-              }`}
+                }`}
             >
               <span className="w-2 h-2 rounded-full bg-zinc-400" />
               Disabled ({studentsData?.disabled_count ?? 0})
@@ -857,11 +851,10 @@ export function WhatsappSection() {
                           <button
                             onClick={() => handleToggleNotifications(student)}
                             disabled={isSaving}
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition-all ${
-                              student.allow_whatsapp_notifications
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition-all ${student.allow_whatsapp_notifications
                                 ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
                                 : 'bg-surface text-text-subtle border-border'
-                            }`}
+                              }`}
                             title={student.allow_whatsapp_notifications ? 'Pause notifications' : 'Enable notifications'}
                           >
                             {student.allow_whatsapp_notifications ? (
@@ -1043,11 +1036,10 @@ export function WhatsappSection() {
                                   ? 'Click to pause automated WhatsApp messages for this student'
                                   : 'Click to enable automated WhatsApp messages for this student'
                               }
-                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[11px] font-bold border transition-all ${
-                                student.allow_whatsapp_notifications
+                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[11px] font-bold border transition-all ${student.allow_whatsapp_notifications
                                   ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20'
                                   : 'bg-surface text-text-subtle border-border hover:text-text hover:bg-surface-hover'
-                              }`}
+                                }`}
                             >
                               {student.allow_whatsapp_notifications ? (
                                 <>
@@ -1078,8 +1070,8 @@ export function WhatsappSection() {
                                 sessionStatus !== 'WORKING'
                                   ? 'Connect WhatsApp session (@professor) before sending a test'
                                   : !student.whatsapp_number
-                                  ? 'Add a phone number before sending a test message'
-                                  : `Send test message to ${student.name || student.username}`
+                                    ? 'Add a phone number before sending a test message'
+                                    : `Send test message to ${student.name || student.username}`
                               }
                             >
                               {isTesting ? (

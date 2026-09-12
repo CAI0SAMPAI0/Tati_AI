@@ -1,35 +1,35 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState, useMemo } from 'react';
-import { apiGet, apiDelete, apiPut } from '@/lib/api/client';
-import { ENDPOINTS } from '@/lib/api/endpoints';
-import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
-import { useSidebarState } from '@/hooks/useSidebarState';
-import { Spinner } from '@/components/ui/spinner';
+import { MainHeader } from '@/components/layout/main-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
+import { useSidebarState } from '@/hooks/useSidebarState';
+import { apiDelete, apiGet, apiPut } from '@/lib/api/client';
+import { ENDPOINTS } from '@/lib/api/endpoints';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
 
 
 import dynamic from 'next/dynamic';
 
-import { 
-  BookOpen, 
-  Search, 
-  Download, 
-  Trash2, 
-  CheckCircle2, 
-  GraduationCap, 
-  Sparkles,
-  X,
+import { cn } from '@/lib/utils';
+import {
+  BookOpen,
   Brain,
+  CheckCircle2,
+  Download,
   Edit2,
-  Save
+  GraduationCap,
+  Save,
+  Search,
+  Sparkles,
+  Trash2,
+  X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { cn } from '@/lib/utils';
 
 const MotionDiv = dynamic(() => import('framer-motion').then(m => m.motion.div), { ssr: false });
 const AnimatePresence = dynamic(() => import('framer-motion').then(m => m.AnimatePresence), { ssr: false });
@@ -100,8 +100,8 @@ export default function VocabClientPage() {
 
   const filteredWords = useMemo(() => {
     return allWords.filter(w => {
-      const matchesSearch = w.term.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                           w.translation?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = w.term.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        w.translation?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesFilter = filter === 'all' || w.status === filter;
       return matchesSearch && matchesFilter;
     });
@@ -116,10 +116,10 @@ export default function VocabClientPage() {
   }, [allWords]);
 
   const handleExport = () => {
-    const csvContent = "data:text/csv;charset=utf-8," 
+    const csvContent = "data:text/csv;charset=utf-8,"
       + "Term,Translation,Example,Status\n"
       + allWords.map(w => `"${w.term}","${w.translation || ''}","${w.example || ''}","${w.status}"`).join("\n");
-    
+
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -176,7 +176,7 @@ export default function VocabClientPage() {
                     <p className="text-white/80 text-sm font-medium">You have {dueData.length} words to review and strengthen your memory.</p>
                   </div>
                 </div>
-                <Button 
+                <Button
                   onClick={() => router.push('/vocab/review')}
                   className="bg-white text-primary hover:bg-white/90 font-bold px-8 py-6 rounded-2xl w-full md:w-auto"
                 >
@@ -203,21 +203,21 @@ export default function VocabClientPage() {
 
             {/* Summary */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <SummaryCard 
-                label="Total Words" 
-                value={stats.total} 
+              <SummaryCard
+                label="Total Words"
+                value={stats.total}
                 icon={<BookOpen className="text-primary" size={24} />}
                 color="bg-primary/10"
               />
-              <SummaryCard 
-                label="Learned" 
-                value={stats.learned} 
+              <SummaryCard
+                label="Learned"
+                value={stats.learned}
                 icon={<CheckCircle2 className="text-success" size={24} />}
                 color="bg-success/10"
               />
-              <SummaryCard 
-                label="Learning" 
-                value={stats.learning} 
+              <SummaryCard
+                label="Learning"
+                value={stats.learning}
                 icon={<GraduationCap className="text-info" size={24} />}
                 color="bg-info/10"
               />
@@ -234,7 +234,7 @@ export default function VocabClientPage() {
                   className="pl-12 mb-0 bg-bg border-none focus:ring-2 focus:ring-primary/20 rounded-2xl"
                 />
                 {searchTerm && (
-                  <button 
+                  <button
                     onClick={() => setSearchTerm('')}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-text-subtle hover:text-text transition-colors"
                   >
@@ -250,8 +250,8 @@ export default function VocabClientPage() {
                     onClick={() => setFilter(f)}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap border transition-all",
-                      filter === f 
-                        ? "bg-primary border-primary text-white shadow-glow" 
+                      filter === f
+                        ? "bg-primary border-primary text-white shadow-glow"
                         : "bg-bg border-border text-text-muted hover:border-primary/30 hover:text-primary"
                     )}
                   >
@@ -277,8 +277,8 @@ export default function VocabClientPage() {
                       <div className={cn(
                         "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border",
                         word.status === 'learned' ? "bg-success/10 text-success border-success/20" :
-                        word.status === 'learning' ? "bg-info/10 text-info border-info/20" :
-                        "bg-primary/10 text-primary border-primary/20"
+                          word.status === 'learning' ? "bg-info/10 text-info border-info/20" :
+                            "bg-primary/10 text-primary border-primary/20"
                       )}>
                         {word.status === 'learned' ? <CheckCircle2 size={24} /> : <BookOpen size={24} />}
                       </div>
@@ -289,22 +289,22 @@ export default function VocabClientPage() {
                           <span className={cn(
                             "text-[0.6rem] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg border",
                             word.status === 'learned' ? "bg-success/10 text-success border-success/20" :
-                            word.status === 'learning' ? "bg-info/10 text-info border-info/20" :
-                            "bg-primary/10 text-primary border-primary/20"
+                              word.status === 'learning' ? "bg-info/10 text-info border-info/20" :
+                                "bg-primary/10 text-primary border-primary/20"
                           )}>
                             {filterLabels[word.status] || word.status}
                           </span>
                         </div>
-                        
+
                         {editingId === word.id ? (
                           <div className="space-y-3 mt-2 animate-in fade-in slide-in-from-top-2">
-                            <Input 
+                            <Input
                               value={editForm.translation}
                               onChange={e => setEditForm(prev => ({ ...prev, translation: e.target.value }))}
                               placeholder="Translation"
                               className="bg-bg border-border text-sm"
                             />
-                            <textarea 
+                            <textarea
                               value={editForm.example}
                               onChange={e => setEditForm(prev => ({ ...prev, example: e.target.value }))}
                               placeholder="Example sentence"
@@ -373,7 +373,7 @@ export default function VocabClientPage() {
                       </p>
                     </div>
                     {allWords.length > 0 && (
-                      <Button variant="ghost" onClick={() => {setSearchTerm(''); setFilter('all');}} className="text-primary text-xs font-bold">
+                      <Button variant="ghost" onClick={() => { setSearchTerm(''); setFilter('all'); }} className="text-primary text-xs font-bold">
                         Clear all filters
                       </Button>
                     )}

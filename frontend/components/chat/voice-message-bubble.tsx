@@ -42,7 +42,7 @@ export function VoiceMessageBubble({ message, onWordClick }: VoiceMessageBubbleP
       }
     }
   }, [message.audio_b64]);
-  
+
   const toggleAudio = () => {
     if (!message.audio_b64) return;
 
@@ -63,7 +63,7 @@ export function VoiceMessageBubble({ message, onWordClick }: VoiceMessageBubbleP
       audioRef.current.play().catch(console.error);
     }
   };
-  
+
   return (
     <div className={cn(
       "flex flex-col gap-1.5 max-w-[85%] md:max-w-[75%] animate-in fade-in slide-in-from-bottom-2 duration-700 group",
@@ -71,7 +71,7 @@ export function VoiceMessageBubble({ message, onWordClick }: VoiceMessageBubbleP
     )}>
       <div className="flex items-center gap-2 px-2">
         <span className="text-[0.55rem] font-black text-text-subtle uppercase tracking-[0.2em]">
-          {isUser ? 'You' : 'Teacher Tati'}
+          {isUser ? 'You' : 'Taty's Hub'}
         </span>
       </div>
       <div className="flex items-end gap-2 relative">
@@ -86,17 +86,17 @@ export function VoiceMessageBubble({ message, onWordClick }: VoiceMessageBubbleP
         )}
         <div className={cn(
           "px-5 py-3.5 rounded-[22px] text-[0.9rem] md:text-sm font-medium leading-relaxed shadow-xl border transition-all duration-500",
-          isUser 
+          isUser
             ? "bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-xl border-primary/20 text-text rounded-tr-md hover:border-primary/40"
             : "bg-surface/90 dark:bg-[#151726]/80 backdrop-blur-2xl border-border/60 dark:border-white/10 text-text rounded-tl-md hover:border-primary/30 shadow-primary/5",
         )}>
           {isUser ? (
-             message.content
+            message.content
           ) : (
             <div className="flex flex-col gap-2">
-              <ClickableText 
-                content={parsed.reply} 
-                onWordClick={onWordClick || (() => {})} 
+              <ClickableText
+                content={parsed.reply}
+                onWordClick={onWordClick || (() => { })}
               />
               {parsed.correction && (
                 <div className="mt-2 text-xs bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/20 text-amber-700 dark:text-amber-300 rounded-xl p-2.5 flex items-start gap-2 max-w-full text-left">
@@ -112,14 +112,14 @@ export function VoiceMessageBubble({ message, onWordClick }: VoiceMessageBubbleP
         </div>
         {!isUser && (
           <div className="flex items-center gap-2">
-            <button 
+            <button
               onClick={toggleAudio}
               disabled={!message.audio_b64}
               className={cn(
                 "p-2.5 rounded-full transition-all duration-300 shadow-lg active:scale-90 shrink-0",
                 !message.audio_b64 && "opacity-30 cursor-not-allowed grayscale",
-                isPlaying 
-                  ? "bg-primary text-white scale-110" 
+                isPlaying
+                  ? "bg-primary text-white scale-110"
                   : "bg-surface dark:bg-white/5 text-text-subtle hover:text-primary hover:scale-110 border border-border/40"
               )}
             >

@@ -1,17 +1,23 @@
 {
   "id": "/",
-  "name": "Teacher Tati - AI English Learning",
+  "name": "Taty's Hub - AI English Learning",
   "short_name": "Tati AI",
   "description": "Pratique inglês com uma professora de IA 24/7.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
   "background_color": "#0e0c1a",
   "theme_color": "#6C63FF",
   "orientation": "portrait-primary",
   "lang": "en-US",
-  "categories": ["education", "language-learning"],
+  "categories": [
+    "education",
+    "language-learning"
+  ],
   "icons": [
     {
       "src": "/icons/icon-192x192.png",

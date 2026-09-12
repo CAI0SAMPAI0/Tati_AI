@@ -1,42 +1,42 @@
 'use client';
 
-import { useState, useEffect, useRef, Suspense } from 'react';
-import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { 
-  Mic, 
-  Square, 
-  Play, 
-  RotateCcw, 
-  ArrowLeft, 
-  Volume2, 
-  X, 
-  Sparkles,
-  Moon,
-  Sun,
-  RefreshCcw,
+import {
   Activity,
+  ArrowLeft,
   CheckCircle2,
   Circle,
   Globe,
-  Target
+  Mic,
+  Moon,
+  Play,
+  RefreshCcw,
+  RotateCcw,
+  Sparkles,
+  Square,
+  Sun,
+  Target,
+  Volume2,
+  X
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 const MotionDiv = dynamic(() => import('framer-motion').then(m => m.motion.div), { ssr: false });
 const AnimatePresence = dynamic(() => import('framer-motion').then(m => m.AnimatePresence), { ssr: false });
 
-import { useVoiceSocket } from '@/hooks/useVoiceSocket';
-import { useVoiceLiveSocket } from '@/hooks/useVoiceLiveSocket';
 import { VoiceAvatar } from '@/components/chat/voice-avatar';
 import { VoiceMessageBubble } from '@/components/chat/voice-message-bubble';
 import WordTooltip from '@/components/chat/word-tooltip';
-import { apiGet, apiPost, apiPut } from '@/lib/api/client';
-import toast from 'react-hot-toast';
 import { useTheme } from '@/hooks/useTheme';
-import { useAuth } from '@/providers/auth-provider';
+import { useVoiceLiveSocket } from '@/hooks/useVoiceLiveSocket';
+import { useVoiceSocket } from '@/hooks/useVoiceSocket';
+import { apiGet, apiPost, apiPut } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/providers/auth-provider';
+import toast from 'react-hot-toast';
 
 function exportWavRaw(samples: Float32Array, sampleRate: number): ArrayBuffer {
   const buffer = new ArrayBuffer(44 + samples.length * 2);
@@ -130,7 +130,7 @@ function VoicePageContent() {
           setAccentIndex(found);
         }
       }
-    } catch (_) {}
+    } catch (_) { }
   }, [user?.profile?.preferred_accent, user?.profile?.accent]);
 
   useEffect(() => {
@@ -149,7 +149,7 @@ function VoicePageContent() {
     const newAccent = ACCENTS[safeIndex];
     try {
       localStorage.setItem('tati_voice_accent', newAccent.id);
-    } catch (_) {}
+    } catch (_) { }
 
     // Sincroniza automaticamente com o perfil do backend e configurações
     apiPut('/profile', { preferred_accent: newAccent.id, accent: newAccent.id })
@@ -346,7 +346,7 @@ function VoicePageContent() {
             setSimulationTitle(current.title);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [simulationId, convId]);
 
@@ -369,7 +369,7 @@ function VoicePageContent() {
     setIsStarting(true);
     setError(null);
     try {
-      const res = await apiPost<any>('/simulation/start', { 
+      const res = await apiPost<any>('/simulation/start', {
         scenario_id: simulationId,
         accent: ACCENTS[accentIndex].id
       });
@@ -390,12 +390,12 @@ function VoicePageContent() {
             content: simData.initial_message.content,
             created_at: new Date().toISOString()
           }]);
-          
+
           if (simData.initial_message.audio) {
             const audioSrc = `data:audio/mp3;base64,${simData.initial_message.audio}`;
             if (audioRef.current) {
               audioRef.current.src = audioSrc;
-              audioRef.current.play().catch(() => {});
+              audioRef.current.play().catch(() => { });
             }
           }
         }
@@ -481,11 +481,11 @@ function VoicePageContent() {
 
   const startRecording = async () => {
     if (!convId && !!simulationId) return;
-    
+
     if (audioRef.current) {
       audioRef.current.pause();
     }
-    
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
@@ -528,20 +528,20 @@ function VoicePageContent() {
     setIsLiveMode(true);
     setLiveMessages([]);
     connectLive();
-    
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      
+
       const AudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       if (AudioCtx.state === 'suspended') {
         await AudioCtx.resume();
       }
       audioContextRef.current = AudioCtx;
-      
+
       const source = AudioCtx.createMediaStreamSource(stream);
       sourceRef.current = source;
-      
+
       const analyser = AudioCtx.createAnalyser();
       analyser.fftSize = 256;
       analyserRef.current = analyser;
@@ -567,11 +567,11 @@ function VoicePageContent() {
       processorRef.current = processor;
       source.connect(processor);
       processor.connect(AudioCtx.destination);
-      
+
       accumulatedAudioRef.current = [];
       setLiveState('listening');
       liveStateRef.current = 'listening';
-      
+
       let buffer4096 = new Float32Array(4096);
       let bufferOffset = 0;
 
@@ -586,10 +586,10 @@ function VoicePageContent() {
           chunkOff += toCopy;
 
           if (bufferOffset < 4096) break;
-          
+
           const inputData = new Float32Array(buffer4096);
           bufferOffset = 0;
-          
+
           let sum = 0;
           for (let i = 0; i < inputData.length; i++) {
             sum += inputData[i] * inputData[i];
@@ -602,7 +602,7 @@ function VoicePageContent() {
               console.log(`[Live VAD] Speech detected (RMS: ${rms.toFixed(5)}). Recording...`);
             }
           }
-          
+
           if (liveStateRef.current === 'speaking' && rms > 0.02) {
             if (audioRef.current) {
               console.log('[Live VAD] User speech detected during playback. Interrupting AI audio.');
@@ -611,7 +611,7 @@ function VoicePageContent() {
               liveStateRef.current = 'listening';
             }
           }
-          
+
           if (liveStateRef.current === 'listening') {
             accumulatedAudioRef.current.push(inputData);
             if (rms < 0.018) {
@@ -620,7 +620,7 @@ function VoicePageContent() {
                 if (silenceTimerRef.current >= 0.3) {
                   console.log(`[Live VAD] Silence accumulating: ${silenceTimerRef.current.toFixed(2)}s / 1.0s (RMS: ${rms.toFixed(5)})`);
                 }
-                
+
                 if (silenceTimerRef.current >= 1.0) {
                   const totalLength = accumulatedAudioRef.current.reduce((acc, val) => acc + val.length, 0);
                   if (totalLength > 16000) {
@@ -631,7 +631,7 @@ function VoicePageContent() {
                       resultBuffer.set(chunk, offset);
                       offset += chunk.length;
                     }
-                    
+
                     const wavBuffer = exportWavRaw(resultBuffer, AudioCtx.sampleRate);
                     const bytes = new Uint8Array(wavBuffer);
                     let binary = '';
@@ -640,7 +640,7 @@ function VoicePageContent() {
                     }
                     const base64 = btoa(binary);
                     sendAudioChunk(base64, ACCENTS[accentIndex].id);
-                    
+
                     accumulatedAudioRef.current = [];
                     silenceTimerRef.current = 0;
                     hasSpokenRef.current = false;
@@ -665,7 +665,7 @@ function VoicePageContent() {
     disconnectLive();
     setLiveState('idle');
     liveStateRef.current = 'idle';
-    
+
     if (processorRef.current) {
       processorRef.current.disconnect();
       processorRef.current = null;
@@ -702,7 +702,7 @@ function VoicePageContent() {
 
     const draw = (timestamp: number) => {
       animationFrameRef.current = requestAnimationFrame(draw);
-      
+
       // Limita para ~30-40 FPS para economizar 50% de CPU/GPU
       if (timestamp - lastFrameTime < 25) return;
       lastFrameTime = timestamp;
@@ -754,7 +754,7 @@ function VoicePageContent() {
       if (audioRef.current.ended) {
         audioRef.current.currentTime = 0;
       }
-      audioRef.current.play().catch(() => {});
+      audioRef.current.play().catch(() => { });
       setState('speaking');
     }
   };
@@ -779,8 +779,8 @@ function VoicePageContent() {
     <div className="fixed inset-0 bg-[#f4f7ff] dark:bg-[#05060b] flex flex-col md:flex-row font-sans overflow-hidden">
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 bg-gradient-to-b from-primary/[0.03] to-transparent" />
 
-      <audio 
-        ref={audioRef} 
+      <audio
+        ref={audioRef}
         autoPlay
         onEnded={() => {
           if (isLiveMode) {
@@ -788,19 +788,19 @@ function VoicePageContent() {
           } else {
             setNormalState('idle');
           }
-        }} 
+        }}
         onPlay={() => {
           if (isLiveMode) {
             setLiveState('speaking');
           } else {
             setNormalState('speaking');
           }
-        }} 
+        }}
         onPause={() => {
           if (!isLiveMode) {
             setNormalState('idle');
           }
-        }} 
+        }}
       />
 
       <MotionDiv initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} className="w-full md:w-[42%] lg:w-[38%] h-[38vh] sm:h-[40vh] md:h-full relative flex flex-col items-center justify-center p-4 sm:p-8 bg-white/95 dark:bg-[#0f1120]/95 border-b md:border-b-0 md:border-r border-border z-20 shadow-xl transition-all">
@@ -813,8 +813,8 @@ function VoicePageContent() {
 
         <div className="absolute top-4 sm:top-6 right-4 sm:right-6 flex items-center gap-3">
           {user?.username === 'programador' && (
-            <button 
-              onClick={() => isLiveMode ? stopLiveMode() : startLiveMode()} 
+            <button
+              onClick={() => isLiveMode ? stopLiveMode() : startLiveMode()}
               className={cn(
                 "px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-xl flex items-center gap-2",
                 isLiveMode ? "text-white" : "bg-white dark:bg-[#1a1c2e] border border-border text-text"
@@ -841,7 +841,7 @@ function VoicePageContent() {
             </button>
           )}
           <button onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')} className="p-1.5 sm:p-2.5 rounded-xl bg-white dark:bg-[#1a1c2e] border border-border text-text-muted hover:text-primary transition-all active:scale-95 shadow-sm">
-             {resolvedTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            {resolvedTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
         </div>
 
@@ -853,7 +853,7 @@ function VoicePageContent() {
             else if (state === 'speaking') togglePlayback();
             else if (audioRef.current?.src) {
               if (audioRef.current.ended) audioRef.current.currentTime = 0;
-              audioRef.current.play().catch(() => {});
+              audioRef.current.play().catch(() => { });
             }
           }}>
             <VoiceAvatar
@@ -873,7 +873,7 @@ function VoicePageContent() {
                   <span className="text-[8px] sm:text-[10px] font-black text-success uppercase tracking-widest">{'Online'}</span>
                 </div>
 
-                <button 
+                <button
                   onClick={handleCycleAccent}
                   onWheel={handleWheelAccent}
                   title="Clique para alternar ou use a roda do mouse para trocar de sotaque"
@@ -925,7 +925,7 @@ function VoicePageContent() {
         {/* Accent Picker Modal via React Portal (Garante que nunca seja cortado) */}
         {typeof document !== 'undefined' && isAccentMenuOpen && createPortal(
           <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 dark:bg-black/85 animate-in fade-in duration-200">
-            <div 
+            <div
               className="fixed inset-0 cursor-pointer"
               onClick={() => setIsAccentMenuOpen(false)}
             />
@@ -937,7 +937,7 @@ function VoicePageContent() {
                   </h3>
                   <p className="text-xs text-text-muted">A Teacher Tati responderá com a pronúncia selecionada</p>
                 </div>
-                <button 
+                <button
                   onClick={() => setIsAccentMenuOpen(false)}
                   className="p-1.5 rounded-full hover:bg-surface-hover text-text-muted hover:text-text transition-colors cursor-pointer"
                 >
@@ -988,26 +988,26 @@ function VoicePageContent() {
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-12 py-6 sm:py-10 space-y-6 sm:space-y-8 scrollbar-hide mask-fade-top-giant">
           {!convId && simulationId ? (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-8 p-6">
-                <div className="relative">
-                    <div className="absolute inset-0 bg-primary/10 rounded-full animate-pulse" />
-                    <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-surface border border-border flex items-center justify-center shadow-xl">
-                        <Sparkles size={40} className="text-primary animate-bounce" />
-                    </div>
+              <div className="relative">
+                <div className="absolute inset-0 bg-primary/10 rounded-full animate-pulse" />
+                <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-surface border border-border flex items-center justify-center shadow-xl">
+                  <Sparkles size={40} className="text-primary animate-bounce" />
                 </div>
-                <div className="max-w-xs space-y-4">
-                    <h3 className="text-2xl font-black tracking-tight">Conversation Scenario</h3>
-                    <p className="text-sm text-text-muted leading-relaxed">Click the button below to enter the scenario and practice your English with Teacher Tati.</p>
+              </div>
+              <div className="max-w-xs space-y-4">
+                <h3 className="text-2xl font-black tracking-tight">Conversation Scenario</h3>
+                <p className="text-sm text-text-muted leading-relaxed">Click the button below to enter the scenario and practice your English with Teacher Tati.</p>
+              </div>
+              <button
+                onClick={handleStartSimulation}
+                disabled={isStarting}
+                className="group relative px-10 py-5 bg-primary text-white rounded-[2rem] font-black text-lg shadow-glow hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+              >
+                <div className="flex items-center gap-3">
+                  {isStarting ? <RotateCcw className="animate-spin" size={24} /> : <Play fill="white" size={24} />}
+                  {isStarting ? 'Starting...' : 'Start Practice'}
                 </div>
-                <button 
-                    onClick={handleStartSimulation}
-                    disabled={isStarting}
-                    className="group relative px-10 py-5 bg-primary text-white rounded-[2rem] font-black text-lg shadow-glow hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
-                >
-                    <div className="flex items-center gap-3">
-                        {isStarting ? <RotateCcw className="animate-spin" size={24} /> : <Play fill="white" size={24} />}
-                        {isStarting ? 'Starting...' : 'Start Practice'}
-                    </div>
-                </button>
+              </button>
             </div>
           ) : (
             <AnimatePresence mode="popLayout" initial={false}>
@@ -1028,14 +1028,14 @@ function VoicePageContent() {
                 </MotionDiv>
               )}
               {messages.length === 0 && !transcription ? (
-                 <MotionDiv key="empty-state" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col items-center justify-center text-center opacity-40 gap-4 p-4">
-                    <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 border-dashed border-primary/30 flex items-center justify-center">
-                      <Mic size={24} className="text-primary/50" />
-                    </div>
-                    <p className="text-sm sm:text-lg italic tracking-widest text-center">
-                        {isLiveMode ? 'Live Mode Active. Start speaking continuous English...' : simulationId ? 'Waiting for simulation...' : 'Say "Hello" to start your class...'}
-                    </p>
-                 </MotionDiv>
+                <MotionDiv key="empty-state" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col items-center justify-center text-center opacity-40 gap-4 p-4">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 border-dashed border-primary/30 flex items-center justify-center">
+                    <Mic size={24} className="text-primary/50" />
+                  </div>
+                  <p className="text-sm sm:text-lg italic tracking-widest text-center">
+                    {isLiveMode ? 'Live Mode Active. Start speaking continuous English...' : simulationId ? 'Waiting for simulation...' : 'Say "Hello" to start your class...'}
+                  </p>
+                </MotionDiv>
               ) : (
                 <MotionDiv key="messages-list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full space-y-6">
                   <div className="w-full flex flex-col gap-6 sm:gap-8">
@@ -1081,15 +1081,15 @@ function VoicePageContent() {
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 sm:gap-4">
-                         <div className="flex items-center gap-1.5 group">
-                            <Volume2 size={10} className="text-text-muted group-hover:text-primary transition-colors" />
-                            <input type="range" min="0" max="1" step="0.01" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="w-12 sm:w-16 h-0.5 bg-black/10 dark:bg-white/10 rounded-full appearance-none cursor-pointer accent-primary" />
-                         </div>
-                         <div className="flex items-center gap-1.5 sm:gap-2">
-                           {[0.75, 1, 1.25, 1.5].map(v => (
-                             <button key={v} onClick={() => setSpeed(v)} className={cn("text-[7px] sm:text-[9px] font-black transition-all px-1 rounded-sm", speed === v ? "text-primary bg-primary/5" : "text-text-muted hover:text-text")}>{v}x</button>
-                           ))}
-                         </div>
+                        <div className="flex items-center gap-1.5 group">
+                          <Volume2 size={10} className="text-text-muted group-hover:text-primary transition-colors" />
+                          <input type="range" min="0" max="1" step="0.01" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="w-12 sm:w-16 h-0.5 bg-black/10 dark:bg-white/10 rounded-full appearance-none cursor-pointer accent-primary" />
+                        </div>
+                        <div className="flex items-center gap-1.5 sm:gap-2">
+                          {[0.75, 1, 1.25, 1.5].map(v => (
+                            <button key={v} onClick={() => setSpeed(v)} className={cn("text-[7px] sm:text-[9px] font-black transition-all px-1 rounded-sm", speed === v ? "text-primary bg-primary/5" : "text-text-muted hover:text-text")}>{v}x</button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1097,11 +1097,11 @@ function VoicePageContent() {
               )}
             </div>
             {!isLiveMode && (
-              <button 
-                onClick={state === 'listening' ? stopRecording : startRecording} 
-                disabled={state === 'processing' || (!convId && !!simulationId)} 
+              <button
+                onClick={state === 'listening' ? stopRecording : startRecording}
+                disabled={state === 'processing' || (!convId && !!simulationId)}
                 className={cn(
-                  "w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center transition-all duration-500 shadow-2xl active:scale-95 border-4 border-white/20 shrink-0", 
+                  "w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center transition-all duration-500 shadow-2xl active:scale-95 border-4 border-white/20 shrink-0",
                   (!convId && simulationId) ? "bg-text-subtle/20 opacity-50 cursor-not-allowed" : state === 'listening' ? "bg-danger" : state === 'processing' ? "bg-warning" : "bg-primary hover:scale-105"
                 )}
               >
@@ -1116,10 +1116,10 @@ function VoicePageContent() {
       </MotionDiv>
 
       {activeWord && (
-        <WordTooltip 
-          word={activeWord} 
-          position={tooltipPos} 
-          onClose={() => setActiveWord(null)} 
+        <WordTooltip
+          word={activeWord}
+          position={tooltipPos}
+          onClose={() => setActiveWord(null)}
         />
       )}
 

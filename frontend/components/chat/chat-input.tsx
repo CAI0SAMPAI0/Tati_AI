@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useRef, useEffect, memo } from 'react';
-import { Paperclip, Mic, Send, X } from 'lucide-react';
+import { Mic, Paperclip, Send, X } from 'lucide-react';
+import React, { memo, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 
 import { cn } from '@/lib/utils';
@@ -21,11 +21,11 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
   const [text, setText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  const [attachments, setAttachments] = useState<{name: string, base64: string, type?: string}[]>([]);
-  
+  const [attachments, setAttachments] = useState<{ name: string, base64: string, type?: string }[]>([]);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Audio recording refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -65,7 +65,7 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
   const handleSend = () => {
     const trimmedText = text.trim();
     if ((!trimmedText && attachments.length === 0) || disabled || isStreaming) return;
-    
+
     if (attachments.length > 0) {
       if (onSendFiles) {
         onSendFiles(attachments.slice(0, MAX_ATTACHMENTS), trimmedText || undefined);
@@ -78,7 +78,7 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
     } else if (trimmedText) {
       onSend(trimmedText);
     }
-    
+
     setText('');
   };
 
@@ -111,7 +111,7 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
           }
         };
         reader.readAsDataURL(blob);
-        
+
         stream.getTracks().forEach(track => track.stop());
       };
 
@@ -163,7 +163,7 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
       reader.onerror = () => toast.error(`Erro ao ler ${file.name}`);
       reader.readAsDataURL(file);
     });
-    
+
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -176,7 +176,7 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
       fileInputRef.current.click();
     }
   };
-  
+
   const removeAttachment = (index: number) => {
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
@@ -196,7 +196,7 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     const files = Array.from(e.dataTransfer.files || []);
     if (files.length === 0) return;
 
@@ -228,13 +228,13 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
     if (attachments.length >= MAX_ATTACHMENTS) return;
     const items = e.clipboardData?.items;
     if (!items) return;
-    
+
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       if (item.type.indexOf('image') !== -1) {
         const file = item.getAsFile();
         if (!file) continue;
-        
+
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64 = (reader.result as string).split(',')[1];
@@ -249,7 +249,7 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
         };
         reader.onerror = () => toast.error('Failed to read pasted image');
         reader.readAsDataURL(file);
-        
+
         e.preventDefault();
         break;
       }
@@ -259,7 +259,7 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
   return (
     <div className="p-2 md:p-4 border-t border-border bg-bg shrink-0">
       <div className="max-w-4xl mx-auto relative">
-        
+
         {attachments.length > 0 && (
           <div className="flex items-center gap-2 p-2 px-3 bg-surface border border-border border-b-0 rounded-t-xl overflow-x-auto scrollbar-none">
             <span className="text-[0.68rem] font-bold text-text-muted uppercase tracking-wider shrink-0 mr-1">
@@ -269,9 +269,9 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
               <div key={i} className="flex items-center gap-2 bg-primary/10 text-primary px-3 py-1.5 rounded-lg text-[0.82rem] whitespace-nowrap shadow-sm border border-primary/20">
                 <Paperclip size={13} className="shrink-0" />
                 <span className="truncate max-w-[140px] font-medium">{att.name}</span>
-                <button 
-                  type="button" 
-                  onClick={() => removeAttachment(i)} 
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(i)}
                   className="hover:bg-primary/20 p-0.5 rounded-full ml-1 transition-colors text-primary"
                   title="Remover anexo"
                 >
@@ -282,7 +282,7 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
           </div>
         )}
 
-        <div 
+        <div
           className={cn(
             "flex items-end gap-2 bg-surface border p-2 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-all",
             attachments.length > 0 ? "rounded-b-xl" : "rounded-xl",
@@ -292,15 +292,15 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            className="hidden" 
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
             multiple
             accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.csv,.md,image/*"
             onChange={handleFileChange}
           />
-          
+
           <button
             aria-label='Anexar arquivo'
             type="button"
@@ -348,7 +348,7 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
               disabled={disabled || isStreaming}
               className={cn(
                 "p-2 rounded-lg text-text-subtle hover:bg-primary/10 hover:text-primary transition-colors disabled:opacity-40",
-                !text.trim() && attachments.length === 0 && "text-primary" 
+                !text.trim() && attachments.length === 0 && "text-primary"
               )}
               title="Record audio"
             >
@@ -372,7 +372,7 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, onSendFi
           )}
         </div>
         <p className="mt-2 text-[0.7rem] text-center text-text-subtle">
-          Teacher Tati practices English with you · Enter to send · Shift+Enter for new line
+          Taty's Hub practices English with you · Enter to send · Shift+Enter for new line
         </p>
       </div>
     </div>

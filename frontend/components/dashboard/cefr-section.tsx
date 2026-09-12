@@ -28,9 +28,10 @@ import {
   Sparkles,
   ImageIcon,
   CheckSquare,
-  Square
+  Square,
+  Search
 } from 'lucide-react';
-import { apiUpload, apiPost, apiGet, apiDelete, apiPut } from '@/lib/api/client';
+import { apiUpload, apiPost, apiGet, apiDelete, apiPut, apiPatch } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
 import { DialogModal } from '@/components/ui/dialog-modal';
 import { LEVEL_OPTIONS } from '@/lib/constants/levels';
@@ -46,13 +47,18 @@ const WEEKDAYS_OPTIONS = [
   { value: 'sun', label: 'Sunday' }
 ];
 
+const detectLevelFromFilename = (filename: string, fallback: string = 'A1'): string => {
+  const match = filename.match(/(?:^|[\s_\-.()[\]])([A-C][1-2])(?:$|[\s_\-.()[\]])/i);
+  return match ? match[1].toUpperCase() : fallback;
+};
+
 export function CefrSection() {
   const [level, setLevel] = useState('A1');
   const [topic, setTopic] = useState('');
   const [cefrTitle, setCefrTitle] = useState('');
   const [cardCount, setCardCount] = useState(10);
   const [simulationCount] = useState(1);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<{ file: File; level: string }[]>([]);
   const [references, setReferences] = useState<any[]>([]);
   const [loadingReferences, setLoadingReferences] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -63,6 +69,7 @@ export function CefrSection() {
   // Phase 3: State for selected references to feed RAG
   const [selectedRefIds, setSelectedRefIds] = useState<string[]>([]);
   const [filterLevel, setFilterLevel] = useState<string>('All');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Phase 2: Scheduling states
   const [schedules, setSchedules] = useState<any[]>([]);
@@ -367,7 +374,7 @@ export function CefrSection() {
   const fetchReferences = async () => {
     setLoadingReferences(true);
     try {
-      const res = await apiGet<{ success: boolean; references: any[] }>('/cefr/admin/references');
+      const res = await apiGet<{ success: boolean; references: any[] }>(`/cefr/admin/references?_t=${Date.now()}`);
       if (res && res.references) {
         setReferences(res.references);
       }
@@ -416,7 +423,12 @@ export function CefrSection() {
       toast.error('Some files were ignored. Only PDF, DOCX and TXT are accepted.');
     }
 
-    setSelectedFiles(prev => [...prev, ...validFiles]);
+    const newItems = validFiles.map(f => ({
+      file: f,
+      level: detectLevelFromFilename(f.name, level),
+    }));
+
+    setSelectedFiles(prev => [...prev, ...newItems]);
   };
 
   const handleRemoveSelectedFile = (index: number) => {
@@ -428,40 +440,67 @@ export function CefrSection() {
     setUploading(true);
     setUploadStatus(null);
 
-    const formData = new FormData();
-    selectedFiles.forEach(f => {
-      formData.append('files', f);
+    const groups: Record<string, File[]> = {};
+    selectedFiles.forEach(item => {
+      if (!groups[item.level]) groups[item.level] = [];
+      groups[item.level].push(item.file);
     });
 
     try {
-      const res = await apiUpload<{ success: boolean; results: any[] }>(
-        `/cefr/admin/upload-material?level=${level}`,
-        formData
-      );
+      let totalSuccess = 0;
+      let totalFail = 0;
 
-      if (res.ok && res.data.results) {
-        const successCount = res.data.results.filter((r: any) => r.success).length;
-        const failCount = res.data.results.filter((r: any) => !r.success).length;
-
-        if (failCount === 0) {
-          toast.success(`${successCount} file(s) uploaded and indexed successfully!`);
-        } else {
-          toast.success(`${successCount} uploaded successfully. ${failCount} failed.`);
-        }
-
-        setUploadStatus({
-          success: true,
-          message: `${successCount} file(s) indexed successfully. ${failCount} failure(s).`
+      for (const [lvl, files] of Object.entries(groups)) {
+        const formData = new FormData();
+        files.forEach(f => {
+          formData.append('files', f);
         });
-        setSelectedFiles([]);
-        fetchReferences();
-      } else {
-        setUploadStatus({ success: false, message: 'Upload failed on server.' });
+
+        const res = await apiUpload<{ success: boolean; results: any[] }>(
+          `/cefr/admin/upload-material?level=${lvl}`,
+          formData
+        );
+
+        if (res.ok && res.data?.results) {
+          totalSuccess += res.data.results.filter((r: any) => r.success).length;
+          totalFail += res.data.results.filter((r: any) => !r.success).length;
+        } else {
+          totalFail += files.length;
+        }
       }
+
+      if (totalFail === 0) {
+        toast.success(`${totalSuccess} file(s) uploaded and indexed successfully!`);
+      } else {
+        toast.success(`${totalSuccess} uploaded successfully. ${totalFail} failed.`);
+      }
+
+      setUploadStatus({
+        success: true,
+        message: `${totalSuccess} file(s) indexed successfully. ${totalFail} failure(s).`
+      });
+      setSelectedFiles([]);
+      fetchReferences();
     } catch (err: any) {
       setUploadStatus({ success: false, message: err.message || 'Error uploading files.' });
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleUpdateReferenceLevel = async (id: string, newLevel: string) => {
+    try {
+      const res = await apiPatch<{ success: boolean }>(`/cefr/admin/references/${id}`, {
+        cefr_level: newLevel,
+      });
+      if (res.ok) {
+        setReferences(prev => prev.map(r => (r.id === id ? { ...r, cefr_level: newLevel } : r)));
+        toast.success(`Level updated to ${newLevel}`);
+      } else {
+        toast.error('Failed to update reference level.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error updating level.');
     }
   };
 
@@ -689,9 +728,14 @@ export function CefrSection() {
     return labels.join(', ');
   };
 
-  const filteredReferences = references.filter(
-    ref => filterLevel === 'All' || ref.cefr_level === filterLevel
-  );
+  const filteredReferences = useMemo(() => {
+    return references.filter(ref => {
+      const refLvl = (ref.cefr_level || '').trim().toUpperCase();
+      const matchesLevel = filterLevel === 'All' || refLvl === filterLevel.toUpperCase();
+      const matchesSearch = !searchQuery.trim() || ref.filename.toLowerCase().includes(searchQuery.trim().toLowerCase());
+      return matchesLevel && matchesSearch;
+    });
+  }, [references, filterLevel, searchQuery]);
   const allFilteredSelected = filteredReferences.length > 0 && filteredReferences.every(ref => selectedRefIds.includes(ref.id));
 
   const handleSelectAllToggle = () => {
@@ -807,20 +851,37 @@ export function CefrSection() {
                         <span>Selected Files ({selectedFiles.length})</span>
                         <button onClick={() => setSelectedFiles([])} className="text-red-400 hover:text-red-500">Clear All</button>
                       </div>
-                      {selectedFiles.map((file, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-sm p-2 bg-surface rounded-lg border border-border/60">
-                          <div className="flex items-center gap-2 truncate">
+                      {selectedFiles.map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-sm p-2 bg-surface rounded-lg border border-border/60 gap-2">
+                          <div className="flex items-center gap-2 truncate flex-1 min-w-0">
                             <FileText size={16} className="text-primary shrink-0" />
-                            <span className="truncate text-text font-medium">{file.name}</span>
-                            <span className="text-xs text-text-muted">({formatBytes(file.size)})</span>
+                            <span className="truncate text-text font-medium">{item.file.name}</span>
+                            <span className="text-xs text-text-muted shrink-0">({formatBytes(item.file.size)})</span>
                           </div>
-                          <button
-                            onClick={() => handleRemoveSelectedFile(idx)}
-                            className="text-text-muted hover:text-red-400 p-1 transition-colors"
-                            title="Remove"
-                          >
-                            <X size={16} />
-                          </button>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <select
+                              value={item.level}
+                              onChange={(e) => {
+                                const newLvl = e.target.value;
+                                setSelectedFiles(prev => prev.map((it, i) => i === idx ? { ...it, level: newLvl } : it));
+                              }}
+                              className={`px-2 py-0.5 text-xs font-semibold rounded-lg border cursor-pointer outline-none bg-surface ${getLevelBadgeStyle(item.level)}`}
+                              title="CEFR Level for this file"
+                            >
+                              {LEVEL_OPTIONS.map(opt => (
+                                <option key={opt.value} value={opt.value} className="bg-surface text-text">
+                                  {opt.value}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => handleRemoveSelectedFile(idx)}
+                              className="text-text-muted hover:text-red-400 p-1 transition-colors"
+                              title="Remove"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -886,22 +947,53 @@ export function CefrSection() {
               <div className="space-y-4">
                 {/* Toolbar for Filtering & Select All */}
                 <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-bg rounded-xl border border-border/60">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-bold text-text-subtle uppercase tracking-wider">Filter by Level:</span>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {['All', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'].map((lvl) => (
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-bold text-text-subtle uppercase tracking-wider">Filter by Level:</span>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {['All', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'].map((lvl) => {
+                          const count = lvl === 'All'
+                            ? references.length
+                            : references.filter(r => (r.cefr_level || '').trim().toUpperCase() === lvl).length;
+                          return (
+                            <button
+                              key={lvl}
+                              onClick={() => setFilterLevel(lvl)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                                filterLevel === lvl
+                                  ? 'bg-primary/10 text-primary border-primary/20'
+                                  : 'bg-surface text-text-subtle border-border/80 hover:border-border'
+                              }`}
+                            >
+                              <span>{lvl}</span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                                filterLevel === lvl ? 'bg-primary text-white' : 'bg-bg text-text-muted border border-border/60'
+                              }`}>
+                                {count}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                      <input
+                        type="text"
+                        placeholder="Search file name..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-8 pr-7 py-1.5 bg-surface border border-border/80 rounded-lg text-xs text-text placeholder:text-text-muted outline-none focus:border-primary transition-all w-44 sm:w-56"
+                      />
+                      {searchQuery && (
                         <button
-                          key={lvl}
-                          onClick={() => setFilterLevel(lvl)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                            filterLevel === lvl
-                              ? 'bg-primary/10 text-primary border-primary/20'
-                              : 'bg-surface text-text-subtle border-border/80 hover:border-border'
-                          }`}
+                          onClick={() => setSearchQuery('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text text-xs"
                         >
-                          {lvl}
+                          ×
                         </button>
-                      ))}
+                      )}
                     </div>
                   </div>
 
@@ -941,9 +1033,18 @@ export function CefrSection() {
                             {ref.filename}
                           </td>
                           <td className="p-3">
-                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full border ${getLevelBadgeStyle(ref.cefr_level)}`}>
-                              {ref.cefr_level}
-                            </span>
+                            <select
+                              value={ref.cefr_level}
+                              onChange={(e) => handleUpdateReferenceLevel(ref.id, e.target.value)}
+                              className={`px-2 py-0.5 text-xs font-semibold rounded-lg border cursor-pointer outline-none bg-surface transition-colors ${getLevelBadgeStyle(ref.cefr_level)}`}
+                              title="Click to change CEFR Level"
+                            >
+                              {['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].map((lvl) => (
+                                <option key={lvl} value={lvl} className="bg-surface text-text">
+                                  {lvl}
+                                </option>
+                              ))}
+                            </select>
                           </td>
                           <td className="p-3">
                             <span className={`px-2 py-0.5 text-xs font-semibold rounded-md shrink-0 border ${getFileIconStyle(ref.file_type)}`}>

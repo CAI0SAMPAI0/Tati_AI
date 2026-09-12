@@ -1,21 +1,21 @@
 'use client';
 
-import Link from 'next/link';
 import { TatiLogo } from '@/components/ui/tati-logo';
 import {
-  PieChart,
-  Users,
-  LineChart,
   BookOpen,
-  Layers,
   Drama,
+  Gamepad2,
+  Layers,
+  LineChart,
   MessageSquare,
+  Newspaper,
+  PieChart,
   Settings,
+  Users,
   X,
   Zap,
-  Gamepad2,
-  Newspaper,
 } from 'lucide-react';
+import Link from 'next/link';
 import { FaWhatsapp } from 'react-icons/fa';
 
 import { cn } from '@/lib/utils';
@@ -112,7 +112,7 @@ export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose 
               <TatiLogo size={32} className="w-full h-full rounded-lg" />
             </div>
             <div className="min-w-0">
-              <div className="font-display text-[0.9rem] font-bold tracking-tight text-text truncate">Teacher Tati</div>
+              <div className="font-display text-[0.9rem] font-bold tracking-tight text-text truncate">Taty's Hub</div>
               <div className="text-[0.65rem] font-bold text-primary uppercase tracking-widest leading-none">Dashboard</div>
             </div>
           </div>
@@ -129,9 +129,9 @@ export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose 
               icon={item.icon}
               label={item.label}
               isActive={activeSection === item.id}
-              onClick={() => { 
-                onSetSection(item.id); 
-                if (window.innerWidth < 768) onClose(); 
+              onClick={() => {
+                onSetSection(item.id);
+                if (window.innerWidth < 768) onClose();
               }}
             />
           ))}

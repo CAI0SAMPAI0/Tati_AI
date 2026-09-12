@@ -1,19 +1,19 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { MessageSquare, BookOpen, CalendarDays, Type, Flame, Lightbulb, Download, Snowflake, ShoppingBag, Trophy } from 'lucide-react';
-import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
-import { useSidebarState } from '@/hooks/useSidebarState';
-import { apiGet, API_BASE } from '@/lib/api/client';
-import { cn } from '@/lib/utils';
-import { ENDPOINTS } from '@/lib/api/endpoints';
+import { MainHeader } from '@/components/layout/main-header';
 import { Button } from '@/components/ui/button';
-import toast from 'react-hot-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { useSidebarState } from '@/hooks/useSidebarState';
+import { API_BASE, apiGet } from '@/lib/api/client';
+import { ENDPOINTS } from '@/lib/api/endpoints';
+import { cn } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
+import { BookOpen, CalendarDays, Download, Flame, Lightbulb, MessageSquare, Snowflake, Trophy, Type } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useAuth } from '@/hooks/useAuth';
+import { useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 
 const ActivityBarChart = dynamic(() => import('@/components/charts/activity-bar-chart'), {
   ssr: false,
@@ -448,8 +448,8 @@ export default function ProgressClientPage() {
                         const medals = ['🥇', '🥈', '🥉'];
                         const isMe = r.username === user?.username;
                         return (
-                          <div 
-                            key={r.username} 
+                          <div
+                            key={r.username}
                             className={cn(
                               "flex items-center justify-between text-xs p-2 rounded-xl border border-transparent",
                               isMe ? "bg-primary/10 border-primary/20" : "bg-bg-secondary/40"

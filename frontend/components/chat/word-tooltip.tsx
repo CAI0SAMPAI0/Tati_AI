@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { X, Volume2, Book, Sparkles, Plus, Check, Languages } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { apiPost } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
+import { cn } from '@/lib/utils';
+import { Book, Check, Languages, Plus, Sparkles, Volume2, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 interface WordTooltipProps {
   word: string | null;
@@ -53,7 +53,7 @@ export default function WordTooltip({ word, position, onClose }: WordTooltipProp
       }
 
       try {
-        // 1. Busca inteligente no backend oficial Teacher Tati (IA + Dicionário Bilíngue + Fonética)
+        // 1. Busca inteligente no backend oficial Taty's Hub (IA + Dicionário Bilíngue + Fonética)
         const res = await apiPost<WordLookupData>(ENDPOINTS.WORD_LOOKUP, { word: cleanedWord });
 
         if (res.ok && res.data && (res.data.translation || res.data.english_definition)) {
@@ -65,7 +65,7 @@ export default function WordTooltip({ word, position, onClose }: WordTooltipProp
             // Busca áudio complementar se necessário
             apiPost<{ audio: string }>(ENDPOINTS.CHAT_TTS, { text: cleanedWord })
               .then(ttsRes => ttsRes.ok && setTatiAudio(ttsRes.data.audio))
-              .catch(() => {});
+              .catch(() => { });
           }
         } else {
           // Fallback secundário caso a rede externa direta falhe
@@ -143,7 +143,7 @@ export default function WordTooltip({ word, position, onClose }: WordTooltipProp
   const y = Math.min(position.y + 10, typeof window !== 'undefined' ? window.innerHeight - 360 : 0);
 
   return (
-    <div 
+    <div
       ref={tooltipRef}
       className="fixed z-[100] w-72 sm:w-80 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-200"
       style={{ left: Math.max(10, x), top: Math.max(10, y) }}
@@ -169,20 +169,20 @@ export default function WordTooltip({ word, position, onClose }: WordTooltipProp
       <div className="p-3 space-y-3 max-h-[75vh] overflow-y-auto">
         {/* Phonetics & Audio Pronounce */}
         <div className="flex items-center gap-2">
-          <button 
+          <button
             disabled={!tatiAudio}
             onClick={() => tatiAudio && playAudio(tatiAudio, 'tati', true)}
             className={cn(
               "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[0.68rem] font-bold transition-all border shadow-sm",
-              tatiAudio 
-                ? "bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 active:scale-95" 
+              tatiAudio
+                ? "bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 active:scale-95"
                 : "bg-bg-secondary border-border text-text-muted opacity-50 cursor-not-allowed"
             )}
           >
             <Volume2 size={13} className={isPlaying === 'tati' ? 'animate-pulse' : ''} />
             PRONOUNCE
           </button>
-          
+
           {data?.phonetic && (
             <span className="text-[0.72rem] font-mono text-text-subtle font-medium">
               {data.phonetic}

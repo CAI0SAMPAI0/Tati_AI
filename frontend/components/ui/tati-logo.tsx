@@ -14,7 +14,7 @@ interface TatiLogoProps {
 }
 
 /** Avatar/logo da Prof. Tatiana com fallback se o arquivo não carregar. */
-export function TatiLogo({ size = 32, className, alt = 'Teacher Tati' }: TatiLogoProps) {
+export function TatiLogo({ size = 32, className, alt = 'Taty's Hub' }: TatiLogoProps) {
   const [failed, setFailed] = useState(false);
 
   if (failed) {
@@ -31,14 +31,14 @@ export function TatiLogo({ size = 32, className, alt = 'Teacher Tati' }: TatiLog
     );
   }
 
-  return (
-    <Image
-      src={LOGO_SRC}
-      alt={alt}
-      width={size}
-      height={size}
-      className={cn('object-cover shrink-0', className)}
-      onError={() => setFailed(true)}
-    />
-  );
+return (
+  <Image
+    src={LOGO_SRC}
+    alt={alt}
+    width={size}
+    height={size}
+    className={cn('object-cover shrink-0', className)}
+    onError={() => setFailed(true)}
+  />
+);
 }

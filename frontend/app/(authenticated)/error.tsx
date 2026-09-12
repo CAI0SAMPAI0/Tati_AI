@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import * as Sentry from '@sentry/nextjs';
+import { Home, MessageSquare, RotateCcw } from 'lucide-react';
 import Image from 'next/image';
-import { RotateCcw, Home, MessageSquare } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 export default function AuthenticatedError({
   error,
@@ -46,7 +46,7 @@ export default function AuthenticatedError({
   const handleHardReload = () => {
     try {
       sessionStorage.removeItem('tati_chunk_reload');
-    } catch {}
+    } catch { }
     window.location.reload();
   };
 

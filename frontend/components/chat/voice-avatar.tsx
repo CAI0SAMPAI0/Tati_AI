@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { apiGet, API_BASE } from '@/lib/api/client';
+import { API_BASE, apiGet } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -324,7 +324,7 @@ export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAva
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={mouthSrc}
-          alt="Teacher Tati"
+          alt="Taty's Hub"
           className="absolute inset-0 w-full h-full object-cover"
         />
 

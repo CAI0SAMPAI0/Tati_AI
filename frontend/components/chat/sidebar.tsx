@@ -1,30 +1,30 @@
 'use client';
 
+import { useAuth } from '@/hooks/useAuth';
+import { usePrefetch } from '@/hooks/usePrefetch';
+import {
+  BookOpen,
+  ChevronRight,
+  LayoutDashboard,
+  LogOut,
+  Plus,
+  Settings,
+  Target,
+  Trash2,
+  X,
+} from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  Plus,
-  LayoutDashboard,
-  Settings,
-  BookOpen,
-  Trash2,
-  LogOut,
-  X,
-  ChevronRight,
-  Target,
-} from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { usePrefetch } from '@/hooks/usePrefetch';
 
-import { cn, isStaff, canAccessDashboard } from '@/lib/utils';
 import { levelLabel } from '@/lib/constants/levels';
+import { canAccessDashboard, cn, isStaff } from '@/lib/utils';
 import { ConversationList } from './conversation-list';
 
-import { apiGet, apiDelete } from '@/lib/api/client';
+import { apiDelete, apiGet } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AccessControl } from '@/lib/api/types';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface SidebarProps {
   currentConvId: string | null;
@@ -47,7 +47,7 @@ export function Sidebar({
 }: SidebarProps) {
   const { user, logout } = useAuth();
   const avatarUrl = user?.avatar_url || (user as any)?.profile?.avatar_url || DEFAULT_AVATAR_URL;
-  
+
   const router = useRouter();
   const queryClient = useQueryClient();
   const { prefetch } = usePrefetch();
@@ -117,7 +117,7 @@ export function Sidebar({
               <span className="hidden text-xs font-bold">T</span>
             </div>
             <span className="font-display text-[0.9rem] font-bold tracking-tight">
-              Teacher Tati
+              Taty's Hub
             </span>
           </div>
           <button
@@ -159,7 +159,7 @@ export function Sidebar({
               )}
             </div>
           </div>
-          <ChevronRight size={12} className="text-text-subtle group-hover:text-primary transition-colors" />    
+          <ChevronRight size={12} className="text-text-subtle group-hover:text-primary transition-colors" />
         </Link>
 
         {/* New Chat Button */}

@@ -495,74 +495,21 @@ class LevelingService:
         q_text = curr_q.get("question", "")
         q_target = curr_q.get("target", "")
 
-        # Coleta respostas acumuladas para a pergunta atual (caso tenha havido follow-up)
-        prev_answers = session.get("current_answers", [])
-        combined_answer = " ".join(prev_answers + [user_text]).strip()
-
-        # 2. Avaliacao via IA da resposta do aluno
+        # Avaliacao direta via IA da resposta do aluno (sem interrupcoes ou conversas paralelas)
         evaluation = LevelingService._evaluate_answer(
             user_name=fresh_user.name or fresh_user.username,
             question=q_text,
             question_level=q_level,
             target=q_target,
-            student_answer=combined_answer,
+            student_answer=user_text.strip(),
         )
 
         is_correct = evaluation.get("is_correct", False)
         mistakes = evaluation.get("mistakes", [])
         corrections = evaluation.get("corrections", [])
         feedback = evaluation.get("pedagogical_feedback", "")
-        needs_follow_up = evaluation.get("needs_follow_up", False)
-        follow_up_q = evaluation.get("follow_up_question", "")
 
-        current_follow_ups = session.get("current_follow_ups", 0)
-
-        # 3. Regra de follow-ups:
-        # "ela nao deve conversar tanto e sim ir direto nas perguntas, claro fazer 2 perguntas no maximo a mais"
-        # Se a resposta foi excessivamente curta (< 5 palavras) e precisa de mais detalhe, permite no maximo 2 perguntas extras
-        words_count = len(user_text.strip().split())
-        should_ask_follow_up = (
-            current_follow_ups < 2
-            and needs_follow_up
-            and bool(follow_up_q)
-            and words_count < 6
-        )
-
-        if should_ask_follow_up:
-            session["current_follow_ups"] = current_follow_ups + 1
-            session["current_answers"] = prev_answers + [user_text]
-            fresh_user.profile["active_leveling"] = session
-            fresh_user.save(update_fields=["profile"])
-
-            follow_up_reply = f"{feedback}\n\n{follow_up_q}".strip()
-            follow_up_reply = strip_emojis(follow_up_reply)
-
-            audio_b64 = AudioService.text_to_speech(follow_up_reply, accent=session_accent)
-            Message.objects.create(
-                session_id=conversation_id,
-                username=fresh_user.username,
-                role="assistant",
-                content=follow_up_reply,
-                audio_b64=audio_b64,
-            )
-            Conversation.objects.filter(id=conversation_id).update(
-                updated_at=datetime.now(timezone.utc).isoformat()
-            )
-
-            return {
-                "ok": True,
-                "reply": follow_up_reply,
-                "audio_b64": audio_b64,
-                "audio": audio_b64,
-                "accent": session_accent,
-                "is_leveling": True,
-                "completed": False,
-                "current_question": curr_idx + 1,
-                "total_questions": total_q,
-                "is_follow_up": True,
-            }
-
-        # Reseta follow-ups para a proxima pergunta
+        # Reseta follow-ups (modo direto: avança sempre para a próxima pergunta da avaliação)
         session["current_follow_ups"] = 0
         session["current_answers"] = []
 
@@ -580,7 +527,7 @@ class LevelingService:
             "question_id": curr_q.get("id", f"{q_level}_{curr_idx+1}"),
             "level": q_level,
             "question": q_text,
-            "user_answer": combined_answer,
+            "user_answer": user_text.strip(),
             "is_correct": is_correct,
             "mistakes": mistakes,
             "corrections": corrections,
@@ -770,22 +717,22 @@ class LevelingService:
             f"Evaluate whether the student's answer demonstrates sufficient communicative ability and grammatical control for CEFR Level {question_level}.\n"
             f"A minor slip should still pass if the meaning is clear and appropriate for {question_level}.\n\n"
             f"CRITICAL RULES:\n"
-            f"1. In 'pedagogical_feedback', write AT MOST 2 LINES in English. You MUST specifically acknowledge or reference what the student said in their sentence (e.g. quote words or topics they mentioned like a place, food, activity, noise, feeling, etc.) and give a brief natural tip or phrasing correction. DO NOT ask conversational questions in 'pedagogical_feedback'.\n"
-            f"2. If the student's answer was too brief (fewer than 4 words or vague) and you need them to speak a bit more to properly judge CEFR {question_level}, set 'needs_follow_up': true and provide 1 short follow-up question in 'follow_up_question'. Otherwise set 'needs_follow_up': false and 'follow_up_question': \"\".\n"
+            f"1. In 'pedagogical_feedback', write AT MOST 1 TO 2 CONCISE LINES in English. Specifically acknowledge what the student said in their sentence and provide a brief natural tip or phrasing correction. DO NOT chat, do NOT start conversations, and DO NOT ask questions in 'pedagogical_feedback'.\n"
+            f"2. DO NOT ask follow-up questions. The assessment progresses directly through the selected questions. Always set 'needs_follow_up': false and 'follow_up_question': \"\".\n"
             f"3. Absolutely DO NOT use any emojis anywhere. No emojis permitted.\n\n"
             f"Respond ONLY with a valid JSON object matching this schema:\n"
             f"{{\n"
             f'  "is_correct": true,\n'
             f'  "mistakes": ["List specific grammatical or vocabulary mistakes in English, if any"],\n'
             f'  "corrections": ["Natural and correct English phrasing for the student\'s answer"],\n'
-            f'  "pedagogical_feedback": "At most 2 lines in English specifically acknowledging what the user said with a constructive tip. NO emojis.",\n'
+            f'  "pedagogical_feedback": "At most 1 to 2 concise lines in English with a constructive tip. NO emojis. NO questions.",\n'
             f'  "needs_follow_up": false,\n'
             f'  "follow_up_question": ""\n'
             f"}}"
         )
 
         keys = get_groq_keys()
-        for g_model in ["openai/gpt-oss-20b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"]:
+        for g_model in ["openai/gpt-oss-20b", "qwen/qwen3.8-27b", "openai/gpt-oss-120b"]:
             for key in keys:
                 try:
                     from groq import Groq
@@ -844,8 +791,8 @@ class LevelingService:
             "mistakes": [] if has_text else ["Answer was too short or incomplete."],
             "corrections": [clean_ans] if has_text else ["Please provide a complete sentence in English."],
             "pedagogical_feedback": strip_emojis(pedagogical),
-            "needs_follow_up": not has_text,
-            "follow_up_question": "Could you tell me a little more about that?" if not has_text else "",
+            "needs_follow_up": False,
+            "follow_up_question": "",
         }
 
 
@@ -923,7 +870,7 @@ class LevelingService:
         story = []
 
         # 1. Header Banner
-        story.append(Paragraph("TEACHER TATI AI • ENGLISH ACADEMY", subtitle_style))
+        story.append(Paragraph("Teacher Tati AI • ENGLISH ACADEMY", subtitle_style))
         story.append(Spacer(1, 4))
         story.append(Paragraph("CEFR English Diagnostic Assessment Report", title_style))
         story.append(Paragraph(f"Official Diagnostic Evaluation — {date_str}", subtitle_style))

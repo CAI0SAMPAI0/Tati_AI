@@ -1,7 +1,7 @@
-import { Sora, DM_Sans } from 'next/font/google';
-import './globals.css';
 import { AppProviders } from '@/providers/app-providers';
 import type { Metadata } from 'next';
+import { DM_Sans, Sora } from 'next/font/google';
+import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Teacher Tati - AI English Learning',

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +11,7 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Sora', 'DM Sans', sans-serif;
             background: linear-gradient(135deg, #6C63FF 0%, #4F46E5 100%);
@@ -22,12 +23,12 @@
             color: white;
             overflow: hidden;
         }
-        
+
         .logo-container {
             text-align: center;
             animation: fadeInUp 1s ease-out;
         }
-        
+
         .logo {
             width: 120px;
             height: 120px;
@@ -40,25 +41,25 @@
             backdrop-filter: blur(10px);
             border: 2px solid rgba(255, 255, 255, 0.3);
         }
-        
+
         .logo-text {
             font-size: 48px;
             font-weight: 800;
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
-        
+
         .app-name {
             font-size: 24px;
             font-weight: 700;
             margin-bottom: 10px;
         }
-        
+
         .tagline {
             font-size: 16px;
             opacity: 0.9;
             margin-bottom: 40px;
         }
-        
+
         .loading {
             display: flex;
             align-items: center;
@@ -66,7 +67,7 @@
             font-size: 14px;
             opacity: 0.8;
         }
-        
+
         .spinner {
             width: 20px;
             height: 20px;
@@ -75,23 +76,29 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-        
+
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
-        
+
         @keyframes fadeInUp {
             from {
                 opacity: 0;
                 transform: translateY(30px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
             }
         }
-        
+
         .install-button {
             position: fixed;
             bottom: 20px;
@@ -109,22 +116,23 @@
             transition: all 0.3s ease;
             display: none;
         }
-        
+
         .install-button:hover {
             background: rgba(255, 255, 255, 0.3);
             transform: translateX(-50%) scale(1.05);
         }
-        
+
         .install-button.show {
             display: block;
             animation: slideUp 0.5s ease-out;
         }
-        
+
         @keyframes slideUp {
             from {
                 opacity: 0;
                 transform: translateX(-50%) translateY(20px);
             }
+
             to {
                 opacity: 1;
                 transform: translateX(-50%) translateY(0);
@@ -132,6 +140,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="logo-container">
         <div class="logo">
@@ -144,23 +153,23 @@
             <span>Carregando...</span>
         </div>
     </div>
-    
+
     <button class="install-button" id="installButton">
         <i class="fas fa-download" style="margin-right: 8px;"></i>
         Instalar App
     </button>
-    
+
     <script>
         let deferredPrompt;
         const installButton = document.getElementById('installButton');
-        
+
         // Verifica se o app pode ser instalado
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
             installButton.classList.add('show');
         });
-        
+
         // Botão de instalação
         installButton.addEventListener('click', () => {
             if (deferredPrompt) {
@@ -176,11 +185,12 @@
                 installButton.classList.remove('show');
             }
         });
-        
+
         // Redireciona para o app principal após o carregamento
         setTimeout(() => {
             window.location.href = '/';
         }, 3000);
     </script>
 </body>
+
 </html>

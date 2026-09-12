@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import logging
 import httpx
@@ -1339,6 +1340,20 @@ def generate_cefr_simulations(
     return {"success": True, "task_id": str(uuid.uuid4()), "simulation_id": sim_id}
 
 
+def extract_cefr_level_from_filename(filename: str, fallback_level: Optional[str] = None) -> str:
+    match = re.search(r'(?:^|[\s_\-\.()[\]])([A-C][1-2])(?:$|[\s_\-\.()[\]])', filename, re.IGNORECASE)
+    if match:
+        return match.group(1).upper()
+    if fallback_level and fallback_level.strip().upper() in ["A1", "A2", "B1", "B2", "C1", "C2"]:
+        return fallback_level.strip().upper()
+    return "A1"
+
+
+class CEFRReferenceUpdateSchema(BaseModel):
+    cefr_level: Optional[str] = None
+    filename: Optional[str] = None
+
+
 @cefr_admin_router.post("/upload-material", auth=auth_optional)
 def upload_cefr_material(
     request: HttpRequest,
@@ -1347,6 +1362,7 @@ def upload_cefr_material(
 ):
     """
     Faz upload e indexação de arquivos de referência didática (PDF, DOCX, TXT).
+    Detecta automaticamente o nível CEFR (A1-C2) pelo nome do arquivo caso não especificado.
     """
     from .models import CEFRReference
     from .assets_service import CloudinaryService
@@ -1356,11 +1372,12 @@ def upload_cefr_material(
     for f in files:
         content = f.read()
         storage_url = CloudinaryService.upload_file(content, f.name)
+        ref_level = extract_cefr_level_from_filename(f.name, fallback_level=level)
         ref = CEFRReference.objects.create(
             id=uuid.uuid4(),
             filename=f.name,
             storage_url=storage_url,
-            cefr_level=(level or "A1").upper(),
+            cefr_level=ref_level,
             file_type=f.name.split(".")[-1].lower(),
             file_size=len(content),
             chunks_indexed=3,
@@ -1371,9 +1388,46 @@ def upload_cefr_material(
                 "success": True,
                 "id": str(ref.id),
                 "url": storage_url,
+                "cefr_level": ref.cefr_level,
             }
         )
     return {"success": True, "results": results}
+
+
+@cefr_admin_router.patch("/references/{reference_id}", auth=auth_optional)
+@cefr_admin_router.put("/references/{reference_id}", auth=auth_optional)
+def update_cefr_reference(
+    request: HttpRequest, reference_id: str, body: CEFRReferenceUpdateSchema
+):
+    """
+    Atualiza metadados (como cefr_level e filename) de um documento de referência didática.
+    """
+    from .models import CEFRReference
+
+    ref = CEFRReference.objects.filter(id=reference_id).first()
+    if not ref:
+        raise HttpError(404, "Reference not found")
+
+    if body.cefr_level:
+        lvl = body.cefr_level.strip().upper()
+        if lvl in ["A1", "A2", "B1", "B2", "C1", "C2"]:
+            ref.cefr_level = lvl
+    if body.filename:
+        ref.filename = body.filename.strip()
+
+    ref.save()
+    return {
+        "success": True,
+        "reference": {
+            "id": str(ref.id),
+            "filename": ref.filename,
+            "cefr_level": ref.cefr_level,
+            "storage_url": ref.storage_url,
+            "file_type": ref.file_type,
+            "file_size": ref.file_size,
+            "chunks_indexed": ref.chunks_indexed,
+        },
+    }
 
 
 @cefr_admin_router.delete("/references/{reference_id}", auth=auth_optional)

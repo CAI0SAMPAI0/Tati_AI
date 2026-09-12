@@ -105,7 +105,7 @@ export default function SimulationsSection() {
     }
     const simDiff = normalizeLevel(s.difficulty);
     const targetDiff = normalizeLevel(filterLevel);
-    
+
     return simDiff === targetDiff || s.difficulty === 'all' || s.difficulty === 'todos';
   });
 
@@ -207,7 +207,7 @@ export default function SimulationsSection() {
       return;
     }
     setIsGenerating(true);
-    const toastId = toast.loading('Teacher Tati AI is crafting this simulation...');
+    const toastId = toast.loading('Taty's Hub AI is crafting this simulation...');
     try {
       const res = await apiPost<{ task_id?: string; detail?: string; simulation_id?: string }>(
         ENDPOINTS.ADMIN_SIMULATIONS,

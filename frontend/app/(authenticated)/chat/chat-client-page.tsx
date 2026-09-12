@@ -52,7 +52,7 @@ export default function ChatClientPage() {
   const [currentConvId, setCurrentConvId] = useState<string | null>(
     searchParams.get('conv_id') ?? searchParams.get('id'),
   );
-  const [convTitle, setConvTitle] = useState('Teacher Tati');
+  const [convTitle, setConvTitle] = useState('Taty's Hub');
   const { sidebarOpen, toggleSidebar: handleToggleSidebar, closeSidebar: handleCloseSidebar } = useSidebarState();
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [isLevelingModalOpen, setIsLevelingModalOpen] = useState(false);
@@ -100,7 +100,7 @@ export default function ChatClientPage() {
       setSummary(null);
     } else {
       setMessages([]);
-      setConvTitle('Teacher Tati');
+      setConvTitle('Taty's Hub');
       setSummary(null);
     }
   }, [currentConvId, setMessages]);
@@ -114,7 +114,7 @@ export default function ChatClientPage() {
 
   const handleNewChat = useCallback(() => {
     setMessages([]);
-    setConvTitle('Teacher Tati');
+    setConvTitle('Taty's Hub');
     if (window.innerWidth < 768) {
       handleCloseSidebar();
     }
@@ -360,7 +360,7 @@ export default function ChatClientPage() {
   const handleFinishEarly = useCallback(async () => {
     if (!currentConvId) return;
     const confirm = window.confirm(
-      'Do you wish to conclude your Leveling Assessment now? Teacher Tati will evaluate the questions answered so far and mark the remainder as 0.'
+      'Do you wish to conclude your Leveling Assessment now? Taty's Hub will evaluate the questions answered so far and mark the remainder as 0.'
     );
     if (!confirm) return;
 
@@ -459,7 +459,7 @@ export default function ChatClientPage() {
               <div className="p-6 border-b border-border flex justify-between items-center bg-surface/50">
                 <div>
                   <h2 className="text-xl font-bold text-text">Pedagogical Summary</h2>
-                  <p className="text-xs text-text-muted mt-0.5">Analysis of your practice with Teacher Tati</p>
+                  <p className="text-xs text-text-muted mt-0.5">Analysis of your practice with Taty's Hub</p>
                 </div>
                 <button
                   onClick={() => setIsSummaryOpen(false)}
