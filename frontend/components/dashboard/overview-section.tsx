@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Users, MessageSquare, Zap, ShoppingBag, ChevronRight, Activity } from 'lucide-react';
-import { StatCard } from './stat-card';
-import { formatTime } from '@/lib/utils';
 import { apiGet } from '@/lib/api/client';
+import { formatTime } from '@/lib/utils';
+import { Activity, ChevronRight, MessageSquare, ShoppingBag, Users, Zap } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { StatCard } from './stat-card';
 
 interface OverviewSectionProps {
   stats: any;
@@ -89,7 +89,7 @@ export function OverviewSection({ stats, students, difficulties, onSeeAllStudent
         ✏️ empilha no mobile e md (col-1), lado a lado só no lg+
         No range 768–1023px com sidebar, duas colunas de tabela ficam apertadas demais
       */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-8">
         {/* Recent Students */}
         <div className="bg-surface border border-border rounded-2xl overflow-hidden">
           <div className="p-5 border-b border-border flex items-center justify-between">
@@ -147,49 +147,6 @@ export function OverviewSection({ stats, students, difficulties, onSeeAllStudent
             </table>
           </div>
         </div>
-
-        {/* Class Difficulty Alerts */}
-        <div className="bg-surface border border-border rounded-2xl overflow-hidden">
-          <div className="p-5 border-b border-border">
-            <h3 className="font-bold text-text">Class Difficulty Alerts</h3>
-          </div>
-          <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-surface text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest sticky top-0 z-10 border-b border-border shadow-sm">
-                <tr>
-                  <th className="px-5 py-3">🧑‍🎓 Student</th>
-                  <th className="px-5 py-3">⚠️ Spotlight</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {!difficulties ? (
-                  <tr>
-                    <td colSpan={2} className="px-5 py-10 text-center text-sm text-text-muted">
-                      Loading alerts...
-                    </td>
-                  </tr>
-                ) : difficulties?.alerts?.length > 0 ? (
-                  difficulties.alerts.map((a: any) => (
-                    <tr key={a.username} className="hover:bg-bg-secondary/30 transition-colors">
-                      <td className="px-5 py-3 text-sm font-medium text-text">@{a.username}</td>
-                      <td className="px-5 py-3">
-                        <span className="text-xs font-medium text-warning">
-                          {a.current_difficulty}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={2} className="px-5 py-10 text-center text-sm text-text-muted">
-                      No students with registered difficulties.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
       </div>
 
       {/* ── Celery Health Monitor ── */}
@@ -200,9 +157,8 @@ export function OverviewSection({ stats, students, difficulties, onSeeAllStudent
             <h3 className="font-bold text-text">Celery Task Manager Status</h3>
           </div>
           {celeryStatus && (
-            <span className={`text-[0.65rem] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-              celeryStatus.status === 'healthy' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
-            }`}>
+            <span className={`text-[0.65rem] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${celeryStatus.status === 'healthy' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
+              }`}>
               {celeryStatus.status}
             </span>
           )}
