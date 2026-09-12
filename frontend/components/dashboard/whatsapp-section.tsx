@@ -61,7 +61,7 @@ interface WhatsAppStudentsResponse {
 }
 
 export function WhatsappSection() {
-  // Conexão oficial da Taty's Hubana (sessão 'professor')
+  // Conexão oficial da Tatiana (sessão 'professor')
   const [activeSession, setActiveSession] = useState<string>('professor');
   const [qrBlobUrl, setQrBlobUrl] = useState<string>('');
   const [loadingQr, setLoadingQr] = useState(false);
@@ -348,7 +348,7 @@ export function WhatsappSection() {
     }
   };
 
-  // Known sessions list (apenas sessão oficial da Taty's Hubana)
+  // Known sessions list (apenas sessão oficial da Tatiana)
   const sessionList = useMemo(() => {
     const defaultList = ['professor'];
     if (sessions) {
@@ -373,7 +373,7 @@ export function WhatsappSection() {
             </div>
             <div>
               <h2 className="font-bold text-sm uppercase tracking-wider text-text">WhatsApp Connection (WAHA)</h2>
-              <p className="text-xs text-text-muted">Official Taty's Hubana connection for automated streak reminders and student notifications</p>
+              <p className="text-xs text-text-muted">Official Tatiana connection for automated streak reminders and student notifications</p>
             </div>
           </div>
           <button
@@ -431,7 +431,7 @@ export function WhatsappSection() {
               <div className="flex items-center gap-2">
                 <p className="text-xs font-black uppercase tracking-wider text-text-subtle">Active Session</p>
                 <span className="text-[10px] bg-emerald-500/10 text-emerald-600 font-bold px-2 py-0.5 rounded-full border border-emerald-500/20">
-                  Taty's Hubana (Production)
+                  Tatiana (Production)
                 </span>
               </div>
 
@@ -444,7 +444,7 @@ export function WhatsappSection() {
               {currentSessionData?.me && currentSessionData.status === 'WORKING' && (
                 <div className="text-xs text-text-muted bg-surface/60 p-2.5 rounded-xl border border-border/50 space-y-0.5">
                   <div className="font-semibold text-text">
-                    📱 WhatsApp Connected: <span className="text-emerald-500 font-bold">{currentSessionData.me.pushName || 'Taty's Hubana'}</span>
+                    📱 WhatsApp Connected: <span className="text-emerald-500 font-bold">{currentSessionData.me.pushName || 'Tatiana'}</span>
                   </div>
                   {currentSessionData.me.id && (
                     <div className="text-[11px] text-text-subtle font-mono">
@@ -455,7 +455,7 @@ export function WhatsappSection() {
               )}
 
               <p className="text-xs text-text-muted max-w-lg leading-relaxed">
-                Taty's Hubana&apos;s connection on Render (WAHA). Utilized by automated background tasks to dispatch daily streak alerts, weekly progress reports, and personalized encouragement to all students with a configured phone number.
+                Tatiana&apos;s connection on Render (WAHA). Utilized by automated background tasks to dispatch daily streak alerts, weekly progress reports, and personalized encouragement to all students with a configured phone number.
               </p>
             </div>
 

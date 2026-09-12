@@ -195,7 +195,7 @@ self.addEventListener('push', (event) => {
   const iconUrl = rawIcon.startsWith('http') ? rawIcon : `${origin}${rawIcon.startsWith('/') ? '' : '/'}${rawIcon}`;
   const badgeUrl = `${origin}/icons/badge-96x96.png`;
 
-  const title = data.title || 'Taty's Hubana';
+  const title = data.title || "Taty's Hub";
   const options = {
     body: data.body || data.message || 'You have a new study notification!',
     icon: iconUrl,

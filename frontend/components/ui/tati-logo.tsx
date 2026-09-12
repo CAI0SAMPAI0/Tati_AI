@@ -14,7 +14,7 @@ interface TatiLogoProps {
 }
 
 /** Avatar/logo da Prof. Tatiana com fallback se o arquivo não carregar. */
-export function TatiLogo({ size = 32, className, alt = 'Taty's Hub' }: TatiLogoProps) {
+export function TatiLogo({ size = 32, className, alt = "Taty's Hub" }: TatiLogoProps) {
   const [failed, setFailed] = useState(false);
 
   if (failed) {

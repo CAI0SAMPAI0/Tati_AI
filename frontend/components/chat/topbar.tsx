@@ -34,7 +34,7 @@ export function ChatTopbar({
         </button>
 
         <h1 className="text-[0.875rem] font-bold text-text truncate">
-          {title || 'Taty's Hub'}
+          {title || "Taty's Hub"}
         </h1>
       </div>
 

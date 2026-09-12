@@ -71,7 +71,7 @@ export function VoiceMessageBubble({ message, onWordClick }: VoiceMessageBubbleP
     )}>
       <div className="flex items-center gap-2 px-2">
         <span className="text-[0.55rem] font-black text-text-subtle uppercase tracking-[0.2em]">
-          {isUser ? 'You' : 'Taty's Hub'}
+          {isUser ? 'You' : "Taty's Hub"}
         </span>
       </div>
       <div className="flex items-end gap-2 relative">

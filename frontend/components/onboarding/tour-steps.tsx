@@ -25,9 +25,9 @@ export const TOUR_STEPS: TourStep[] = [
     targetId: 'tour-chat',
     title: 'Chat with Tati',
     description:
-      'This is your main learning space. Chat with Taty's Hub to practice English conversation, get corrections, and improve your skills.',
-    icon: < MessageCircle size = { 28} className = "text-primary" />,
-  route: '/chat',
+      "This is your main learning space. Chat with Taty's Hub to practice English conversation, get corrections, and improve your skills.",
+    icon: <MessageCircle size={28} className="text-primary" />,
+    route: '/chat',
   },
 {
   targetId: 'tour-voice',

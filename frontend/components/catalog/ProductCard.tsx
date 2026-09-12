@@ -88,7 +88,7 @@ export default function ProductCard({ item, showOwned, onAccessGranted }: Produc
           <div className="px-4 pb-4 pt-3">
             <h3 className="font-display text-lg font-bold text-ink line-clamp-2">{item.title}</h3>
             <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted">
-              {item.description || 'Material exclusivo curado pela Taty's Hub.'}
+              {item.description || "Material exclusivo curado pela Taty's Hub."}
             </p>
           </div>
         </Link>
@@ -114,7 +114,7 @@ export default function ProductCard({ item, showOwned, onAccessGranted }: Produc
           <div className="px-4 pb-4 pt-3">
             <h3 className="font-display text-lg font-bold text-ink line-clamp-2">{item.title}</h3>
             <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted">
-              {item.description || 'Material exclusivo curado pela Taty's Hub.'}
+              {item.description || "Material exclusivo curado pela Taty's Hub."}
             </p>
           </div>
         </div>
