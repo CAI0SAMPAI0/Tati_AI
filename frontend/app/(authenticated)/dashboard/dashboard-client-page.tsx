@@ -197,7 +197,6 @@ export default function DashboardClientPage() {
               <OverviewSection 
                 stats={stats} 
                 students={students || []} 
-                difficulties={difficulties}
                 onSeeAllStudents={() => setActiveSection('students')}
               />
             </>

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -42,7 +42,7 @@ export default function InstallPage() {
             <ArrowLeft size={24} />
           </button>
           <div>
-            <h1 className="text-2xl font-bold font-display">Install Tati AI</h1>
+            <h1 className="text-2xl font-bold font-display">Install Taty's Hub</h1>
             <p className="text-xs text-text-muted font-bold uppercase tracking-widest">
               Get the best experience on any device
             </p>
@@ -64,7 +64,7 @@ export default function InstallPage() {
               </div>
               <div className="p-6 space-y-4">
                 <p className="text-sm text-text-muted">
-                  Instale o Tati AI direto na sua tela de início pelo Safari (Web App / PWA):
+                  Instale o Taty's Hub direto na sua tela de início pelo Safari (Web App / PWA):
                 </p>
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
@@ -135,7 +135,7 @@ export default function InstallPage() {
               </div>
               <div className="p-6 space-y-4">
                 <p className="text-sm text-text-muted">
-                  Instale o Tati AI como Web App (PWA) no seu iPhone:
+                  Instale o Taty's Hub como Web App (PWA) no seu iPhone:
                 </p>
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
@@ -163,7 +163,7 @@ export default function InstallPage() {
             </div>
             <div className="p-6 space-y-4">
               <p className="text-sm text-text-muted">
-                Use Tati AI diretamente no seu navegador ou instale como app no computador.
+                Use o Taty's Hub diretamente no seu navegador ou instale como app no computador.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <Button variant="secondary" className="gap-2 font-bold" onClick={() => window.open('https://tati-ai.vercel.app', '_blank')}>

@@ -324,7 +324,7 @@ export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAva
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={mouthSrc}
-          alt="Taty's Hub"
+          alt="Teacher Tati"
           className="absolute inset-0 w-full h-full object-cover"
         />
 

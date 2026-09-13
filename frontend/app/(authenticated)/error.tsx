@@ -56,7 +56,7 @@ export default function AuthenticatedError({
         <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-5 shadow-sm overflow-hidden">
           <Image
             src="/images/tati_logo.jpg"
-            alt="Teacher Tati"
+            alt="Taty's Hub"
             width={52}
             height={52}
             className="rounded-xl object-cover"
@@ -72,7 +72,7 @@ export default function AuthenticatedError({
 
         <p className="text-sm text-text-muted mb-6 leading-relaxed">
           {isChunkError
-            ? 'Uma atualização do aplicativo foi instalada. Recarregue para continuar seus estudos com a Teacher Tati.'
+            ? "Uma atualização do aplicativo foi instalada. Recarregue para continuar seus estudos com o Taty's Hub."
             : 'Ocorreu uma instabilidade temporária na tela. Os detalhes já foram enviados para a nossa equipe.'}
         </p>
 

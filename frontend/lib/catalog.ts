@@ -12,7 +12,7 @@ export type CatalogMaterial = {
   title: string;
   description?: string | null;
   price: number;              // legado — mantido para compatibilidade
-  price_students?: number | null; // preço para alunos da Tati AI
+  price_students?: number | null; // preço para alunos do Taty's Hub
   price_buyers?: number | null;   // preço para clientes do Hub
   thumbnail_url?: string | null;
   preview_url?: string | null;

@@ -112,7 +112,7 @@ export default function HubSidebar({ isOpen, onClose }: SidebarProps) {
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-hub bg-primary/10 py-3 text-sm font-bold text-primary transition hover:bg-primary/20"
           >
             <MessageSquare size={18} />
-            Back to Tati AI
+            Back to Taty's Hub
           </Link>
         </div>
       </aside>

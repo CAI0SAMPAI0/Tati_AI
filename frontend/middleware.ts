@@ -3,36 +3,61 @@ import type { NextRequest } from 'next/server';
 
 const AUTH_TOKEN_COOKIE = 'auth_token';
 
-const publicRoutes = ['/login', '/hub', '/reset-password'];
+// Rotas públicas acessíveis sem autenticação
+const publicRoutes = [
+  '/',
+  '/login',
+  '/register',
+  '/reset-password',
+  '/privacy',
+  '/politica-de-privacidade',
+  '/teste-cefr',
+  '/cefr-test',
+  '/hub',
+];
+
+// Rotas de autenticação que devem redirecionar para /chat caso o usuário já esteja logado
+const authOnlyWhenGuestRoutes = ['/login', '/register'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith('/_next/') || pathname === '/favicon.ico') {
+  // Ignora arquivos internos do Next.js e arquivos estáticos
+  if (
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/images/') ||
+    pathname.startsWith('/icons/') ||
+    pathname.startsWith('/downloads/') ||
+    pathname.startsWith('/google') ||
+    pathname === '/favicon.ico' ||
+    pathname === '/robots.txt' ||
+    pathname === '/sitemap.xml' ||
+    pathname === '/manifest.json' ||
+    pathname === '/sw.js' ||
+    /\.(html|xml|txt|json|png|jpg|jpeg|svg|ico|webp|pdf)$/i.test(pathname)
+  ) {
     return NextResponse.next();
   }
 
   const token = request.cookies.get(AUTH_TOKEN_COOKIE)?.value;
 
-  if (pathname === '/') {
-    const url = request.nextUrl.clone();
-    url.pathname = token ? '/chat' : '/login';
-    return NextResponse.redirect(url);
-  }
-
   const isPublicRoute = publicRoutes.some(
-    (route) => pathname === route || pathname.startsWith(route + '/')
+    (route) => pathname === route || (route !== '/' && pathname.startsWith(route + '/'))
   );
 
-  // Allow /reset-password even when logged in (user clicked email link)
+  // Se o usuário está logado e acessa /login ou /register, redireciona para /chat
+  const isAuthGuestRoute = authOnlyWhenGuestRoutes.some(
+    (route) => pathname === route || pathname.startsWith(route + '/')
+  );
   const isResetWithToken = pathname === '/reset-password' && request.nextUrl.searchParams.has('token');
 
-  if (token && isPublicRoute && !isResetWithToken) {
+  if (token && isAuthGuestRoute && !isResetWithToken) {
     const url = request.nextUrl.clone();
     url.pathname = '/chat';
     return NextResponse.redirect(url);
   }
 
+  // Se não estiver logado e não for rota pública, redireciona para /login
   if (!token && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
@@ -44,6 +69,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api/|_next/static|_next/image|favicon\\.ico|images/|sw\\.js|manifest\\.json).*)',
+    '/((?!api/|_next/static|_next/image|favicon\\.ico|images/|icons/|downloads/|sw\\.js|manifest\\.json).*)',
   ],
 };

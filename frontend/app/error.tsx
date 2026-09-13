@@ -43,7 +43,7 @@ export default function RootError({
         <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-5 shadow-sm overflow-hidden">
           <Image
             src="/images/tati_logo.jpg"
-            alt="Teacher Tati"
+            alt="Taty's Hub"
             width={52}
             height={52}
             className="rounded-xl object-cover"

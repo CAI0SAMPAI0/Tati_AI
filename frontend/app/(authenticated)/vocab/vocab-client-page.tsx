@@ -369,7 +369,7 @@ export default function VocabClientPage() {
                     <div className="space-y-1">
                       <p className="text-text font-bold">No words found</p>
                       <p className="text-text-muted text-sm px-10">
-                        {allWords.length === 0 ? 'Start practicing in the chat with Teacher Tati to build your vocabulary.' : 'Try adjusting your search or filters.'}
+                        {allWords.length === 0 ? "Start practicing in the chat with Taty's Hub to build your vocabulary." : 'Try adjusting your search or filters.'}
                       </p>
                     </div>
                     {allWords.length > 0 && (

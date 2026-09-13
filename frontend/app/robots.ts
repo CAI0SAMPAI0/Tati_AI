@@ -6,7 +6,15 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: '*',
-      allow: ['/', '/login', '/reset-password', '/hub'],
+      allow: [
+        '/',
+        '/login',
+        '/reset-password',
+        '/hub',
+        '/privacy',
+        '/politica-de-privacidade',
+        '/teste-cefr',
+      ],
       disallow: ['/api/', '/django-admin/', '/receipt/', '/settings/'],
     },
     sitemap: baseUrl + '/sitemap.xml',

@@ -85,10 +85,10 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit, o
             <Image src="/images/tati_logo.jpg" alt="Tati" width={28} height={28} className="w-full h-full object-cover" />
           </div>
           <h2 className="font-display text-xl font-bold mb-2">
-            Hi! I'm Taty's Hub
+            Welcome to Taty&apos;s Hub 👋
           </h2>
           <p className="text-sm text-text-muted max-w-[320px] mb-6">
-            Your AI English teacher. Let's practice together?
+            Your AI English learning hub. Let&apos;s practice together?
           </p>
 
           {onStartLeveling && (

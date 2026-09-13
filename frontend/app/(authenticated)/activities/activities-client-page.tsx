@@ -38,9 +38,6 @@ const teImg = (url: string) => {
   if (url.includes('test-english.com')) {
     return `${API_BASE}/activities/test-english/image-proxy?url=${encodeURIComponent(url)}`;
   }
-  if (url.includes('liveworksheets.com')) {
-    return `${API_BASE}/activities/liveworksheets/image-proxy?url=${encodeURIComponent(url)}`;
-  }
   return url;
 };
 
@@ -116,7 +113,6 @@ export default function ActivitiesClientPage() {
   const [activeTab, setActiveTab] = useState<TabType>('grammar');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'done'>('all');
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'test-english' | 'liveworksheets'>('all');
   const [selectedActivity, setSelectedActivity] = useState<any | null>(null);
 
   const { sidebarOpen, toggleSidebar: handleToggleSidebar, closeSidebar: handleCloseSidebar } = useSidebarState();
@@ -132,7 +128,7 @@ export default function ActivitiesClientPage() {
 
   useEffect(() => {
     setVisibleCount(10);
-  }, [activeTab, effectiveLevel, searchQuery, statusFilter, sourceFilter]);
+  }, [activeTab, effectiveLevel, searchQuery, statusFilter]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -147,10 +143,6 @@ export default function ActivitiesClientPage() {
       const savedStatus = sessionStorage.getItem('tati_activities_filter_status') as any;
       if (savedStatus && ['all', 'pending', 'done'].includes(savedStatus)) {
         setStatusFilter(savedStatus);
-      }
-      const savedSource = sessionStorage.getItem('tati_activities_filter_source') as any;
-      if (savedSource && ['all', 'test-english', 'liveworksheets'].includes(savedSource)) {
-        setSourceFilter(savedSource);
       }
     }
   }, []);
@@ -170,13 +162,6 @@ export default function ActivitiesClientPage() {
     setStatusFilter(val);
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('tati_activities_filter_status', val);
-    }
-  };
-
-  const handleSourceFilterChange = (val: 'all' | 'test-english' | 'liveworksheets') => {
-    setSourceFilter(val);
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('tati_activities_filter_source', val);
     }
   };
 
@@ -276,32 +261,6 @@ export default function ActivitiesClientPage() {
     enabled: activeTab === 'reading',
   });
 
-  // LiveWorksheets Content (Cached 30 mins)
-  const { data: grammarLW } = useQuery<{ items: TestEnglishItem[] }>({
-    queryKey: ['liveworksheets-grammar', testEnglishLevel],
-    queryFn: () => apiGet<any>(ENDPOINTS.LIVEWORKSHEETS_CONTENT(testEnglishLevel, 'grammar')),
-    staleTime: 30 * 60 * 1000,
-    enabled: activeTab === 'grammar',
-  });
-  const { data: vocabularyLW } = useQuery<{ items: TestEnglishItem[] }>({
-    queryKey: ['liveworksheets-vocabulary', testEnglishLevel],
-    queryFn: () => apiGet<any>(ENDPOINTS.LIVEWORKSHEETS_CONTENT(testEnglishLevel, 'vocabulary')),
-    staleTime: 30 * 60 * 1000,
-    enabled: activeTab === 'vocabulary',
-  });
-  const { data: listeningLW } = useQuery<{ items: TestEnglishItem[] }>({
-    queryKey: ['liveworksheets-listening', testEnglishLevel],
-    queryFn: () => apiGet<any>(ENDPOINTS.LIVEWORKSHEETS_CONTENT(testEnglishLevel, 'listening')),
-    staleTime: 30 * 60 * 1000,
-    enabled: activeTab === 'listenings',
-  });
-  const { data: readingLW } = useQuery<{ items: TestEnglishItem[] }>({
-    queryKey: ['liveworksheets-reading', testEnglishLevel],
-    queryFn: () => apiGet<any>(ENDPOINTS.LIVEWORKSHEETS_CONTENT(testEnglishLevel, 'reading')),
-    staleTime: 30 * 60 * 1000,
-    enabled: activeTab === 'reading',
-  });
-
   const { data: gamesRaw = [] } = useQuery<GameItem[]>({
     queryKey: ['activities-games'],
     queryFn: () => apiGet<GameItem[]>(ENDPOINTS.ACTIVITIES_GAMES),
@@ -324,31 +283,17 @@ export default function ActivitiesClientPage() {
 
   // Combine items for each category
   const filterItems = useCallback(
-    (teItems: TestEnglishItem[] = [], lwItems: TestEnglishItem[] = [], category?: string) => {
-      let combined = [
-        ...(teItems || []).map((i) => ({
-          ...i,
-          id: i.url || i.slug,
-          source: 'test-english.com',
-          category,
-          title: formatFallbackTitle(i),
-        })),
-        ...(lwItems || []).map((i) => ({
-          ...i,
-          id: i.url || i.slug,
-          source: 'liveworksheets.com',
-          category,
-          title: formatFallbackTitle(i),
-        })),
-      ];
+    (teItems: TestEnglishItem[] = [], category?: string) => {
+      let combined = (teItems || []).map((i) => ({
+        ...i,
+        id: i.url || i.slug,
+        source: 'test-english.com',
+        category,
+        title: formatFallbackTitle(i),
+      }));
 
       if (searchQuery) {
         combined = combined.filter((i) => i.title.toLowerCase().includes(searchQuery.toLowerCase()));
-      }
-      if (sourceFilter === 'test-english') {
-        combined = combined.filter((i) => i.source === 'test-english.com');
-      } else if (sourceFilter === 'liveworksheets') {
-        combined = combined.filter((i) => i.source === 'liveworksheets.com');
       }
 
       if (statusFilter === 'done') {
@@ -363,24 +308,24 @@ export default function ActivitiesClientPage() {
 
       return combined;
     },
-    [searchQuery, sourceFilter, statusFilter, completedActivityIds]
+    [searchQuery, statusFilter, completedActivityIds]
   );
 
   const grammarItems = useMemo(
-    () => filterItems(grammarTE?.items, grammarLW?.items, 'grammar'),
-    [grammarTE, grammarLW, filterItems]
+    () => filterItems(grammarTE?.items, 'grammar'),
+    [grammarTE, filterItems]
   );
   const vocabularyItems = useMemo(
-    () => filterItems(vocabularyTE?.items, vocabularyLW?.items, 'vocabulary'),
-    [vocabularyTE, vocabularyLW, filterItems]
+    () => filterItems(vocabularyTE?.items, 'vocabulary'),
+    [vocabularyTE, filterItems]
   );
   const listeningItems = useMemo(
-    () => filterItems(listeningTE?.items, listeningLW?.items, 'listening'),
-    [listeningTE, listeningLW, filterItems]
+    () => filterItems(listeningTE?.items, 'listening'),
+    [listeningTE, filterItems]
   );
   const readingItems = useMemo(
-    () => filterItems(readingTE?.items, readingLW?.items, 'reading'),
-    [readingTE, readingLW, filterItems]
+    () => filterItems(readingTE?.items, 'reading'),
+    [readingTE, filterItems]
   );
 
   const flashcards = useMemo(() => {
@@ -494,7 +439,7 @@ export default function ActivitiesClientPage() {
     return (
       <div className="space-y-8">
         <p className="text-text-muted text-sm max-w-2xl">
-          Interactive {categoryName} exercises for level {testEnglishLevel} from test-english.com & liveworksheets.com.
+          Interactive {categoryName} exercises for level {testEnglishLevel} from test-english.com.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {currentItems.map((item) => {
@@ -653,20 +598,6 @@ export default function ActivitiesClientPage() {
                   <option value="all">All Status</option>
                   <option value="pending">⏳ Pending</option>
                   <option value="done">✓ Completed</option>
-                </select>
-              </div>
-
-              {/* Source Filter */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-text-subtle uppercase tracking-wider whitespace-nowrap">Source:</span>
-                <select
-                  value={sourceFilter}
-                  onChange={(e) => handleSourceFilterChange(e.target.value as any)}
-                  className="px-3 py-2 bg-surface border border-border rounded-2xl text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all cursor-pointer text-text"
-                >
-                  <option value="all">All Sources</option>
-                  <option value="test-english">test-english.com</option>
-                  <option value="liveworksheets">liveworksheets.com</option>
                 </select>
               </div>
 

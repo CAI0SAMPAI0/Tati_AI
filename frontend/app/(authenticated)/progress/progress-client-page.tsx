@@ -559,7 +559,7 @@ export default function ProgressClientPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
                     <span className="text-sm font-black text-blue-500 leading-none">+15 XP</span>
-                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Chat with Teacher Tati</span>
+                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Chat with Taty's Hub</span>
                   </div>
                   <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
                     <span className="text-sm font-black text-purple-500 leading-none">+30 XP</span>
