@@ -37,12 +37,12 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-bg text-text antialiased selection:bg-primary/20 selection:text-primary">
       {/* ── HEADER PRINCIPAL ── */}
-      <header className="sticky top-0 z-50 border-b border-border bg-surface/90 backdrop-blur-md">
+      <header className="sticky top-0 z-50 w-full border-b border-border bg-surface">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3 transition-opacity hover:opacity-85">
-            <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-primary to-primary/80 shadow-md shadow-primary/20">
-              <span className="font-display text-lg font-black text-white">T</span>
+          <Link href="/" className="flex items-center gap-3 transition-opacity hover:opacity-90">
+            <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-primary to-primary/90 shadow-sm shadow-primary/10">
+              <span className="font-display text-lg font-black text-white tracking-tight">T</span>
             </div>
             <div className="flex flex-col">
               <span className="font-display text-base font-extrabold tracking-tight text-text">
@@ -168,7 +168,7 @@ export default function HomePage() {
                       <div className="text-sm font-bold text-text">Teacher Tati AI</div>
                       <div className="flex items-center gap-1 text-[11px] text-success">
                         <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
-                        Online agora para ensinar
+                        Online
                       </div>
                     </div>
                   </div>
@@ -192,11 +192,10 @@ export default function HomePage() {
 
                   {/* Aluno */}
                   <div className="flex items-start justify-end gap-2.5">
-                    <div className="rounded-2xl rounded-tr-sm bg-primary p-3.5 text-white leading-relaxed">
+                    <div className="rounded-2xl rounded-tr-sm bg-primary p-3.5 text-white leading-relaxed max-w-[80%]">
                       I usually like reading books and listen music with my friends.
                     </div>
                   </div>
-
                   {/* Feedback didático da Tati */}
                   <div className="flex items-start gap-2.5">
                     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-[11px] font-bold">
