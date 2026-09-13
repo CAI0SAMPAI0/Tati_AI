@@ -127,7 +127,14 @@ export function OverviewSection({ stats, students, onSeeAllStudents }: OverviewS
                           ) : (s.name || s.username || '?').charAt(0).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <div className="text-sm font-semibold truncate text-text">{s.name || s.username}</div>
+                          <div className="flex items-center gap-1.5">
+                            <div className="text-sm font-semibold truncate text-text">{s.name || s.username}</div>
+                            {s.role === 'lead' && (
+                              <span className="px-1.5 py-0.2 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-[0.55rem] font-bold">
+                                Lead
+                              </span>
+                            )}
+                          </div>
                           <div className="text-[0.65rem] text-text-muted truncate">@{s.username}</div>
                         </div>
                       </div>

@@ -8,6 +8,7 @@ class UserRole(models.TextChoices):
     PROFESSOR = "professor", "Professora Tatiana"
     STUDENT = "student", "Aluno"
     BUYER = "buyer", "Comprador"
+    LEAD = "lead", "Lead / Teste CEFR"
 
 
 class CEFRLevel(models.TextChoices):

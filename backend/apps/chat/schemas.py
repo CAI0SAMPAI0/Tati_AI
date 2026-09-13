@@ -43,3 +43,24 @@ class VoiceSynthesisInput(BaseModel):
 class VoiceSynthesisOut(BaseModel):
     audio_b64: str
     duration_seconds: float = 0.0
+
+
+class PublicLevelingStartInput(BaseModel):
+    total_questions: Optional[int] = 8
+    count_per_level: Optional[int] = None
+    accent: Optional[str] = "en-US"
+
+
+class PublicLevelingStepInput(BaseModel):
+    session_id: str
+    user_text: str
+    accent: Optional[str] = "en-US"
+
+
+class PublicLevelingSubmitInput(BaseModel):
+    session_id: str
+    name: str
+    email: str
+    create_account: bool = False
+    username: Optional[str] = None
+    password: Optional[str] = None

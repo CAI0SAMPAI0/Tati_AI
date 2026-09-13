@@ -253,6 +253,11 @@ export default function DashboardClientPage() {
                             <div className="min-w-0">
                               <div className="flex items-center flex-wrap gap-1.5">
                                 <span className="text-sm font-bold truncate text-text group-hover:text-primary transition-colors">{s.name || s.username}</span>
+                                {s.role === 'lead' && (
+                                  <span className="px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-[0.6rem] font-bold">
+                                    Lead CEFR
+                                  </span>
+                                )}
                                 {s.risk_level === 'critical' && (
                                   <span className="px-1.5 py-0.5 rounded bg-danger/10 text-danger text-[0.6rem] font-bold animate-pulse">Critical</span>
                                 )}

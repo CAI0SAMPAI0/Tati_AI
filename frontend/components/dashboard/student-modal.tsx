@@ -234,12 +234,28 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-xl font-bold text-primary">
                   {localStudent.avatar_url ? <img src={localStudent.avatar_url} alt="" className="w-full h-full rounded-full object-cover" /> : localStudent.username.charAt(0).toUpperCase()}
                 </div>
-                <div>
-                  <h3 className="font-bold text-text">@{localStudent.username}</h3>
-                  <p className="text-xs text-text-muted flex items-center gap-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-text">@{localStudent.username}</h3>
+                    {localStudent.role === 'lead' ? (
+                      <span className="px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-[0.65rem] font-bold">
+                        Lead (CEFR)
+                      </span>
+                    ) : localStudent.role === 'buyer' ? (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[0.65rem] font-bold">
+                        Buyer
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-[0.65rem] font-bold">
+                        Aluno
+                      </span>
+                    )}
+                  </div>
+                  {localStudent.email && (
+                    <p className="text-xs text-text-muted mt-0.5">{localStudent.email}</p>
+                  )}
+                  <p className="text-xs text-text-muted flex items-center gap-1 mt-0.5">
                     <Clock size={12} /> {'Joined'}: {formatDateTime(localStudent.created_at)}
                   </p>
-                </div>
               </div>
 
               <div className="grid grid-cols-3 gap-3">
