@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: 'Pratique conversação em inglês 24/7 com a Teacher Tati AI. Faça o teste de nivelamento CEFR gratuito e receba seu relatório em PDF.',
   manifest: '/manifest.json',
   verification: {
-    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || 'google78ad7f94a8dd4259',
+    google: '2pUtbPwWrV8Q1kdAj8fmkYUIY7a-BI0NRj_WKjAHoLM',
   },
 };
 
@@ -49,7 +49,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta
           name="google-site-verification"
-          content={process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || 'google78ad7f94a8dd4259'}
+          content="2pUtbPwWrV8Q1kdAj8fmkYUIY7a-BI0NRj_WKjAHoLM"
         />
         <link rel="icon" href="/images/tati_logo.jpg" />
 

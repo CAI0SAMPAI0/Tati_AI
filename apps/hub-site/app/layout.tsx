@@ -44,8 +44,11 @@ twitter: {
   description: "Catálogo de materiais premium de Taty's Materials",
   images: '/images/tati_logo.jpg',
 },
-alternates: {
-  canonical: 'https://tati-hub.vercel.app',
+  alternates: {
+    canonical: 'https://tati-hub.vercel.app',
+  },
+  verification: {
+    google: '2pUtbPwWrV8Q1kdAj8fmkYUIY7a-BI0NRj_WKjAHoLM',
   },
 };
 
@@ -53,6 +56,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR" className={`${sora.variable} ${dmSans.variable}`}>
       <head>
+        <meta
+          name="google-site-verification"
+          content="2pUtbPwWrV8Q1kdAj8fmkYUIY7a-BI0NRj_WKjAHoLM"
+        />
         <link rel="icon" href="/images/tati_logo.jpg" />
       </head>
       <body className="min-h-screen bg-bg font-body text-ink antialiased">

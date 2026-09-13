@@ -28,6 +28,9 @@ export const metadata: Metadata = {
     locale: 'pt_BR',
     type: 'website',
   },
+  verification: {
+    google: '2pUtbPwWrV8Q1kdAj8fmkYUIY7a-BI0NRj_WKjAHoLM',
+  },
 };
 
 export default function HomePage() {
