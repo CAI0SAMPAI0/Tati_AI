@@ -15,16 +15,21 @@ export const ACCENTS: AccentOption[] = [
   { id: 'en-IN', label: '🇮🇳 Indian', shortLabel: 'IN', desc: 'India (Neerja)', flag: '🇮🇳' },
   { id: 'en-ZA', label: '🇿🇦 South African', shortLabel: 'ZA', desc: 'South Africa (Leah)', flag: '🇿🇦' },
   { id: 'en-NZ', label: '🇳🇿 New Zealand', shortLabel: 'NZ', desc: 'New Zealand (Molly)', flag: '🇳🇿' },
+  { id: 'en-CN', label: '🇨🇳 Chinese Accent', shortLabel: 'CN', desc: 'Chinese English (Xiaoxiao)', flag: '🇨🇳' },
+  { id: 'en-JP', label: '🇯🇵 Japanese Accent', shortLabel: 'JP', desc: 'Japanese English (Nanami)', flag: '🇯🇵' },
 ];
 
 export const DEFAULT_ACCENT = 'en-US';
 
-export function getStoredAccent(): string {
-  if (typeof window === 'undefined') return DEFAULT_ACCENT;
-  return localStorage.getItem('tati_voice_accent') || DEFAULT_ACCENT;
+export function getStoredAccent(fallback?: string): string {
+  if (typeof window === 'undefined') return fallback || DEFAULT_ACCENT;
+  return localStorage.getItem('tati_voice_accent') || fallback || DEFAULT_ACCENT;
 }
 
 export function saveStoredAccent(accentId: string): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem('tati_voice_accent', accentId);
+  try {
+    window.dispatchEvent(new CustomEvent('tati_accent_changed', { detail: accentId }));
+  } catch (_) {}
 }

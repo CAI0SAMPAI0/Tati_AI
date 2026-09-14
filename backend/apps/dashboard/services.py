@@ -280,6 +280,9 @@ class DashboardService:
                     "focus": focus_val,
                     "total_xp": u.total_xp,
                     "streak_count": u.streak_count,
+                    "current_streak": u.streak_count,
+                    "freeze_count": st.get("freeze_count", 0) or 0,
+                    "streak_freeze_count": st.get("freeze_count", 0) or 0,
                     "is_exempt": bool(u.is_exempt),
                     "is_premium_active": bool(u.is_premium_active),
                     "last_active": last_active_iso,
@@ -1019,6 +1022,9 @@ class DashboardService:
         msgs_count = Message.objects.filter(username=username, role="user").count()
         subs_count = ActivitySubmission.objects.filter(username=username).count()
 
+        st = u.streak_data if isinstance(u.streak_data, dict) else {}
+        freeze_count = st.get("freeze_count", 0) or 0
+
         return {
             "username": u.username,
             "name": u.name or u.username,
@@ -1027,6 +1033,9 @@ class DashboardService:
             "level": u.level or "A1",
             "total_xp": u.total_xp,
             "streak_count": u.streak_count,
+            "current_streak": u.streak_count,
+            "freeze_count": freeze_count,
+            "streak_freeze_count": freeze_count,
             "is_exempt": bool(u.is_exempt),
             "is_premium_active": bool(u.is_premium_active),
             "messages_count": msgs_count,
@@ -1151,6 +1160,9 @@ class DashboardService:
         total_msgs = Message.objects.filter(username=username, role="user").count()
         total_exercises = len(submissions)
 
+        st = u.streak_data if isinstance(u.streak_data, dict) else {}
+        freeze_count = st.get("freeze_count", 0) or 0
+
         return {
             "summary": summary,
             "study_time_chart": study_time_chart,
@@ -1158,6 +1170,9 @@ class DashboardService:
             "weekly_study_time": [item["study_minutes"] for item in study_time_chart],
             "total_xp": u.total_xp,
             "streak_count": u.streak_count,
+            "current_streak": u.streak_count,
+            "freeze_count": freeze_count,
+            "streak_freeze_count": freeze_count,
             "current_level": u.level or "A1",
             "messages_count": total_msgs,
             "exercises_completed": total_exercises,
@@ -1165,8 +1180,31 @@ class DashboardService:
 
     @staticmethod
     def get_student_activity_progress(username: str) -> dict:
+        user = User.objects.filter(username=username).first()
+        usernames = [username]
+        if user:
+            if user.email:
+                same_email = list(
+                    User.objects.filter(email__iexact=user.email).values_list(
+                        "username", flat=True
+                    )
+                )
+                usernames.extend(same_email)
+            if "durban" in user.username.lower() or (
+                user.name and "durban" in user.name.lower()
+            ):
+                durban_users = list(
+                    User.objects.filter(
+                        Q(username__icontains="durban")
+                        | Q(name__icontains="durban")
+                        | Q(email__icontains="durban")
+                    ).values_list("username", flat=True)
+                )
+                usernames.extend(durban_users)
+        usernames = list(set(usernames))
+
         subs = list(
-            ActivitySubmission.objects.filter(username=username).order_by(
+            ActivitySubmission.objects.filter(username__in=usernames).order_by(
                 "-created_at"
             )[:200]
         )
@@ -1182,9 +1220,15 @@ class DashboardService:
             "news": 0,
         }
 
+        seen_keys = set()
         mapped_submissions = []
         for s in subs:
             meta = s.metadata if isinstance(s.metadata, dict) else {}
+            key = meta.get("url") or meta.get("slug") or meta.get("activity_id") or str(s.id)
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+
             cat_raw = str(meta.get("category") or s.activity_type or "grammar").lower()
 
             if "gramm" in cat_raw:
@@ -1250,11 +1294,41 @@ class DashboardService:
                 }
             )
 
+        # Incorpora avaliações de nivelamento CEFR concluídas no histórico
+        if user:
+            prof = user.profile if isinstance(user.profile, dict) else {}
+            leveling_list = list(prof.get("leveling_history") or [])
+            for alt_u in usernames:
+                if alt_u != username:
+                    alt_user = User.objects.filter(username=alt_u).first()
+                    if alt_user and isinstance(alt_user.profile, dict):
+                        for item in alt_user.profile.get("leveling_history") or []:
+                            if item not in leveling_list:
+                                leveling_list.append(item)
+
+            for idx, lh in enumerate(leveling_list):
+                if lh.get("completed"):
+                    comp_at = lh.get("completed_at") or lh.get("started_at") or ""
+                    assigned = lh.get("assigned_level") or "A1"
+                    mapped_submissions.append(
+                        {
+                            "id": f"leveling-{idx}",
+                            "category": "grammar",
+                            "activity_type": "CEFR Leveling Test",
+                            "title": f"CEFR Leveling Assessment ({assigned})",
+                            "url": "",
+                            "score": 100,
+                            "status": "completed",
+                            "created_at": comp_at,
+                        }
+                    )
+                    counts["grammar"] += 1
+
         # Flashcards protegidos contra UUID error
         fc_progress = []
         try:
             fc_progress = list(
-                UserFlashcardProgress.objects.filter(user_id=username).order_by(
+                UserFlashcardProgress.objects.filter(user_id__in=usernames).order_by(
                     "-reviewed_at"
                 )[:30]
             )
@@ -1266,7 +1340,7 @@ class DashboardService:
         vocab_learned = []
         try:
             vocab_learned = list(
-                UserVocabulary.objects.filter(username=username).order_by(
+                UserVocabulary.objects.filter(username__in=usernames).order_by(
                     "-created_at"
                 )[:30]
             )

@@ -12,6 +12,9 @@ from .schemas import (
     CreateConversationInput,
     MessageOut,
     SendMessageInput,
+    PublicLevelingStartInput,
+    PublicLevelingStepInput,
+    PublicLevelingSubmitInput,
 )
 from .services import AIService, ConversationService
 
@@ -107,6 +110,58 @@ def get_leveling_status(request: HttpRequest):
     return {"active": False}
 
 
+# ── TESTE CEFR PÚBLICO (PARA VISITANTES SEM LOGIN) ───────────────────
+
+
+@chat_router.post("/leveling/public/start", auth=auth_optional)
+def start_public_leveling(request: HttpRequest, payload: Optional[PublicLevelingStartInput] = None):
+    """
+    Inicia o Teste CEFR para visitante externo sem exigir autenticação.
+    """
+    from .leveling_service import LevelingService
+
+    total_q = payload.total_questions if payload else 8
+    count_per_level = payload.count_per_level if payload else None
+    accent = payload.accent if payload else "en-US"
+
+    return LevelingService.start_public_leveling_session(
+        total_questions=total_q,
+        count_per_level=count_per_level,
+        accent=accent,
+    )
+
+
+@chat_router.post("/leveling/public/step", auth=auth_optional)
+def step_public_leveling(request: HttpRequest, payload: PublicLevelingStepInput):
+    """
+    Processa resposta de visitante no teste de nivelamento público.
+    """
+    from .leveling_service import LevelingService
+
+    return LevelingService.process_public_leveling_step(
+        session_id=payload.session_id,
+        user_text=payload.user_text,
+        accent=payload.accent,
+    )
+
+
+@chat_router.post("/leveling/public/submit", auth=auth_optional)
+def submit_public_leveling(request: HttpRequest, payload: PublicLevelingSubmitInput):
+    """
+    Finaliza o teste CEFR do visitante, envia PDF por e-mail e cria conta como Lead se solicitado.
+    """
+    from .leveling_service import LevelingService
+
+    return LevelingService.submit_public_leveling(
+        session_id=payload.session_id,
+        name=payload.name,
+        email=payload.email,
+        create_account=payload.create_account,
+        username=payload.username,
+        password=payload.password,
+    )
+
+
 @chat_router.get(
     "/conversations/{conversation_id}/messages",
     response=list[MessageOut],
@@ -158,6 +213,7 @@ async def send_chat_message(request: HttpRequest, payload: SendMessageInput):
         conversation_id=payload.conversation_id,
         user_text=payload.message,
         difficulty=payload.current_difficulty,
+        accent=getattr(payload, "accent", None),
     )
     reply_text = res.get("reply") if isinstance(res, dict) else str(res)
     audio_b64 = res.get("audio_b64") if isinstance(res, dict) else ""
@@ -196,14 +252,14 @@ async def synthesize_voice(request: HttpRequest, payload: TTSInput):
 
     text = payload.text or payload.message or ""
     accent = payload.accent
-    if not accent or accent == "en-US":
+    if not accent or str(accent).lower() in ["default", ""]:
         if (
             hasattr(request, "auth")
             and request.auth
             and hasattr(request.auth, "profile")
             and isinstance(request.auth.profile, dict)
         ):
-            accent = request.auth.profile.get("preferred_accent") or request.auth.profile.get("accent") or accent or "en-US"
+            accent = request.auth.profile.get("preferred_accent") or request.auth.profile.get("accent")
     accent = accent or "en-US"
     audio_b64 = await AudioService.text_to_speech_async(text, accent=accent)
     return {

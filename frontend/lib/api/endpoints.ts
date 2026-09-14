@@ -45,6 +45,9 @@ export const ENDPOINTS = {
   LEVELING_START: '/chat/leveling/start',
   LEVELING_STATUS: '/chat/leveling/status',
   LEVELING_FINISH: '/chat/leveling/finish',
+  LEVELING_PUBLIC_START: '/chat/leveling/public/start',
+  LEVELING_PUBLIC_STEP: '/chat/leveling/public/step',
+  LEVELING_PUBLIC_SUBMIT: '/chat/leveling/public/submit',
   WORD_LOOKUP: '/chat/word-lookup',
 
   // Avatar

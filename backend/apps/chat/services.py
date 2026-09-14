@@ -171,7 +171,7 @@ def call_meta_llama(
     return None
 
 
-def get_tati_system_prompt(user: User, difficulty: str = None, memory_summary: str = "") -> str:
+def get_tati_system_prompt(user: User, difficulty: str = None, memory_summary: str = "", accent: str = None) -> str:
     """
     Prompt Humanizado Anti-IA da Teacher Tatiana Duarte (Teacher Tati).
     Proíbe respostas robóticas, proíbe emojis (nem no texto nem no áudio),
@@ -179,6 +179,30 @@ def get_tati_system_prompt(user: User, difficulty: str = None, memory_summary: s
     """
     level = (difficulty or getattr(user, "level", None) or "A1").upper()
     name = getattr(user, "name", None) or getattr(user, "username", "there")
+
+    accent_instruction = ""
+    if accent:
+        norm = accent.upper().replace("_", "-")
+        if "GB" in norm or "UK" in norm or "BRITISH" in norm:
+            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu Inglês Britânico (UK). Use vocabulário e grafia britânica natural quando aplicável (ex: flat, holiday, colour, favour, brilliant)."
+        elif "AU" in norm or "AUSTRALIAN" in norm:
+            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu Inglês Australiano (AU). Traga a energia e o calor do inglês da Austrália com naturalidade."
+        elif "CA" in norm or "CANADIAN" in norm:
+            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu Inglês Canadense (CA)."
+        elif "IE" in norm or "IRISH" in norm:
+            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu Inglês Irlandês (IE)."
+        elif "IN" in norm or "INDIAN" in norm:
+            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu Inglês Indiano (IN)."
+        elif "ZA" in norm or "SOUTH" in norm:
+            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu Inglês Sul-Africano (ZA)."
+        elif "NZ" in norm or "ZEALAND" in norm:
+            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu Inglês Neozelandês (NZ)."
+        elif "CN" in norm or "CHINESE" in norm:
+            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu prática de Inglês Internacional com sotaque Chinês (Asian International Business English). Foque em clareza, ritmo cadenciado e expressões comuns na comunicação global com a Ásia."
+        elif "JP" in norm or "JAPANESE" in norm:
+            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu prática de Inglês com sotaque Japonês (Japanese English Context). Mantenha tom polido e cortês, dicção nítida e vocabulário claro para comunicação internacional com parceiros do Japão."
+        elif "US" in norm or "AMERICAN" in norm:
+            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu Inglês Americano (US). Use expressões cotidianas e naturais dos EUA."
 
     level_guidelines = {
         "A1": (
@@ -223,7 +247,7 @@ You are talking 1-on-1 with your student, {name}, who is at CEFR Level: {level}.
 4. CORREÇÃO PEDAGÓGICA SUTIL:
    - Se o aluno cometer um erro de inglês, não dê uma palestra gramatical. Demonstre carinhosamente a forma natural em apenas 1 frase rápida e continue a conversa normalmente.
 5. ADAPTAÇÃO AO NÍVEL ({level}):
-   {level_guidelines}
+   {level_guidelines}{accent_instruction}
 """
     if memory_summary:
         prompt += f"""
@@ -473,7 +497,19 @@ class AIService:
         # 2. Constrói histórico com Compressão e Retenção de Dados
         memory_summary, active_dialog = build_conversation_context(conversation_id, max_recent=8)
 
-        sys_prompt = get_tati_system_prompt(user, difficulty, memory_summary=memory_summary)
+        user_accent = accent
+        user_pref = None
+        if user:
+            prof = getattr(user, "profile", None)
+            if isinstance(prof, dict):
+                user_pref = prof.get("preferred_accent") or prof.get("accent")
+            if not user_pref and hasattr(user, "preferred_accent"):
+                user_pref = getattr(user, "preferred_accent")
+        if not user_accent or str(user_accent).lower() in ["default", ""]:
+            user_accent = user_pref or "en-US"
+        user_accent = user_accent or "en-US"
+
+        sys_prompt = get_tati_system_prompt(user, difficulty, memory_summary=memory_summary, accent=user_accent)
         
         if generated_doc:
             sys_prompt += (
@@ -664,13 +700,6 @@ class AIService:
 
         # 8. Gera áudio via Edge TTS (com texto limpo de emojis e com o sotaque selecionado)
         from .audio_service import AudioService
-
-        user_accent = accent
-        if not user_accent or user_accent.lower() in ["default", ""]:
-            if user and hasattr(user, "profile") and isinstance(user.profile, dict):
-                user_accent = user.profile.get("preferred_accent") or user.profile.get("accent") or "en-US"
-            else:
-                user_accent = "en-US"
 
         clean_tts_reply = re.sub(r"\[ATTACHED_DOCUMENT:.*?\]", "", reply_text, flags=re.DOTALL).strip()
         audio_b64 = AudioService.text_to_speech(clean_tts_reply, accent=user_accent)

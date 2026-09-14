@@ -4,9 +4,12 @@ import { DM_Sans, Sora } from 'next/font/google';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Teacher Tati - AI English Learning',
-  description: 'Practice English with an AI teacher 24/7.',
+  title: "Teacher Tati AI | Plataforma Inteligente de Inglês",
+  description: 'Pratique conversação em inglês 24/7 com a Teacher Tati AI. Faça o teste de nivelamento CEFR gratuito e receba seu relatório em PDF.',
   manifest: '/manifest.json',
+  verification: {
+    google: '2pUtbPwWrV8Q1kdAj8fmkYUIY7a-BI0NRj_WKjAHoLM',
+  },
 };
 
 // Apenas o weight usado em display (h1/h2/h3) — reduz download da fonte
@@ -42,8 +45,12 @@ export default function RootLayout({
     >
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="Tati AI" />
+        <meta name="apple-mobile-web-app-title" content="Taty's Hub" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta
+          name="google-site-verification"
+          content="2pUtbPwWrV8Q1kdAj8fmkYUIY7a-BI0NRj_WKjAHoLM"
+        />
         <link rel="icon" href="/images/tati_logo.jpg" />
 
         {/* Preconnect ao backend para reduzir latência de rede nas primeiras requests */}

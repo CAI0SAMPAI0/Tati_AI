@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone, timedelta
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from ninja.errors import HttpError
@@ -6,7 +7,7 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
 from .models import UserRole, CEFRLevel
-from .schemas import RegisterInput, LoginInput, TokenResponse, UserOut
+from .schemas import RegisterInput, LoginInput, TokenResponse, UserOut, ConsentInput
 from .security import (
     create_access_token,
     create_refresh_token,
@@ -240,6 +241,16 @@ class AuthService:
         else:
             role = UserRole.STUDENT
 
+        now_iso = datetime.now(timezone.utc).isoformat()
+        profile_data = {
+            "lgpd_consent": {
+                "accepted_at": now_iso,
+                "terms_version": "2.2",
+                "accepted_terms": bool(getattr(data, "accepted_terms", True)),
+                "parental_consent": bool(getattr(data, "parental_consent", True)),
+            }
+        }
+
         user = User.objects.create(
             username=username,
             email=email,
@@ -249,10 +260,26 @@ class AuthService:
             level=data.level.upper()
             if data.level.upper() in CEFRLevel.values
             else CEFRLevel.A1,
+            profile=profile_data,
         )
 
         logger.info(f"[Auth] Novo usuário registrado com sucesso: {username} ({role})")
         return cls.build_token_response(user)
+
+    @classmethod
+    def record_user_consent(cls, user: User, data: ConsentInput) -> UserOut:
+        prof = user.profile if isinstance(user.profile, dict) else {}
+        now_iso = datetime.now(timezone.utc).isoformat()
+        prof["lgpd_consent"] = {
+            "accepted_at": now_iso,
+            "terms_version": "2.2",
+            "accepted_terms": bool(data.accepted_terms),
+            "parental_consent": bool(data.parental_consent),
+        }
+        user.profile = prof
+        user.save(update_fields=["profile"])
+        logger.info(f"[Auth] Consentimento LGPD v2.2 registrado para {user.username}")
+        return cls._build_user_out(user)
 
     @classmethod
     def google_login(cls, credential: str, is_hub_only: bool = False) -> TokenResponse:

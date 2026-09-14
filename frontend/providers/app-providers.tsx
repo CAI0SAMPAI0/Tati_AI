@@ -24,8 +24,13 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
           {children}
           <Toaster
             position="top-right"
+            containerStyle={{
+              zIndex: 99999999,
+            }}
+            containerClassName="!z-[99999999]"
             toastOptions={{
               style: {
+                zIndex: 99999999,
                 background: 'var(--surface)',
                 color: 'var(--text)',
                 border: '1px solid var(--border)',

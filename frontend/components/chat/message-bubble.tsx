@@ -118,8 +118,8 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
 
   // Has a file attachment (PDF, DOCX, PPTX) — no audio for these messages
   const hasFile = !!docData;
-  // Has audio from the message itself (e.g. voice mode responses)
-  const hasAudio = !hasFile && !!(message.audio_url || message.audio_b64);
+  // Has audio from the message itself or can be played for assistant text
+  const hasAudio = !hasFile && (!!(message.audio_url || message.audio_b64) || (!isUser && !!parsed.reply));
 
   const handleCopy = () => {
     const textToCopy = isUser ? message.content : parsed.reply;
@@ -460,9 +460,17 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
           </div>
         )}
 
-        {/* AudioPlayer shows automatically when audio is present, never for PDF messages */}
+        {/* AudioPlayer shows automatically when audio is present or can be synthesized on demand, never for PDF messages */}
         {hasAudio && !isStreaming && (
-          <AudioPlayer url={message.audio_url || undefined} base64={message.audio_b64 || undefined} autoPlay={isAutoplay} />
+          <AudioPlayer
+            url={message.audio_url || undefined}
+            base64={message.audio_b64 || undefined}
+            text={!isUser ? parsed.reply : undefined}
+            autoPlay={isAutoplay}
+            onAudioUpdated={(newB64) => {
+              message.audio_b64 = newB64;
+            }}
+          />
         )}
 
         <span className="text-[0.7rem] text-text-subtle px-1 mt-0.5 opacity-70">

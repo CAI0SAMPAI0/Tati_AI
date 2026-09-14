@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -252,4 +253,147 @@
   .hub-theme .btn-primary:hover {
     background: var(--primary-hover);
   }
+
+  /* ── Landing Page Redesign Styles ── */
+  .font-display-serif {
+    font-family: 'DM Serif Display', Georgia, serif;
+  }
+
+  .landing-bg {
+    background-color: #f9f8f6;
+  }
+
+  .landing-text {
+    color: #1a1826;
+  }
+
+  .landing-btn-primary {
+    background-color: #6d28d9;
+    color: #ffffff;
+    transition: background-color 0.18s ease, box-shadow 0.18s ease, transform 0.15s ease;
+    box-shadow: 0 1px 3px rgba(109, 40, 217, 0.25), 0 4px 12px rgba(109, 40, 217, 0.15);
+  }
+
+  .landing-btn-primary:hover {
+    background-color: #5b21b6;
+    box-shadow: 0 2px 6px rgba(109, 40, 217, 0.3), 0 8px 20px rgba(109, 40, 217, 0.2);
+    transform: translateY(-1px);
+  }
+
+  .landing-btn-outline {
+    border: 1.5px solid #d4d0e8;
+    color: #3d3a52;
+    transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+  }
+
+  .landing-btn-outline:hover {
+    border-color: #6d28d9;
+    background-color: rgba(109, 40, 217, 0.04);
+    color: #6d28d9;
+  }
+
+  .landing-nav-link {
+    color: #6b6880;
+    transition: color 0.15s ease;
+  }
+
+  .landing-nav-link:hover {
+    color: #1a1826;
+  }
+
+  .landing-card {
+    background-color: #ffffff;
+    border: 1px solid #e8e5f0;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  }
+
+  .landing-card:hover {
+    box-shadow: 0 8px 32px rgba(26, 24, 38, 0.08);
+    border-color: #c4bedd;
+    transform: translateY(-2px);
+  }
+
+  .landing-stat-num {
+    font-family: 'DM Serif Display', Georgia, serif;
+    color: #1a1826;
+  }
+
+  .landing-cefr-badge {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+  }
+
+  .landing-chat-wrap {
+    animation: landingFloat 5s ease-in-out infinite;
+  }
+
+  /* ── CEFR Public Test Forced Light Theme (Matches Landing Page) ── */
+  .cefr-theme-light {
+    --bg: #f9f8f6;
+    --bg-secondary: #f4f3f8;
+    --surface: #ffffff;
+    --surface-hover: #faf9fd;
+    --card: #ffffff;
+    --border: #e8e5f0;
+    --border-focus: #6d28d9;
+    --text: #1a1826;
+    --text-muted: #6b6880;
+    --text-subtle: #9d9ab0;
+    --input-bg: #ffffff;
+    --primary: #6d28d9;
+    --primary-hover: #5b21b6;
+    --primary-dim: rgba(109, 40, 217, 0.1);
+    --primary-glow: rgba(109, 40, 217, 0.25);
+    background-color: #f9f8f6 !important;
+    color: #1a1826 !important;
+    color-scheme: light !important;
+  }
+
+  .cefr-theme-light .bg-surface {
+    background-color: #ffffff !important;
+  }
+
+  .cefr-theme-light .bg-bg {
+    background-color: #f9f8f6 !important;
+  }
+
+  .cefr-theme-light .bg-bg-secondary {
+    background-color: #f4f3f8 !important;
+  }
+
+  .cefr-theme-light .border-border {
+    border-color: #e8e5f0 !important;
+  }
+
+  .cefr-theme-light .text-text {
+    color: #1a1826 !important;
+  }
+
+  .cefr-theme-light .text-text-muted {
+    color: #6b6880 !important;
+  }
+
+  .cefr-theme-light .text-text-subtle {
+    color: #9d9ab0 !important;
+  }
 }
+
+
+@keyframes landingFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* Garante que os toasts e notificações fiquem sempre acima de qualquer modal ou backdrop */
+div[data-hot-toast],
+.react-hot-toast,
+div:has(> div[data-hot-toast]) {
+  z-index: 99999999 !important;
+}
+

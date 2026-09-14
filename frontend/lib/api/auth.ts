@@ -25,6 +25,8 @@ export async function registerUser(payload: {
   password: string;
   level: string;
   is_hub_only?: boolean;
+  accepted_terms?: boolean;
+  parental_consent?: boolean;
 }): Promise<{ ok: boolean; status: number; data: User }> {
   return apiPost<User>('/auth/register', payload);
 }

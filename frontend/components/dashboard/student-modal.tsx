@@ -32,7 +32,7 @@ interface StudentModalProps {
 
 export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModalProps) {
 
-  const [activeTab, setActiveTab] = useState<'info' | 'prompt' | 'insight' | 'interests' | 'analytics' | 'progress'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'progress' | 'analytics' | 'prompt' | 'insight' | 'interests'>('info');
   const [localStudent, setLocalStudent] = useState(student);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -206,8 +206,8 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
         <div className="flex bg-bg-secondary p-1 rounded-xl overflow-x-auto no-scrollbar shrink-0">
           {[
             { id: 'info', icon: <User size={14} />, label: 'Profile' },
-            { id: 'analytics', icon: <BarChart2 size={14} />, label: 'Analytics' },
             { id: 'progress', icon: <CheckCircle size={14} />, label: 'Progress' },
+            { id: 'analytics', icon: <BarChart2 size={14} />, label: 'Analytics' },
             { id: 'prompt', icon: <AlertCircle size={14} />, label: 'Prompt' },
             { id: 'insight', icon: <Brain size={14} />, label: 'Insight' },
             { id: 'interests', icon: <Target size={14} />, label: 'Interests' },
@@ -234,26 +234,38 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-xl font-bold text-primary">
                   {localStudent.avatar_url ? <img src={localStudent.avatar_url} alt="" className="w-full h-full rounded-full object-cover" /> : localStudent.username.charAt(0).toUpperCase()}
                 </div>
-                <div>
-                  <h3 className="font-bold text-text">@{localStudent.username}</h3>
-                  <p className="text-xs text-text-muted flex items-center gap-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-text">@{localStudent.username}</h3>
+                    {localStudent.role === 'lead' ? (
+                      <span className="px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-[0.65rem] font-bold">
+                        Lead (CEFR)
+                      </span>
+                    ) : localStudent.role === 'buyer' ? (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[0.65rem] font-bold">
+                        Buyer
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-[0.65rem] font-bold">
+                        Aluno
+                      </span>
+                    )}
+                  </div>
+                  {localStudent.email && (
+                    <p className="text-xs text-text-muted mt-0.5">{localStudent.email}</p>
+                  )}
+                  <p className="text-xs text-text-muted flex items-center gap-1 mt-0.5">
                     <Clock size={12} /> {'Joined'}: {formatDateTime(localStudent.created_at)}
                   </p>
-                </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 bg-surface border border-border rounded-xl">
                   <span className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block truncate">Messages</span>
                   <p className="text-sm font-bold text-text mt-1">{localStudent.total_messages || 0}</p>
                 </div>
                 <div className="p-3 bg-surface border border-border rounded-xl">
                   <span className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block truncate">Streak</span>
-                  <p className="text-sm font-bold text-warning mt-1">🔥 {localStudent.current_streak || 0} days</p>
-                </div>
-                <div className="p-3 bg-surface border border-border rounded-xl">
-                  <span className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block truncate">Freezes</span>
-                  <p className="text-sm font-bold text-info mt-1">❄️ {localStudent.streak_freeze_count || 0}/3</p>
+                  <p className="text-sm font-bold text-warning mt-1">🔥 {localStudent.current_streak ?? localStudent.streak_count ?? 0} days</p>
                 </div>
               </div>
 

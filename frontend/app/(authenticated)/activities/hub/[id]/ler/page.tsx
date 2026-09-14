@@ -48,8 +48,8 @@ export default function ReadMaterialPage() {
   }, [isLoaded, user, contentId, router]);
 
   const watermarkText = user?.email
-    ? `${user.email} · Tati AI`
-    : 'Tati AI · Exclusive use';
+    ? `${user.email} · Taty's Materials`
+    : "Taty's Materials · Exclusive use";
 
   if (!isLoaded || !user) {
     return (
@@ -80,7 +80,7 @@ export default function ReadMaterialPage() {
           <div className="card-surface p-8 text-center">
             <p className="font-medium text-danger">{error}</p>
             <Link href="/activities/hub" className="btn-primary mt-6 inline-block">
-              Back to the Hub
+              Back to Taty's Materials
             </Link>
           </div>
         )}

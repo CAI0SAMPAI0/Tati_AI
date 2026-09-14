@@ -7,6 +7,7 @@ class StreakDataOut(BaseModel):
     current_streak: int = 0
     longest_streak: int = 0
     freeze_count: int = 0
+    streak_freeze_count: int = 0
     last_activity_date: Optional[str] = None
     study_dates: List[str] = []
     has_studied_today: bool = False

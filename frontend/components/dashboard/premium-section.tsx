@@ -33,7 +33,7 @@ interface PremiumContent {
   title: string;
   description: string;
   price: number;           // legado — mantido para compatibilidade
-  price_students: number;  // preço para alunos da Tati AI
+  price_students: number;  // preço para alunos do Taty's Hub
   price_buyers: number;    // preço para clientes do Hub
   type: 'pdf' | 'link' | 'article' | 'video';
   category?: string;
@@ -215,7 +215,7 @@ export function PremiumSection() {
                 <Users size={11} className="text-primary shrink-0" />
                 <div className="min-w-0">
                   <div className="text-[0.55rem] font-bold text-primary/70 uppercase tracking-wider leading-none mb-0.5">
-                    Tati AI
+                    Taty's Hub
                   </div>
                   <div className="text-xs font-black text-primary truncate">
                     {formatPrice(item.price_students ?? item.price ?? 0)}
@@ -226,7 +226,7 @@ export function PremiumSection() {
                 <ShoppingBag size={11} className="text-success shrink-0" />
                 <div className="min-w-0">
                   <div className="text-[0.55rem] font-bold text-success/70 uppercase tracking-wider leading-none mb-0.5">
-                    Hub
+                    Materials
                   </div>
                   <div className="text-xs font-black text-success truncate">
                     {formatPrice(item.price_buyers ?? item.price ?? 0)}
@@ -344,12 +344,12 @@ export function PremiumSection() {
               <DollarSign size={12} /> Pricing by Audience
             </label>
             <div className="grid grid-cols-2 gap-3">
-              {/* Students — Tati AI */}
+              {/* Students — Taty's Hub */}
               <div className="p-3 rounded-xl border border-primary/20 bg-primary/5 space-y-2">
                 <div className="flex items-center gap-1.5">
                   <Users size={13} className="text-primary" />
                   <span className="text-[0.7rem] font-bold text-primary uppercase tracking-wider">
-                    Tati AI Students
+                    Taty's Hub Students
                   </span>
                 </div>
                 <input
@@ -367,16 +367,16 @@ export function PremiumSection() {
                   }
                 />
                 <p className="text-[0.65rem] text-text-muted leading-tight">
-                  Charged to users of the Tati AI app
+                  Charged to users of the Taty's Hub app
                 </p>
               </div>
 
-              {/* Buyers — Hub */}
+              {/* Buyers — Taty's Materials */}
               <div className="p-3 rounded-xl border border-success/20 bg-success/5 space-y-2">
                 <div className="flex items-center gap-1.5">
                   <ShoppingBag size={13} className="text-success" />
                   <span className="text-[0.7rem] font-bold text-success uppercase tracking-wider">
-                    Hub Buyers
+                    Materials Buyers
                   </span>
                 </div>
                 <input

@@ -51,6 +51,14 @@ export const ConversationList = memo(function ConversationList({ currentId, onSe
   // Flatten pages into a single list
   const conversations = infiniteData?.pages.flat() ?? [];
 
+  React.useEffect(() => {
+    const handleActivity = () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    };
+    window.addEventListener('tati_chat_activity', handleActivity);
+    return () => window.removeEventListener('tati_chat_activity', handleActivity);
+  }, [queryClient]);
+
   const groups = useMemo(() => {
     if (!conversations || !conversations.length) return null;
 

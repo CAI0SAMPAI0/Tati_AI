@@ -226,15 +226,15 @@ export function LoginForm() {
 
             <div className="relative z-10">
               <p className="mb-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
-                Taty Hub Premium
+                Taty's Materials
               </p>
 
               <h1 className="mb-4 text-4xl font-semibold leading-tight tracking-tight text-ink">
-                Entre ou crie sua conta Tati AI.
+                Entre ou crie sua conta Taty's Hub.
               </h1>
 
               <p className="mb-7 text-sm leading-7 text-ink0">
-                Quem já tem acesso à Tati AI usa a mesma conta. Quem ainda não tem
+                Quem já tem acesso ao Taty's Hub usa a mesma conta. Quem ainda não tem
                 acesso pode criar agora ou entrar com Google.
               </p>
 

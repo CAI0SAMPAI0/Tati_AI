@@ -24,7 +24,8 @@ from reportlab.platypus import (
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
-from apps.authentication.models import User
+import re
+from apps.authentication.models import User, UserRole
 from apps.chat.models import Conversation, Message
 from apps.chat.audio_service import AudioService, get_groq_keys, strip_emojis
 from apps.notifications.services import BrevoEmailService
@@ -249,16 +250,16 @@ class LevelingService:
         session_accent = accent
         if not session_accent or str(session_accent).lower() in ["default", ""]:
             session_accent = (
-                session.get("accent")
-                if isinstance(session, dict)
-                else None
-            ) or (
                 fresh_user.profile.get("preferred_accent")
                 if isinstance(getattr(fresh_user, "profile", None), dict)
                 else None
             ) or (
                 fresh_user.profile.get("accent")
                 if isinstance(getattr(fresh_user, "profile", None), dict)
+                else None
+            ) or (
+                session.get("accent")
+                if isinstance(session, dict)
                 else None
             ) or "en-US"
         session_accent = session_accent or "en-US"
@@ -450,10 +451,6 @@ class LevelingService:
         session_accent = accent
         if not session_accent or str(session_accent).lower() in ["default", ""]:
             session_accent = (
-                session.get("accent")
-                if isinstance(session, dict)
-                else None
-            ) or (
                 fresh_user.profile.get("preferred_accent")
                 if isinstance(getattr(fresh_user, "profile", None), dict)
                 else None
@@ -461,10 +458,16 @@ class LevelingService:
                 fresh_user.profile.get("accent")
                 if isinstance(getattr(fresh_user, "profile", None), dict)
                 else None
+            ) or (
+                session.get("accent")
+                if isinstance(session, dict)
+                else None
             ) or "en-US"
         session_accent = session_accent or "en-US"
         if isinstance(session, dict):
             session["accent"] = session_accent
+            fresh_user.profile["active_leveling"] = session
+            fresh_user.save(update_fields=["profile"])
 
         if not isinstance(session, dict) or session.get("completed"):
             return {
@@ -1140,3 +1143,386 @@ class LevelingService:
         </body>
         </html>
         """
+
+    @staticmethod
+    def start_public_leveling_session(
+        total_questions: Optional[int] = None,
+        count_per_level: Optional[int] = None,
+        accent: Optional[str] = "en-US",
+    ) -> Dict[str, Any]:
+        """
+        Inicia sessão de nivelamento para visitante sem login.
+        Sessão é mantida em cache (24h) indexada por session_id.
+        """
+        session_id = str(uuid.uuid4())
+        bank = LEVELING_QUESTIONS_BANK or load_leveling_questions()
+        selected_questions = []
+
+        if total_questions:
+            total_q_target = max(4, min(24, int(total_questions)))
+            base_count = total_q_target // 4
+            remainder = total_q_target % 4
+            counts = {
+                "A1": base_count + (1 if remainder > 0 else 0),
+                "A2": base_count + (1 if remainder > 1 else 0),
+                "B1": base_count + (1 if remainder > 2 else 0),
+                "B2": base_count,
+            }
+        elif count_per_level:
+            c = max(1, min(6, int(count_per_level)))
+            counts = {"A1": c, "A2": c, "B1": c, "B2": c}
+        else:
+            counts = {"A1": 2, "A2": 2, "B1": 2, "B2": 2}
+
+        for lvl in ["A1", "A2", "B1", "B2"]:
+            pool = bank.get(lvl, [])
+            n = min(counts.get(lvl, 2), len(pool))
+            if pool and n > 0:
+                selected_questions.extend(random.sample(pool, n))
+
+        total_q = len(selected_questions)
+        user_accent = accent if accent and str(accent).lower() not in ["default", ""] else "en-US"
+
+        session_data = {
+            "session_id": session_id,
+            "questions": selected_questions,
+            "current_index": 0,
+            "total_questions": total_q,
+            "scores": {
+                "A1": {"correct": 0, "total": sum(1 for q in selected_questions if q.get("level") == "A1")},
+                "A2": {"correct": 0, "total": sum(1 for q in selected_questions if q.get("level") == "A2")},
+                "B1": {"correct": 0, "total": sum(1 for q in selected_questions if q.get("level") == "B1")},
+                "B2": {"correct": 0, "total": sum(1 for q in selected_questions if q.get("level") == "B2")},
+            },
+            "answers": [],
+            "completed": False,
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "accent": user_accent,
+        }
+
+        cache.set(f"public_cefr_session_{session_id}", session_data, timeout=86400)
+
+        first_q = selected_questions[0]
+        opening_text = (
+            f"Hello and welcome! I am Teacher Tati, your AI English mentor.\n\n"
+            f"I have prepared {total_q} diagnostic questions to discover your CEFR level (A1 to B2). Answer naturally in English! (Type /finish anytime to conclude early).\n\n"
+            f"---\n"
+            f"**Question 1/{total_q}**:\n"
+            f"**{first_q['question']}**"
+        )
+        opening_text = strip_emojis(opening_text)
+        audio_b64 = AudioService.text_to_speech(opening_text, accent=user_accent)
+
+        return {
+            "session_id": session_id,
+            "reply": opening_text,
+            "audio_b64": audio_b64,
+            "accent": user_accent,
+            "is_leveling": True,
+            "current_question": 1,
+            "total_questions": total_q,
+            "question_text": first_q["question"],
+        }
+
+    @staticmethod
+    def process_public_leveling_step(
+        session_id: str,
+        user_text: str,
+        accent: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Processa uma resposta de visitante no teste de nivelamento público.
+        """
+        session_key = f"public_cefr_session_{session_id}"
+        session = cache.get(session_key)
+
+        if not session or not isinstance(session, dict):
+            return {
+                "ok": False,
+                "reply": "Sessão de teste não encontrada ou expirada. Por favor, reinicie o teste.",
+                "completed": False,
+            }
+
+        session_accent = accent or session.get("accent", "en-US")
+        questions = session.get("questions", [])
+        curr_idx = session.get("current_index", 0)
+        total_q = session.get("total_questions", len(questions))
+
+        clean_input = user_text.strip().lower()
+        is_early_finish = (
+            clean_input in ["/finish", "/fim", "/encerrar", "/end", "/stop", "finish", "fim"]
+            or clean_input.startswith("/finish")
+        )
+
+        if is_early_finish or curr_idx >= total_q:
+            scores = session.get("scores", {})
+            best_level = "A1"
+            max_correct = -1
+            level_hierarchy = ["A1", "A2", "B1", "B2"]
+            for lvl in level_hierarchy:
+                c = scores.get(lvl, {}).get("correct", 0)
+                if c >= max_correct:
+                    max_correct = c
+                    best_level = lvl
+            if max_correct == 0:
+                best_level = "A1"
+
+            session["completed"] = True
+            session["completed_at"] = datetime.now(timezone.utc).isoformat()
+            session["assigned_level"] = best_level
+            cache.set(session_key, session, timeout=86400)
+
+            final_reply = (
+                f"You have finished your CEFR Leveling Challenge!\n\n"
+                f"---\n"
+                f"**Your Performance by Level:**\n"
+                f"• Level A1: {scores.get('A1', {}).get('correct', 0)}/{scores.get('A1', {}).get('total', 0)} correct\n"
+                f"• Level A2: {scores.get('A2', {}).get('correct', 0)}/{scores.get('A2', {}).get('total', 0)} correct\n"
+                f"• Level B1: {scores.get('B1', {}).get('correct', 0)}/{scores.get('B1', {}).get('total', 0)} correct\n"
+                f"• Level B2: {scores.get('B2', {}).get('correct', 0)}/{scores.get('B2', {}).get('total', 0)} correct\n\n"
+                f"**Your Assessed CEFR Level: {best_level}**\n\n"
+                f"Preencha seus dados abaixo para receber seu relatório completo em PDF no e-mail e, se desejar, crie sua conta para acessar o sistema!"
+            )
+            final_reply = strip_emojis(final_reply)
+            audio_b64 = AudioService.text_to_speech(final_reply, accent=session_accent)
+
+            return {
+                "ok": True,
+                "reply": final_reply,
+                "audio_b64": audio_b64,
+                "completed": True,
+                "new_level": best_level,
+                "scores": scores,
+                "session_id": session_id,
+            }
+
+        curr_q = questions[curr_idx]
+        q_level = curr_q.get("level", "A1")
+        q_text = curr_q.get("question", "")
+        q_target = curr_q.get("target", "")
+
+        evaluation = LevelingService._evaluate_answer(
+            user_name="Student",
+            question=q_text,
+            question_level=q_level,
+            target=q_target,
+            student_answer=user_text.strip(),
+        )
+
+        is_correct = evaluation.get("is_correct", False)
+        mistakes = evaluation.get("mistakes", [])
+        corrections = evaluation.get("corrections", [])
+        feedback = evaluation.get("pedagogical_feedback", "")
+
+        if is_correct and q_level in session["scores"]:
+            session["scores"][q_level]["correct"] += 1
+
+        session["answers"].append({
+            "index": curr_idx + 1,
+            "question_id": curr_q.get("id", f"{q_level}_{curr_idx+1}"),
+            "level": q_level,
+            "question": q_text,
+            "user_answer": user_text.strip(),
+            "is_correct": is_correct,
+            "mistakes": mistakes,
+            "corrections": corrections,
+            "feedback": feedback,
+        })
+
+        next_idx = curr_idx + 1
+        session["current_index"] = next_idx
+
+        if next_idx < total_q:
+            next_q = questions[next_idx]
+            reply_text = (
+                f"{feedback}\n\n"
+                f"---\n"
+                f"**Question {next_idx + 1}/{total_q}**:\n"
+                f"**{next_q['question']}**"
+            )
+            reply_text = strip_emojis(reply_text)
+            cache.set(session_key, session, timeout=86400)
+            audio_b64 = AudioService.text_to_speech(reply_text, accent=session_accent)
+
+            return {
+                "ok": True,
+                "reply": reply_text,
+                "audio_b64": audio_b64,
+                "completed": False,
+                "current_question": next_idx + 1,
+                "total_questions": total_q,
+                "session_id": session_id,
+            }
+        else:
+            scores = session.get("scores", {})
+            best_level = "A1"
+            max_correct = -1
+            level_hierarchy = ["A1", "A2", "B1", "B2"]
+            for lvl in level_hierarchy:
+                c = scores.get(lvl, {}).get("correct", 0)
+                if c >= max_correct:
+                    max_correct = c
+                    best_level = lvl
+            if max_correct == 0:
+                best_level = "A1"
+
+            session["completed"] = True
+            session["completed_at"] = datetime.now(timezone.utc).isoformat()
+            session["assigned_level"] = best_level
+            cache.set(session_key, session, timeout=86400)
+
+            final_reply = (
+                f"{feedback}\n\n"
+                f"---\n"
+                f"**Congratulations! You have completed your Leveling Assessment!**\n\n"
+                f"**Your Performance by Level:**\n"
+                f"• Level A1: {scores.get('A1', {}).get('correct', 0)}/{scores.get('A1', {}).get('total', 0)} correct\n"
+                f"• Level A2: {scores.get('A2', {}).get('correct', 0)}/{scores.get('A2', {}).get('total', 0)} correct\n"
+                f"• Level B1: {scores.get('B1', {}).get('correct', 0)}/{scores.get('B1', {}).get('total', 0)} correct\n"
+                f"• Level B2: {scores.get('B2', {}).get('correct', 0)}/{scores.get('B2', {}).get('total', 0)} correct\n\n"
+                f"**Your Assessed CEFR Level: {best_level}**\n\n"
+                f"Preencha seu nome e e-mail abaixo para receber seu relatório em PDF completo e, se desejar, crie sua conta para acessar a plataforma!"
+            )
+            final_reply = strip_emojis(final_reply)
+            audio_b64 = AudioService.text_to_speech(final_reply, accent=session_accent)
+
+            return {
+                "ok": True,
+                "reply": final_reply,
+                "audio_b64": audio_b64,
+                "completed": True,
+                "new_level": best_level,
+                "scores": scores,
+                "session_id": session_id,
+            }
+
+    @staticmethod
+    def submit_public_leveling(
+        session_id: str,
+        name: str,
+        email: str,
+        create_account: bool = False,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Recebe nome e email do visitante, gera PDF e envia por e-mail.
+        Se create_account for True, registra usuário com role LEAD ('lead').
+        """
+        session_key = f"public_cefr_session_{session_id}"
+        session = cache.get(session_key) or {}
+
+        student_name = name.strip()
+        student_email = email.strip().lower()
+        assigned_level = session.get("assigned_level", "A1")
+        scores = session.get("scores", {
+            "A1": {"correct": 1, "total": 2},
+            "A2": {"correct": 1, "total": 2},
+            "B1": {"correct": 0, "total": 2},
+            "B2": {"correct": 0, "total": 2},
+        })
+        qa_list = session.get("answers", [])
+
+        # 1. Gera PDF do relatório oficial
+        pdf_bytes = LevelingService.generate_pdf_report(
+            student_name=student_name,
+            date_str=datetime.now().strftime("%B %d, %Y"),
+            old_level="A1",
+            new_level=assigned_level,
+            scores_by_level=scores,
+            qa_list=qa_list,
+        )
+
+        # 2. Envia e-mail com anexo via Brevo
+        email_sent = False
+        if student_email and "@" in student_email:
+            try:
+                email_html = LevelingService.build_email_html(
+                    student_name=student_name,
+                    new_level=assigned_level,
+                    old_level="A1",
+                    scores=scores,
+                    qa_list=qa_list,
+                )
+                pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
+                safe_slug = re.sub(r'[^a-zA-Z0-9_]', '_', student_name.lower())[:20] or "student"
+                attachments = [{
+                    "name": f"Level_Assessment_Report_{safe_slug}.pdf",
+                    "content": pdf_b64,
+                }]
+                res = BrevoEmailService.send_email_detailed(
+                    to_email=student_email,
+                    subject="Your English Level Assessment Results - Teacher Tati",
+                    html_content=email_html,
+                    recipient_name=student_name,
+                    attachments=attachments,
+                )
+                email_sent = res.get("success", False)
+            except Exception as mail_err:
+                logger.error(f"[Public Leveling] Failed sending report email: {mail_err}")
+
+        # 3. Criação de conta (se solicitada)
+        account_created = False
+        token_data = None
+
+        if create_account and password:
+            from apps.authentication.services import AuthService
+            from apps.authentication.security import hash_password
+
+            candidate_username = (username or student_email.split("@")[0]).strip().lower()
+            candidate_username = re.sub(r'[^a-z0-9_]', '', candidate_username) or "lead"
+            final_username = candidate_username
+            counter = 1
+            while User.objects.filter(username=final_username).exists():
+                final_username = f"{candidate_username}{counter}"
+                counter += 1
+
+            existing_user = User.objects.filter(email=student_email).first()
+            if existing_user:
+                existing_user.level = assigned_level
+                prof = existing_user.profile if isinstance(existing_user.profile, dict) else {}
+                if "leveling_history" not in prof:
+                    prof["leveling_history"] = []
+                prof["leveling_history"].append(session)
+                existing_user.profile = prof
+                existing_user.save(update_fields=["level", "profile"])
+                user = existing_user
+                account_created = True
+            else:
+                user = User.objects.create(
+                    username=final_username,
+                    email=student_email,
+                    name=student_name,
+                    password=hash_password(password),
+                    role=UserRole.LEAD,
+                    level=assigned_level,
+                    profile={
+                        "source": "public_cefr_test",
+                        "leveling_history": [session],
+                    }
+                )
+                account_created = True
+
+            token_response = AuthService.build_token_response(user)
+            token_data = {
+                "access_token": token_response.access_token,
+                "token_type": token_response.token_type,
+                "refresh_token": token_response.refresh_token,
+                "user": token_response.user.dict() if hasattr(token_response.user, "dict") else {},
+            }
+
+        pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
+
+        return {
+            "success": True,
+            "email_sent": email_sent,
+            "account_created": account_created,
+            "assigned_level": assigned_level,
+            "token_response": token_data,
+            "pdf_b64": pdf_b64,
+            "message": (
+                "Relatório enviado por e-mail com sucesso!"
+                + (" Conta de acesso criada!" if account_created else "")
+            ),
+        }
+

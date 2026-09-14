@@ -23,6 +23,8 @@ VOICE_ACCENT_MAP = {
     "en-SG": "en-SG-LunaNeural",
     "en-PH": "en-PH-RosaNeural",
     "en-NG": "en-NG-EzinneNeural",
+    "en-CN": "zh-CN-XiaoxiaoNeural",
+    "en-JP": "ja-JP-NanamiNeural",
 }
 
 
@@ -99,18 +101,33 @@ class AudioService:
             return ""
 
         norm_accent = (accent or "en-US").strip()
-        if norm_accent.lower() in ["en-uk", "uk", "en_gb", "en-gb", "british"]:
+        lower_acc = norm_accent.lower().replace("_", "-")
+        if lower_acc in ["en-uk", "uk", "en-gb", "british"]:
             norm_accent = "en-GB"
-        elif norm_accent.lower() in ["en-us", "us", "en_us", "american"]:
+        elif lower_acc in ["en-us", "us", "american"]:
             norm_accent = "en-US"
-        elif norm_accent.lower() in ["en-au", "au", "en_au", "australian"]:
+        elif lower_acc in ["en-au", "au", "australian"]:
             norm_accent = "en-AU"
-        elif norm_accent.lower() in ["en-ca", "ca", "en_ca", "canadian"]:
+        elif lower_acc in ["en-ca", "ca", "canadian"]:
             norm_accent = "en-CA"
-        elif norm_accent.lower() in ["en-ie", "ie", "irish"]:
+        elif lower_acc in ["en-ie", "ie", "irish"]:
             norm_accent = "en-IE"
-        elif norm_accent.lower() in ["en-in", "in", "indian"]:
+        elif lower_acc in ["en-in", "in", "indian"]:
             norm_accent = "en-IN"
+        elif lower_acc in ["en-za", "za", "south-african", "south-africa"]:
+            norm_accent = "en-ZA"
+        elif lower_acc in ["en-nz", "nz", "new-zealand"]:
+            norm_accent = "en-NZ"
+        elif lower_acc in ["en-sg", "sg", "singapore"]:
+            norm_accent = "en-SG"
+        elif lower_acc in ["en-ph", "ph", "philippines"]:
+            norm_accent = "en-PH"
+        elif lower_acc in ["en-ng", "ng", "nigerian", "nigeria"]:
+            norm_accent = "en-NG"
+        elif lower_acc in ["en-cn", "cn", "chinese", "chines", "zh-cn"]:
+            norm_accent = "en-CN"
+        elif lower_acc in ["en-jp", "jp", "japanese", "japones", "ja-jp"]:
+            norm_accent = "en-JP"
 
         voice = VOICE_ACCENT_MAP.get(norm_accent)
         if not voice:

@@ -11,13 +11,14 @@ interface MessageListProps {
   messages: Message[];
   isStreaming: boolean;
   streamingContent: string;
+  conversationId?: string | null;
   onEdit?: (messageId: string, newContent: string) => Promise<void>;
   onResend?: (content: string) => void;
   onSendMessage?: (text: string) => void;
   onStartLeveling?: () => void;
 }
 
-export function MessageList({ messages, isStreaming, streamingContent, onEdit, onResend, onSendMessage, onStartLeveling }: MessageListProps) {
+export function MessageList({ messages, isStreaming, streamingContent, conversationId, onEdit, onResend, onSendMessage, onStartLeveling }: MessageListProps) {
   const router = useRouter();
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -28,7 +29,17 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit, o
 
   const [visibleCount, setVisibleCount] = useState(20);
   const prevLengthRef = useRef(messages.length);
-  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isInitialScrollRef = useRef(true);
+  const prevConvIdRef = useRef<string | null | undefined>(conversationId);
+
+  // Reset scroll initial state when switching conversation
+  useEffect(() => {
+    if (conversationId !== prevConvIdRef.current) {
+      prevConvIdRef.current = conversationId;
+      isInitialScrollRef.current = true;
+      setVisibleCount(20);
+    }
+  }, [conversationId]);
 
   useEffect(() => {
     if (messages.length > prevLengthRef.current) {
@@ -38,13 +49,37 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit, o
     prevLengthRef.current = messages.length;
   }, [messages.length]);
 
+  // Instant scroll on entry / conversation load, smooth only for newly added messages
   useEffect(() => {
-    // bloqueando o scroll automático se não tiver mensagens
     if (messages.length === 0 && !isStreaming) return;
-    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
-    scrollTimerRef.current = setTimeout(() => {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 50);
+
+    if (isInitialScrollRef.current) {
+      // Abre DIRETAMENTE na última mensagem sem animação de scroll
+      if (containerRef.current) {
+        containerRef.current.scrollTop = containerRef.current.scrollHeight;
+      }
+      requestAnimationFrame(() => {
+        if (containerRef.current) {
+          containerRef.current.scrollTop = containerRef.current.scrollHeight;
+        }
+      });
+      isInitialScrollRef.current = false;
+      return;
+    }
+
+    if (isStreaming) {
+      if (containerRef.current) {
+        const isNearBottom =
+          containerRef.current.scrollHeight - containerRef.current.scrollTop - containerRef.current.clientHeight < 150;
+        if (isNearBottom) {
+          containerRef.current.scrollTop = containerRef.current.scrollHeight;
+        }
+      }
+      return;
+    }
+
+    // Novas mensagens enviadas/recebidas rolam com animação suave
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, isStreaming, streamingContent]);
 
   const handleScroll = useCallback(() => {
@@ -85,10 +120,10 @@ export function MessageList({ messages, isStreaming, streamingContent, onEdit, o
             <Image src="/images/tati_logo.jpg" alt="Tati" width={28} height={28} className="w-full h-full object-cover" />
           </div>
           <h2 className="font-display text-xl font-bold mb-2">
-            Hi! I'm Taty's Hub
+            Welcome to Taty&apos;s Hub 👋
           </h2>
           <p className="text-sm text-text-muted max-w-[320px] mb-6">
-            Your AI English teacher. Let's practice together?
+            Your AI English learning hub. Let&apos;s practice together?
           </p>
 
           {onStartLeveling && (

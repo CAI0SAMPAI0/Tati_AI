@@ -9,11 +9,10 @@ import { StatCard } from './stat-card';
 interface OverviewSectionProps {
   stats: any;
   students: any[];
-  difficulties: any;
   onSeeAllStudents: () => void;
 }
 
-export function OverviewSection({ stats, students, difficulties, onSeeAllStudents }: OverviewSectionProps) {
+export function OverviewSection({ stats, students, onSeeAllStudents }: OverviewSectionProps) {
   const [celeryStatus, setCeleryStatus] = useState<any>(null);
 
   useEffect(() => {
@@ -33,11 +32,11 @@ export function OverviewSection({ stats, students, difficulties, onSeeAllStudent
         - gap menor no mobile, maior no desktop
       */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
-        {/* Tati AI */}
+        {/* Taty's Hub */}
         <StatCard
           icon={<Users size={24} />}
           value={stats?.total_students ?? '—'}
-          label="Students (Tati AI)"
+          label="Students (Taty's Hub)"
           trend="↑ Active"
           trendUp
         />
@@ -47,12 +46,12 @@ export function OverviewSection({ stats, students, difficulties, onSeeAllStudent
           label="Messages Today"
         />
 
-        {/* Hub */}
+        {/* Taty's Materials */}
         <StatCard
           icon={<ShoppingBag size={24} />}
           value={stats?.total_buyers ?? '—'}
-          label="Buyers (Hub)"
-          trend="Hub clients"
+          label="Buyers (Taty's Materials)"
+          trend="Materials clients"
           trendUp
         />
         <StatCard
@@ -73,13 +72,13 @@ export function OverviewSection({ stats, students, difficulties, onSeeAllStudent
         <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-primary/5 border border-primary/15">
           <Users size={15} className="text-primary shrink-0" />
           <span className="text-xs font-semibold text-primary">
-            Tati AI — English learning app (role: student / staff)
+            Taty's Hub — English learning app (role: student / staff)
           </span>
         </div>
         <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-success/5 border border-success/15">
           <ShoppingBag size={15} className="text-success shrink-0" />
           <span className="text-xs font-semibold text-success">
-            Hub Premium — Material store (role: buyer)
+            Taty's Materials — Material store (role: buyer)
           </span>
         </div>
       </div>
@@ -97,7 +96,7 @@ export function OverviewSection({ stats, students, difficulties, onSeeAllStudent
               <Users size={16} className="text-primary" />
               <h3 className="font-bold text-text">Recent Students</h3>
               <span className="text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary uppercase tracking-wider">
-                Tati AI
+                Taty's Hub
               </span>
             </div>
             <button
@@ -128,7 +127,14 @@ export function OverviewSection({ stats, students, difficulties, onSeeAllStudent
                           ) : (s.name || s.username || '?').charAt(0).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <div className="text-sm font-semibold truncate text-text">{s.name || s.username}</div>
+                          <div className="flex items-center gap-1.5">
+                            <div className="text-sm font-semibold truncate text-text">{s.name || s.username}</div>
+                            {s.role === 'lead' && (
+                              <span className="px-1.5 py-0.2 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-[0.55rem] font-bold">
+                                Lead
+                              </span>
+                            )}
+                          </div>
                           <div className="text-[0.65rem] text-text-muted truncate">@{s.username}</div>
                         </div>
                       </div>

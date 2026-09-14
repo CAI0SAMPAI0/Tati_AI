@@ -29,7 +29,7 @@ const NAV_ITEMS: Array<{ id: DashSection; icon: React.ReactNode; label: string }
   { id: 'games', icon: <Gamepad2 size={20} />, label: 'Games' },
   { id: 'news', icon: <Newspaper size={20} />, label: 'News' },
   { id: 'cefr', icon: <BookOpen size={20} />, label: 'CEFR Materials' },
-  { id: 'premium', icon: <Zap size={20} />, label: 'Premium Hub' },
+  { id: 'premium', icon: <Zap size={20} />, label: "Taty's Materials" },
   { id: 'whatsapp', icon: <FaWhatsapp size={20} />, label: 'WhatsApp Config' },
 ];
 

@@ -89,11 +89,15 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (user?.profile?.preferred_accent) {
-      setSelectedAccent(user.profile.preferred_accent);
-      saveStoredAccent(user.profile.preferred_accent);
+    const userAccent = user?.preferred_accent || (user?.profile as any)?.preferred_accent || (user?.profile as any)?.accent;
+    const stored = getStoredAccent();
+    if (stored && stored !== 'en-US') {
+      setSelectedAccent(stored);
+    } else if (userAccent) {
+      setSelectedAccent(userAccent);
+      saveStoredAccent(userAccent);
     } else {
-      setSelectedAccent(getStoredAccent());
+      setSelectedAccent(stored || 'en-US');
     }
   }, [user]);
 
@@ -238,7 +242,7 @@ export default function SettingsPage() {
               <label className="flex items-center justify-between cursor-pointer group pb-6 border-b border-border">
                 <div>
                   <p className="text-sm font-bold text-text mb-0.5">Autoplay chat audio</p>
-                  <p className="text-xs text-text-muted">Automatically play voice messages when Teacher Tati replies in chat (Voice and Simulations are always automatic)</p>
+                  <p className="text-xs text-text-muted">Automatically play voice messages when Taty's Hub replies in chat (Voice and Simulations are always automatic)</p>
                 </div>
                 <input
                   type="checkbox"
@@ -460,7 +464,7 @@ export default function SettingsPage() {
             <div className="p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-bold text-text mb-0.5">Install Tati AI</p>
+                  <p className="text-sm font-bold text-text mb-0.5">Install Taty's Hub</p>
                   <p className="text-xs text-text-muted">Get the native app for Android or add to Home Screen on iOS</p>
                 </div>
                 <Button

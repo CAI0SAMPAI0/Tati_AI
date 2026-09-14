@@ -7,11 +7,11 @@ export const dynamic = 'force-dynamic';
 
 
 export const metadata: Metadata = {
-  title: 'Catálogo | Tati Hub',
+  title: "Catálogo | Taty's Materials",
   description:
-    "Explore o catálogo completo de materiais premium da Taty's Hub — e-books, guias de estudo e recursos selecionados para alunos de inglês.",
+    "Explore o catálogo completo de materiais premium de Taty's Materials — e-books, guias de estudo e recursos selecionados para alunos de inglês.",
   keywords: [
-  'Tati Hub',
+  "Taty's Materials",
   'Catálogo',
   'English Class',
   'Materiais',
@@ -27,15 +27,15 @@ export const metadata: Metadata = {
   canonical: 'https://tati-hub.vercel.app/materiais',
   },
 openGraph: {
-  title: 'Catálogo | Tati Hub',
-  description: "Explore o catálogo completo de materiais premium da Taty's Hub.",
+  title: "Catálogo | Taty's Materials",
+  description: "Explore o catálogo completo de materiais premium de Taty's Materials.",
   images: '/images/tati_logo.jpg',
   url: 'https://tati-hub.vercel.app/materiais',
 },
 twitter: {
   card: 'summary_large_image',
-  title: 'Catálogo | Tati Hub',
-  description: "Explore o catálogo completo de materiais premium da Taty's Hub.",
+  title: "Catálogo | Taty's Materials",
+  description: "Explore o catálogo completo de materiais premium de Taty's Materials.",
   images: '/images/tati_logo.jpg',
 },
 };

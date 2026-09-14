@@ -21,10 +21,10 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Tati Hub | Taty's English Class",
+  title: "Taty's Materials | Taty's English Class",
   description:
-    "Catálogo de materiais premium da Taty's Hub — e-books, exercícios e guias de estudo.",
-  keywords: ['Tati Hub', 'Taty\'s English Class',
+    "Catálogo de materiais premium de Taty's Materials — e-books, exercícios e guias de estudo.",
+  keywords: ["Taty's Materials", "Taty's English Class",
   'English Class', 'Materias', 'Exercícios',
   'Guias', 'Livros', 'Planos de estudo', 'Gramática',
   'Vocabulário', 'Inglês Online', 'Cursos de Inglês'],
@@ -32,20 +32,23 @@ export const metadata: Metadata = {
   icon: '/images/tati_logo.jpg',
   },
 openGraph: {
-  title: "Tati Hub | Taty's English Class",
-  description: "Catálogo de materiais premium da Taty's Hub",
+  title: "Taty's Materials | Taty's English Class",
+  description: "Catálogo de materiais premium de Taty's Materials",
   type: 'website',
   url: 'https://tati-hub.vercel.app',
   images: '/images/tati_logo.jpg',
 },
 twitter: {
   card: 'summary_large_image',
-  title: "Tati Hub | Taty's English Class",
-  description: "Catálogo de materiais premium da Taty's Hub",
+  title: "Taty's Materials | Taty's English Class",
+  description: "Catálogo de materiais premium de Taty's Materials",
   images: '/images/tati_logo.jpg',
 },
-alternates: {
-  canonical: 'https://tati-hub.vercel.app',
+  alternates: {
+    canonical: 'https://tati-hub.vercel.app',
+  },
+  verification: {
+    google: '2pUtbPwWrV8Q1kdAj8fmkYUIY7a-BI0NRj_WKjAHoLM',
   },
 };
 
@@ -53,6 +56,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR" className={`${sora.variable} ${dmSans.variable}`}>
       <head>
+        <meta
+          name="google-site-verification"
+          content="2pUtbPwWrV8Q1kdAj8fmkYUIY7a-BI0NRj_WKjAHoLM"
+        />
         <link rel="icon" href="/images/tati_logo.jpg" />
       </head>
       <body className="min-h-screen bg-bg font-body text-ink antialiased">

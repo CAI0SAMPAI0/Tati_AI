@@ -115,7 +115,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const updateProfile = useCallback((newUser: User) => {
-    setUser(prev => prev ? { ...prev, ...newUser } : newUser);
+    setUser(prev => {
+      const updated = prev ? { ...prev, ...newUser } : newUser;
+      const currentSession = getStoredSession();
+      if (currentSession?.token) {
+        saveStoredSession({ token: currentSession.token, user: updated });
+      }
+      return updated;
+    });
   }, []);
 
   const logout = useCallback(() => {

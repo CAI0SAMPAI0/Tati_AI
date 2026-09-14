@@ -9,9 +9,10 @@ import { useErrorCountStore } from '@/store/error-store';
 import { useChatSocketInstance } from '@/providers/chat-socket-provider';
 import { apiPost } from '@/lib/api/client';
 import toast from 'react-hot-toast';
+import { getStoredAccent } from '@/lib/constants/accents';
 
 export function useChatSocket(conversationId: string | null) {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { socket } = useChatSocketInstance();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -34,6 +35,36 @@ export function useChatSocket(conversationId: string | null) {
     pdf_b64?: string | null;
   } | null>(null);
   const pendingAudioRef = useRef<string | null>(null);
+
+  const getEffectiveAccent = useCallback(() => {
+    const userProfile = user?.profile as { preferred_accent?: string; accent?: string } | undefined;
+    const profileAccent = user?.preferred_accent || userProfile?.preferred_accent || userProfile?.accent;
+    return getStoredAccent(profileAccent || 'en-US');
+  }, [user]);
+
+  const [activeAccent, setActiveAccent] = useState<string>(() => getEffectiveAccent());
+
+  useEffect(() => {
+    const handleAccent = () => {
+      setActiveAccent(getEffectiveAccent());
+    };
+    window.addEventListener('tati_accent_changed', handleAccent);
+    window.addEventListener('storage', handleAccent);
+    return () => {
+      window.removeEventListener('tati_accent_changed', handleAccent);
+      window.removeEventListener('storage', handleAccent);
+    };
+  }, [getEffectiveAccent]);
+
+  useEffect(() => {
+    const userAccent = user?.preferred_accent || (user?.profile as any)?.preferred_accent || (user?.profile as any)?.accent;
+    if (userAccent && typeof window !== 'undefined') {
+      const stored = localStorage.getItem('tati_voice_accent');
+      if (!stored) {
+        localStorage.setItem('tati_voice_accent', userAccent);
+      }
+    }
+  }, [user]);
 
   // Sync ref with state
   useEffect(() => {
@@ -135,6 +166,10 @@ export function useChatSocket(conversationId: string | null) {
             }
             return [...prev, newAssistantMsg];
           });
+
+          try {
+            window.dispatchEvent(new CustomEvent('tati_chat_activity', { detail: { conversation_id: currentId } }));
+          } catch (_) {}
 
           // Error Detection Logic
           if (msg.result && (msg.result as any).has_linguistic_error) {
@@ -282,7 +317,7 @@ export function useChatSocket(conversationId: string | null) {
       convIdRef.current = overrideConvId;
     }
 
-    const currentAccent = typeof window !== 'undefined' ? localStorage.getItem('tati_voice_accent') || 'en-US' : 'en-US';
+    const currentAccent = getEffectiveAccent();
 
     const sent = socket.send({
       type: 'text',
@@ -310,7 +345,7 @@ export function useChatSocket(conversationId: string | null) {
       if (prev.some(m => m.id === newUserMsg.id)) return prev;
       return [...prev, newUserMsg];
     });
-  }, [socket]);
+  }, [socket, getEffectiveAccent]);
 
   const sendAudio = useCallback(async (base64: string, overrideConvId?: string) => {
     if (!socket) return;
@@ -328,7 +363,7 @@ export function useChatSocket(conversationId: string | null) {
       convIdRef.current = overrideConvId;
     }
     
-    const currentAccent = typeof window !== 'undefined' ? localStorage.getItem('tati_voice_accent') || 'en-US' : 'en-US';
+    const currentAccent = getEffectiveAccent();
 
     const sent = socket.send({
       type: 'audio',
@@ -352,7 +387,7 @@ export function useChatSocket(conversationId: string | null) {
       };
       setMessages((prev) => [...prev, newUserMsg]);
     }
-  }, [socket]);
+  }, [socket, getEffectiveAccent]);
 
   const sendFiles = useCallback(async (
     files: Array<{ name: string; base64: string; type?: string }>,
@@ -387,7 +422,7 @@ export function useChatSocket(conversationId: string | null) {
       ? `${caption}\n\n${attachmentsTag}`
       : attachmentsTag;
 
-    const currentAccent = typeof window !== 'undefined' ? localStorage.getItem('tati_voice_accent') || 'en-US' : 'en-US';
+    const currentAccent = getEffectiveAccent();
 
     const sent = socket.send({
       type: 'files',
@@ -415,7 +450,7 @@ export function useChatSocket(conversationId: string | null) {
       };
       setMessages((prev) => [...prev, newUserMsg]);
     }
-  }, [socket]);
+  }, [socket, getEffectiveAccent]);
 
   const sendFile = useCallback(async (filename: string, base64: string, caption?: string, overrideConvId?: string) => {
     return sendFiles([{ name: filename, base64 }], caption, overrideConvId);

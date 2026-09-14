@@ -848,17 +848,8 @@ class NotificationDispatcher:
                 )
                 sent_total += 1
 
-                # 3. WhatsApp (WAHA) se habilitado e o aluno tiver telefone
-                student_phone = WahaWhatsAppService.extract_student_phone(s)
-                allow_wa = WahaWhatsAppService.is_whatsapp_allowed(s)
-                if send_whatsapp and student_phone and allow_wa:
-                    wa_msg = (
-                        f'*Teacher Tatiana*\n\nHello *{first_name}*! A new *{activity_type}* activity ("{title}") is now available for your level *{level_tag}*.\n\n👉 Practice now: https://tati-ai.vercel.app{url}'
-                        if not is_all_levels else
-                        f'*Teacher Tatiana*\n\nHello *{first_name}*! A new *{activity_type}* activity ("{title}") is now available for practice.\n\n👉 Practice now: https://tati-ai.vercel.app{url}'
-                    )
-                    if WahaWhatsAppService.send_message(student_phone, wa_msg, recipient_user=s):
-                        whatsapp_sent += 1
+                # 3. WhatsApp desativado para novas atividades conforme diretriz
+                # (WhatsApp reservado apenas para: não perder ofensivas, nudge manual e relatório semanal)
 
             except Exception as e:
                 logger.error(
@@ -1370,21 +1361,9 @@ class NotificationSchedulerService:
             username=user.username, category="retention", title=title, body=body
         )
 
-        # WhatsApp Dispatch
-        student_phone = WahaWhatsAppService.extract_student_phone(user)
-        allow_wa = WahaWhatsAppService.is_whatsapp_allowed(user)
+        # WhatsApp automático de inatividade desativado conforme diretriz
+        # (WhatsApp reservado apenas para: não perder ofensivas, nudge manual e relatório semanal)
         wa_sent = False
-        if student_phone and allow_wa:
-            wa_msg = (
-                f"Hello {first_name}! Teacher Tati misses you.\n\n"
-                f"A quick 5-minute practice session today will help you retain your English vocabulary.\n\n"
-                f"Practice now: https://tati-ai.vercel.app/chat"
-            )
-            wa_sent = WahaWhatsAppService.send_message(
-                phone_number=student_phone,
-                message=wa_msg,
-                recipient_user=user,
-            )
 
         return {
             "success": True,

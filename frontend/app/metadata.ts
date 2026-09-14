@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Teacher Tati - AI English Learning',
+  title: "Taty's Hub - AI English Learning",
   description: 'Practice English with an AI teacher 24/7.',
   manifest: '/manifest.json',
 };

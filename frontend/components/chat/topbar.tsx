@@ -1,9 +1,15 @@
 'use client';
 
-import { Menu, FileText, Mic, BookOpen } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Menu, FileText, Mic, BookOpen, Check } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { NotificationsDropdown } from '@/components/layout/notifications-dropdown';
+import { ACCENTS, getStoredAccent, saveStoredAccent } from '@/lib/constants/accents';
+import { useAuth } from '@/hooks/useAuth';
+import { apiPut } from '@/lib/api/client';
+import toast from 'react-hot-toast';
+import { cn } from '@/lib/utils';
 
 interface ChatTopbarProps {
   title: string;
@@ -22,13 +28,86 @@ export function ChatTopbar({
   onSwitchToVoice,
   showSummaryBtn,
 }: ChatTopbarProps) {
+  const { user, updateProfile } = useAuth();
+  const [currentAccent, setCurrentAccent] = useState<string>('en-US');
+  const [isAccentMenuOpen, setIsAccentMenuOpen] = useState(false);
+  const accentMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const userAccent = user?.preferred_accent || (user?.profile as any)?.preferred_accent || (user?.profile as any)?.accent;
+    const stored = getStoredAccent();
+    if (stored && stored !== 'en-US') {
+      setCurrentAccent(stored);
+    } else if (userAccent) {
+      setCurrentAccent(userAccent);
+      saveStoredAccent(userAccent);
+    } else {
+      setCurrentAccent(stored || 'en-US');
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const handleAccentChange = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) {
+        setCurrentAccent(detail);
+      } else {
+        setCurrentAccent(getStoredAccent());
+      }
+    };
+    window.addEventListener('tati_accent_changed', handleAccentChange);
+    window.addEventListener('storage', handleAccentChange);
+    return () => {
+      window.removeEventListener('tati_accent_changed', handleAccentChange);
+      window.removeEventListener('storage', handleAccentChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (accentMenuRef.current && !accentMenuRef.current.contains(e.target as Node)) {
+        setIsAccentMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelectAccent = async (accentId: string) => {
+    setCurrentAccent(accentId);
+    saveStoredAccent(accentId);
+    setIsAccentMenuOpen(false);
+
+    const accentObj = ACCENTS.find(a => a.id === accentId);
+    toast.success(`Voice accent changed to ${accentObj?.label || accentId}`, { id: 'chat-accent-sync' });
+
+    try {
+      await apiPut('/profile', { preferred_accent: accentId, accent: accentId });
+      if (user) {
+        updateProfile({
+          ...user,
+          preferred_accent: accentId,
+          profile: {
+            ...user.profile,
+            preferred_accent: accentId,
+            accent: accentId,
+          },
+        });
+      }
+    } catch (e) {
+      console.error('Failed to sync accent to profile from chat:', e);
+    }
+  };
+
+  const currentAccentObj = ACCENTS.find(a => a.id === currentAccent) || ACCENTS[0];
+
   return (
     <header className="h-14 flex items-center justify-between px-4 border-b border-border bg-bg shrink-0">
       <div className="flex items-center gap-3 overflow-hidden">
         <button
           aria-label="Abrir menu"
           onClick={onToggleSidebar}
-          className="p-1.5 rounded-md hover:bg-surface-hover text-text-muted"
+          className="p-1.5 rounded-md hover:bg-surface-hover text-text-muted cursor-pointer"
         >
           <Menu size={20} />
         </button>
@@ -39,6 +118,51 @@ export function ChatTopbar({
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Accent Selector */}
+        <div className="relative" ref={accentMenuRef}>
+          <button
+            type="button"
+            onClick={() => setIsAccentMenuOpen(!isAccentMenuOpen)}
+            title={`Teacher Tati Accent: ${currentAccentObj.label}`}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-surface border border-border hover:border-primary/40 text-xs font-bold text-text transition-all active:scale-95 cursor-pointer shadow-xs"
+          >
+            <span className="text-sm">{currentAccentObj.flag}</span>
+            <span className="hidden sm:inline text-[11px] font-bold text-text-muted">{currentAccentObj.shortLabel}</span>
+          </button>
+
+          {isAccentMenuOpen && (
+            <div className="absolute right-0 top-full mt-2 w-52 bg-surface border border-border rounded-2xl shadow-xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+              <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-text-muted border-b border-border mb-1">
+                Teacher Tati Accent
+              </div>
+              <div className="max-h-60 overflow-y-auto space-y-0.5 scrollbar-thin">
+                {ACCENTS.map((acc) => {
+                  const isSelected = acc.id === currentAccent;
+                  return (
+                    <button
+                      key={acc.id}
+                      type="button"
+                      onClick={() => handleSelectAccent(acc.id)}
+                      className={cn(
+                        "w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all text-left cursor-pointer",
+                        isSelected
+                          ? "bg-primary/10 text-primary font-bold"
+                          : "hover:bg-bg text-text"
+                      )}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <span>{acc.flag}</span>
+                        <span className="truncate">{acc.label.replace(/^.*?\s/, '')}</span>
+                      </div>
+                      {isSelected && <Check size={14} className="text-primary shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
         <NotificationsDropdown />
 
         {showActivities && (
