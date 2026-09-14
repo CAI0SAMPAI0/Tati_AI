@@ -9,6 +9,7 @@ import { useErrorCountStore } from '@/store/error-store';
 import { useChatSocketInstance } from '@/providers/chat-socket-provider';
 import { apiPost } from '@/lib/api/client';
 import toast from 'react-hot-toast';
+import { getStoredAccent } from '@/lib/constants/accents';
 
 export function useChatSocket(conversationId: string | null) {
   const { token, user } = useAuth();
@@ -36,13 +37,24 @@ export function useChatSocket(conversationId: string | null) {
   const pendingAudioRef = useRef<string | null>(null);
 
   const getEffectiveAccent = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('tati_voice_accent');
-      if (stored) return stored;
-    }
     const userProfile = user?.profile as { preferred_accent?: string; accent?: string } | undefined;
-    return user?.preferred_accent || userProfile?.preferred_accent || userProfile?.accent || 'en-US';
+    const profileAccent = user?.preferred_accent || userProfile?.preferred_accent || userProfile?.accent;
+    return getStoredAccent(profileAccent || 'en-US');
   }, [user]);
+
+  const [activeAccent, setActiveAccent] = useState<string>(() => getEffectiveAccent());
+
+  useEffect(() => {
+    const handleAccent = () => {
+      setActiveAccent(getEffectiveAccent());
+    };
+    window.addEventListener('tati_accent_changed', handleAccent);
+    window.addEventListener('storage', handleAccent);
+    return () => {
+      window.removeEventListener('tati_accent_changed', handleAccent);
+      window.removeEventListener('storage', handleAccent);
+    };
+  }, [getEffectiveAccent]);
 
   useEffect(() => {
     const userAccent = user?.preferred_accent || (user?.profile as any)?.preferred_accent || (user?.profile as any)?.accent;
@@ -438,7 +450,7 @@ export function useChatSocket(conversationId: string | null) {
       };
       setMessages((prev) => [...prev, newUserMsg]);
     }
-  }, [socket]);
+  }, [socket, getEffectiveAccent]);
 
   const sendFile = useCallback(async (filename: string, base64: string, caption?: string, overrideConvId?: string) => {
     return sendFiles([{ name: filename, base64 }], caption, overrideConvId);

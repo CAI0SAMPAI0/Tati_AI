@@ -213,6 +213,7 @@ async def send_chat_message(request: HttpRequest, payload: SendMessageInput):
         conversation_id=payload.conversation_id,
         user_text=payload.message,
         difficulty=payload.current_difficulty,
+        accent=getattr(payload, "accent", None),
     )
     reply_text = res.get("reply") if isinstance(res, dict) else str(res)
     audio_b64 = res.get("audio_b64") if isinstance(res, dict) else ""
@@ -251,14 +252,14 @@ async def synthesize_voice(request: HttpRequest, payload: TTSInput):
 
     text = payload.text or payload.message or ""
     accent = payload.accent
-    if not accent or accent == "en-US":
+    if not accent or str(accent).lower() in ["default", ""]:
         if (
             hasattr(request, "auth")
             and request.auth
             and hasattr(request.auth, "profile")
             and isinstance(request.auth.profile, dict)
         ):
-            accent = request.auth.profile.get("preferred_accent") or request.auth.profile.get("accent") or accent or "en-US"
+            accent = request.auth.profile.get("preferred_accent") or request.auth.profile.get("accent")
     accent = accent or "en-US"
     audio_b64 = await AudioService.text_to_speech_async(text, accent=accent)
     return {

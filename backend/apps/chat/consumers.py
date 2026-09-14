@@ -162,9 +162,19 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                     user_pref = getattr(self.user, "preferred_accent")
 
             accent = content.get("accent")
-            if not accent or str(accent).lower() in ["default", ""] or (accent == "en-US" and user_pref):
-                accent = user_pref or accent or "en-US"
+            if not accent or str(accent).lower() in ["default", ""]:
+                accent = user_pref or "en-US"
             accent = accent or "en-US"
+
+            if self.user and accent and accent != user_pref:
+                try:
+                    if not isinstance(self.user.profile, dict):
+                        self.user.profile = {}
+                    self.user.profile["preferred_accent"] = accent
+                    self.user.profile["accent"] = accent
+                    await sync_to_async(self.user.save)(update_fields=["profile"])
+                except Exception as save_pref_err:
+                    logger.warning(f"[ChatWS] Error syncing accent to user profile: {save_pref_err}")
 
             origin = content.get("origin") or ("voice" if is_audio else "chat")
 

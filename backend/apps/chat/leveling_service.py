@@ -250,16 +250,16 @@ class LevelingService:
         session_accent = accent
         if not session_accent or str(session_accent).lower() in ["default", ""]:
             session_accent = (
-                session.get("accent")
-                if isinstance(session, dict)
-                else None
-            ) or (
                 fresh_user.profile.get("preferred_accent")
                 if isinstance(getattr(fresh_user, "profile", None), dict)
                 else None
             ) or (
                 fresh_user.profile.get("accent")
                 if isinstance(getattr(fresh_user, "profile", None), dict)
+                else None
+            ) or (
+                session.get("accent")
+                if isinstance(session, dict)
                 else None
             ) or "en-US"
         session_accent = session_accent or "en-US"
@@ -451,10 +451,6 @@ class LevelingService:
         session_accent = accent
         if not session_accent or str(session_accent).lower() in ["default", ""]:
             session_accent = (
-                session.get("accent")
-                if isinstance(session, dict)
-                else None
-            ) or (
                 fresh_user.profile.get("preferred_accent")
                 if isinstance(getattr(fresh_user, "profile", None), dict)
                 else None
@@ -462,10 +458,16 @@ class LevelingService:
                 fresh_user.profile.get("accent")
                 if isinstance(getattr(fresh_user, "profile", None), dict)
                 else None
+            ) or (
+                session.get("accent")
+                if isinstance(session, dict)
+                else None
             ) or "en-US"
         session_accent = session_accent or "en-US"
         if isinstance(session, dict):
             session["accent"] = session_accent
+            fresh_user.profile["active_leveling"] = session
+            fresh_user.save(update_fields=["profile"])
 
         if not isinstance(session, dict) or session.get("completed"):
             return {

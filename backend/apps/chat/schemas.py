@@ -33,6 +33,7 @@ class SendMessageInput(BaseModel):
     message: str
     synthesize_audio: bool = False
     current_difficulty: Optional[str] = None
+    accent: Optional[str] = None
 
 
 class VoiceSynthesisInput(BaseModel):

@@ -501,8 +501,8 @@ class AIService:
                 user_pref = prof.get("preferred_accent") or prof.get("accent")
             if not user_pref and hasattr(user, "preferred_accent"):
                 user_pref = getattr(user, "preferred_accent")
-        if not user_accent or user_accent.lower() in ["default", ""] or (user_accent == "en-US" and user_pref):
-            user_accent = user_pref or user_accent or "en-US"
+        if not user_accent or str(user_accent).lower() in ["default", ""]:
+            user_accent = user_pref or "en-US"
         user_accent = user_accent or "en-US"
 
         sys_prompt = get_tati_system_prompt(user, difficulty, memory_summary=memory_summary, accent=user_accent)

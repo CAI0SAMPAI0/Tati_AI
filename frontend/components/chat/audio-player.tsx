@@ -3,16 +3,23 @@
 import { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, Gauge } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getStoredAccent } from '@/lib/constants/accents';
+import { apiPost } from '@/lib/api/client';
 
 interface AudioPlayerProps {
   url?: string;
   base64?: string;
   className?: string;
   autoPlay?: boolean;
+  text?: string;
+  onAudioUpdated?: (newBase64: string) => void;
 }
 
-export function AudioPlayer({ url, base64, className, autoPlay }: AudioPlayerProps) {
+export function AudioPlayer({ url, base64, className, autoPlay, text, onAudioUpdated }: AudioPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const [activeBase64, setActiveBase64] = useState<string | undefined>(base64);
+  const [activeUrl, setActiveUrl] = useState<string | undefined>(url);
   const [progress, setProgress] = useState(0);
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
@@ -20,7 +27,17 @@ export function AudioPlayer({ url, base64, className, autoPlay }: AudioPlayerPro
   const [showVolume, setShowVolume] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const audioSrc = base64 ? `data:audio/mp3;base64,${base64}` : url;
+  const initialAccentRef = useRef<string>(getStoredAccent());
+
+  useEffect(() => {
+    setActiveBase64(base64);
+  }, [base64]);
+
+  useEffect(() => {
+    setActiveUrl(url);
+  }, [url]);
+
+  const audioSrc = activeBase64 ? `data:audio/mp3;base64,${activeBase64}` : activeUrl;
 
   useEffect(() => {
     if (autoPlay && audioRef.current && !isPlaying && audioSrc) {
@@ -56,14 +73,52 @@ export function AudioPlayer({ url, base64, className, autoPlay }: AudioPlayerPro
     };
   }, []);
 
-  const togglePlay = () => {
+  const togglePlay = async () => {
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
-    } else {
-      audioRef.current.play();
+      setIsPlaying(false);
+      return;
     }
-    setIsPlaying(!isPlaying);
+
+    const currentStoredAccent = getStoredAccent();
+    const accentChanged = Boolean(text && initialAccentRef.current && initialAccentRef.current !== currentStoredAccent);
+    const missingAudio = !activeBase64 && !activeUrl && Boolean(text);
+
+    if ((accentChanged || missingAudio) && text) {
+      try {
+        setIsLoadingAudio(true);
+        const res = await apiPost<{ audio_b64?: string; audio?: string }>('/chat/tts', {
+          text: text,
+          message: text,
+          accent: currentStoredAccent,
+        });
+        if (res.ok && (res.data?.audio_b64 || res.data?.audio)) {
+          const newB64 = (res.data.audio_b64 || res.data.audio) as string;
+          setActiveBase64(newB64);
+          initialAccentRef.current = currentStoredAccent;
+          onAudioUpdated?.(newB64);
+          setTimeout(() => {
+            if (audioRef.current) {
+              audioRef.current.play()
+                .then(() => setIsPlaying(true))
+                .catch((e) => console.error('Play error after TTS fetch:', e));
+            }
+          }, 50);
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to fetch TTS for updated accent:', err);
+      } finally {
+        setIsLoadingAudio(false);
+      }
+    }
+
+    if (audioSrc) {
+      audioRef.current.play()
+        .then(() => setIsPlaying(true))
+        .catch((err) => console.error('Play error:', err));
+    }
   };
 
   const handleVolumeChange = (v: number) => {
@@ -92,7 +147,7 @@ export function AudioPlayer({ url, base64, className, autoPlay }: AudioPlayerPro
     audioRef.current.playbackRate = nextSpeed;
   };
 
-  if (!audioSrc) return null;
+  if (!audioSrc && !text) return null;
 
   return (
     <div className={cn("flex flex-col gap-2 mt-2 animate-in fade-in slide-in-from-top-1", className)}>
@@ -101,9 +156,17 @@ export function AudioPlayer({ url, base64, className, autoPlay }: AudioPlayerPro
         
         <button 
           onClick={togglePlay}
-          className="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-white hover:bg-primary-hover transition-all active:scale-90 shadow-md shadow-primary/20"
+          disabled={isLoadingAudio}
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-white hover:bg-primary-hover transition-all active:scale-90 shadow-md shadow-primary/20 disabled:opacity-75 cursor-pointer"
+          title={isLoadingAudio ? "Loading accent audio..." : isPlaying ? "Pause audio" : "Play audio"}
         >
-          {isPlaying ? <Pause size={15} fill="currentColor" /> : <Play size={15} fill="currentColor" className="ml-0.5" />}
+          {isLoadingAudio ? (
+            <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : isPlaying ? (
+            <Pause size={15} fill="currentColor" />
+          ) : (
+            <Play size={15} fill="currentColor" className="ml-0.5" />
+          )}
         </button>
 
         <div className="w-28 h-1.5 bg-border rounded-full overflow-hidden relative mx-1">

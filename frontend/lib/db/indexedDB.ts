@@ -49,15 +49,24 @@ export async function saveMessagesLocal(conversationId: string, messages: Messag
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
+      const index = store.index('conversation_id');
+      const req = index.getAllKeys(conversationId);
 
-      messages.forEach((msg) => {
-        const item = {
-          ...msg,
-          conversation_id: conversationId,
-        };
-        store.put(item);
-      });
+      req.onsuccess = () => {
+        const existingKeys = req.result;
+        for (const key of existingKeys) {
+          store.delete(key);
+        }
+        messages.forEach((msg) => {
+          const item = {
+            ...msg,
+            conversation_id: conversationId,
+          };
+          store.put(item);
+        });
+      };
 
+      req.onerror = () => reject(req.error);
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
@@ -78,7 +87,27 @@ export async function getMessagesLocal(conversationId: string): Promise<Message[
       request.onsuccess = () => {
         const msgs = request.result as Message[];
         msgs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-        resolve(msgs);
+
+        // Deduplicate messages by role + content, preferring real backend IDs over temporary IDs
+        const seen = new Map<string, Message>();
+        for (const m of msgs) {
+          const cleanContent = (m.content || '').trim();
+          const key = `${m.role}:${cleanContent}`;
+          const existing = seen.get(key);
+          if (!existing) {
+            seen.set(key, m);
+          } else {
+            const isExistingTemp = String(existing.id).startsWith('user-') || String(existing.id).startsWith('assistant-') || String(existing.id).startsWith('temp-');
+            const isCurrentTemp = String(m.id).startsWith('user-') || String(m.id).startsWith('assistant-') || String(m.id).startsWith('temp-');
+            if (isExistingTemp && !isCurrentTemp) {
+              seen.set(key, m);
+            }
+          }
+        }
+        const result = Array.from(seen.values()).sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        resolve(result);
       };
 
       request.onerror = () => reject(request.error);
