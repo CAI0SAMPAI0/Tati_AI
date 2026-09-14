@@ -388,4 +388,12 @@
   50% {
     transform: translateY(-8px);
   }
-}
+}
+
+/* Garante que os toasts e notificações fiquem sempre acima de qualquer modal ou backdrop */
+div[data-hot-toast],
+.react-hot-toast,
+div:has(> div[data-hot-toast]) {
+  z-index: 99999999 !important;
+}
+

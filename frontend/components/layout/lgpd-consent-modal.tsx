@@ -18,6 +18,7 @@ export function LgpdConsentModal() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [parentalConsent, setParentalConsent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -31,8 +32,8 @@ export function LgpdConsentModal() {
   const consent = (user?.profile as any)?.lgpd_consent;
   const hasAccepted = Boolean(consent?.accepted_terms && consent?.terms_version === '2.2');
 
-  // Se já aceitou, não exibe o modal
-  if (hasAccepted) {
+  // Se já aceitou ou foi dispensado localmente, não exibe o modal
+  if (isDismissed || hasAccepted) {
     return null;
   }
 
@@ -52,6 +53,7 @@ export function LgpdConsentModal() {
         accepted_terms: true,
         parental_consent: true,
       });
+      setIsDismissed(true);
       toast.success('✔ Termos e consentimento registrados com sucesso! Bem-vindo(a) de volta!');
       await refreshUser();
     } catch (err: any) {
