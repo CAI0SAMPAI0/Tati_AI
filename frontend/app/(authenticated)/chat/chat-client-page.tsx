@@ -9,43 +9,15 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { X, Target } from 'lucide-react';
 import { LevelingModal } from '@/components/chat/leveling-modal';
 import toast from 'react-hot-toast';
-import dynamic from 'next/dynamic';
+import { Sidebar } from '@/components/chat/sidebar';
+import { ChatTopbar } from '@/components/chat/topbar';
+import { MessageList } from '@/components/chat/message-list';
+import { ChatInput } from '@/components/chat/chat-input';
+import { motion, AnimatePresence } from 'framer-motion';
+import MarkdownWrapper from '@/components/chat/markdown-wrapper';
 import { cn } from '@/lib/utils';
 import { useSidebarState } from '@/hooks/useSidebarState';
 import { useQueryClient } from '@tanstack/react-query';
-
-
-const Sidebar = dynamic(
-  () => import('@/components/chat/sidebar').then(m => m.Sidebar),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="hidden md:flex w-[280px] bg-bg-secondary border-r border-border flex-col animate-pulse">
-        <div className="p-6"><div className="h-8 w-32 bg-surface rounded-lg" /></div>
-        <div className="flex-1 px-3 space-y-3">
-          {Array(6).fill(0).map((_, i) => <div key={i} className="h-11 w-full bg-surface rounded-xl" />)}
-        </div>
-      </div>
-    ),
-  }
-);
-const ChatTopbar = dynamic(
-  () => import('@/components/chat/topbar').then(m => m.ChatTopbar),
-  { ssr: false, loading: () => <div className="h-16 border-b border-border bg-bg animate-pulse" /> }
-);
-const MessageList = dynamic(
-  () => import('@/components/chat/message-list').then(m => m.MessageList),
-  { ssr: false, loading: () => <div className="flex-1 bg-bg" /> }
-);
-const ChatInput = dynamic(
-  () => import('@/components/chat/chat-input').then(m => m.ChatInput),
-  { ssr: false, loading: () => <div className="h-16 bg-surface/30 animate-pulse rounded-2xl mx-4 mb-4" /> }
-);
-
-// framer-motion (~75KB) — só necessário no modal de summary
-const MotionDiv = dynamic(() => import('framer-motion').then(m => m.motion.div), { ssr: false });
-const AnimatePresence = dynamic(() => import('framer-motion').then(m => m.AnimatePresence), { ssr: false });
-const ReactMarkdown = dynamic(() => import('@/components/chat/markdown-wrapper'), { ssr: false });
 
 export default function ChatClientPage() {
   const router = useRouter();
@@ -474,14 +446,14 @@ export default function ChatClientPage() {
       <AnimatePresence>
         {isSummaryOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-12">
-            <MotionDiv
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsSummaryOpen(false)}
               className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             />
-            <MotionDiv
+            <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -508,9 +480,9 @@ export default function ChatClientPage() {
                   </div>
                 ) : (
                   <div className="prose dark:prose-invert prose-headings:text-text prose-headings:font-black prose-p:text-text/90 prose-strong:text-primary prose-ul:list-disc prose-li:text-text/80 max-w-none text-sm leading-relaxed text-text">
-                    <ReactMarkdown>
+                    <MarkdownWrapper>
                       {summary || 'No summary available at the moment.'}
-                    </ReactMarkdown>
+                    </MarkdownWrapper>
                   </div>
                 )}
               </div>
@@ -523,7 +495,7 @@ export default function ChatClientPage() {
                   Close
                 </button>
               </div>
-            </MotionDiv>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>

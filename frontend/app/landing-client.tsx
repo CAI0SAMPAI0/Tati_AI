@@ -14,7 +14,7 @@ const NAV_LINKS = [
 ];
 
 const STATS = [
-  { value: '+25.000', label: 'Mensagens e práticas didáticas' },
+  { value: '+2.000', label: 'Mensagens e práticas didáticas' },
   { value: '4 Níveis', label: 'Mapeamento oficial CEFR (A1–B2)' },
   { value: '24/7', label: 'Disponível sem restrições' },
   { value: 'PDF', label: 'Relatório diagnóstico por e-mail' },

@@ -14,7 +14,6 @@ export default function RootError({
 }) {
   const purgeAndReload = async () => {
     try {
-      sessionStorage.removeItem('tati_chunk_reload');
       if (typeof window !== 'undefined') {
         if ('caches' in window) {
           const keys = await caches.keys();
@@ -27,6 +26,7 @@ export default function RootError({
       }
     } catch {}
     const url = new URL(window.location.href);
+    url.searchParams.delete('_v');
     url.searchParams.set('_v', Date.now().toString());
     window.location.href = url.toString();
   };
@@ -44,17 +44,21 @@ export default function RootError({
 
     if (isChunk) {
       try {
-        const lastReload = sessionStorage.getItem('tati_chunk_reload');
-        const now = Date.now();
-        if (!lastReload || now - parseInt(lastReload, 10) > 8000) {
-          sessionStorage.setItem('tati_chunk_reload', String(now));
+        const alreadyReloaded = sessionStorage.getItem('tati_chunk_reloaded');
+        if (!alreadyReloaded) {
+          sessionStorage.setItem('tati_chunk_reloaded', 'true');
           purgeAndReload();
         }
-      } catch {
-        purgeAndReload();
-      }
+      } catch {}
     }
   }, [error]);
+
+  const handleHardReload = () => {
+    try {
+      sessionStorage.removeItem('tati_chunk_reloaded');
+    } catch {}
+    purgeAndReload();
+  };
 
   return (
     <div className="min-h-screen bg-bg flex items-center justify-center p-4">
