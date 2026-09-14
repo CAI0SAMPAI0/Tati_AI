@@ -136,12 +136,28 @@ else:
 UPSTASH_REDIS_URL = os.getenv("UPSTASH_REDIS_URL")
 REDIS_URL = os.getenv("REDIS_URL", UPSTASH_REDIS_URL)
 
-# Verifica se a URL do Redis é válida e não contém templates Railway não resolvidos (ex: ${{REDISHOST}})
-IS_VALID_REDIS_URL = bool(
-    REDIS_URL
-    and REDIS_URL.startswith(("redis://", "rediss://"))
-    and "${{" not in REDIS_URL
-)
+# Valida rigorosamente se a URL do Redis é válida, tem hostname/port corretos e não contém
+# templates não resolvidos (ex: ${{REDISHOST}} ou resíduos como 'redis://}:}@}:}')
+from urllib.parse import urlparse
+
+def _validate_redis_url(url: str | None) -> bool:
+    if not url or not isinstance(url, str):
+        return False
+    clean_url = url.strip()
+    if not clean_url.startswith(("redis://", "rediss://")):
+        return False
+    if "{" in clean_url or "}" in clean_url or "$" in clean_url:
+        return False
+    try:
+        parsed = urlparse(clean_url)
+        _ = parsed.port  # Levanta ValueError se o port não puder ser convertido para int (ex: '}')
+        if not parsed.hostname:
+            return False
+        return True
+    except Exception:
+        return False
+
+IS_VALID_REDIS_URL = _validate_redis_url(REDIS_URL)
 
 # Ativa Redis automaticamente se uma URL válida for fornecida, exceto se desativado explicitamente
 USE_REDIS_CACHE_ENV = os.getenv("USE_REDIS_CACHE")
@@ -175,10 +191,13 @@ else:
 # ── CELERY & BACKGROUND TASKS ─────────────────────────────────────────
 from celery.schedules import crontab
 
-CELERY_BROKER_URL = os.getenv(
-    "CELERY_BROKER_URL",
-    REDIS_URL if IS_VALID_REDIS_URL else "redis://localhost:6379/0"
-)
+_RAW_CELERY_BROKER = os.getenv("CELERY_BROKER_URL")
+if _validate_redis_url(_RAW_CELERY_BROKER):
+    CELERY_BROKER_URL = _RAW_CELERY_BROKER
+elif IS_VALID_REDIS_URL:
+    CELERY_BROKER_URL = REDIS_URL
+else:
+    CELERY_BROKER_URL = "redis://localhost:6379/0"
 CELERY_RESULT_BACKEND = "django-db"
 CELERY_CACHE_BACKEND = "django-cache"
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
