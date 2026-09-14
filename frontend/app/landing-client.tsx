@@ -1,8 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { Spinner } from '@/components/ui/spinner';
 
 const HUB_URL = 'https://tati-hub.vercel.app/materiais';
 
@@ -284,6 +286,45 @@ function ChatMockup() {
 
 export default function LandingClient() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    // 1. Limpar parâmetro _v da URL imediatamente caso exista
+    if (typeof window !== 'undefined') {
+      try {
+        const url = new URL(window.location.href);
+        if (url.searchParams.has('_v')) {
+          url.searchParams.delete('_v');
+          window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+        }
+      } catch {}
+    }
+
+    // 2. Se o usuário já estiver logado, redireciona direto para o chat ou a última tela salva
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      if (token) {
+        setIsRedirecting(true);
+        const lastRoute = typeof window !== 'undefined' ? localStorage.getItem('tati_last_route') : null;
+        const targetRoute =
+          lastRoute &&
+          lastRoute.startsWith('/') &&
+          !['/', '/login', '/register', '/reset-password'].includes(lastRoute)
+            ? lastRoute
+            : '/chat';
+        router.replace(targetRoute);
+      }
+    } catch {}
+  }, [router]);
+
+  if (isRedirecting) {
+    return (
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
 
   return (
     <div

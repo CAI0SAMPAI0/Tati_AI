@@ -25,10 +25,12 @@ export default function RootError({
         }
       }
     } catch {}
-    const url = new URL(window.location.href);
-    url.searchParams.delete('_v');
-    url.searchParams.set('_v', Date.now().toString());
-    window.location.href = url.toString();
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('_v');
+      window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+      window.location.reload();
+    }
   };
 
   useEffect(() => {
@@ -96,7 +98,7 @@ export default function RootError({
 
           <button
             type="button"
-            onClick={purgeAndReload}
+            onClick={handleHardReload}
             className="flex-1 py-2.5 px-4 rounded-xl bg-surface border border-border text-text text-xs font-bold hover:bg-surface-hover active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <RotateCcw size={14} className="text-primary" />

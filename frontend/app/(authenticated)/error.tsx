@@ -27,10 +27,12 @@ export default function AuthenticatedError({
         }
       }
     } catch {}
-    const url = new URL(window.location.href);
-    url.searchParams.delete('_v');
-    url.searchParams.set('_v', Date.now().toString());
-    window.location.href = url.toString();
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('_v');
+      window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+      window.location.reload();
+    }
   };
 
   useEffect(() => {

@@ -54,7 +54,22 @@ export function middleware(request: NextRequest) {
   if (token && isAuthGuestRoute && !isResetWithToken) {
     const url = request.nextUrl.clone();
     url.pathname = '/chat';
+    if (url.searchParams.has('_v')) url.searchParams.delete('_v');
     return NextResponse.redirect(url);
+  }
+
+  // Se o usuário está logado e acessa a raiz (/), redireciona direto para última tela ou /chat
+  if (token && pathname === '/') {
+    const lastRoute = request.cookies.get('tati_last_route')?.value;
+    const validRoute =
+      lastRoute &&
+      lastRoute.startsWith('/') &&
+      !['/', '/login', '/register', '/reset-password'].includes(lastRoute)
+        ? decodeURIComponent(lastRoute)
+        : '/chat';
+    const targetUrl = new URL(validRoute, request.url);
+    if (targetUrl.searchParams.has('_v')) targetUrl.searchParams.delete('_v');
+    return NextResponse.redirect(targetUrl);
   }
 
   // Se não estiver logado e não for rota pública, redireciona para /login

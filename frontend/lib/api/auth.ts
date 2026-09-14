@@ -88,8 +88,14 @@ export function clearStoredSession(): void {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem('tati_last_route');
   } catch {}
   clearAuthTokenCookie();
+  try {
+    if (typeof document !== 'undefined') {
+      document.cookie = 'tati_last_route=; path=/; max-age=0; SameSite=Lax';
+    }
+  } catch {}
 }
 
 export { syncAuthTokenCookieFromStorage };
