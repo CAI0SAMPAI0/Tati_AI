@@ -153,12 +153,18 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
 
             from apps.chat.audio_service import AudioService
 
-            accent = (
-                content.get("accent")
-                or (self.user.profile.get("preferred_accent") if self.user and isinstance(getattr(self.user, "profile", None), dict) else None)
-                or (self.user.profile.get("accent") if self.user and isinstance(getattr(self.user, "profile", None), dict) else None)
-                or "en-US"
-            )
+            user_pref = None
+            if self.user:
+                prof = getattr(self.user, "profile", None)
+                if isinstance(prof, dict):
+                    user_pref = prof.get("preferred_accent") or prof.get("accent")
+                if not user_pref and hasattr(self.user, "preferred_accent"):
+                    user_pref = getattr(self.user, "preferred_accent")
+
+            accent = content.get("accent")
+            if not accent or str(accent).lower() in ["default", ""] or (accent == "en-US" and user_pref):
+                accent = user_pref or accent or "en-US"
+            accent = accent or "en-US"
 
             origin = content.get("origin") or ("voice" if is_audio else "chat")
 
@@ -252,8 +258,8 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                 f"[ChatWS] Resposta concluída para '{self.username}' | Modelo: {model_used} | Modo: {origin}"
             )
 
-            # Se for modo de voz e não tiver áudio gerado, gera áudio via Edge TTS
-            if not audio_b64 and origin == "voice":
+            # Se não tiver áudio gerado, gera áudio via Edge TTS de forma assíncrona garantida
+            if not audio_b64:
                 clean_reply_text = re.sub(r"\[ATTACHED_DOCUMENT:.*?\]", "", reply_text, flags=re.DOTALL).strip()
                 audio_b64 = await AudioService.text_to_speech_async(
                     clean_reply_text, accent=accent

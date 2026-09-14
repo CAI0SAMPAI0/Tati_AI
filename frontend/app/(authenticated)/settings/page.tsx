@@ -89,11 +89,15 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (user?.profile?.preferred_accent) {
-      setSelectedAccent(user.profile.preferred_accent);
-      saveStoredAccent(user.profile.preferred_accent);
+    const userAccent = user?.preferred_accent || (user?.profile as any)?.preferred_accent || (user?.profile as any)?.accent;
+    const stored = getStoredAccent();
+    if (stored && stored !== 'en-US') {
+      setSelectedAccent(stored);
+    } else if (userAccent) {
+      setSelectedAccent(userAccent);
+      saveStoredAccent(userAccent);
     } else {
-      setSelectedAccent(getStoredAccent());
+      setSelectedAccent(stored || 'en-US');
     }
   }, [user]);
 

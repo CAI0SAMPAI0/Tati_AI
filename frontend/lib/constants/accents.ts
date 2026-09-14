@@ -19,12 +19,15 @@ export const ACCENTS: AccentOption[] = [
 
 export const DEFAULT_ACCENT = 'en-US';
 
-export function getStoredAccent(): string {
-  if (typeof window === 'undefined') return DEFAULT_ACCENT;
-  return localStorage.getItem('tati_voice_accent') || DEFAULT_ACCENT;
+export function getStoredAccent(fallback?: string): string {
+  if (typeof window === 'undefined') return fallback || DEFAULT_ACCENT;
+  return localStorage.getItem('tati_voice_accent') || fallback || DEFAULT_ACCENT;
 }
 
 export function saveStoredAccent(accentId: string): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem('tati_voice_accent', accentId);
+  try {
+    window.dispatchEvent(new CustomEvent('tati_accent_changed', { detail: accentId }));
+  } catch (_) {}
 }

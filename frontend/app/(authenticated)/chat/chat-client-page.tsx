@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
 import { useSidebarState } from '@/hooks/useSidebarState';
+import { useQueryClient } from '@tanstack/react-query';
 
 
 const Sidebar = dynamic(
@@ -60,6 +61,29 @@ export default function ChatClientPage() {
   const [summary, setSummary] = useState<string | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const locale = 'en-US';
+  const queryClient = useQueryClient();
+
+  const onConversationCreated = useCallback((newConv: Conversation) => {
+    queryClient.setQueryData(['conversations'], (old: any) => {
+      if (!old || !old.pages) return old;
+      const newPages = [...old.pages];
+      if (newPages[0]) {
+        newPages[0] = [newConv, ...newPages[0].filter((c: any) => c.id !== newConv.id)];
+      } else {
+        newPages[0] = [newConv];
+      }
+      return { ...old, pages: newPages };
+    });
+    queryClient.invalidateQueries({ queryKey: ['conversations'] });
+  }, [queryClient]);
+
+  useEffect(() => {
+    const handleActivity = () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    };
+    window.addEventListener('tati_chat_activity', handleActivity);
+    return () => window.removeEventListener('tati_chat_activity', handleActivity);
+  }, [queryClient]);
 
   useEffect(() => {
     const nextConvId = searchParams.get('conv_id') ?? searchParams.get('id');
@@ -134,6 +158,7 @@ export default function ChatClientPage() {
       if (res.ok && res.data?.conversation_id) {
         toast.success(`Leveling Challenge started with ${res.data.total_questions || totalQuestions} questions! Please answer in English.`, { id: 'start-leveling' });
         const newConvId = res.data.conversation_id;
+        queryClient.invalidateQueries({ queryKey: ['conversations'] });
         setCurrentConvId(newConvId);
         setConvTitle(res.data.title || 'CEFR Leveling Challenge');
         const initialMsg: Message = {
@@ -163,7 +188,7 @@ export default function ChatClientPage() {
     } finally {
       setIsStartingLeveling(false);
     }
-  }, [router, setMessages, handleCloseSidebar]);
+  }, [router, setMessages, handleCloseSidebar, queryClient]);
 
   const handleSend = async (text: string) => {
     let convId = currentConvId;
@@ -175,6 +200,7 @@ export default function ChatClientPage() {
         });
         if (res.ok) {
           convId = res.data.id;
+          onConversationCreated(res.data);
           setCurrentConvId(convId);
           setConvTitle(res.data.title);
           router.replace(`/chat?conv_id=${convId}`, { scroll: false });
@@ -203,6 +229,7 @@ export default function ChatClientPage() {
         });
         if (res.ok) {
           convId = res.data.id;
+          onConversationCreated(res.data);
           setCurrentConvId(convId);
           setConvTitle(res.data.title);
           router.replace(`/chat?conv_id=${convId}`, { scroll: false });
@@ -251,6 +278,7 @@ export default function ChatClientPage() {
         });
         if (convRes.ok) {
           const newId = convRes.data.id;
+          onConversationCreated(convRes.data);
           setCurrentConvId(newId);
           setConvTitle(convRes.data.title);
           router.replace(`/chat?conv_id=${newId}`, { scroll: false });
@@ -265,7 +293,7 @@ export default function ChatClientPage() {
     } else {
       sendMessage(content, currentConvId);
     }
-  }, [currentConvId, sendMessage, router]);
+  }, [currentConvId, sendMessage, router, onConversationCreated]);
 
   const handleSendFile = async (filename: string, base64: string, caption?: string) => {
     let convId = currentConvId;
@@ -277,6 +305,7 @@ export default function ChatClientPage() {
         });
         if (res.ok) {
           convId = res.data.id;
+          onConversationCreated(res.data);
           setCurrentConvId(convId);
           setConvTitle(res.data.title);
           router.replace(`/chat?conv_id=${convId}`, { scroll: false });
@@ -306,6 +335,7 @@ export default function ChatClientPage() {
         });
         if (res.ok) {
           convId = res.data.id;
+          onConversationCreated(res.data);
           setCurrentConvId(convId);
           setConvTitle(res.data.title);
           router.replace(`/chat?conv_id=${convId}`, { scroll: false });
@@ -402,6 +432,7 @@ export default function ChatClientPage() {
             messages={messages}
             isStreaming={isStreaming}
             streamingContent={streamingContent}
+            conversationId={currentConvId}
             onEdit={handleEditMessage}
             onResend={handleResend}
             onSendMessage={handleSend}
