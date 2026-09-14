@@ -36,6 +36,8 @@ export default function LoginPage() {
   const [regUsername, setRegUsername] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regLevel, setRegLevel] = useState('A1');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [parentalConsent, setParentalConsent] = useState(false);
 
   // Forgot state
   const [forgotId, setForgotId] = useState('');
@@ -219,6 +221,14 @@ export default function LoginPage() {
     clearMessages();
     if (!regName || !regEmail || !regUsername || !regPassword) { setError('Please fill in all fields.'); return; }
     if (regPassword.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (!acceptedTerms) {
+      setError('É obrigatório aceitar os Termos de Uso e Política de Privacidade (LGPD).');
+      return;
+    }
+    if (!parentalConsent) {
+      setError('Por favor, confirme a declaração de maioridade ou autorização dos pais/responsáveis (Art. 14 da LGPD).');
+      return;
+    }
     setLoading(true);
     try {
       const res = await registerUser({
@@ -227,7 +237,9 @@ export default function LoginPage() {
         username: regUsername,
         password: regPassword,
         level: regLevel,
-        is_hub_only: isHubAccess
+        is_hub_only: isHubAccess,
+        accepted_terms: acceptedTerms,
+        parental_consent: parentalConsent,
       });
       if (!res.ok) { setError((res.data as any).detail || 'Error creating account.'); return; }
 
@@ -438,7 +450,41 @@ export default function LoginPage() {
                 <Input label={'Username'} placeholder={'Username'} value={regUsername} onChange={(e) => setRegUsername(e.target.value)} />
                 <Input label={'Password'} type="password" placeholder={'Password'} value={regPassword} onChange={(e) => setRegPassword(e.target.value)} />
                 <Select label={'English level'} value={regLevel} onChange={(e) => setRegLevel(e.target.value)} options={levelOptions} />
-                <Button type="submit" fullWidth loading={loading}>
+
+                <div className="space-y-3 my-4 p-3.5 rounded-xl bg-bg-secondary/40 border border-border/80 text-left">
+                  <label className="flex items-start gap-2.5 text-xs text-text-muted cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      className="mt-0.5 rounded border-border text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                    />
+                    <span>
+                      Li e aceito os{' '}
+                      <a
+                        href="/privacy"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary font-bold underline hover:opacity-80 inline-flex items-center gap-0.5"
+                      >
+                        Termos de Uso e Política de Privacidade (LGPD)
+                      </a>.
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2.5 text-xs text-text-muted cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={parentalConsent}
+                      onChange={(e) => setParentalConsent(e.target.checked)}
+                      className="mt-0.5 rounded border-border text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                    />
+                    <span>
+                      Declaro que sou maior de 18 anos ou possuo autorização expressa dos pais/responsáveis legais (Art. 14 da LGPD).
+                    </span>
+                  </label>
+                </div>
+
+                <Button type="submit" fullWidth loading={loading} disabled={!acceptedTerms || !parentalConsent}>
                   {'Create Account'}
                 </Button>
               </form>

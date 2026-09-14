@@ -9,6 +9,8 @@ class RegisterInput(BaseModel):
     password: str = Field(..., min_length=6)
     level: str = "A1"
     is_hub_only: bool = False
+    accepted_terms: bool = True
+    parental_consent: bool = True
 
 
 class LoginInput(BaseModel):

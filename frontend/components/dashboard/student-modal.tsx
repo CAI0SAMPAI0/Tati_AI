@@ -8,6 +8,7 @@ import {
   Brain,
   CheckCircle,
   Clock,
+  MessageSquare,
   RefreshCw,
   Save,
   Send,
@@ -32,7 +33,7 @@ interface StudentModalProps {
 
 export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModalProps) {
 
-  const [activeTab, setActiveTab] = useState<'info' | 'prompt' | 'insight' | 'interests' | 'analytics' | 'progress'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'messages' | 'prompt' | 'insight' | 'interests' | 'analytics' | 'progress'>('info');
   const [localStudent, setLocalStudent] = useState(student);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -47,7 +48,22 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
   const [isNudging, setIsNudging] = useState(false);
   const [activityProgress, setActivityProgress] = useState<any>(null);
   const [isFetchingProgress, setIsFetchingProgress] = useState(false);
+  const [messages, setMessages] = useState<any[] | null>(null);
+  const [isFetchingMessages, setIsFetchingMessages] = useState(false);
   const lang = 'en-US';
+
+  const fetchMessages = async () => {
+    if (!localStudent?.username) return;
+    setIsFetchingMessages(true);
+    try {
+      const res = await apiGet<any[]>(`/dashboard/students/${encodeURIComponent(localStudent.username)}/messages`);
+      setMessages(res || []);
+    } catch (err) {
+      toast.error('Failed to load student messages.');
+    } finally {
+      setIsFetchingMessages(false);
+    }
+  };
 
   const fetchActivityProgress = async () => {
     setIsFetchingProgress(true);
@@ -70,6 +86,7 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
     setRecommendations([]);
     setAnalytics(null);
     setActivityProgress(null);
+    setMessages(null);
     if (student) {
       setNudgeMessage(`Hi ${student.name || student.username}! Taty's Hub here. I noticed you haven't practiced English lately. Let's do a quick chat session today?`);
     }
@@ -191,7 +208,10 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
     if (activeTab === 'progress' && localStudent && !activityProgress) {
       fetchActivityProgress();
     }
-  }, [activeTab, localStudent, analytics, activityProgress]);
+    if (activeTab === 'messages' && localStudent && !messages) {
+      fetchMessages();
+    }
+  }, [activeTab, localStudent, analytics, activityProgress, messages]);
 
   if (!localStudent) return null;
 
@@ -206,8 +226,9 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
         <div className="flex bg-bg-secondary p-1 rounded-xl overflow-x-auto no-scrollbar shrink-0">
           {[
             { id: 'info', icon: <User size={14} />, label: 'Profile' },
-            { id: 'analytics', icon: <BarChart2 size={14} />, label: 'Analytics' },
+            { id: 'messages', icon: <MessageSquare size={14} />, label: 'Messages & Chat' },
             { id: 'progress', icon: <CheckCircle size={14} />, label: 'Progress' },
+            { id: 'analytics', icon: <BarChart2 size={14} />, label: 'Analytics' },
             { id: 'prompt', icon: <AlertCircle size={14} />, label: 'Prompt' },
             { id: 'insight', icon: <Brain size={14} />, label: 'Insight' },
             { id: 'interests', icon: <Target size={14} />, label: 'Interests' },
@@ -258,18 +279,14 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                   </p>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 bg-surface border border-border rounded-xl">
                   <span className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block truncate">Messages</span>
                   <p className="text-sm font-bold text-text mt-1">{localStudent.total_messages || 0}</p>
                 </div>
                 <div className="p-3 bg-surface border border-border rounded-xl">
                   <span className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block truncate">Streak</span>
-                  <p className="text-sm font-bold text-warning mt-1">🔥 {localStudent.current_streak || 0} days</p>
-                </div>
-                <div className="p-3 bg-surface border border-border rounded-xl">
-                  <span className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-wider block truncate">Freezes</span>
-                  <p className="text-sm font-bold text-info mt-1">❄️ {localStudent.streak_freeze_count || 0}/3</p>
+                  <p className="text-sm font-bold text-warning mt-1">🔥 {localStudent.current_streak ?? localStudent.streak_count ?? 0} days</p>
                 </div>
               </div>
 
@@ -302,6 +319,78 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                   Delete student
                 </Button>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'messages' && (
+            <div className="space-y-4 animate-fade-in">
+              <div className="flex items-center justify-between pb-2 border-b border-border">
+                <div>
+                  <h4 className="text-xs font-bold text-text uppercase tracking-widest flex items-center gap-2">
+                    <MessageSquare size={14} className="text-primary" />
+                    Chat History & Messages
+                  </h4>
+                  <p className="text-[0.7rem] text-text-muted mt-0.5">
+                    Histórico de mensagens trocadas pelo aluno com a Teacher Tati AI.
+                  </p>
+                </div>
+                <button
+                  onClick={fetchMessages}
+                  disabled={isFetchingMessages}
+                  className="px-2.5 py-1.5 rounded-lg border border-border hover:bg-surface-hover text-text-muted hover:text-primary transition-all text-xs flex items-center gap-1.5"
+                  title="Atualizar mensagens"
+                >
+                  <RefreshCw size={12} className={cn(isFetchingMessages && "animate-spin text-primary")} />
+                  <span>Atualizar</span>
+                </button>
+              </div>
+
+              {isFetchingMessages ? (
+                <div className="flex justify-center items-center py-12">
+                  <RefreshCw size={24} className="animate-spin text-primary" />
+                </div>
+              ) : !messages || messages.length === 0 ? (
+                <div className="p-8 border border-border/70 rounded-2xl bg-bg-secondary/30 text-center space-y-2">
+                  <p className="text-sm font-bold text-text">Nenhuma mensagem registrada ainda</p>
+                  <p className="text-xs text-text-muted">
+                    O aluno ainda não enviou mensagens para a Teacher Tati AI nesta conta.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1.5 custom-scrollbar">
+                  {messages.map((m: any) => {
+                    const isUser = m.role === 'user';
+                    return (
+                      <div
+                        key={m.id}
+                        className={cn(
+                          "p-3 rounded-xl border transition-all text-xs space-y-1.5",
+                          isUser
+                            ? "bg-primary/5 border-primary/20 ml-3"
+                            : "bg-surface border-border/80 mr-3"
+                        )}
+                      >
+                        <div className="flex items-center justify-between text-[0.65rem] font-bold">
+                          <span className={cn(isUser ? "text-primary font-bold" : "text-purple-600 dark:text-purple-400 font-bold")}>
+                            {isUser ? `👤 ${localStudent.name || localStudent.username}` : '🤖 Teacher Tati AI'}
+                          </span>
+                          <span className="text-text-muted font-normal text-[0.65rem]">
+                            {formatDateTime(m.created_at)}
+                          </span>
+                        </div>
+                        <p className="text-text whitespace-pre-wrap leading-relaxed text-xs">
+                          {m.content}
+                        </p>
+                        {m.has_audio && (
+                          <span className="inline-block px-2 py-0.5 rounded bg-surface-hover text-text-muted text-[0.6rem] font-medium border border-border">
+                            🎙️ Áudio gravado
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 

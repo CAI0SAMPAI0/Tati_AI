@@ -42,6 +42,7 @@ interface StreakData {
   current_streak: number;
   longest_streak: number;
   streak_freeze_count?: number;
+  freeze_count?: number;
 }
 
 interface WeeklyReport {
@@ -396,10 +397,10 @@ export default function ProgressClientPage() {
                     <p className="text-xs font-bold text-text-subtle uppercase tracking-widest mt-1">
                       consecutive days
                     </p>
-                    {streakData?.streak_freeze_count && streakData.streak_freeze_count > 0 ? (
+                    {((streakData?.streak_freeze_count ?? streakData?.freeze_count ?? 0) > 0) ? (
                       <div className="flex items-center gap-1.5 mt-3 text-xs font-bold text-cyan-500 bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/20" title="Streak Freeze Active">
                         <Snowflake size={14} className="animate-pulse" />
-                        <span>{streakData.streak_freeze_count} Freeze Active</span>
+                        <span>{(streakData?.streak_freeze_count ?? streakData?.freeze_count)} Freeze Active</span>
                       </div>
                     ) : null}
                   </div>

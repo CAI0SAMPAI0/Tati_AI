@@ -103,6 +103,8 @@ function VoicePageContent() {
     { id: 'en-IN', label: '🇮🇳 Indian', shortLabel: 'IN', desc: 'India' },
     { id: 'en-ZA', label: '🇿🇦 South African', shortLabel: 'ZA', desc: 'South Africa' },
     { id: 'en-NZ', label: '🇳🇿 New Zealand', shortLabel: 'NZ', desc: 'New Zealand' },
+    { id: 'en-CN', label: '🇨🇳 Chinese', shortLabel: 'CN', desc: 'Chinese English' },
+    { id: 'en-JP', label: '🇯🇵 Japanese', shortLabel: 'JP', desc: 'Japanese English' },
   ];
 
   const [accentIndex, setAccentIndex] = useState(() => {

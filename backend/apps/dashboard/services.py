@@ -280,6 +280,9 @@ class DashboardService:
                     "focus": focus_val,
                     "total_xp": u.total_xp,
                     "streak_count": u.streak_count,
+                    "current_streak": u.streak_count,
+                    "freeze_count": st.get("freeze_count", 0) or 0,
+                    "streak_freeze_count": st.get("freeze_count", 0) or 0,
                     "is_exempt": bool(u.is_exempt),
                     "is_premium_active": bool(u.is_premium_active),
                     "last_active": last_active_iso,
@@ -1019,6 +1022,9 @@ class DashboardService:
         msgs_count = Message.objects.filter(username=username, role="user").count()
         subs_count = ActivitySubmission.objects.filter(username=username).count()
 
+        st = u.streak_data if isinstance(u.streak_data, dict) else {}
+        freeze_count = st.get("freeze_count", 0) or 0
+
         return {
             "username": u.username,
             "name": u.name or u.username,
@@ -1027,6 +1033,9 @@ class DashboardService:
             "level": u.level or "A1",
             "total_xp": u.total_xp,
             "streak_count": u.streak_count,
+            "current_streak": u.streak_count,
+            "freeze_count": freeze_count,
+            "streak_freeze_count": freeze_count,
             "is_exempt": bool(u.is_exempt),
             "is_premium_active": bool(u.is_premium_active),
             "messages_count": msgs_count,
@@ -1151,6 +1160,9 @@ class DashboardService:
         total_msgs = Message.objects.filter(username=username, role="user").count()
         total_exercises = len(submissions)
 
+        st = u.streak_data if isinstance(u.streak_data, dict) else {}
+        freeze_count = st.get("freeze_count", 0) or 0
+
         return {
             "summary": summary,
             "study_time_chart": study_time_chart,
@@ -1158,6 +1170,9 @@ class DashboardService:
             "weekly_study_time": [item["study_minutes"] for item in study_time_chart],
             "total_xp": u.total_xp,
             "streak_count": u.streak_count,
+            "current_streak": u.streak_count,
+            "freeze_count": freeze_count,
+            "streak_freeze_count": freeze_count,
             "current_level": u.level or "A1",
             "messages_count": total_msgs,
             "exercises_completed": total_exercises,
@@ -1299,6 +1314,27 @@ class DashboardService:
             ],
             "pronunciation": [],
         }
+
+    @staticmethod
+    def get_student_messages(username: str, limit: int = 60) -> list[dict]:
+        msgs = (
+            Message.objects.filter(username=username)
+            .order_by("-created_at")[:limit]
+        )
+        results = []
+        for m in msgs:
+            results.append(
+                {
+                    "id": str(m.id),
+                    "role": m.role,
+                    "content": m.content,
+                    "session_id": m.session_id,
+                    "has_audio": bool(m.audio_b64),
+                    "created_at": m.created_at.isoformat() if m.created_at else "",
+                    "date": m.date.isoformat() if m.date else "",
+                }
+            )
+        return results
 
     @staticmethod
     def get_student_insight(username: str, lang: str = "en-US") -> dict:

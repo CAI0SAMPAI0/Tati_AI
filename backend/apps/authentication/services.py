@@ -240,6 +240,16 @@ class AuthService:
         else:
             role = UserRole.STUDENT
 
+        now_iso = datetime.now(timezone.utc).isoformat()
+        profile_data = {
+            "lgpd_consent": {
+                "accepted_at": now_iso,
+                "terms_version": "2.2",
+                "accepted_terms": bool(getattr(data, "accepted_terms", True)),
+                "parental_consent": bool(getattr(data, "parental_consent", True)),
+            }
+        }
+
         user = User.objects.create(
             username=username,
             email=email,
@@ -249,6 +259,7 @@ class AuthService:
             level=data.level.upper()
             if data.level.upper() in CEFRLevel.values
             else CEFRLevel.A1,
+            profile=profile_data,
         )
 
         logger.info(f"[Auth] Novo usuário registrado com sucesso: {username} ({role})")

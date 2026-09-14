@@ -22,6 +22,7 @@ interface StreakData {
   current_streak: number;
   longest_streak: number;
   streak_freeze_count?: number;
+  freeze_count?: number;
 }
 
 export default function ShopClientPage() {
@@ -62,7 +63,7 @@ export default function ShopClientPage() {
   };
 
   const userXp = xpData?.xp ?? 0;
-  const freezeCount = streakData?.streak_freeze_count ?? 0;
+  const freezeCount = streakData?.streak_freeze_count ?? streakData?.freeze_count ?? 0;
   const canBuy = userXp >= 150 && freezeCount < 3;
 
   return (

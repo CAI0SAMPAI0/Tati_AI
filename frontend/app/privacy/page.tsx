@@ -391,7 +391,7 @@ export default function PrivacyPolicyPage() {
                 Sendinblue) para entrega de relatórios em PDF, links de recuperação e alertas essenciais de conta.
               </li>
               <li>
-                <strong style={{ color: '#1a1826' }}>Processamento Financeiro:</strong> Asaas e Mercado Pago para
+                <strong style={{ color: '#1a1826' }}>Processamento Financeiro:</strong> Mercado Pago para
                 transações seguras no catálogo de materiais. Dados de cartões não são armazenados em nossos servidores.
               </li>
             </ul>
@@ -432,7 +432,43 @@ export default function PrivacyPolicyPage() {
             </div>
           </section>
 
-          {/* Seção 7 */}
+          {/* Seção 7 - Proteção de Menores */}
+          <section className="space-y-3 pt-8" style={{ borderTop: '1px solid #f0edf8' }}>
+            <div className="flex items-center gap-3">
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: '#f5f3ff', color: '#6d28d9' }}
+              >
+                <Lock size={18} />
+              </div>
+              <h2 className="font-display-serif text-xl sm:text-2xl font-bold" style={{ color: '#1a1826' }}>
+                7. Proteção de Dados de Menores de Idade (Artigo 14 da LGPD)
+              </h2>
+            </div>
+            <p className="text-sm leading-relaxed" style={{ color: '#6b6880' }}>
+              O tratamento de dados pessoais de crianças (até 12 anos incompletos) e adolescentes (entre 12 e 18 anos)
+              é realizado em observância aos seus melhores interesses e às exigências expressas do Artigo 14 da Lei Geral
+              de Proteção de Dados:
+            </p>
+            <div className="space-y-2.5 text-xs sm:text-sm leading-relaxed" style={{ color: '#6b6880' }}>
+              <p>
+                • <strong style={{ color: '#1a1826' }}>Consentimento dos Pais ou Responsáveis:</strong> O cadastro e utilização
+                da plataforma por menores de 18 anos pressupõe a ciência e autorização inequívoca de ao menos um dos pais ou
+                responsável legal, confirmada expressamente no ato da criação da conta.
+              </p>
+              <p>
+                • <strong style={{ color: '#1a1826' }}>Finalidade Estritamente Educacional:</strong> Os dados coletados (nome,
+                e-mail e histórico de aprendizado) destinam-se exclusivamente à personalização das aulas, acompanhamento
+                didático e entrega de devolutivas pedagógicas de inglês.
+              </p>
+              <p>
+                • <strong style={{ color: '#1a1826' }}>Vedação à Transferência Comercial:</strong> Dados de menores jamais
+                são comercializados, transferidos para fins publicitários ou submetidos a perfis de consumo abusivo.
+              </p>
+            </div>
+          </section>
+
+          {/* Seção 8 */}
           <section className="space-y-3 pt-8" style={{ borderTop: '1px solid #f0edf8' }}>
             <div className="flex items-center gap-3">
               <div
@@ -442,12 +478,12 @@ export default function PrivacyPolicyPage() {
                 <CheckCircle2 size={18} />
               </div>
               <h2 className="font-display-serif text-xl sm:text-2xl font-bold" style={{ color: '#1a1826' }}>
-                7. Seus Direitos como Titular (Artigo 18 da LGPD)
+                8. Seus Direitos como Titular (Artigo 18 da LGPD)
               </h2>
             </div>
             <p className="text-sm leading-relaxed" style={{ color: '#6b6880' }}>
-              A qualquer momento, mediante simples solicitação ao nosso canal de contato, você pode exercer os direitos
-              garantidos pela lei:
+              A qualquer momento, mediante simples solicitação ao nosso canal de contato, você ou seu responsável legal
+              pode exercer os direitos garantidos pela lei:
             </p>
             <div className="space-y-2 text-xs sm:text-sm leading-relaxed" style={{ color: '#6b6880' }}>
               <p>
@@ -473,7 +509,7 @@ export default function PrivacyPolicyPage() {
             </div>
           </section>
 
-          {/* Seção 8 */}
+          {/* Seção 9 */}
           <section className="space-y-3 pt-8" style={{ borderTop: '1px solid #f0edf8' }}>
             <div className="flex items-center gap-3">
               <div
@@ -483,7 +519,7 @@ export default function PrivacyPolicyPage() {
                 <Bell size={18} />
               </div>
               <h2 className="font-display-serif text-xl sm:text-2xl font-bold" style={{ color: '#1a1826' }}>
-                8. Cookies e Tecnologias de Navegação
+                9. Cookies e Tecnologias de Navegação
               </h2>
             </div>
             <p className="text-sm leading-relaxed" style={{ color: '#6b6880' }}>
@@ -492,7 +528,7 @@ export default function PrivacyPolicyPage() {
             </p>
           </section>
 
-          {/* Seção 9 - Contato */}
+          {/* Seção 10 - Contato */}
           <section className="space-y-4 pt-8" style={{ borderTop: '1px solid #f0edf8' }}>
             <div className="flex items-center gap-3">
               <div
@@ -502,7 +538,7 @@ export default function PrivacyPolicyPage() {
                 <Mail size={18} />
               </div>
               <h2 className="font-display-serif text-xl sm:text-2xl font-bold" style={{ color: '#1a1826' }}>
-                9. Canal de Atendimento e Encarregado (DPO)
+                10. Canal de Atendimento e Encarregado (DPO)
               </h2>
             </div>
             <p className="text-sm leading-relaxed" style={{ color: '#6b6880' }}>

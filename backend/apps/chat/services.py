@@ -197,6 +197,10 @@ def get_tati_system_prompt(user: User, difficulty: str = None, memory_summary: s
             accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu Inglês Sul-Africano (ZA)."
         elif "NZ" in norm or "ZEALAND" in norm:
             accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu Inglês Neozelandês (NZ)."
+        elif "CN" in norm or "CHINESE" in norm:
+            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu prática de Inglês Internacional com sotaque Chinês (Asian International Business English). Foque em clareza, ritmo cadenciado e expressões comuns na comunicação global com a Ásia."
+        elif "JP" in norm or "JAPANESE" in norm:
+            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu prática de Inglês com sotaque Japonês (Japanese English Context). Mantenha tom polido e cortês, dicção nítida e vocabulário claro para comunicação internacional com parceiros do Japão."
         elif "US" in norm or "AMERICAN" in norm:
             accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu Inglês Americano (US). Use expressões cotidianas e naturais dos EUA."
 

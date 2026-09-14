@@ -43,10 +43,12 @@ class StreakService:
 
         study_dates = streak_data.get("study_dates") or []
 
+        f_count = streak_data.get("freeze_count", 0) or 0
         return StreakDataOut(
             current_streak=streak_data.get("current_streak", 0) or 0,
             longest_streak=streak_data.get("longest_streak", 0) or 0,
-            freeze_count=streak_data.get("freeze_count", 0) or 0,
+            freeze_count=f_count,
+            streak_freeze_count=f_count,
             last_activity_date=last_date_str,
             study_dates=study_dates[-30:] if isinstance(study_dates, list) else [],
             has_studied_today=has_studied,

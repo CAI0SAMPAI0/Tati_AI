@@ -264,11 +264,8 @@ export default function DashboardClientPage() {
                                 {s.risk_level === 'warning' && (
                                   <span className="px-1.5 py-0.5 rounded bg-warning/10 text-warning text-[0.6rem] font-bold">At Risk</span>
                                 )}
-                                {s.current_streak > 0 && (
-                                  <span className="px-1.5 py-0.5 rounded bg-warning/10 text-warning text-[0.6rem] font-bold" title={`${s.current_streak} days streak`}>🔥 {s.current_streak}</span>
-                                )}
-                                {s.streak_freeze_count > 0 && (
-                                  <span className="px-1.5 py-0.5 rounded bg-info/10 text-info text-[0.6rem] font-bold" title={`${s.streak_freeze_count} freezes remaining`}>❄️ {s.streak_freeze_count}</span>
+                                {(s.current_streak > 0 || s.streak_count > 0) && (
+                                  <span className="px-1.5 py-0.5 rounded bg-warning/10 text-warning text-[0.6rem] font-bold" title={`${s.current_streak || s.streak_count} days streak`}>🔥 {s.current_streak || s.streak_count}</span>
                                 )}
                               </div>
                               <div className="text-[0.7rem] text-text-muted truncate">@{s.username}</div>
