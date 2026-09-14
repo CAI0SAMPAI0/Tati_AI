@@ -131,15 +131,6 @@ def get_student_activity_progress(request: HttpRequest, username: str):
     return DashboardService.get_student_activity_progress(username)
 
 
-@dashboard_router.get("/students/{username}/messages", auth=auth_required)
-def get_student_messages(request: HttpRequest, username: str, limit: int = 60):
-    """
-    Retorna histórico real de conversas e mensagens trocadas pelo aluno com a IA.
-    """
-    require_staff_user(request)
-    return DashboardService.get_student_messages(username, limit=limit)
-
-
 @dashboard_router.get("/students/{username}/insight", auth=auth_required)
 def get_student_insight(request: HttpRequest, username: str, lang: str = "en-US"):
     """
