@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   Send,
   Volume2,
+  Square,
   Mic,
   MicOff,
   Sparkles,
@@ -93,6 +94,29 @@ export default function PublicCefrTestPage() {
     };
   }, []);
 
+  // Força tema claro no teste CEFR para manter harmonia visual com a landing page
+  useEffect(() => {
+    const htmlEl = document.documentElement;
+    const wasDark = htmlEl.classList.contains('dark');
+    const prevTheme = htmlEl.getAttribute('data-theme');
+
+    htmlEl.classList.remove('dark');
+    htmlEl.setAttribute('data-theme', 'light');
+    htmlEl.style.colorScheme = 'light';
+
+    return () => {
+      if (wasDark) {
+        htmlEl.classList.add('dark');
+      }
+      if (prevTheme) {
+        htmlEl.setAttribute('data-theme', prevTheme);
+      } else {
+        htmlEl.removeAttribute('data-theme');
+      }
+      htmlEl.style.colorScheme = '';
+    };
+  }, []);
+
   // Initialize Speech Recognition if supported in browser
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -169,11 +193,27 @@ export default function PublicCefrTestPage() {
     };
   }, [accent]);
 
+  // Stop currently playing audio
+  const stopAudio = () => {
+    try {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current = null;
+      }
+    } catch {
+      // ignore
+    }
+    setPlayingAudioId(null);
+  };
+
   // Play base64 audio
   const playAudio = (b64: string, id: string) => {
     try {
       if (audioRef.current) {
         audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current = null;
       }
       const audioUrl = b64.startsWith('data:audio') ? b64 : `data:audio/mp3;base64,${b64}`;
       const audio = new Audio(audioUrl);
@@ -182,16 +222,29 @@ export default function PublicCefrTestPage() {
 
       audio.onended = () => {
         setPlayingAudioId(null);
+        audioRef.current = null;
       };
       audio.onerror = () => {
         setPlayingAudioId(null);
+        audioRef.current = null;
       };
 
       audio.play().catch(() => {
         setPlayingAudioId(null);
+        audioRef.current = null;
       });
     } catch {
       setPlayingAudioId(null);
+      audioRef.current = null;
+    }
+  };
+
+  // Toggle audio: stops if currently playing, plays otherwise
+  const toggleAudio = (b64: string, id: string) => {
+    if (playingAudioId === id) {
+      stopAudio();
+    } else {
+      playAudio(b64, id);
     }
   };
 
@@ -222,6 +275,7 @@ export default function PublicCefrTestPage() {
     if (e) e.preventDefault();
     if (!inputText.trim() || !sessionId || isLoading || isCompleted) return;
 
+    stopAudio();
     const userText = inputText.trim();
     setInputText('');
 
@@ -271,6 +325,7 @@ export default function PublicCefrTestPage() {
 
   // Conclude test early with /finish command
   const handleFinishEarly = () => {
+    stopAudio();
     setInputText('/finish');
     setTimeout(() => {
       const form = document.getElementById('cefr-input-form') as HTMLFormElement | null;
@@ -365,7 +420,14 @@ export default function PublicCefrTestPage() {
   const progressPercent = Math.min(100, Math.round((currentQuestion / totalQuestions) * 100));
 
   return (
-    <div className="flex h-screen flex-col bg-bg text-text antialiased selection:bg-primary/20 selection:text-primary">
+    <div
+      className="cefr-theme-light flex h-screen flex-col antialiased selection:bg-primary/20 selection:text-primary"
+      style={{
+        backgroundColor: '#f9f8f6',
+        color: '#1a1826',
+        fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+      }}
+    >
       {/* ── TOPBAR DO TESTE CEFR ── */}
       <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface/90 px-4 backdrop-blur-md sm:px-6">
         <div className="flex items-center gap-3">
@@ -392,8 +454,21 @@ export default function PublicCefrTestPage() {
           </div>
         </div>
 
-        {/* Controles de Sotaque e Conclusão */}
+        {/* Controles de Sotaque, Parar Áudio e Conclusão */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Botão de parar áudio quando estiver reproduzindo */}
+          {playingAudioId && (
+            <button
+              type="button"
+              onClick={stopAudio}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-2.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-rose-700 transition-all animate-pulse"
+              title="Parar áudio da Teacher Tati"
+            >
+              <Square size={12} fill="currentColor" />
+              <span>Parar Áudio</span>
+            </button>
+          )}
+
           {/* Seletor de voz */}
           <div className="flex items-center rounded-lg border border-border bg-bg p-0.5 text-xs font-semibold">
             <button
@@ -478,8 +553,13 @@ export default function PublicCefrTestPage() {
                 className={`flex items-start gap-3 ${isAssistant ? 'justify-start' : 'justify-end'}`}
               >
                 {isAssistant && (
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-primary text-white font-bold text-xs shadow-md shadow-primary/20">
-                    TT
+                  <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-primary/20 bg-primary/10 shadow-sm">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/images/tati_logo.jpg"
+                      alt="Teacher Tati AI"
+                      className="h-full w-full object-contain"
+                    />
                   </div>
                 )}
 
@@ -518,15 +598,26 @@ export default function PublicCefrTestPage() {
                     {isAssistant && msg.audio_b64 && (
                       <div className="mt-3 flex items-center gap-2 border-t border-border/60 pt-2.5">
                         <button
-                          onClick={() => playAudio(msg.audio_b64!, msg.id)}
+                          type="button"
+                          onClick={() => toggleAudio(msg.audio_b64!, msg.id)}
                           className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition-all ${
                             isPlaying
-                              ? 'bg-primary text-white animate-pulse'
+                              ? 'bg-rose-600 text-white hover:bg-rose-700 shadow-sm animate-pulse'
                               : 'bg-primary/10 text-primary hover:bg-primary/20'
                           }`}
+                          title={isPlaying ? 'Clique para parar o áudio' : 'Ouvir Teacher Tati'}
                         >
-                          <Volume2 size={13} />
-                          {isPlaying ? 'Ouvindo pronúncia...' : 'Ouvir Teacher Tati'}
+                          {isPlaying ? (
+                            <>
+                              <Square size={11} fill="currentColor" />
+                              Parar áudio
+                            </>
+                          ) : (
+                            <>
+                              <Volume2 size={13} />
+                              Ouvir Teacher Tati
+                            </>
+                          )}
                         </button>
                       </div>
                     )}
@@ -545,8 +636,13 @@ export default function PublicCefrTestPage() {
           {/* Indicador de carregamento / IA avaliando */}
           {isLoading && (
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-primary text-white font-bold text-xs">
-                TT
+              <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-primary/20 bg-primary/10 shadow-sm">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/images/tati_logo.jpg"
+                  alt="Teacher Tati AI"
+                  className="h-full w-full object-contain"
+                />
               </div>
               <div className="inline-flex items-center gap-2 rounded-2xl bg-surface border border-border px-4 py-3 text-xs text-text-muted">
                 <Spinner size="sm" />

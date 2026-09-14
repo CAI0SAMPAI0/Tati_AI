@@ -328,7 +328,58 @@
   .landing-chat-wrap {
     animation: landingFloat 5s ease-in-out infinite;
   }
+
+  /* ── CEFR Public Test Forced Light Theme (Matches Landing Page) ── */
+  .cefr-theme-light {
+    --bg: #f9f8f6;
+    --bg-secondary: #f4f3f8;
+    --surface: #ffffff;
+    --surface-hover: #faf9fd;
+    --card: #ffffff;
+    --border: #e8e5f0;
+    --border-focus: #6d28d9;
+    --text: #1a1826;
+    --text-muted: #6b6880;
+    --text-subtle: #9d9ab0;
+    --input-bg: #ffffff;
+    --primary: #6d28d9;
+    --primary-hover: #5b21b6;
+    --primary-dim: rgba(109, 40, 217, 0.1);
+    --primary-glow: rgba(109, 40, 217, 0.25);
+    background-color: #f9f8f6 !important;
+    color: #1a1826 !important;
+    color-scheme: light !important;
+  }
+
+  .cefr-theme-light .bg-surface {
+    background-color: #ffffff !important;
+  }
+
+  .cefr-theme-light .bg-bg {
+    background-color: #f9f8f6 !important;
+  }
+
+  .cefr-theme-light .bg-bg-secondary {
+    background-color: #f4f3f8 !important;
+  }
+
+  .cefr-theme-light .border-border {
+    border-color: #e8e5f0 !important;
+  }
+
+  .cefr-theme-light .text-text {
+    color: #1a1826 !important;
+  }
+
+  .cefr-theme-light .text-text-muted {
+    color: #6b6880 !important;
+  }
+
+  .cefr-theme-light .text-text-subtle {
+    color: #9d9ab0 !important;
+  }
 }
+
 
 @keyframes landingFloat {
   0%, 100% {
