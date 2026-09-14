@@ -12,6 +12,25 @@ export default function RootError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const purgeAndReload = async () => {
+    try {
+      sessionStorage.removeItem('tati_chunk_reload');
+      if (typeof window !== 'undefined') {
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map((r) => r.unregister()));
+        }
+      }
+    } catch {}
+    const url = new URL(window.location.href);
+    url.searchParams.set('_v', Date.now().toString());
+    window.location.href = url.toString();
+  };
+
   useEffect(() => {
     Sentry.captureException(error);
     console.error('[RootError]', error);
@@ -27,12 +46,12 @@ export default function RootError({
       try {
         const lastReload = sessionStorage.getItem('tati_chunk_reload');
         const now = Date.now();
-        if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+        if (!lastReload || now - parseInt(lastReload, 10) > 8000) {
           sessionStorage.setItem('tati_chunk_reload', String(now));
-          window.location.reload();
+          purgeAndReload();
         }
       } catch {
-        window.location.reload();
+        purgeAndReload();
       }
     }
   }, [error]);
@@ -73,7 +92,7 @@ export default function RootError({
 
           <button
             type="button"
-            onClick={() => window.location.reload()}
+            onClick={purgeAndReload}
             className="flex-1 py-2.5 px-4 rounded-xl bg-surface border border-border text-text text-xs font-bold hover:bg-surface-hover active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <RotateCcw size={14} className="text-primary" />

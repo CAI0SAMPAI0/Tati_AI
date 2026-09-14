@@ -24,7 +24,12 @@ export function RegisterServiceWorker() {
       window.location.reload();
     });
 
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((reg) => {
+        reg.update().catch(() => {});
+      })
+      .catch(() => {});
   }, []);
 
   return null;

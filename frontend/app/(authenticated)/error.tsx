@@ -14,6 +14,25 @@ export default function AuthenticatedError({
 }) {
   const [isChunkError, setIsChunkError] = useState(false);
 
+  const purgeAndReload = async () => {
+    try {
+      sessionStorage.removeItem('tati_chunk_reload');
+      if (typeof window !== 'undefined') {
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map((r) => r.unregister()));
+        }
+      }
+    } catch {}
+    const url = new URL(window.location.href);
+    url.searchParams.set('_v', Date.now().toString());
+    window.location.href = url.toString();
+  };
+
   useEffect(() => {
     // Log exception to Sentry
     Sentry.captureException(error);
@@ -29,25 +48,22 @@ export default function AuthenticatedError({
 
     if (isChunk) {
       setIsChunkError(true);
-      // Auto-reload safely once within 10s to avoid reload loops
+      // Auto-reload safely once within 8s to avoid reload loops
       try {
         const lastReload = sessionStorage.getItem('tati_chunk_reload');
         const now = Date.now();
-        if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+        if (!lastReload || now - parseInt(lastReload, 10) > 8000) {
           sessionStorage.setItem('tati_chunk_reload', String(now));
-          window.location.reload();
+          purgeAndReload();
         }
       } catch {
-        window.location.reload();
+        purgeAndReload();
       }
     }
   }, [error]);
 
   const handleHardReload = () => {
-    try {
-      sessionStorage.removeItem('tati_chunk_reload');
-    } catch { }
-    window.location.reload();
+    purgeAndReload();
   };
 
   return (
@@ -79,7 +95,7 @@ export default function AuthenticatedError({
         <div className="w-full flex flex-col sm:flex-row gap-2.5">
           <button
             type="button"
-            onClick={reset}
+            onClick={isChunkError ? purgeAndReload : reset}
             className="flex-1 py-2.5 px-4 rounded-xl bg-primary text-white text-xs font-bold shadow-md shadow-primary/25 hover:bg-primary/90 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <RotateCcw size={14} />

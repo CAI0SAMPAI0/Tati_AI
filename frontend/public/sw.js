@@ -1,5 +1,5 @@
-const CACHE_NAME = 'tati-ai-v2.3.1';
-const STATIC_ASSETS = ['/', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png', '/icons/badge-96x96.png'];
+const CACHE_NAME = 'tati-ai-v2.4.0';
+const STATIC_ASSETS = ['/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png', '/icons/badge-96x96.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -30,6 +30,15 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  if (event.data === 'PURGE_CACHES') {
+    caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))));
+  }
+});
+
 self.addEventListener('fetch', (event) => {
   const request = event.request;
 
@@ -44,11 +53,15 @@ self.addEventListener('fetch', (event) => {
   if (request.headers.has('authorization')) return;
   if (request.method !== 'GET') return;
 
-  // Ignora chamadas de API, auth, chat e outros serviços dinâmicos
+  // Ignora chamadas de API, auth, chat e requisições dinâmicas RSC do Next.js App Router
   if (
     url.pathname.startsWith('/api') ||
     url.pathname.startsWith('/auth') ||
-    url.pathname.startsWith('/chat')
+    url.pathname.startsWith('/chat') ||
+    url.searchParams.has('_rsc') ||
+    request.headers.get('RSC') === '1' ||
+    request.headers.get('Next-Router-State-Tree') ||
+    request.headers.get('Next-Url')
   ) {
     return;
   }
@@ -160,9 +173,13 @@ self.addEventListener('fetch', (event) => {
       return fetch(request).then((response) => {
         if (!response || response.status !== 200 || response.type !== 'basic') return response;
 
-        // Evita cachear respostas HTML que possam vir como fetch (ex: data/HTML dinâmico)
+        // Evita cachear respostas HTML ou RSC do Next.js que possam vir como fetch
         const contentType = response.headers.get('content-type') || '';
-        if (contentType.includes('text/html')) {
+        if (
+          contentType.includes('text/html') ||
+          contentType.includes('text/x-component') ||
+          contentType.includes('application/json')
+        ) {
           return response;
         }
 
