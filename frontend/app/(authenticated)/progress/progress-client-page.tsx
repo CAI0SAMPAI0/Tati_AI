@@ -9,11 +9,12 @@ import { API_BASE, apiGet } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
-import { BookOpen, CalendarDays, Download, Flame, Lightbulb, MessageSquare, Snowflake, Trophy, Type } from 'lucide-react';
+import { BookOpen, CalendarDays, Download, Flame, Lightbulb, MessageSquare, Snowflake, Trophy, Type, History, ArrowRight } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import { getStoredSession } from '@/lib/api/auth';
 
 const ActivityBarChart = dynamic(() => import('@/components/charts/activity-bar-chart'), {
   ssr: false,
@@ -168,11 +169,15 @@ export default function ProgressClientPage() {
   const handleDownloadReport = async () => {
     setIsDownloading(true);
     try {
-      const token = localStorage.getItem('token');
-      const url = `${API_BASE}/users/progress/report/download`;
+      const session = getStoredSession();
+      const token = session?.token || (typeof window !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('access_token')) : null);
+      const base = (API_BASE || '').replace(/\/+$/, '');
+      const url = `${base}/users/progress/report/download`;
 
       const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
       });
 
       if (!response.ok) throw new Error('Download failed');
@@ -194,7 +199,8 @@ export default function ProgressClientPage() {
     }
   };
 
-  const levelGradient = (xpData?.level && LEVEL_COLORS[xpData.level as string]) || LEVEL_COLORS.A1;
+  const currentLevel = (user?.level || xpData?.level || 'A1').toUpperCase();
+  const levelGradient = LEVEL_COLORS[currentLevel] || LEVEL_COLORS.A1;
 
   return (
     <div className="min-h-screen bg-bg flex flex-col md:flex-row overflow-x-hidden">
@@ -230,62 +236,60 @@ export default function ProgressClientPage() {
             </Button>
           </header>
 
-          {/* ── XP Progress Bar ── */}
-          <div className="bg-surface border border-border rounded-3xl p-6 space-y-4 group hover:border-primary/30 transition-all">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-3">
+          {/* ── Level, Score & History Card ── */}
+          <div className="bg-surface border border-border rounded-3xl p-6 group hover:border-primary/30 transition-all">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-4">
                 <div className={cn(
-                  'w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black text-white bg-gradient-to-br',
+                  'w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-black text-white bg-gradient-to-br shadow-sm shrink-0',
                   levelGradient,
                 )}>
-                  {'🏆'}
+                  🏆
                 </div>
                 <div>
                   <p className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest">
-                    Current Level
+                    Nível Atual
                   </p>
-                  <p className="text-base font-black text-text leading-tight">
-                    {xpLoading ? (
-                      <span className="inline-block w-16 h-4 bg-bg-secondary rounded animate-pulse" />
+                  <p className="text-xl font-black text-text leading-tight">
+                    {xpLoading && !user?.level ? (
+                      <span className="inline-block w-12 h-5 bg-bg-secondary rounded animate-pulse" />
                     ) : (
-                      xpData?.level || 'A1'
+                      currentLevel
                     )}
                   </p>
                 </div>
               </div>
 
-              <div className="text-right">
-                {xpLoading ? (
-                  <div className="w-24 h-4 bg-bg-secondary rounded animate-pulse" />
-                ) : (
-                  <>
-                    <span className="text-xl font-black text-primary tabular-nums">
-                      {(xpData?.total_xp || xpData?.xp || 0).toLocaleString('en-US')}
-                    </span>
-                    <span className="text-xs font-bold text-text-muted ml-1">
-                      XP
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
+              <div className="flex items-center gap-6 flex-wrap">
+                <div>
+                  <p className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest text-left sm:text-right">
+                    Pontuação
+                  </p>
+                  <div className="flex items-baseline gap-1">
+                    {xpLoading ? (
+                      <span className="inline-block w-20 h-6 bg-bg-secondary rounded animate-pulse" />
+                    ) : (
+                      <>
+                        <span className="text-2xl font-black text-primary tabular-nums">
+                          {(xpData?.total_xp || xpData?.xp || 0).toLocaleString('pt-BR')}
+                        </span>
+                        <span className="text-xs font-bold text-text-muted">
+                          pts
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
 
-            {/* Progress track */}
-            <div className="space-y-1.5">
-              <div className="w-full h-3 bg-bg border border-border rounded-full overflow-hidden p-0.5">
-                <div
-                  className={cn(
-                    'h-full rounded-full transition-all duration-1000 bg-gradient-to-r',
-                    levelGradient,
-                  )}
-                  style={{ width: `${xpData?.level_progress ?? 0}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-[0.6rem] font-bold text-text-subtle uppercase tracking-widest">
-                <span>Keep learning!</span>
-                <span>
-                  {xpLoading ? '—' : `${(xpData?.total_xp || xpData?.xp || 0).toLocaleString('en-US')} Total XP`}
-                </span>
+                <Link
+                  href="/history"
+                  prefetch={true}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-bg-secondary hover:bg-primary/10 hover:text-primary text-text font-bold text-xs transition-all border border-border hover:border-primary/30 active:scale-[0.98]"
+                >
+                  <History size={16} />
+                  <span>Histórico de Atividades</span>
+                  <ArrowRight size={14} />
+                </Link>
               </div>
             </div>
           </div>
@@ -440,11 +444,11 @@ export default function ProgressClientPage() {
                 <div className="flex-1 flex flex-col justify-between gap-4">
                   <div>
                     <div className="text-xs font-bold text-yellow-500 uppercase tracking-widest mb-3 bg-yellow-500/10 px-3 py-1.5 rounded-xl border border-yellow-500/20 inline-block">
-                      🏆 {xpData?.level || 'A1'} League
+                      🏆 {currentLevel} League
                     </div>
 
                     <div className="space-y-2">
-                      {((levelRankings?.[xpData?.level || 'A1'] || []) as any[]).slice(0, 3).map((r, i) => {
+                      {((levelRankings?.[currentLevel] || []) as any[]).slice(0, 3).map((r, i) => {
                         const medals = ['🥇', '🥈', '🥉'];
                         const isMe = r.username === user?.username;
                         return (
@@ -465,7 +469,7 @@ export default function ProgressClientPage() {
                           </div>
                         );
                       })}
-                      {(!levelRankings?.[xpData?.level || 'A1'] || levelRankings?.[xpData?.level || 'A1'].length === 0) && (
+                      {(!levelRankings?.[currentLevel] || levelRankings?.[currentLevel].length === 0) && (
                         <p className="text-xs italic text-text-muted text-center py-4">No active students in this league yet.</p>
                       )}
                     </div>
@@ -475,7 +479,7 @@ export default function ProgressClientPage() {
                     <div className="flex items-center justify-between mb-3 text-xs">
                       <span className="font-bold text-text-subtle uppercase tracking-wider">Your Position:</span>
                       {(() => {
-                        const rankingList = levelRankings?.[xpData?.level || 'A1'] || [];
+                        const rankingList = levelRankings?.[currentLevel] || [];
                         const myIndex = rankingList.findIndex((r: any) => r.username === user?.username);
                         if (myIndex !== -1) {
                           return <span className="font-black text-primary">#{myIndex + 1} of {rankingList.length}</span>;

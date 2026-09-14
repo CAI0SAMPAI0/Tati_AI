@@ -56,6 +56,7 @@ AUTH_USER_MODEL = "authentication.User"
 # ── MIDDLEWARE ────────────────────────────────────────────────────────
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
+    "app.middleware.NormalizePathMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "app.middleware.RateLimitMiddleware",
     "app.middleware.PerformanceMiddleware",

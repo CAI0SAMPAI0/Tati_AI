@@ -11,6 +11,34 @@ from django.http import JsonResponse
 logger = logging.getLogger("performance")
 
 
+class NormalizePathMiddleware:
+    """
+    Normaliza caminhos com múltiplas barras (ex: //users/... -> /users/...)
+    evitando erros 404 em clientes e proxies reversos.
+    """
+    sync_capable = True
+    async_capable = True
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        if iscoroutinefunction(self.get_response):
+            markcoroutinefunction(self)
+
+    def __call__(self, request):
+        if getattr(request, "path_info", "").startswith("//"):
+            request.path_info = "/" + request.path_info.lstrip("/")
+        if getattr(request, "path", "").startswith("//"):
+            request.path = "/" + request.path.lstrip("/")
+        return self.get_response(request)
+
+    async def __acall__(self, request):
+        if getattr(request, "path_info", "").startswith("//"):
+            request.path_info = "/" + request.path_info.lstrip("/")
+        if getattr(request, "path", "").startswith("//"):
+            request.path = "/" + request.path.lstrip("/")
+        return await self.get_response(request)
+
+
 class PerformanceMiddleware:
     sync_capable = True
     async_capable = True
