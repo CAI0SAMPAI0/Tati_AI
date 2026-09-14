@@ -248,7 +248,7 @@ export default function ProgressClientPage() {
                 </div>
                 <div>
                   <p className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest">
-                    Nível Atual
+                    Current Level
                   </p>
                   <p className="text-xl font-black text-text leading-tight">
                     {xpLoading && !user?.level ? (
@@ -263,7 +263,7 @@ export default function ProgressClientPage() {
               <div className="flex items-center gap-6 flex-wrap">
                 <div>
                   <p className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest text-left sm:text-right">
-                    Pontuação
+                    Score
                   </p>
                   <div className="flex items-baseline gap-1">
                     {xpLoading ? (
@@ -271,7 +271,7 @@ export default function ProgressClientPage() {
                     ) : (
                       <>
                         <span className="text-2xl font-black text-primary tabular-nums">
-                          {(xpData?.total_xp || xpData?.xp || 0).toLocaleString('pt-BR')}
+                          {(xpData?.total_xp || xpData?.xp || 0).toLocaleString('en-US')}
                         </span>
                         <span className="text-xs font-bold text-text-muted">
                           pts
@@ -287,7 +287,7 @@ export default function ProgressClientPage() {
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-bg-secondary hover:bg-primary/10 hover:text-primary text-text font-bold text-xs transition-all border border-border hover:border-primary/30 active:scale-[0.98]"
                 >
                   <History size={16} />
-                  <span>Histórico de Atividades</span>
+                  <span>Activity History</span>
                   <ArrowRight size={14} />
                 </Link>
               </div>
