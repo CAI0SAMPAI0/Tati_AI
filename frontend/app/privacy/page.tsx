@@ -1,271 +1,605 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Shield, ArrowLeft, Lock, FileText, Eye, CheckCircle2, Mail, Globe, Server, Bell } from 'lucide-react';
+import Image from 'next/image';
+import {
+  Shield,
+  ArrowLeft,
+  Lock,
+  FileText,
+  Eye,
+  CheckCircle2,
+  Mail,
+  Globe,
+  Server,
+  Bell,
+  Sparkles,
+  ExternalLink,
+} from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Política de Privacidade | Teacher Tati AI',
-  description: 'Conheça como a Teacher Tati AI protege, coleta e trata seus dados pessoais em conformidade com a LGPD e GDPR.',
+  description:
+    'Conheça como a Teacher Tati AI protege, coleta e trata seus dados pessoais em conformidade com a LGPD (Lei nº 13.709/2018). Contato: cmsampaio135@gmail.com.',
+  openGraph: {
+    title: 'Política de Privacidade | Teacher Tati AI',
+    description:
+      'Transparência e segurança no tratamento de seus dados na Teacher Tati AI. Em conformidade com a LGPD.',
+    url: 'https://tati-ai.vercel.app/politica-de-privacidade',
+    siteName: 'Teacher Tati AI',
+    locale: 'pt_BR',
+    type: 'website',
+  },
 };
+
+const HUB_URL = 'https://tati-hub.vercel.app/materiais';
+const CONTACT_EMAIL = 'cmsampaio135@gmail.com';
 
 export default function PrivacyPolicyPage() {
   return (
-    <div className="min-h-screen bg-bg text-text antialiased selection:bg-primary/20 selection:text-primary">
-      {/* Header público */}
-      <header className="sticky top-0 z-30 border-b border-border bg-surface/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-80">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white font-black shadow-md shadow-primary/20">
-              T
+    <div
+      className="landing-bg landing-text"
+      style={{
+        minHeight: '100vh',
+        backgroundColor: '#f9f8f6',
+        color: '#1a1826',
+        fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+      }}
+    >
+      {/* ─── HEADER PÚBLICO (PADRÃO LANDING PAGE) ─── */}
+      <header
+        className="sticky top-0 z-40 backdrop-blur-md"
+        style={{
+          background: 'rgba(249, 248, 246, 0.94)',
+          borderBottom: '1px solid #e8e5f0',
+        }}
+      >
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+          {/* Logo Brand */}
+          <Link href="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-90">
+            <div
+              className="relative w-9 h-9 rounded-full overflow-hidden flex-shrink-0"
+              style={{ background: '#f5f3ff', border: '1.5px solid #ddd6fe' }}
+            >
+              <Image
+                src="/images/tati_logo.jpg"
+                alt="Teacher Tati AI logo"
+                fill
+                sizes="36px"
+                className="object-contain"
+                priority
+              />
             </div>
-            <div className="flex flex-col">
-              <span className="font-display text-base font-bold text-text">Teacher Tati AI</span>
-              <span className="text-[10px] text-text-subtle">Taty's English Class</span>
+            <div>
+              <p className="text-sm font-semibold leading-none" style={{ color: '#1a1826' }}>
+                Teacher Tati <span style={{ color: '#6d28d9' }}>AI</span>
+              </p>
+              <p className="text-xs leading-none mt-1" style={{ color: '#9d9ab0' }}>
+                Tati&apos;s English Class
+              </p>
             </div>
           </Link>
 
-          <div className="flex items-center gap-3">
+          {/* Ações do Topo */}
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href="/"
-              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-text-muted transition-colors hover:bg-surface-hover hover:text-text"
+              className="landing-btn-outline text-xs px-3.5 py-1.5 rounded-xl font-medium inline-flex items-center gap-1.5 transition-all"
             >
-              <ArrowLeft size={14} />
-              Voltar ao Início
+              <ArrowLeft size={13} />
+              <span className="hidden sm:inline">Voltar ao</span> Início
+            </Link>
+            <Link
+              href="/teste-cefr"
+              className="landing-btn-outline text-xs px-3.5 py-1.5 rounded-xl font-medium inline-flex items-center gap-1.5 transition-all"
+            >
+              <Sparkles size={13} />
+              <span>Teste CEFR</span>
             </Link>
             <Link
               href="/login"
-              className="rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-white shadow transition-all hover:bg-primary/90"
+              className="landing-btn-primary text-xs px-4 py-1.5 rounded-xl font-medium transition-all"
             >
-              Acessar Sistema
+              Entrar
             </Link>
           </div>
         </div>
       </header>
 
-      {/* Hero da Política */}
-      <div className="border-b border-border bg-gradient-to-b from-primary/5 via-surface/30 to-transparent py-12 sm:py-16">
-        <div className="mx-auto max-w-4xl px-4 text-center sm:px-6">
-          <div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1 text-xs font-semibold text-primary">
+      {/* ─── HERO DA POLÍTICA DE PRIVACIDADE ─── */}
+      <section
+        style={{
+          borderBottom: '1px solid #e8e5f0',
+          background: 'linear-gradient(180deg, rgba(109, 40, 217, 0.04) 0%, rgba(249, 248, 246, 1) 100%)',
+          padding: '64px 0 56px',
+        }}
+      >
+        <div className="max-w-4xl mx-auto px-6 text-center space-y-4">
+          <div
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium"
+            style={{
+              background: '#f5f3ff',
+              border: '1px solid #ddd6fe',
+              color: '#6d28d9',
+            }}
+          >
             <Shield size={14} />
-            Privacidade & Segurança de Dados (LGPD)
+            Privacidade & Proteção de Dados (LGPD)
           </div>
-          <h1 className="font-display text-3xl font-extrabold tracking-tight text-text sm:text-4xl md:text-5xl">
+
+          <h1
+            className="font-display-serif text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight leading-tight"
+            style={{ color: '#1a1826' }}
+          >
             Política de Privacidade
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-text-muted sm:text-base">
-            Seu aprendizado com segurança e transparência. Saiba com clareza como tratamos suas informações e conteúdos de voz e texto na plataforma Teacher Tati AI.
+
+          <p className="text-sm sm:text-base leading-relaxed max-w-2xl mx-auto" style={{ color: '#6b6880' }}>
+            Seu aprendizado com segurança, respeito e total transparência. Saiba com clareza
+            como tratamos suas informações, áudios e mensagens na plataforma Teacher Tati AI.
           </p>
-          <div className="mt-4 text-xs text-text-subtle">
-            Última atualização: <span className="font-semibold text-text">12 de Setembro de 2026</span> • Versão 2.2
+
+          <div className="pt-2 text-xs" style={{ color: '#9d9ab0' }}>
+            Última atualização: <strong style={{ color: '#1a1826' }}>Setembro de 2026</strong> • Versão 2.2 em conformidade com a LGPD
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Conteúdo Principal */}
-      <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6 sm:py-14">
-        <div className="space-y-10 rounded-2xl border border-border bg-surface p-6 shadow-sm sm:p-10">
+      {/* ─── CONTEÚDO PRINCIPAL ─── */}
+      <main className="max-w-4xl mx-auto px-6 py-12 sm:py-16">
+        <div
+          className="landing-card rounded-3xl p-6 sm:p-12 space-y-12"
+          style={{
+            background: '#ffffff',
+            border: '1px solid #e8e5f0',
+            boxShadow: '0 8px 32px rgba(26, 24, 38, 0.04)',
+          }}
+        >
           {/* Seção 1 */}
           <section className="space-y-3">
-            <div className="flex items-center gap-2.5 text-primary">
-              <FileText size={20} />
-              <h2 className="font-display text-xl font-bold text-text">1. Visão Geral e Compromisso</h2>
+            <div className="flex items-center gap-3">
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: '#f5f3ff', color: '#6d28d9' }}
+              >
+                <FileText size={18} />
+              </div>
+              <h2 className="font-display-serif text-xl sm:text-2xl font-bold" style={{ color: '#1a1826' }}>
+                1. Visão Geral e Compromisso
+              </h2>
             </div>
-            <p className="text-sm leading-relaxed text-text-muted">
-              Esta Política de Privacidade descreve de forma transparente como a <strong>Teacher Tati AI</strong> ("nós", "nossa plataforma", gerida por <em>Taty's English Class</em>) coleta, utiliza, armazena, compartilha e protege os dados pessoais dos nossos alunos, compradores de materiais didáticos e visitantes ("você" ou "titular").
+            <p className="text-sm leading-relaxed" style={{ color: '#6b6880' }}>
+              Esta Política de Privacidade descreve de forma transparente e acessível como a{' '}
+              <strong style={{ color: '#1a1826' }}>Teacher Tati AI</strong> (&quot;nós&quot;, &quot;nossa plataforma&quot;,
+              gerida por <em>Tati&apos;s English Class</em>) coleta, utiliza, armazena e protege os dados pessoais dos
+              nossos alunos, usuários do teste CEFR, compradores de materiais didáticos e visitantes (&quot;você&quot; ou
+              &quot;titular&quot;).
             </p>
-            <p className="text-sm leading-relaxed text-text-muted">
-              Atuamos em estrita observância à <strong>Lei Geral de Proteção de Dados Pessoais (LGPD — Lei nº 13.709/2018)</strong> e, subsidiariamente, ao Regulamento Geral sobre a Proteção de Dados da União Europeia (GDPR), garantindo respeito à sua privacidade, autodeterminação informativa e sigilo de suas comunicações.
+            <p className="text-sm leading-relaxed" style={{ color: '#6b6880' }}>
+              Atuamos em estrita observância à{' '}
+              <strong style={{ color: '#1a1826' }}>
+                Lei Geral de Proteção de Dados Pessoais (LGPD — Lei nº 13.709/2018)
+              </strong>
+              , garantindo respeito à sua privacidade, liberdade de expressão, autodeterminação informativa e sigilo de
+              suas comunicações.
             </p>
           </section>
 
           {/* Seção 2 */}
-          <section className="space-y-3 border-t border-border pt-8">
-            <div className="flex items-center gap-2.5 text-primary">
-              <Globe size={20} />
-              <h2 className="font-display text-xl font-bold text-text">2. Controlador dos Dados Pessoais</h2>
+          <section className="space-y-3 pt-8" style={{ borderTop: '1px solid #f0edf8' }}>
+            <div className="flex items-center gap-3">
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: '#f5f3ff', color: '#6d28d9' }}
+              >
+                <Globe size={18} />
+              </div>
+              <h2 className="font-display-serif text-xl sm:text-2xl font-bold" style={{ color: '#1a1826' }}>
+                2. Controlador dos Dados Pessoais
+              </h2>
             </div>
-            <p className="text-sm leading-relaxed text-text-muted">
-              Para fins da legislação aplicável, a controladora dos dados é:
+            <p className="text-sm leading-relaxed" style={{ color: '#6b6880' }}>
+              Para todos os efeitos da legislação de proteção de dados, a controladora responsável é:
             </p>
-            <div className="rounded-xl border border-border bg-bg p-4 text-xs text-text-muted leading-relaxed">
-              <p><strong>Entidade:</strong> Teacher Tati AI / Taty's English Class</p>
-              <p><strong>Domínio Oficial:</strong> https://tati-ai.vercel.app</p>
-              <p><strong>Canal do Encarregado (DPO) / Suporte:</strong> dpo@tati-ai.com.br / suporte@tati-ai.com.br</p>
-              <p><strong>Jurisdição:</strong> República Federativa do Brasil</p>
+            <div
+              className="rounded-2xl p-5 text-xs sm:text-sm leading-relaxed space-y-1.5"
+              style={{ background: '#fdfcfe', border: '1px solid #ede9fe' }}
+            >
+              <p>
+                <strong style={{ color: '#1a1826' }}>Entidade Responsável:</strong> Teacher Tati AI / Tati&apos;s English Class
+              </p>
+              <p>
+                <strong style={{ color: '#1a1826' }}>Domínio Oficial:</strong> https://tati-ai.vercel.app
+              </p>
+              <p>
+                <strong style={{ color: '#1a1826' }}>E-mail de Contato & DPO:</strong>{' '}
+                <a
+                  href={`mailto:${CONTACT_EMAIL}`}
+                  className="font-semibold underline transition-colors hover:opacity-80"
+                  style={{ color: '#6d28d9' }}
+                >
+                  {CONTACT_EMAIL}
+                </a>
+              </p>
+              <p>
+                <strong style={{ color: '#1a1826' }}>Jurisdição:</strong> República Federativa do Brasil
+              </p>
             </div>
           </section>
 
           {/* Seção 3 */}
-          <section className="space-y-3 border-t border-border pt-8">
-            <div className="flex items-center gap-2.5 text-primary">
-              <Eye size={20} />
-              <h2 className="font-display text-xl font-bold text-text">3. Dados Pessoais que Coletamos</h2>
+          <section className="space-y-3 pt-8" style={{ borderTop: '1px solid #f0edf8' }}>
+            <div className="flex items-center gap-3">
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: '#f5f3ff', color: '#6d28d9' }}
+              >
+                <Eye size={18} />
+              </div>
+              <h2 className="font-display-serif text-xl sm:text-2xl font-bold" style={{ color: '#1a1826' }}>
+                3. Dados Pessoais Coletados
+              </h2>
             </div>
-            <p className="text-sm leading-relaxed text-text-muted">
-              Coletamos apenas as informações estritamente necessárias para a prestação dos nossos serviços educacionais e de inteligência artificial:
+            <p className="text-sm leading-relaxed" style={{ color: '#6b6880' }}>
+              Coletamos exclusivamente as informações necessárias para a entrega dos nossos serviços educacionais e de
+              prática inteligente de conversação:
             </p>
-            <ul className="space-y-2 text-sm text-text-muted">
-              <li className="flex items-start gap-2">
-                <CheckCircle2 size={16} className="mt-0.5 text-primary shrink-0" />
-                <span><strong>Dados Cadastrais e de Identificação:</strong> Nome completo, endereço de e-mail, nome de usuário (username) e senha criptografada. Opcionalmente: número de telefone/WhatsApp para notificações e avisos de estudo autorizados.</span>
+            <ul className="space-y-3 text-sm" style={{ color: '#6b6880' }}>
+              <li className="flex items-start gap-2.5">
+                <CheckCircle2 size={17} className="mt-0.5 shrink-0" style={{ color: '#059669' }} />
+                <span>
+                  <strong style={{ color: '#1a1826' }}>Dados Cadastrais e de Identificação:</strong> Nome completo,
+                  endereço de e-mail, nome de usuário e senha criptografada. Número de telefone/WhatsApp opcional para
+                  recebimento de notificações de estudo autorizadas.
+                </span>
               </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle2 size={16} className="mt-0.5 text-primary shrink-0" />
-                <span><strong>Dados de Diagnóstico e Nivelamento (CEFR):</strong> Respostas fornecidas em desafios de nivelamento (A1, A2, B1, B2), pontuações, análise de competência comunicativa e emissão de certificados/relatórios de nível em formato PDF.</span>
+              <li className="flex items-start gap-2.5">
+                <CheckCircle2 size={17} className="mt-0.5 shrink-0" style={{ color: '#059669' }} />
+                <span>
+                  <strong style={{ color: '#1a1826' }}>Dados de Diagnóstico CEFR (A1–B2):</strong> Respostas fornecidas
+                  nos testes de nivelamento, pontuações atingidas e emissão do relatório diagnóstico em formato PDF.
+                </span>
               </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle2 size={16} className="mt-0.5 text-primary shrink-0" />
-                <span><strong>Mensagens e Interações com a IA:</strong> Transcrição de mensagens de texto trocadas nas salas de conversa, correções gramaticais solicitadas e flashcards de vocabulário criados pelo aluno.</span>
+              <li className="flex items-start gap-2.5">
+                <CheckCircle2 size={17} className="mt-0.5 shrink-0" style={{ color: '#059669' }} />
+                <span>
+                  <strong style={{ color: '#1a1826' }}>Mensagens e Interações com a Teacher Tati AI:</strong> Diálogos
+                  educacionais, transcrições de exercícios práticos, histórico de correções gramaticais e flashcards de
+                  vocabulário criados pelo aluno.
+                </span>
               </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle2 size={16} className="mt-0.5 text-primary shrink-0" />
-                <span><strong>Áudio e Voz:</strong> Gravações de áudio enviadas voluntariamente pelo aluno para análise de pronúncia e conversação. Tais áudios são processados em tempo real exclusivamente para conversão fala-texto (STT) e avaliação didática.</span>
+              <li className="flex items-start gap-2.5">
+                <CheckCircle2 size={17} className="mt-0.5 shrink-0" style={{ color: '#059669' }} />
+                <span>
+                  <strong style={{ color: '#1a1826' }}>Áudio e Pronúncia:</strong> Áudios gravados voluntariamente para
+                  treino de pronúncia e ritmo. O processamento ocorre exclusivamente para conversão de fala em texto e
+                  devolução imediata do feedback pedagógico.
+                </span>
               </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle2 size={16} className="mt-0.5 text-primary shrink-0" />
-                <span><strong>Dados Técnicos e Registros de Acesso:</strong> Endereço IP, tipo de navegador, sistema operacional, horários de acesso e cookies essenciais de sessão, em cumprimento ao Artigo 15 do Marco Civil da Internet (Lei nº 12.965/2014).</span>
+              <li className="flex items-start gap-2.5">
+                <CheckCircle2 size={17} className="mt-0.5 shrink-0" style={{ color: '#059669' }} />
+                <span>
+                  <strong style={{ color: '#1a1826' }}>Dados Técnicos e Registros de Conexão:</strong> Endereço IP, tipo
+                  de navegador, sistema operacional e registros de acesso, em cumprimento ao Artigo 15 do Marco Civil da
+                  Internet (Lei nº 12.965/2014).
+                </span>
               </li>
             </ul>
           </section>
 
           {/* Seção 4 */}
-          <section className="space-y-3 border-t border-border pt-8">
-            <div className="flex items-center gap-2.5 text-primary">
-              <Lock size={20} />
-              <h2 className="font-display text-xl font-bold text-text">4. Finalidades e Bases Legais do Tratamento</h2>
+          <section className="space-y-3 pt-8" style={{ borderTop: '1px solid #f0edf8' }}>
+            <div className="flex items-center gap-3">
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: '#f5f3ff', color: '#6d28d9' }}
+              >
+                <Lock size={18} />
+              </div>
+              <h2 className="font-display-serif text-xl sm:text-2xl font-bold" style={{ color: '#1a1826' }}>
+                4. Finalidades e Bases Legais (Art. 7º da LGPD)
+              </h2>
             </div>
-            <p className="text-sm leading-relaxed text-text-muted">
-              Todo tratamento de dados realizado pela plataforma possui respaldo nas bases legais da LGPD (Art. 7º):
+            <p className="text-sm leading-relaxed" style={{ color: '#6b6880' }}>
+              Todo tratamento de dados realizado pela Teacher Tati AI possui amparo em bases legais estipuladas pela LGPD:
             </p>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-border bg-bg/50 p-3.5">
-                <h3 className="font-semibold text-xs text-text">Execução de Contrato (Art. 7º, V)</h3>
-                <p className="mt-1 text-xs text-text-muted">
-                  Autenticar seu acesso, liberar exercícios, disponibilizar relatórios de progresso, e-books e acompanhar sua evolução no idioma.
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
+              <div
+                className="rounded-2xl p-4 space-y-1"
+                style={{ background: '#fdfcfe', border: '1px solid #ede9fe' }}
+              >
+                <h3 className="font-semibold text-xs uppercase tracking-wider" style={{ color: '#6d28d9' }}>
+                  Execução de Contrato (Art. 7º, V)
+                </h3>
+                <p className="text-xs leading-relaxed" style={{ color: '#6b6880' }}>
+                  Autenticar seu login, liberar salas de conversação, acompanhar ofensivas de estudo, permitir acesso a
+                  materiais e gerar relatórios de evolução.
                 </p>
               </div>
-              <div className="rounded-xl border border-border bg-bg/50 p-3.5">
-                <h3 className="font-semibold text-xs text-text">Consentimento (Art. 7º, I)</h3>
-                <p className="mt-1 text-xs text-text-muted">
-                  Envio voluntário de testes CEFR por visitantes externos para recebimento de relatório em PDF e comunicações personalizadas.
+
+              <div
+                className="rounded-2xl p-4 space-y-1"
+                style={{ background: '#fdfcfe', border: '1px solid #ede9fe' }}
+              >
+                <h3 className="font-semibold text-xs uppercase tracking-wider" style={{ color: '#059669' }}>
+                  Consentimento do Titular (Art. 7º, I)
+                </h3>
+                <p className="text-xs leading-relaxed" style={{ color: '#6b6880' }}>
+                  Realização espontânea do teste CEFR por visitantes externos e preenchimento voluntário de dados para
+                  receber o PDF e eventuais comunicações.
                 </p>
               </div>
-              <div className="rounded-xl border border-border bg-bg/50 p-3.5">
-                <h3 className="font-semibold text-xs text-text">Legítimo Interesse (Art. 7º, IX)</h3>
-                <p className="mt-1 text-xs text-text-muted">
-                  Aprimoramento contínuo dos prompts didáticos, personalização de dificuldades e garantia de estabilidade e segurança do sistema.
+
+              <div
+                className="rounded-2xl p-4 space-y-1"
+                style={{ background: '#fdfcfe', border: '1px solid #ede9fe' }}
+              >
+                <h3 className="font-semibold text-xs uppercase tracking-wider" style={{ color: '#d97706' }}>
+                  Legítimo Interesse (Art. 7º, IX)
+                </h3>
+                <p className="text-xs leading-relaxed" style={{ color: '#6b6880' }}>
+                  Otimização contínua das respostas e correções didáticas da IA, prevenção contra abusos e garantia de
+                  estabilidade da infraestrutura técnica.
                 </p>
               </div>
-              <div className="rounded-xl border border-border bg-bg/50 p-3.5">
-                <h3 className="font-semibold text-xs text-text">Cumprimento de Obrigação Legal (Art. 7º, II)</h3>
-                <p className="mt-1 text-xs text-text-muted">
-                  Guarda de logs de acesso conforme exigido pelo Marco Civil da Internet e emissão de notas ou comprovantes financeiros quando aplicável.
+
+              <div
+                className="rounded-2xl p-4 space-y-1"
+                style={{ background: '#fdfcfe', border: '1px solid #ede9fe' }}
+              >
+                <h3 className="font-semibold text-xs uppercase tracking-wider" style={{ color: '#0284c7' }}>
+                  Obrigação Legal (Art. 7º, II)
+                </h3>
+                <p className="text-xs leading-relaxed" style={{ color: '#6b6880' }}>
+                  Armazenamento de registros de conexão e IPs de acesso para cumprimento das obrigações do Marco Civil da
+                  Internet e emissão de notas quando aplicável.
                 </p>
               </div>
             </div>
           </section>
 
           {/* Seção 5 */}
-          <section className="space-y-3 border-t border-border pt-8">
-            <div className="flex items-center gap-2.5 text-primary">
-              <Server size={20} />
-              <h2 className="font-display text-xl font-bold text-text">5. Compartilhamento de Dados com Terceiros</h2>
+          <section className="space-y-3 pt-8" style={{ borderTop: '1px solid #f0edf8' }}>
+            <div className="flex items-center gap-3">
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: '#f5f3ff', color: '#6d28d9' }}
+              >
+                <Server size={18} />
+              </div>
+              <h2 className="font-display-serif text-xl sm:text-2xl font-bold" style={{ color: '#1a1826' }}>
+                5. Compartilhamento Seguro com Terceiros
+              </h2>
             </div>
-            <p className="text-sm leading-relaxed text-text-muted">
-              <strong>Nós não vendemos nem comercializamos seus dados pessoais sob nenhuma hipótese.</strong> O compartilhamento ocorre única e exclusivamente com operadores técnicos qualificados, contratualmente vinculados a obrigações de sigilo e segurança:
+            <p className="text-sm leading-relaxed" style={{ color: '#6b6880' }}>
+              <strong style={{ color: '#1a1826' }}>
+                Nós nunca comercializamos, alugamos ou vendemos seus dados pessoais a terceiros sob nenhuma hipótese.
+              </strong>{' '}
+              O compartilhamento ocorre estritamente com parceiros tecnológicos indispensáveis para a operação:
             </p>
-            <ul className="space-y-1.5 text-xs text-text-muted list-disc list-inside">
-              <li><strong>Provedores de Nuvem e Banco de Dados:</strong> Hospedagem segura e banco PostgreSQL gerenciado com criptografia em repouso.</li>
-              <li><strong>Serviços de Inferência e IA (LLMs):</strong> Provedores homologados de inteligência artificial (ex: Groq, HuggingFace Inference) para processamento em tempo real de mensagens de conversação e avaliação gramatical didática, sem que suas conversas sejam utilizadas para treinamento de modelos públicos de terceiros.</li>
-              <li><strong>Serviço de Comunicação Transacional:</strong> Brevo / Sendinblue para envio seguro de e-mails transacionais (relatórios CEFR em PDF e links de recuperação de senha).</li>
-              <li><strong>Processadores de Pagamento:</strong> Asaas e Mercado Pago para liquidação de assinaturas e compras no Hub de Materiais. Dados de cartão de crédito não trafegam nem são gravados em nossos servidores.</li>
+            <ul className="space-y-2 text-xs sm:text-sm leading-relaxed list-disc list-inside" style={{ color: '#6b6880' }}>
+              <li>
+                <strong style={{ color: '#1a1826' }}>Hospedagem & Nuvem:</strong> Servidores em nuvem de alta segurança
+                com banco de dados PostgreSQL isolado e criptografia em repouso.
+              </li>
+              <li>
+                <strong style={{ color: '#1a1826' }}>Modelos de Inteligência Artificial:</strong> Provedores homologados
+                de IA para processamento em tempo real das mensagens e avaliação gramatical, sem que suas conversas
+                pessoais sejam compartilhadas para treinamento de modelos públicos abertos.
+              </li>
+              <li>
+                <strong style={{ color: '#1a1826' }}>Comunicação Transacional:</strong> Serviços de e-mail (Brevo /
+                Sendinblue) para entrega de relatórios em PDF, links de recuperação e alertas essenciais de conta.
+              </li>
+              <li>
+                <strong style={{ color: '#1a1826' }}>Processamento Financeiro:</strong> Asaas e Mercado Pago para
+                transações seguras no catálogo de materiais. Dados de cartões não são armazenados em nossos servidores.
+              </li>
             </ul>
           </section>
 
           {/* Seção 6 */}
-          <section className="space-y-3 border-t border-border pt-8">
-            <div className="flex items-center gap-2.5 text-primary">
-              <Shield size={20} />
-              <h2 className="font-display text-xl font-bold text-text">6. Segurança da Informação</h2>
+          <section className="space-y-3 pt-8" style={{ borderTop: '1px solid #f0edf8' }}>
+            <div className="flex items-center gap-3">
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: '#f5f3ff', color: '#6d28d9' }}
+              >
+                <Shield size={18} />
+              </div>
+              <h2 className="font-display-serif text-xl sm:text-2xl font-bold" style={{ color: '#1a1826' }}>
+                6. Segurança da Informação
+              </h2>
             </div>
-            <p className="text-sm leading-relaxed text-text-muted">
-              Adotamos padrões elevados de governança e segurança técnica para proteger suas informações:
+            <p className="text-sm leading-relaxed" style={{ color: '#6b6880' }}>
+              Implementamos medidas técnicas e administrativas rigorosas para manter a integridade de seus dados:
             </p>
-            <ul className="grid grid-cols-1 gap-2 text-xs text-text-muted sm:grid-cols-2">
-              <li className="flex items-center gap-2 rounded-lg border border-border bg-bg/50 p-2.5">
-                <CheckCircle2 size={14} className="text-success shrink-0" />
-                <span>Criptografia HTTPS / TLS em todas as comunicações</span>
-              </li>
-              <li className="flex items-center gap-2 rounded-lg border border-border bg-bg/50 p-2.5">
-                <CheckCircle2 size={14} className="text-success shrink-0" />
-                <span>Senhas criptografadas com hash irreversível bcrypt</span>
-              </li>
-              <li className="flex items-center gap-2 rounded-lg border border-border bg-bg/50 p-2.5">
-                <CheckCircle2 size={14} className="text-success shrink-0" />
-                <span>Autenticação segura baseada em JWT com expiração controlada</span>
-              </li>
-              <li className="flex items-center gap-2 rounded-lg border border-border bg-bg/50 p-2.5">
-                <CheckCircle2 size={14} className="text-success shrink-0" />
-                <span>Backups regulares e isolamento de privilégios de acesso</span>
-              </li>
-            </ul>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              {[
+                'Criptografia HTTPS / TLS de ponta a ponta em todo o tráfego',
+                'Senhas salvas com hash irreversível bcrypt e salteamento forte',
+                'Autenticação moderna via JWT com expiração e controle de sessão',
+                'Isolamento de privilégios de acesso e cópias regulares de segurança',
+              ].map((item) => (
+                <div
+                  key={item}
+                  className="flex items-center gap-2.5 rounded-xl p-3 text-xs"
+                  style={{ background: '#fdfcfe', border: '1px solid #ede9fe' }}
+                >
+                  <CheckCircle2 size={15} style={{ color: '#059669', flexShrink: 0 }} />
+                  <span style={{ color: '#3d3a52' }}>{item}</span>
+                </div>
+              ))}
+            </div>
           </section>
 
           {/* Seção 7 */}
-          <section className="space-y-3 border-t border-border pt-8">
-            <div className="flex items-center gap-2.5 text-primary">
-              <CheckCircle2 size={20} />
-              <h2 className="font-display text-xl font-bold text-text">7. Seus Direitos como Titular (Art. 18 LGPD)</h2>
+          <section className="space-y-3 pt-8" style={{ borderTop: '1px solid #f0edf8' }}>
+            <div className="flex items-center gap-3">
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: '#f5f3ff', color: '#6d28d9' }}
+              >
+                <CheckCircle2 size={18} />
+              </div>
+              <h2 className="font-display-serif text-xl sm:text-2xl font-bold" style={{ color: '#1a1826' }}>
+                7. Seus Direitos como Titular (Artigo 18 da LGPD)
+              </h2>
             </div>
-            <p className="text-sm leading-relaxed text-text-muted">
-              A qualquer momento e de forma gratuita, você pode exercer os seguintes direitos garantidos pela LGPD:
+            <p className="text-sm leading-relaxed" style={{ color: '#6b6880' }}>
+              A qualquer momento, mediante simples solicitação ao nosso canal de contato, você pode exercer os direitos
+              garantidos pela lei:
             </p>
-            <div className="space-y-1.5 text-xs text-text-muted">
-              <p>• <strong>Confirmação e Acesso:</strong> Saber se tratamos dados seus e solicitar cópia completa de suas informações.</p>
-              <p>• <strong>Correção:</strong> Atualizar dados incompletos, inexatos ou desatualizados diretamente em seu perfil ou via suporte.</p>
-              <p>• <strong>Anonimização ou Eliminação:</strong> Solicitar a exclusão ou anonimização de dados desnecessários ou tratados em desconformidade com a lei.</p>
-              <p>• <strong>Portabilidade:</strong> Solicitar seus relatórios e histórico didático em formato estruturado.</p>
-              <p>• <strong>Revogação do Consentimento:</strong> Revogar autorizações concedidas a qualquer tempo, com encerramento de comunicações não essenciais.</p>
+            <div className="space-y-2 text-xs sm:text-sm leading-relaxed" style={{ color: '#6b6880' }}>
+              <p>
+                • <strong style={{ color: '#1a1826' }}>Acesso e Confirmação:</strong> Saber se tratamos seus dados e obter
+                cópia das informações cadastradas.
+              </p>
+              <p>
+                • <strong style={{ color: '#1a1826' }}>Correção de Dados:</strong> Atualizar informações incompletas,
+                desatualizadas ou inexatas.
+              </p>
+              <p>
+                • <strong style={{ color: '#1a1826' }}>Exclusão ou Anonimização:</strong> Solicitar a eliminação dos seus
+                dados pessoais dos nossos bancos ativos.
+              </p>
+              <p>
+                • <strong style={{ color: '#1a1826' }}>Portabilidade:</strong> Solicitar o envio dos seus dados didáticos e
+                histórico de aprendizado.
+              </p>
+              <p>
+                • <strong style={{ color: '#1a1826' }}>Revogação de Consentimento:</strong> Cancelar autorizações
+                previamente concedidas a qualquer instante.
+              </p>
             </div>
           </section>
 
           {/* Seção 8 */}
-          <section className="space-y-3 border-t border-border pt-8">
-            <div className="flex items-center gap-2.5 text-primary">
-              <Bell size={20} />
-              <h2 className="font-display text-xl font-bold text-text">8. Cookies e Tecnologias de Sessão</h2>
+          <section className="space-y-3 pt-8" style={{ borderTop: '1px solid #f0edf8' }}>
+            <div className="flex items-center gap-3">
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: '#f5f3ff', color: '#6d28d9' }}
+              >
+                <Bell size={18} />
+              </div>
+              <h2 className="font-display-serif text-xl sm:text-2xl font-bold" style={{ color: '#1a1826' }}>
+                8. Cookies e Tecnologias de Navegação
+              </h2>
             </div>
-            <p className="text-sm leading-relaxed text-text-muted">
-              Utilizamos cookies exclusivamente técnicos e funcionais (`auth_token` e preferências de tema) para manter sua sessão conectada enquanto você navega e estuda. Não realizamos rastreamento invasivo para publicidade de terceiros.
+            <p className="text-sm leading-relaxed" style={{ color: '#6b6880' }}>
+              Utilizamos apenas cookies essenciais para autenticação de sessão e retenção das suas preferências durante o
+              estudo. Não realizamos rastreamento intrusivo para fins de publicidade direcionada de terceiros.
             </p>
           </section>
 
-          {/* Seção 9 */}
-          <section className="space-y-3 border-t border-border pt-8">
-            <div className="flex items-center gap-2.5 text-primary">
-              <Mail size={20} />
-              <h2 className="font-display text-xl font-bold text-text">9. Canal de Atendimento e DPO</h2>
+          {/* Seção 9 - Contato */}
+          <section className="space-y-4 pt-8" style={{ borderTop: '1px solid #f0edf8' }}>
+            <div className="flex items-center gap-3">
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: '#f5f3ff', color: '#6d28d9' }}
+              >
+                <Mail size={18} />
+              </div>
+              <h2 className="font-display-serif text-xl sm:text-2xl font-bold" style={{ color: '#1a1826' }}>
+                9. Canal de Atendimento e Encarregado (DPO)
+              </h2>
             </div>
-            <p className="text-sm leading-relaxed text-text-muted">
-              Para exercer qualquer dos seus direitos previstos na LGPD, tirar dúvidas sobre o tratamento de seus dados ou enviar sugestões, entre em contato diretamente com nossa equipe de privacidade:
+            <p className="text-sm leading-relaxed" style={{ color: '#6b6880' }}>
+              Para exercer qualquer um dos seus direitos, tirar dúvidas sobre o tratamento das suas informações ou sugerir
+              aprimoramentos, fale diretamente com nossa equipe através do e-mail oficial:
             </p>
-            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-xs text-text-muted">
-              <p className="font-semibold text-text">Encarregado de Proteção de Dados (DPO): Tatiana / Equipe de Privacidade</p>
-              <p className="mt-1">E-mail: <a href="mailto:privacidade@tati-ai.com.br" className="text-primary hover:underline">privacidade@tati-ai.com.br</a></p>
-              <p>Prazo de resposta: Em até 15 (quinze) dias conforme estabelece a regulamentação da ANPD.</p>
+
+            <div
+              className="rounded-2xl p-6 space-y-2.5"
+              style={{
+                background: '#f5f3ff',
+                border: '1.5px solid #ddd6fe',
+              }}
+            >
+              <p className="font-semibold text-sm" style={{ color: '#1a1826' }}>
+                Encarregado de Proteção de Dados (DPO): Tatiana / Equipe de Privacidade
+              </p>
+              <p className="text-sm flex items-center gap-2" style={{ color: '#3d3058' }}>
+                <Mail size={16} style={{ color: '#6d28d9' }} />
+                <span>E-mail direto para contato:</span>
+                <a
+                  href={`mailto:${CONTACT_EMAIL}`}
+                  className="font-bold underline hover:opacity-80 transition-opacity"
+                  style={{ color: '#6d28d9' }}
+                >
+                  {CONTACT_EMAIL}
+                </a>
+              </p>
+              <p className="text-xs pt-1" style={{ color: '#6b6880' }}>
+                Prazo de Resposta: Em até 15 (quinze) dias corridos, conforme preconiza a regulamentação da Autoridade
+                Nacional de Proteção de Dados (ANPD).
+              </p>
             </div>
           </section>
-        </div>
-
-        {/* Rodapé da página */}
-        <div className="mt-8 flex flex-col items-center justify-between gap-4 border-t border-border pt-6 text-xs text-text-subtle sm:flex-row">
-          <p>© 2026 Teacher Tati AI — Taty's English Class. Todos os direitos reservados.</p>
-          <div className="flex items-center gap-4">
-            <Link href="/" className="hover:text-text transition-colors">Início</Link>
-            <Link href="/login" className="hover:text-text transition-colors">Login</Link>
-            <Link href="/teste-cefr" className="hover:text-text transition-colors">Teste CEFR</Link>
-          </div>
         </div>
       </main>
+
+      {/* ─── FOOTER (PADRÃO LANDING PAGE) ─── */}
+      <footer style={{ background: '#ffffff', borderTop: '1px solid #e8e5f0' }}>
+        <div className="max-w-6xl mx-auto px-6 py-10">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-8">
+            <div className="flex items-center gap-2.5">
+              <div
+                className="relative w-8 h-8 rounded-full overflow-hidden flex-shrink-0"
+                style={{ background: '#f5f3ff', border: '1px solid #ddd6fe' }}
+              >
+                <Image
+                  src="/images/tati_logo.jpg"
+                  alt="Teacher Tati AI"
+                  fill
+                  sizes="32px"
+                  className="object-contain"
+                />
+              </div>
+              <div>
+                <p className="text-sm font-semibold leading-none" style={{ color: '#1a1826' }}>
+                  Teacher Tati <span style={{ color: '#6d28d9' }}>AI</span>
+                </p>
+                <p className="text-xs leading-none mt-1" style={{ color: '#c4c1d4' }}>
+                  Tati&apos;s English Class
+                </p>
+              </div>
+            </div>
+
+            <nav className="flex flex-wrap gap-5">
+              <Link href="/" className="landing-nav-link text-xs font-medium">
+                Início
+              </Link>
+              <Link href="/teste-cefr" className="landing-nav-link text-xs font-medium">
+                Teste CEFR
+              </Link>
+              <a
+                href={HUB_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="landing-nav-link text-xs font-medium inline-flex items-center gap-1"
+              >
+                Hub de Materiais
+                <ExternalLink size={10} />
+              </a>
+              <Link href="/login" className="landing-nav-link text-xs font-medium">
+                Entrar
+              </Link>
+              <Link href="/login?tab=register" className="landing-nav-link text-xs font-medium">
+                Criar Conta
+              </Link>
+            </nav>
+          </div>
+
+          <div style={{ borderTop: '1px solid #f0edf8', paddingTop: '1.5rem' }}>
+            <p className="text-xs text-center" style={{ color: '#c4c1d4' }}>
+              © {new Date().getFullYear()} Teacher Tati AI. Todos os direitos reservados. Em conformidade com a LGPD e
+              regulamentações educacionais.
+            </p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
