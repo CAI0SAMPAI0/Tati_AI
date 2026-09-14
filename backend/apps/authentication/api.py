@@ -15,6 +15,7 @@ from .schemas import (
     TokenResponse,
     UserOut,
     ProfileUpdateInput,
+    ConsentInput,
 )
 from .services import AuthService
 from .security import auth_required
@@ -92,6 +93,15 @@ def register(request: HttpRequest, payload: RegisterInput):
     """
     res = AuthService.register_student(payload)
     return 201, res
+
+
+@auth_router.post("/consent", response=UserOut, auth=auth_required)
+def record_consent(request: HttpRequest, payload: ConsentInput):
+    """
+    Registra o consentimento LGPD v2.2 e autorização parental de um usuário logado.
+    """
+    user: User = request.auth
+    return AuthService.record_user_consent(user, payload)
 
 
 @auth_router.post("/google", response=TokenResponse)

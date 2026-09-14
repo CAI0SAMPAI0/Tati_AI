@@ -13,6 +13,11 @@ class RegisterInput(BaseModel):
     parental_consent: bool = True
 
 
+class ConsentInput(BaseModel):
+    accepted_terms: bool = True
+    parental_consent: bool = True
+
+
 class LoginInput(BaseModel):
     username: Optional[str] = None
     email: Optional[str] = None

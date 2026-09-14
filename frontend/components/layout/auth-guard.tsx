@@ -9,6 +9,7 @@ import dynamic from 'next/dynamic';
 // Lazy: não bloqueia o render inicial das rotas autenticadas
 import { NotificationProvider } from '@/providers/notification-provider';
 import { ChatSocketProvider } from '@/providers/chat-socket-provider';
+import { LgpdConsentModal } from '@/components/layout/lgpd-consent-modal';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { token, isLoaded, isBootstrappingProfile } = useAuth();
@@ -34,6 +35,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     <NotificationProvider>
       <ChatSocketProvider>
         {children}
+        <LgpdConsentModal />
       </ChatSocketProvider>
     </NotificationProvider>
   );
