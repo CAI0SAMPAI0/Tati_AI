@@ -1,0 +1,12 @@
+.git
+.venv
+node_modules
+frontend/node_modules
+apps/hub-site/node_modules
+.next
+frontend/.next
+apps/hub-site/.next
+__pycache__
+*.pyc
+*.sqlite3
+.env*

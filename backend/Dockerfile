@@ -19,14 +19,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Copia dependências e instala
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip \
+# Suporte resiliente para build na raiz do monorepo (Railway) ou no subdiretorio /backend (Docker Compose / Hugging Face)
+COPY . /tmp/build/
+
+RUN if [ -f "/tmp/build/backend/requirements.txt" ]; then \
+      cp /tmp/build/backend/requirements.txt ./requirements.txt; \
+      cp -r /tmp/build/backend/. ./; \
+    else \
+      cp /tmp/build/requirements.txt ./requirements.txt; \
+      cp -r /tmp/build/. ./; \
+    fi \
+    && rm -rf /tmp/build \
+    && pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-COPY . .
-
-# Coleta arquivos estáticos
+# Coleta arquivos estaticos
 RUN python manage.py collectstatic --noinput || true
 
 EXPOSE 7860 8080
