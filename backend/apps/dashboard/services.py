@@ -779,6 +779,15 @@ class DashboardService:
     # ── GAMES ADMIN ───────────────────────────────────────────────────────
 
     @staticmethod
+    def _clean_levels(raw_levels) -> list[str]:
+        if not raw_levels:
+            return ["all"]
+        if isinstance(raw_levels, str):
+            raw_levels = [l.strip().upper() for l in raw_levels.split(",") if l.strip()]
+        clean = [str(l).strip().upper() for l in raw_levels if l and str(l).strip().lower() != "all"]
+        return clean if clean else ["all"]
+
+    @staticmethod
     def get_games_admin() -> list[dict]:
         games = Game.objects.all().order_by("-created_at")
         return [
@@ -787,7 +796,7 @@ class DashboardService:
                 "title": g.title,
                 "description": g.description or "",
                 "wordwall_url": g.wordwall_url,
-                "levels": g.levels or ["all"],
+                "levels": DashboardService._clean_levels(g.levels),
                 "is_published": g.is_published,
                 "created_at": g.created_at.isoformat() if g.created_at else "",
             }
@@ -801,10 +810,7 @@ class DashboardService:
         if not title or not wordwall_url:
             raise HttpError(400, "Título e URL do Wordwall são obrigatórios.")
 
-        levels = data.get("levels") or ["ALL"]
-        if isinstance(levels, str):
-            levels = [l.strip().upper() for l in levels.split(",") if l.strip()]
-
+        levels = DashboardService._clean_levels(data.get("levels"))
         is_published = data.get("is_published", True)
         g = Game.objects.create(
             title=title,
@@ -843,12 +849,7 @@ class DashboardService:
         if "wordwall_url" in data:
             g.wordwall_url = data["wordwall_url"]
         if "levels" in data:
-            lvls = data["levels"]
-            g.levels = (
-                [l.strip().upper() for l in lvls.split(",")]
-                if isinstance(lvls, str)
-                else lvls
-            )
+            g.levels = DashboardService._clean_levels(data["levels"])
         if "is_published" in data:
             g.is_published = data["is_published"]
         g.save()
@@ -888,7 +889,7 @@ class DashboardService:
                 "title": n.title,
                 "url": n.url,
                 "description": n.description or "",
-                "levels": n.levels or ["all"],
+                "levels": DashboardService._clean_levels(n.levels),
                 "thumbnail_url": n.thumbnail_url or "",
                 "is_published": n.is_published,
                 "created_at": n.created_at.isoformat() if n.created_at else "",
@@ -903,10 +904,7 @@ class DashboardService:
         if not title or not url:
             raise HttpError(400, "Título e URL são obrigatórios.")
 
-        levels = data.get("levels") or ["ALL"]
-        if isinstance(levels, str):
-            levels = [l.strip().upper() for l in levels.split(",") if l.strip()]
-
+        levels = DashboardService._clean_levels(data.get("levels"))
         is_published = data.get("is_published", True)
         n = NewsItem.objects.create(
             title=title,
@@ -950,12 +948,7 @@ class DashboardService:
         if "thumbnail_url" in data:
             n.thumbnail_url = data["thumbnail_url"]
         if "levels" in data:
-            lvls = data["levels"]
-            n.levels = (
-                [l.strip().upper() for l in lvls.split(",")]
-                if isinstance(lvls, str)
-                else lvls
-            )
+            n.levels = DashboardService._clean_levels(data["levels"])
         if "is_published" in data:
             n.is_published = data["is_published"]
         n.save()
@@ -976,31 +969,6 @@ class DashboardService:
                     f"[Dashboard] Erro ao notificar alunos de notícia: {exc}"
                 )
 
-        return {"success": True, "id": str(n.id), "title": n.title}
-
-    @staticmethod
-    def update_news(news_id: str, data: dict) -> dict:
-        n = NewsItem.objects.filter(id=news_id).first()
-        if not n:
-            raise HttpError(404, "Notícia não encontrada.")
-        if "title" in data:
-            n.title = data["title"]
-        if "url" in data:
-            n.url = data["url"]
-        if "description" in data:
-            n.description = data["description"]
-        if "levels" in data:
-            lvls = data["levels"]
-            n.levels = (
-                [l.strip().upper() for l in lvls.split(",")]
-                if isinstance(lvls, str)
-                else lvls
-            )
-        if "thumbnail_url" in data:
-            n.thumbnail_url = data["thumbnail_url"]
-        if "is_published" in data:
-            n.is_published = data["is_published"]
-        n.save()
         return {"success": True, "id": str(n.id), "title": n.title}
 
     @staticmethod

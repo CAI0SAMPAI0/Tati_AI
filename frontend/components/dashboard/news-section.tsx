@@ -45,11 +45,16 @@ interface FormState {
   is_published: boolean;
 }
 
+const getCleanLevels = (levels?: string[] | null): string[] => {
+  if (!levels || !Array.isArray(levels)) return [];
+  return levels.filter((l) => l && l.toLowerCase() !== 'all');
+};
+
 const EMPTY_FORM: FormState = {
   title: '',
   description: '',
   url: '',
-  levels: ['all'],
+  levels: [],
   is_published: true,
 };
 
@@ -77,8 +82,12 @@ export default function NewsSection() {
 
   const filteredNews = news.filter((n) => {
     if (filterLevel === 'all') return true;
-    const nLevels = (n.levels || []).map((l) => l.toUpperCase());
-    return nLevels.includes('ALL') || nLevels.includes(filterLevel.toUpperCase());
+    const clean = getCleanLevels(n.levels).map((l) => l.toUpperCase());
+    if (clean.length > 0) {
+      return clean.includes(filterLevel.toUpperCase());
+    }
+    const hasAll = (n.levels || []).map((l) => (l || '').toLowerCase()).includes('all');
+    return hasAll;
   });
 
   const handleSelectAll = () => {
@@ -156,15 +165,15 @@ export default function NewsSection() {
 
   const handleToggleLevel = (levelValue: string) => {
     setFormData((prev) => {
-      const current = prev.levels.map((l) => l.toUpperCase());
+      const cleanPrev = prev.levels.filter((l) => l.toLowerCase() !== 'all');
       const target = levelValue.toUpperCase();
-      const isCurrentlySelected = current.includes(target);
+      const isCurrentlySelected = cleanPrev.map((l) => l.toUpperCase()).includes(target);
 
       let newLevels: string[];
       if (isCurrentlySelected) {
-        newLevels = prev.levels.filter((l) => l.toUpperCase() !== target);
+        newLevels = cleanPrev.filter((l) => l.toUpperCase() !== target);
       } else {
-        newLevels = [...prev.levels, levelValue];
+        newLevels = [...cleanPrev, levelValue];
       }
 
       return { ...prev, levels: newLevels };
@@ -174,11 +183,12 @@ export default function NewsSection() {
   const openModal = (item?: NewsRow) => {
     if (item) {
       setEditingNews(item);
+      const clean = getCleanLevels(item.levels);
       setFormData({
         title: item.title || '',
         description: item.description || '',
         url: item.url || '',
-        levels: item.levels || ['all'],
+        levels: clean,
         is_published: item.is_published,
       });
     } else {
@@ -201,11 +211,12 @@ export default function NewsSection() {
     }
     setIsSaving(true);
     try {
+      const cleanLevels = getCleanLevels(formData.levels);
       const payload = {
         title: title.trim(),
         description: (formData.description || '').trim(),
         url: url.trim(),
-        levels: formData.levels,
+        levels: cleanLevels.length > 0 ? cleanLevels : ['ALL'],
         is_published: formData.is_published,
       };
 
@@ -373,11 +384,15 @@ export default function NewsSection() {
                   <div className="flex items-start justify-between gap-2">
                     <h4 className="font-bold text-text truncate flex-1">{n.title}</h4>
                     <div className="flex flex-wrap gap-1 justify-end shrink-0">
-                      {(n.levels || ['all']).map((l) => (
-                        <span key={l} className="text-[0.6rem] font-bold px-2 py-0.5 rounded-full bg-surface-hover border border-border uppercase tracking-widest text-text-subtle">
-                          {l === 'all' || l === 'ALL' ? 'All' : l.toUpperCase()}
-                        </span>
-                      ))}
+                      {(() => {
+                        const clean = getCleanLevels(n.levels);
+                        const displayLevels = clean.length > 0 ? clean : ['all'];
+                        return displayLevels.map((l) => (
+                          <span key={l} className="text-[0.6rem] font-bold px-2 py-0.5 rounded-full bg-surface-hover border border-border uppercase tracking-widest text-text-subtle">
+                            {l.toLowerCase() === 'all' ? 'All' : l.toUpperCase()}
+                          </span>
+                        ));
+                      })()}
                     </div>
                   </div>
                   {n.description && (

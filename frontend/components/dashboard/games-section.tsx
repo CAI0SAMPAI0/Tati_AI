@@ -43,11 +43,16 @@ interface FormState {
   is_published: boolean;
 }
 
+const getCleanLevels = (levels?: string[] | null): string[] => {
+  if (!levels || !Array.isArray(levels)) return [];
+  return levels.filter((l) => l && l.toLowerCase() !== 'all');
+};
+
 const EMPTY_FORM: FormState = {
   title: '',
   description: '',
   wordwall_url: '',
-  levels: ['all'],
+  levels: [],
   is_published: true,
 };
 
@@ -75,8 +80,12 @@ export default function GamesSection() {
 
   const filteredGames = games.filter((g) => {
     if (filterLevel === 'all') return true;
-    const gLevels = (g.levels || []).map((l) => l.toUpperCase());
-    return gLevels.includes('ALL') || gLevels.includes(filterLevel.toUpperCase());
+    const clean = getCleanLevels(g.levels).map((l) => l.toUpperCase());
+    if (clean.length > 0) {
+      return clean.includes(filterLevel.toUpperCase());
+    }
+    const hasAll = (g.levels || []).map((l) => (l || '').toLowerCase()).includes('all');
+    return hasAll;
   });
 
   const handleSelectAll = () => {
@@ -154,15 +163,15 @@ export default function GamesSection() {
 
   const handleToggleLevel = (levelValue: string) => {
     setFormData((prev) => {
-      const current = prev.levels.map((l) => l.toUpperCase());
+      const cleanPrev = prev.levels.filter((l) => l.toLowerCase() !== 'all');
       const target = levelValue.toUpperCase();
-      const isCurrentlySelected = current.includes(target);
+      const isCurrentlySelected = cleanPrev.map((l) => l.toUpperCase()).includes(target);
 
       let newLevels: string[];
       if (isCurrentlySelected) {
-        newLevels = prev.levels.filter((l) => l.toUpperCase() !== target);
+        newLevels = cleanPrev.filter((l) => l.toUpperCase() !== target);
       } else {
-        newLevels = [...prev.levels, levelValue];
+        newLevels = [...cleanPrev, levelValue];
       }
 
       return { ...prev, levels: newLevels };
@@ -172,11 +181,12 @@ export default function GamesSection() {
   const openModal = (game?: GameRow) => {
     if (game) {
       setEditingGame(game);
+      const clean = getCleanLevels(game.levels);
       setFormData({
         title: game.title || '',
         description: game.description || '',
         wordwall_url: game.wordwall_url || '',
-        levels: game.levels || ['all'],
+        levels: clean,
         is_published: game.is_published,
       });
     } else {
@@ -199,11 +209,12 @@ export default function GamesSection() {
     }
     setIsSaving(true);
     try {
+      const cleanLevels = getCleanLevels(formData.levels);
       const payload = {
         title: title.trim(),
         description: (formData.description || '').trim(),
         wordwall_url: url.trim(),
-        levels: formData.levels,
+        levels: cleanLevels.length > 0 ? cleanLevels : ['ALL'],
         is_published: formData.is_published,
       };
 
@@ -358,11 +369,15 @@ export default function GamesSection() {
                       {g.is_published ? 'Published' : 'Draft'}
                     </span>
                     <div className="flex flex-wrap gap-1 justify-end">
-                      {(g.levels || ['all']).map((l) => (
-                        <span key={l} className="text-[0.6rem] font-bold px-2 py-0.5 rounded-full bg-surface-hover border border-border uppercase tracking-widest text-text-subtle">
-                          {l === 'all' || l === 'ALL' ? 'All Levels' : l.toUpperCase()}
-                        </span>
-                      ))}
+                      {(() => {
+                        const clean = getCleanLevels(g.levels);
+                        const displayLevels = clean.length > 0 ? clean : ['all'];
+                        return displayLevels.map((l) => (
+                          <span key={l} className="text-[0.6rem] font-bold px-2 py-0.5 rounded-full bg-surface-hover border border-border uppercase tracking-widest text-text-subtle">
+                            {l.toLowerCase() === 'all' ? 'All Levels' : l.toUpperCase()}
+                          </span>
+                        ));
+                      })()}
                     </div>
                   </div>
                 </div>

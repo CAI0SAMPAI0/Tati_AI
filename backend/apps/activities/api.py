@@ -202,7 +202,7 @@ def get_games(request: HttpRequest):
             title=g.title,
             description=g.description or "",
             wordwall_url=g.wordwall_url,
-            levels=g.levels or [],
+            levels=([l for l in (g.levels or []) if l and str(l).strip().lower() != "all"] or ["all"]),
         )
         for g in qs
     ]
@@ -222,7 +222,7 @@ def get_news(request: HttpRequest):
             title=n.title,
             url=n.url,
             description=n.description or "",
-            levels=n.levels or [],
+            levels=([l for l in (n.levels or []) if l and str(l).strip().lower() != "all"] or ["all"]),
             thumbnail_url=n.thumbnail_url,
         )
         for n in qs
