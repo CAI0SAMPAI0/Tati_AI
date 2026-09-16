@@ -10,7 +10,6 @@ import {
   EyeOff,
   Newspaper,
   ExternalLink,
-  ImageOff,
   CheckSquare,
   Square,
   CheckCircle2,

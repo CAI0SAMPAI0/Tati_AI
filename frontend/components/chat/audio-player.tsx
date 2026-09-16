@@ -26,8 +26,27 @@ export function AudioPlayer({ url, base64, className, autoPlay, text, onAudioUpd
   const [speed, setSpeed] = useState(1);
   const [showVolume, setShowVolume] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playerIdRef = useRef<string>(`player-${Math.random().toString(36).slice(2, 9)}`);
+  const autoPlayedSrcRef = useRef<string | null>(null);
 
   const initialAccentRef = useRef<string>(getStoredAccent());
+
+  // Interrompe este áudio se outro player começar a tocar no chat
+  useEffect(() => {
+    const handleStopOther = (e: Event) => {
+      const customEvent = e as CustomEvent<{ id: string }>;
+      if (customEvent.detail?.id !== playerIdRef.current) {
+        if (audioRef.current && !audioRef.current.paused) {
+          audioRef.current.pause();
+        }
+        setIsPlaying(false);
+      }
+    };
+    window.addEventListener('tati_pause_other_audio', handleStopOther);
+    return () => {
+      window.removeEventListener('tati_pause_other_audio', handleStopOther);
+    };
+  }, []);
 
   useEffect(() => {
     setActiveBase64(base64);
@@ -40,7 +59,11 @@ export function AudioPlayer({ url, base64, className, autoPlay, text, onAudioUpd
   const audioSrc = activeBase64 ? `data:audio/mp3;base64,${activeBase64}` : activeUrl;
 
   useEffect(() => {
-    if (autoPlay && audioRef.current && !isPlaying && audioSrc) {
+    if (autoPlay && audioRef.current && !isPlaying && audioSrc && autoPlayedSrcRef.current !== audioSrc) {
+      autoPlayedSrcRef.current = audioSrc;
+      window.dispatchEvent(
+        new CustomEvent('tati_pause_other_audio', { detail: { id: playerIdRef.current } })
+      );
       audioRef.current
         .play()
         .then(() => setIsPlaying(true))
@@ -48,7 +71,7 @@ export function AudioPlayer({ url, base64, className, autoPlay, text, onAudioUpd
           // Navegadores podem bloquear autoplay sem interação prévia
         });
     }
-  }, [audioSrc, autoPlay]);
+  }, [audioSrc, autoPlay, isPlaying]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -100,6 +123,9 @@ export function AudioPlayer({ url, base64, className, autoPlay, text, onAudioUpd
           onAudioUpdated?.(newB64);
           setTimeout(() => {
             if (audioRef.current) {
+              window.dispatchEvent(
+                new CustomEvent('tati_pause_other_audio', { detail: { id: playerIdRef.current } })
+              );
               audioRef.current.play()
                 .then(() => setIsPlaying(true))
                 .catch((e) => console.error('Play error after TTS fetch:', e));
@@ -115,6 +141,9 @@ export function AudioPlayer({ url, base64, className, autoPlay, text, onAudioUpd
     }
 
     if (audioSrc) {
+      window.dispatchEvent(
+        new CustomEvent('tati_pause_other_audio', { detail: { id: playerIdRef.current } })
+      );
       audioRef.current.play()
         .then(() => setIsPlaying(true))
         .catch((err) => console.error('Play error:', err));

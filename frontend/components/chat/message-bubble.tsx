@@ -16,9 +16,10 @@ interface MessageBubbleProps {
   onWordClick?: (word: string, x: number, y: number) => void;
   onEdit?: (messageId: string, newContent: string) => Promise<void>;
   onResend?: (content: string) => void;
+  isLastAssistant?: boolean;
 }
 
-export const MessageBubble = React.memo(function MessageBubble({ message, isStreaming, onWordClick, onEdit, onResend }: MessageBubbleProps) {
+export const MessageBubble = React.memo(function MessageBubble({ message, isStreaming, onWordClick, onEdit, onResend, isLastAssistant }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
@@ -103,9 +104,9 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
     };
   }, [isUser, message.content]);
 
-  // Verifica configuração de autoplay de áudio no chat
+  // Verifica configuração de autoplay de áudio no chat - apenas para a última mensagem da Tati
   const isAutoplay = useMemo(() => {
-    if (isUser || typeof window === 'undefined') return false;
+    if (isUser || !isLastAssistant || typeof window === 'undefined') return false;
     try {
       const raw = localStorage.getItem('tati_settings');
       if (raw) {
@@ -114,7 +115,7 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
       }
     } catch (_) {}
     return false;
-  }, [isUser]);
+  }, [isUser, isLastAssistant]);
 
   // Has a file attachment (PDF, DOCX, PPTX) — no audio for these messages
   const hasFile = !!docData;

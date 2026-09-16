@@ -268,14 +268,17 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                 f"[ChatWS] Resposta concluída para '{self.username}' | Modelo: {model_used} | Modo: {origin}"
             )
 
-            # Se não tiver áudio gerado, gera áudio via Edge TTS de forma assíncrona garantida
+            # 1. Finaliza o stream de texto imediatamente para remover as reticências e comitar a resposta na tela sem atraso
+            await self.send_json({"type": "stream_end", "model": model_used})
+
+            # 2. Se não tiver áudio gerado, gera áudio via Edge TTS de forma assíncrona
             if not audio_b64:
                 clean_reply_text = re.sub(r"\[ATTACHED_DOCUMENT:.*?\]", "", reply_text, flags=re.DOTALL).strip()
                 audio_b64 = await AudioService.text_to_speech_async(
                     clean_reply_text, accent=accent
                 )
 
-            # Se tiver áudio gerado, envia o payload de áudio
+            # 3. Envia o áudio para a mensagem recém-criada
             if audio_b64:
                 await self.send_json(
                     {
@@ -285,9 +288,6 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                         "model": model_used,
                     }
                 )
-
-            # Finaliza stream
-            await self.send_json({"type": "stream_end", "model": model_used})
 
         except asyncio.CancelledError:
             raise

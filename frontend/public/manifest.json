@@ -3,7 +3,7 @@
   "name": "Taty's Hub - AI English Learning",
   "short_name": "Taty's Hub",
   "description": "Pratique inglês com uma professora de IA 24/7.",
-  "start_url": "/",
+  "start_url": "/chat",
   "scope": "/",
   "display": "standalone",
   "display_override": [

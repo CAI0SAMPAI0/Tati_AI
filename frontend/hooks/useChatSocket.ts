@@ -216,6 +216,8 @@ export function useChatSocket(conversationId: string | null) {
         if (msg.audio) {
           pendingAudioRef.current = msg.audio;
           setMessages((prev) => {
+            // Se ainda estiver em streaming, guarda no pendingAudioRef e não sobrescreve mensagens anteriores
+            if (streamingRef.current) return prev;
             const last = [...prev];
             for (let i = last.length - 1; i >= 0; i--) {
               if (last[i].role === 'assistant') {

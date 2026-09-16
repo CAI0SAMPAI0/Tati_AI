@@ -69,17 +69,20 @@ export function MessageList({ messages, isStreaming, streamingContent, conversat
 
     if (isStreaming) {
       if (containerRef.current) {
-        const isNearBottom =
-          containerRef.current.scrollHeight - containerRef.current.scrollTop - containerRef.current.clientHeight < 150;
-        if (isNearBottom) {
-          containerRef.current.scrollTop = containerRef.current.scrollHeight;
-        }
+        containerRef.current.scrollTop = containerRef.current.scrollHeight;
       }
       return;
     }
 
-    // Novas mensagens enviadas/recebidas rolam com animação suave
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Novas mensagens enviadas/recebidas rolam automaticamente para o final da conversa
+    const scrollTimer = setTimeout(() => {
+      if (containerRef.current) {
+        containerRef.current.scrollTop = containerRef.current.scrollHeight;
+      }
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 50);
+
+    return () => clearTimeout(scrollTimer);
   }, [messages.length, isStreaming, streamingContent]);
 
   const handleScroll = useCallback(() => {
@@ -111,6 +114,15 @@ export function MessageList({ messages, isStreaming, streamingContent, conversat
 
   const showWelcome = messages.length === 0 && !isStreaming;
   const paginatedMessages = messages.slice(-visibleCount);
+
+  // Identifica a última mensagem do assistente para controlar autoplay isolado
+  let lastAssistantIdx = -1;
+  for (let i = paginatedMessages.length - 1; i >= 0; i--) {
+    if (paginatedMessages[i].role === 'assistant') {
+      lastAssistantIdx = i;
+      break;
+    }
+  }
 
   return (
     <div ref={containerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin">
@@ -190,6 +202,7 @@ export function MessageList({ messages, isStreaming, streamingContent, conversat
           onWordClick={handleWordClick}
           onEdit={onEdit}
           onResend={onResend}
+          isLastAssistant={!isStreaming && i === lastAssistantIdx}
         />
       ))}
 

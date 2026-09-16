@@ -58,16 +58,23 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Se o usuário está logado e acessa a raiz (/), redireciona direto para última tela ou /chat
+  // Se o usuário está logado e acessa a raiz (/), redireciona sempre direto para /chat
   if (token && pathname === '/') {
-    const lastRoute = request.cookies.get('tati_last_route')?.value;
-    const validRoute =
-      lastRoute &&
-      lastRoute.startsWith('/') &&
-      !['/', '/login', '/register', '/reset-password'].includes(lastRoute)
-        ? decodeURIComponent(lastRoute)
-        : '/chat';
-    const targetUrl = new URL(validRoute, request.url);
+    const targetUrl = new URL('/chat', request.url);
+    if (targetUrl.searchParams.has('_v')) targetUrl.searchParams.delete('_v');
+    return NextResponse.redirect(targetUrl);
+  }
+
+  // Se estiver em modo PWA ou APK e acessar a raiz (/), nunca exibe a landing page
+  const isPwaOrApk =
+    Boolean(request.headers.get('x-requested-with')) ||
+    request.cookies.get('is_pwa')?.value === '1' ||
+    request.nextUrl.searchParams.get('mode') === 'standalone' ||
+    request.nextUrl.searchParams.get('source') === 'pwa' ||
+    request.nextUrl.searchParams.has('apk');
+
+  if (isPwaOrApk && pathname === '/') {
+    const targetUrl = new URL(token ? '/chat' : '/login', request.url);
     if (targetUrl.searchParams.has('_v')) targetUrl.searchParams.delete('_v');
     return NextResponse.redirect(targetUrl);
   }

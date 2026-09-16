@@ -299,23 +299,40 @@ export default function LandingClient() {
           window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
         }
       } catch {}
-    }
 
-    // 2. Se o usuário já estiver logado, redireciona direto para o chat ou a última tela salva
-    try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      // 2. Detecta modo PWA ou APK (Standalone, TWA, WebView)
+      const isPwaOrApk =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        Boolean((window.navigator as any).standalone) ||
+        document.referrer.includes('android-app://') ||
+        /wv|Android.*Version\/[\d.]+/i.test(navigator.userAgent) ||
+        new URLSearchParams(window.location.search).get('mode') === 'standalone' ||
+        new URLSearchParams(window.location.search).get('mode') === 'pwa' ||
+        new URLSearchParams(window.location.search).get('source') === 'pwa' ||
+        new URLSearchParams(window.location.search).has('apk');
+
+      if (isPwaOrApk) {
+        try {
+          document.cookie = 'is_pwa=1; path=/; max-age=31536000; SameSite=Lax';
+        } catch {}
+      }
+
+      const token = localStorage.getItem('token');
+
+      // No modo PWA ou APK: NUNCA mostrar a landing page
+      if (isPwaOrApk) {
+        setIsRedirecting(true);
+        router.replace(token ? '/chat' : '/login');
+        return;
+      }
+
+      // Se o usuário estiver logado na web comum, redireciona sempre para o chat
       if (token) {
         setIsRedirecting(true);
-        const lastRoute = typeof window !== 'undefined' ? localStorage.getItem('tati_last_route') : null;
-        const targetRoute =
-          lastRoute &&
-          lastRoute.startsWith('/') &&
-          !['/', '/login', '/register', '/reset-password'].includes(lastRoute)
-            ? lastRoute
-            : '/chat';
-        router.replace(targetRoute);
+        router.replace('/chat');
+        return;
       }
-    } catch {}
+    }
   }, [router]);
 
   if (isRedirecting) {
