@@ -163,6 +163,16 @@ export default function FlashcardsClientPage() {
     saveResult('unknown', showHint);
   };
 
+  const handleShowAnswer = () => {
+    if (revealed) return;
+    setRevealed(true);
+  };
+
+  const handleSelfGrade = (status: CardStatus) => {
+    setCardStatus(status);
+    saveResult(status, false);
+  };
+
   const saveResult = (status: CardStatus, usedHint: boolean) => {
     setResults(prev => [...prev, { card: currentCard, status, userAnswer: userInput, usedHint }]);
     // Save progress to backend
@@ -359,7 +369,7 @@ export default function FlashcardsClientPage() {
             {/* Title */}
             <div className="text-center">
               <h1 className="text-2xl font-bold text-text">{deck.title}</h1>
-              <p className="text-sm text-text-muted mt-1">What word or phrase does this image represent?</p>
+              <p className="text-sm text-text-muted mt-1">Pratique e memorize o vocabulário em inglês</p>
             </div>
 
             {/* Card */}
@@ -367,50 +377,30 @@ export default function FlashcardsClientPage() {
               ${revealed
                 ? cardStatus === 'correct' ? 'border-green-500/60' 
                 : cardStatus === 'wrong' ? 'border-red-500/60' 
-                : 'border-yellow-500/60'
+                : cardStatus === 'unknown' ? 'border-yellow-500/60'
+                : 'border-primary/50'
                 : 'border-border'}`}
             >
-              {/* Image / Placeholder */}
-              <div className="relative w-full h-56 md:h-72 bg-bg flex items-center justify-center overflow-hidden">
-                {currentCard.image_url ? (
-                  <img
-                    src={currentCard.image_url}
-                    alt="Flashcard image"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center gap-3 opacity-30">
-                    <ImageIcon size={48} />
-                    <p className="text-sm font-medium">No image</p>
-                  </div>
-                )}
-
-                {/* Status overlay when revealed */}
-                {revealed && (
-                  <div className={`absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end justify-center pb-4`}>
-                    <div className={`flex items-center gap-2 px-5 py-2 rounded-2xl font-bold text-sm
-                      ${cardStatus === 'correct' ? 'bg-green-500 text-white' 
-                      : cardStatus === 'wrong' ? 'bg-red-500 text-white' 
-                      : 'bg-yellow-500 text-black'}`}>
-                      {cardStatus === 'correct' ? <><Check size={16} /> Correct!</> 
-                      : cardStatus === 'wrong' ? <><X size={16} /> Wrong</> 
-                      : <><HelpCircle size={16} /> Skipped</>}
-                    </div>
+              {/* Header: Meaning / Portuguese Translation (Clean & prominent) */}
+              <div className="p-6 md:p-8 text-center space-y-3 bg-gradient-to-b from-primary/5 to-transparent border-b border-border/50">
+                <span className="text-xs uppercase font-black text-primary tracking-widest block">Significado / Tradução</span>
+                <h2 className="text-2xl md:text-3xl font-bold text-text leading-tight">
+                  {currentCard.back || currentCard.front}
+                </h2>
+                {currentCard.image_url && (
+                  <div className="flex justify-center pt-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={currentCard.image_url}
+                      alt="Context illustration"
+                      className="w-20 h-20 md:w-24 md:h-24 rounded-2xl object-cover border border-border/80 shadow-sm"
+                    />
                   </div>
                 )}
               </div>
 
-              {/* Hint / explanation (optional) */}
-              {(showHint || revealed) && currentCard.back && (
-                <div className={`px-6 py-3 text-sm font-medium text-center border-t border-border bg-bg/50 transition-all
-                  ${revealed ? 'text-text' : 'text-text-muted'}`}>
-                  {revealed && <span className="text-[0.65rem] uppercase font-black text-text-muted block mb-1">Hint / Translation</span>}
-                  {currentCard.back}
-                </div>
-              )}
-
-              {/* Answer area */}
-              <div className="p-5 space-y-3">
+              {/* Interaction area */}
+              <div className="p-5 space-y-4">
                 {!revealed ? (
                   <>
                     <input
@@ -419,65 +409,101 @@ export default function FlashcardsClientPage() {
                       value={userInput}
                       onChange={e => setUserInput(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' && userInput.trim()) handleCheck(); }}
-                      placeholder="Type the word or phrase..."
-                      className="w-full bg-bg border border-border rounded-2xl px-5 py-4 text-text text-lg font-medium outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all placeholder:text-text-muted/40"
+                      placeholder="Digite a palavra em inglês (opcional)..."
+                      className="w-full bg-bg border border-border rounded-2xl px-5 py-3.5 text-text text-base font-medium outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all placeholder:text-text-muted/40"
                     />
-                    <div className="flex gap-3">
-                      {!showHint && currentCard.back && (
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        onClick={handleShowAnswer}
+                        className="flex-1 py-3.5 px-4 rounded-2xl font-bold text-sm bg-primary text-white hover:bg-primary/90 transition-all shadow-glow flex items-center justify-center gap-2"
+                      >
+                        <Sparkles size={16} /> Ver Resposta
+                      </button>
+                      {userInput.trim() && (
                         <button
-                          onClick={() => setShowHint(true)}
-                          className="flex-1 py-3 rounded-2xl font-bold text-sm border border-border text-text-muted hover:bg-surface-hover transition-all flex items-center justify-center gap-2"
+                          onClick={handleCheck}
+                          className="py-3.5 px-5 rounded-2xl font-bold text-sm bg-green-500/15 text-green-500 hover:bg-green-500/25 border border-green-500/30 transition-all flex items-center justify-center gap-2"
                         >
-                          <HelpCircle size={16} /> Show Hint
+                          <Check size={16} /> Conferir
                         </button>
                       )}
                       <button
                         onClick={handleIDontKnow}
-                        className="flex-1 py-3 rounded-2xl font-bold text-sm bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 border border-yellow-500/20 transition-all flex items-center justify-center gap-2"
+                        className="py-3.5 px-4 rounded-2xl font-bold text-sm bg-surface hover:bg-surface-hover border border-border text-text-muted transition-all flex items-center justify-center gap-2"
                       >
-                        <X size={16} /> I don't know
-                      </button>
-                      <button
-                        onClick={handleCheck}
-                        disabled={!userInput.trim()}
-                        className="flex-1 py-3 rounded-2xl font-bold text-sm bg-primary text-white hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 shadow-glow"
-                      >
-                        <Check size={16} /> Check
+                        <HelpCircle size={16} /> Pular
                       </button>
                     </div>
                   </>
                 ) : (
                   /* Revealed state */
-                  <div className="space-y-4">
-                    {/* Correct answer */}
-                    <div className="rounded-2xl bg-bg border border-border p-4 space-y-2">
-                      <div className="text-xs text-text-muted font-bold uppercase tracking-wider">Correct Answer</div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xl font-bold text-text">{currentCard.front}</span>
+                  <div className="space-y-5">
+                    {/* Correct answer box */}
+                    <div className="rounded-2xl bg-primary/10 border border-primary/25 p-5 space-y-3">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <span className="text-[0.68rem] text-primary font-black uppercase tracking-wider block">Resposta em Inglês</span>
+                          <span className="text-2xl md:text-3xl font-extrabold text-text mt-1 block">{currentCard.front}</span>
+                        </div>
                         <button
                           onClick={(e) => handlePlayAudio(currentCard.front, e)}
-                          className="p-2 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-all"
+                          className="p-3.5 rounded-2xl bg-primary text-white hover:scale-105 active:scale-95 transition-all shadow-glow flex items-center gap-2 text-sm font-bold shrink-0"
+                          title="Ouvir pronúncia"
                         >
-                          <Volume2 size={16} />
+                          <Volume2 size={18} /> Ouvir
                         </button>
                       </div>
-                      {cardStatus === 'wrong' && userInput && (
-                        <div className="text-xs text-red-400 mt-1">Your answer: "{userInput}"</div>
-                      )}
+
                       {currentCard.explanation && (
-                        <p className="text-xs text-text-subtle leading-relaxed border-t border-border pt-2 mt-2">
-                          {currentCard.explanation}
-                        </p>
+                        <div className="text-xs md:text-sm text-text-subtle pt-3 border-t border-primary/15 leading-relaxed">
+                          <span className="font-semibold text-text">Exemplo/Contexto: </span>{currentCard.explanation}
+                        </div>
+                      )}
+
+                      {cardStatus === 'wrong' && userInput && (
+                        <div className="text-xs text-red-400 pt-1">Sua resposta digitada: &quot;{userInput}&quot;</div>
                       )}
                     </div>
 
-                    <button
-                      onClick={handleNext}
-                      className="w-full py-4 rounded-2xl font-bold text-base bg-primary text-white hover:bg-primary/90 transition-all shadow-glow flex items-center justify-center gap-2"
-                    >
-                      {currentIndex === cards.length - 1 ? 'Finish Session' : 'Next Card'}
-                      <ArrowRight size={18} />
-                    </button>
+                    {/* Self grading when answer was just revealed */}
+                    {cardStatus === null ? (
+                      <div className="space-y-2.5">
+                        <p className="text-xs font-bold text-text-muted uppercase text-center tracking-wider">Como foi o seu desempenho?</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            onClick={() => handleSelfGrade('wrong')}
+                            className="py-3.5 rounded-2xl font-bold text-sm bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30 transition-all flex items-center justify-center gap-2"
+                          >
+                            <X size={16} /> Preciso revisar
+                          </button>
+                          <button
+                            onClick={() => handleSelfGrade('correct')}
+                            className="py-3.5 rounded-2xl font-bold text-sm bg-green-500/15 text-green-400 hover:bg-green-500/25 border border-green-500/30 transition-all flex items-center justify-center gap-2"
+                          >
+                            <Check size={16} /> Acertei!
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-center gap-2 py-1.5 text-xs font-bold">
+                          {cardStatus === 'correct' ? (
+                            <span className="text-green-400 flex items-center gap-1.5"><Check size={16} /> Registrado como acertado!</span>
+                          ) : cardStatus === 'wrong' ? (
+                            <span className="text-red-400 flex items-center gap-1.5"><X size={16} /> Marcado para revisão</span>
+                          ) : (
+                            <span className="text-yellow-400 flex items-center gap-1.5"><HelpCircle size={16} /> Pulado</span>
+                          )}
+                        </div>
+                        <button
+                          onClick={handleNext}
+                          className="w-full py-4 rounded-2xl font-bold text-base bg-primary text-white hover:bg-primary/90 transition-all shadow-glow flex items-center justify-center gap-2"
+                        >
+                          {currentIndex === cards.length - 1 ? 'Finalizar Sessão' : 'Próximo Flashcard'}
+                          <ArrowRight size={18} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

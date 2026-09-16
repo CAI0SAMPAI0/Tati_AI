@@ -434,8 +434,6 @@ export default function ChatClientPage() {
             <ChatInput
               onSend={handleSend}
               onSendAudio={handleSendAudio}
-              onSendFile={handleSendFile}
-              onSendFiles={handleSendFiles}
               disabled={false}
               isStreaming={isStreaming}
             />

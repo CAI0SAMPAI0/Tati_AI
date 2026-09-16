@@ -212,9 +212,9 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.activities.tasks.sync_hub_materials_task",
         "schedule": 1800.0,
     },
-    "daily-streak-reminders-17h": {
+    "daily-streak-reminders-18h": {
         "task": "apps.notifications.tasks.send_daily_streak_reminders_task",
-        "schedule": crontab(hour=17, minute=0),  # 17:00 Horário de Brasília
+        "schedule": crontab(hour=18, minute=0),  # 18:00 Horário de Brasília
     },
     "weekly-progress-reports-sunday-19h": {
         "task": "apps.notifications.tasks.send_weekly_progress_reports_task",

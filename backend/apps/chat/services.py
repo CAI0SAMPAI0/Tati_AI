@@ -171,7 +171,7 @@ def call_meta_llama(
     return None
 
 
-def get_tati_system_prompt(user: User, difficulty: str = None, memory_summary: str = "", accent: str = None) -> str:
+def get_tati_system_prompt(user: User, difficulty: str = None, memory_summary: str = "", accent: str = None, origin: str = "chat") -> str:
     """
     Prompt Humanizado Anti-IA da Teacher Tatiana Duarte (Teacher Tati).
     Proíbe respostas robóticas, proíbe emojis (nem no texto nem no áudio),
@@ -184,25 +184,32 @@ def get_tati_system_prompt(user: User, difficulty: str = None, memory_summary: s
     if accent:
         norm = accent.upper().replace("_", "-")
         if "GB" in norm or "UK" in norm or "BRITISH" in norm:
-            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu Inglês Britânico (UK). Use vocabulário e grafia britânica natural quando aplicável (ex: flat, holiday, colour, favour, brilliant)."
+            accent_instruction = "\n   O aluno escolheu Inglês Britânico (UK). Use vocabulário e grafia britânica natural quando aplicável (ex: flat, holiday, colour, favour, brilliant)."
         elif "AU" in norm or "AUSTRALIAN" in norm:
-            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu Inglês Australiano (AU). Traga a energia e o calor do inglês da Austrália com naturalidade."
+            accent_instruction = "\n   O aluno escolheu Inglês Australiano (AU). Traga a energia e o calor do inglês da Austrália com naturalidade."
         elif "CA" in norm or "CANADIAN" in norm:
-            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu Inglês Canadense (CA)."
+            accent_instruction = "\n   O aluno escolheu Inglês Canadense (CA)."
         elif "IE" in norm or "IRISH" in norm:
-            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu Inglês Irlandês (IE)."
+            accent_instruction = "\n   O aluno escolheu Inglês Irlandês (IE)."
         elif "IN" in norm or "INDIAN" in norm:
-            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu Inglês Indiano (IN)."
+            accent_instruction = "\n   O aluno escolheu Inglês Indiano (IN)."
         elif "ZA" in norm or "SOUTH" in norm:
-            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu Inglês Sul-Africano (ZA)."
+            accent_instruction = "\n   O aluno escolheu Inglês Sul-Africano (ZA)."
         elif "NZ" in norm or "ZEALAND" in norm:
-            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu Inglês Neozelandês (NZ)."
+            accent_instruction = "\n   O aluno escolheu Inglês Neozelandês (NZ)."
         elif "CN" in norm or "CHINESE" in norm:
-            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu prática de Inglês Internacional com sotaque Chinês (Asian International Business English). Foque em clareza, ritmo cadenciado e expressões comuns na comunicação global com a Ásia."
+            accent_instruction = "\n   O aluno escolheu prática de Inglês Internacional com sotaque Chinês (Asian International Business English). Foque em clareza, ritmo cadenciado e expressões comuns na comunicação global com a Ásia."
         elif "JP" in norm or "JAPANESE" in norm:
-            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu prática de Inglês com sotaque Japonês (Japanese English Context). Mantenha tom polido e cortês, dicção nítida e vocabulário claro para comunicação internacional com parceiros do Japão."
+            accent_instruction = "\n   O aluno escolheu prática de Inglês com sotaque Japonês (Japanese English Context). Mantenha tom polido e cortês, dicção nítida e vocabulário claro para comunicação internacional com parceiros do Japão."
         elif "US" in norm or "AMERICAN" in norm:
-            accent_instruction = "\n6. SOTAQUE E VARIANTE DE INGLÊS:\n   O aluno escolheu Inglês Americano (US). Use expressões cotidianas e naturais dos EUA."
+            accent_instruction = "\n   O aluno escolheu Inglês Americano (US). Use expressões cotidianas e naturais dos EUA."
+
+    is_voice = str(origin).lower() == "voice"
+    voice_clause = ""
+    if is_voice:
+        voice_clause = (
+            "\n     c) MODO DE VOZ (VOICE MODE) ATIVO: O aluno está falando por áudio. É FUNDAMENTAL que você diga a correção logo na primeira frase falada, para que ele escute a pronúncia e a estrutura correta antes de você dar sequência ao diálogo!"
+        )
 
     level_guidelines = {
         "A1": (
@@ -244,10 +251,19 @@ You are talking 1-on-1 with your student, {name}, who is at CEFR Level: {level}.
    - Responda como uma pessoa de verdade conversando no WhatsApp ou no café: direta, acolhedora e concisa (máximo de 1 a 2 parágrafos curtos, 3 a 5 frases no total).
    - ESPELHAMENTO: se o aluno responder curto ou informal, responda na mesma energia; se ele for expressivo, acompanhe o ritmo.
    - FAÇA APENAS UMA PERGUNTA no final da sua fala para manter a conversa fluindo com naturalidade. Nunca faça várias perguntas na mesma resposta.
-4. CORREÇÃO PEDAGÓGICA SUTIL:
-   - Se o aluno cometer um erro de inglês, não dê uma palestra gramatical. Demonstre carinhosamente a forma natural em apenas 1 frase rápida e continue a conversa normalmente.
+4. CORREÇÃO PEDAGÓGICA ATIVA, GENTIL E OBRIGATÓRIA (PRIORIDADE MÁXIMA):
+   - Como Teacher Tati, sua missão indispensável é ensinar o aluno e ajudá-lo a aprender com os erros. NUNCA deixe passar batido um erro de gramática, vocabulário, tempo verbal, preposição, conjugação ou estrutura!
+   - SEMPRE que o aluno errar ou falar de forma inadequada:
+     a) Aponte o erro com gentileza e carinho logo na primeira frase (ex: "Quick tip: instead of 'I have 25 years', remember we say 'I am 25 years old'!" ou "Just a quick correction: we say 'on Monday', not 'in Monday'!").
+     b) Em seguida, responda naturalmente ao assunto que ele falou e termine com a sua pergunta única para manter a conversa fluindo.{voice_clause}
 5. ADAPTAÇÃO AO NÍVEL ({level}):
    {level_guidelines}{accent_instruction}
+6. PAPEL DE CONVERSAÇÃO E NÃO GERAÇÃO DE ARQUIVOS (PDF/DOCS):
+   - Você é uma professora de conversação e ensino de inglês. Seu propósito é o diálogo com os alunos e a prática do idioma.
+   - Você NÃO pode criar nem gerar arquivos (PDFs, DOCs, apresentações, apostilas, downloads, etc.).
+   - Se o aluno pedir para gerar, criar ou baixar um PDF, arquivo ou documento em qualquer formato (ex: 'generate a pdf', 'crie um pdf', 'make a document', 'download doc'):
+     Avise de forma calorosa, breve e amigável que você está aqui para conversar com ele e ajudá-lo a praticar o inglês, e que não pode gerar arquivos no momento. Convide-o em seguida a praticar o tópico na própria conversa com você (ex: "I'm here to chat with you and help you practice your English, but I cannot create or download files at the moment. Let's practice [topic] right here in our conversation! What would you like to explore about it?").
+   - NUNCA escreva textos quilométricos simulando uma apostila ou documento. Responda em parágrafos de conversa reais (1 a 2 parágrafos curtos).
 """
     if memory_summary:
         prompt += f"""
@@ -457,34 +473,9 @@ class AIService:
 
         clean_user_text = strip_emojis(user_text.strip())
 
-        # Processamento e leitura integral de arquivos enviados (máximo 3)
+        # Processamento de arquivos (desativado conforme diretriz pedagógica de foco em conversação)
         files_extracted_text = ""
         generated_doc = None
-        if files:
-            files_extracted_text = DocumentService.read_uploaded_files(files)
-
-        # Determina se deve gerar um documento formatado (PDF, DOCX, PPTX)
-        should_gen, target_format = DocumentService.should_generate_document(
-            user_text=user_text,
-            num_files=len(files or []),
-        )
-
-        if should_gen:
-            try:
-                student_name = getattr(user, "name", None) or getattr(user, "username", "there")
-                generated_doc = DocumentService.generate_document_from_instruction(
-                    user_text=user_text,
-                    files_extracted_text=files_extracted_text,
-                    student_name=student_name,
-                    target_format=target_format,
-                )
-                if generated_doc and on_doc:
-                    try:
-                        on_doc(generated_doc)
-                    except Exception as doc_cb_err:
-                        logger.warning(f"[AIService] Erro no callback on_doc: {doc_cb_err}")
-            except Exception as doc_err:
-                logger.error(f"[AIService] Erro ao gerar documento formatado: {doc_err}")
 
         # 1. Salva mensagem do usuário
         Message.objects.create(
@@ -509,14 +500,13 @@ class AIService:
             user_accent = user_pref or "en-US"
         user_accent = user_accent or "en-US"
 
-        sys_prompt = get_tati_system_prompt(user, difficulty, memory_summary=memory_summary, accent=user_accent)
-        
-        if generated_doc:
-            sys_prompt += (
-                f"\n\n=== NOTIFICAÇÃO DE DOCUMENTO GERADO ===\n"
-                f"Você acabou de gerar e formatar com sucesso o arquivo '{generated_doc['filename']}' no formato {generated_doc['format'].upper()}.\n"
-                f"Avise o aluno de forma calorosa e natural que o documento está pronto para abrir no navegador ou baixar logo abaixo."
-            )
+        sys_prompt = get_tati_system_prompt(
+            user,
+            difficulty,
+            memory_summary=memory_summary,
+            accent=user_accent,
+            origin=origin or "chat",
+        )
 
         messages_payload = [{"role": "system", "content": sys_prompt}]
 

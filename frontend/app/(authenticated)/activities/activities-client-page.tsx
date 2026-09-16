@@ -119,12 +119,30 @@ export default function ActivitiesClientPage() {
   const [filterLevel, setFilterLevel] = useState<string>('All');
   const [visibleCount, setVisibleCount] = useState(10);
 
+  const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
   const isStaff = user?.role && ['professor', 'professora', 'programador', 'Tatiana', 'Tati', 'Professora', 'Programador', 'admin', 'Admin'].includes(user.role);
   const userLevelNormalized = (user?.level || '').toUpperCase().trim();
-  const isB1OrAbove = ['B1', 'B2', 'C1', 'C2'].includes(userLevelNormalized);
-  const canFilterLevels = Boolean(isStaff || isB1OrAbove);
+  const userLevelIdx = CEFR_LEVELS.indexOf(userLevelNormalized);
 
-  const effectiveLevel = canFilterLevels ? filterLevel : (['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].includes(userLevelNormalized) ? userLevelNormalized : 'A1');
+  // Alunos podem acessar seu nível e todos os níveis anteriores (A2 acessa A1 e A2, etc.)
+  const allowedLevels = useMemo(() => {
+    if (isStaff) return CEFR_LEVELS;
+    if (userLevelIdx !== -1) {
+      return CEFR_LEVELS.slice(0, userLevelIdx + 1);
+    }
+    return ['A1'];
+  }, [isStaff, userLevelIdx]);
+
+  const canFilterLevels = Boolean(isStaff || allowedLevels.length > 1);
+
+  const effectiveLevel = useMemo(() => {
+    if (!canFilterLevels) {
+      return userLevelNormalized && CEFR_LEVELS.includes(userLevelNormalized) ? userLevelNormalized : 'A1';
+    }
+    if (filterLevel === 'All') return 'All';
+    if (allowedLevels.includes(filterLevel)) return filterLevel;
+    return userLevelNormalized && allowedLevels.includes(userLevelNormalized) ? userLevelNormalized : allowedLevels[allowedLevels.length - 1] || 'A1';
+  }, [canFilterLevels, filterLevel, allowedLevels, userLevelNormalized]);
 
   useEffect(() => {
     setVisibleCount(10);
@@ -363,6 +381,52 @@ export default function ActivitiesClientPage() {
     return filtered.filter((p) => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [podcastsRaw, searchQuery]);
 
+  // Helper to extract clean levels excluding 'all'
+  const getCleanLevels = (levels?: string[]): string[] => {
+    if (!Array.isArray(levels)) return [];
+    return levels
+      .map((l) => (l || '').trim().toUpperCase())
+      .filter((l) => l && l !== 'ALL');
+  };
+
+  const games = useMemo(() => {
+    if (!gamesRaw) return [];
+    let filtered = gamesRaw;
+    if (effectiveLevel !== 'All') {
+      const target = effectiveLevel.toUpperCase().trim();
+      filtered = filtered.filter((g) => {
+        const clean = getCleanLevels(g.levels);
+        if (clean.length > 0) {
+          return clean.includes(target);
+        }
+        return Array.isArray(g.levels) && g.levels.map((l) => (l || '').toLowerCase()).includes('all');
+      });
+    }
+    if (searchQuery) {
+      filtered = filtered.filter((g) => g.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+    return filtered;
+  }, [gamesRaw, searchQuery, effectiveLevel]);
+
+  const news = useMemo(() => {
+    if (!newsRaw) return [];
+    let filtered = newsRaw;
+    if (effectiveLevel !== 'All') {
+      const target = effectiveLevel.toUpperCase().trim();
+      filtered = filtered.filter((n) => {
+        const clean = getCleanLevels(n.levels);
+        if (clean.length > 0) {
+          return clean.includes(target);
+        }
+        return Array.isArray(n.levels) && n.levels.map((l) => (l || '').toLowerCase()).includes('all');
+      });
+    }
+    if (searchQuery) {
+      filtered = filtered.filter((n) => (n.title || '').toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+    return filtered;
+  }, [newsRaw, searchQuery, effectiveLevel]);
+
   // Mark completion handlers
   const handleMarkDone = async (item: any) => {
     const actId = item.url || item.slug || item.id;
@@ -416,8 +480,8 @@ export default function ActivitiesClientPage() {
     { id: 'reading', icon: <FileText size={18} />, label: 'Reading', count: readingItems.length },
     { id: 'flashcards', icon: <Layers size={18} />, label: 'Flashcards', count: flashcards.length },
     { id: 'simulations', icon: <Drama size={18} />, label: 'Simulations', count: simulations.length },
-    { id: 'games', icon: <Gamepad2 size={18} />, label: 'Games', count: gamesRaw.length },
-    { id: 'news', icon: <Newspaper size={18} />, label: 'News', count: newsRaw.length },
+    { id: 'games', icon: <Gamepad2 size={18} />, label: 'Games', count: games.length },
+    { id: 'news', icon: <Newspaper size={18} />, label: 'News', count: news.length },
   ];
 
   const handleLoadMore = () => {
@@ -577,12 +641,9 @@ export default function ActivitiesClientPage() {
                     className="px-3 py-2 bg-surface border border-border rounded-2xl text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all cursor-pointer text-text"
                   >
                     <option value="All">All Levels</option>
-                    <option value="A1">A1</option>
-                    <option value="A2">A2</option>
-                    <option value="B1">B1</option>
-                    <option value="B2">B2</option>
-                    <option value="C1">C1</option>
-                    <option value="C2">C2</option>
+                    {allowedLevels.map((lvl) => (
+                      <option key={lvl} value={lvl}>{lvl}</option>
+                    ))}
                   </select>
                 </div>
               )}
@@ -739,14 +800,20 @@ export default function ActivitiesClientPage() {
 
             {activeTab === 'games' && (
               <div className="space-y-8">
-                {gamesRaw.length > 0 ? (
+                {games.length > 0 ? (
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {gamesRaw
-                        .filter((g) => !searchQuery || g.title.toLowerCase().includes(searchQuery.toLowerCase()))
+                      {games
                         .slice(0, visibleCount)
                         .map((g) => {
                           const isDone = completedActivityIds.has(g.id) || completedActivityIds.has(g.wordwall_url);
+                          const cleanLvls = getCleanLevels(g.levels);
+                          const displayLevel = cleanLvls.length > 0
+                            ? (effectiveLevel !== 'All' && cleanLvls.includes(effectiveLevel.toUpperCase())
+                                ? effectiveLevel.toUpperCase()
+                                : cleanLvls.join(', '))
+                            : 'ALL';
+
                           return (
                             <div
                               key={g.id}
@@ -757,7 +824,7 @@ export default function ActivitiesClientPage() {
                                   url: g.wordwall_url,
                                   source: 'WordWall',
                                   category: 'games',
-                                  level: g.levels?.[0] || 'all',
+                                  level: displayLevel,
                                 })
                               }
                               className="text-left bg-surface border border-border rounded-2xl overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 transition-all group cursor-pointer"
@@ -768,6 +835,9 @@ export default function ActivitiesClientPage() {
                                     <Gamepad2 size={20} />
                                   </div>
                                   <div className="flex items-center gap-1.5">
+                                    <span className="text-[0.65rem] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase">
+                                      {displayLevel}
+                                    </span>
                                     {isDone ? (
                                       <span className="flex items-center gap-1 bg-success text-white text-[0.65rem] font-bold px-2 py-0.5 rounded-full">
                                         <CheckCircle2 size={12} /> Completed
@@ -798,7 +868,7 @@ export default function ActivitiesClientPage() {
                           );
                         })}
                     </div>
-                    {gamesRaw.filter((g) => !searchQuery || g.title.toLowerCase().includes(searchQuery.toLowerCase())).length > visibleCount && (
+                    {games.length > visibleCount && (
                       <div className="flex justify-center pt-4">
                         <button
                           onClick={handleLoadMore}
@@ -821,14 +891,20 @@ export default function ActivitiesClientPage() {
 
             {activeTab === 'news' && (
               <div className="space-y-8">
-                {newsRaw.length > 0 ? (
+                {news.length > 0 ? (
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {newsRaw
-                        .filter((n) => !searchQuery || (n.title || '').toLowerCase().includes(searchQuery.toLowerCase()))
+                      {news
                         .slice(0, visibleCount)
                         .map((n) => {
                           const isDone = completedActivityIds.has(n.id) || completedActivityIds.has(n.url);
+                          const cleanLvls = getCleanLevels(n.levels);
+                          const displayLevel = cleanLvls.length > 0
+                            ? (effectiveLevel !== 'All' && cleanLvls.includes(effectiveLevel.toUpperCase())
+                                ? effectiveLevel.toUpperCase()
+                                : cleanLvls.join(', '))
+                            : 'ALL';
+
                           return (
                             <div
                               key={n.id}
@@ -840,7 +916,7 @@ export default function ActivitiesClientPage() {
                                   image: n.thumbnail_url || undefined,
                                   source: 'News',
                                   category: 'news',
-                                  level: n.levels?.[0] || 'all',
+                                  level: displayLevel,
                                 })
                               }
                               className="text-left bg-surface border border-border rounded-2xl overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 transition-all group cursor-pointer flex flex-col"
@@ -855,7 +931,10 @@ export default function ActivitiesClientPage() {
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                                   />
-                                  <div className="absolute top-2 right-2">
+                                  <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                                    <span className="text-[0.65rem] font-black bg-black/60 text-white px-2 py-0.5 rounded-full uppercase shadow backdrop-blur-sm">
+                                      {displayLevel}
+                                    </span>
                                     {isDone ? (
                                       <span className="flex items-center gap-1 bg-success text-white text-[0.65rem] font-bold px-2 py-0.5 rounded-full shadow">
                                         <CheckCircle2 size={12} /> Completed
@@ -872,7 +951,10 @@ export default function ActivitiesClientPage() {
                                   <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
                                     <Newspaper size={20} />
                                   </div>
-                                  <div className="flex gap-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[0.65rem] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase">
+                                      {displayLevel}
+                                    </span>
                                     {isDone ? (
                                       <span className="flex items-center gap-1 bg-success text-white text-[0.65rem] font-bold px-2 py-0.5 rounded-full shadow">
                                         <CheckCircle2 size={12} /> Completed
@@ -905,7 +987,7 @@ export default function ActivitiesClientPage() {
                           );
                         })}
                     </div>
-                    {newsRaw.filter((n) => !searchQuery || (n.title || '').toLowerCase().includes(searchQuery.toLowerCase())).length > visibleCount && (
+                    {news.length > visibleCount && (
                       <div className="flex justify-center pt-4">
                         <button
                           onClick={handleLoadMore}

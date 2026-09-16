@@ -56,7 +56,7 @@ class BackgroundNotificationRunner:
     Executa um daemon leve em segundo plano no processo do Django para:
     1. Manter o WAHA (Render) acordado com ping periódico (evita suspensão no Render).
     2. Disparar notificações agendadas pontualmente no Horário de Brasília (BRT):
-       - 17:00 BRT: Lembrete diário de ofensiva (Streak) via Email, Push e WhatsApp.
+       - 18:00 BRT: Lembrete diário de ofensiva (Streak) via Email, Push e WhatsApp.
        - 14:00 BRT: Lembrete de inatividade para alunos ausentes.
        - Domingos 19:00 BRT: Relatório semanal de evolução.
        - Dia 1 de cada mês 09:00 BRT: Fechamento da competição mensal e premiação.
@@ -90,8 +90,8 @@ class BackgroundNotificationRunner:
                 if tick % 20 == 1:
                     cls._ping_waha()
 
-                # 2. Lembrete diário de ofensiva (Janela das 17h BR)
-                if now_brt.hour == 17:
+                # 2. Lembrete diário de ofensiva (Janela das 18h BR)
+                if now_brt.hour == 18:
                     cls._run_daily_streak(now_brt)
 
                 # 3. Incentivo de inatividade (Janela das 14h BR)
