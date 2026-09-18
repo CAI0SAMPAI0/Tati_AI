@@ -54,7 +54,7 @@ CATALOG: List[GrammarEntry] = [
         key_structure="I am / He-she-it is / You-we-they are",
         tip_teacher_tati="'I'm' = short form. 'I am' = full form. Both are correct!",
         source_name="test-english.com",
-        source_url="https://test-english.com/grammar-points/a1/verb-to-be/",
+        source_url="https://test-english.com/grammar-points/a1/present-simple-forms-of-to-be/",
     ),
     GrammarEntry(
         topic="possessive_adjectives",
