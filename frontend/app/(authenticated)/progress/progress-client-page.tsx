@@ -75,7 +75,7 @@ const TIPS = [
   'Practice at least 30 minutes a day for faster results.',
   'Maintain your daily streak to unlock special trophies.',
   'Use new words to expand your vocabulary.',
-  'Complete quizzes to earn extra XP.',
+  'Complete quizzes to earn extra points.',
   'Join the weekly leaderboard to stay motivated.',
 ];
 
@@ -153,13 +153,13 @@ export default function ProgressClientPage() {
 
   const chartData = useMemo(() => {
     if (period === 'weekly' && weeklyReport) {
-      return weeklyReport.messages_by_day.map((val, i) => ({
-        name: weeklyReport.days_of_week[i] ?? `D${i + 1}`,
+      return (weeklyReport.messages_by_day || []).map((val, i) => ({
+        name: weeklyReport.days_of_week?.[i] ?? `D${i + 1}`,
         messages: val,
       }));
     }
     if (period === 'monthly' && monthlyReport) {
-      return monthlyReport.messages_by_week.map((val, i) => ({
+      return (monthlyReport.messages_by_week || []).map((val, i) => ({
         name: `Wk ${i + 1}`,
         messages: val,
       }));
@@ -430,7 +430,7 @@ export default function ProgressClientPage() {
             <div className="bg-surface border border-border rounded-3xl p-6 flex flex-col justify-between gap-4 group hover:border-primary/30 transition-all">
               <div className="flex items-center gap-3">
                 <div className="w-1.5 h-6 bg-yellow-500 rounded-full" />
-                <h3 className="text-sm font-bold text-text">Study Club (XP League)</h3>
+                <h3 className="text-sm font-bold text-text">Study Club (Competition League)</h3>
               </div>
 
               {rankingLoading ? (
@@ -466,7 +466,7 @@ export default function ProgressClientPage() {
                                 {r.name || r.username} {isMe && "(You)"}
                               </span>
                             </div>
-                            <span className="font-black text-text-muted shrink-0 tabular-nums">{r.score} XP</span>
+                            <span className="font-black text-text-muted shrink-0 tabular-nums">{r.score} pts</span>
                           </div>
                         );
                       })}
@@ -498,103 +498,7 @@ export default function ProgressClientPage() {
                 </div>
               )}
             </div>
-
           </div>
-          {/* ── Fluency & CEFR Evolution ── */}
-          <div className="bg-surface border border-border rounded-3xl p-6 space-y-6 group hover:border-primary/30 transition-all">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-1.5 h-6 bg-emerald-500 rounded-full" />
-                <h3 className="text-sm font-bold text-text">Fluency & CEFR Level Evolution</h3>
-              </div>
-              <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                Level: {fluencyData?.current_level || 'A1'}
-              </span>
-            </div>
-
-            {fluencyLoading ? (
-              <div className="h-[240px] flex items-center justify-center">
-                <div className="w-full h-full bg-bg-secondary rounded-2xl animate-pulse" />
-              </div>
-            ) : fluencyData ? (
-              <FluencyEvolutionChart
-                pronunciation={fluencyData.pronunciation || []}
-                cefr={fluencyData.cefr || []}
-              />
-            ) : (
-              <div className="h-[240px] flex items-center justify-center text-text-muted text-sm">
-                No fluency evolution data available.
-              </div>
-            )}
-          </div>
-
-          {/* ── Tips & Points system ── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* ── Tips ── */}
-            <div className="bg-surface border border-border rounded-3xl p-6 space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-yellow-500/10 flex items-center justify-center shrink-0">
-                  <Lightbulb size={18} className="text-yellow-500" />
-                </div>
-                <h3 className="text-sm font-bold text-text">Tips for Faster Growth</h3>
-              </div>
-
-              <ul className="space-y-3">
-                {TIPS.map((tip, i) => (
-                  <li key={i} className="flex items-start gap-3">
-                    <span className="mt-0.5 w-5 h-5 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-[0.6rem] font-black text-primary shrink-0">
-                      {i + 1}
-                    </span>
-                    <p className="text-sm text-text-muted leading-relaxed">{tip}</p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* ── How Points Work ── */}
-            <div className="bg-surface border border-border rounded-3xl p-6 space-y-4 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    <Flame size={18} className="text-primary" />
-                  </div>
-                  <h3 className="text-sm font-bold text-text">How Points (XP) & Streaks Work</h3>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
-                    <span className="text-sm font-black text-blue-500 leading-none">+15 XP</span>
-                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Chat with Taty's Hub</span>
-                  </div>
-                  <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
-                    <span className="text-sm font-black text-purple-500 leading-none">+30 XP</span>
-                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Voice mode conversation</span>
-                  </div>
-                  <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
-                    <span className="text-sm font-black text-emerald-500 leading-none">+25 XP</span>
-                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">CEFR Leveling (daily)</span>
-                  </div>
-                  <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
-                    <span className="text-sm font-black text-primary leading-none">+25 XP</span>
-                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Each completed activity</span>
-                  </div>
-                  <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
-                    <span className="text-sm font-black text-amber-500 leading-none">+20 XP</span>
-                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Daily study streak</span>
-                  </div>
-                  <div className="p-2.5 bg-bg-secondary/40 border border-border/50 rounded-xl flex flex-col justify-center">
-                    <span className="text-sm font-black text-pink-500 leading-none">+25 XP</span>
-                    <span className="text-[0.65rem] text-text-muted mt-1 leading-tight">Simulations & Flashcards</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-[0.65rem] text-text-muted italic text-center border-t border-border/60 pt-3 mt-3">
-                🔥 <strong>Daily Study Streak:</strong> Doing <strong>any</strong> of the activities above once a day immediately maintains your streak. There is no minimum requirement!
-              </div>
-            </div>
-          </div>
-
         </main>
       </div>
     </div>

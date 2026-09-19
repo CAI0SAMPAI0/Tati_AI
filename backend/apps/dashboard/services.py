@@ -1,5 +1,6 @@
 import logging
 from datetime import date, datetime, timedelta, timezone
+from typing import Optional, Any, Dict, List
 from zoneinfo import ZoneInfo
 
 from django.db.models import Count, Max, Q
@@ -1462,7 +1463,7 @@ class DashboardService:
             .exclude(role="buyer")
             .order_by("name", "username")
         )
-        if search:
+        if search and isinstance(search, str):
             s_clean = search.strip()
             users = users.filter(
                 Q(name__icontains=s_clean)

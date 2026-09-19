@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Menu, FileText, Mic, BookOpen, Check } from 'lucide-react';
-import Link from 'next/link';
+import { Menu, FileText, Mic, BookMarked, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { NotificationsDropdown } from '@/components/layout/notifications-dropdown';
 import { ACCENTS, getStoredAccent, saveStoredAccent } from '@/lib/constants/accents';
@@ -175,7 +174,7 @@ export function ChatTopbar({
             }}
             className="flex gap-1.5 px-3 py-1.5 h-auto text-xs font-bold"
           >
-            <BookOpen size={14} className="text-primary" />
+            <BookMarked size={14} className="text-primary" />
             <span className="hidden sm:inline">My Activities</span>
           </Button>
         )}

@@ -409,7 +409,7 @@ export default function HistoryClientPage() {
               <p className="text-[0.7rem] text-text-muted mt-3">Average accuracy score</p>
             </div>
 
-            {/* Total XP Earned */}
+            {/* Total Score Earned */}
             <div className="bg-surface border border-border rounded-3xl p-5 shadow-sm relative overflow-hidden group hover:border-amber-500/40 transition-all">
               <div className="flex items-center gap-3.5">
                 <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
@@ -417,14 +417,14 @@ export default function HistoryClientPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-text-muted uppercase tracking-wider">
-                    Total XP
+                    Score
                   </p>
                   <p className="text-2xl font-black text-text mt-0.5">
                     +{stats.totalXp}
                   </p>
                 </div>
               </div>
-              <p className="text-[0.7rem] text-text-muted mt-3">Estimated XP gained</p>
+              <p className="text-[0.7rem] text-text-muted mt-3">Estimated points gained</p>
             </div>
 
             {/* Top Category */}

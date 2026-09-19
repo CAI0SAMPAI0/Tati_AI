@@ -79,7 +79,7 @@ export default function ShopClientPage() {
             <div>
               <h2 className="text-3xl font-black text-text tracking-tight">Rewards Shop</h2>
               <p className="text-sm text-text-muted">
-                Spend your accumulated XP to buy items that help you learn and keep your streaks.
+                Spend your accumulated points to buy items that help you learn and keep your streaks.
               </p>
             </div>
 
@@ -96,7 +96,7 @@ export default function ShopClientPage() {
                   <div className="h-5 w-16 bg-bg-secondary rounded animate-pulse mt-1" />
                 ) : (
                   <p className="text-lg font-black text-text tabular-nums">
-                    {userXp.toLocaleString()} <span className="text-text-muted text-xs font-bold">XP</span>
+                    {userXp.toLocaleString()} <span className="text-text-muted text-xs font-bold">pts</span>
                   </p>
                 )}
               </div>
@@ -134,7 +134,7 @@ export default function ShopClientPage() {
               <div className="flex items-center justify-between border-t border-border pt-4 mt-2">
                 <div className="flex items-center gap-1.5 font-bold text-text-subtle">
                   <Coins size={16} className="text-amber-500" />
-                  <span className="text-sm">150 XP</span>
+                  <span className="text-sm">150 pts</span>
                 </div>
 
                 <Button
@@ -169,10 +169,10 @@ export default function ShopClientPage() {
 
                 <div className="space-y-2">
                   <h3 className="text-lg font-bold text-text-subtle flex items-center gap-2">
-                    XP Booster <span className="text-xs font-normal text-text-muted">(Coming Soon)</span>
+                    Score Booster <span className="text-xs font-normal text-text-muted">(Coming Soon)</span>
                   </h3>
                   <p className="text-sm text-text-muted leading-relaxed">
-                    Double all XP earned from chats, tasks, and exercises for 24 hours. Climb the leaderboard and earn premium badges!
+                    Double all points earned from chats, tasks, and exercises for 24 hours. Climb the leaderboard and earn premium badges!
                   </p>
                 </div>
               </div>
@@ -180,7 +180,7 @@ export default function ShopClientPage() {
               <div className="flex items-center justify-between border-t border-border pt-4 mt-2">
                 <div className="flex items-center gap-1.5 font-bold text-text-muted">
                   <Coins size={16} className="text-text-muted" />
-                  <span className="text-sm">300 XP</span>
+                  <span className="text-sm">300 pts</span>
                 </div>
 
                 <Button

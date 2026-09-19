@@ -38,14 +38,18 @@ export default function CompetitionsClientPage() {
   const { data: globalRanking = [], isLoading: globalLoading } = useQuery<RankingEntry[]>({
     queryKey: ['competitions-global-ranking'],
     queryFn: () => apiGet<RankingEntry[]>('/users/progress/ranking/top15'),
+    refetchInterval: 5000,
+    placeholderData: (previousData) => previousData,
   });
   const { data: levelRankings, isLoading: levelLoading } = useQuery<Record<string, RankingEntry[]>>({
     queryKey: ['competitions-level-rankings'],
     queryFn: () => apiGet<Record<string, RankingEntry[]>>('/users/progress/ranking/by-level'),
+    refetchInterval: 5000,
+    placeholderData: (previousData) => previousData,
   });
 
   const currentRanking = rankingMode === 'global' ? globalRanking : (levelRankings?.[selectedLevelCat] || []);
-  const isLoading = globalLoading || levelLoading;
+  const isInitialLoading = (globalLoading && globalRanking.length === 0) || (levelLoading && !levelRankings);
 
   return (
     <div className="min-h-screen bg-bg flex flex-col md:flex-row overflow-x-hidden">
@@ -173,7 +177,7 @@ export default function CompetitionsClientPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {isLoading ? Array(5).fill(0).map((_, i) => (
+                  {isInitialLoading ? Array(5).fill(0).map((_, i) => (
                     <tr key={i} className="animate-pulse">
                       <td colSpan={3} className="px-6 py-12" />
                     </tr>
@@ -227,7 +231,7 @@ export default function CompetitionsClientPage() {
                     How to Earn Points & Climb the Ranking
                   </h2>
                   <p className="text-xs text-text-muted">
-                    Every interaction with Taty's Hub earns you XP towards the monthly competition.
+                    Every interaction with Taty's Hub earns you points towards the monthly competition.
                   </p>
                 </div>
               </div>
@@ -240,13 +244,13 @@ export default function CompetitionsClientPage() {
                     <Mic size={18} />
                   </div>
                   <span className="px-2.5 py-1 rounded-full text-xs font-black bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/20">
-                    +30 XP / message
+                    +30 pts / message
                   </span>
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-text mb-1">Voice Mode Conversation</h3>
                   <p className="text-xs text-text-muted leading-relaxed">
-                    Practice spoken English with Taty's Hub. Every spoken voice interaction awards 30 XP.
+                    Practice spoken English with Taty's Hub. Every spoken voice interaction awards 30 points.
                   </p>
                 </div>
               </div>
@@ -257,7 +261,7 @@ export default function CompetitionsClientPage() {
                     <MessageSquare size={18} />
                   </div>
                   <span className="px-2.5 py-1 rounded-full text-xs font-black bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                    +15 XP / message
+                    +15 pts / message
                   </span>
                 </div>
                 <div>
@@ -274,13 +278,13 @@ export default function CompetitionsClientPage() {
                     <Target size={18} />
                   </div>
                   <span className="px-2.5 py-1 rounded-full text-xs font-black bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                    +25 XP / day (1x)
+                    +25 pts / day (1x)
                   </span>
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-text mb-1">CEFR Leveling Challenge</h3>
                   <p className="text-xs text-text-muted leading-relaxed">
-                    Discover and update your proficiency level (A1 to B2). Awards 25 XP once per day upon completion.
+                    Discover and update your proficiency level (A1 to B2). Awards 25 points once per day upon completion.
                   </p>
                 </div>
               </div>
@@ -291,13 +295,13 @@ export default function CompetitionsClientPage() {
                     <Flame size={18} />
                   </div>
                   <span className="px-2.5 py-1 rounded-full text-xs font-black bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                    +20 XP / day
+                    Ofensiva Diária
                   </span>
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-text mb-1">Daily Study Streak</h3>
+                  <h3 className="text-sm font-bold text-text mb-1">Daily Streak (Ofensiva)</h3>
                   <p className="text-xs text-text-muted leading-relaxed">
-                    Study consistently every single day. Daily practice awards streak retention bonus points.
+                    Entre e estude diariamente para manter sua sequência de dias ativa e desbloquear troféus exclusivos de consistência.
                   </p>
                 </div>
               </div>
@@ -308,7 +312,7 @@ export default function CompetitionsClientPage() {
                     <Sparkles size={18} />
                   </div>
                   <span className="px-2.5 py-1 rounded-full text-xs font-black bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                    +25 XP / exercise done
+                    +25 pts / exercise done
                   </span>
                 </div>
                 <div>
@@ -325,7 +329,7 @@ export default function CompetitionsClientPage() {
                     <BookOpen size={18} />
                   </div>
                   <span className="px-2.5 py-1 rounded-full text-xs font-black bg-pink-500/15 text-pink-600 dark:text-pink-400 border border-pink-500/20">
-                    +25 XP / exercise done
+                    +25 pts / exercise done
                   </span>
                 </div>
                 <div>

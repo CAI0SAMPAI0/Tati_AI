@@ -70,6 +70,7 @@ export default function LoginPage() {
 
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
+    const refreshToken = params.get('refresh_token');
     const userParam = params.get('user');
     const isHub = params.get('access') === 'hub';
 
@@ -88,7 +89,7 @@ export default function LoginPage() {
       // Limpa os parâmetros da URL
       window.history.replaceState({}, '', window.location.pathname);
 
-      saveSession(token, userObj || { username: 'student' }).then((savedUser) => {
+      saveSession(token, userObj || { username: 'student' }, refreshToken).then((savedUser) => {
         if (isHub || userObj?.is_hub_only || (savedUser as any)?.is_hub_only) {
           window.location.href = process.env.NEXT_PUBLIC_HUB_SITE_URL || 'http://localhost:3001/materiais';
         } else {

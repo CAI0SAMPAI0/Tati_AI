@@ -241,6 +241,7 @@ def google_oauth_callback(
     cached_state = cache.get(f"google_oauth_state_{state}")
     if cached_state and cached_state.get("ready") and cached_state.get("jwt"):
         jwt_token = cached_state["jwt"]
+        refresh_token_val = cached_state.get("refresh_token", "")
         user_dict = cached_state["user"]
     else:
         if not code:
@@ -275,6 +276,7 @@ def google_oauth_callback(
             retry_cache = cache.get(f"google_oauth_state_{state}")
             if retry_cache and retry_cache.get("ready") and retry_cache.get("jwt"):
                 jwt_token = retry_cache["jwt"]
+                refresh_token_val = retry_cache.get("refresh_token", "")
                 user_dict = retry_cache["user"]
             else:
                 return HttpResponse(
@@ -299,12 +301,14 @@ def google_oauth_callback(
                 else token_res.user
             )
             jwt_token = token_res.access_token
+            refresh_token_val = getattr(token_res, "refresh_token", "") or ""
 
             cache.set(
                 f"google_oauth_state_{state}",
                 {
                     "ready": True,
                     "jwt": jwt_token,
+                    "refresh_token": refresh_token_val,
                     "user": user_dict,
                 },
                 timeout=600,
@@ -342,14 +346,16 @@ def google_oauth_callback(
     }
     safe_user_json = json.dumps(safe_user)
     hub_param = "&access=hub" if is_hub else ""
+    refresh_param = f"&refresh_token={refresh_token_val}" if refresh_token_val else ""
     redirect_target = (
-        f"{frontend_origin.rstrip('/')}/login?token={jwt_token}&user={quote(safe_user_json)}{hub_param}"
+        f"{frontend_origin.rstrip('/')}/login?token={jwt_token}{refresh_param}&user={quote(safe_user_json)}{hub_param}"
     )
 
     username_val = safe_user["username"]
 
     # Prepara valores serializados para injeção segura no JavaScript (evita quebra por aspas/newlines)
     jwt_token_js = json.dumps(jwt_token)
+    refresh_token_js = json.dumps(refresh_token_val)
     safe_user_json_js = json.dumps(safe_user_json)
     safe_user_obj_js = safe_user_json
     username_val_js = json.dumps(username_val)
@@ -414,8 +420,11 @@ def google_oauth_callback(
             // 1. Salva credenciais imediatamente no localStorage e cookie
             try {{
                 localStorage.setItem('token', {jwt_token_js});
+                localStorage.setItem('refresh_token', {refresh_token_js});
                 localStorage.setItem('user', {safe_user_json_js});
-                document.cookie = 'token=' + encodeURIComponent({jwt_token_js}) + '; path=/; max-age=2592000; SameSite=Lax';
+                var sec = window.location.protocol === 'https:' ? '; Secure' : '';
+                document.cookie = 'auth_token=' + encodeURIComponent({jwt_token_js}) + '; path=/; max-age=7776000; SameSite=Lax' + sec;
+                document.cookie = 'token=' + encodeURIComponent({jwt_token_js}) + '; path=/; max-age=7776000; SameSite=Lax' + sec;
             }} catch(e) {{}}
 
             // 2. Notifica o app Flutter nativo caso esteja embutido no InAppWebView
@@ -431,7 +440,7 @@ def google_oauth_callback(
             // 3. Notifica janela pai caso seja popup Web
             try {{
                 if (window.opener) {{
-                    window.opener.postMessage({{ type: 'GOOGLE_AUTH_SUCCESS', token: {jwt_token_js}, user: {safe_user_obj_js} }}, '*');
+                    window.opener.postMessage({{ type: 'GOOGLE_AUTH_SUCCESS', token: {jwt_token_js}, refreshToken: {refresh_token_js}, user: {safe_user_obj_js} }}, '*');
                     window.close();
                 }}
             }} catch(e) {{}}

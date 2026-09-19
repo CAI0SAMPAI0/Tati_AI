@@ -3,9 +3,9 @@
 import { useAuth } from '@/hooks/useAuth';
 import { usePrefetch } from '@/hooks/usePrefetch';
 import {
-  BookOpen,
+  BookMarked,
   ChevronRight,
-  LayoutDashboard,
+  LayoutGrid,
   LogOut,
   Plus,
   Settings,
@@ -202,7 +202,7 @@ export function Sidebar({
               className="p-2 rounded-lg border border-border text-text-muted hover:bg-primary/10 hover:text-primary hover:border-primary/50 transition-all"
               title="Dashboard"
             >
-              <LayoutDashboard size={18} />
+              <LayoutGrid size={18} />
             </Link>
           )}
           <Link
@@ -221,7 +221,7 @@ export function Sidebar({
               className="p-2 rounded-lg border border-border text-text-muted hover:bg-primary/10 hover:text-primary hover:border-primary/50 transition-all"
               title="My Activities"
             >
-              <BookOpen size={18} />
+              <BookMarked size={18} />
             </Link>
           )}
           <div className="flex-1" />

@@ -31,7 +31,7 @@ interface RequestOptions extends Omit<RequestInit, 'headers'> {
   _retried?: boolean;
 }
 
-const REFRESH_PATH = process.env.NEXT_PUBLIC_AUTH_REFRESH_PATH;
+const REFRESH_PATH = process.env.NEXT_PUBLIC_AUTH_REFRESH_PATH || '/auth/refresh';
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')

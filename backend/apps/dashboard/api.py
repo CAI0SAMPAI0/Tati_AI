@@ -1,15 +1,20 @@
+import json
 import os
 from typing import List, Optional, Any, Dict
 from ninja import Router
-from django.http import HttpRequest
-from django.contrib.auth import get_user_model
+from django.http import HttpRequest as DjangoHttpRequest
 from ninja.errors import HttpError
 from pydantic import BaseModel
 
+from apps.authentication.models import User
 from apps.authentication.security import auth_required
 from .services import DashboardService
 
-User = get_user_model()
+
+class HttpRequest(DjangoHttpRequest):
+    auth: User
+
+
 dashboard_router = Router(tags=["Teacher Tati Dashboard & Administration"])
 
 

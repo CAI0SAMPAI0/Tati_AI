@@ -5,12 +5,16 @@ const COOKIE_MAX_AGE_SECONDS = 90 * 24 * 60 * 60; // 90 dias de sessão persiste
 export function setAuthTokenCookie(token: string): void {
   if (typeof document === 'undefined') return;
   const encoded = encodeURIComponent(token);
-  document.cookie = `${AUTH_TOKEN_COOKIE}=${encoded}; path=/; max-age=${COOKIE_MAX_AGE_SECONDS}; SameSite=Lax`;
+  const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+  const secureFlag = isHttps ? '; Secure' : '';
+  document.cookie = `${AUTH_TOKEN_COOKIE}=${encoded}; path=/; max-age=${COOKIE_MAX_AGE_SECONDS}; SameSite=Lax${secureFlag}`;
 }
 
 export function clearAuthTokenCookie(): void {
   if (typeof document === 'undefined') return;
-  document.cookie = `${AUTH_TOKEN_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+  const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+  const secureFlag = isHttps ? '; Secure' : '';
+  document.cookie = `${AUTH_TOKEN_COOKIE}=; path=/; max-age=0; SameSite=Lax${secureFlag}`;
 }
 
 export function syncAuthTokenCookieFromStorage(): void {

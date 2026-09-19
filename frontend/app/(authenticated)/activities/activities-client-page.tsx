@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Layers,
   Drama,
@@ -110,6 +110,7 @@ interface NewsItem {
 
 export default function ActivitiesClientPage() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>('grammar');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'done'>('all');
@@ -120,29 +121,14 @@ export default function ActivitiesClientPage() {
   const [visibleCount, setVisibleCount] = useState(10);
 
   const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
-  const isStaff = user?.role && ['professor', 'professora', 'programador', 'Tatiana', 'Tati', 'Professora', 'Programador', 'admin', 'Admin'].includes(user.role);
   const userLevelNormalized = (user?.level || '').toUpperCase().trim();
-  const userLevelIdx = CEFR_LEVELS.indexOf(userLevelNormalized);
-
-  // Alunos podem acessar seu nível e todos os níveis anteriores (A2 acessa A1 e A2, etc.)
-  const allowedLevels = useMemo(() => {
-    if (isStaff) return CEFR_LEVELS;
-    if (userLevelIdx !== -1) {
-      return CEFR_LEVELS.slice(0, userLevelIdx + 1);
-    }
-    return ['A1'];
-  }, [isStaff, userLevelIdx]);
-
-  const canFilterLevels = Boolean(isStaff || allowedLevels.length > 1);
+  const allowedLevels = CEFR_LEVELS;
 
   const effectiveLevel = useMemo(() => {
-    if (!canFilterLevels) {
-      return userLevelNormalized && CEFR_LEVELS.includes(userLevelNormalized) ? userLevelNormalized : 'A1';
-    }
     if (filterLevel === 'All') return 'All';
-    if (allowedLevels.includes(filterLevel)) return filterLevel;
-    return userLevelNormalized && allowedLevels.includes(userLevelNormalized) ? userLevelNormalized : allowedLevels[allowedLevels.length - 1] || 'A1';
-  }, [canFilterLevels, filterLevel, allowedLevels, userLevelNormalized]);
+    if (CEFR_LEVELS.includes(filterLevel)) return filterLevel;
+    return userLevelNormalized && CEFR_LEVELS.includes(userLevelNormalized) ? userLevelNormalized : 'All';
+  }, [filterLevel, userLevelNormalized]);
 
   useEffect(() => {
     setVisibleCount(10);
@@ -445,6 +431,9 @@ export default function ActivitiesClientPage() {
       });
       toast.success("Activity completed successfully!", { id: 'act-status' });
       await refetchSubmissions();
+      queryClient.invalidateQueries({ queryKey: ['competitions-global-ranking'] });
+      queryClient.invalidateQueries({ queryKey: ['competitions-level-rankings'] });
+      queryClient.invalidateQueries({ queryKey: ['goals'] });
     } catch (e) {
       toast.error("Error completing activity.");
     }
@@ -468,6 +457,9 @@ export default function ActivitiesClientPage() {
       });
       toast.success("Activity reverted to pending!", { id: 'act-status' });
       await refetchSubmissions();
+      queryClient.invalidateQueries({ queryKey: ['competitions-global-ranking'] });
+      queryClient.invalidateQueries({ queryKey: ['competitions-level-rankings'] });
+      queryClient.invalidateQueries({ queryKey: ['goals'] });
     } catch (e) {
       toast.error("Error reverting activity.");
     }
@@ -632,21 +624,20 @@ export default function ActivitiesClientPage() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-stretch sm:items-center flex-wrap">
-              {canFilterLevels && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-text-subtle uppercase tracking-wider whitespace-nowrap">Level:</span>
-                  <select
-                    value={filterLevel}
-                    onChange={(e) => handleFilterLevelChange(e.target.value)}
-                    className="px-3 py-2 bg-surface border border-border rounded-2xl text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all cursor-pointer text-text"
-                  >
-                    <option value="All">All Levels</option>
-                    {allowedLevels.map((lvl) => (
-                      <option key={lvl} value={lvl}>{lvl}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              {/* Level Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-text-subtle uppercase tracking-wider whitespace-nowrap">Level:</span>
+                <select
+                  value={filterLevel}
+                  onChange={(e) => handleFilterLevelChange(e.target.value)}
+                  className="px-3 py-2 bg-surface border border-border rounded-2xl text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all cursor-pointer text-text"
+                >
+                  <option value="All">All Levels</option>
+                  {CEFR_LEVELS.map((lvl) => (
+                    <option key={lvl} value={lvl}>{lvl}</option>
+                  ))}
+                </select>
+              </div>
 
               {/* Status Filter */}
               <div className="flex items-center gap-2">

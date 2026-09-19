@@ -177,6 +177,8 @@ def get_ranking(request: HttpRequest):
 
 @activities_router.get("/trophies", response=List[TrophyOut], auth=auth_optional)
 @activities_router.get("/achievements", response=List[TrophyOut], auth=auth_optional)
+@activities_router.get("/trophies/my", response=List[TrophyOut], auth=auth_optional)
+@activities_router.get("/achievements/my", response=List[TrophyOut], auth=auth_optional)
 def get_trophies(request: HttpRequest):
     """
     Lista todos os troféus e medalhas pedagógicas conquistadas pelo aluno.

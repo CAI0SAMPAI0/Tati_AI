@@ -463,19 +463,20 @@ class RankingService:
 
         scores = {}
 
-        # 1. Base consolidada: bucket mensal de XP do usuário (já agrega chat, voz, CEFR e atividades de forma unificada)
+        # 1. Base consolidada: pontuação do usuário (já agrega chat, voz, CEFR e atividades)
         for u in User.objects.all():
             xp_data = u.xp_data if isinstance(u.xp_data, dict) else {}
+            total = int(getattr(u, "total_xp", 0) or xp_data.get("xp", 0) or 0)
+            legacy = int(xp_data.get("legacy_competition_points", 0) or 0)
+            user_total = max(total, legacy)
             if all_time:
-                legacy = int(xp_data.get("legacy_competition_points", 0) or 0)
-                total = int(xp_data.get("xp", 0) or 0)
-                scores[u.username] = max(total, legacy)
+                scores[u.username] = user_total
             else:
                 monthly_xp_map = xp_data.get("monthly_xp")
+                pts = 0
                 if isinstance(monthly_xp_map, dict):
                     pts = int(monthly_xp_map.get(month_key, 0) or 0)
-                    if pts:
-                        scores[u.username] = pts
+                scores[u.username] = pts
 
         # 2. Para alunos legados ou registros sem bucket monthly_xp, computa a partir de ActivitySubmission
         rows = list(ActivitySubmission.objects.all())
@@ -564,7 +565,7 @@ class RankingService:
 
         result = sorted(students, key=lambda x: x["score"], reverse=True)
         try:
-            cache.set(cache_key, result, timeout=60)
+            cache.set(cache_key, result, timeout=5)
         except Exception:
             pass
         return result
@@ -1083,29 +1084,582 @@ class MonthlyCompetitionService:
 
 
 class TrophyService:
-    @staticmethod
-    def get_trophies(user: User) -> list[TrophyOut]:
-        all_trophies = Trophy.objects.all()
-        unlocked_ids = set(
-            UserTrophy.objects.filter(username=user.username).values_list(
-                "trophy_id", flat=True
-            )
+    SYSTEM_TROPHIES = [
+        # Streaks (3, 7, 14, 21, 30, 45, 50, 100)
+        {
+            "id": "streak-3",
+            "name": "3-Day Streak",
+            "description": "Studied for 3 consecutive days without breaking rhythm!",
+            "icon": "🔥",
+            "category": "streak",
+            "requirement_type": "streak",
+            "requirement_value": 3,
+        },
+        {
+            "id": "streak-7",
+            "name": "7-Day Streak",
+            "description": "A full week of consistent learning!",
+            "icon": "🔥",
+            "category": "streak",
+            "requirement_type": "streak",
+            "requirement_value": 7,
+        },
+        {
+            "id": "streak-14",
+            "name": "14-Day Streak",
+            "description": "Two consecutive weeks of daily practice!",
+            "icon": "🔥",
+            "category": "streak",
+            "requirement_type": "streak",
+            "requirement_value": 14,
+        },
+        {
+            "id": "streak-21",
+            "name": "21-Day Streak",
+            "description": "21 straight days! Habit successfully formed.",
+            "icon": "🔥",
+            "category": "streak",
+            "requirement_type": "streak",
+            "requirement_value": 21,
+        },
+        {
+            "id": "streak-30",
+            "name": "30-Day Streak",
+            "description": "A full month of daily immersion in English!",
+            "icon": "🔥",
+            "category": "streak",
+            "requirement_type": "streak",
+            "requirement_value": 30,
+        },
+        {
+            "id": "streak-45",
+            "name": "45-Day Streak",
+            "description": "45 consecutive days of pure dedication and consistency.",
+            "icon": "🔥",
+            "category": "streak",
+            "requirement_type": "streak",
+            "requirement_value": 45,
+        },
+        {
+            "id": "streak-50",
+            "name": "50-Day Streak",
+            "description": "Halfway to the century! 50 days in a row.",
+            "icon": "🔥",
+            "category": "streak",
+            "requirement_type": "streak",
+            "requirement_value": 50,
+        },
+        {
+            "id": "streak-100",
+            "name": "100-Day Streak",
+            "description": "Learning Legend! 100 consecutive days of study.",
+            "icon": "🔥",
+            "category": "streak",
+            "requirement_type": "streak",
+            "requirement_value": 100,
+        },
+        # Daily Messages
+        {
+            "id": "msg-day-10",
+            "name": "Quick Chat",
+            "description": "Sent at least 10 messages in a single day.",
+            "icon": "💬",
+            "category": "time",
+            "requirement_type": "msg_day",
+            "requirement_value": 10,
+        },
+        {
+            "id": "msg-day-25",
+            "name": "Active Dialogue",
+            "description": "Sent 25 messages in a single day.",
+            "icon": "💬",
+            "category": "time",
+            "requirement_type": "msg_day",
+            "requirement_value": 25,
+        },
+        {
+            "id": "msg-day-50",
+            "name": "Deep Conversation",
+            "description": "Sent 50 messages in a single day with full focus.",
+            "icon": "💬",
+            "category": "time",
+            "requirement_type": "msg_day",
+            "requirement_value": 50,
+        },
+        {
+            "id": "msg-day-100",
+            "name": "Daily Marathon",
+            "description": "Sent 100 messages in a single day.",
+            "icon": "💬",
+            "category": "time",
+            "requirement_type": "msg_day",
+            "requirement_value": 100,
+        },
+        # Weekly Messages
+        {
+            "id": "msg-week-50",
+            "name": "Chatty Week",
+            "description": "Sent 50 messages in a single week.",
+            "icon": "📨",
+            "category": "time",
+            "requirement_type": "msg_week",
+            "requirement_value": 50,
+        },
+        {
+            "id": "msg-week-100",
+            "name": "Dedicated Week",
+            "description": "Sent 100 messages in a single week.",
+            "icon": "📨",
+            "category": "time",
+            "requirement_type": "msg_week",
+            "requirement_value": 100,
+        },
+        {
+            "id": "msg-week-200",
+            "name": "Fluent Week",
+            "description": "Sent 200 messages in a single week.",
+            "icon": "📨",
+            "category": "time",
+            "requirement_type": "msg_week",
+            "requirement_value": 200,
+        },
+        # Monthly Messages
+        {
+            "id": "msg-month-200",
+            "name": "Monthly Conversationalist",
+            "description": "Sent 200 messages throughout the month.",
+            "icon": "📅",
+            "category": "time",
+            "requirement_type": "msg_month",
+            "requirement_value": 200,
+        },
+        {
+            "id": "msg-month-500",
+            "name": "Immersive Month",
+            "description": "Sent 500 messages in a single month.",
+            "icon": "📅",
+            "category": "time",
+            "requirement_type": "msg_month",
+            "requirement_value": 500,
+        },
+        {
+            "id": "msg-month-1000",
+            "name": "Master of Dialogue",
+            "description": "Sent 1,000 messages in a single month.",
+            "icon": "📅",
+            "category": "time",
+            "requirement_type": "msg_month",
+            "requirement_value": 1000,
+        },
+        # Grammar (1, 5, 15, 50, 100, 198)
+        {
+            "id": "grammar-1",
+            "name": "Grammar Starter",
+            "description": "Completed your 1st grammar exercise.",
+            "icon": "✍️",
+            "category": "questions",
+            "requirement_type": "grammar",
+            "requirement_value": 1,
+        },
+        {
+            "id": "grammar-5",
+            "name": "Grammar Explorer",
+            "description": "Completed 5 grammar exercises.",
+            "icon": "✍️",
+            "category": "questions",
+            "requirement_type": "grammar",
+            "requirement_value": 5,
+        },
+        {
+            "id": "grammar-15",
+            "name": "Grammar Scholar",
+            "description": "Completed 15 grammar exercises.",
+            "icon": "✍️",
+            "category": "questions",
+            "requirement_type": "grammar",
+            "requirement_value": 15,
+        },
+        {
+            "id": "grammar-50",
+            "name": "Grammar Master",
+            "description": "Completed 50 grammar exercises.",
+            "icon": "✍️",
+            "category": "questions",
+            "requirement_type": "grammar",
+            "requirement_value": 50,
+        },
+        {
+            "id": "grammar-100",
+            "name": "Grammar Expert",
+            "description": "Completed 100 grammar exercises.",
+            "icon": "✍️",
+            "category": "questions",
+            "requirement_type": "grammar",
+            "requirement_value": 100,
+        },
+        {
+            "id": "grammar-198",
+            "name": "Grammar Legend",
+            "description": "Completed all 198 grammar activities in the system!",
+            "icon": "👑",
+            "category": "questions",
+            "requirement_type": "grammar",
+            "requirement_value": 198,
+        },
+        # Vocabulary
+        {
+            "id": "vocab-1",
+            "name": "Word Explorer",
+            "description": "Completed your 1st vocabulary exercise.",
+            "icon": "📖",
+            "category": "questions",
+            "requirement_type": "vocabulary",
+            "requirement_value": 1,
+        },
+        {
+            "id": "vocab-5",
+            "name": "Vocabulary Builder",
+            "description": "Completed 5 vocabulary exercises.",
+            "icon": "📖",
+            "category": "questions",
+            "requirement_type": "vocabulary",
+            "requirement_value": 5,
+        },
+        {
+            "id": "vocab-15",
+            "name": "Word Enthusiast",
+            "description": "Completed 15 vocabulary exercises.",
+            "icon": "📖",
+            "category": "questions",
+            "requirement_type": "vocabulary",
+            "requirement_value": 15,
+        },
+        {
+            "id": "vocab-30",
+            "name": "Lexicon Master",
+            "description": "Completed 30 vocabulary exercises.",
+            "icon": "📖",
+            "category": "questions",
+            "requirement_type": "vocabulary",
+            "requirement_value": 30,
+        },
+        # Listening
+        {
+            "id": "listening-1",
+            "name": "First Listen",
+            "description": "Completed your 1st listening activity or podcast.",
+            "icon": "🎧",
+            "category": "time",
+            "requirement_type": "listening",
+            "requirement_value": 1,
+        },
+        {
+            "id": "listening-5",
+            "name": "Attentive Ear",
+            "description": "Completed 5 listening activities or podcasts.",
+            "icon": "🎧",
+            "category": "time",
+            "requirement_type": "listening",
+            "requirement_value": 5,
+        },
+        {
+            "id": "listening-15",
+            "name": "Audio Pro",
+            "description": "Completed 15 listening activities or podcasts.",
+            "icon": "🎧",
+            "category": "time",
+            "requirement_type": "listening",
+            "requirement_value": 15,
+        },
+        {
+            "id": "listening-30",
+            "name": "Listening Virtuoso",
+            "description": "Completed 30 listening activities or podcasts.",
+            "icon": "🎧",
+            "category": "time",
+            "requirement_type": "listening",
+            "requirement_value": 30,
+        },
+        # Reading
+        {
+            "id": "reading-1",
+            "name": "First Reader",
+            "description": "Completed your 1st reading exercise.",
+            "icon": "📚",
+            "category": "questions",
+            "requirement_type": "reading",
+            "requirement_value": 1,
+        },
+        {
+            "id": "reading-5",
+            "name": "Bookworm",
+            "description": "Completed 5 reading exercises.",
+            "icon": "📚",
+            "category": "questions",
+            "requirement_type": "reading",
+            "requirement_value": 5,
+        },
+        {
+            "id": "reading-15",
+            "name": "Avid Reader",
+            "description": "Completed 15 reading exercises.",
+            "icon": "📚",
+            "category": "questions",
+            "requirement_type": "reading",
+            "requirement_value": 15,
+        },
+        {
+            "id": "reading-30",
+            "name": "Master of Texts",
+            "description": "Completed 30 reading exercises.",
+            "icon": "📚",
+            "category": "questions",
+            "requirement_type": "reading",
+            "requirement_value": 30,
+        },
+        # Flashcards
+        {
+            "id": "flashcards-1",
+            "name": "Card Flipper",
+            "description": "Reviewed your 1st flashcard session.",
+            "icon": "🃏",
+            "category": "credits",
+            "requirement_type": "flashcards",
+            "requirement_value": 1,
+        },
+        {
+            "id": "flashcards-10",
+            "name": "Memory Novice",
+            "description": "Reviewed 10 flashcard sessions.",
+            "icon": "🃏",
+            "category": "credits",
+            "requirement_type": "flashcards",
+            "requirement_value": 10,
+        },
+        {
+            "id": "flashcards-25",
+            "name": "Memory Champion",
+            "description": "Reviewed 25 flashcard sessions.",
+            "icon": "🃏",
+            "category": "credits",
+            "requirement_type": "flashcards",
+            "requirement_value": 25,
+        },
+        {
+            "id": "flashcards-50",
+            "name": "Recall Genius",
+            "description": "Reviewed 50 flashcard sessions.",
+            "icon": "🃏",
+            "category": "credits",
+            "requirement_type": "flashcards",
+            "requirement_value": 50,
+        },
+        # Simulations
+        {
+            "id": "sim-1",
+            "name": "First Simulation",
+            "description": "Completed your 1st real-world conversation simulation.",
+            "icon": "🎭",
+            "category": "milestones",
+            "requirement_type": "simulations",
+            "requirement_value": 1,
+        },
+        {
+            "id": "sim-5",
+            "name": "Confident Roleplayer",
+            "description": "Completed 5 conversation simulations.",
+            "icon": "🎭",
+            "category": "milestones",
+            "requirement_type": "simulations",
+            "requirement_value": 5,
+        },
+        {
+            "id": "sim-10",
+            "name": "Scenario Expert",
+            "description": "Completed 10 conversation simulations.",
+            "icon": "🎭",
+            "category": "milestones",
+            "requirement_type": "simulations",
+            "requirement_value": 10,
+        },
+        {
+            "id": "sim-25",
+            "name": "Simulation Master",
+            "description": "Completed 25 real-world simulations!",
+            "icon": "🎭",
+            "category": "milestones",
+            "requirement_type": "simulations",
+            "requirement_value": 25,
+        },
+        # Games
+        {
+            "id": "games-1",
+            "name": "First Game",
+            "description": "Played your 1st interactive learning game.",
+            "icon": "🎮",
+            "category": "questions",
+            "requirement_type": "games",
+            "requirement_value": 1,
+        },
+        {
+            "id": "games-5",
+            "name": "Player Two",
+            "description": "Played 5 interactive games.",
+            "icon": "🎮",
+            "category": "questions",
+            "requirement_type": "games",
+            "requirement_value": 5,
+        },
+        {
+            "id": "games-15",
+            "name": "Arcade Star",
+            "description": "Played 15 interactive games.",
+            "icon": "🎮",
+            "category": "questions",
+            "requirement_type": "games",
+            "requirement_value": 15,
+        },
+        {
+            "id": "games-30",
+            "name": "Gaming Champion",
+            "description": "Played 30 interactive games.",
+            "icon": "🎮",
+            "category": "questions",
+            "requirement_type": "games",
+            "requirement_value": 30,
+        },
+    ]
+
+    @classmethod
+    def get_my_achievements(cls, user: User) -> list[TrophyOut]:
+        now = datetime.now(timezone.utc)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_start = today_start - timedelta(days=now.weekday())
+        month_start = today_start.replace(day=1)
+
+        from apps.chat.models import Message
+
+        username = getattr(user, "username", "aluno")
+
+        # 1. Streak stats
+        streak_data = (
+            user.streak_data
+            if isinstance(getattr(user, "streak_data", None), dict)
+            else {}
+        )
+        current_streak = (
+            streak_data.get("current_streak", 0)
+            or getattr(user, "streak_count", 0)
+            or 0
+        )
+        longest_streak = max(
+            streak_data.get("longest_streak", 0) or 0, current_streak
         )
 
-        results = []
-        for t in all_trophies:
-            is_unlocked = str(t.id) in unlocked_ids
-            results.append(
-                TrophyOut(
-                    id=str(t.id),
-                    name=t.name,
-                    description=t.description or "",
-                    icon=t.icon or "🏆",
-                    category=t.category or "general",
-                    is_unlocked=is_unlocked,
+        # 2. Messages stats
+        msgs_today = Message.objects.filter(
+            username=username, role="user", created_at__gte=today_start
+        ).count()
+        msgs_week = Message.objects.filter(
+            username=username, role="user", created_at__gte=week_start
+        ).count()
+        msgs_month = Message.objects.filter(
+            username=username, role="user", created_at__gte=month_start
+        ).count()
+
+        # 3. Activity counts by category
+        cat_counts = defaultdict(int)
+        user_subs = ActivitySubmission.objects.filter(username=username, status="completed")
+        for s in user_subs:
+            meta = s.metadata if isinstance(s.metadata, dict) else {}
+            cat = (meta.get("category") or "").lower().strip()
+            act_type = (s.activity_type or "").lower().strip()
+            if cat in ("grammar", "vocabulary", "listening", "reading", "flashcards", "simulations", "games"):
+                cat_counts[cat] += 1
+            elif "grammar" in act_type or "grammar" in cat:
+                cat_counts["grammar"] += 1
+            elif "vocab" in act_type or "vocab" in cat:
+                cat_counts["vocabulary"] += 1
+            elif "listen" in act_type or "podcast" in act_type:
+                cat_counts["listening"] += 1
+            elif "read" in act_type:
+                cat_counts["reading"] += 1
+            elif "flashcard" in act_type:
+                cat_counts["flashcards"] += 1
+            elif "simul" in act_type or "scenario" in act_type or "roleplay" in act_type or "interview" in act_type:
+                cat_counts["simulations"] += 1
+            elif "game" in act_type or "wordwall" in act_type:
+                cat_counts["games"] += 1
+
+        # Also count user flashcard progress if available
+        try:
+            from apps.activities.models import UserFlashcardProgress
+            fc_prog = UserFlashcardProgress.objects.filter(user_id=username).count()
+            cat_counts["flashcards"] = max(cat_counts["flashcards"], fc_prog)
+        except Exception:
+            pass
+
+        unlocked_ids = set()
+        try:
+            unlocked_ids = set(
+                UserTrophy.objects.filter(username=username).values_list(
+                    "trophy_id", flat=True
                 )
             )
+        except Exception:
+            pass
+
+        results = []
+
+        # Process system trophies (100% in English, covering all 7 activities, streaks & messages)
+        for t in cls.SYSTEM_TROPHIES:
+            t_id = t["id"]
+            target = t["requirement_value"]
+            req_type = t.get("requirement_type", "")
+
+            prog = 0
+            if req_type == "streak":
+                prog = longest_streak
+            elif req_type == "msg_day":
+                prog = msgs_today
+            elif req_type == "msg_week":
+                prog = msgs_week
+            elif req_type == "msg_month":
+                prog = msgs_month
+            elif req_type in cat_counts:
+                prog = cat_counts[req_type]
+
+            is_unlocked = (t_id in unlocked_ids) or (prog >= target)
+
+            if is_unlocked and t_id not in unlocked_ids:
+                try:
+                    UserTrophy.objects.get_or_create(
+                        username=username, trophy_id=t_id
+                    )
+                    unlocked_ids.add(t_id)
+                except Exception:
+                    pass
+
+            results.append(
+                TrophyOut(
+                    id=t_id,
+                    name=t["name"],
+                    title=t["name"],
+                    description=t["description"],
+                    icon=t["icon"],
+                    category=t["category"],
+                    is_unlocked=is_unlocked,
+                    unlocked=is_unlocked,
+                    progress=min(prog, target),
+                    target=target,
+                )
+            )
+
         return results
+
+    @staticmethod
+    def get_trophies(user: User) -> list[TrophyOut]:
+        return TrophyService.get_my_achievements(user)
 
 
 class HubService:
@@ -1648,9 +2202,41 @@ class SubmissionService:
             or ("completed" if score > 0 else "pending")
         )
 
+        if not user or not isinstance(user, User):
+            from django.contrib.auth import get_user_model
+            U = get_user_model()
+            user = U.objects.filter(username=username).first()
+
         # 1. Se for marcar como PENDENTE (Reverter)
         if status_req == "pending" or score <= 0:
             from django.db.models import Q
+
+            matching_subs = list(
+                ActivitySubmission.objects.filter(
+                    Q(username=username)
+                    & (
+                        Q(metadata__activity_id=str(activity_id))
+                        | Q(metadata__url=target_url)
+                        | Q(metadata__slug=target_slug)
+                    )
+                )
+            )
+
+            # Determina os pontos a subtrair baseado no que foi concedido anteriormente
+            deduct_amount = 0
+            for sub in matching_subs:
+                meta = sub.metadata if isinstance(sub.metadata, dict) else {}
+                pts = meta.get("points_awarded")
+                if pts is None and sub.score > 0:
+                    pts = 25
+                if pts:
+                    deduct_amount += int(pts)
+
+            if not deduct_amount and matching_subs:
+                deduct_amount = 25
+
+            if deduct_amount > 0 and user and isinstance(user, User):
+                XPService.deduct_xp(user, deduct_amount, f"Reversão da atividade {activity_type}")
 
             ActivitySubmission.objects.filter(
                 Q(username=username)
@@ -1667,8 +2253,8 @@ class SubmissionService:
             return {
                 "success": True,
                 "status": "pending",
-                "message": "Atividade revertida para pendente.",
-                "xp_earned": 0,
+                "message": "Atividade revertida para pendente e pontuação subtraída.",
+                "xp_earned": -deduct_amount,
                 "new_total_xp": total_xp,
                 "streak_count": streak_count,
             }

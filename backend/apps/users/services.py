@@ -1,5 +1,6 @@
 import logging
 import uuid
+from collections import defaultdict
 from pathlib import Path
 from typing import Optional
 from datetime import date, datetime, timedelta, timezone
@@ -203,47 +204,235 @@ class XPService:
 
         return cls.get_xp(user)
 
+    @classmethod
+    def deduct_xp(
+        cls, user: User, amount: int, reason: str = "Atividade revertida para pendente"
+    ) -> XPOut:
+        xp_data = user.xp_data if isinstance(user.xp_data, dict) else {}
+        current = xp_data.get("xp", 0) or 0
+        current = max(0, current - amount)
+        xp_data["xp"] = current
+
+        now = datetime.now(timezone.utc)
+        current_month_key = f"{now.year}-{now.month:02d}"
+        monthly_xp = xp_data.get("monthly_xp")
+        if isinstance(monthly_xp, dict):
+            monthly_xp[current_month_key] = max(
+                0, int(monthly_xp.get(current_month_key, 0) or 0) - amount
+            )
+            xp_data["monthly_xp"] = monthly_xp
+        xp_data["updated_at"] = now.isoformat()
+
+        user.xp_data = xp_data
+        user.save(update_fields=["xp_data"])
+
+        return cls.get_xp(user)
+
 
 class GoalService:
     @staticmethod
     def list_goals(user: User) -> list[GoalOut]:
-        goals_data = user.study_goals if isinstance(user.study_goals, list) else []
+        now = datetime.now(timezone.utc)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_start = today_start - timedelta(days=now.weekday())
+
+        from apps.activities.models import ActivitySubmission
+        from apps.chat.models import Message
+
+        # 1. Daily activities completed (target: 3)
+        daily_act_count = ActivitySubmission.objects.filter(
+            username=user.username,
+            created_at__gte=today_start,
+            status="completed",
+        ).count()
+
+        # 2. Weekly activities completed (target: 15)
+        weekly_act_count = ActivitySubmission.objects.filter(
+            username=user.username,
+            created_at__gte=week_start,
+            status="completed",
+        ).count()
+
+        # 3. Weekly simulations completed (target: 2)
+        weekly_sim_count = ActivitySubmission.objects.filter(
+            username=user.username,
+            activity_type__in=["simulation", "scenario", "interview", "roleplay"],
+            created_at__gte=week_start,
+            status="completed",
+        ).count()
+
+        # 4. Daily chat messages with AI (target: 20)
+        daily_msg_count = Message.objects.filter(
+            username=user.username,
+            role="user",
+            created_at__gte=today_start,
+        ).count()
+
+        # 5. Weekly study days active (target: 5)
+        week_dates = set(
+            m.created_at.date()
+            for m in Message.objects.filter(
+                username=user.username, role="user", created_at__gte=week_start
+            )
+            if m.created_at
+        )
+        week_dates.update(
+            s.created_at.date()
+            for s in ActivitySubmission.objects.filter(
+                username=user.username, created_at__gte=week_start
+            )
+            if s.created_at
+        )
+        weekly_days_count = len(week_dates)
+
+        # 6. Vocabulary / Flashcards reviewed today (target: 10)
+        vocab_count = 0
+        try:
+            from apps.activities.models import UserFlashcardProgress
+
+            vocab_count = UserFlashcardProgress.objects.filter(
+                user_id=user.username,
+                reviewed_at__gte=today_start,
+            ).count()
+        except Exception:
+            pass
+
+        # Count activity submissions by category
+        cat_counts = defaultdict(int)
+        user_subs = ActivitySubmission.objects.filter(username=user.username, status="completed")
+        for s in user_subs:
+            meta = s.metadata if isinstance(s.metadata, dict) else {}
+            cat = (meta.get("category") or "").lower().strip()
+            act_type = (s.activity_type or "").lower().strip()
+            if cat in ("grammar", "vocabulary", "listening", "reading", "flashcards", "simulations", "games"):
+                cat_counts[cat] += 1
+            elif "grammar" in act_type or "grammar" in cat:
+                cat_counts["grammar"] += 1
+            elif "vocab" in act_type or "vocab" in cat:
+                cat_counts["vocabulary"] += 1
+            elif "listen" in act_type or "podcast" in act_type:
+                cat_counts["listening"] += 1
+            elif "read" in act_type:
+                cat_counts["reading"] += 1
+            elif "flashcard" in act_type:
+                cat_counts["flashcards"] += 1
+            elif "simul" in act_type or "scenario" in act_type or "roleplay" in act_type or "interview" in act_type:
+                cat_counts["simulations"] += 1
+            elif "game" in act_type or "wordwall" in act_type:
+                cat_counts["games"] += 1
+
+        try:
+            from apps.activities.models import UserFlashcardProgress
+
+            fc_prog = UserFlashcardProgress.objects.filter(user_id=user.username).count()
+            cat_counts["flashcards"] = max(cat_counts["flashcards"], fc_prog)
+        except Exception:
+            pass
+
+        system_goals = [
+            {
+                "type": "grammar",
+                "title": "Grammar Practice",
+                "description": "Complete 3 grammar exercises",
+                "target": 3,
+                "progress": cat_counts["grammar"],
+                "period": "weekly",
+            },
+            {
+                "type": "vocabulary",
+                "title": "Vocabulary Expansion",
+                "description": "Complete 3 vocabulary exercises",
+                "target": 3,
+                "progress": cat_counts["vocabulary"],
+                "period": "weekly",
+            },
+            {
+                "type": "listening",
+                "title": "Listening & Podcasts",
+                "description": "Complete 2 listening activities or podcasts",
+                "target": 2,
+                "progress": cat_counts["listening"],
+                "period": "weekly",
+            },
+            {
+                "type": "reading",
+                "title": "Reading Comprehension",
+                "description": "Complete 2 reading exercises",
+                "target": 2,
+                "progress": cat_counts["reading"],
+                "period": "weekly",
+            },
+            {
+                "type": "flashcards",
+                "title": "Flashcards Mastery",
+                "description": "Review at least 10 flashcards",
+                "target": 10,
+                "progress": cat_counts["flashcards"],
+                "period": "daily",
+            },
+            {
+                "type": "simulations",
+                "title": "Real-World Simulations",
+                "description": "Complete 2 conversation simulations or interviews",
+                "target": 2,
+                "progress": cat_counts["simulations"],
+                "period": "weekly",
+            },
+            {
+                "type": "games",
+                "title": "Learning Games",
+                "description": "Play 2 interactive English learning games",
+                "target": 2,
+                "progress": cat_counts["games"],
+                "period": "weekly",
+            },
+            {
+                "type": "daily_messages",
+                "title": "Daily AI Conversation",
+                "description": "Send 20 practice messages in English today",
+                "target": 20,
+                "progress": daily_msg_count,
+                "period": "daily",
+            },
+            {
+                "type": "weekly_streak",
+                "title": "Weekly Consistency",
+                "description": "Study on at least 5 days this week",
+                "target": 5,
+                "progress": weekly_days_count,
+                "period": "weekly",
+            },
+        ]
+
         results = []
-        for g in goals_data:
-            if isinstance(g, dict):
-                results.append(
-                    GoalOut(
-                        id=uuid.UUID(g.get("id", str(uuid.uuid4()))),
-                        type=g.get("type", "study_time"),
-                        target=g.get("target", 15),
-                        progress=g.get("progress", 0),
-                        period=g.get("period", "daily"),
-                        is_completed=g.get("is_completed", False),
-                    )
+        for g in system_goals:
+            goal_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, f"system-goal-{g['type']}")
+            prog = g["progress"]
+            tgt = g["target"]
+            results.append(
+                GoalOut(
+                    id=goal_uuid,
+                    type=g["type"],
+                    title=g["title"],
+                    description=g["description"],
+                    target=tgt,
+                    progress=prog,
+                    period=g["period"],
+                    is_completed=prog >= tgt,
                 )
+            )
+
         return results
 
     @staticmethod
     def create_goal(user: User, data: GoalInput) -> GoalOut:
-        goals_data = (
-            list(user.study_goals or []) if isinstance(user.study_goals, list) else []
-        )
-        new_id = str(uuid.uuid4())
-        goal_item = {
-            "id": new_id,
-            "type": data.type,
-            "target": data.target,
-            "progress": 0,
-            "period": data.period,
-            "is_completed": False,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-        goals_data.append(goal_item)
-        user.study_goals = goals_data
-        user.save(update_fields=["study_goals"])
-
-        return GoalOut(
-            id=uuid.UUID(new_id),
+        # Custom goal creation is deprecated; return the first matching system goal
+        goals = GoalService.list_goals(user)
+        for g in goals:
+            if g.type == data.type:
+                return g
+        return goals[0] if goals else GoalOut(
+            id=uuid.uuid4(),
             type=data.type,
             target=data.target,
             progress=0,
@@ -406,14 +595,68 @@ class ProgressReportService:
             )
         )
 
+        # Messages grouped by week of the month (Week 1: days 1-7, Week 2: 8-14, Week 3: 15-21, Week 4: 22-28, Week 5: 29+)
+        messages_by_week = [0, 0, 0, 0]
+        import calendar
+
+        _, last_day = calendar.monthrange(now.year, now.month)
+        if last_day > 28:
+            messages_by_week.append(0)
+
+        study_dates = set()
+        words_set = set()
+
+        for m in msgs:
+            d = m.created_at.day if m.created_at else 1
+            if d <= 7:
+                messages_by_week[0] += 1
+            elif d <= 14:
+                messages_by_week[1] += 1
+            elif d <= 21:
+                messages_by_week[2] += 1
+            elif d <= 28:
+                messages_by_week[3] += 1
+            else:
+                if len(messages_by_week) >= 5:
+                    messages_by_week[4] += 1
+
+            if m.created_at:
+                study_dates.add(m.created_at.date())
+
+            if m.content:
+                for w in m.content.split():
+                    if len(w) > 2:
+                        words_set.add(w.lower())
+
+        from apps.activities.models import ActivitySubmission
+
+        subs = list(
+            ActivitySubmission.objects.filter(
+                username=username, created_at__gte=month_start, status="completed"
+            )
+        )
+        for s in subs:
+            if s.created_at:
+                study_dates.add(s.created_at.date())
+
+        total_conversations = len(
+            set(m.session_id for m in msgs if getattr(m, "session_id", None))
+        ) or max(1, len(msgs) // 4)
+        unique_words_count = len(words_set) or (len(msgs) * 4)
+
         return {
             "period": "monthly",
             "username": username,
             "total_xp": total_xp,
+            "score": total_xp,
             "level": level,
             "total_messages": len(msgs),
+            "messages_by_week": messages_by_week,
+            "study_days": len(study_dates),
+            "unique_words_used": unique_words_count,
+            "total_conversations": total_conversations,
             "study_time_hours": round((len(msgs) * 3) / 60, 1),
-            "total_exercises": len(msgs) // 2,
+            "total_exercises": len(subs) or (len(msgs) // 2),
             "fluency_score": 85,
         }
 

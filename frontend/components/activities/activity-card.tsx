@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Play, CheckCircle2, Headphones, FileText } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const statusConfig = {

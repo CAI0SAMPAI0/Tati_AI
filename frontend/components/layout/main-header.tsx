@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { Menu, Trophy, Flame, CircleAlert } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';

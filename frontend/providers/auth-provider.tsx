@@ -39,7 +39,7 @@ interface AuthState {
   user: User | null;
   isLoaded: boolean;
   isBootstrappingProfile: boolean;
-  saveSession: (token: string, user: User) => Promise<User>;
+  saveSession: (token: string, user: User, refreshToken?: string | null) => Promise<User>;
   updateProfile: (user: User) => void;
   refreshUser: () => Promise<void>;
   logout: () => void;
@@ -73,29 +73,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(normalizedUser);
       saveStoredSession({ token, user: normalizedUser });
     } catch (err) {
-      if (err instanceof ApiClientError && (err.status === 401 || err.status === 404)) {
+      if (err instanceof ApiClientError && err.status === 401) {
         logoutRef.current();
       }
     }
   }, [token]);
 
-  const saveSession = useCallback(async (newToken: string, newUser: User): Promise<User> => {
+  const saveSession = useCallback(async (newToken: string, newUser: User, newRefreshToken?: string | null): Promise<User> => {
     setIsBootstrappingProfile(true);
     // Reiniciar o cache do React Query ao entrar/logar
     queryClient.clear();
     let savedUser = normalizeUserAvatar(newUser);
     // Persist token first so /profile can authenticate immediately.
-    saveStoredSession({ token: newToken, user: savedUser });
+    saveStoredSession({ token: newToken, user: savedUser, refreshToken: newRefreshToken });
     try {
       const freshUser = await apiGet<User>(ENDPOINTS.PROFILE);
       savedUser = normalizeUserAvatar(freshUser);
       setUser(savedUser);
-      saveStoredSession({ token: newToken, user: savedUser });
+      saveStoredSession({ token: newToken, user: savedUser, refreshToken: newRefreshToken });
     } catch {
       // Keep login resilient: fallback to user from login payload.
       savedUser = normalizeUserAvatar(newUser);
       setUser(savedUser);
-      saveStoredSession({ token: newToken, user: savedUser });
+      saveStoredSession({ token: newToken, user: savedUser, refreshToken: newRefreshToken });
     } finally {
       setToken(newToken);
       setIsBootstrappingProfile(false);
@@ -180,11 +180,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         triggerPodcastWarmup();
       })
       .catch((err) => {
-        if (err instanceof ApiClientError && (err.status === 401 || err.status === 404)) {
+        if (err instanceof ApiClientError && err.status === 401) {
           // Token inválido — faz logout silencioso
           logoutRef.current();
         }
-        // Erro de rede: mantém sessão atual sem derrubar o usuário
+        // Erro de rede ou 404: mantém sessão atual sem derrubar o usuário
       });
   }, [queryClient]);
 

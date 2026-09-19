@@ -1,9 +1,10 @@
 from typing import List, Optional
 from ninja import Router
-from django.http import HttpRequest
-from django.contrib.auth import get_user_model
+from django.http import HttpRequest as DjangoHttpRequest
+from ninja.errors import HttpError
 from pydantic import BaseModel
 
+from apps.authentication.models import User
 from apps.authentication.security import auth_required, auth_optional
 from .schemas import (
     StreakDataOut,
@@ -29,7 +30,11 @@ from .services import (
 )
 from apps.activities.services import VocabularyService
 
-User = get_user_model()
+
+class HttpRequest(DjangoHttpRequest):
+    auth: User
+
+
 users_router = Router(tags=["Users & Gamification"])
 avatar_router = Router(tags=["Avatar & Customization"])
 

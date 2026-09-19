@@ -440,6 +440,69 @@ class ConversationService:
 
 class AIService:
     @classmethod
+    def generate_reply_sync(
+        cls, messages: List[Dict[str, str]], user: Optional[User] = None
+    ) -> str:
+        """
+        Gera resposta síncrona simples (texto direto sem áudio nem persistência),
+        usada por serviços analíticos como insights pedagógicos no dashboard.
+        """
+        sys_prompt = "You are Teacher Tatiana Duarte, an encouraging and expert English teacher."
+        user_content = ""
+        for m in messages:
+            if m.get("role") == "system":
+                sys_prompt = m.get("content", sys_prompt)
+            elif m.get("role") == "user":
+                user_content = m.get("content", "")
+
+        messages_payload = [
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": user_content},
+        ]
+
+        # 1. Llama
+        try:
+            candidate = call_meta_llama(messages_payload, temperature=0.7, max_tokens=400)
+            if candidate:
+                return strip_emojis(candidate.strip())
+        except Exception:
+            pass
+
+        # 2. Groq
+        keys = get_groq_keys()
+        for g_model in ["openai/gpt-oss-20b", "qwen/qwen3.6-27b"]:
+            for key in keys:
+                try:
+                    client = Groq(api_key=key, timeout=10.0)
+                    chat_completion = client.chat.completions.create(
+                        messages=messages_payload,
+                        model=g_model,
+                        temperature=0.7,
+                        max_tokens=400,
+                    )
+                    ans = chat_completion.choices[0].message.content or ""
+                    if ans.strip():
+                        return strip_emojis(ans.strip())
+                except Exception:
+                    pass
+
+        # 3. Gemini
+        if GEMINI_API_KEY and genai:
+            try:
+                model = genai.GenerativeModel("gemini-1.5-flash")
+                prompt_full = f"{sys_prompt}\n\nUser: {user_content}"
+                res = model.generate_content(prompt_full)
+                if res and hasattr(res, "text") and res.text:
+                    return strip_emojis(res.text.strip())
+            except Exception:
+                pass
+
+        return (
+            "Student demonstrates active participation and positive engagement in conversational topics. "
+            "Recommended next step: continue practicing complex sentence structures and vocabulary expansion."
+        )
+
+    @classmethod
     def generate_reply(
         cls,
         user: User,

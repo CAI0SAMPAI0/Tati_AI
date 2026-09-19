@@ -73,11 +73,15 @@ class HubMaterialOut(BaseModel):
 class TrophyOut(BaseModel):
     id: str
     name: str
+    title: Optional[str] = None
     description: str
     icon: str
     category: str
     is_unlocked: bool = False
+    unlocked: bool = False
     unlocked_at: Optional[str] = None
+    progress: int = 0
+    target: int = 1
 
 
 class RankingUserOut(BaseModel):

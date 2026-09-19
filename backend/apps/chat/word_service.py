@@ -47,16 +47,17 @@ class WordLookupService:
                 cached["accent"] = resolved_accent
             return cached
 
-        try:
-            cached_data = cache.get(cache_key)
-            if cached_data and isinstance(cached_data, dict):
-                if not cached_data.get("audio_b64") or cached_data.get("accent") != resolved_accent:
-                    cached_data["audio_b64"] = AudioService.text_to_speech(cleaned_alpha, accent=resolved_accent)
-                    cached_data["accent"] = resolved_accent
-                _LOCAL_WORD_CACHE[cleaned_alpha] = cached_data
-                return cached_data
-        except Exception:
-            pass
+        if cache is not None:
+            try:
+                cached_data = cache.get(cache_key)
+                if cached_data and isinstance(cached_data, dict):
+                    if not cached_data.get("audio_b64") or cached_data.get("accent") != resolved_accent:
+                        cached_data["audio_b64"] = AudioService.text_to_speech(cleaned_alpha, accent=resolved_accent)
+                        cached_data["accent"] = resolved_accent
+                    _LOCAL_WORD_CACHE[cleaned_alpha] = cached_data
+                    return cached_data
+            except Exception:
+                pass
 
         # 2. Busca definição e tradução via IA (Groq com fallback)
         word_info = cls._fetch_ai_definition(cleaned_alpha)
@@ -69,10 +70,11 @@ class WordLookupService:
 
         # 4. Salva em cache por 7 dias (604800s)
         _LOCAL_WORD_CACHE[cleaned_alpha] = word_info
-        try:
-            cache.set(cache_key, word_info, timeout=604800)
-        except Exception:
-            pass
+        if cache is not None:
+            try:
+                cache.set(cache_key, word_info, timeout=604800)
+            except Exception:
+                pass
 
         return word_info
 
@@ -136,6 +138,7 @@ class WordLookupService:
 
                 genai.configure(api_key=gemini_key)
                 model = genai.GenerativeModel("gemini-1.5-flash")
+                prompt = f"{system_instruction}\n\n{user_content}"
                 res = model.generate_content(prompt)
                 raw_text = res.text.strip()
                 match = re.search(r"\{.*\}", raw_text, re.DOTALL)

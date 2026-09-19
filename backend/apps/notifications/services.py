@@ -482,26 +482,6 @@ class NotificationService:
             "message": "Dispositivo cadastrado para notificações WebPush.",
         }
 
-
-class NotificationDispatcher:
-    """
-    Despachador central de notificações in-app e WebPush/FCM para o sistema operacional.
-    """
-
-    @staticmethod
-    def get_vapid_keys() -> dict:
-        public_key = os.getenv(
-            "VAPID_PUBLIC_KEY", ""
-        )
-        private_key = os.getenv("VAPID_PRIVATE_KEY", "")
-        contact = os.getenv("VAPID_CONTACT", "")
-        return {
-            "public_key": public_key,
-            "private_key": private_key,
-            "contact": contact,
-        }
-
-
 def _send_fcm_v1_admin_sdk(
     fcm_token: str, title: str, body: str, url: str
 ) -> Optional[bool]:

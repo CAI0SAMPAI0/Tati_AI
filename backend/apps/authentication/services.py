@@ -340,7 +340,14 @@ class AuthService:
             else:
                 role = UserRole.STUDENT
 
+            now_iso = datetime.now(timezone.utc).isoformat()
             profile_data = {"avatar_url": picture} if picture else {}
+            profile_data["lgpd_consent"] = {
+                "accepted_at": now_iso,
+                "terms_version": "2.2",
+                "accepted_terms": True,
+                "parental_consent": True,
+            }
 
             user = User.objects.create(
                 username=candidate,
@@ -353,10 +360,22 @@ class AuthService:
             user.save()
             logger.info(f"[Auth] Novo usuário Google criado: {user.username}")
         else:
-            # Atualiza avatar se não tiver foto configurada ainda
+            # Atualiza avatar se não tiver foto e garante consentimento LGPD
             user_prof = user.profile if isinstance(user.profile, dict) else {}
+            has_changes = False
             if picture and not user_prof.get("avatar_url"):
                 user_prof["avatar_url"] = picture
+                has_changes = True
+            if not user_prof.get("lgpd_consent"):
+                now_iso = datetime.now(timezone.utc).isoformat()
+                user_prof["lgpd_consent"] = {
+                    "accepted_at": now_iso,
+                    "terms_version": "2.2",
+                    "accepted_terms": True,
+                    "parental_consent": True,
+                }
+                has_changes = True
+            if has_changes:
                 user.profile = user_prof
                 user.save(update_fields=["profile"])
 

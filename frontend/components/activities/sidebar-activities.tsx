@@ -76,9 +76,22 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
         { href: '/activities/hub', icon: <Zap size={20} />, label: 'Hub' },
         { href: '/progress', icon: <TrendingUp size={20} />, label: 'Progress' },
         { href: '/goals', icon: <Target size={20} />, label: 'Goals' },
-        { href: '/achievements', icon: <Trophy size={20} />, label: 'Achievements' },
+        { href: '/activities/achievements/my', icon: <Trophy size={20} />, label: 'Achievements' },
         { href: '/competitions', icon: <ChartBar size={20} />, label: 'Competitions' },
       ];
+
+  const isItemActive = (href: string) => {
+    if (pathname === href) return true;
+    if (
+      (href === '/achievements' || href === '/activities/achievements/my') &&
+      (pathname === '/achievements' || pathname.startsWith('/activities/achievements') || pathname.startsWith('/achievements'))
+    ) {
+      return true;
+    }
+    if (href === '/activities' && pathname === '/activities') return true;
+    if (href === '/activities/hub' && pathname.startsWith('/activities/hub')) return true;
+    return false;
+  };
 
   return (
     <>
@@ -117,7 +130,7 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
               href={item.href}
               icon={item.icon}
               label={item.label}
-              isActive={pathname === item.href}
+              isActive={isItemActive(item.href)}
               onMouseEnter={() => {
                 const route = item.href === '/activities/hub' ? 'hub-catalog' : item.href.replace('/', '');
                 prefetch(route || 'chat');

@@ -18,7 +18,7 @@ interface MessageListProps {
   onStartLeveling?: () => void;
 }
 
-export function MessageList({ messages, isStreaming, streamingContent, conversationId, onEdit, onResend, onSendMessage, onStartLeveling }: MessageListProps) {
+export function MessageList({ messages, isStreaming, streamingContent, conversationId, onEdit, onResend, onStartLeveling }: MessageListProps) {
   const router = useRouter();
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -132,7 +132,7 @@ export function MessageList({ messages, isStreaming, streamingContent, conversat
             <Image src="/images/tati_logo.jpg" alt="Tati" width={28} height={28} className="w-full h-full object-cover" />
           </div>
           <h2 className="font-display text-xl font-bold mb-2">
-            Welcome to Taty&apos;s Hub 👋
+            Welcome to Taty&apos;s Hub
           </h2>
           <p className="text-sm text-text-muted max-w-[320px] mb-6">
             Your AI English learning hub. Let&apos;s practice together?
@@ -159,26 +159,6 @@ export function MessageList({ messages, isStreaming, streamingContent, conversat
               </button>
             </div>
           )}
-
-          <div className="bg-surface border border-border px-3 py-2 rounded-lg text-xs text-text-subtle mb-6">
-            💡 Click any English word to see the translation and hear the pronunciation
-          </div>
-          <div className="flex flex-wrap justify-center gap-2 max-w-sm">
-            {[
-              { key: 'chat.sugg_1', label: 'How do I introduce myself?' },
-              { key: 'chat.sugg_2', label: 'Correct my English, please' },
-              { key: 'chat.sugg_3', label: "Let's practice conversation" },
-              { key: 'chat.sugg_4', label: 'Explain past tense to me' }
-            ].map((sugg) => (
-              <button
-                key={sugg.key}
-                onClick={() => onSendMessage?.(sugg.label)}
-                className="px-3 py-1.5 bg-surface border border-border rounded-full text-[0.8rem] text-text-muted hover:bg-primary-dim hover:text-primary hover:border-primary/50 transition-all cursor-pointer"
-              >
-                {sugg.label}
-              </button>
-            ))}
-          </div>
           <button
             onClick={() => router.push('/pronunciation-reader')}
             className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-dim border border-primary/30 rounded-full text-[0.8rem] text-primary font-semibold hover:bg-primary hover:text-white transition-all cursor-pointer"

@@ -39,6 +39,8 @@ class GoalOut(BaseModel):
     progress: int = 0
     period: str
     is_completed: bool = False
+    title: Optional[str] = None
+    description: Optional[str] = None
 
 
 class XPAwardInput(BaseModel):
