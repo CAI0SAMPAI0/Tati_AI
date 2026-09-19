@@ -120,9 +120,8 @@ export default function ActivitiesClientPage() {
   const [filterLevel, setFilterLevel] = useState<string>('All');
   const [visibleCount, setVisibleCount] = useState(10);
 
-  const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+  const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B1+', 'B2', 'C1', 'C2'];
   const userLevelNormalized = (user?.level || '').toUpperCase().trim();
-  const allowedLevels = CEFR_LEVELS;
 
   const effectiveLevel = useMemo(() => {
     if (filterLevel === 'All') return 'All';

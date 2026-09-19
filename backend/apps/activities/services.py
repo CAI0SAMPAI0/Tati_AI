@@ -2344,21 +2344,24 @@ class ExternalContentService:
         enriched = []
         if level.lower() in ("all", "any"):
             for lvl in cls.TE_LEVELS:
-                lvl_path = lvl.lower().replace("+", "-plus") if "+" in lvl else lvl.lower()
+                lvl_path = "b1-b2" if lvl in ("B1+", "B1-B2") else lvl.lower()
                 for it in cat_data.get(lvl, []):
                     slug = it.get("slug", "")
                     if slug in ("grammar-points", "vocabulary", "listening", "reading", ""):
                         slug = it.get("title", "").lower().replace(":", "").replace("'", "").replace("?", "").replace(" ", "-")
-                    url = f"https://test-english.com/{cat_slug}/{lvl_path}/{slug}/"
+                    url = it.get("url") or f"https://test-english.com/{cat_slug}/{lvl_path}/{slug}/"
                     enriched.append({**it, "url": url, "level": lvl})
         else:
-            level_code = level.upper()
-            lvl_path = level.lower().replace("+", "-plus") if "+" in level else level.lower()
-            for it in cat_data.get(level_code, []):
+            level_code = level.upper().strip()
+            items = cat_data.get(level_code) or []
+            if not items and level_code in ("B1+", "B1-PLUS", "B1_PLUS", "B1-B2", "B1_B2"):
+                items = cat_data.get("B1+") or cat_data.get("B1-B2") or []
+            lvl_path = "b1-b2" if level_code in ("B1+", "B1-PLUS", "B1-B2") else level_code.lower()
+            for it in items:
                 slug = it.get("slug", "")
                 if slug in ("grammar-points", "vocabulary", "listening", "reading", ""):
                     slug = it.get("title", "").lower().replace(":", "").replace("'", "").replace("?", "").replace(" ", "-")
-                url = f"https://test-english.com/{cat_slug}/{lvl_path}/{slug}/"
+                url = it.get("url") or f"https://test-english.com/{cat_slug}/{lvl_path}/{slug}/"
                 enriched.append({**it, "url": url, "level": level_code})
 
         return {

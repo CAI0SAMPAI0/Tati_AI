@@ -234,28 +234,28 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-xl font-bold text-primary">
                   {localStudent.avatar_url ? <img src={localStudent.avatar_url} alt="" className="w-full h-full rounded-full object-cover" /> : localStudent.username.charAt(0).toUpperCase()}
                 </div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-text">@{localStudent.username}</h3>
-                    {localStudent.role === 'lead' ? (
-                      <span className="px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-[0.65rem] font-bold">
-                        Lead (CEFR)
-                      </span>
-                    ) : localStudent.role === 'buyer' ? (
-                      <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[0.65rem] font-bold">
-                        Buyer
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-[0.65rem] font-bold">
-                        Aluno
-                      </span>
-                    )}
-                  </div>
-                  {localStudent.email && (
-                    <p className="text-xs text-text-muted mt-0.5">{localStudent.email}</p>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-text">@{localStudent.username}</h3>
+                  {localStudent.role === 'lead' ? (
+                    <span className="px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-[0.65rem] font-bold">
+                      Lead (CEFR)
+                    </span>
+                  ) : localStudent.role === 'buyer' ? (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[0.65rem] font-bold">
+                      Buyer
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-[0.65rem] font-bold">
+                      Aluno
+                    </span>
                   )}
-                  <p className="text-xs text-text-muted flex items-center gap-1 mt-0.5">
-                    <Clock size={12} /> {'Joined'}: {formatDateTime(localStudent.created_at)}
-                  </p>
+                </div>
+                {localStudent.email && (
+                  <p className="text-xs text-text-muted mt-0.5">{localStudent.email}</p>
+                )}
+                <p className="text-xs text-text-muted flex items-center gap-1 mt-0.5">
+                  <Clock size={12} /> {'Joined'}: {formatDateTime(localStudent.created_at)}
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -612,38 +612,6 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                               <span className="font-bold text-text truncate">Card #{f.card_index ?? i + 1}</span>
                             </div>
                             <span className="text-[0.6rem] text-success font-bold shrink-0">✓ Correct</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Vocabulary List */}
-                  {activityProgress.vocabulary?.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-bold text-text-muted uppercase tracking-widest">Vocabulary Learned</h4>
-                      <div className="flex flex-wrap gap-1.5">
-                        {activityProgress.vocabulary.map((v: any, i: number) => (
-                          <span key={v.id || i} className="px-2.5 py-1 bg-primary/10 text-primary text-[0.65rem] font-bold rounded-lg border border-primary/20">
-                            {v.word}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Pronunciation */}
-                  {activityProgress.pronunciation?.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-bold text-text-muted uppercase tracking-widest">Pronunciation Challenges</h4>
-                      <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
-                        {activityProgress.pronunciation.map((p: any, i: number) => (
-                          <div key={i} className="p-2.5 bg-bg-secondary/40 border border-border/80 rounded-xl flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className={cn("w-2 h-2 rounded-full shrink-0", p.is_done ? "bg-success" : "bg-warning")} />
-                              <span className="font-bold text-text truncate">{p.word || p.phrase || `Challenge #${i + 1}`}</span>
-                            </div>
-                            {p.score != null && <span className="text-text-muted shrink-0">{p.score}%</span>}
                           </div>
                         ))}
                       </div>
