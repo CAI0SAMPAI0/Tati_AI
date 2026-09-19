@@ -110,6 +110,7 @@ export default function LoginPage() {
   }, [saveSession, router]);
 
   // Google OAuth
+  const googleInitializedRef = useRef(false);
   useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     if (!clientId) return;
@@ -122,13 +123,16 @@ export default function LoginPage() {
         return;
       }
 
-      g.accounts.id.initialize({
-        client_id: clientId,
-        callback: handleGoogleCredential,
-        auto_select: false,
-        cancel_on_tap_outside: true,
-        ux_mode: 'popup',
-      });
+      if (!googleInitializedRef.current) {
+        g.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleGoogleCredential,
+          auto_select: false,
+          cancel_on_tap_outside: true,
+          ux_mode: 'popup',
+        });
+        googleInitializedRef.current = true;
+      }
 
       if (googleBtnRef.current) {
         g.accounts.id.renderButton(googleBtnRef.current, {
@@ -142,12 +146,7 @@ export default function LoginPage() {
       }
     };
 
-    if ((window as any).google?.accounts?.id) {
-      initGoogle();
-    } else {
-      initGoogle();
-    }
-
+    initGoogle();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -181,6 +180,15 @@ export default function LoginPage() {
     clearMessages();
     setLoading(true);
     setError('');
+
+    // Se estiver rodando no app Flutter (WebView), aciona o modal nativo do Android
+    if (typeof window !== 'undefined') {
+      const isFlutter = (window as any).isFlutterApp || (window as any).flutter_inappwebview;
+      if (isFlutter && (window as any).flutter_inappwebview?.callHandler) {
+        (window as any).flutter_inappwebview.callHandler('googleLogin');
+        return;
+      }
+    }
 
     // Redireciona diretamente para o fluxo de autenticação do Google (302 Redirect)
     const base = API_BASE || process.env.NEXT_PUBLIC_API_BASE_URL || '';

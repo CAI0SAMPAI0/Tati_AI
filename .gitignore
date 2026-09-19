@@ -106,6 +106,7 @@ coverage.xml
 
 # Mobile Builds
 *.aab
+*.apk
 mobile_app/capacitor/www/
 
 .worktrees/

@@ -379,21 +379,30 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
               {interests.length > 0 && (
                 <div className="space-y-4">
                   <div className="flex flex-wrap gap-2">
-                    {interests.map((interest, i) => (
-                      <span key={i} className="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-lg border border-primary/20">
-                        {interest}
-                      </span>
-                    ))}
+                    {interests.map((interest: any, i) => {
+                      const label = typeof interest === 'string' ? interest : (interest?.title || interest?.topic || interest?.name || JSON.stringify(interest));
+                      return (
+                        <span key={i} className="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-lg border border-primary/20">
+                          {label}
+                        </span>
+                      );
+                    })}
                   </div>
                   {recommendations.length > 0 && (
                     <div className="space-y-2">
                       <h4 className="text-xs font-bold text-text-muted uppercase tracking-widest">{'Practical Recommendations'}</h4>
-                      {recommendations.map((rec: any, i) => (
-                        <div key={i} className="p-3 bg-surface border border-border rounded-xl text-xs leading-relaxed">
-                          <span className="font-bold text-primary mr-2">✦</span>
-                          <span className="font-bold">{rec.recommendation || rec}:</span> {rec.description}
-                        </div>
-                      ))}
+                      {recommendations.map((rec: any, i) => {
+                        const recTitle = typeof rec === 'string' ? rec : (rec.title || rec.recommendation || rec.topic || 'Recommendation');
+                        const recDesc = rec.description || (rec.topic && rec.title !== rec.topic ? rec.topic : '');
+                        const recType = rec.type ? `[${rec.type}] ` : '';
+                        return (
+                          <div key={i} className="p-3 bg-surface border border-border rounded-xl text-xs leading-relaxed">
+                            <span className="font-bold text-primary mr-2">✦</span>
+                            <span className="font-bold">{recType}{recTitle}</span>
+                            {recDesc ? `: ${recDesc}` : ''}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

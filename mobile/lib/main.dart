@@ -113,8 +113,24 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
   bool isPageLoaded = false;
   String? fcmToken;
 
-  final String appUrl = "https://tati-ai.vercel.app";
-  final String backendApiUrl = "https://caio007-tati-ai-backend.hf.space/api/v1";
+  // Modo dev: ativo por padrão para o APK de dev
+  static const bool isDevMode = bool.fromEnvironment('DEV_MODE', defaultValue: true);
+
+  // Frontend URL: em dev aponta para o Railway; em produção para Vercel
+  final String appUrl = const String.fromEnvironment(
+    'APP_URL',
+    defaultValue: isDevMode
+        ? "https://stunning-tranquility-production-4c54.up.railway.app"
+        : "https://tati-ai.vercel.app",
+  );
+
+  // Backend API URL: em dev aponta para o Railway; em produção para HF Space
+  final String backendApiUrl = const String.fromEnvironment(
+    'BACKEND_API_URL',
+    defaultValue: isDevMode
+        ? "https://cheerful-surprise-production-f539.up.railway.app/api/v1"
+        : "https://caio007-tati-ai-backend.hf.space/api/v1",
+  );
 
   @override
   void initState() {
