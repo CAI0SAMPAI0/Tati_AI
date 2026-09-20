@@ -1,12 +1,16 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Menu, FileText, Mic, BookMarked, Check } from 'lucide-react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { Menu, FileText, Mic, BookMarked, Check, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { NotificationsDropdown } from '@/components/layout/notifications-dropdown';
 import { ACCENTS, getStoredAccent, saveStoredAccent } from '@/lib/constants/accents';
 import { useAuth } from '@/hooks/useAuth';
-import { apiPut } from '@/lib/api/client';
+import { apiPut, apiGet } from '@/lib/api/client';
+import { ENDPOINTS } from '@/lib/api/endpoints';
+import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 
@@ -16,6 +20,12 @@ interface ChatTopbarProps {
   onShowSummary: () => void;
   onSwitchToVoice: () => void;
   showSummaryBtn: boolean;
+}
+
+interface StreakData {
+  current_streak: number;
+  trophies_earned: number;
+  total_trophies?: number;
 }
 
 const showActivities = true;
@@ -31,6 +41,17 @@ export function ChatTopbar({
   const [currentAccent, setCurrentAccent] = useState<string>('en-US');
   const [isAccentMenuOpen, setIsAccentMenuOpen] = useState(false);
   const accentMenuRef = useRef<HTMLDivElement>(null);
+
+  const { data: streakData } = useQuery<StreakData>({
+    queryKey: ['streak-data'],
+    queryFn: () => apiGet<StreakData>(ENDPOINTS.STREAK),
+    refetchInterval: 60000,
+  });
+
+  const currentStreak = streakData?.current_streak ?? user?.streak ?? 0;
+  const isStreakActive = currentStreak > 0;
+  const trophiesEarned = streakData?.trophies_earned ?? 0;
+  const totalTrophies = streakData?.total_trophies ?? 50;
 
   useEffect(() => {
     const userAccent = user?.preferred_accent || (user?.profile as any)?.preferred_accent || (user?.profile as any)?.accent;
@@ -116,7 +137,47 @@ export function ChatTopbar({
         </h1>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Streak Flame */}
+        <Link
+          href="/activities/hub"
+          prefetch={true}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-surface border border-border hover:border-primary/40 text-xs font-bold transition-all active:scale-95 shadow-xs"
+          title={`Streak: ${currentStreak} days (${isStreakActive ? 'Active' : 'Inactive'})`}
+        >
+          <div className={cn(
+            "w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center transition-transform hover:scale-110",
+            !isStreakActive && "opacity-40 grayscale"
+          )}>
+            <Image
+              src={isStreakActive ? "/images/streak-active.svg" : "/images/streak-inactive.svg"}
+              alt="Streak"
+              width={16}
+              height={20}
+              className="object-contain"
+            />
+          </div>
+          <span className={cn(
+            "min-w-[1ch] inline-block text-[11px] sm:text-xs",
+            isStreakActive ? "text-orange-500 font-bold" : "text-text-muted font-medium"
+          )}>
+            {currentStreak}
+          </span>
+        </Link>
+
+        {/* Trophies */}
+        <Link
+          href="/achievements"
+          prefetch={true}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-surface border border-border hover:border-primary/40 text-xs font-bold transition-all active:scale-95 shadow-xs text-yellow-500"
+          title="Achievements"
+        >
+          <Trophy size={15} fill="currentColor" />
+          <span className="text-text-muted font-medium text-[11px] sm:text-xs min-w-[3ch] inline-block">
+            {trophiesEarned}/{totalTrophies}
+          </span>
+        </Link>
+
         {/* Accent Selector */}
         <div className="relative" ref={accentMenuRef}>
           <button

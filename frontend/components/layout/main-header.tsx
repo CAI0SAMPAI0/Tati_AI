@@ -11,6 +11,8 @@ import { ENDPOINTS } from '@/lib/api/endpoints';
 import { NotificationsDropdown } from './notifications-dropdown';
 
 import { DEFAULT_AVATAR_URL } from '@/lib/constants/user';
+import Image from 'next/image';
+import { cn } from '@/lib/utils';
 
 interface MainHeaderProps {
   onToggleMenu?: () => void;
@@ -19,6 +21,7 @@ interface MainHeaderProps {
 interface StreakData {
   current_streak: number;
   trophies_earned: number;
+  total_trophies?: number;
   total_questions?: number;
   hours_saved?: number;
 }
@@ -67,24 +70,54 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
         </div>
 
         <div className="flex items-center gap-3 md:gap-5">
-          {!isHubOnly && (
-            <>
-              <div className="flex items-center gap-1.5 text-orange-500 font-bold text-sm" title="Streak">
-                <Flame size={18} fill="currentColor" />
-                <span className="min-w-[1ch] inline-block">
-                  {streakData?.current_streak ?? user?.streak ?? 0}
-                </span>
+          {!isHubOnly && (() => {
+            const currentStreak = streakData?.current_streak ?? user?.streak ?? 0;
+            const isStreakActive = currentStreak > 0;
+            const trophiesEarned = streakData?.trophies_earned ?? 0;
+            const totalTrophies = streakData?.total_trophies ?? 50;
 
-              </div>
+            return (
+              <>
+                <Link
+                  href="/activities/hub"
+                  prefetch={true}
+                  className="flex items-center gap-1.5 font-bold text-sm hover:opacity-80 transition-opacity"
+                  title={`Streak: ${currentStreak} days (${isStreakActive ? 'Active' : 'Inactive'})`}
+                >
+                  <div className={cn(
+                    "w-6 h-6 flex items-center justify-center transition-transform hover:scale-110",
+                    !isStreakActive && "opacity-40 grayscale"
+                  )}>
+                    <Image
+                      src={isStreakActive ? "/images/streak-active.svg" : "/images/streak-inactive.svg"}
+                      alt="Streak"
+                      width={18}
+                      height={22}
+                      className="object-contain"
+                    />
+                  </div>
+                  <span className={cn(
+                    "min-w-[1ch] inline-block",
+                    isStreakActive ? "text-orange-500 font-bold" : "text-text-muted font-medium"
+                  )}>
+                    {currentStreak}
+                  </span>
+                </Link>
 
-              <div className="flex items-center gap-1.5 text-yellow-500 font-bold text-sm" title="Achievements">
-                <Trophy size={18} fill="currentColor" />
-                <span className="text-text-muted font-medium min-w-[4ch] inline-block">
-                  {streakData?.trophies_earned ?? 0}/50
-                </span>
-              </div>
-            </>
-          )}
+                <Link
+                  href="/achievements"
+                  prefetch={true}
+                  className="flex items-center gap-1.5 text-yellow-500 font-bold text-sm hover:opacity-80 transition-opacity"
+                  title="Achievements"
+                >
+                  <Trophy size={18} fill="currentColor" />
+                  <span className="text-text-muted font-medium min-w-[4ch] inline-block">
+                    {trophiesEarned}/{totalTrophies}
+                  </span>
+                </Link>
+              </>
+            );
+          })()}
 
           <NotificationsDropdown />
 

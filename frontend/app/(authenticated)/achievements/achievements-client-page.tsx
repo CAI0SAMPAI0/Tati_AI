@@ -11,6 +11,13 @@ import {
   HelpCircle,
   Sparkles,
   Medal as MedalIcon,
+  PenTool,
+  BookOpen,
+  MessageSquare,
+  Headphones,
+  BookMarked,
+  Layers,
+  Gamepad2,
 } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
@@ -22,19 +29,28 @@ import Image from 'next/image';
 
 const CATEGORIES = [
   { id: 'all', icon: <Trophy size={16} />, label: 'All' },
-  { id: 'questions', icon: <HelpCircle size={16} />, label: 'Questions' },
+  { id: 'grammar', icon: <PenTool size={16} />, label: 'Grammar' },
+  { id: 'vocabulary', icon: <BookOpen size={16} />, label: 'Vocabulary' },
+  { id: 'messages', icon: <MessageSquare size={16} />, label: 'Messages' },
+  { id: 'simulations', icon: <Sparkles size={16} />, label: 'Simulations' },
   { id: 'streak', icon: <Flame size={16} />, label: 'Streak' },
-  { id: 'credits', icon: <Coins size={16} />, label: 'Credits' },
-  { id: 'time', icon: <Clock size={16} />, label: 'Time' },
-  { id: 'milestones', icon: <Target size={16} />, label: 'Milestones' },
+  { id: 'listening', icon: <Headphones size={16} />, label: 'Listening' },
+  { id: 'reading', icon: <BookMarked size={16} />, label: 'Reading' },
+  { id: 'flashcards', icon: <Layers size={16} />, label: 'Flashcards' },
+  { id: 'games', icon: <Gamepad2 size={16} />, label: 'Games' },
 ];
 
 const CATEGORY_MAP: Record<string, string[]> = {
-  questions: ['questions', 'question', 'grammar', 'vocabulary', 'vocab', 'reading', 'read', 'games', 'game', 'quiz'],
+  all: [],
+  grammar: ['grammar', 'questions'],
+  vocabulary: ['vocabulary', 'vocab'],
+  messages: ['messages', 'message', 'msg', 'chat', 'time'],
+  simulations: ['simulations', 'simulation', 'milestones'],
   streak: ['streak'],
-  credits: ['credits', 'credit', 'flashcards', 'flashcard', 'coins'],
-  time: ['time', 'messages', 'message', 'msg', 'chat', 'listening', 'listen', 'podcast'],
-  milestones: ['milestones', 'milestone', 'simulations', 'simulation', 'interview', 'scenario', 'legend'],
+  listening: ['listening', 'listen', 'podcast', 'audio'],
+  reading: ['reading', 'read'],
+  flashcards: ['flashcards', 'flashcard', 'cards', 'credits'],
+  games: ['games', 'game'],
 };
 
 interface DashboardStats {

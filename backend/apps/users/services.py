@@ -45,6 +45,15 @@ class StreakService:
         study_dates = streak_data.get("study_dates") or []
 
         f_count = streak_data.get("freeze_count", 0) or 0
+
+        trophies_earned, total_trophies = 0, 50
+        if user and isinstance(user, User):
+            try:
+                from apps.activities.services import TrophyService
+                trophies_earned, total_trophies = TrophyService.get_unlocked_trophies_count(user)
+            except Exception as e:
+                logger.warning(f"Error computing trophies_earned in get_streak_data: {e}")
+
         return StreakDataOut(
             current_streak=streak_data.get("current_streak", 0) or 0,
             longest_streak=streak_data.get("longest_streak", 0) or 0,
@@ -53,6 +62,8 @@ class StreakService:
             last_activity_date=last_date_str,
             study_dates=study_dates[-30:] if isinstance(study_dates, list) else [],
             has_studied_today=has_studied,
+            trophies_earned=trophies_earned,
+            total_trophies=total_trophies,
         )
 
     @classmethod

@@ -11,6 +11,8 @@ class StreakDataOut(BaseModel):
     last_activity_date: Optional[str] = None
     study_dates: List[str] = []
     has_studied_today: bool = False
+    trophies_earned: int = 0
+    total_trophies: int = 50
 
 
 class StreakRecordOut(BaseModel):

@@ -184,7 +184,9 @@ def get_trophies(request: HttpRequest):
     """
     Lista todos os troféus e medalhas pedagógicas conquistadas pelo aluno.
     """
-    user = request.auth or User(username="aluno", role="student")
+    user = request.auth if isinstance(request.auth, User) else None
+    if not user:
+        user = User(username="aluno", role="student")
     return TrophyService.get_trophies(user)
 
 
