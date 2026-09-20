@@ -173,9 +173,16 @@ export default function ProgressClientPage() {
       const session = getStoredSession();
       const token = session?.token || (typeof window !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('access_token')) : null);
       const base = (API_BASE || '').replace(/\/+$/, '');
-      const url = `${base}/users/progress/report/download`;
+      const downloadEndpoint = `${base}/users/progress/report/download${token ? `?token=${encodeURIComponent(token)}` : ''}`;
 
-      const response = await fetch(url, {
+      // Se estiver no aplicativo Flutter (APK), abre diretamente o download no navegador externo
+      if (typeof window !== 'undefined' && (window as any).flutter_inappwebview?.callHandler) {
+        (window as any).flutter_inappwebview.callHandler('openExternalUrl', downloadEndpoint);
+        toast.success('Iniciando download no navegador...');
+        return;
+      }
+
+      const response = await fetch(downloadEndpoint, {
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },

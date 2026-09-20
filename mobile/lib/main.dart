@@ -356,7 +356,21 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                   useShouldOverrideUrlLoading: true,
                   allowFileAccessFromFileURLs: true,
                   allowUniversalAccessFromFileURLs: true,
+                  javaScriptCanOpenWindowsAutomatically: true,
+                  supportMultipleWindows: true,
                 ),
+                onCreateWindow: (controller, createWindowAction) async {
+                  final uri = createWindowAction.request.url;
+                  if (uri != null) {
+                    try {
+                      await InAppBrowser.openWithSystemBrowser(url: uri);
+                    } catch (e) {
+                      debugPrint('[onCreateWindow] Erro ao abrir no navegador: $e');
+                    }
+                    return true;
+                  }
+                  return false;
+                },
                 onWebViewCreated: (controller) {
                   webViewController = controller;
 
@@ -492,10 +506,13 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                     handlerName: 'openExternalUrl',
                     callback: (args) async {
                       if (args.isNotEmpty) {
-                        final String urlToOpen = args[0] is Map
+                        String urlToOpen = args[0] is Map
                             ? args[0]['url']?.toString() ?? ''
                             : args[0].toString();
                         if (urlToOpen.isNotEmpty) {
+                          if (!urlToOpen.startsWith('http://') && !urlToOpen.startsWith('https://')) {
+                            urlToOpen = '$appUrl${urlToOpen.startsWith('/') ? '' : '/'}$urlToOpen';
+                          }
                           debugPrint('[External Link] Abrindo no navegador: $urlToOpen');
                           try {
                             await InAppBrowser.openWithSystemBrowser(url: WebUri(urlToOpen));
@@ -561,6 +578,20 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                     window.isFlutterApp = true;
                     window.tatiAppVersion = '1.0.1';
                     window.tatiAppVersionCode = 2;
+
+                    // Intercepta window.open para garantir abertura no navegador do celular
+                    var origOpen = window.open;
+                    window.open = function(url, target, features) {
+                      if (url) {
+                        var a = document.createElement('a');
+                        a.href = url;
+                        if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {
+                          window.flutter_inappwebview.callHandler('openExternalUrl', a.href);
+                          return null;
+                        }
+                      }
+                      return origOpen ? origOpen.apply(window, arguments) : null;
+                    };
 
                     window.addEventListener('storage', function(e) {
                       if (e.key === 'token' && e.newValue) {

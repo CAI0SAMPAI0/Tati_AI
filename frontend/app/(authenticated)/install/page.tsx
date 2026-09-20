@@ -111,7 +111,17 @@ export default function InstallPage() {
                 </div>
               ) : (
                 <>
-                  <Button className="w-full gap-2 font-bold" onClick={() => window.open('/downloads/tati-ai.apk', '_blank')}>
+                  <Button 
+                    className="w-full gap-2 font-bold" 
+                    onClick={() => {
+                      const apkUrl = 'https://tati-ai.vercel.app/downloads/tati-ai.apk';
+                      if (typeof window !== 'undefined' && (window as any).flutter_inappwebview?.callHandler) {
+                        (window as any).flutter_inappwebview.callHandler('openExternalUrl', apkUrl);
+                      } else {
+                        window.location.href = apkUrl;
+                      }
+                    }}
+                  >
                     <Download size={18} />
                     Download .APK (Direto)
                   </Button>

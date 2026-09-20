@@ -166,6 +166,17 @@ class OptionalAuthBearer:
                     if user:
                         request.user = user
                         return user
+
+        # Fallback para token via query string (necessário para downloads diretos no navegador/WebView)
+        query_token = request.GET.get("token")
+        if query_token:
+            payload = decode_token(query_token)
+            if payload and payload.get("sub"):
+                user = User.objects.filter(username=payload["sub"]).first()
+                if user:
+                    request.user = user
+                    return user
+
         return True
 
 
