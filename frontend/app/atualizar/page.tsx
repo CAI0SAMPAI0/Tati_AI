@@ -11,6 +11,7 @@ export default function AtualizarPage() {
   const [downloadStarted, setDownloadStarted] = useState(false);
   const [seconds, setSeconds] = useState(3);
   const [isAlreadyUpdated, setIsAlreadyUpdated] = useState(false);
+  const [isOldApk, setIsOldApk] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -24,7 +25,17 @@ export default function AtualizarPage() {
       return () => clearTimeout(timer);
     }
 
-    // Contador regressivo para iniciar o download automaticamente
+    // Detecta se está dentro do WebView do APK antigo
+    const isFlutter = typeof window !== 'undefined' && Boolean(
+      (window as any).isFlutterApp || (window as any).flutter_inappwebview
+    );
+    if (isFlutter && (!code || Number(code) < 2)) {
+      setIsOldApk(true);
+      // No APK antigo, o WebView não suporta downloads automáticos em segundo plano.
+      return;
+    }
+
+    // Contador regressivo para iniciar o download automaticamente (apenas no navegador padrão)
     const timer = setInterval(() => {
       setSeconds((prev) => {
         if (prev <= 1) {
@@ -60,6 +71,31 @@ export default function AtualizarPage() {
     } catch (_) {
       window.location.href = DIRECT_DOWNLOAD_URL;
     }
+  };
+
+  const handleOpenInChrome = async () => {
+    // Sempre copia o link para a área de transferência primeiro
+    if (typeof window !== 'undefined' && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(DIRECT_DOWNLOAD_URL);
+        setCopied(true);
+      } catch (_) {}
+    }
+
+    // Se navigator.share for suportado pelo Android, abre o menu nativo para escolher o Chrome
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Teacher Tatiana AI',
+          text: 'Baixar atualização do aplicativo (APK)',
+          url: DIRECT_DOWNLOAD_URL,
+        });
+        return;
+      } catch (_) {}
+    }
+
+    // Fallback: se não tiver share, tenta disparar o download
+    triggerDownload();
   };
 
   const handleCopyLink = () => {
@@ -140,55 +176,81 @@ export default function AtualizarPage() {
             </span>
           </div>
 
-          {/* Botão de Download Principal (Sólido, sem gradiente) */}
-          <button
-            onClick={triggerDownload}
-            className="w-full py-3 px-4 bg-[#6d28d9] hover:bg-[#5b21b6] active:scale-[0.99] transition-all rounded-xl font-semibold text-white shadow-sm flex items-center justify-center gap-2 mb-2.5 cursor-pointer text-sm"
-          >
-            <Download size={16} />
-            <span>Baixar Atualização (17 MB)</span>
-          </button>
+          {isOldApk ? (
+            /* Layout especial para quem está no APK antigo (WebView bloqueia download direto) */
+            <div className="space-y-2.5">
+              <div className="p-3 bg-[#f5f3ff] border border-[#ddd6fe] rounded-xl text-xs text-[#524f64] leading-relaxed">
+                O Android não permite baixar arquivos diretamente de dentro desta versão do aplicativo. Toque abaixo para abrir no <strong className="text-[#6d28d9]">Chrome</strong> ou copie o link:
+              </div>
 
-          {/* Botão secundário para abrir no navegador padrão do Android */}
-          <button
-            onClick={triggerDownload}
-            className="w-full py-2.5 px-3 bg-[#f5f3ff] hover:bg-[#ede9fe] border border-[#ddd6fe] transition-colors rounded-xl text-xs font-semibold text-[#6d28d9] flex items-center justify-center gap-1.5 mb-2.5 cursor-pointer"
-          >
-            <ExternalLink size={14} />
-            <span>Abrir download no Navegador do Celular</span>
-          </button>
+              <button
+                onClick={handleOpenInChrome}
+                className="w-full py-3 px-4 bg-[#6d28d9] hover:bg-[#5b21b6] active:scale-[0.99] transition-all rounded-xl font-semibold text-white shadow-sm flex items-center justify-center gap-2 cursor-pointer text-sm"
+              >
+                <ExternalLink size={16} />
+                <span>Abrir no Chrome / Compartilhar</span>
+              </button>
 
-          {/* Botão para copiar o link caso o celular bloqueie popups */}
-          <button
-            onClick={handleCopyLink}
-            className="w-full py-2 px-3 bg-white hover:bg-[#f8f7fc] border border-[#e8e5f0] transition-colors rounded-xl text-xs font-medium text-[#524f64] flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            {copied ? (
-              <>
-                <Check size={13} className="text-[#059669]" />
-                <span className="text-[#059669] font-semibold">Link copiado! Cole no Chrome.</span>
-              </>
-            ) : (
-              <>
-                <Copy size={13} />
-                <span>Copiar link do download</span>
-              </>
-            )}
-          </button>
+              <button
+                onClick={handleCopyLink}
+                className="w-full py-2.5 px-3 bg-white hover:bg-[#f8f7fc] border border-[#e8e5f0] transition-colors rounded-xl text-xs font-semibold text-[#524f64] flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                {copied ? (
+                  <>
+                    <Check size={14} className="text-[#059669]" />
+                    <span className="text-[#059669] font-bold">Link copiado! Abra o Chrome e cole.</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy size={14} />
+                    <span>Copiar Link do Download</span>
+                  </>
+                )}
+              </button>
+            </div>
+          ) : (
+            /* Layout para quem está no navegador normal ou APK novo */
+            <>
+              <button
+                onClick={triggerDownload}
+                className="w-full py-3 px-4 bg-[#6d28d9] hover:bg-[#5b21b6] active:scale-[0.99] transition-all rounded-xl font-semibold text-white shadow-sm flex items-center justify-center gap-2 mb-2.5 cursor-pointer text-sm"
+              >
+                <Download size={16} />
+                <span>Baixar Atualização (17 MB)</span>
+              </button>
 
-          <div className="mt-4 pt-3 border-t border-[#f0edf8] text-center">
-            <p className="text-xs text-[#524f64]">
-              {downloadStarted ? (
-                <span className="text-[#059669] font-medium flex items-center justify-center gap-1">
-                  <CheckCircle2 size={13} /> Download iniciado! Verifique a barra de notificações.
-                </span>
-              ) : (
-                <span>
-                  Iniciando download automático em <strong className="text-[#6d28d9]">{seconds}s</strong>...
-                </span>
-              )}
-            </p>
-          </div>
+              <button
+                onClick={handleCopyLink}
+                className="w-full py-2 px-3 bg-white hover:bg-[#f8f7fc] border border-[#e8e5f0] transition-colors rounded-xl text-xs font-medium text-[#524f64] flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                {copied ? (
+                  <>
+                    <Check size={13} className="text-[#059669]" />
+                    <span className="text-[#059669] font-semibold">Link copiado! Cole no Chrome.</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy size={13} />
+                    <span>Copiar link do download</span>
+                  </>
+                )}
+              </button>
+
+              <div className="mt-4 pt-3 border-t border-[#f0edf8] text-center">
+                <p className="text-xs text-[#524f64]">
+                  {downloadStarted ? (
+                    <span className="text-[#059669] font-medium flex items-center justify-center gap-1">
+                      <CheckCircle2 size={13} /> Download iniciado! Verifique a barra de notificações.
+                    </span>
+                  ) : (
+                    <span>
+                      Iniciando download automático em <strong className="text-[#6d28d9]">{seconds}s</strong>...
+                    </span>
+                  )}
+                </p>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Passo a Passo Simples */}
