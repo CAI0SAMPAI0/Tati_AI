@@ -42,23 +42,24 @@ export default function AtualizarPage() {
   const triggerDownload = () => {
     setDownloadStarted(true);
 
-    // 1. Se estiver no Flutter, aciona o handler nativo para abrir direto no navegador externo
+    // 1. Se estiver no Flutter e tiver o handler nativo, abre direto no navegador externo
     try {
       if (typeof window !== 'undefined' && (window as any).flutter_inappwebview?.callHandler) {
         (window as any).flutter_inappwebview.callHandler('openExternalUrl', DIRECT_DOWNLOAD_URL);
       }
     } catch (_) {}
 
-    // 2. Tenta abrir via Intent do Android (abre o Chrome/navegador padrão no Android mesmo em WebViews antigas)
+    // 2. Download direto no navegador padrão
     try {
-      const intentUrl = `intent://tati-ai.vercel.app/downloads/tati-ai.apk#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end`;
-      window.location.href = intentUrl;
-    } catch (_) {}
-
-    // 3. Fallback direto
-    setTimeout(() => {
+      const a = document.createElement('a');
+      a.href = DIRECT_DOWNLOAD_URL;
+      a.download = 'tati-ai.apk';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (_) {
       window.location.href = DIRECT_DOWNLOAD_URL;
-    }, 600);
+    }
   };
 
   const handleCopyLink = () => {
