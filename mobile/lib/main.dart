@@ -254,6 +254,7 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                       try {
                         debugPrint('[Google Login] Abrindo modal nativo de contas do Android...');
                         final GoogleSignIn googleSignIn = GoogleSignIn(
+                          serverClientId: '180033452403-sdrigagekhqpi9l937fpg3knkfgjgf1p.apps.googleusercontent.com',
                           scopes: ['email', 'profile'],
                         );
 
@@ -262,15 +263,26 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                         if (account != null) {
                           debugPrint('[Google Login] Conta selecionada: ${account.email}');
                           final GoogleSignInAuthentication auth = await account.authentication;
-                          final String? tokenToSend = auth.idToken ?? auth.accessToken;
+                          
+                          String? tokenToSend = auth.idToken ?? auth.accessToken;
 
                           if (tokenToSend != null) {
                             debugPrint('[Google Login] Token obtido, enviando ao backend...');
-                            final response = await http.post(
+                            var response = await http.post(
                               Uri.parse("$backendApiUrl/auth/google"),
                               headers: {"Content-Type": "application/json"},
                               body: jsonEncode({"credential": tokenToSend}),
                             );
+
+                            // Se idToken falhou (ex: audience mismatch), tenta com accessToken como fallback
+                            if (response.statusCode != 200 && auth.accessToken != null && auth.accessToken != tokenToSend) {
+                              debugPrint('[Google Login] idToken falhou (${response.statusCode}). Tentando com accessToken...');
+                              response = await http.post(
+                                Uri.parse("$backendApiUrl/auth/google"),
+                                headers: {"Content-Type": "application/json"},
+                                body: jsonEncode({"credential": auth.accessToken}),
+                              );
+                            }
 
                             if (response.statusCode == 200) {
                               final data = jsonDecode(response.body);
@@ -279,19 +291,48 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
 
                               debugPrint('[Google Login] Sucesso! Injetando sessão no WebView.');
 
-                              // Injeta no localStorage e redireciona
+                              // Sincroniza cookies nativos no WebKit
+                              try {
+                                final cookieManager = CookieManager.instance();
+                                await cookieManager.setCookie(
+                                  url: WebUri(appUrl),
+                                  name: "auth_token",
+                                  value: token,
+                                  path: "/",
+                                  isSecure: true,
+                                  sameSite: HTTPCookieSameSitePolicy.LAX,
+                                );
+                                await cookieManager.setCookie(
+                                  url: WebUri(appUrl),
+                                  name: "token",
+                                  value: token,
+                                  path: "/",
+                                  isSecure: true,
+                                  sameSite: HTTPCookieSameSitePolicy.LAX,
+                                );
+                              } catch (e) {
+                                debugPrint('[Google Login] Aviso ao setar cookie nativo: $e');
+                              }
+
+                              // Injeta no localStorage e cookies do document
                               await controller.evaluateJavascript(source: """
                                 localStorage.setItem('token', '$token');
                                 localStorage.setItem('user', '${jsonEncode(user)}');
-                                document.cookie = 'token=$token; path=/; max-age=2592000; SameSite=Lax';
+                                document.cookie = 'auth_token=$token; path=/; max-age=2592000; SameSite=Lax; Secure';
+                                document.cookie = 'token=$token; path=/; max-age=2592000; SameSite=Lax; Secure';
                                 window.location.href = '/chat';
                               """);
+
+                              // Garantia defensiva: navegação direta via controller caso o window.location demore
+                              Future.delayed(const Duration(milliseconds: 400), () {
+                                controller.loadUrl(urlRequest: URLRequest(url: WebUri("$appUrl/chat")));
+                              });
 
                               if (user != null && user['username'] != null) {
                                 _syncTokenWithBackend(user['username'], token);
                               }
 
-                              return {"success": true};
+                              return {"success": true, "token": token, "user": user};
                             } else {
                               debugPrint('[Google Login] Erro no backend: ${response.body}');
                             }

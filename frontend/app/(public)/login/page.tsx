@@ -185,7 +185,21 @@ export default function LoginPage() {
     if (typeof window !== 'undefined') {
       const isFlutter = (window as any).isFlutterApp || (window as any).flutter_inappwebview;
       if (isFlutter && (window as any).flutter_inappwebview?.callHandler) {
-        (window as any).flutter_inappwebview.callHandler('googleLogin');
+        (window as any).flutter_inappwebview
+          .callHandler('googleLogin')
+          .then(async (res: any) => {
+            if (res && res.token && res.user) {
+              await saveSession(res.token, res.user);
+              router.push('/chat');
+            } else if (res && res.success) {
+              router.push('/chat');
+            } else {
+              setLoading(false);
+            }
+          })
+          .catch(() => {
+            setLoading(false);
+          });
         return;
       }
     }
@@ -197,7 +211,7 @@ export default function LoginPage() {
     const hubParam = isHub ? '&access=hub' : '';
     const targetUrl = `${base.replace(/\/+$/, '')}/auth/google/login?origin=${origin}${hubParam}`;
     window.location.href = targetUrl;
-  }, []);
+  }, [saveSession, router]);
 
   // Login
   const handleLogin = async (e: React.FormEvent) => {

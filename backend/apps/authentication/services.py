@@ -287,10 +287,18 @@ class AuthService:
         # 1. Tenta validar como Google ID Token (JWT)
         try:
             google_client_id = getattr(settings, "GOOGLE_CLIENT_ID", "")
+            allowed_audiences = [
+                cid
+                for cid in [
+                    google_client_id,
+                    "180033452403-sdrigagekhqpi9l937fpg3knkfgjgf1p.apps.googleusercontent.com",
+                ]
+                if cid
+            ]
             id_info = id_token.verify_oauth2_token(
                 credential,
                 google_requests.Request(),
-                audience=google_client_id if google_client_id else None,
+                audience=allowed_audiences if allowed_audiences else None,
             )
         except Exception as e:
             logger.info(
