@@ -50,8 +50,6 @@ export function ChatTopbar({
 
   const currentStreak = streakData?.current_streak ?? user?.streak ?? 0;
   const isStreakActive = currentStreak > 0;
-  const trophiesEarned = streakData?.trophies_earned ?? 0;
-  const totalTrophies = streakData?.total_trophies ?? 50;
 
   useEffect(() => {
     const userAccent = user?.preferred_accent || (user?.profile as any)?.preferred_accent || (user?.profile as any)?.accent;
@@ -162,19 +160,6 @@ export function ChatTopbar({
             isStreakActive ? "text-orange-500 font-bold" : "text-text-muted font-medium"
           )}>
             {currentStreak}
-          </span>
-        </Link>
-
-        {/* Trophies */}
-        <Link
-          href="/achievements"
-          prefetch={true}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-surface border border-border hover:border-primary/40 text-xs font-bold transition-all active:scale-95 shadow-xs text-yellow-500"
-          title="Achievements"
-        >
-          <Trophy size={15} fill="currentColor" />
-          <span className="text-text-muted font-medium text-[11px] sm:text-xs min-w-[3ch] inline-block">
-            {trophiesEarned}/{totalTrophies}
           </span>
         </Link>
 

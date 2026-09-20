@@ -569,7 +569,7 @@ export default function ProfileClientPage() {
           </div>
         )}
 
-        {/* Tab 4: Plan */}
+        {/* Tab 4: Plan 
         {tab === 'plan' && (
           <div className="space-y-6">
             <section className="bg-surface border border-border rounded-3xl p-6 md:p-8 space-y-6">
@@ -632,7 +632,7 @@ export default function ProfileClientPage() {
               </div>
             </section>
           </div>
-        )}
+        )}*/}
       </div>
     </div>
   );
