@@ -188,3 +188,8 @@ scratch_send_all.py
 
 # Questionários de nivelamento (não devem ir para produção)
 docs-questionario/
+
+# Keystores
+*.jks
+*.keystore
+key.properties

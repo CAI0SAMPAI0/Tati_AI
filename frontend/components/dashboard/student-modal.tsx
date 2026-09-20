@@ -250,9 +250,6 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                     </span>
                   )}
                 </div>
-                {localStudent.email && (
-                  <p className="text-xs text-text-muted mt-0.5">{localStudent.email}</p>
-                )}
                 <p className="text-xs text-text-muted flex items-center gap-1 mt-0.5">
                   <Clock size={12} /> {'Joined'}: {formatDateTime(localStudent.created_at)}
                 </p>

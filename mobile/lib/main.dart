@@ -113,8 +113,11 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
   bool isPageLoaded = false;
   String? fcmToken;
 
-  // Modo dev: ativo por padrão para o APK de dev
-  static const bool isDevMode = bool.fromEnvironment('DEV_MODE', defaultValue: true);
+  static const int localVersionCode = 2;
+  static const String localVersionName = "1.0.1";
+
+  // Modo dev: falso por padrão para o APK de produção
+  static const bool isDevMode = bool.fromEnvironment('DEV_MODE', defaultValue: false);
 
   // Frontend URL: em dev aponta para o Railway; em produção para Vercel
   final String appUrl = const String.fromEnvironment(
@@ -142,6 +145,112 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
       }
     };
     _initPermissionsAndPush();
+    // Verifica se há atualização disponível em segundo plano após 2 segundos
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) _checkForAppUpdate();
+    });
+  }
+
+  Future<void> _checkForAppUpdate() async {
+    try {
+      final response = await http
+          .get(Uri.parse("$appUrl/downloads/version.json"))
+          .timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final int remoteVersionCode = data['versionCode'] ?? 0;
+        final String remoteVersionName = data['version'] ?? '';
+        final String downloadUrl =
+            data['downloadUrl'] ?? "$appUrl/downloads/tati-ai.apk";
+        final String changelog = data['changelog'] ??
+            'Uma nova versão do Teacher Tatiana AI está disponível com melhorias e correções.';
+        final bool forceUpdate = data['forceUpdate'] ?? false;
+
+        if (remoteVersionCode > localVersionCode && mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: !forceUpdate,
+            builder: (ctx) => WillPopScope(
+              onWillPop: () async => !forceUpdate,
+              child: AlertDialog(
+                backgroundColor: const Color(0xFF181A20),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                title: Row(
+                  children: [
+                    const Icon(Icons.system_update_rounded,
+                        color: Color(0xFF8B5CF6), size: 28),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Nova Versão ($remoteVersionName)',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Há uma atualização recomendada para o seu aplicativo:',
+                      style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF262A34),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        changelog,
+                        style: const TextStyle(
+                            color: Color(0xFFE5E7EB), fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  if (!forceUpdate)
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('Depois',
+                          style: TextStyle(color: Color(0xFF9CA3AF))),
+                    ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF8B5CF6),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () async {
+                      try {
+                        await InAppBrowser.openWithSystemBrowser(url: WebUri(downloadUrl));
+                      } catch (e) {
+                        webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri(downloadUrl)));
+                      }
+                      if (!forceUpdate && mounted) {
+                        Navigator.of(ctx).pop();
+                      }
+                    },
+                    child: const Text('Atualizar Agora'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[Update Check] Verificação de versão: $e');
+    }
   }
 
   Future<void> _initPermissionsAndPush() async {
