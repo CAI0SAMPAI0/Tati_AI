@@ -299,22 +299,40 @@ export default function HistoryClientPage() {
 
   // KPIs
   const stats = useMemo(() => {
-    const total = submissions.length;
-    const avg =
-      total > 0
-        ? Math.round(
-            submissions.reduce((acc: number, s: any) => acc + (s.score !== undefined ? s.score : 100), 0) /
-              total
-          )
-        : 0;
+    const completedSubs = (submissions || []).filter(
+      (s: any) => s.status !== 'pending' && (s.score === undefined || s.score > 0)
+    );
+    const total = completedSubs.length;
 
-    const totalXp = submissions.reduce((acc: number, s: any) => {
-      const sc = s.score !== undefined ? s.score : 100;
-      return acc + (sc >= 70 ? 15 : 5);
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    const monthSubmissions = completedSubs.filter((s: any) => {
+      if (!s.created_at) return true;
+      const d = new Date(s.created_at);
+      return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+    });
+
+    const monthScore = monthSubmissions.reduce((acc: number, s: any) => {
+      const pts =
+        s.metadata?.points_awarded ??
+        (s.score !== undefined ? (s.score >= 70 ? 25 : (s.score > 0 ? 5 : 0)) : 25);
+      return acc + Number(pts || 0);
     }, 0);
 
-    const categoryCounts: Record<string, number> = {};
-    submissions.forEach((s: any) => {
+    const categoryCounts: Record<string, number> = {
+      grammar: 0,
+      vocabulary: 0,
+      listening: 0,
+      reading: 0,
+      simulations: 0,
+      games: 0,
+      news: 0,
+      flashcards: 0,
+    };
+
+    completedSubs.forEach((s: any) => {
       const cat = resolveActivityCategory(s);
       categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
     });
@@ -324,11 +342,12 @@ export default function HistoryClientPage() {
     Object.entries(categoryCounts).forEach(([cat, cnt]) => {
       if (cnt > maxCount) {
         maxCount = cnt;
-        topCategory = cat.charAt(0).toUpperCase() + cat.slice(1);
+        const config = CATEGORY_CONFIG[cat];
+        topCategory = config ? config.label : cat.charAt(0).toUpperCase() + cat.slice(1);
       }
     });
 
-    return { total, avg, totalXp, topCategory, categoryCounts };
+    return { total, monthScore, topCategory, categoryCounts };
   }, [submissions]);
 
   return (
@@ -348,10 +367,6 @@ export default function HistoryClientPage() {
           {/* Header & Title */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 text-primary text-xs font-black uppercase tracking-wider mb-1">
-                <HistoryIcon size={16} />
-                Study Activity Log
-              </div>
               <h1 className="text-2xl md:text-3xl font-black text-text tracking-tight">
                 Activity History
               </h1>
@@ -372,7 +387,7 @@ export default function HistoryClientPage() {
           </div>
 
           {/* Stats KPI Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Total Completed */}
             <div className="bg-surface border border-border rounded-3xl p-5 shadow-sm relative overflow-hidden group hover:border-primary/40 transition-all">
               <div className="flex items-center gap-3.5">
@@ -391,25 +406,7 @@ export default function HistoryClientPage() {
               <p className="text-[0.7rem] text-text-muted mt-3">Activities finished</p>
             </div>
 
-            {/* Average Accuracy */}
-            <div className="bg-surface border border-border rounded-3xl p-5 shadow-sm relative overflow-hidden group hover:border-emerald-500/40 transition-all">
-              <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-                  <Award size={24} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-text-muted uppercase tracking-wider">
-                    Avg Score
-                  </p>
-                  <p className="text-2xl font-black text-text mt-0.5">
-                    {stats.avg}%
-                  </p>
-                </div>
-              </div>
-              <p className="text-[0.7rem] text-text-muted mt-3">Average accuracy score</p>
-            </div>
-
-            {/* Total Score Earned */}
+            {/* Total Score Earned this month */}
             <div className="bg-surface border border-border rounded-3xl p-5 shadow-sm relative overflow-hidden group hover:border-amber-500/40 transition-all">
               <div className="flex items-center gap-3.5">
                 <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
@@ -420,7 +417,7 @@ export default function HistoryClientPage() {
                     Score
                   </p>
                   <p className="text-2xl font-black text-text mt-0.5">
-                    +{stats.totalXp}
+                    +{stats.monthScore}
                   </p>
                 </div>
               </div>
@@ -451,9 +448,8 @@ export default function HistoryClientPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <TrendingUp size={18} className="text-primary" />
-                <h2 className="text-sm font-bold text-text">Skills Overview</h2>
+                <h2 className="text-sm font-bold text-text">Activities done</h2>
               </div>
-              <span className="text-xs text-text-muted">Completed vs Practice</span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2.5">
@@ -588,8 +584,8 @@ export default function HistoryClientPage() {
                   {submissions.length === 0
                     ? "You haven't completed any activities yet. Complete your first exercise in Activities to build your study history and stats!"
                     : search || selectedCategory !== 'all'
-                    ? 'No completed activities match your current search or category filter.'
-                    : 'No completed activities found.'}
+                      ? 'No completed activities match your current search or category filter.'
+                      : 'No completed activities found.'}
                 </p>
               </div>
               <Link
@@ -618,12 +614,12 @@ export default function HistoryClientPage() {
 
                   const formattedDate = sub.created_at
                     ? new Date(sub.created_at).toLocaleDateString('pt-BR', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
                     : 'Completed';
 
                   const score = sub.score !== undefined ? sub.score : 100;
@@ -681,10 +677,10 @@ export default function HistoryClientPage() {
                                   {meta.url.includes('test-english')
                                     ? 'test-english.com'
                                     : meta.url.includes('liveworksheets')
-                                    ? 'liveworksheets.com'
-                                    : meta.url.includes('wordwall')
-                                    ? 'wordwall.net'
-                                    : 'Online Exercise'}
+                                      ? 'liveworksheets.com'
+                                      : meta.url.includes('wordwall')
+                                        ? 'wordwall.net'
+                                        : 'Online Exercise'}
                                 </span>
                               </>
                             )}
