@@ -14,6 +14,7 @@ const publicRoutes = [
   '/teste-cefr',
   '/cefr-test',
   '/hub',
+  '/atualizar',
 ];
 
 // Rotas de autenticação que devem redirecionar para /chat caso o usuário já esteja logado

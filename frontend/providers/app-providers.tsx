@@ -6,6 +6,8 @@ import { QueryProvider } from './query-provider';
 import { Toaster } from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 
+import { AppUpdateDetector } from '@/components/app-update-detector';
+
 const RegisterServiceWorker = dynamic(
   () => import('@/components/pwa/register-sw').then(m => m.RegisterServiceWorker as any),
   { ssr: false }
@@ -21,6 +23,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     <ThemeProvider>
       <QueryProvider>
         <AuthProvider>
+          <AppUpdateDetector />
           {children}
           <Toaster
             position="top-right"

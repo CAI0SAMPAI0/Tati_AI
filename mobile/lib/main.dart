@@ -502,6 +502,8 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                   await controller.evaluateJavascript(source: """
                     // Bridge para detectar Flutter e injetar comportamentos
                     window.isFlutterApp = true;
+                    window.tatiAppVersion = '1.0.1';
+                    window.tatiAppVersionCode = 2;
 
                     window.addEventListener('storage', function(e) {
                       if (e.key === 'token' && e.newValue) {
