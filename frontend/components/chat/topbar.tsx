@@ -140,7 +140,7 @@ export function ChatTopbar({
       <div className="flex items-center gap-1.5 sm:gap-2">
         {/* Streak Flame */}
         <Link
-          href="/activities/hub"
+          href="/achievements"
           prefetch={true}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-surface border border-border hover:border-primary/40 text-xs font-bold transition-all active:scale-95 shadow-xs"
           title={`Streak: ${currentStreak} days (${isStreakActive ? 'Active' : 'Inactive'})`}

@@ -135,7 +135,11 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
                 const route = item.href === '/activities/hub' ? 'hub-catalog' : item.href.replace('/', '');
                 prefetch(route || 'chat');
               }}
-              onClick={onClose}
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                  onClose();
+                }
+              }}
             />
           ))}
         </nav>
@@ -145,6 +149,11 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
             href="/chat"
             prefetch={true}
             onMouseEnter={() => prefetch('chat')}
+            onClick={() => {
+              if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                onClose();
+              }
+            }}
             className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold text-primary bg-primary/10 hover:bg-primary/20 transition-all"
           >
             <MessageSquare size={20} />

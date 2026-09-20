@@ -7,23 +7,49 @@ export function useSidebarState() {
 
   // Initialize state based on localStorage and window size
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    const syncState = () => {
+      if (typeof window === 'undefined') return;
       try {
-        const collapsed = localStorage.getItem('tati_sidebar_collapsed') === 'true';
         const isMobile = window.innerWidth < 768;
-        setSidebarOpen(isMobile ? false : !collapsed);
+        if (isMobile) {
+          setSidebarOpen(false);
+        } else {
+          const collapsed = localStorage.getItem('tati_sidebar_collapsed') === 'true';
+          setSidebarOpen(!collapsed);
+        }
       } catch {
         const isMobile = window.innerWidth < 768;
         setSidebarOpen(isMobile ? false : true);
       }
-    }
+    };
+
+    syncState();
+
+    const handleCustomChange = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (typeof detail === 'boolean') {
+        setSidebarOpen(detail);
+      } else {
+        syncState();
+      }
+    };
+
+    window.addEventListener('tati_sidebar_changed', handleCustomChange);
+    window.addEventListener('storage', syncState);
+    return () => {
+      window.removeEventListener('tati_sidebar_changed', handleCustomChange);
+      window.removeEventListener('storage', syncState);
+    };
   }, []);
 
   const handleToggle = useCallback(() => {
     setSidebarOpen(prev => {
       const next = !prev;
       try {
-        localStorage.setItem('tati_sidebar_collapsed', String(!next));
+        if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+          localStorage.setItem('tati_sidebar_collapsed', String(!next));
+        }
+        window.dispatchEvent(new CustomEvent('tati_sidebar_changed', { detail: next }));
       } catch {}
       return next;
     });
@@ -31,20 +57,22 @@ export function useSidebarState() {
 
   const handleClose = useCallback(() => {
     setSidebarOpen(false);
-    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
-      try {
+    try {
+      if (typeof window !== 'undefined' && window.innerWidth >= 768) {
         localStorage.setItem('tati_sidebar_collapsed', 'true');
-      } catch {}
-    }
+      }
+      window.dispatchEvent(new CustomEvent('tati_sidebar_changed', { detail: false }));
+    } catch {}
   }, []);
 
   const handleOpen = useCallback(() => {
     setSidebarOpen(true);
-    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
-      try {
+    try {
+      if (typeof window !== 'undefined' && window.innerWidth >= 768) {
         localStorage.setItem('tati_sidebar_collapsed', 'false');
-      } catch {}
-    }
+      }
+      window.dispatchEvent(new CustomEvent('tati_sidebar_changed', { detail: true }));
+    } catch {}
   }, []);
 
   return {

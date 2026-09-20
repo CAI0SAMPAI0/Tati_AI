@@ -79,7 +79,7 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
             return (
               <>
                 <Link
-                  href="/activities/hub"
+                  href="/achievements"
                   prefetch={true}
                   className="flex items-center gap-1.5 font-bold text-sm hover:opacity-80 transition-opacity"
                   title={`Streak: ${currentStreak} days (${isStreakActive ? 'Active' : 'Inactive'})`}
