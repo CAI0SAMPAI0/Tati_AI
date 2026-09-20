@@ -118,10 +118,11 @@ if DATABASE_URL:
         conn_max_age=conn_max_age,
         conn_health_checks=conn_health_checks,
     )
-    if "pooler.supabase.com" in str(db_config.get("HOST", "")) and not db_config.get(
-        "PORT"
-    ):
-        db_config["PORT"] = 5432
+    # Supabase Pooler: na porta 5432 roda em 'Session Mode' com limite estrito de 15 conexões (EMAXCONNSESSION).
+    # Na porta 6543 roda em 'Transaction Mode', permitindo conexões concorrentes sem esgotar o pool.
+    if "pooler.supabase.com" in str(db_config.get("HOST", "")):
+        if str(db_config.get("PORT", "")) in ("5432", ""):
+            db_config["PORT"] = 6543
 
     db_config.setdefault("OPTIONS", {})["connect_timeout"] = 10
     DATABASES = {"default": db_config}

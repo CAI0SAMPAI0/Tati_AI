@@ -130,7 +130,8 @@ def get_podcasts(
     """
     Lista podcasts recomendados e episódios com transcrições.
     """
-    user_level = level or (request.auth.level if request.auth else "Beginner")
+    user = request.auth if isinstance(getattr(request, "auth", None), User) else None
+    user_level = level or (user.level if user and getattr(user, "level", None) else "Beginner")
     return PodcastService.get_podcasts(user_level, category)
 
 

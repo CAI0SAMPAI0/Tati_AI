@@ -77,6 +77,23 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         except Exception:
             pass
 
+    async def send_json(self, content, close=False):
+        if getattr(self, "_disconnected", False):
+            return
+        try:
+            await super().send_json(content, close=close)
+        except Exception as e:
+            if e.__class__.__name__ in (
+                "ClientDisconnected",
+                "ConnectionClosed",
+                "ConnectionClosedOK",
+                "ConnectionClosedError",
+            ):
+                self._disconnected = True
+                logger.info(f"[ChatWS] Cliente desconectou ao enviar mensagem ({e.__class__.__name__})")
+                return
+            raise
+
     async def receive_json(self, content):
         try:
             await self._handle_receive_json(content)
@@ -291,7 +308,16 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
 
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as e:
+            if e.__class__.__name__ in (
+                "ClientDisconnected",
+                "ConnectionClosed",
+                "ConnectionClosedOK",
+                "ConnectionClosedError",
+            ):
+                self._disconnected = True
+                logger.info(f"[ChatWS] Cliente desconectou durante processamento ({e.__class__.__name__})")
+                return
             logger.error("[ChatWS] Erro ao processar mensagem", exc_info=True)
             if not self._disconnected:
                 try:
