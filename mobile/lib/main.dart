@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -341,6 +342,16 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
             children: [
               InAppWebView(
                 initialUrlRequest: URLRequest(url: WebUri(appUrl)),
+                initialUserScripts: UnmodifiableListView([
+                  UserScript(
+                    source: """
+                      window.isFlutterApp = true;
+                      window.tatiAppVersion = '1.0.1';
+                      window.tatiAppVersionCode = 2;
+                    """,
+                    injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+                  ),
+                ]),
                 initialSettings: InAppWebViewSettings(
                   javaScriptEnabled: true,
                   domStorageEnabled: true,

@@ -3,16 +3,27 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Download, Sparkles, ShieldCheck, CheckCircle2, RefreshCw, Smartphone, ExternalLink } from 'lucide-react';
+import { Download, Sparkles, ShieldCheck, CheckCircle2, Smartphone, ExternalLink, Copy, Check } from 'lucide-react';
 
-const APK_DOWNLOAD_URL = '/downloads/tati-ai.apk';
 const DIRECT_DOWNLOAD_URL = 'https://tati-ai.vercel.app/downloads/tati-ai.apk';
 
 export default function AtualizarPage() {
   const [downloadStarted, setDownloadStarted] = useState(false);
   const [seconds, setSeconds] = useState(3);
+  const [isAlreadyUpdated, setIsAlreadyUpdated] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    // Se o app já estiver na versão atualizada (versionCode >= 2), não precisa atualizar
+    const code = typeof window !== 'undefined' ? (window as any).tatiAppVersionCode : null;
+    if (code && Number(code) >= 2) {
+      setIsAlreadyUpdated(true);
+      const timer = setTimeout(() => {
+        window.location.href = '/chat';
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+
     // Contador regressivo para iniciar o download automaticamente
     const timer = setInterval(() => {
       setSeconds((prev) => {
@@ -31,18 +42,57 @@ export default function AtualizarPage() {
   const triggerDownload = () => {
     setDownloadStarted(true);
 
-    // Se estiver no Flutter, aciona o handler nativo para abrir direto no navegador externo
-    if (typeof window !== 'undefined') {
-      const isFlutter = Boolean((window as any).isFlutterApp || (window as any).flutter_inappwebview);
-      if (isFlutter && (window as any).flutter_inappwebview?.callHandler) {
-        (window as any).flutter_inappwebview.callHandler('openExternalUrl', { url: DIRECT_DOWNLOAD_URL });
-        return;
+    // 1. Se estiver no Flutter, aciona o handler nativo para abrir direto no navegador externo
+    try {
+      if (typeof window !== 'undefined' && (window as any).flutter_inappwebview?.callHandler) {
+        (window as any).flutter_inappwebview.callHandler('openExternalUrl', DIRECT_DOWNLOAD_URL);
       }
-    }
+    } catch (_) {}
 
-    // Navegador padrão
-    window.location.href = DIRECT_DOWNLOAD_URL;
+    // 2. Tenta abrir via Intent do Android (abre o Chrome/navegador padrão no Android mesmo em WebViews antigas)
+    try {
+      const intentUrl = `intent://tati-ai.vercel.app/downloads/tati-ai.apk#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end`;
+      window.location.href = intentUrl;
+    } catch (_) {}
+
+    // 3. Fallback direto
+    setTimeout(() => {
+      window.location.href = DIRECT_DOWNLOAD_URL;
+    }, 600);
   };
+
+  const handleCopyLink = () => {
+    if (typeof window !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(DIRECT_DOWNLOAD_URL);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    }
+  };
+
+  if (isAlreadyUpdated) {
+    return (
+      <main className="min-h-screen bg-[#0A0B10] text-slate-100 flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden">
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-emerald-600/20 rounded-full blur-[128px] pointer-events-none" />
+        <div className="max-w-md w-full relative z-10 flex flex-col items-center text-center">
+          <div className="w-20 h-20 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-6 shadow-xl shadow-emerald-500/10">
+            <CheckCircle2 size={42} />
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-white mb-2">
+            Aplicativo Atualizado!
+          </h1>
+          <p className="text-slate-400 text-sm mb-6">
+            Você já está utilizando a versão mais recente do <strong className="text-emerald-400">Teacher Tatiana AI (v1.0.1)</strong>.
+          </p>
+          <Link
+            href="/chat"
+            className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-xl font-bold text-white shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
+          >
+            <span>Ir para o Aplicativo</span>
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#0A0B10] text-slate-100 flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden">
@@ -98,7 +148,7 @@ export default function AtualizarPage() {
           {/* Botão de Download Principal */}
           <button
             onClick={triggerDownload}
-            className="w-full py-3.5 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.98] transition-all rounded-xl font-bold text-white shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 mb-3 cursor-pointer"
+            className="w-full py-3.5 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.98] transition-all rounded-xl font-bold text-white shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 mb-2.5 cursor-pointer"
           >
             <Download size={18} />
             <span>Baixar Atualização (17 MB)</span>
@@ -107,10 +157,28 @@ export default function AtualizarPage() {
           {/* Botão secundário para abrir no navegador padrão do Android */}
           <button
             onClick={triggerDownload}
-            className="w-full py-2.5 px-3 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 transition-all rounded-xl text-xs font-semibold text-slate-300 flex items-center justify-center gap-1.5 cursor-pointer"
+            className="w-full py-2.5 px-3 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 transition-all rounded-xl text-xs font-semibold text-slate-300 flex items-center justify-center gap-1.5 mb-2.5 cursor-pointer"
           >
             <ExternalLink size={14} />
             <span>Abrir download no Navegador do Celular</span>
+          </button>
+
+          {/* Botão para copiar o link caso o celular bloqueie popups */}
+          <button
+            onClick={handleCopyLink}
+            className="w-full py-2 px-3 bg-slate-900/80 hover:bg-slate-800/60 border border-slate-800 transition-all rounded-xl text-xs font-medium text-slate-400 flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            {copied ? (
+              <>
+                <Check size={13} className="text-emerald-400" />
+                <span className="text-emerald-400 font-semibold">Link copiado! Cole no Chrome.</span>
+              </>
+            ) : (
+              <>
+                <Copy size={13} />
+                <span>Copiar link do download</span>
+              </>
+            )}
           </button>
 
           <div className="mt-4 pt-3 border-t border-slate-800/80 text-center">
