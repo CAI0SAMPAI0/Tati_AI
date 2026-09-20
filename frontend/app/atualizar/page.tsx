@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Download, Sparkles, ShieldCheck, CheckCircle2, Smartphone, ExternalLink, Copy, Check } from 'lucide-react';
+import { Download, Sparkles, ShieldCheck, CheckCircle2, Smartphone, ExternalLink, Copy, Check, ArrowRight } from 'lucide-react';
 
 const DIRECT_DOWNLOAD_URL = 'https://tati-ai.vercel.app/downloads/tati-ai.apk';
 
@@ -71,23 +71,23 @@ export default function AtualizarPage() {
 
   if (isAlreadyUpdated) {
     return (
-      <main className="min-h-screen bg-[#0A0B10] text-slate-100 flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-emerald-600/20 rounded-full blur-[128px] pointer-events-none" />
-        <div className="max-w-md w-full relative z-10 flex flex-col items-center text-center">
-          <div className="w-20 h-20 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-6 shadow-xl shadow-emerald-500/10">
-            <CheckCircle2 size={42} />
+      <main className="min-h-screen bg-[#f8f7fc] text-[#1a1826] flex flex-col items-center justify-center p-4 sm:p-6 relative">
+        <div className="max-w-md w-full flex flex-col items-center text-center bg-white border border-[#e8e5f0] rounded-3xl p-8 shadow-sm">
+          <div className="w-16 h-16 rounded-2xl bg-[#ecfdf5] border border-[#a7f3d0] flex items-center justify-center text-[#059669] mb-5">
+            <CheckCircle2 size={36} />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white mb-2">
+          <h1 className="text-2xl font-bold text-[#1a1826] mb-2">
             Aplicativo Atualizado!
           </h1>
-          <p className="text-slate-400 text-sm mb-6">
-            Você já está utilizando a versão mais recente do <strong className="text-emerald-400">Teacher Tatiana AI (v1.0.1)</strong>.
+          <p className="text-[#524f64] text-sm mb-6 leading-relaxed">
+            Você já está utilizando a versão mais recente do <strong className="text-[#6d28d9]">Teacher Tatiana AI (v1.0.1)</strong>.
           </p>
           <Link
             href="/chat"
-            className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-xl font-bold text-white shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
+            className="w-full py-3 px-4 bg-[#6d28d9] hover:bg-[#5b21b6] transition-colors rounded-xl font-semibold text-white shadow-sm flex items-center justify-center gap-2 text-sm"
           >
             <span>Ir para o Aplicativo</span>
+            <ArrowRight size={16} />
           </Link>
         </div>
       </main>
@@ -95,69 +95,63 @@ export default function AtualizarPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#0A0B10] text-slate-100 flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden">
-      {/* Luz ambiente de fundo */}
-      <div className="absolute -top-40 -left-40 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] pointer-events-none" />
-      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-[128px] pointer-events-none" />
-
-      <div className="max-w-md w-full relative z-10 flex flex-col items-center text-center">
+    <main className="min-h-screen bg-[#f8f7fc] text-[#1a1826] flex flex-col items-center justify-center p-4 sm:p-6">
+      <div className="max-w-md w-full flex flex-col items-center text-center">
         {/* Logo / Badge */}
-        <div className="relative mb-6">
-          <div className="w-24 h-24 rounded-3xl bg-gradient-to-tr from-purple-600 to-indigo-500 p-1 shadow-2xl shadow-purple-500/25 flex items-center justify-center">
-            <div className="w-full h-full bg-[#12131C] rounded-[22px] flex items-center justify-center overflow-hidden">
-              <Image
-                src="/images/tati_logo.jpg"
-                alt="Teacher Tatiana AI"
-                width={88}
-                height={88}
-                className="object-cover"
-                priority
-              />
-            </div>
+        <div className="relative mb-5">
+          <div className="w-20 h-20 rounded-2xl bg-white border border-[#e8e5f0] p-1 shadow-sm flex items-center justify-center overflow-hidden">
+            <Image
+              src="/images/tati_logo.jpg"
+              alt="Teacher Tatiana AI"
+              width={72}
+              height={72}
+              className="object-contain rounded-xl"
+              priority
+            />
           </div>
-          <div className="absolute -bottom-2 -right-2 bg-gradient-to-r from-emerald-500 to-teal-400 text-black text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1">
+          <div className="absolute -bottom-2 -right-2 bg-[#f5f3ff] text-[#6d28d9] border border-[#ddd6fe] text-[10px] font-bold uppercase px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
             <Sparkles size={10} /> v1.0.1
           </div>
         </div>
 
         {/* Título & Status */}
-        <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white mb-2">
-          Atualização Obrigatória
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1a1826] mb-2">
+          Atualização Disponível
         </h1>
-        <p className="text-slate-400 text-sm leading-relaxed mb-6">
-          Uma nova versão oficial do aplicativo <strong className="text-purple-400">Teacher Tatiana AI</strong> está disponível com login Google nativo corrigido e melhorias essenciais.
+        <p className="text-[#524f64] text-sm leading-relaxed mb-6">
+          Uma nova versão do aplicativo <strong className="text-[#6d28d9]">Teacher Tatiana AI</strong> está disponível com melhorias essenciais e login Google corrigido.
         </p>
 
         {/* Card Principal de Download */}
-        <div className="w-full bg-[#131520] border border-purple-500/20 rounded-2xl p-5 sm:p-6 shadow-xl mb-6 text-left relative overflow-hidden backdrop-blur-md">
+        <div className="w-full bg-white border border-[#e8e5f0] rounded-2xl p-5 sm:p-6 shadow-sm mb-6 text-left">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
+              <div className="w-10 h-10 rounded-xl bg-[#f5f3ff] border border-[#ddd6fe] flex items-center justify-center text-[#6d28d9]">
                 <Smartphone size={20} />
               </div>
               <div>
-                <h2 className="text-sm font-bold text-white">tati-ai.apk</h2>
-                <span className="text-xs text-slate-400 font-medium">17.3 MB • Android Oficial</span>
+                <h2 className="text-sm font-bold text-[#1a1826]">tati-ai.apk</h2>
+                <span className="text-xs text-[#6b6880] font-medium">17.3 MB • Android Oficial</span>
               </div>
             </div>
-            <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-bold flex items-center gap-1">
+            <span className="text-xs bg-[#ecfdf5] text-[#059669] border border-[#a7f3d0] px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
               <ShieldCheck size={12} /> Seguro
             </span>
           </div>
 
-          {/* Botão de Download Principal */}
+          {/* Botão de Download Principal (Sólido, sem gradiente) */}
           <button
             onClick={triggerDownload}
-            className="w-full py-3.5 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.98] transition-all rounded-xl font-bold text-white shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 mb-2.5 cursor-pointer"
+            className="w-full py-3 px-4 bg-[#6d28d9] hover:bg-[#5b21b6] active:scale-[0.99] transition-all rounded-xl font-semibold text-white shadow-sm flex items-center justify-center gap-2 mb-2.5 cursor-pointer text-sm"
           >
-            <Download size={18} />
+            <Download size={16} />
             <span>Baixar Atualização (17 MB)</span>
           </button>
 
           {/* Botão secundário para abrir no navegador padrão do Android */}
           <button
             onClick={triggerDownload}
-            className="w-full py-2.5 px-3 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 transition-all rounded-xl text-xs font-semibold text-slate-300 flex items-center justify-center gap-1.5 mb-2.5 cursor-pointer"
+            className="w-full py-2.5 px-3 bg-[#f5f3ff] hover:bg-[#ede9fe] border border-[#ddd6fe] transition-colors rounded-xl text-xs font-semibold text-[#6d28d9] flex items-center justify-center gap-1.5 mb-2.5 cursor-pointer"
           >
             <ExternalLink size={14} />
             <span>Abrir download no Navegador do Celular</span>
@@ -166,12 +160,12 @@ export default function AtualizarPage() {
           {/* Botão para copiar o link caso o celular bloqueie popups */}
           <button
             onClick={handleCopyLink}
-            className="w-full py-2 px-3 bg-slate-900/80 hover:bg-slate-800/60 border border-slate-800 transition-all rounded-xl text-xs font-medium text-slate-400 flex items-center justify-center gap-1.5 cursor-pointer"
+            className="w-full py-2 px-3 bg-white hover:bg-[#f8f7fc] border border-[#e8e5f0] transition-colors rounded-xl text-xs font-medium text-[#524f64] flex items-center justify-center gap-1.5 cursor-pointer"
           >
             {copied ? (
               <>
-                <Check size={13} className="text-emerald-400" />
-                <span className="text-emerald-400 font-semibold">Link copiado! Cole no Chrome.</span>
+                <Check size={13} className="text-[#059669]" />
+                <span className="text-[#059669] font-semibold">Link copiado! Cole no Chrome.</span>
               </>
             ) : (
               <>
@@ -181,15 +175,15 @@ export default function AtualizarPage() {
             )}
           </button>
 
-          <div className="mt-4 pt-3 border-t border-slate-800/80 text-center">
-            <p className="text-xs text-slate-400">
+          <div className="mt-4 pt-3 border-t border-[#f0edf8] text-center">
+            <p className="text-xs text-[#524f64]">
               {downloadStarted ? (
-                <span className="text-emerald-400 font-medium flex items-center justify-center gap-1">
+                <span className="text-[#059669] font-medium flex items-center justify-center gap-1">
                   <CheckCircle2 size={13} /> Download iniciado! Verifique a barra de notificações.
                 </span>
               ) : (
                 <span>
-                  Iniciando download automático em <strong className="text-purple-400">{seconds}s</strong>...
+                  Iniciando download automático em <strong className="text-[#6d28d9]">{seconds}s</strong>...
                 </span>
               )}
             </p>
@@ -198,23 +192,23 @@ export default function AtualizarPage() {
 
         {/* Passo a Passo Simples */}
         <div className="w-full text-left space-y-2.5 mb-6">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Como instalar no seu celular:</p>
-          <div className="bg-[#12131C] border border-slate-800/80 rounded-xl p-3 flex items-start gap-3">
-            <span className="w-5 h-5 rounded-full bg-purple-500/20 text-purple-400 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
-            <p className="text-xs text-slate-300">
-              Aguarde o download do arquivo <strong className="text-white">tati-ai.apk</strong> ser concluído.
+          <p className="text-xs font-bold uppercase tracking-wider text-[#6b6880]">Como instalar no seu celular:</p>
+          <div className="bg-white border border-[#e8e5f0] rounded-xl p-3 flex items-start gap-3 shadow-xs">
+            <span className="w-5 h-5 rounded-full bg-[#f5f3ff] text-[#6d28d9] text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+            <p className="text-xs text-[#524f64]">
+              Aguarde o download do arquivo <strong className="text-[#1a1826]">tati-ai.apk</strong> ser concluído.
             </p>
           </div>
-          <div className="bg-[#12131C] border border-slate-800/80 rounded-xl p-3 flex items-start gap-3">
-            <span className="w-5 h-5 rounded-full bg-purple-500/20 text-purple-400 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
-            <p className="text-xs text-slate-300">
+          <div className="bg-white border border-[#e8e5f0] rounded-xl p-3 flex items-start gap-3 shadow-xs">
+            <span className="w-5 h-5 rounded-full bg-[#f5f3ff] text-[#6d28d9] text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+            <p className="text-xs text-[#524f64]">
               Puxe a barra de notificações do celular e toque no arquivo baixado.
             </p>
           </div>
-          <div className="bg-[#12131C] border border-slate-800/80 rounded-xl p-3 flex items-start gap-3">
-            <span className="w-5 h-5 rounded-full bg-purple-500/20 text-purple-400 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
-            <p className="text-xs text-slate-300">
-              Toque em <strong className="text-white">Instalar</strong> ou <strong className="text-white">Atualizar</strong>. Pronto! Abra o aplicativo e aproveite.
+          <div className="bg-white border border-[#e8e5f0] rounded-xl p-3 flex items-start gap-3 shadow-xs">
+            <span className="w-5 h-5 rounded-full bg-[#f5f3ff] text-[#6d28d9] text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+            <p className="text-xs text-[#524f64]">
+              Toque em <strong className="text-[#1a1826]">Instalar</strong> ou <strong className="text-[#1a1826]">Atualizar</strong>. Pronto! Abra o aplicativo e aproveite.
             </p>
           </div>
         </div>
@@ -222,7 +216,7 @@ export default function AtualizarPage() {
         {/* Botão voltar para Login caso seja usuário web */}
         <Link
           href="/login"
-          className="text-xs text-slate-500 hover:text-slate-400 transition-colors inline-flex items-center gap-1"
+          className="text-xs text-[#6b6880] hover:text-[#1a1826] transition-colors inline-flex items-center gap-1"
         >
           <span>Ir para a tela de login Web</span>
         </Link>
