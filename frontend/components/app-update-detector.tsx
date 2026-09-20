@@ -19,9 +19,9 @@ export function AppUpdateDetector() {
         (window as any).flutter_inappwebview
       );
 
-      // Se for Flutter e NÃO tiver version code (ou for menor que 3), redireciona para atualização
+      // Se for Flutter e NÃO tiver version code (ou for menor que 2), redireciona para atualização
       const versionCode = (window as any).tatiAppVersionCode;
-      const isOldApk = isFlutter && (!versionCode || Number(versionCode) < 3);
+      const isOldApk = isFlutter && (!versionCode || Number(versionCode) < 2);
 
       if (isOldApk) {
         window.location.href = '/atualizar';
