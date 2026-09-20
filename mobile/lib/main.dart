@@ -352,6 +352,10 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                   transparentBackground: true,
                   saveFormData: true,
                   sharedCookiesEnabled: true,
+                  useOnDownloadStart: true,
+                  useShouldOverrideUrlLoading: true,
+                  allowFileAccessFromFileURLs: true,
+                  allowUniversalAccessFromFileURLs: true,
                 ),
                 onWebViewCreated: (controller) {
                   webViewController = controller;
@@ -482,6 +486,59 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
                       }
                     },
                   );
+
+                  // Handler para abrir links/downloads no navegador externo do Android
+                  controller.addJavaScriptHandler(
+                    handlerName: 'openExternalUrl',
+                    callback: (args) async {
+                      if (args.isNotEmpty) {
+                        final String urlToOpen = args[0] is Map
+                            ? args[0]['url']?.toString() ?? ''
+                            : args[0].toString();
+                        if (urlToOpen.isNotEmpty) {
+                          debugPrint('[External Link] Abrindo no navegador: $urlToOpen');
+                          try {
+                            await InAppBrowser.openWithSystemBrowser(url: WebUri(urlToOpen));
+                          } catch (e) {
+                            debugPrint('[External Link] Erro ao abrir: $e');
+                          }
+                        }
+                      }
+                    },
+                  );
+                },
+                onDownloadStartRequest: (controller, downloadStartRequest) async {
+                  debugPrint('[Download] Detectado início de download: ${downloadStartRequest.url}');
+                  try {
+                    await InAppBrowser.openWithSystemBrowser(url: downloadStartRequest.url);
+                  } catch (e) {
+                    debugPrint('[Download] Erro ao abrir no navegador: $e');
+                  }
+                },
+                shouldOverrideUrlLoading: (controller, navigationAction) async {
+                  final uri = navigationAction.request.url;
+                  if (uri == null) return NavigationActionPolicy.ALLOW;
+
+                  final urlStr = uri.toString().toLowerCase();
+
+                  // Se for download direto (.apk, .pdf, /downloads/), abre no navegador do celular
+                  if (urlStr.endsWith('.apk') ||
+                      urlStr.endsWith('.pdf') ||
+                      urlStr.contains('/downloads/')) {
+                    debugPrint('[Navigation] Redirecionando download para navegador: $uri');
+                    await InAppBrowser.openWithSystemBrowser(url: uri);
+                    return NavigationActionPolicy.CANCEL;
+                  }
+
+                  // Links externos ou esquemas especiais
+                  if (urlStr.startsWith('whatsapp:') ||
+                      urlStr.startsWith('tel:') ||
+                      urlStr.startsWith('mailto:')) {
+                    await InAppBrowser.openWithSystemBrowser(url: uri);
+                    return NavigationActionPolicy.CANCEL;
+                  }
+
+                  return NavigationActionPolicy.ALLOW;
                 },
                 onPermissionRequest: (controller, request) async {
                   return PermissionResponse(

@@ -30,12 +30,18 @@ export default function AtualizarPage() {
 
   const triggerDownload = () => {
     setDownloadStarted(true);
-    const link = document.createElement('a');
-    link.href = APK_DOWNLOAD_URL;
-    link.setAttribute('download', 'tati-ai.apk');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+    // Se estiver no Flutter, aciona o handler nativo para abrir direto no navegador externo
+    if (typeof window !== 'undefined') {
+      const isFlutter = Boolean((window as any).isFlutterApp || (window as any).flutter_inappwebview);
+      if (isFlutter && (window as any).flutter_inappwebview?.callHandler) {
+        (window as any).flutter_inappwebview.callHandler('openExternalUrl', { url: DIRECT_DOWNLOAD_URL });
+        return;
+      }
+    }
+
+    // Navegador padrão
+    window.location.href = DIRECT_DOWNLOAD_URL;
   };
 
   return (
@@ -89,7 +95,7 @@ export default function AtualizarPage() {
             </span>
           </div>
 
-          {/* Botão de Download */}
+          {/* Botão de Download Principal */}
           <button
             onClick={triggerDownload}
             className="w-full py-3.5 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.98] transition-all rounded-xl font-bold text-white shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 mb-3 cursor-pointer"
@@ -98,16 +104,14 @@ export default function AtualizarPage() {
             <span>Baixar Atualização (17 MB)</span>
           </button>
 
-          {/* Link para abrir no navegador padrão se estiver travado no webview */}
-          <a
-            href={DIRECT_DOWNLOAD_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full py-2.5 px-3 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 transition-all rounded-xl text-xs font-semibold text-slate-300 flex items-center justify-center gap-1.5"
+          {/* Botão secundário para abrir no navegador padrão do Android */}
+          <button
+            onClick={triggerDownload}
+            className="w-full py-2.5 px-3 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 transition-all rounded-xl text-xs font-semibold text-slate-300 flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <ExternalLink size={14} />
             <span>Abrir download no Navegador do Celular</span>
-          </a>
+          </button>
 
           <div className="mt-4 pt-3 border-t border-slate-800/80 text-center">
             <p className="text-xs text-slate-400">
