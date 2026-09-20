@@ -41,7 +41,6 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'personal', label: 'Personal Info', icon: <UserIcon size={16} /> },
   { id: 'achievements', label: 'Achievements', icon: <Trophy size={16} /> },
   { id: 'security', label: 'Security', icon: <Lock size={16} /> },
-  { id: 'plan', label: 'Plan', icon: <Zap size={16} /> },
 ];
 
 export default function ProfileClientPage() {
@@ -213,7 +212,6 @@ export default function ProfileClientPage() {
               {tab === 'personal' && 'Personal Information'}
               {tab === 'achievements' && 'Competition Score & Achievements'}
               {tab === 'security' && 'Security & Account Management'}
-              {tab === 'plan' && 'Subscription & Feature Access'}
             </p>
           </div>
         </div>
