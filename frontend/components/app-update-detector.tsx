@@ -19,10 +19,9 @@ export function AppUpdateDetector() {
         (window as any).flutter_inappwebview
       );
 
-      // No novo APK (v1.0.1), window.tatiAppVersionCode é definido como 2.
-      // Se for Flutter e NÃO tiver version code (ou for menor que 2), é o APK antigo!
+      // Se for Flutter e NÃO tiver version code (ou for menor que 3), redireciona para atualização
       const versionCode = (window as any).tatiAppVersionCode;
-      const isOldApk = isFlutter && (!versionCode || Number(versionCode) < 2);
+      const isOldApk = isFlutter && (!versionCode || Number(versionCode) < 3);
 
       if (isOldApk) {
         window.location.href = '/atualizar';
