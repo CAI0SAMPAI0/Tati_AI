@@ -15,7 +15,6 @@ from .models import (
     UserFlashcardProgress,
     UserVocabulary,
     Podcast,
-    Trophy,
     UserTrophy,
     PremiumContent,
     ActivitySubmission,

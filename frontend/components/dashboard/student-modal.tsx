@@ -654,11 +654,30 @@ function StudentSubmissionsSection({ submissions }: { submissions: any[] }) {
     return (submissions || []).filter(s => {
       if (filter === 'all') return true;
       const cat = String(s.category || s.activity_type || '').toLowerCase().trim();
-      if (filter === 'vocabulary') return cat === 'vocab' || cat === 'vocabulary';
-      if (filter === 'listening') return cat === 'listening' || cat === 'listenings' || cat === 'podcast' || cat === 'podcasts';
-      if (filter === 'simulations') return cat === 'simulation' || cat === 'simulations';
-      if (filter === 'games') return cat === 'game' || cat === 'games';
-      if (filter === 'news') return cat === 'news' || cat === 'article' || cat === 'articles';
+      const title = String(s.title || '').toLowerCase();
+      const url = String(s.url || '').toLowerCase();
+
+      if (filter === 'vocabulary') {
+        return cat === 'vocab' || cat === 'vocabulary' || cat.includes('vocab') || title.includes('vocab') || url.includes('vocab');
+      }
+      if (filter === 'listening') {
+        return cat === 'listening' || cat === 'listenings' || cat === 'podcast' || cat === 'podcasts' || cat.includes('listen') || title.includes('listening');
+      }
+      if (filter === 'simulations') {
+        return cat === 'simulation' || cat === 'simulations' || cat.includes('simul') || title.includes('simulation');
+      }
+      if (filter === 'games') {
+        return cat === 'game' || cat === 'games' || cat.includes('game') || cat.includes('wordwall') || url.includes('wordwall');
+      }
+      if (filter === 'news') {
+        return cat === 'news' || cat === 'article' || cat === 'articles' || cat.includes('news') || title.includes('news');
+      }
+      if (filter === 'grammar') {
+        return cat === 'grammar' || cat.includes('gramm') || title.includes('grammar') || url.includes('grammar');
+      }
+      if (filter === 'reading') {
+        return cat === 'reading' || cat.includes('read') || title.includes('reading') || url.includes('reading');
+      }
       return cat === filter;
     });
   }, [submissions, filter]);
@@ -753,7 +772,7 @@ function StudentSubmissionsSection({ submissions }: { submissions: any[] }) {
             onClick={() => setVisibleCount((prev) => prev + 20)}
             className="w-full py-2 text-xs font-bold text-primary hover:bg-primary/5 rounded-xl border border-primary/20 transition-all cursor-pointer"
           >
-            Carregar mais (+{filtered.length - visibleCount})
+            Load more (+{filtered.length - visibleCount})
           </button>
         )}
       </div>

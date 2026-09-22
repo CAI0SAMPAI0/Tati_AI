@@ -1198,24 +1198,30 @@ class DashboardService:
                 continue
             seen_keys.add(key)
 
-            cat_raw = str(meta.get("category") or s.activity_type or "grammar").lower()
+            url = str(meta.get("url") or "").lower()
+            slug = str(meta.get("slug") or "").lower()
+            title_raw = str(meta.get("title") or "").lower()
+            act_type = str(s.activity_type or "").lower()
+            meta_cat = str(meta.get("category") or "").lower()
 
-            if "gramm" in cat_raw:
-                cat = "grammar"
-            elif "vocab" in cat_raw:
+            combined = f"{meta_cat} {act_type} {url} {slug} {title_raw}"
+
+            if "vocab" in combined:
                 cat = "vocabulary"
-            elif "listen" in cat_raw or "podcast" in cat_raw:
+            elif "listen" in combined or "podcast" in combined:
                 cat = "listening"
-            elif "read" in cat_raw:
+            elif "read" in combined:
                 cat = "reading"
-            elif "simul" in cat_raw:
+            elif "simul" in combined:
                 cat = "simulations"
-            elif "game" in cat_raw or "wordwall" in cat_raw:
+            elif "game" in combined or "wordwall" in combined:
                 cat = "games"
-            elif "news" in cat_raw or "article" in cat_raw:
+            elif "news" in combined or "article" in combined:
                 cat = "news"
-            elif "flash" in cat_raw:
+            elif "flash" in combined:
                 cat = "flashcards"
+            elif "gramm" in combined:
+                cat = "grammar"
             else:
                 cat = "grammar"
 
@@ -1246,7 +1252,11 @@ class DashboardService:
 
             status = (
                 "completed"
-                if (s.status in ("completed", "done") or (s.score and s.score > 0))
+                if (
+                    s.status in ("completed", "done")
+                    or (s.score and s.score > 0)
+                    or meta.get("status") in ("completed", "done")
+                )
                 else "pending"
             )
 
@@ -1305,17 +1315,20 @@ class DashboardService:
             pass
         counts["flashcards"] += len(fc_progress)
 
-        # Vocabulário aprendido
+        # Vocabulário aprendido (mantido na chave vocabulary para consultas analíticas)
         vocab_learned = []
         try:
             vocab_learned = list(
                 UserVocabulary.objects.filter(username__in=usernames).order_by(
                     "-created_at"
-                )[:30]
+                )[:50]
             )
         except Exception:
             pass
-        counts["vocabulary"] += len(vocab_learned)
+
+        mapped_submissions.sort(
+            key=lambda x: x.get("created_at") or "", reverse=True
+        )
 
         return {
             "summary": counts,
