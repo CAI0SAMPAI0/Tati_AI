@@ -306,6 +306,24 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                     }
                 )
 
+            # 4. Envia atualização de streak e troféus em tempo real para o topbar
+            try:
+                from apps.users.services import StreakService
+                fresh_user = await aget_user_by_username(self.username)
+                if fresh_user:
+                    streak_info = await sync_to_async(StreakService.get_streak_data)(fresh_user)
+                    await self.send_json(
+                        {
+                            "type": "streak_update",
+                            "current_streak": streak_info.current_streak,
+                            "longest_streak": streak_info.longest_streak,
+                            "trophies_earned": streak_info.trophies_earned,
+                            "total_trophies": streak_info.total_trophies,
+                        }
+                    )
+            except Exception as streak_sync_err:
+                logger.warning(f"[ChatWS] Error syncing streak to client: {streak_sync_err}")
+
         except asyncio.CancelledError:
             raise
         except Exception as e:

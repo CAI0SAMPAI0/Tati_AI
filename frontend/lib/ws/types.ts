@@ -14,6 +14,7 @@ export type WsMessageType =
   | 'document_generated'
   | 'simulation_state'
   | 'message_id_update'
+  | 'streak_update'
   | 'error';
 
 export type WsOrigin = 'chat' | 'voice';
@@ -46,6 +47,10 @@ export interface WsIncomingMessage {
   completed_objectives?: string[];
   real_id?: string | number;
   role?: 'user' | 'assistant';
+  current_streak?: number;
+  longest_streak?: number;
+  trophies_earned?: number;
+  total_trophies?: number;
 }
 
 export interface WsOutgoingMessage {

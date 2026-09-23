@@ -418,7 +418,13 @@ export default function ActivitiesClientPage() {
   const handleMarkDone = async (item: any) => {
     const actId = item.url || item.slug || item.id;
     try {
-      await apiPost('/activities/submissions', {
+      const res = await apiPost<{
+        success?: boolean;
+        current_streak?: number;
+        longest_streak?: number;
+        trophies_earned?: number;
+        total_trophies?: number;
+      }>('/activities/submissions', {
         activity_id: actId,
         activity_type: item.source || 'external',
         score: 100,
@@ -435,6 +441,27 @@ export default function ActivitiesClientPage() {
       queryClient.invalidateQueries({ queryKey: ['competitions-global-ranking'] });
       queryClient.invalidateQueries({ queryKey: ['competitions-level-rankings'] });
       queryClient.invalidateQueries({ queryKey: ['goals'] });
+      queryClient.invalidateQueries({ queryKey: ['streak-data'] });
+      queryClient.invalidateQueries({ queryKey: ['my-streak'] });
+      queryClient.invalidateQueries({ queryKey: ['ranking-position'] });
+
+      const streakData = res.data;
+      if (streakData && (typeof streakData.trophies_earned === 'number' || typeof streakData.current_streak === 'number')) {
+        queryClient.setQueryData(['streak-data'], (old: any) => ({
+          ...(old || {}),
+          current_streak: streakData.current_streak ?? old?.current_streak ?? 0,
+          longest_streak: streakData.longest_streak ?? old?.longest_streak,
+          trophies_earned: streakData.trophies_earned ?? old?.trophies_earned ?? 0,
+          total_trophies: streakData.total_trophies ?? old?.total_trophies ?? 50,
+        }));
+      }
+
+      try {
+        window.dispatchEvent(new CustomEvent('tati_activity_completed', { detail: { ...item, ...streakData } }));
+        if (streakData && typeof streakData.trophies_earned === 'number') {
+          window.dispatchEvent(new CustomEvent('tati_streak_updated', { detail: streakData }));
+        }
+      } catch (_) {}
     } catch (e) {
       toast.error("Error completing activity.");
     }
@@ -461,6 +488,12 @@ export default function ActivitiesClientPage() {
       queryClient.invalidateQueries({ queryKey: ['competitions-global-ranking'] });
       queryClient.invalidateQueries({ queryKey: ['competitions-level-rankings'] });
       queryClient.invalidateQueries({ queryKey: ['goals'] });
+      queryClient.invalidateQueries({ queryKey: ['streak-data'] });
+      queryClient.invalidateQueries({ queryKey: ['my-streak'] });
+      queryClient.invalidateQueries({ queryKey: ['ranking-position'] });
+      try {
+        window.dispatchEvent(new CustomEvent('tati_activity_completed', { detail: item }));
+      } catch (_) {}
     } catch (e) {
       toast.error("Error reverting activity.");
     }

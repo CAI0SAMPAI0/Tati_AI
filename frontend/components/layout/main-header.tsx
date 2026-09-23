@@ -5,9 +5,7 @@ import { Menu, Trophy, Flame, CircleAlert } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 import { Button } from '@/components/ui/button';
-import { useQuery } from '@tanstack/react-query';
-import { apiGet } from '@/lib/api/client';
-import { ENDPOINTS } from '@/lib/api/endpoints';
+import { useStreakAndTrophies } from '@/hooks/useStreakAndTrophies';
 import { NotificationsDropdown } from './notifications-dropdown';
 
 import { DEFAULT_AVATAR_URL } from '@/lib/constants/user';
@@ -18,24 +16,11 @@ interface MainHeaderProps {
   onToggleMenu?: () => void;
 }
 
-interface StreakData {
-  current_streak: number;
-  trophies_earned: number;
-  total_trophies?: number;
-  total_questions?: number;
-  hours_saved?: number;
-}
-
 export function MainHeader({ onToggleMenu }: MainHeaderProps) {
   const { user } = useAuth();
   const avatarUrl = user?.avatar_url || (user as any)?.profile?.avatar_url || DEFAULT_AVATAR_URL;
 
-  // Use TanStack Query to fetch streak and trophy data
-  const { data: streakData } = useQuery<StreakData>({
-    queryKey: ['streak-data'],
-    queryFn: () => apiGet<StreakData>(ENDPOINTS.STREAK),
-    refetchInterval: 60000,
-  });
+  const { currentStreak, isStreakActive, trophiesEarned, totalTrophies } = useStreakAndTrophies();
 
   const isHubOnly = (user as any)?.is_hub_only;
 
@@ -70,14 +55,8 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
         </div>
 
         <div className="flex items-center gap-3 md:gap-5">
-          {!isHubOnly && (() => {
-            const currentStreak = streakData?.current_streak ?? user?.streak ?? 0;
-            const isStreakActive = currentStreak > 0;
-            const trophiesEarned = streakData?.trophies_earned ?? 0;
-            const totalTrophies = streakData?.total_trophies ?? 50;
-
-            return (
-              <>
+          {!isHubOnly && (
+            <>
                 <Link
                   href="/achievements"
                   prefetch={true}
@@ -116,8 +95,7 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
                   </span>
                 </Link>
               </>
-            );
-          })()}
+            )}
 
           <NotificationsDropdown />
 

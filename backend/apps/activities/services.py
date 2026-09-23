@@ -564,7 +564,7 @@ class RankingService:
 
         result = sorted(students, key=lambda x: x["score"], reverse=True)
         try:
-            cache.set(cache_key, result, timeout=5)
+            cache.set(cache_key, result, timeout=60)
         except Exception:
             pass
         return result
@@ -677,12 +677,24 @@ class RankingService:
         year: Optional[int] = None,
         month: Optional[int] = None,
     ) -> dict:
+        username = getattr(current_user, "username", "")
+        role = (getattr(current_user, "role", "") or "").lower()
+        is_staff = username.lower() in cls.EXCLUDED_STAFF or role in cls.EXCLUDED_ROLES
+
+        if is_staff:
+            return {
+                "position": 0,
+                "score": int(getattr(current_user, "total_xp", 0) or 0),
+                "total_students": 0,
+                "is_staff": True,
+            }
+
         students = cls._get_students(year=year, month=month)
         my_pos = next(
             (
                 i + 1
                 for i, x in enumerate(students)
-                if x["username"] == getattr(current_user, "username", "")
+                if x["username"] == username
             ),
             0,
         )
@@ -690,14 +702,34 @@ class RankingService:
             (
                 x["score"]
                 for x in students
-                if x["username"] == getattr(current_user, "username", "")
+                if x["username"] == username
             ),
             0,
         )
+
+        # Se não pontuou no ciclo mensal vigente, resgata XP acumulado e posição no ranking geral
+        if user_score == 0 and current_user:
+            xp_data = getattr(current_user, "xp_data", {})
+            if not isinstance(xp_data, dict):
+                xp_data = {}
+            user_score = int(getattr(current_user, "total_xp", 0) or xp_data.get("xp", 0) or 0)
+
+        if my_pos == 0 and current_user and user_score > 0:
+            all_time_students = cls._get_students(all_time=True)
+            my_pos = next(
+                (
+                    i + 1
+                    for i, x in enumerate(all_time_students)
+                    if x["username"] == username
+                ),
+                0,
+            )
+
         return {
             "position": my_pos,
             "score": user_score,
             "total_students": len(students),
+            "is_staff": False,
         }
 
 
@@ -2337,12 +2369,22 @@ class SubmissionService:
         total_xp = user.total_xp if user and isinstance(user, User) else 25
         streak_count = user.streak_count if user and isinstance(user, User) else 1
 
+        trophies_earned, total_trophies = 0, 50
+        if user and isinstance(user, User):
+            try:
+                trophies_earned, total_trophies = TrophyService.get_unlocked_trophies_count(user)
+            except Exception:
+                pass
+
         return {
             "success": True,
             "id": str(submission.id),
             "xp_earned": xp_earned,
             "new_total_xp": total_xp,
             "streak_count": streak_count,
+            "current_streak": streak_count,
+            "trophies_earned": trophies_earned,
+            "total_trophies": total_trophies,
             "status": "completed",
         }
 

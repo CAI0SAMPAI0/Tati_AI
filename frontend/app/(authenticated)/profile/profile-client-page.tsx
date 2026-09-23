@@ -88,7 +88,7 @@ export default function ProfileClientPage() {
   // Ranking & Score query
   const { data: positionData } = useQuery({
     queryKey: ['my-ranking-position'],
-    queryFn: () => apiGet<{ position: number; score: number; total_students: number }>('/users/progress/ranking/position'),
+    queryFn: () => apiGet<{ position: number; score: number; total_students: number; is_staff?: boolean }>('/users/progress/ranking/position'),
   });
 
   // Streak query
@@ -113,8 +113,25 @@ export default function ProfileClientPage() {
   const daysLeft = sub?.days_left ?? 0;
   const isGracePeriod = sub?.in_grace_period ?? false;
 
-  const userScore = positionData?.score ?? (user as any)?.total_xp ?? 0;
-  const userRank = positionData?.position ? `#${positionData.position}` : '#-';
+  const isStaff = Boolean(
+    positionData?.is_staff ||
+    user?.role === 'admin' ||
+    user?.role === 'programmer' ||
+    user?.role === 'programador' ||
+    user?.role === 'teacher' ||
+    user?.role === 'professor'
+  );
+
+  const userScore = (positionData?.score && positionData.score > 0)
+    ? positionData.score
+    : ((user as any)?.total_xp || (user as any)?.streak_count || 0);
+
+  const userRank = isStaff
+    ? 'Staff'
+    : (positionData?.position && positionData.position > 0)
+      ? `#${positionData.position}`
+      : '#-';
+
   const currentStreak = streakData?.current_streak ?? (user as any)?.streak_count ?? 0;
 
   const handleSaveProfile = async () => {
@@ -249,30 +266,42 @@ export default function ProfileClientPage() {
             </p>
           </div>
 
-          {/* Competition Stats Badges */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="flex flex-col items-center px-4 py-2.5 bg-primary/5 border-l-4 border-primary rounded-xl border border-primary/10">
-              <div className="flex items-center gap-1.5 text-primary text-[0.65rem] font-bold uppercase tracking-wider mb-0.5">
-                <TrendingUp size={13} />
-                <span>Score</span>
+          {/* Competition Stats Badges or Staff Badge */}
+          {isStaff ? (
+            <div className="flex items-center gap-2.5 px-4 py-3 bg-primary/10 border border-primary/20 rounded-2xl shrink-0">
+              <Sparkles size={18} className="text-primary" />
+              <div className="flex flex-col">
+                <span className="text-xs font-black uppercase tracking-wider text-primary">
+                  {user?.role ? user.role.toUpperCase() : 'STAFF'}
+                </span>
+                <span className="text-[0.65rem] text-text-muted">Educational Team</span>
               </div>
-              <span className="text-xl font-black text-text leading-tight tabular-nums">
-                {userScore.toLocaleString('pt-BR')}
-              </span>
-              <span className="text-[0.6rem] text-text-muted">competition pts</span>
             </div>
+          ) : (
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="flex flex-col items-center px-4 py-2.5 bg-primary/5 border-l-4 border-primary rounded-xl border border-primary/10">
+                <div className="flex items-center gap-1.5 text-primary text-[0.65rem] font-bold uppercase tracking-wider mb-0.5">
+                  <TrendingUp size={13} />
+                  <span>Score</span>
+                </div>
+                <span className="text-xl font-black text-text leading-tight tabular-nums">
+                  {userScore.toLocaleString('pt-BR')}
+                </span>
+                <span className="text-[0.6rem] text-text-muted">competition pts</span>
+              </div>
 
-            <div className="flex flex-col items-center px-4 py-2.5 bg-orange-500/5 border-l-4 border-orange-500 rounded-xl border border-orange-500/10">
-              <div className="flex items-center gap-1.5 text-orange-500 text-[0.65rem] font-bold uppercase tracking-wider mb-0.5">
-                <Medal size={13} />
-                <span>Rank</span>
+              <div className="flex flex-col items-center px-4 py-2.5 bg-orange-500/5 border-l-4 border-orange-500 rounded-xl border border-orange-500/10">
+                <div className="flex items-center gap-1.5 text-orange-500 text-[0.65rem] font-bold uppercase tracking-wider mb-0.5">
+                  <Medal size={13} />
+                  <span>Rank</span>
+                </div>
+                <span className="text-xl font-black text-text leading-tight tabular-nums">
+                  {userRank}
+                </span>
+                <span className="text-[0.6rem] text-text-muted">global position</span>
               </div>
-              <span className="text-xl font-black text-text leading-tight tabular-nums">
-                {userRank}
-              </span>
-              <span className="text-[0.6rem] text-text-muted">global position</span>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Navigation Tabs */}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ChatSocket } from '@/lib/ws/chat-socket';
 import type { WsIncomingMessage } from '@/lib/ws/types';
 import type { Message } from '@/lib/api/types';
@@ -12,6 +13,7 @@ import toast from 'react-hot-toast';
 import { getStoredAccent } from '@/lib/constants/accents';
 
 export function useChatSocket(conversationId: string | null) {
+  const queryClient = useQueryClient();
   const { token, user } = useAuth();
   const { socket } = useChatSocketInstance();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -273,12 +275,36 @@ export function useChatSocket(conversationId: string | null) {
           });
         }
         break;
+      case 'streak_update':
+        if (typeof msg.current_streak === 'number' || typeof msg.trophies_earned === 'number') {
+          queryClient.setQueryData(['streak-data'], (old: any) => ({
+            ...(old || {}),
+            current_streak: msg.current_streak ?? old?.current_streak ?? 0,
+            longest_streak: msg.longest_streak ?? old?.longest_streak,
+            trophies_earned: msg.trophies_earned ?? old?.trophies_earned ?? 0,
+            total_trophies: msg.total_trophies ?? old?.total_trophies ?? 50,
+          }));
+          queryClient.invalidateQueries({ queryKey: ['streak-data'] });
+          queryClient.invalidateQueries({ queryKey: ['my-streak'] });
+          queryClient.invalidateQueries({ queryKey: ['achievements-streak'] });
+          try {
+            window.dispatchEvent(new CustomEvent('tati_streak_updated', {
+              detail: {
+                current_streak: msg.current_streak,
+                longest_streak: msg.longest_streak,
+                trophies_earned: msg.trophies_earned,
+                total_trophies: msg.total_trophies,
+              }
+            }));
+          } catch (_) {}
+        }
+        break;
       case 'error':
         setIsStreaming(false);
         console.error('WS Error:', msg.message);
         break;
     }
-  }, [errorCount, increment, handleTriggerExercise]);
+  }, [errorCount, increment, handleTriggerExercise, queryClient]);
 
   useEffect(() => {
     if (!socket) return;
