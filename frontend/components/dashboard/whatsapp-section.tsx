@@ -455,7 +455,7 @@ export function WhatsappSection() {
               )}
 
               <p className="text-xs text-text-muted max-w-lg leading-relaxed">
-                Tatiana&apos;s connection on Render (WAHA). Utilized by automated background tasks to dispatch daily streak alerts, weekly progress reports, and personalized encouragement to all students with a configured phone number.
+                Tatiana&apos;s connection on WAHA. Used by automated background tasks to send daily streak alerts, weekly progress reports, and personalized encouragement to all students with a configured phone number.
               </p>
             </div>
 
