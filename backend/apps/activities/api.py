@@ -47,7 +47,7 @@ grammar_router = Router(tags=["Grammar"])
 speech_router = Router(tags=["Speech & Pronunciation"])
 
 
-# ── FLASHCARDS & REPETIÇÃO ESPAÇADA (SRS) ────────────────────────────
+#    FLASHCARDS & REPETIÇÃO ESPAÇADA (SRS)                             
 
 
 @activities_router.get("/flashcards/my", auth=auth_required)
@@ -117,7 +117,7 @@ def review_flashcard(request: HttpRequest, payload: FlashcardReviewInput):
     )
 
 
-# ── PODCASTS & TREINAMENTO AUDITIVO ───────────────────────────────────
+#    PODCASTS & TREINAMENTO AUDITIVO                                    
 
 
 @activities_router.get("/podcasts", response=List[PodcastOut], auth=auth_optional)
@@ -161,7 +161,7 @@ def get_podcast_detail(request: HttpRequest, podcast_id: str):
     return PodcastService.get_podcast(podcast_id)
 
 
-# ── RANKING & COMPETIÇÕES ─────────────────────────────────────────────
+#    RANKING & COMPETIÇÕES                                              
 
 
 @activities_router.get("/ranking", response=List[RankingUserOut], auth=auth_optional)
@@ -173,7 +173,7 @@ def get_ranking(request: HttpRequest):
     return RankingService.get_ranking(user)
 
 
-# ── TROFÉUS & CONQUISTAS ──────────────────────────────────────────────
+#    TROFÉUS & CONQUISTAS                                               
 
 
 @activities_router.get("/trophies", response=List[TrophyOut], auth=auth_optional)
@@ -190,7 +190,7 @@ def get_trophies(request: HttpRequest):
     return TrophyService.get_trophies(user)
 
 
-# ── GAMES & NEWS ──────────────────────────────────────────────────────
+#    GAMES & NEWS                                                       
 
 
 @activities_router.get("/games", response=List[GameOut], auth=auth_optional)
@@ -234,7 +234,7 @@ def get_news(request: HttpRequest):
     ]
 
 
-# ── SUBMISSÕES DE ATIVIDADES ──────────────────────────────────────────
+#    SUBMISSÕES DE ATIVIDADES                                           
 
 
 @activities_router.get("/submissions/my", auth=auth_optional)
@@ -264,7 +264,7 @@ def submit_activity(request: HttpRequest, payload: SubmissionInput):
     return SubmissionService.submit_activity(user, payload.dict())
 
 
-# ── HUB DE MATERIAIS & PREMIUM ────────────────────────────────────────
+#    HUB DE MATERIAIS & PREMIUM                                         
 
 
 @activities_router.get("/hub", response=List[HubMaterialOut], auth=auth_optional)
@@ -306,7 +306,7 @@ def get_hub_content_access(request: HttpRequest, content_id: str):
     return HubService.get_content_access(user, content_id)
 
 
-# ── CATÁLOGO PÚBLICO & CHECKOUT DE MATERIAIS ─────────────────────────
+#    CATÁLOGO PÚBLICO & CHECKOUT DE MATERIAIS                          
 
 
 @catalog_router.get("", response=List[HubMaterialOut], auth=auth_optional)
@@ -344,7 +344,7 @@ def catalog_checkout_status(request: HttpRequest, payment_id: str):
     return HubService.get_checkout_status(payment_id)
 
 
-# ── GRAMÁTICA & EXERCÍCIOS ────────────────────────────────────────────
+#    GRAMÁTICA & EXERCÍCIOS                                             
 
 
 @grammar_router.get("", auth=auth_optional)
@@ -371,7 +371,7 @@ def clear_grammar_cache(request: HttpRequest):
     return {"ok": True, "message": "Grammar cache cleared"}
 
 
-# ── READING & LISTENING ───────────────────────────────────────────────
+#    READING & LISTENING                                                
 
 
 @activities_router.get("/reading", auth=auth_optional)
@@ -394,7 +394,7 @@ def get_listening_materials(request: HttpRequest, level: str = "A1"):
     return ExternalContentService.get_test_english_content(level, "listening")
 
 
-# ── PRONÚNCIA & SPEECH ────────────────────────────────────────────────
+#    PRONÚNCIA & SPEECH                                                 
 
 
 @speech_router.post(
@@ -438,7 +438,7 @@ def speech_tts(request: HttpRequest, payload: dict):
     return {"audio": audio_b64, "audio_b64": audio_b64}
 
 
-# ── EXTERNAL CONTENT: TEST ENGLISH & LIVEWORKSHEETS ───────────────────
+#    EXTERNAL CONTENT: TEST ENGLISH & LIVEWORKSHEETS                    
 
 
 @activities_router.get("/test-english/content", auth=auth_optional)
@@ -749,7 +749,7 @@ def get_hub_page(
         )
 
 
-# ── FLASHCARD ASSETS & CLOUDINARY UPLOAD ──────────────────────────────
+#    FLASHCARD ASSETS & CLOUDINARY UPLOAD                               
 
 flashcard_assets_router = Router(tags=["Flashcard Assets"])
 
@@ -780,7 +780,7 @@ def upload_flashcard_image_from_url(request: HttpRequest, payload: dict):
     return {"url": url}
 
 
-# ── PREMIUM ADMIN ROUTER ───────────────────────────────────────────────
+#    PREMIUM ADMIN ROUTER                                                
 
 admin_premium_router = Router(tags=["Admin Premium Materials"])
 
@@ -937,7 +937,7 @@ def delete_admin_premium(request: HttpRequest, content_id: str):
     raise HttpError(404, "Material não encontrado.")
 
 
-# ── CEFR & SCHEDULER ADMIN ROUTER ─────────────────────────────────────
+#    CEFR & SCHEDULER ADMIN ROUTER                                      
 
 cefr_admin_router = Router(tags=["CEFR & Scheduler Admin"])
 
@@ -1580,7 +1580,7 @@ def delete_cefr_simulation(request: HttpRequest, sim_id: str):
     return {"success": True, "message": "Simulation deleted successfully."}
 
 
-# ── CEFR IMAGES RESOLVER ──────────────────────────────────────────────
+#    CEFR IMAGES RESOLVER                                               
 
 cefr_images_router = Router(tags=["CEFR Images"])
 

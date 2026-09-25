@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# ── CACHE HELPERS (DJANGO CORE CACHE + REDIS) ─────────────────────────
+#    CACHE HELPERS (DJANGO CORE CACHE + REDIS)                          
 
 
 async def cache_get(key: str) -> Optional[Any]:

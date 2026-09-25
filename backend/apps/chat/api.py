@@ -22,7 +22,7 @@ User = get_user_model()
 chat_router = Router(tags=["Teacher Tati AI Chat"])
 
 
-# ── CONVERSAS & HISTÓRICO ─────────────────────────────────────────────
+#    CONVERSAS & HISTÓRICO                                              
 
 
 @chat_router.get("/conversations", response=list[ConversationOut], auth=auth_required)
@@ -41,7 +41,7 @@ def create_conversation(request: HttpRequest, payload: CreateConversationInput):
     return ConversationService.create_conversation(request.auth, payload)
 
 
-# ── TESTE DE NIVELAMENTO CEFR (DIAGNÓSTICO) ──────────────────────────
+#    TESTE DE NIVELAMENTO CEFR (DIAGNÓSTICO)                           
 
 
 @chat_router.post("/leveling/start", auth=auth_required)
@@ -110,7 +110,7 @@ def get_leveling_status(request: HttpRequest):
     return {"active": False}
 
 
-# ── TESTE CEFR PÚBLICO (PARA VISITANTES SEM LOGIN) ───────────────────
+#    TESTE CEFR PÚBLICO (PARA VISITANTES SEM LOGIN)                    
 
 
 @chat_router.post("/leveling/public/start", auth=auth_optional)
@@ -196,7 +196,7 @@ async def get_conversation_summary(
     )
 
 
-# ── ENVIO DE MENSAGEM & RESPOSTA DA IA ────────────────────────────────
+#    ENVIO DE MENSAGEM & RESPOSTA DA IA                                 
 
 
 @chat_router.post("", auth=auth_required)
@@ -239,7 +239,7 @@ class TranscribeInput(BaseModel):
     audio: str | None = ""
 
 
-# ── SÍNTESE DE VOZ & TTS ──────────────────────────────────────────────
+#    SÍNTESE DE VOZ & TTS                                               
 
 
 @chat_router.post("/synthesize-voice", auth=auth_optional)
@@ -270,7 +270,7 @@ async def synthesize_voice(request: HttpRequest, payload: TTSInput):
     }
 
 
-# ── TRANSCRIÇÃO DE VOZ (STT) ──────────────────────────────────────────
+#    TRANSCRIÇÃO DE VOZ (STT)                                           
 
 
 @chat_router.post("/transcribe", auth=auth_optional)
@@ -290,7 +290,7 @@ class WordLookupInput(BaseModel):
     accent: str | None = None
 
 
-# ── DICIONÁRIO & TRADUÇÃO BILÍNGUE ────────────────────────────────────
+#    DICIONÁRIO & TRADUÇÃO BILÍNGUE                                     
 
 
 @chat_router.get("/word-lookup", auth=auth_optional)

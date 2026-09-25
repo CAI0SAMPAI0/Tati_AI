@@ -146,7 +146,7 @@ class BrevoEmailService:
             "attempts": [],
         }
 
-        # ── 1. BREVO HTTP API (Porta 443) ──────────────────────────────────
+        #    1. BREVO HTTP API (Porta 443)                                   
         if brevo_key:
             url = "https://api.brevo.com/v3/smtp/email"
             headers = {
@@ -204,7 +204,7 @@ class BrevoEmailService:
                 }
             )
 
-        # ── 2. RESEND HTTP API FALLBACK (Porta 443) ────────────────────────
+        #    2. RESEND HTTP API FALLBACK (Porta 443)                         
         resend_key = os.getenv("RESEND_API_KEY")
         if resend_key and not resend_key.startswith("xkeysib-"):
             try:
@@ -255,7 +255,7 @@ class BrevoEmailService:
                     }
                 )
 
-        # ── 3. SMTP FALLBACK (Gmail / Custom SMTP) ─────────────────────────
+        #    3. SMTP FALLBACK (Gmail / Custom SMTP)                          
         smtp_host = os.getenv("SMTP_HOST")
         smtp_user = os.getenv("SMTP_USER")
         smtp_pass = os.getenv("SMTP_PASSWORD")
@@ -976,7 +976,7 @@ class NotificationSchedulerService:
         )
         return start_brt.astimezone(timezone.utc), end_brt.astimezone(timezone.utc)
 
-    # ── 1. LEMBRETE DIÁRIO DE OFENSIVA (STREAK) — 20:00 BRT ─────────────
+    #    1. LEMBRETE DIÁRIO DE OFENSIVA (STREAK) — 20:00 BRT              
     @staticmethod
     def send_daily_streak_reminder_to_user(
         user: User, force: bool = False
@@ -1130,7 +1130,7 @@ class NotificationSchedulerService:
             "total_students": len(students),
         }
 
-    # ── 2. RELATÓRIO SEMANAL DE EVOLUÇÃO — DOMINGOS 19:00 BRT ─────────────
+    #    2. RELATÓRIO SEMANAL DE EVOLUÇÃO — DOMINGOS 19:00 BRT              
     @staticmethod
     def send_weekly_report_to_user(user: User, force: bool = False) -> dict:
         """
@@ -1282,7 +1282,7 @@ class NotificationSchedulerService:
             "total_students": len(students),
         }
 
-    # ── 3. INCENTIVO DE INATIVIDADE (NUDGE) — 14:00 BRT ───────────────────
+    #    3. INCENTIVO DE INATIVIDADE (NUDGE) — 14:00 BRT                    
     @staticmethod
     def send_inactivity_nudge_to_user(user: User, force: bool = False) -> dict:
         """
@@ -1405,7 +1405,7 @@ class NotificationSchedulerService:
             "total_students": len(students),
         }
 
-    # ── 4. STREAK BROKEN (COMEBACK) ──────────────────────────────────────
+    #    4. STREAK BROKEN (COMEBACK)                                       
     @staticmethod
     def send_streak_broken_to_user(user: User, force: bool = False) -> dict:
         first_name = (
@@ -1471,7 +1471,7 @@ class NotificationSchedulerService:
             "push": push_diag,
         }
 
-    # ── 5. STREAK MILESTONE (7, 14, 30 DIAS) ─────────────────────────────
+    #    5. STREAK MILESTONE (7, 14, 30 DIAS)                              
     @staticmethod
     def send_streak_milestone_to_user(
         user: User, milestone: int = 7, force: bool = False
@@ -1538,7 +1538,7 @@ class NotificationSchedulerService:
             "push": push_diag,
         }
 
-    # ── 6. DISPARO DE TESTE CONTROLADO (INDIVIDUAL OU GERAL) ──────────────
+    #    6. DISPARO DE TESTE CONTROLADO (INDIVIDUAL OU GERAL)               
     @staticmethod
     def send_test_notification_to_user(
         user: User, notification_type: str = "streak_reminder", force: bool = True

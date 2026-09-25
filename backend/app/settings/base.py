@@ -24,7 +24,7 @@ DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "t")
 
 ALLOWED_HOSTS = ["*"]
 
-# ── INSTALLED APPS ───────────────────────────────────────────────────
+#    INSTALLED APPS                                                    
 INSTALLED_APPS = [
     # Daphne deve vir antes de django.contrib.staticfiles para ASGI WebSockets
     "daphne",
@@ -53,7 +53,7 @@ INSTALLED_APPS = [
 
 AUTH_USER_MODEL = "authentication.User"
 
-# ── MIDDLEWARE ────────────────────────────────────────────────────────
+#    MIDDLEWARE                                                         
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "app.middleware.NormalizePathMiddleware",
@@ -99,7 +99,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "app.wsgi.application"
 ASGI_APPLICATION = "app.asgi.application"
 
-# ── BANCO DE DADOS ────────────────────────────────────────────────────
+#    BANCO DE DADOS                                                     
 # Utiliza DATABASE_URL (Supabase PostgreSQL / Railway) ou fallback local SQLite
 DATABASE_URL = (
     os.getenv("DATABASE_URL")
@@ -134,7 +134,7 @@ else:
         }
     }
 
-# ── CACHE (UPSTASH REDIS / DJANGO CACHE BACKEND) ─────────────────────
+#    CACHE (UPSTASH REDIS / DJANGO CACHE BACKEND)                      
 UPSTASH_REDIS_URL = os.getenv("UPSTASH_REDIS_URL")
 REDIS_URL = os.getenv("REDIS_URL", UPSTASH_REDIS_URL)
 
@@ -190,7 +190,7 @@ else:
         }
     }
 
-# ── CELERY & BACKGROUND TASKS ─────────────────────────────────────────
+#    CELERY & BACKGROUND TASKS                                          
 from celery.schedules import crontab
 
 _RAW_CELERY_BROKER = os.getenv("CELERY_BROKER_URL")
@@ -235,7 +235,7 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
-# ── DJANGO CHANNELS (WEBSOCKETS LAYER) ────────────────────────────────
+#    DJANGO CHANNELS (WEBSOCKETS LAYER)                                 
 # Em containers autônomos (HF Spaces), InMemoryChannelLayer garante latência zero e 0 falhas de conexão de rede
 if (
     os.getenv("USE_REDIS_CHANNELS", "false").lower() in ("true", "1")
@@ -256,7 +256,7 @@ else:
         },
     }
 
-# ── CORS HEADERS ──────────────────────────────────────────────────────
+#    CORS HEADERS                                                       
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
@@ -322,7 +322,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:3000",
 ]
 
-# ── INTERNACIONALIZAÇÃO & TEMPO ───────────────────────────────────────
+#    INTERNACIONALIZAÇÃO & TEMPO                                        
 LANGUAGE_CODE = "pt-br"
 TIME_ZONE = "America/Sao_Paulo"
 USE_I18N = True
@@ -335,7 +335,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# ── SEGURANÇA E ADMINS (RBAC) ─────────────────────────────────────────
+#    SEGURANÇA E ADMINS (RBAC)                                          
 SUPERADMIN_EMAILS = [
     e.strip().lower()
     for e in os.getenv(
@@ -349,7 +349,7 @@ PROGRAMMER_USERNAMES = [
     if u.strip()
 ]
 
-# ── GOOGLE OAUTH & REDIRECTS ──────────────────────────────────────────
+#    GOOGLE OAUTH & REDIRECTS                                           
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID") or os.getenv(
     "NEXT_PUBLIC_GOOGLE_CLIENT_ID", ""
 )
@@ -358,7 +358,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "https://tati-ai.vercel.app")
 BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "")
 USE_X_FORWARDED_HOST = True
 
-# ── LOGGING E MONITORAMENTO ──────────────────────────────────────────
+#    LOGGING E MONITORAMENTO                                           
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
 LOGGING = {

@@ -25,7 +25,7 @@ def require_staff_user(request: HttpRequest):
     return user
 
 
-# ── ESTATÍSTICAS RÁPIDAS & OVERVIEW ───────────────────────────────────
+#    ESTATÍSTICAS RÁPIDAS & OVERVIEW                                    
 
 
 @dashboard_router.get("/stats", auth=auth_required)
@@ -95,7 +95,7 @@ def get_celery_health(request: HttpRequest):
     }
 
 
-# ── GERENCIAMENTO DE ALUNOS ───────────────────────────────────────────
+#    GERENCIAMENTO DE ALUNOS                                            
 
 
 @dashboard_router.get("/students", auth=auth_required)
@@ -219,7 +219,7 @@ class FlashcardDeckInput(BaseModel):
     is_published: Optional[bool] = True
 
 
-# ── FLASHCARDS ADMIN ──────────────────────────────────────────────────
+#    FLASHCARDS ADMIN                                                   
 
 
 @dashboard_router.get("/flashcards", auth=auth_required)
@@ -260,7 +260,7 @@ def delete_flashcard_deck(request: HttpRequest, deck_id: str):
     return DashboardService.delete_flashcard_deck(deck_id)
 
 
-# ── SIMULAÇÕES ADMIN ──────────────────────────────────────────────────
+#    SIMULAÇÕES ADMIN                                                   
 
 
 class SimulationInput(BaseModel):
@@ -322,7 +322,7 @@ def delete_simulation(request: HttpRequest, simulation_id: str):
     return DashboardService.delete_simulation(simulation_id)
 
 
-# ── GAMES ADMIN (WORDWALL) ────────────────────────────────────────────
+#    GAMES ADMIN (WORDWALL)                                             
 
 
 class GameInput(BaseModel):
@@ -369,7 +369,7 @@ def delete_game(request: HttpRequest, game_id: str):
     return DashboardService.delete_game(game_id)
 
 
-# ── NEWS ADMIN (NOTÍCIAS EM INGLÊS) ───────────────────────────────────
+#    NEWS ADMIN (NOTÍCIAS EM INGLÊS)                                    
 
 
 class NewsInput(BaseModel):
@@ -417,7 +417,7 @@ def delete_news(request: HttpRequest, news_id: str):
     return DashboardService.delete_news(news_id)
 
 
-# ── WAHA (WHATSAPP SESSIONS) ──────────────────────────────────────────
+#    WAHA (WHATSAPP SESSIONS)                                           
 
 
 @dashboard_router.get("/waha/sessions", auth=auth_required)
@@ -517,7 +517,7 @@ def get_waha_session_qr(request: HttpRequest, session: Optional[str] = None):
     return HttpResponse(b"", content_type="image/png", status=404)
 
 
-# ── GERENCIAMENTO DE WHATSAPP DE ALUNOS ──────────────────────────────
+#    GERENCIAMENTO DE WHATSAPP DE ALUNOS                               
 
 
 class StudentWhatsAppUpdateInput(BaseModel):

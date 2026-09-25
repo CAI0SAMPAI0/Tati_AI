@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+//  Types 
 
 interface AvatarFrames {
   has_frames?: boolean;
@@ -31,7 +31,7 @@ interface VoiceAvatarProps {
   lastAssistantText?: string;
 }
 
-// ─── Emotion detection ───────────────────────────────────────────────────────
+//  Emotion detection 
 
 const SURPRISE_RE = /!|uau|wow|incrível|incredible|que\b.{0,20}!/i;
 const POSITIVE_RE = /parabéns|congratulations|perfeito|perfect|excelente|excellent|maravilhoso|wonderful|fantástico|fantastic|ótimo|great|brilliant|😊|😄|😃|🎉|👏/i;
@@ -43,7 +43,7 @@ function detectEmotion(text: string): 'surprise' | 'positive' | 'neutral' {
   return 'neutral';
 }
 
-// ─── Amplitude smoothing (ring buffer) ───────────────────────────────────────
+//  Amplitude smoothing (ring buffer) 
 
 class AmplitudeSmoother {
   private buf: Float32Array;
@@ -60,7 +60,7 @@ class AmplitudeSmoother {
   }
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+//  Component 
 
 const INITIAL_SRC = '/images/tati_logo.jpg';
 const MIN_HOLD_MS = 90;
@@ -72,14 +72,14 @@ export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAva
     staleTime: Infinity,
   });
 
-  // ── Rendering state ────────────────────────────────────────────────────────
+  // Rendering state
   // mouthSrc / mouthKey: changing key re-triggers fade-in CSS animation
   const [mouthSrc, setMouthSrc] = useState(INITIAL_SRC);
   const [mouthKey, setMouthKey] = useState(0);
   const [reactionSrc, setReactionSrc] = useState<string | null>(null);
   const [blinkVisible, setBlinkVisible] = useState(false);
 
-  // ── Refs (never cause stale closures) ─────────────────────────────────────
+  // Refs (never cause stale closures) 
   const framesRef = useRef<AvatarFrames | undefined>(undefined);
   const currentMouthRef = useRef(INITIAL_SRC);   // source-of-truth for current mouth
   const mouthLevelRef = useRef<MouthLevel>(0);
@@ -103,7 +103,7 @@ export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAva
   // Keep framesRef in sync
   useEffect(() => { framesRef.current = frames; }, [frames]);
 
-  // ── Helpers (STABLE — empty deps, use only refs) ───────────────────────────
+  // Helpers (STABLE — empty deps, use only refs) 
 
   const getUrl = useCallback((path?: string): string => {
     if (!path) return INITIAL_SRC;
@@ -155,7 +155,7 @@ export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAva
     return cur;
   }, []);
 
-  // ── Initial frame ──────────────────────────────────────────────────────────
+  // Initial frame
 
   useEffect(() => {
     if (frames?.has_frames && frames.normal) {
@@ -165,7 +165,7 @@ export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAva
     }
   }, [frames, getUrl]);
 
-  // ── Emotion detection ──────────────────────────────────────────────────────
+  // Emotion detection
 
   useEffect(() => {
     if (!lastAssistantText || lastAssistantText === lastTextRef.current) return;
@@ -185,7 +185,7 @@ export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAva
     }
   }, [lastAssistantText, getUrl]);
 
-  // ── Blink: independent timer, overlay layer ────────────────────────────────
+  // Blink: independent timer, overlay layer
 
   useEffect(() => {
     const scheduleBlink = (): ReturnType<typeof setTimeout> => {
@@ -207,7 +207,7 @@ export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAva
     return () => { if (blinkTimerRef.current) clearTimeout(blinkTimerRef.current); };
   }, []); // runs once — reads framesRef internally
 
-  // ── Mouth animation ────────────────────────────────────────────────────────
+  // Mouth animation
 
   useEffect(() => {
     if (mouthIntervalRef.current) clearInterval(mouthIntervalRef.current);
@@ -226,7 +226,7 @@ export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAva
       return;
     }
 
-    // ── Web Audio setup ──────────────────────────────────────────────────────
+    // Web Audio setup
     let usingAudio = false;
     try {
       if (!audioCtxRef.current) {
@@ -283,7 +283,7 @@ export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAva
     // changeMouth, frameForLevel, nextLevel, getUrl are all stable (empty deps)
   }, [state, audioElement, changeMouth, frameForLevel, nextLevel, getUrl]);
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // Render 
 
   const blinkUrl = framesRef.current?.piscando ? getUrl(framesRef.current.piscando) : null;
 

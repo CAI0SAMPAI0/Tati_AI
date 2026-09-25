@@ -16,11 +16,11 @@ Cada módulo em `modules/` deve seguir esta estrutura (quando aplicável):
 
 ```text
 módulo/
-├── routes/        # Endpoints HTTP (FastAPI APIRouter)
-├── services/      # Lógica de negócio e orquestração
-├── repositories/  # Acesso a dados (queries SQL/ORM)
-├── schema/        # Definições de dados Pydantic
-└── tasks.py       # Tarefas assíncronas do Celery
+├   routes/        # Endpoints HTTP (FastAPI APIRouter)
+├   services/      # Lógica de negócio e orquestração
+├   repositories/  # Acesso a dados (queries SQL/ORM)
+├   schema/        # Definições de dados Pydantic
+└   tasks.py       # Tarefas assíncronas do Celery
 ```
 
 ## Tecnologias e Bibliotecas

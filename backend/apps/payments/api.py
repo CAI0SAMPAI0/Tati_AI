@@ -16,7 +16,7 @@ User = get_user_model()
 payments_router = Router(tags=["Mercado Pago Payments"])
 
 
-# ── COBRANÇA PIX ──────────────────────────────────────────────────────
+#    COBRANÇA PIX                                                       
 
 
 @payments_router.post("/mercadopago/pix", response=PixPaymentOut, auth=auth_required)
@@ -27,7 +27,7 @@ def create_pix_payment(request: HttpRequest, payload: CreatePixInput):
     return MercadoPagoService.create_pix_payment(request.auth, payload)
 
 
-# ── CHECKOUT TRANSPARENTE / PREFERENCE ────────────────────────────────
+#    CHECKOUT TRANSPARENTE / PREFERENCE                                 
 
 
 @payments_router.post(
@@ -40,7 +40,7 @@ def create_preference(request: HttpRequest, payload: CreatePreferenceInput):
     return MercadoPagoService.create_preference(request.auth, payload)
 
 
-# ── CONSULTA DE STATUS DE PAGAMENTO / ASSINATURA ──────────────────────
+#    CONSULTA DE STATUS DE PAGAMENTO / ASSINATURA                       
 
 
 @payments_router.get("/status", auth=auth_required)
@@ -122,7 +122,7 @@ def get_payment_status(request: HttpRequest, payment_id: str):
     return MercadoPagoService.get_payment_status(payment_id)
 
 
-# ── WEBHOOK MERCADO PAGO ──────────────────────────────────────────────
+#    WEBHOOK MERCADO PAGO                                               
 
 
 @payments_router.post("/mercadopago/webhook")

@@ -91,7 +91,7 @@ class StudentUser(HttpUser):
             self.token = StudentUser.shared_token
             self.client.headers["Authorization"] = f"Bearer {self.token}"
 
-    # ── 1. DASHBOARD & GAMIFICAÇÃO (Maior frequência de requisições do aluno) ──
+    #    1. DASHBOARD & GAMIFICAÇÃO (Maior frequência de requisições do aluno)   
     @tag("student", "dashboard", "fast")
     @task(15)
     def view_dashboard_and_profile(self):
@@ -119,7 +119,7 @@ class StudentUser(HttpUser):
         with self.client.get("/users/weekly-plan", name="[Progress] Weekly Plan", catch_response=True) as res:
             self._check_latency(res)
 
-    # ── 2. VOCABULÁRIO & FLASHCARDS (Leituras de banco e SRS) ───────────────
+    #    2. VOCABULÁRIO & FLASHCARDS (Leituras de banco e SRS)                
     @tag("student", "activities", "vocab")
     @task(10)
     def study_vocabulary_and_flashcards(self):
@@ -142,7 +142,7 @@ class StudentUser(HttpUser):
         ) as res:
             self._check_latency(res)
 
-    # ── 3. RECOMENDAÇÕES & CONTEÚDO (Módulos e Gramática) ───────────────────
+    #    3. RECOMENDAÇÕES & CONTEÚDO (Módulos e Gramática)                    
     @tag("student", "activities", "content")
     @task(8)
     def browse_recommendations_and_grammar(self):
@@ -160,7 +160,7 @@ class StudentUser(HttpUser):
         with self.client.get("/grammar", name="[Grammar] Catalog", catch_response=True) as res:
             self._check_latency(res)
 
-    # ── 4. CHAT (Leitura de Conversas e Histórico) ──────────────────────────
+    #    4. CHAT (Leitura de Conversas e Histórico)                           
     @tag("student", "chat")
     @task(6)
     def view_chat_conversations(self):
@@ -182,7 +182,7 @@ class StudentUser(HttpUser):
                             name="[Chat] Get Messages",
                         )
 
-    # ── 5. OPERAÇÕES DE ESCRITA / CARGA PESADA (Teste de Bottlenecks em DB) ──
+    #    5. OPERAÇÕES DE ESCRITA / CARGA PESADA (Teste de Bottlenecks em DB)   
     @tag("student", "write", "heavy")
     @task(1)
     def create_chat_conversation(self):
@@ -213,7 +213,7 @@ class StudentUser(HttpUser):
 
 
 
-# ── EVENT LISTENERS: Relatório Final de Gargalos e Resumo de Latência ────────
+#    EVENT LISTENERS: Relatório Final de Gargalos e Resumo de Latência         
 @events.test_stop.add_listener
 def on_test_stop(environment, **kwargs):
     """Exibe no terminal um resumo executivo com p95, p99 e taxa de falhas."""

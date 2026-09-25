@@ -40,9 +40,9 @@ class DocumentService:
        possa sair do chat e ao voltar o arquivo esteja pronto para abrir no navegador.
     """
 
-    # ─────────────────────────────────────────────────────────────────────────
+    #                                                                          
     # 1. LEITURA INTEGRAL DE ARQUIVOS (MÁXIMO 3)
-    # ─────────────────────────────────────────────────────────────────────────
+    #                                                                          
 
     @classmethod
     def read_uploaded_files(cls, files: List[Dict[str, Any]]) -> str:
@@ -307,9 +307,9 @@ class DocumentService:
                     return p
         return soffice_path
 
-    # ─────────────────────────────────────────────────────────────────────────
+    #                                                                          
     # 2. DETECÇÃO DE FORMATO SOLICITADO & SE DEVE GERAR DOCUMENTO
-    # ─────────────────────────────────────────────────────────────────────────
+    #                                                                          
 
     @classmethod
     def detect_target_format(cls, user_text: str) -> str:
@@ -361,9 +361,9 @@ class DocumentService:
 
         return False, target_format
 
-    # ─────────────────────────────────────────────────────────────────────────
+    #                                                                          
     # 3. GERAÇÃO FORMATADA DO DOCUMENTO (PDF, DOCX, PPTX)
-    # ─────────────────────────────────────────────────────────────────────────
+    #                                                                          
 
     @classmethod
     def generate_document_from_instruction(
@@ -530,9 +530,9 @@ class DocumentService:
             ],
         }
 
-    # ─────────────────────────────────────────────────────────────────────────
+    #                                                                          
     # 4. CONSTRUTORES DE ARQUIVO (PDF, DOCX, PPTX)
-    # ─────────────────────────────────────────────────────────────────────────
+    #                                                                          
 
     @classmethod
     def _build_pdf(cls, data: Dict[str, Any], output_path: str, student_name: str):

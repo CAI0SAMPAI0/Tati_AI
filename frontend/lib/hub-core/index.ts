@@ -3,7 +3,7 @@
  * Exporta APENAS o que não existe em frontend/lib/api/
  */
 
-// ─── levels ───────────────────────────────────────────────────────────────────
+//     levels                                                                    
 
 export type CEFRLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
 
@@ -56,7 +56,7 @@ export function levelLabel(raw: string | null | undefined): string {
   return CEFR_LABEL_MAP[code] ?? code;
 }
 
-// ─── tipos extras do hub (não existem em frontend/lib/api/types.ts) ──────────
+//     tipos extras do hub (não existem em frontend/lib/api/types.ts)           
 
 export interface PremiumCatalogItem {
   id: string;

@@ -158,10 +158,10 @@ export function PremiumSection() {
 
   const getIcon = (type: string) => {
     switch (type) {
-      case 'pdf':     return <FileText size={20} />;
-      case 'link':    return <LinkIcon size={20} />;
-      case 'video':   return <Video size={20} />;
-      default:        return <FileDigit size={20} />;
+      case 'pdf': return <FileText size={20} />;
+      case 'link': return <LinkIcon size={20} />;
+      case 'video': return <Video size={20} />;
+      default: return <FileDigit size={20} />;
     }
   };
 
@@ -178,7 +178,7 @@ export function PremiumSection() {
         </Button>
       </div>
 
-      {/* ── Cards ── */}
+      {/*    Cards    */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {contents.map((item) => (
           <div
@@ -262,7 +262,7 @@ export function PremiumSection() {
         ))}
       </div>
 
-      {/* ── Modal ── */}
+      {/*    Modal    */}
       <DialogModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -338,7 +338,7 @@ export function PremiumSection() {
             </div>
           </div>
 
-          {/* ── Preços por audiência ── */}
+          {/*    Preços por audiência    */}
           <div>
             <label className="block text-[0.73rem] font-semibold text-text-muted mb-2 uppercase tracking-wider flex items-center gap-1">
               <DollarSign size={12} /> Pricing by Audience
@@ -412,8 +412,8 @@ export function PremiumSection() {
                   formData.type === 'link'
                     ? 'https://notebooklm.google.com/...'
                     : isUploading
-                    ? 'Uploading file to Cloudinary...'
-                    : 'File path or URL...'
+                      ? 'Uploading file to Cloudinary...'
+                      : 'File path or URL...'
                 }
                 value={formData.content_source}
                 onChange={(e) => setFormData(prev => ({ ...prev, content_source: e.target.value }))}

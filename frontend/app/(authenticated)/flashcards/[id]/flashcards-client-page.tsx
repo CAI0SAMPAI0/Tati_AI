@@ -13,7 +13,7 @@ import dynamic from 'next/dynamic';
 const MotionDiv = dynamic(() => import('framer-motion').then(m => m.motion.div), { ssr: false });
 const AnimatePresence = dynamic(() => import('framer-motion').then(m => m.AnimatePresence), { ssr: false });
 
-// ── Types ──────────────────────────────────────────────────────────────────────
+//    Types                                                                       
 
 interface Flashcard {
   front: string;    // word / term (answer)
@@ -31,7 +31,7 @@ interface Deck {
 
 type CardStatus = 'correct' | 'wrong' | 'unknown' | null;
 
-// ── Levenshtein distance ───────────────────────────────────────────────────────
+//    Levenshtein distance                                                        
 
 function levenshtein(a: string, b: string): number {
   const m = a.length, n = b.length;
@@ -56,7 +56,7 @@ function isApproximateMatch(input: string, answer: string): boolean {
   return levenshtein(a, b) <= Math.max(1, maxAllowedErrors);
 }
 
-// ── Normalizer ─────────────────────────────────────────────────────────────────
+//    Normalizer                                                                  
 
 function normalizeCard(raw: any): Flashcard {
   const vals = Object.values(raw) as string[];
@@ -68,7 +68,7 @@ function normalizeCard(raw: any): Flashcard {
   };
 }
 
-// ── Flashcard Session ──────────────────────────────────────────────────────────
+//    Flashcard Session                                                           
 
 interface CardResult {
   card: Flashcard;
@@ -88,7 +88,7 @@ export default function FlashcardsClientPage() {
     enabled: !!deckId,
   });
 
-  // ── Session state ────────────────────────────────────────────────────────────
+  //    Session state                                                             
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userInput, setUserInput] = useState('');
   const [revealed, setRevealed] = useState(false);
@@ -141,11 +141,11 @@ export default function FlashcardsClientPage() {
           status: 'completed',
           url: `/flashcards/${deckId}`,
         },
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }, [finished, deckId, deck?.title, cards.length, results]);
 
-  // ── Handlers ──────────────────────────────────────────────────────────────────
+  //    Handlers                                                                   
 
   const handleCheck = () => {
     if (!currentCard || revealed) return;
@@ -181,7 +181,7 @@ export default function FlashcardsClientPage() {
       card_front: currentCard.front,
       status,
       used_hint: usedHint,
-    }).catch(() => {});
+    }).catch(() => { });
   };
 
   const handleNext = () => {
@@ -214,7 +214,7 @@ export default function FlashcardsClientPage() {
     setFinished(false);
   };
 
-  // ── Loading ───────────────────────────────────────────────────────────────────
+  //    Loading                                                                    
 
   if (isLoading) return (
     <div className="min-h-screen bg-bg flex items-center justify-center">
@@ -224,7 +224,7 @@ export default function FlashcardsClientPage() {
 
   if (!deck || cards.length === 0) return (
     <div className="min-h-screen bg-bg flex flex-col">
-      <MainHeader onToggleMenu={() => {}} />
+      <MainHeader onToggleMenu={() => { }} />
       <div className="flex-1 flex flex-col items-center justify-center space-y-4 text-center p-8">
         <Sparkles size={48} className="text-primary/30" />
         <p className="text-text-muted max-w-sm">
@@ -235,14 +235,14 @@ export default function FlashcardsClientPage() {
     </div>
   );
 
-  // ── Summary Screen ────────────────────────────────────────────────────────────
+  //    Summary Screen                                                             
 
   if (finished) {
     const cleanCorrect = results.filter(r => r.status === 'correct' && !r.usedHint).length;
     const hintCorrect = results.filter(r => r.status === 'correct' && r.usedHint).length;
     const wrong = results.filter(r => r.status === 'wrong').length;
     const unknown = results.filter(r => r.status === 'unknown').length;
-    
+
     // Regra:
     // - Acerto sem dica = 1.0 (100%)
     // - Acerto com dica = 0.5 (meio certo)
@@ -252,7 +252,7 @@ export default function FlashcardsClientPage() {
 
     return (
       <div className="min-h-screen bg-bg flex flex-col">
-        <MainHeader onToggleMenu={() => {}} />
+        <MainHeader onToggleMenu={() => { }} />
         <main className="flex-1 flex flex-col items-center justify-center p-6">
           <MotionDiv
             initial={{ opacity: 0, y: 30 }}
@@ -326,15 +326,15 @@ export default function FlashcardsClientPage() {
     );
   }
 
-  // ── Progress bar ──────────────────────────────────────────────────────────────
+  //    Progress bar                                                               
 
   const progress = (currentIndex / cards.length) * 100;
 
-  // ── Main Card UI ──────────────────────────────────────────────────────────────
+  //    Main Card UI                                                               
 
   return (
     <div className="min-h-screen bg-bg flex flex-col">
-      <MainHeader onToggleMenu={() => {}} />
+      <MainHeader onToggleMenu={() => { }} />
 
       <main className="flex-1 flex flex-col items-center p-4 md:p-8">
         {/* Back + Progress */}
@@ -375,10 +375,10 @@ export default function FlashcardsClientPage() {
             {/* Card */}
             <div className={`bg-surface border-2 rounded-3xl overflow-hidden shadow-xl transition-all duration-300
               ${revealed
-                ? cardStatus === 'correct' ? 'border-green-500/60' 
-                : cardStatus === 'wrong' ? 'border-red-500/60' 
-                : cardStatus === 'unknown' ? 'border-yellow-500/60'
-                : 'border-primary/50'
+                ? cardStatus === 'correct' ? 'border-green-500/60'
+                  : cardStatus === 'wrong' ? 'border-red-500/60'
+                    : cardStatus === 'unknown' ? 'border-yellow-500/60'
+                      : 'border-primary/50'
                 : 'border-border'}`}
             >
               {/* Header: Meaning / Portuguese Translation (Clean & prominent) */}

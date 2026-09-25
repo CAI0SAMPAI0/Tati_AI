@@ -16,7 +16,7 @@ User = get_user_model()
 notifications_router = Router(tags=["Notifications"])
 
 
-# ── NOTIFICAÇÕES IN-APP ───────────────────────────────────────────────
+#    NOTIFICAÇÕES IN-APP                                                
 
 
 @notifications_router.get("", response=List[NotificationOut], auth=auth_required)
@@ -55,7 +55,7 @@ def get_vapid_public_key(request: HttpRequest):
     return {"public_key": vapid["public_key"], "vapid_public_key": vapid["public_key"]}
 
 
-# ── REGISTRO DE WEBPUSH ───────────────────────────────────────────────
+#    REGISTRO DE WEBPUSH                                                
 
 
 @notifications_router.post("/subscribe", auth=auth_required)
@@ -67,7 +67,7 @@ def subscribe_push(request: HttpRequest, payload: SubscribePushInput):
     return NotificationService.register_push_subscription(request.auth, payload)
 
 
-# ── DISPARO DE NOTIFICAÇÃO MANUAL / TESTE (POR NÍVEL OU GLOBAL) ──────
+#    DISPARO DE NOTIFICAÇÃO MANUAL / TESTE (POR NÍVEL OU GLOBAL)       
 
 
 @notifications_router.post("/broadcast", auth=auth_required)
@@ -93,7 +93,7 @@ def broadcast_notification(request: HttpRequest, payload: dict):
     )
 
 
-# ── DISPARO DE E-MAIL (BREVO & MULTI-PROVIDER) ───────────────────────
+#    DISPARO DE E-MAIL (BREVO & MULTI-PROVIDER)                        
 
 
 @notifications_router.post("/send-email", auth=auth_required)
@@ -235,7 +235,7 @@ def trigger_inactivity_nudges(request: HttpRequest):
     return NotificationSchedulerService.send_inactivity_nudges_to_all_inactive_students()
 
 
-# ── CRON WEBHOOKS SEGUROS (HORÁRIO DE BRASÍLIA / HUGGING FACE / VERCEL) ─
+#    CRON WEBHOOKS SEGUROS (HORÁRIO DE BRASÍLIA / HUGGING FACE / VERCEL)  
 
 
 def _validate_cron_access(request: HttpRequest) -> bool:
@@ -362,7 +362,7 @@ def get_monthly_top3(
     }
 
 
-# ── DISPARO DE WHATSAPP (WAHA) ────────────────────────────────────────
+#    DISPARO DE WHATSAPP (WAHA)                                         
 
 
 @notifications_router.post("/send-whatsapp", auth=auth_required)

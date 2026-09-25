@@ -65,7 +65,7 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
     pollCountRef.current = 0;
   }, []);
 
-  // ── Confirmação unificada (WebSocket ou polling) ──────────────────
+  //    Confirmação unificada (WebSocket ou polling)                   
   const handlePaymentConfirmed = useCallback(async (isProcessing = false) => {
     stopPolling();
     setContentIsProcessing(isProcessing);
@@ -74,27 +74,27 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
     onAccessGranted?.();
   }, [stopPolling, onAccessGranted]);
 
-  // ── WebSocket: escuta confirmações em tempo real ──────────────────
+  //    WebSocket: escuta confirmações em tempo real                   
   // Só ativa enquanto o modal está aberto e aguardando pagamento
-    usePaymentWebSocket({
-      enabled: isAwaitingPayment,
-      onConfirmed: useCallback((data: { payment_id: string }) => {
-        // Só reage se for o pagamento deste item
-        if (
-          !checkoutResult?.paymentId ||
-          data.payment_id !== checkoutResult.paymentId
-        ) return;
-        handlePaymentConfirmed(false);
-      }, [checkoutResult?.paymentId, handlePaymentConfirmed]),
-      onRefused: useCallback((data: { payment_id: string }) => {
-        if (
-          !checkoutResult?.paymentId ||
-          data.payment_id !== checkoutResult.paymentId
-        ) return;
-        stopPolling();
-        setPollingStatus('error');
-      }, [checkoutResult?.paymentId, stopPolling]),
-    });
+  usePaymentWebSocket({
+    enabled: isAwaitingPayment,
+    onConfirmed: useCallback((data: { payment_id: string }) => {
+      // Só reage se for o pagamento deste item
+      if (
+        !checkoutResult?.paymentId ||
+        data.payment_id !== checkoutResult.paymentId
+      ) return;
+      handlePaymentConfirmed(false);
+    }, [checkoutResult?.paymentId, handlePaymentConfirmed]),
+    onRefused: useCallback((data: { payment_id: string }) => {
+      if (
+        !checkoutResult?.paymentId ||
+        data.payment_id !== checkoutResult.paymentId
+      ) return;
+      stopPolling();
+      setPollingStatus('error');
+    }, [checkoutResult?.paymentId, stopPolling]),
+  });
 
   const handleClose = useCallback(() => {
     stopPolling();
@@ -106,7 +106,7 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
     }, 300);
   }, [stopPolling]);
 
-  // ── Polling: fallback caso WebSocket não chegue ───────────────────
+  //    Polling: fallback caso WebSocket não chegue                    
   const startPolling = useCallback((paymentId: string) => {
     setPollingStatus('polling');
     pollCountRef.current = 0;
@@ -253,8 +253,8 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
         {pollingStatus === 'polling'
           ? 'Aguardando confirmação do pagamento...'
           : pollingStatus === 'error'
-          ? 'Tempo esgotado. Recarregue a página após pagar.'
-          : 'Finalize o pagamento para liberar o acesso.'}
+            ? 'Tempo esgotado. Recarregue a página após pagar.'
+            : 'Finalize o pagamento para liberar o acesso.'}
       </p>
 
       {pollingStatus === 'polling' && (
@@ -317,9 +317,8 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
 
   const ConfirmedStep = () => (
     <div className="py-4 text-center">
-      <div className={`mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full ${
-        contentIsProcessing ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success'
-      }`}>
+      <div className={`mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full ${contentIsProcessing ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success'
+        }`}>
         {contentIsProcessing ? <Clock size={40} /> : <CheckCircle size={40} />}
       </div>
 
@@ -456,11 +455,10 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
                         key={m.id}
                         type="button"
                         onClick={() => setBillingType(m.id)}
-                        className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-hub border transition-all duration-300 ${
-                          active
+                        className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-hub border transition-all duration-300 ${active
                             ? 'border-primary bg-primary/10 text-primary shadow-glow scale-[1.01]'
                             : 'border-line hover:border-primary/40 text-muted bg-bgSecondary'
-                        }`}
+                          }`}
                       >
                         <Icon size={16} strokeWidth={active ? 2.5 : 2} className={active ? 'animate-bounce text-primary' : 'text-muted'} />
                         <div className="text-center">

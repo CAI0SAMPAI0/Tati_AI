@@ -60,7 +60,7 @@ function Section({
   );
 }
 
-/* ─── Estado visual: Erro / Timeout ───────────────────────── */
+/*     Estado visual: Erro / Timeout                           */
 function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-line py-16 text-center">
@@ -82,7 +82,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-/* ─── Estado visual: Vazio (HTTP 200 + []) ────────────────── */
+/*     Estado visual: Vazio (HTTP 200 + [])                    */
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-line py-16 text-center">
@@ -97,7 +97,7 @@ function EmptyState() {
   );
 }
 
-/* ─── Estado visual: Nenhum resultado de busca/filtro ─────── */
+/*     Estado visual: Nenhum resultado de busca/filtro         */
 function NoResultsState() {
   return (
     <div className="rounded-2xl border-2 border-dashed border-line py-20 text-center text-muted">
@@ -164,7 +164,7 @@ export default function CatalogPageClient() {
 
   const showSections = filter === 'all' && !searchQuery.trim();
 
-  // ─── Estados visuais corretos ──────────────────────────────
+  //     Estados visuais corretos                               
   // 1. Loading  → Skeleton
   // 2. Erro     → Mensagem de erro + retry
   // 3. Vazio    → "Nenhum material" (somente com HTTP 200 + [])

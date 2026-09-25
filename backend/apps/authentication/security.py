@@ -17,7 +17,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(
 )  # 90 dias (3 meses)
 
 
-# ── CRIPTO & HASH DE SENHA ────────────────────────────────────────────
+#    CRIPTO & HASH DE SENHA                                             
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -72,7 +72,7 @@ def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 
-# ── JWT TOKENS ────────────────────────────────────────────────────────
+#    JWT TOKENS                                                         
 
 
 def create_access_token(
@@ -114,7 +114,7 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-# ── AUTENTICAÇÃO NINJA (HTTPBEARER) ───────────────────────────────────
+#    AUTENTICAÇÃO NINJA (HTTPBEARER)                                    
 
 
 class AuthBearer(HttpBearer):

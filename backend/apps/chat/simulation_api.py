@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 simulation_router = Router(tags=["Simulations & Scenarios"])
 
 
-# ── SCHEMAS ───────────────────────────────────────────────────────────
+# SCHEMAS
 
 
 class SimStartInput(BaseModel):
@@ -47,7 +47,7 @@ class SimEvaluateInput(BaseModel):
     scenario_id: Optional[str] = ""
 
 
-# ── HELPERS ───────────────────────────────────────────────────────────
+# HELPERS
 
 
 def _get_scenario_details(scenario_id: str) -> Optional[dict]:
@@ -94,7 +94,7 @@ def _get_scenario_details(scenario_id: str) -> Optional[dict]:
     }
 
 
-# ── ENDPOINTS (ASYNC) ───────────────────────────────────────────────────
+# ENDPOINTS (ASYNC)                                                  
 
 
 @simulation_router.get("/scenarios", auth=auth_optional)

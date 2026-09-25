@@ -15,7 +15,7 @@ class GrammarEntry:
 
 
 CATALOG: List[GrammarEntry] = [
-    # ── A1 ──────────────────────────────────────────────────────────
+    #    A1                                                           
     GrammarEntry(
         topic="present_simple",
         level="A1",
@@ -66,7 +66,7 @@ CATALOG: List[GrammarEntry] = [
         source_name="test-english.com",
         source_url="https://test-english.com/grammar-points/a1/possessive-adjectives/",
     ),
-    # ── A2 ──────────────────────────────────────────────────────────
+    #    A2                                                           
     GrammarEntry(
         topic="past_simple",
         level="A2",
@@ -87,7 +87,7 @@ CATALOG: List[GrammarEntry] = [
         source_name="BBC Learning English",
         source_url="https://www.bbc.co.uk/learningenglish/english/course/towards-advanced/unit-1/session-2",
     ),
-    # ── B1 ──────────────────────────────────────────────────────────
+    #    B1                                                           
     GrammarEntry(
         topic="present_perfect",
         level="B1",
@@ -108,7 +108,7 @@ CATALOG: List[GrammarEntry] = [
         source_name="test-english.com",
         source_url="https://test-english.com/grammar-points/b1/first-conditional/",
     ),
-    # ── B2 ──────────────────────────────────────────────────────────
+    #    B2                                                           
     GrammarEntry(
         topic="second_conditional",
         level="B2",
@@ -129,7 +129,7 @@ CATALOG: List[GrammarEntry] = [
         source_name="BBC Learning English",
         source_url="https://www.bbc.co.uk/learningenglish/english/course/towards-advanced/unit-16/session-1",
     ),
-    # ── C1 ──────────────────────────────────────────────────────────
+    #    C1                                                           
     GrammarEntry(
         topic="inversion",
         level="C1",

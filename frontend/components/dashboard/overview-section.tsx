@@ -23,7 +23,7 @@ export function OverviewSection({ stats, students, onSeeAllStudents }: OverviewS
 
   return (
     <div className="space-y-8">
-      {/* ── Stat Cards ── */}
+      {/*    Stat Cards    */}
       {/*
         ✏️ CORREÇÃO PRINCIPAL:
         - mobile:  2 colunas (grid-cols-2)
@@ -64,7 +64,7 @@ export function OverviewSection({ stats, students, onSeeAllStudents }: OverviewS
         />
       </div>
 
-      {/* ── Divisor visual entre produtos ── */}
+      {/*    Divisor visual entre produtos    */}
       {/*
         ✏️ empilha no mobile (grid-cols-1), lado a lado no md+
       */}
@@ -83,7 +83,7 @@ export function OverviewSection({ stats, students, onSeeAllStudents }: OverviewS
         </div>
       </div>
 
-      {/* ── Tabelas ── */}
+      {/*    Tabelas    */}
       {/*
         ✏️ empilha no mobile e md (col-1), lado a lado só no lg+
         No range 768–1023px com sidebar, duas colunas de tabela ficam apertadas demais
@@ -155,7 +155,7 @@ export function OverviewSection({ stats, students, onSeeAllStudents }: OverviewS
         </div>
       </div>
 
-      {/* ── Celery Health Monitor ── */}
+      {/*    Celery Health Monitor    */}
       <div className="bg-surface border border-border rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">

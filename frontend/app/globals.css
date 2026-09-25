@@ -254,7 +254,7 @@
     background: var(--primary-hover);
   }
 
-  /* ── Landing Page Redesign Styles ── */
+  /*    Landing Page Redesign Styles    */
   .font-display-serif {
     font-family: 'DM Serif Display', Georgia, serif;
   }
@@ -329,7 +329,7 @@
     animation: landingFloat 5s ease-in-out infinite;
   }
 
-  /* ── CEFR Public Test Forced Light Theme (Matches Landing Page) ── */
+  /*    CEFR Public Test Forced Light Theme (Matches Landing Page)    */
   .cefr-theme-light {
     --bg: #f9f8f6;
     --bg-secondary: #f4f3f8;
@@ -396,4 +396,4 @@ div[data-hot-toast],
 div:has(> div[data-hot-toast]) {
   z-index: 99999999 !important;
 }
-
+

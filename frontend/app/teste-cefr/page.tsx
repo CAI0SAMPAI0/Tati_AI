@@ -428,7 +428,7 @@ export default function PublicCefrTestPage() {
         fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       }}
     >
-      {/* ── TOPBAR DO TESTE CEFR ── */}
+      {/*    TOPBAR DO TESTE CEFR    */}
       <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface/90 px-4 backdrop-blur-md sm:px-6">
         <div className="flex items-center gap-3">
           <Link
@@ -473,18 +473,16 @@ export default function PublicCefrTestPage() {
           <div className="flex items-center rounded-lg border border-border bg-bg p-0.5 text-xs font-semibold">
             <button
               onClick={() => setAccent('en-US')}
-              className={`rounded px-2 py-1 transition-all ${
-                accent === 'en-US' ? 'bg-surface font-bold text-primary shadow-sm' : 'text-text-muted hover:text-text'
-              }`}
+              className={`rounded px-2 py-1 transition-all ${accent === 'en-US' ? 'bg-surface font-bold text-primary shadow-sm' : 'text-text-muted hover:text-text'
+                }`}
               title="Voz Americana (US)"
             >
               🇺🇸 US
             </button>
             <button
               onClick={() => setAccent('en-GB')}
-              className={`rounded px-2 py-1 transition-all ${
-                accent === 'en-GB' ? 'bg-surface font-bold text-primary shadow-sm' : 'text-text-muted hover:text-text'
-              }`}
+              className={`rounded px-2 py-1 transition-all ${accent === 'en-GB' ? 'bg-surface font-bold text-primary shadow-sm' : 'text-text-muted hover:text-text'
+                }`}
               title="Voz Britânica (UK)"
             >
               🇬🇧 UK
@@ -511,7 +509,7 @@ export default function PublicCefrTestPage() {
         </div>
       </header>
 
-      {/* ── BARRA DE PROGRESSO ── */}
+      {/*    BARRA DE PROGRESSO    */}
       <div className="h-1.5 w-full bg-bg-secondary">
         <div
           className="h-full bg-gradient-to-r from-primary to-indigo-500 transition-all duration-500 ease-out"
@@ -529,7 +527,7 @@ export default function PublicCefrTestPage() {
         <span>{isCompleted ? '100%' : `${progressPercent}% concluído`}</span>
       </div>
 
-      {/* ── CORPO DO CHAT ── */}
+      {/*    CORPO DO CHAT    */}
       <main className="flex-1 overflow-y-auto p-4 sm:p-6">
         <div className="mx-auto max-w-3xl space-y-6">
           {/* Spinner de inicialização */}
@@ -565,11 +563,10 @@ export default function PublicCefrTestPage() {
 
                 <div className={`max-w-[85%] sm:max-w-[78%] ${isAssistant ? 'items-start' : 'items-end'}`}>
                   <div
-                    className={`rounded-3xl p-4 sm:p-5 shadow-sm leading-relaxed text-sm ${
-                      isAssistant
+                    className={`rounded-3xl p-4 sm:p-5 shadow-sm leading-relaxed text-sm ${isAssistant
                         ? 'rounded-tl-sm bg-surface border border-border text-text'
                         : 'rounded-tr-sm bg-primary text-white font-medium'
-                    }`}
+                      }`}
                   >
                     {/* Renderiza quebras de linha e negrito simples */}
                     <div className="whitespace-pre-wrap">
@@ -600,11 +597,10 @@ export default function PublicCefrTestPage() {
                         <button
                           type="button"
                           onClick={() => toggleAudio(msg.audio_b64!, msg.id)}
-                          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition-all ${
-                            isPlaying
+                          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition-all ${isPlaying
                               ? 'bg-rose-600 text-white hover:bg-rose-700 shadow-sm animate-pulse'
                               : 'bg-primary/10 text-primary hover:bg-primary/20'
-                          }`}
+                            }`}
                           title={isPlaying ? 'Clique para parar o áudio' : 'Ouvir Teacher Tati'}
                         >
                           {isPlaying ? (
@@ -651,7 +647,7 @@ export default function PublicCefrTestPage() {
             </div>
           )}
 
-          {/* ── CARD DO FORMULÁRIO DE CONCLUSÃO DO TESTE CEFR ── */}
+          {/*    CARD DO FORMULÁRIO DE CONCLUSÃO DO TESTE CEFR    */}
           {isCompleted && (
             <div className="my-8 rounded-3xl border border-primary/30 bg-surface p-6 sm:p-8 shadow-xl shadow-primary/10 animate-fade-in">
               <div className="text-center">
@@ -853,7 +849,7 @@ export default function PublicCefrTestPage() {
         </div>
       </main>
 
-      {/* ── BARRA DE DIGITAÇÃO / ENVIO ── */}
+      {/*    BARRA DE DIGITAÇÃO / ENVIO    */}
       {!isCompleted && (
         <footer className="shrink-0 border-t border-border bg-surface p-3 sm:p-4">
           <form
@@ -865,11 +861,10 @@ export default function PublicCefrTestPage() {
             <button
               type="button"
               onClick={toggleRecording}
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-all ${
-                isRecording
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-all ${isRecording
                   ? 'border-danger bg-danger/10 text-danger animate-pulse'
                   : 'border-border bg-bg text-text-muted hover:bg-surface-hover hover:text-text'
-              }`}
+                }`}
               title={isRecording ? 'Parar gravação' : 'Falar em inglês'}
             >
               {isRecording ? <MicOff size={18} /> : <Mic size={18} />}

@@ -45,7 +45,7 @@ export default function PrivacyPolicyPage() {
         fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       }}
     >
-      {/* ─── HEADER PÚBLICO (PADRÃO LANDING PAGE) ─── */}
+      {/*     HEADER PÚBLICO (PADRÃO LANDING PAGE)     */}
       <header
         className="sticky top-0 z-40 backdrop-blur-md"
         style={{
@@ -105,7 +105,7 @@ export default function PrivacyPolicyPage() {
         </div>
       </header>
 
-      {/* ─── HERO DA POLÍTICA DE PRIVACIDADE ─── */}
+      {/*     HERO DA POLÍTICA DE PRIVACIDADE     */}
       <section
         style={{
           borderBottom: '1px solid #e8e5f0',
@@ -144,7 +144,7 @@ export default function PrivacyPolicyPage() {
         </div>
       </section>
 
-      {/* ─── CONTEÚDO PRINCIPAL ─── */}
+      {/*     CONTEÚDO PRINCIPAL     */}
       <main className="max-w-4xl mx-auto px-6 py-12 sm:py-16">
         <div
           className="landing-card rounded-3xl p-6 sm:p-12 space-y-12"
@@ -576,7 +576,7 @@ export default function PrivacyPolicyPage() {
         </div>
       </main>
 
-      {/* ─── FOOTER (PADRÃO LANDING PAGE) ─── */}
+      {/*     FOOTER (PADRÃO LANDING PAGE)     */}
       <footer style={{ background: '#ffffff', borderTop: '1px solid #e8e5f0' }}>
         <div className="max-w-6xl mx-auto px-6 py-10">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-8">

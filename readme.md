@@ -168,36 +168,36 @@ sequenceDiagram
 
 ```text
 Tati_AI/
-├── apps/
-│   └── hub-site/                # Portal público de catálogo e leitura de apostilas (Next.js 14)
-├── packages/
-│   └── hub-core/                # SDK TypeScript, tipagens unificadas e controle de sessão
-├── frontend/                    # Aplicação web principal do aluno (Next.js 14 + App Router + PWA)
-│   ├── app/
-│   │   ├── (authenticated)/     # Rotas com autenticação: chat, voice, flashcards, progresso, etc.
-│   │   └── (public)/            # Rotas públicas: login, recuperação de senha
-│   ├── components/              # Componentes de UI, chat em tempo real, dashboard e gráficos
-│   ├── hooks/                   # Hooks customizados (useAuth, useChatSocket, useVoiceSocket)
-│   └── public/                  # Manifesto PWA, service worker, imagens e ícones
-├── backend/                     # API principal (Django 5 + Django-Ninja + Channels ASGI)
-│   ├── app/                     # Configuração Django, ASGI (ProtocolTypeRouter), Daphne e Celery
-│   ├── apps/                    # Módulos de domínio desacoplados:
-│   │   ├── activities/          # Quizzes, flashcards, podcasts e exercícios
-│   │   ├── authentication/      # JWT, Google OAuth e segurança de rotas
-│   │   ├── chat/                # Consumers Django Channels, GPT-OSS-20B, Gemini e áudio
-│   │   ├── dashboard/           # Métricas do aluno, estatísticas e rankings
-│   │   ├── notifications/       # Push notifications, WebPush e e-mails
-│   │   ├── payments/            # Integração com Mercado Pago (PIX, preferences e webhooks)
-│   │   └── users/               # Perfis, XP, streaks, níveis CEFR e avatares
-│   ├── assets/                  # Imagens e frames visuais da personagem Teacher Tati
-│   ├── manage.py                # Utilitário administrativo do Django
-│   └── requirements.txt         # Dependências Python (Django, Ninja, Channels, Daphne, etc.)
-├── mobile/                      # Aplicativo mobile nativo em Flutter (Android & iOS)
-│   ├── lib/                     # Código Dart com InAppWebView e gravação de áudio nativa
-│   └── android/ & ios/          # Configurações de plataforma e Firebase Cloud Messaging
-├── docs/                        # Documentação técnica e guias de arquitetura
-├── docker-compose.yml           # Orquestração de containers (PostgreSQL, Redis, Backend, Frontend)
-└── package.json                 # Configuração raiz do NPM Workspaces
+├   apps/
+│   └   hub-site/                # Portal público de catálogo e leitura de apostilas (Next.js 14)
+├   packages/
+│   └   hub-core/                # SDK TypeScript, tipagens unificadas e controle de sessão
+├   frontend/                    # Aplicação web principal do aluno (Next.js 14 + App Router + PWA)
+│   ├   app/
+│   │   ├   (authenticated)/     # Rotas com autenticação: chat, voice, flashcards, progresso, etc.
+│   │   └   (public)/            # Rotas públicas: login, recuperação de senha
+│   ├   components/              # Componentes de UI, chat em tempo real, dashboard e gráficos
+│   ├   hooks/                   # Hooks customizados (useAuth, useChatSocket, useVoiceSocket)
+│   └   public/                  # Manifesto PWA, service worker, imagens e ícones
+├   backend/                     # API principal (Django 5 + Django-Ninja + Channels ASGI)
+│   ├   app/                     # Configuração Django, ASGI (ProtocolTypeRouter), Daphne e Celery
+│   ├   apps/                    # Módulos de domínio desacoplados:
+│   │   ├   activities/          # Quizzes, flashcards, podcasts e exercícios
+│   │   ├   authentication/      # JWT, Google OAuth e segurança de rotas
+│   │   ├   chat/                # Consumers Django Channels, GPT-OSS-20B, Gemini e áudio
+│   │   ├   dashboard/           # Métricas do aluno, estatísticas e rankings
+│   │   ├   notifications/       # Push notifications, WebPush e e-mails
+│   │   ├   payments/            # Integração com Mercado Pago (PIX, preferences e webhooks)
+│   │   └   users/               # Perfis, XP, streaks, níveis CEFR e avatares
+│   ├   assets/                  # Imagens e frames visuais da personagem Teacher Tati
+│   ├   manage.py                # Utilitário administrativo do Django
+│   └   requirements.txt         # Dependências Python (Django, Ninja, Channels, Daphne, etc.)
+├   mobile/                      # Aplicativo mobile nativo em Flutter (Android & iOS)
+│   ├   lib/                     # Código Dart com InAppWebView e gravação de áudio nativa
+│   └   android/ & ios/          # Configurações de plataforma e Firebase Cloud Messaging
+├   docs/                        # Documentação técnica e guias de arquitetura
+├   docker-compose.yml           # Orquestração de containers (PostgreSQL, Redis, Backend, Frontend)
+└   package.json                 # Configuração raiz do NPM Workspaces
 ```
 
 ---

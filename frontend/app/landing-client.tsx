@@ -298,7 +298,7 @@ export default function LandingClient() {
           url.searchParams.delete('_v');
           window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
         }
-      } catch {}
+      } catch { }
 
       // 2. Detecta modo PWA ou APK (Standalone, TWA, WebView)
       const isPwaOrApk =
@@ -314,7 +314,7 @@ export default function LandingClient() {
       if (isPwaOrApk) {
         try {
           document.cookie = 'is_pwa=1; path=/; max-age=31536000; SameSite=Lax';
-        } catch {}
+        } catch { }
       }
 
       const token = localStorage.getItem('token');
@@ -351,7 +351,7 @@ export default function LandingClient() {
         fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       }}
     >
-      {/* ─── NAV ─── */}
+      {/*     NAV     */}
       <header
         className="sticky top-0 z-50 backdrop-blur-md"
         style={{
@@ -546,7 +546,7 @@ export default function LandingClient() {
         )}
       </header>
 
-      {/* ─── HERO ─── */}
+      {/*     HERO     */}
       <section className="relative overflow-hidden" style={{ padding: '80px 0 96px' }}>
         <div className="max-w-6xl mx-auto px-6 grid md:grid-cols-2 gap-14 items-center">
           <div className="space-y-7">
@@ -647,7 +647,7 @@ export default function LandingClient() {
         </div>
       </section>
 
-      {/* ─── STATS ─── */}
+      {/*     STATS     */}
       <section
         style={{
           background: '#ffffff',
@@ -673,7 +673,7 @@ export default function LandingClient() {
         </div>
       </section>
 
-      {/* ─── CEFR ─── */}
+      {/*     CEFR     */}
       <section id="cefr" style={{ padding: '96px 0', background: '#f9f8f6' }}>
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center max-w-xl mx-auto mb-12 space-y-4">
@@ -766,7 +766,7 @@ export default function LandingClient() {
         </div>
       </section>
 
-      {/* ─── FEATURES / MÉTODO / RECURSOS ─── */}
+      {/*     FEATURES / MÉTODO / RECURSOS     */}
       <section
         id="metodo"
         style={{
@@ -842,7 +842,7 @@ export default function LandingClient() {
         </div>
       </section>
 
-      {/* ─── FINAL CTA ─── */}
+      {/*     FINAL CTA     */}
       <section
         style={{
           background: '#f9f8f6',
@@ -908,7 +908,7 @@ export default function LandingClient() {
         </div>
       </section>
 
-      {/* ─── FOOTER ─── */}
+      {/*     FOOTER     */}
       <footer
         style={{ background: '#ffffff', borderTop: '1px solid #e8e5f0' }}
       >

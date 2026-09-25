@@ -26,7 +26,7 @@ auth_router = Router(tags=["Auth"])
 profile_router = Router(tags=["Profile"])
 
 
-# ── AUTH ENDPOINTS ───────────────────────────────────────────────────
+#    AUTH ENDPOINTS                                                    
 
 
 @auth_router.post("/login", response=TokenResponse)
@@ -526,7 +526,7 @@ def get_me(request: HttpRequest):
     return AuthService._build_user_out(user)
 
 
-# ── PROFILE ENDPOINTS ─────────────────────────────────────────────────
+#    PROFILE ENDPOINTS                                                  
 
 
 @profile_router.get("", response=UserOut, auth=auth_required)

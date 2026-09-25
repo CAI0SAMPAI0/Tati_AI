@@ -332,7 +332,7 @@ export function CefrSection() {
   const handlePublishAllFiltered = async () => {
     let itemsToPublish: any[] = [];
     let endpointPrefix = '';
-     if (activeCuratorTab === 'flashcards') {
+    if (activeCuratorTab === 'flashcards') {
       activeGroupedFlashcards.filter((g: any) => !g.is_published).forEach((g: any) => {
         itemsToPublish.push(g);
       });
@@ -408,7 +408,7 @@ export function CefrSection() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const filesArray = Array.from(e.target.files);
-    
+
     if (selectedFiles.length + filesArray.length > 10) {
       toast.error('Only 10 files can be uploaded at a time.');
       return;
@@ -521,7 +521,7 @@ export function CefrSection() {
   };
 
   const toggleSelectReference = (id: string) => {
-    setSelectedRefIds(prev => 
+    setSelectedRefIds(prev =>
       prev.includes(id) ? prev.filter(refId => refId !== id) : [...prev, id]
     );
   };
@@ -758,26 +758,24 @@ export function CefrSection() {
 
   return (
     <div className="space-y-8 max-w-7xl">
-      {/* ─── MAIN LEVEL TABS ─── */}
+      {/*     MAIN LEVEL TABS     */}
       <div className="flex border-b border-border gap-6 mb-6">
         <button
           onClick={() => setActiveMainTab('configure')}
-          className={`flex items-center gap-2 pb-4 text-sm font-bold border-b-2 transition-all relative ${
-            activeMainTab === 'configure'
+          className={`flex items-center gap-2 pb-4 text-sm font-bold border-b-2 transition-all relative ${activeMainTab === 'configure'
               ? 'border-primary text-primary'
               : 'border-transparent text-text-muted hover:text-text hover:border-border'
-          }`}
+            }`}
         >
           <Settings size={16} />
           Configure & Generate
         </button>
         <button
           onClick={() => setActiveMainTab('curator')}
-          className={`flex items-center gap-2 pb-4 text-sm font-bold border-b-2 transition-all relative ${
-            activeMainTab === 'curator'
+          className={`flex items-center gap-2 pb-4 text-sm font-bold border-b-2 transition-all relative ${activeMainTab === 'curator'
               ? 'border-primary text-primary'
               : 'border-transparent text-text-muted hover:text-text hover:border-border'
-          }`}
+            }`}
         >
           <Layers size={16} />
           AI Generated Curator
@@ -800,7 +798,7 @@ export function CefrSection() {
 
       {activeMainTab === 'configure' ? (
         <div className="space-y-8 animate-in fade-in duration-200">
-          {/* ─── MULTIPLE UPLOAD CARD ─── */}
+          {/*     MULTIPLE UPLOAD CARD     */}
           <div className="bg-surface border border-border p-6 rounded-2xl shadow-sm">
             <h2 className="text-xl font-bold text-text mb-2 flex items-center gap-2">
               <Upload size={22} className="text-primary" />
@@ -828,7 +826,7 @@ export function CefrSection() {
 
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-bold text-text-subtle">Files (PDF, DOCX, TXT)</label>
-                
+
                 <div className="flex flex-col gap-4">
                   <div className="relative border-2 border-dashed border-border hover:border-primary/50 transition-all rounded-xl p-6 flex flex-col items-center justify-center bg-surface-hover/40 cursor-pointer">
                     <input
@@ -912,11 +910,10 @@ export function CefrSection() {
 
             {uploadStatus && (
               <div
-                className={`mt-4 p-4 rounded-xl flex items-center gap-3 text-sm font-medium border ${
-                  uploadStatus.success
+                className={`mt-4 p-4 rounded-xl flex items-center gap-3 text-sm font-medium border ${uploadStatus.success
                     ? 'bg-green-500/5 text-green-400 border-green-500/10'
                     : 'bg-red-500/5 text-red-400 border-red-500/10'
-                }`}
+                  }`}
               >
                 {uploadStatus.success ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
                 {uploadStatus.message}
@@ -924,7 +921,7 @@ export function CefrSection() {
             )}
           </div>
 
-          {/* ─── INDEXED REFERENCE MATERIALS SECTION ─── */}
+          {/*     INDEXED REFERENCE MATERIALS SECTION     */}
           <div className="bg-surface border border-border p-6 rounded-2xl shadow-sm">
             <h2 className="text-xl font-bold text-text mb-2 flex items-center gap-2">
               <Layers size={22} className="text-primary" />
@@ -959,16 +956,14 @@ export function CefrSection() {
                             <button
                               key={lvl}
                               onClick={() => setFilterLevel(lvl)}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 ${
-                                filterLevel === lvl
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 ${filterLevel === lvl
                                   ? 'bg-primary/10 text-primary border-primary/20'
                                   : 'bg-surface text-text-subtle border-border/80 hover:border-border'
-                              }`}
+                                }`}
                             >
                               <span>{lvl}</span>
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
-                                filterLevel === lvl ? 'bg-primary text-white' : 'bg-bg text-text-muted border border-border/60'
-                              }`}>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${filterLevel === lvl ? 'bg-primary text-white' : 'bg-bg text-text-muted border border-border/60'
+                                }`}>
                                 {count}
                               </span>
                             </button>
@@ -1081,7 +1076,7 @@ export function CefrSection() {
             )}
           </div>
 
-          {/* ─── CONTENT GENERATION CARD ─── */}
+          {/*     CONTENT GENERATION CARD     */}
           <div className="bg-surface border border-border p-6 rounded-2xl shadow-sm">
             <h2 className="text-xl font-bold text-text mb-2 flex items-center gap-2">
               <BookOpen size={22} className="text-primary" />
@@ -1181,9 +1176,8 @@ export function CefrSection() {
                             setExpandedTopicIdx(isExpanded ? null : idx);
                             setSelectedSubtopics([]);
                           }}
-                          className={`w-full flex items-center justify-between px-3 py-2.5 text-left transition-all ${
-                            isExpanded ? 'bg-primary/5' : 'bg-bg hover:bg-primary/5'
-                          }`}
+                          className={`w-full flex items-center justify-between px-3 py-2.5 text-left transition-all ${isExpanded ? 'bg-primary/5' : 'bg-bg hover:bg-primary/5'
+                            }`}
                         >
                           <span className="text-xs font-bold text-text">{t.topic}</span>
                           <span className="text-[10px] text-text-muted font-normal">{t.count || items.length} items</span>
@@ -1201,11 +1195,10 @@ export function CefrSection() {
                                         isSelected ? prev.filter(s => s !== item) : [...prev, item]
                                       );
                                     }}
-                                    className={`px-2 py-1 rounded-lg text-[11px] font-medium border transition-all ${
-                                      isSelected
+                                    className={`px-2 py-1 rounded-lg text-[11px] font-medium border transition-all ${isSelected
                                         ? 'bg-primary/10 border-primary/30 text-primary'
                                         : 'bg-surface border-border text-text-subtle hover:border-primary/20 hover:bg-primary/5'
-                                    }`}
+                                      }`}
                                   >
                                     {item}
                                   </button>
@@ -1285,7 +1278,7 @@ export function CefrSection() {
             </div>
           </div>
 
-          {/* ─── DYNAMIC CRON SCHEDULING CARD (PHASE 2) ─── */}
+          {/*     DYNAMIC CRON SCHEDULING CARD (PHASE 2)     */}
           <div className="bg-surface border border-border p-6 rounded-2xl shadow-sm">
             <h2 className="text-xl font-bold text-text mb-2 flex items-center gap-2">
               <Calendar size={22} className="text-primary" />
@@ -1312,11 +1305,10 @@ export function CefrSection() {
                         <button
                           key={day.value}
                           onClick={() => toggleWeekdaySelection(day.value)}
-                          className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-all ${
-                            isSelected
+                          className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-all ${isSelected
                               ? 'bg-primary text-white border-primary shadow-sm shadow-primary/10'
                               : 'bg-bg text-text border-border hover:bg-surface-hover'
-                          }`}
+                            }`}
                         >
                           {day.label}
                         </button>
@@ -1430,11 +1422,10 @@ export function CefrSection() {
                     {schedules.map(sch => (
                       <div
                         key={sch.id}
-                        className={`p-4 rounded-xl border transition-all flex items-center justify-between ${
-                          sch.active
+                        className={`p-4 rounded-xl border transition-all flex items-center justify-between ${sch.active
                             ? 'bg-primary/5 border-primary/20'
                             : 'bg-bg/40 border-border/80 opacity-70'
-                        }`}
+                          }`}
                       >
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
@@ -1458,11 +1449,10 @@ export function CefrSection() {
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleStartEditSchedule(sch)}
-                            className={`p-1.5 rounded-lg transition-all ${
-                              editingScheduleId === sch.id
+                            className={`p-1.5 rounded-lg transition-all ${editingScheduleId === sch.id
                                 ? 'bg-primary/20 text-primary border border-primary/30'
                                 : 'text-text-muted hover:text-primary hover:bg-primary/5'
-                            }`}
+                              }`}
                             title="Edit schedule"
                           >
                             <Pencil size={16} />
@@ -1491,7 +1481,7 @@ export function CefrSection() {
           </div>
         </div>
       ) : (
-        /* ─── AI GENERATED MATERIALS CURATOR PANEL ─── */
+        /*     AI GENERATED MATERIALS CURATOR PANEL     */
         <div className="bg-surface border border-border p-6 rounded-2xl shadow-sm animate-in fade-in duration-200">
           <h2 className="text-xl font-bold text-text mb-2 flex items-center gap-2">
             <BookOpen size={22} className="text-primary" />
@@ -1513,11 +1503,10 @@ export function CefrSection() {
                       <button
                         key={lvl}
                         onClick={() => setGeneratedFilterLevel(lvl)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                          generatedFilterLevel === lvl
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${generatedFilterLevel === lvl
                             ? 'bg-primary/10 text-primary border-primary/20'
                             : 'bg-surface text-text-subtle border-border/80 hover:border-border'
-                        }`}
+                          }`}
                       >
                         {lvl}
                       </button>
@@ -1537,11 +1526,10 @@ export function CefrSection() {
                       <button
                         key={status.id}
                         onClick={() => setCuratorStatusFilter(status.id as any)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                          curatorStatusFilter === status.id
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${curatorStatusFilter === status.id
                             ? 'bg-primary/10 text-primary border-primary/20'
                             : 'bg-surface text-text-subtle border-border/80 hover:border-border'
-                        }`}
+                          }`}
                       >
                         {status.label}
                       </button>
@@ -1568,11 +1556,10 @@ export function CefrSection() {
                       setActiveCuratorTab(tab.id as any);
                       setSelectedCuratorIds([]);
                     }}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
-                      activeCuratorTab === tab.id
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${activeCuratorTab === tab.id
                         ? 'bg-primary text-white border-primary shadow-sm shadow-primary/10'
                         : 'bg-surface text-text border-border hover:bg-surface-hover'
-                    }`}
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -1755,75 +1742,75 @@ export function CefrSection() {
                       {activeGroupedFlashcards.map((group) => {
                         const isSelected = selectedCuratorIds.includes(group.id);
                         return (
-                        <div
-                          key={group.id}
-                          className={cn(
-                            "bg-surface border rounded-2xl p-5 flex flex-col gap-4 group transition-all relative",
-                            isSelected ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-border hover:border-primary/40"
-                          )}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-3">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedCuratorIds((prev) =>
-                                    prev.includes(group.id) ? prev.filter((item) => item !== group.id) : [...prev, group.id]
-                                  );
-                                }}
-                                className="text-text-muted hover:text-primary transition-all p-0.5"
-                                title={isSelected ? "Desmarcar" : "Selecionar"}
-                              >
-                                {isSelected ? (
-                                  <CheckSquare size={20} className="text-primary" />
-                                ) : (
-                                  <Square size={20} />
-                                )}
-                              </button>
-                              <div className="bg-indigo-500/10 w-10 h-10 rounded-xl flex items-center justify-center text-indigo-400">
-                                 <Layers size={20} />
+                          <div
+                            key={group.id}
+                            className={cn(
+                              "bg-surface border rounded-2xl p-5 flex flex-col gap-4 group transition-all relative",
+                              isSelected ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-border hover:border-primary/40"
+                            )}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedCuratorIds((prev) =>
+                                      prev.includes(group.id) ? prev.filter((item) => item !== group.id) : [...prev, group.id]
+                                    );
+                                  }}
+                                  className="text-text-muted hover:text-primary transition-all p-0.5"
+                                  title={isSelected ? "Desmarcar" : "Selecionar"}
+                                >
+                                  {isSelected ? (
+                                    <CheckSquare size={20} className="text-primary" />
+                                  ) : (
+                                    <Square size={20} />
+                                  )}
+                                </button>
+                                <div className="bg-indigo-500/10 w-10 h-10 rounded-xl flex items-center justify-center text-indigo-400">
+                                  <Layers size={20} />
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end gap-1">
+                                <span className="text-[0.65rem] font-bold px-2 py-0.5 rounded-full bg-indigo-500/5 border border-indigo-500/20 text-indigo-400">
+                                  {group.cards.length} cards
+                                </span>
+                                <span className={cn(
+                                  "text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider",
+                                  group.is_published ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'
+                                )}>
+                                  {group.is_published ? 'Published' : 'Draft'}
+                                </span>
+                                <span className="text-[0.55rem] font-black uppercase text-text-subtle tracking-tighter">
+                                  {group.level}
+                                </span>
                               </div>
                             </div>
-                            <div className="flex flex-col items-end gap-1">
-                              <span className="text-[0.65rem] font-bold px-2 py-0.5 rounded-full bg-indigo-500/5 border border-indigo-500/20 text-indigo-400">
-                                {group.cards.length} cards
-                              </span>
-                              <span className={cn(
-                                "text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider",
-                                group.is_published ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'
-                              )}>
-                                {group.is_published ? 'Published' : 'Draft'}
-                              </span>
-                              <span className="text-[0.55rem] font-black uppercase text-text-subtle tracking-tighter">
-                                {group.level}
-                              </span>
+
+                            <div>
+                              <h4 className="font-bold text-text mb-1 truncate">{group.topic}</h4>
+                              <p className="text-xs text-text-muted line-clamp-2 leading-relaxed h-8">
+                                Vocabulary deck about {group.topic}.
+                              </p>
                             </div>
-                          </div>
 
-                          <div>
-                            <h4 className="font-bold text-text mb-1 truncate">{group.topic}</h4>
-                            <p className="text-xs text-text-muted line-clamp-2 leading-relaxed h-8">
-                              Vocabulary deck about {group.topic}.
-                            </p>
-                          </div>
-
-                          <div className="grid grid-cols-3 gap-2 mt-auto pt-2">
-                             <button onClick={() => handleStartEditFlashcardGroup(group)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title="Edit">
+                            <div className="grid grid-cols-3 gap-2 mt-auto pt-2">
+                              <button onClick={() => handleStartEditFlashcardGroup(group)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title="Edit">
                                 <Pencil size={16} />
-                             </button>
-                             <button onClick={() => handleTogglePublishFlashcardGroup(group)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title={group.is_published ? "Unpublish (Draft)" : "Publish"}>
+                              </button>
+                              <button onClick={() => handleTogglePublishFlashcardGroup(group)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title={group.is_published ? "Unpublish (Draft)" : "Publish"}>
                                 {group.is_published ? <EyeOff size={16} /> : <Eye size={16} />}
-                             </button>
-                             <button
+                              </button>
+                              <button
                                 onClick={() => handleDeleteFlashcardGroup(group)}
                                 className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle border border-border"
                                 title="Delete"
-                             >
+                              >
                                 <Trash2 size={16} />
-                             </button>
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      );
+                        );
                       })}
                     </div>
                   );
@@ -1844,72 +1831,72 @@ export function CefrSection() {
                       {activeSimulations.map((sim) => {
                         const isSelected = selectedCuratorIds.includes(sim.id);
                         return (
-                        <div
-                          key={sim.id}
-                          className={cn(
-                            "bg-surface border rounded-2xl p-5 flex flex-col gap-4 group transition-all relative",
-                            isSelected ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-border hover:border-primary/40"
-                          )}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-3">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedCuratorIds((prev) =>
-                                    prev.includes(sim.id) ? prev.filter((item) => item !== sim.id) : [...prev, sim.id]
-                                  );
-                                }}
-                                className="text-text-muted hover:text-primary transition-all p-0.5"
-                                title={isSelected ? "Desmarcar" : "Selecionar"}
-                              >
-                                {isSelected ? (
-                                  <CheckSquare size={20} className="text-primary" />
-                                ) : (
-                                  <Square size={20} />
-                                )}
-                              </button>
-                              <div className="bg-pink-500/10 w-10 h-10 rounded-xl flex items-center justify-center text-pink-400">
-                                 <Clapperboard size={20} />
+                          <div
+                            key={sim.id}
+                            className={cn(
+                              "bg-surface border rounded-2xl p-5 flex flex-col gap-4 group transition-all relative",
+                              isSelected ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-border hover:border-primary/40"
+                            )}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedCuratorIds((prev) =>
+                                      prev.includes(sim.id) ? prev.filter((item) => item !== sim.id) : [...prev, sim.id]
+                                    );
+                                  }}
+                                  className="text-text-muted hover:text-primary transition-all p-0.5"
+                                  title={isSelected ? "Desmarcar" : "Selecionar"}
+                                >
+                                  {isSelected ? (
+                                    <CheckSquare size={20} className="text-primary" />
+                                  ) : (
+                                    <Square size={20} />
+                                  )}
+                                </button>
+                                <div className="bg-pink-500/10 w-10 h-10 rounded-xl flex items-center justify-center text-pink-400">
+                                  <Clapperboard size={20} />
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end gap-1">
+                                <span className={cn(
+                                  "text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider",
+                                  sim.is_published ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'
+                                )}>
+                                  {sim.is_published ? 'Published' : 'Draft'}
+                                </span>
+                                <span className="text-[0.55rem] font-black uppercase text-text-subtle tracking-tighter">
+                                  {sim.level}
+                                </span>
                               </div>
                             </div>
-                            <div className="flex flex-col items-end gap-1">
-                              <span className={cn(
-                                "text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider",
-                                sim.is_published ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'
-                              )}>
-                                {sim.is_published ? 'Published' : 'Draft'}
-                              </span>
-                              <span className="text-[0.55rem] font-black uppercase text-text-subtle tracking-tighter">
-                                {sim.level}
-                              </span>
+
+                            <div>
+                              <h4 className="font-bold text-text mb-1 truncate">{sim.topic}</h4>
+                              <p className="text-xs text-text-muted line-clamp-2 leading-relaxed h-8" title={sim.scenario}>
+                                {sim.scenario || 'No scenario details provided.'}
+                              </p>
                             </div>
-                          </div>
 
-                          <div>
-                            <h4 className="font-bold text-text mb-1 truncate">{sim.topic}</h4>
-                            <p className="text-xs text-text-muted line-clamp-2 leading-relaxed h-8" title={sim.scenario}>
-                              {sim.scenario || 'No scenario details provided.'}
-                            </p>
-                          </div>
-
-                          <div className="grid grid-cols-3 gap-2 mt-auto pt-2">
-                             <button onClick={() => handleStartEditItem(sim, 'simulation')} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title="Edit">
+                            <div className="grid grid-cols-3 gap-2 mt-auto pt-2">
+                              <button onClick={() => handleStartEditItem(sim, 'simulation')} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title="Edit">
                                 <Pencil size={16} />
-                             </button>
-                             <button onClick={() => handleTogglePublishSimulation(sim.id, sim.is_published)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title={sim.is_published ? "Unpublish (Draft)" : "Publish"}>
+                              </button>
+                              <button onClick={() => handleTogglePublishSimulation(sim.id, sim.is_published)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title={sim.is_published ? "Unpublish (Draft)" : "Publish"}>
                                 {sim.is_published ? <EyeOff size={16} /> : <Eye size={16} />}
-                             </button>
-                             <button
+                              </button>
+                              <button
                                 onClick={() => handleDeleteSimulation(sim.id)}
                                 className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle border border-border"
                                 title="Delete"
-                             >
+                              >
                                 <Trash2 size={16} />
-                             </button>
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      );
+                        );
                       })}
                     </div>
                   );
@@ -1920,7 +1907,7 @@ export function CefrSection() {
         </div>
       )}
 
-      {/* ─── CURATOR EDIT DIALOG MODAL ─── */}
+      {/*     CURATOR EDIT DIALOG MODAL     */}
       <DialogModal
         isOpen={editingItem !== null}
         onClose={() => { setEditingItem(null); setEditingItemType(null); }}

@@ -26,7 +26,7 @@ const FluencyEvolutionChart = dynamic(() => import('@/components/charts/fluency-
   loading: () => <div className="h-[240px] w-full bg-bg-secondary rounded-2xl animate-pulse" />
 });
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+//     Types                                                                     
 
 interface XpData {
   total_xp?: number;
@@ -69,7 +69,7 @@ interface MonthlyReport {
 
 type Period = 'weekly' | 'monthly';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+//     Constants                                                                 
 
 const TIPS = [
   'Practice at least 30 minutes a day for faster results.',
@@ -88,7 +88,7 @@ const LEVEL_COLORS: Record<string, string> = {
   C2: 'from-primary to-violet-400',
 };
 
-// ─── Skeleton helpers ─────────────────────────────────────────────────────────
+//     Skeleton helpers                                                          
 
 function StatSkeleton() {
   return (
@@ -102,7 +102,7 @@ function StatSkeleton() {
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+//     Page                                                                      
 
 export default function ProgressClientPage() {
   const { user } = useAuth();
@@ -219,7 +219,7 @@ export default function ProgressClientPage() {
 
         <main className="p-4 md:p-8 max-w-7xl w-full mx-auto space-y-8 animate-fade-in">
 
-          {/* ── Header ── */}
+          {/*    Header    */}
           <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
               <h1 className="text-2xl md:text-3xl font-display font-bold text-text mb-2">
@@ -244,7 +244,7 @@ export default function ProgressClientPage() {
             </Button>
           </header>
 
-          {/* ── Level, Score & History Card ── */}
+          {/*    Level, Score & History Card    */}
           <div className="bg-surface border border-border rounded-3xl p-6 group hover:border-primary/30 transition-all">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div className="flex items-center gap-4">
@@ -302,7 +302,7 @@ export default function ProgressClientPage() {
             </div>
           </div>
 
-          {/* ── Period Tabs ── */}
+          {/*    Period Tabs    */}
           <div className="flex gap-2">
             {(['weekly', 'monthly'] as const).map((p) => (
               <button
@@ -320,7 +320,7 @@ export default function ProgressClientPage() {
             ))}
           </div>
 
-          {/* ── Stats Grid ── */}
+          {/*    Stats Grid    */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {reportLoading || !stats ? (
               Array(4).fill(0).map((_, i) => <StatSkeleton key={i} />)
@@ -354,8 +354,8 @@ export default function ProgressClientPage() {
             )}
           </div>
 
-          {/* ── Chart + Streak ── */}
-          {/* ── Chart + Streak + XP League ── */}
+          {/*    Chart + Streak    */}
+          {/*    Chart + Streak + XP League    */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
             {/* Bar Chart */}
@@ -512,7 +512,7 @@ export default function ProgressClientPage() {
   );
 }
 
-// ─── Sub-components ────────────────────────────────────────────────────────────
+//     Sub-components                                                             
 
 interface StatCardProps {
   icon: React.ReactNode;

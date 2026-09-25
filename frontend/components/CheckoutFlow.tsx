@@ -212,7 +212,7 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
     }
   };
 
-  // ── Conteúdo do passo "aguardando pagamento" ───────────────────────────────
+  //    Conteúdo do passo "aguardando pagamento"                                
   const PaymentStep = () => (
     <div className="py-2 text-center">
       <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -230,8 +230,8 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
         {pollingStatus === 'polling'
           ? 'Aguardando confirmação do pagamento...'
           : pollingStatus === 'error'
-          ? 'Tempo esgotado. Recarregue a página após pagar.'
-          : 'Finalize o pagamento para liberar o acesso.'}
+            ? 'Tempo esgotado. Recarregue a página após pagar.'
+            : 'Finalize o pagamento para liberar o acesso.'}
       </p>
 
       {pollingStatus === 'polling' && (
@@ -289,12 +289,11 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
     </div>
   );
 
-  // ── Passo: pagamento confirmado ────────────────────────────────────────────
+  //    Passo: pagamento confirmado                                             
   const ConfirmedStep = () => (
     <div className="py-4 text-center">
-      <div className={`mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full ${
-        contentIsProcessing ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success'
-      }`}>
+      <div className={`mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full ${contentIsProcessing ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success'
+        }`}>
         {contentIsProcessing ? <Clock size={40} /> : <CheckCircle size={40} />}
       </div>
 
@@ -327,7 +326,7 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
     </div>
   );
 
-  // ── Passo: pedido cancelado ────────────────────────────────────────────────
+  //    Passo: pedido cancelado                                                 
   const CancelledStep = () => (
     <div className="py-4 text-center">
       <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-danger/10 text-danger">
@@ -359,7 +358,7 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
         className="absolute inset-0 bg-black/75 dark:bg-black/85 cursor-default transition-all"
         onClick={handleClose}
       />
- 
+
       <div
         role="dialog"
         aria-modal="true"
@@ -378,7 +377,7 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
             <X size={18} />
           </button>
         </div>
- 
+
         <div className="max-h-[80vh] overflow-y-auto p-6 scrollbar-none space-y-6">
           {step === 'form' && (
             <form onSubmit={handleCheckout} className="space-y-6">
@@ -389,7 +388,7 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
                   R$ {item.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </span>
               </div>
- 
+
               <div className="space-y-3.5">
                 <label className="block text-[10px] font-black uppercase tracking-widest text-subtle">
                   Identificação
@@ -409,9 +408,8 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       readOnly={!!user?.email}
-                      className={`input-hub h-12 rounded-hub bg-bgSecondary border-line focus:border-primary text-sm px-4 ${
-                        user?.email ? 'opacity-60 cursor-not-allowed' : ''
-                      }`}
+                      className={`input-hub h-12 rounded-hub bg-bgSecondary border-line focus:border-primary text-sm px-4 ${user?.email ? 'opacity-60 cursor-not-allowed' : ''
+                        }`}
                       placeholder="E-mail"
                     />
                     <input
@@ -424,7 +422,7 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
                   </div>
                 </div>
               </div>
- 
+
               <div className="space-y-3">
                 <label className="block text-[10px] font-black uppercase tracking-widest text-subtle">
                   Forma de pagamento
@@ -440,11 +438,10 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
                         key={m.id}
                         type="button"
                         onClick={() => setBillingType(m.id)}
-                        className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-hub border transition-all duration-300 ${
-                          active
+                        className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-hub border transition-all duration-300 ${active
                             ? 'border-primary bg-primary/10 text-primary shadow-glow scale-[1.01]'
                             : 'border-line hover:border-primary/40 text-muted bg-bgSecondary'
-                        }`}
+                          }`}
                       >
                         <Icon size={16} strokeWidth={active ? 2.5 : 2} className={active ? 'animate-bounce text-primary' : 'text-muted'} />
                         <div className="text-center">
@@ -458,7 +455,7 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
                   })}
                 </div>
               </div>
- 
+
               <button
                 type="submit"
                 disabled={processing}
@@ -478,7 +475,7 @@ export default function CheckoutFlow({ item, onAccessGranted }: CheckoutFlowProp
               </button>
             </form>
           )}
- 
+
           {step === 'payment' && <PaymentStep />}
           {step === 'confirmed' && <ConfirmedStep />}
           {step === 'cancelled' && <CancelledStep />}

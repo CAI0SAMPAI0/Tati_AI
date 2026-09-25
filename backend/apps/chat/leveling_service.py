@@ -580,7 +580,7 @@ class LevelingService:
                 "total_questions": total_q,
             }
         else:
-            # ── 5. TESTE CONCLUIDO COM SUCESSO! ─────────────────────────
+            #    5. TESTE CONCLUIDO COM SUCESSO!                          
             scores = session.get("scores", {})
             old_level = fresh_user.level or "A1"
 
