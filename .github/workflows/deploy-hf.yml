@@ -17,6 +17,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          lfs: true
 
       - name: Push to Hugging Face Space
         env:
@@ -24,6 +25,7 @@ jobs:
         run: |
           git config --global user.email "github-actions-bot@example.com"
           git config --global user.name "GitHub Actions Bot"
+          git config --global lfs.allowincompletepush true
           
           # Ativa o Git LFS no runner
           git lfs install
@@ -38,12 +40,16 @@ jobs:
           cp -r backend/* hf_space_dir/
           # Copia explicitamente o arquivo .gitattributes para a raiz da pasta do Space
           cp backend/.gitattributes hf_space_dir/ || true
+
+          # Remove assets/images from the Space directory (assets are served from frontend)
+          rm -rf hf_space_dir/assets/images || true
           
           # Enter the Space directory
           cd hf_space_dir
           
           # Inicializa o Git LFS localmente na pasta do Space
           git lfs install --local
+          git config lfs.allowincompletepush true
           
           # Check if there are changes to deploy
           git add .

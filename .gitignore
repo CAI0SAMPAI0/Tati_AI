@@ -31,6 +31,7 @@ Thumbs.db
 
 # Backend data (local)
 backend/data/
+backend/assets/
 backend/runtime.txt
 backend/token.json
 backend/.pytest_cache/
