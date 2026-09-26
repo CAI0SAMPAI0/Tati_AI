@@ -86,6 +86,7 @@ export const ENDPOINTS = {
   ACTIVITIES_RANKING: '/activities/ranking',
   ACTIVITIES_GAMES: '/activities/games',
   ACTIVITIES_NEWS: '/activities/news',
+  ACTIVITIES_MUSICS: '/activities/musics',
   ACTIVITIES_PODCASTS_WARMUP: '/activities/podcasts/warmup',
   ACTIVITIES_PODCASTS_RECOMMENDATIONS: '/activities/podcasts/recommendations',
   ACTIVITIES_PODCAST_DETAIL: (id: string) => `/activities/podcasts/${id}`,

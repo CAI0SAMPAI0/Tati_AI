@@ -99,34 +99,57 @@ export const NotificationsDropdown = memo(function NotificationsDropdown() {
                 <p className="text-xs font-medium">No notifications</p>
               </div>
             ) : (
-              notifications.map((n) => (
-                <div
-                  key={n.id}
-                  onClick={() => markRead(n.id)}
-                  className={cn(
-                    'flex items-start gap-3 px-4 py-3 hover:bg-bg-secondary/50 cursor-pointer transition-colors border-b border-border/50 last:border-0',
-                    !n.is_read && 'bg-primary/5'
-                  )}
-                >
-                  <div className="w-8 h-8 rounded-xl bg-bg-secondary flex items-center justify-center text-base shrink-0 mt-0.5">
-                    {NOTIF_ICONS[n.category] || '🔔'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className={cn('text-xs font-bold text-text truncate', !n.is_read && 'text-primary')}>
-                        {n.title}
-                      </p>
-                      {!n.is_read && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                      )}
+              notifications.map((n) => {
+                let displayTitle = n.title;
+                let displayBody = n.body;
+                if (n.category === 'trophy' || n.category === 'achievements' || displayTitle.toLowerCase().includes('trof') || displayTitle.toLowerCase().includes('conquist')) {
+                  if (displayTitle.includes('Parabéns! Você conquistou o') || displayTitle.includes('Parabens!')) {
+                    displayTitle = displayTitle.replace(/Parab[eé]ns!\s*Voc[eé]\s*conquistou\s*o/gi, 'Congratulations! You won')
+                                               .replace(/º\s*Lugar\s*na\s*Competi[çc][ãa]o\s*Mensal!/gi, ' Place in the Monthly Competition!')
+                                               .replace('1º Lugar', '1st Place')
+                                               .replace('2º Lugar', '2nd Place')
+                                               .replace('3º Lugar', '3rd Place');
+                  }
+                  if (displayTitle.includes('Novo troféu desbloqueado') || displayTitle.includes('Marco de ofensiva conquistado')) {
+                    displayTitle = '🏆 Trophy Unlocked!';
+                  }
+                  if (displayBody.includes('Incrível dedicação!') || displayBody.includes('Incrivel dedicacao!')) {
+                    displayBody = displayBody.replace(/Incr[ií]vel\s*dedica[çc][ãa]o!\s*Voc[eé]\s*ficou\s*em/gi, 'Incredible dedication! You finished in')
+                                             .replace(/no\s*Ranking\s*Geral\s*de/gi, 'in the Overall Ranking of')
+                                             .replace(/\bcom\b/gi, 'with')
+                                             .replace(/pontos\s*de\s*XP\.\s*Continue\s*brilhando\s*no\s*novo\s*ciclo\s*deste\s*m[eê]s!/gi, 'XP points. Keep shining in the new cycle!');
+                  }
+                }
+
+                return (
+                  <div
+                    key={n.id}
+                    onClick={() => markRead(n.id)}
+                    className={cn(
+                      'flex items-start gap-3 px-4 py-3 hover:bg-bg-secondary/50 cursor-pointer transition-colors border-b border-border/50 last:border-0',
+                      !n.is_read && 'bg-primary/5'
+                    )}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-bg-secondary flex items-center justify-center text-base shrink-0 mt-0.5">
+                      {NOTIF_ICONS[n.category] || '🔔'}
                     </div>
-                    <p className="text-[0.65rem] text-text-muted leading-relaxed mt-0.5 line-clamp-2">
-                      {n.body}
-                    </p>
-                    <p className="text-[0.6rem] text-text-subtle mt-1">{timeAgo(n.created_at)}</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className={cn('text-xs font-bold text-text truncate', !n.is_read && 'text-primary')}>
+                          {displayTitle}
+                        </p>
+                        {!n.is_read && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                        )}
+                      </div>
+                      <p className="text-[0.65rem] text-text-muted leading-relaxed mt-0.5 line-clamp-2">
+                        {displayBody}
+                      </p>
+                      <p className="text-[0.6rem] text-text-subtle mt-1">{timeAgo(n.created_at)}</p>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

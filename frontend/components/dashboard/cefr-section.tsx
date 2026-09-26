@@ -29,7 +29,8 @@ import {
   ImageIcon,
   CheckSquare,
   Square,
-  Search
+  Search,
+  Play
 } from 'lucide-react';
 import { apiUpload, apiPost, apiGet, apiDelete, apiPut, apiPatch } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
@@ -81,6 +82,8 @@ export function CefrSection() {
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   const [scheduleTypes, setScheduleTypes] = useState<string[]>(['flashcards', 'simulations']);
+  const [scheduleReferenceIds, setScheduleReferenceIds] = useState<string[]>([]);
+  const [runningScheduleId, setRunningScheduleId] = useState<string | null>(null);
 
   // Top-level tabs
   const [activeMainTab, setActiveMainTab] = useState<'configure' | 'curator'>('configure');
@@ -549,7 +552,8 @@ export function CefrSection() {
         execution_time: scheduleTime,
         weekly_frequency: 1,
         materials_per_execution: scheduleLimit,
-        selected_types: scheduleTypes
+        selected_types: scheduleTypes,
+        reference_ids: scheduleReferenceIds
       };
 
       let res;
@@ -565,6 +569,7 @@ export function CefrSection() {
         setScheduleTime('06:00');
         setScheduleLimit(5);
         setScheduleTypes(['flashcards', 'simulations']);
+        setScheduleReferenceIds([]);
         setEditingScheduleId(null);
         setScheduleActive(true);
         fetchSchedules();
@@ -585,6 +590,7 @@ export function CefrSection() {
     setScheduleLimit(sch.materials_per_execution || 5);
     setScheduleActive(sch.active);
     setScheduleTypes(sch.selected_types || ['flashcards', 'simulations']);
+    setScheduleReferenceIds(sch.reference_ids || []);
   };
 
   const handleCancelEditSchedule = () => {
@@ -594,6 +600,7 @@ export function CefrSection() {
     setScheduleLimit(5);
     setScheduleActive(true);
     setScheduleTypes(['flashcards', 'simulations']);
+    setScheduleReferenceIds([]);
   };
 
   const handleToggleSchedule = async (id: string, currentActive: boolean) => {
@@ -622,6 +629,29 @@ export function CefrSection() {
       }
     } catch (err: any) {
       toast.error(err.message || 'Error deleting schedule.');
+    }
+  };
+
+  const handleRunScheduleNow = async (id: string) => {
+    setRunningScheduleId(id);
+    const toastId = toast.loading('Running schedule generation now...');
+    try {
+      const res = await apiPost<{ success: boolean; message?: string; generated_materials?: number; errors?: string[] }>(
+        `/cefr/admin/schedules/${id}/run-now`,
+        {}
+      );
+      if (res.ok && res.data?.success) {
+        toast.success(res.data.message || 'Schedule executed successfully!', { id: toastId });
+        fetchSchedules();
+        fetchGeneratedContent(true);
+      } else {
+        const errorMsg = (res.data as any)?.error || (res.data as any)?.message || 'Failed to run schedule.';
+        toast.error(errorMsg, { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error running schedule.', { id: toastId });
+    } finally {
+      setRunningScheduleId(null);
     }
   };
 
@@ -1288,17 +1318,18 @@ export function CefrSection() {
               Configure the AI to generate new content (flashcards and simulations) autonomously on the specified days and times.
             </p>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8">
               {/* Schedule Creation Form */}
-              <div className="lg:col-span-1 space-y-4 border-r border-border/60 pr-0 lg:pr-8">
+              <div className="xl:col-span-5 space-y-4 border-b xl:border-b-0 xl:border-r border-border/60 pb-6 xl:pb-0 pr-0 xl:pr-6">
                 <h3 className="text-md font-bold text-text flex items-center gap-2">
                   <Settings size={18} className="text-text-subtle" />
                   {editingScheduleId ? 'Edit Schedule' : 'New Schedule'}
                 </h3>
 
+                {/* Days of the Week */}
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-text-subtle uppercase">Days of the Week</label>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5 sm:gap-2">
                     {WEEKDAYS_OPTIONS.map(day => {
                       const isSelected = scheduleWeekdays.includes(day.value);
                       return (
@@ -1317,6 +1348,81 @@ export function CefrSection() {
                   </div>
                 </div>
 
+                {/* Target Reference Files Selection */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-text-subtle uppercase flex items-center gap-1.5">
+                      <FileText size={13} className="text-primary" />
+                      Target Reference Files & Levels
+                    </label>
+                    <span className="text-[11px] text-text-muted">
+                      {scheduleReferenceIds.length > 0
+                        ? `${scheduleReferenceIds.length} file(s) selected`
+                        : 'All files (Automatic)'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-text-muted">
+                    Select which reference files the AI will read. The system will automatically generate materials for the CEFR levels of the selected files.
+                  </p>
+
+                  {references.length === 0 ? (
+                    <div className="p-3 bg-bg rounded-xl border border-dashed border-border text-center text-xs text-text-muted">
+                      No files uploaded yet. Upload materials above to link them here.
+                    </div>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 border border-border/60 rounded-xl p-2 bg-bg/50">
+                      {references.map((r: any) => {
+                        const isSelected = scheduleReferenceIds.includes(r.id);
+                        return (
+                          <div
+                            key={r.id}
+                            onClick={() => {
+                              setScheduleReferenceIds(prev =>
+                                isSelected ? prev.filter(id => id !== r.id) : [...prev, r.id]
+                              );
+                            }}
+                            className={`flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-primary/10 border-primary/40 text-text'
+                                : 'bg-surface border-border/70 text-text-subtle hover:border-border'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => {}}
+                                className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary/20 bg-bg cursor-pointer pointer-events-none"
+                              />
+                              <span className="truncate font-medium">{r.filename}</span>
+                            </div>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border shrink-0 ${getLevelBadgeStyle(r.cefr_level)}`}>
+                              {r.cefr_level}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Level summary indicator */}
+                  {scheduleReferenceIds.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap pt-1 text-xs">
+                      <span className="text-[11px] text-text-subtle font-medium">Will generate for levels:</span>
+                      {Array.from(new Set(
+                        references
+                          .filter(r => scheduleReferenceIds.includes(r.id))
+                          .map(r => r.cefr_level?.toUpperCase() || 'A1')
+                      )).sort().map(lvl => (
+                        <span key={lvl} className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getLevelBadgeStyle(lvl)}`}>
+                          {lvl}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Material Types */}
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-text-subtle uppercase">Material Types</label>
                   <div className="flex flex-col gap-2">
@@ -1346,7 +1452,7 @@ export function CefrSection() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-text-subtle uppercase flex items-center gap-1">
                       <Clock size={12} />
@@ -1361,15 +1467,20 @@ export function CefrSection() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-text-subtle uppercase flex items-center gap-1">Level Limit</label>
+                    <label className="text-xs font-bold text-text-subtle uppercase flex items-center gap-1">
+                      Materials to Generate
+                    </label>
                     <input
                       type="number"
                       min="1"
-                      max="6"
+                      max="30"
                       value={scheduleLimit}
-                      onChange={e => setScheduleLimit(Math.max(1, Math.min(6, parseInt(e.target.value) || 1)))}
+                      onChange={e => setScheduleLimit(Math.max(1, Math.min(30, parseInt(e.target.value) || 1)))}
                       className="w-full bg-bg border border-border rounded-xl px-3 py-2.5 text-text focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                     />
+                    <p className="text-[11px] text-text-muted">
+                      Items created per level each run (1 to 30)
+                    </p>
                   </div>
                 </div>
 
@@ -1383,7 +1494,7 @@ export function CefrSection() {
                   </button>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <button
                     onClick={handleSaveSchedule}
                     disabled={savingSchedule}
@@ -1403,11 +1514,13 @@ export function CefrSection() {
               </div>
 
               {/* Active Schedules List */}
-              <div className="lg:col-span-2 space-y-4">
-                <h3 className="text-md font-bold text-text flex items-center gap-2">
-                  <Layers size={18} className="text-text-subtle" />
-                  Active Configurations
-                </h3>
+              <div className="xl:col-span-7 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-md font-bold text-text flex items-center gap-2">
+                    <Layers size={18} className="text-text-subtle" />
+                    Active Configurations
+                  </h3>
+                </div>
 
                 {loadingSchedules ? (
                   <div className="flex justify-center py-10">
@@ -1418,23 +1531,28 @@ export function CefrSection() {
                     <p className="text-sm">No schedules registered.</p>
                   </div>
                 ) : (
-                  <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                  <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
                     {schedules.map(sch => (
                       <div
                         key={sch.id}
-                        className={`p-4 rounded-xl border transition-all flex items-center justify-between ${sch.active
+                        className={`p-4 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 ${sch.active
                             ? 'bg-primary/5 border-primary/20'
                             : 'bg-bg/40 border-border/80 opacity-70'
                           }`}
                       >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <Clock size={16} className="text-primary" />
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Clock size={16} className="text-primary shrink-0" />
                             <span className="text-md font-bold text-text">{sch.execution_time.slice(0, 5)}</span>
                             <span className="text-xs text-text-muted">|</span>
                             <span className="text-xs font-semibold text-text-subtle bg-bg border border-border px-2 py-0.5 rounded-md">
-                              Max: {sch.materials_per_execution} levels
+                              {sch.materials_per_execution} items per run
                             </span>
+                            {sch.active && (
+                              <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                Active
+                              </span>
+                            )}
                           </div>
                           <p className="text-xs text-text-muted font-medium">
                             Days: {formatWeekdays(sch.weekdays)}
@@ -1444,9 +1562,50 @@ export function CefrSection() {
                               Generates: {sch.selected_types.map((t: string) => t.charAt(0).toUpperCase() + t.slice(1)).join(', ')}
                             </p>
                           )}
+                          {/* Attached references & target levels */}
+                          {sch.reference_ids && sch.reference_ids.length > 0 ? (
+                            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                              <span className="text-[11px] text-text-subtle font-semibold">Target Levels:</span>
+                              {Array.from(new Set(
+                                references
+                                  .filter(r => sch.reference_ids.includes(r.id))
+                                  .map(r => r.cefr_level?.toUpperCase() || 'A1')
+                              )).sort().map(lvl => (
+                                <span key={lvl} className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${getLevelBadgeStyle(lvl)}`}>
+                                  {lvl}
+                                </span>
+                              ))}
+                              <span className="text-[11px] text-text-muted">
+                                ({sch.reference_ids.length} file{sch.reference_ids.length > 1 ? 's' : ''})
+                              </span>
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-text-muted">
+                              Uses all uploaded reference files
+                            </p>
+                          )}
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center flex-wrap gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/40 justify-end shrink-0">
+                          <button
+                            onClick={() => handleRunScheduleNow(sch.id)}
+                            disabled={runningScheduleId === sch.id}
+                            className={`p-2 rounded-lg transition-all border ${
+                              runningScheduleId === sch.id
+                                ? 'bg-primary/20 text-primary border-primary/30 cursor-not-allowed'
+                                : 'bg-primary/10 text-primary border-primary/20 hover:bg-primary hover:text-white'
+                            }`}
+                            title="Run generation now"
+                          >
+                            {runningScheduleId === sch.id ? (
+                              <Loader2 size={16} className="animate-spin text-primary" />
+                            ) : (
+                              <div className="flex items-center gap-1 font-semibold text-xs px-1">
+                                <Play size={14} className="fill-current" />
+                                <span>Run Now</span>
+                              </div>
+                            )}
+                          </button>
                           <button
                             onClick={() => handleStartEditSchedule(sch)}
                             className={`p-1.5 rounded-lg transition-all ${editingScheduleId === sch.id

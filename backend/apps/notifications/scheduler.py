@@ -106,6 +106,10 @@ class BackgroundNotificationRunner:
                 if now_brt.day == 1 and now_brt.hour == 9:
                     cls._run_monthly_competition(now_brt)
 
+                # 6. Agendamentos pedagógicos CEFR (checa a cada minuto se coincide com agendamento ativo)
+                if tick % 2 == 0:
+                    cls._run_cefr_schedules(now_brt)
+
             except Exception as e:
                 logger.error(f"[Scheduler] Erro no loop de agendamento: {e}", exc_info=True)
             finally:
@@ -116,6 +120,14 @@ class BackgroundNotificationRunner:
 
             # Dorme por 30 segundos antes da próxima checagem
             time.sleep(30)
+
+    @classmethod
+    def _run_cefr_schedules(cls, now_brt):
+        try:
+            from apps.activities.generator import CEFRGeneratorService
+            CEFRGeneratorService.check_and_run_schedules(force=False)
+        except Exception as e:
+            logger.error(f"[Scheduler] Erro ao checar agendamentos CEFR: {e}")
 
     @classmethod
     def _ping_waha(cls):

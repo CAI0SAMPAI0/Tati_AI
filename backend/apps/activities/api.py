@@ -264,6 +264,73 @@ def submit_activity(request: HttpRequest, payload: SubmissionInput):
     return SubmissionService.submit_activity(user, payload.dict())
 
 
+class StudentFeedbackInput(BaseModel):
+    area: str = "general"
+    activity_id: Optional[str] = ""
+    activity_title: Optional[str] = ""
+    rating: int = 5
+    comment: str
+    cefr_level: Optional[str] = "A1"
+    student_name: Optional[str] = ""
+
+
+class DeveloperBugReportInput(BaseModel):
+    title: str
+    description: str
+    image_urls: Optional[List[str]] = []
+    page_url: Optional[str] = ""
+    user_agent: Optional[str] = ""
+
+
+@activities_router.post("/student-feedback", auth=auth_optional)
+def submit_student_feedback(request: HttpRequest, payload: StudentFeedbackInput):
+    """
+    Permite que o aluno envie feedback sobre qualquer atividade diretamente para a Professora Tatiana.
+    """
+    from .services import StudentFeedbackService
+
+    username = "anonymous"
+    student_name = payload.student_name or ""
+    if hasattr(request, "auth") and request.auth and isinstance(request.auth, User):
+        username = getattr(request.auth, "username", "anonymous")
+        if not student_name:
+            first = getattr(request.auth, "first_name", "")
+            last = getattr(request.auth, "last_name", "")
+            student_name = f"{first} {last}".strip() or username
+
+    return StudentFeedbackService.create_feedback(
+        student_username=username,
+        data={
+            **payload.dict(),
+            "student_name": student_name,
+        },
+    )
+
+
+@activities_router.post("/developer-bug-report", auth=auth_optional)
+def submit_developer_bug_report(request: HttpRequest, payload: DeveloperBugReportInput):
+    """
+    Permite que o aluno reporte um bug ou problema técnico diretamente para o programador.
+    Envia email detalhado contendo screenshots para o email configurado na variável EMAIL_FEEDBACK.
+    """
+    from .services import DeveloperBugService
+
+    user_info = {
+        "username": "anonymous",
+        "name": "Aluno Anônimo",
+        "email": "",
+    }
+    if hasattr(request, "auth") and request.auth and isinstance(request.auth, User):
+        user_info["username"] = getattr(request.auth, "username", "anonymous")
+        first = getattr(request.auth, "first_name", "")
+        last = getattr(request.auth, "last_name", "")
+        user_info["name"] = f"{first} {last}".strip() or user_info["username"]
+        user_info["email"] = getattr(request.auth, "email", "")
+
+    return DeveloperBugService.create_bug_report(user_info, payload.dict())
+
+
+
 #    HUB DE MATERIAIS & PREMIUM                                         
 
 
@@ -463,6 +530,17 @@ def liveworksheets_content(
     from .services import ExternalContentService
 
     return ExternalContentService.get_liveworksheets_content(level, category)
+
+
+@activities_router.get("/musics", auth=auth_optional)
+def list_musics(request: HttpRequest):
+    """
+    Retorna o catálogo de músicas e letras do LingoClip com os 3 modos de jogo
+    (Múltipla Escolha, Digitação e Karaokê).
+    """
+    from .services import ExternalContentService
+
+    return ExternalContentService.get_musics_content()
 
 
 # Cache em memória para os proxies de imagem das atividades
@@ -780,6 +858,29 @@ def upload_flashcard_image_from_url(request: HttpRequest, payload: dict):
     return {"url": url}
 
 
+@flashcard_assets_router.post("/ai-image", auth=auth_optional)
+def generate_flashcard_ai_image(request: HttpRequest, payload: dict):
+    """
+    Gera imagem com IA (FLUX.1-dev) para flashcards sem spoilers de texto e salva no Cloudinary.
+    """
+    from .image_service import ImageResolverService
+
+    prompt = (payload.get("prompt") or "").strip()
+    topic = (payload.get("topic") or "").strip() or None
+    if not prompt:
+        raise HttpError(400, "Prompt é obrigatório.")
+
+    # 1. Tenta gerar via FLUX.1-dev
+    url = ImageResolverService.generate_flux_image(prompt, topic=topic)
+
+    # 2. Se FLUX falhar ou demorar, faz fallback inteligente sem spoilers
+    if not url:
+        url = ImageResolverService.resolve_image(prompt, topic=topic)
+
+    return {"url": url}
+
+
+
 #    PREMIUM ADMIN ROUTER                                                
 
 admin_premium_router = Router(tags=["Admin Premium Materials"])
@@ -960,6 +1061,7 @@ def get_cefr_all(request: HttpRequest):
                 "explanation": f.explanation or "",
                 "image_url": f.image_url or "",
                 "topic": f.topic or "General",
+                "options": f.options or [],
                 "is_published": f.is_published,
             }
             for f in fc
@@ -1017,6 +1119,7 @@ def get_cefr_schedules(request: HttpRequest):
                 "weekly_frequency": s.weekly_frequency,
                 "materials_per_execution": s.materials_per_execution,
                 "selected_types": s.selected_types or ["flashcards", "simulations"],
+                "reference_ids": s.reference_ids if isinstance(s.reference_ids, list) else [],
             }
             for s in schedules
         ],
@@ -1030,6 +1133,7 @@ class CEFRScheduleSchema(BaseModel):
     weekly_frequency: Optional[int] = 1
     materials_per_execution: Optional[int] = 5
     selected_types: Optional[List[str]] = ["flashcards", "simulations"]
+    reference_ids: Optional[List[str]] = []
 
 
 class CEFRFlashcardGroupSaveSchema(BaseModel):
@@ -1051,6 +1155,7 @@ def create_cefr_schedule(request: HttpRequest, payload: CEFRScheduleSchema):
         weekly_frequency=payload.weekly_frequency,
         materials_per_execution=payload.materials_per_execution,
         selected_types=payload.selected_types,
+        reference_ids=payload.reference_ids or [],
     )
     return {"success": True, "data": {"id": str(s.id)}}
 
@@ -1070,6 +1175,7 @@ def update_cefr_schedule(
     s.weekly_frequency = payload.weekly_frequency
     s.materials_per_execution = payload.materials_per_execution
     s.selected_types = payload.selected_types
+    s.reference_ids = payload.reference_ids or []
     s.save()
     return {"success": True, "data": {"id": str(s.id)}}
 
@@ -1088,207 +1194,53 @@ def delete_cefr_schedule(request: HttpRequest, schedule_id: str):
 @cefr_admin_router.get("/extract-topics", auth=auth_optional)
 def extract_cefr_topics(request: HttpRequest, reference_ids: Optional[str] = None):
     """
-    Extrai tópicos e subtemas pedagógicos dos materiais indexados usando IA e alinhados ao nível CEFR.
+    Extrai tópicos e subtemas pedagógicos reais dos materiais indexados usando IA e alinhados ao nível CEFR.
     """
+    from .generator import CEFRGeneratorService
     from .models import CEFRReference
 
-    level = "A1"
-    if reference_ids:
-        ref_id_list = [r.strip() for r in reference_ids.split(",") if r.strip()]
-        refs = list(CEFRReference.objects.filter(id__in=ref_id_list))
-        if refs:
-            level = refs[0].cefr_level.upper()
+    # 1. Coleta IDs passados via múltiplos parâmetros (?reference_ids=A&reference_ids=B) ou string separada por vírgula
+    raw_list = request.GET.getlist("reference_ids")
+    all_ref_ids = []
+    for item in raw_list:
+        for part in str(item).split(","):
+            if part.strip():
+                all_ref_ids.append(part.strip())
+    if not all_ref_ids and reference_ids:
+        all_ref_ids = [r.strip() for r in reference_ids.split(",") if r.strip()]
 
-    lvl = level.upper()
-    if lvl in ["B1", "B2"]:
-        topics = [
-            {
-                "topic": "Airport, Boarding and Flight Procedures",
-                "items": [
-                    "boarding pass",
-                    "security checkpoint",
-                    "customs declaration",
-                    "carry-on luggage",
-                    "gate change",
-                    "departure lounge",
-                ],
-                "count": 6,
-            },
-            {
-                "topic": "Job Interviews and Professional Career",
-                "items": [
-                    "work experience",
-                    "strengths and weaknesses",
-                    "career goals",
-                    "leadership skills",
-                    "salary expectations",
-                ],
-                "count": 5,
-            },
-            {
-                "topic": "Housing, Rent and Utilities",
-                "items": [
-                    "lease agreement",
-                    "security deposit",
-                    "monthly rent",
-                    "utilities included",
-                    "landlord obligations",
-                ],
-                "count": 5,
-            },
-            {
-                "topic": "Technology and Digital Communication",
-                "items": [
-                    "cloud storage",
-                    "data privacy",
-                    "software development",
-                    "cybersecurity",
-                    "remote collaboration",
-                ],
-                "count": 5,
-            },
-            {
-                "topic": "Environment and Sustainable Living",
-                "items": [
-                    "renewable energy",
-                    "carbon footprint",
-                    "recycling policies",
-                    "global warming",
-                    "biodiversity",
-                ],
-                "count": 5,
-            },
-        ]
-    elif lvl in ["C1", "C2"]:
-        topics = [
-            {
-                "topic": "Diplomatic Negotiations and Global Trade",
-                "items": [
-                    "bilateral agreements",
-                    "tariff exemptions",
-                    "geopolitical diplomacy",
-                    "economic sanctions",
-                    "multilateral treaties",
-                ],
-                "count": 5,
-            },
-            {
-                "topic": "Advanced Academic Rhetoric and Research",
-                "items": [
-                    "empirical methodology",
-                    "paradigm shift",
-                    "statistical validity",
-                    "peer review process",
-                    "hypothesis testing",
-                ],
-                "count": 5,
-            },
-            {
-                "topic": "Ethics in Artificial Intelligence",
-                "items": [
-                    "algorithmic bias",
-                    "autonomous systems",
-                    "moral accountability",
-                    "data governance",
-                    "machine learning safety",
-                ],
-                "count": 5,
-            },
-        ]
-    else:
-        topics = [
-            {
-                "topic": "Family and Relationships",
-                "items": [
-                    "father",
-                    "mother",
-                    "sister",
-                    "brother",
-                    "cousin",
-                    "grandparents",
-                ],
-                "count": 6,
-            },
-            {
-                "topic": "Hobbies and Free Time",
-                "items": [
-                    "reading",
-                    "cycling",
-                    "cooking",
-                    "traveling",
-                    "listening to music",
-                ],
-                "count": 5,
-            },
-            {
-                "topic": "Work and Occupations",
-                "items": [
-                    "teacher",
-                    "engineer",
-                    "doctor",
-                    "lawyer",
-                    "programmer",
-                    "manager",
-                ],
-                "count": 6,
-            },
-            {
-                "topic": "Daily Routine",
-                "items": [
-                    "wake up",
-                    "take a shower",
-                    "have breakfast",
-                    "go to work",
-                    "study",
-                ],
-                "count": 5,
-            },
-            {
-                "topic": "Food and Dining",
-                "items": [
-                    "breakfast",
-                    "lunch",
-                    "dinner",
-                    "vegetables",
-                    "fruit",
-                    "restaurant",
-                    "order",
-                ],
-                "count": 7,
-            },
-            {
-                "topic": "Shopping and Clothes",
-                "items": [
-                    "shirt",
-                    "pants",
-                    "shoes",
-                    "jacket",
-                    "price",
-                    "size",
-                    "discount",
-                ],
-                "count": 7,
-            },
-            {
-                "topic": "Travel and Airport",
-                "items": ["passport", "ticket", "hotel", "luggage", "vacation"],
-                "count": 5,
-            },
-            {
-                "topic": "Weather and Seasons",
-                "items": [
-                    "sunny",
-                    "rainy",
-                    "cloudy",
-                    "winter",
-                    "summer",
-                    "spring",
-                    "autumn",
-                ],
-                "count": 7,
-            },
-        ]
-    return {"success": True, "level": lvl, "topics": topics}
+    # 2. Se referências foram fornecidas, extrai tópicos diretamente dos arquivos usando IA
+    if all_ref_ids:
+        res = CEFRGeneratorService.extract_topics_from_references(all_ref_ids)
+        if res and res.get("topics"):
+            return res
+
+    # 3. Se não houver IDs específicos, busca os materiais mais recentes do nível solicitado
+    level = request.GET.get("level") or "A1"
+    refs = list(CEFRReference.objects.filter(cefr_level__iexact=level)[:3])
+    if refs:
+        res = CEFRGeneratorService.extract_topics_from_references([str(r.id) for r in refs])
+        if res and res.get("topics"):
+            return res
+
+    # 4. Fallback contextualizado se não houver referências
+    return CEFRGeneratorService.extract_topics_from_references([])
+
+
+@cefr_admin_router.post("/schedules/{schedule_id}/run-now", auth=auth_optional)
+def run_cefr_schedule_now(request: HttpRequest, schedule_id: str):
+    """
+    Executa imediatamente um agendamento específico (disparo manual para testes e validação).
+    """
+    from .models import CEFRSchedule
+    from .generator import CEFRGeneratorService
+
+    sched = CEFRSchedule.objects.filter(id=schedule_id).first()
+    if not sched:
+        raise HttpError(404, "Agendamento não encontrado.")
+
+    res = CEFRGeneratorService.run_single_schedule(sched)
+    return res
 
 
 @cefr_admin_router.post("/generate-flashcards", auth=auth_optional)
@@ -1367,17 +1319,40 @@ def upload_cefr_material(
 ):
     """
     Faz upload e indexação de arquivos de referência didática (PDF, DOCX, TXT).
-    Detecta automaticamente o nível CEFR (A1-C2) pelo nome do arquivo caso não especificado.
+    Extrai e indexa os chunks imediatamente no banco (cefr_documents) para extração de tópicos com IA.
     """
     from .models import CEFRReference
     from .assets_service import CloudinaryService
-    import uuid
+    from django.db import connection
+    from psycopg2.extras import Json
+    import uuid, io, pypdf
 
     results = []
     for f in files:
         content = f.read()
         storage_url = CloudinaryService.upload_file(content, f.name)
         ref_level = extract_cefr_level_from_filename(f.name, fallback_level=level)
+
+        full_text = ""
+        if f.name.lower().endswith(".pdf"):
+            try:
+                reader = pypdf.PdfReader(io.BytesIO(content))
+                full_text = "\n".join(p.extract_text() or "" for p in reader.pages)
+            except Exception as e:
+                logger.warning(f"Erro ao extrair PDF {f.name}: {e}")
+        else:
+            try:
+                full_text = content.decode("utf-8", errors="ignore")
+            except Exception:
+                pass
+
+        chunk_size = 1200
+        chunks = [
+            full_text[i : i + chunk_size]
+            for i in range(0, len(full_text), chunk_size)
+            if full_text[i : i + chunk_size].strip()
+        ]
+
         ref = CEFRReference.objects.create(
             id=uuid.uuid4(),
             filename=f.name,
@@ -1385,8 +1360,35 @@ def upload_cefr_material(
             cefr_level=ref_level,
             file_type=f.name.split(".")[-1].lower(),
             file_size=len(content),
-            chunks_indexed=3,
+            chunks_indexed=len(chunks),
         )
+
+        if chunks:
+            try:
+                with connection.cursor() as cur:
+                    for idx, chunk in enumerate(chunks):
+                        cur.execute(
+                            """
+                            INSERT INTO cefr_documents (id, level, source_file, content, metadata, created_at)
+                            VALUES (%s, %s, %s, %s, %s, now());
+                            """,
+                            (
+                                str(uuid.uuid4()),
+                                ref.cefr_level,
+                                ref.filename,
+                                chunk,
+                                Json(
+                                    {
+                                        "original_name": ref.filename,
+                                        "reference_id": str(ref.id),
+                                        "chunk_index": idx,
+                                    }
+                                ),
+                            ),
+                        )
+            except Exception as e:
+                logger.warning(f"Erro ao salvar chunks de {f.name} em cefr_documents: {e}")
+
         results.append(
             {
                 "filename": f.name,
@@ -1394,6 +1396,7 @@ def upload_cefr_material(
                 "id": str(ref.id),
                 "url": storage_url,
                 "cefr_level": ref.cefr_level,
+                "chunks_indexed": len(chunks),
             }
         )
     return {"success": True, "results": results}
@@ -1494,14 +1497,21 @@ def save_flashcard_group(request: HttpRequest, body: CEFRFlashcardGroupSaveSchem
         is_pub = card.get("is_published", True)
         if is_pub:
             has_published = True
+        raw_opts = card.get("options") or []
+        cleaned_opts = [str(o).strip() for o in raw_opts if str(o).strip()]
+        card_front = card.get("front", "").strip()
+        if card_front and card_front not in cleaned_opts:
+            cleaned_opts.insert(0, card_front)
+
         fc = Flashcard.objects.create(
             id=uuid.uuid4(),
             level=body.new_level.upper(),
             topic=body.new_topic,
-            front=card.get("front", ""),
+            front=card_front,
             back=card.get("back", ""),
             explanation=card.get("explanation", ""),
             image_url=card.get("image_url", ""),
+            options=cleaned_opts[:4],
             is_published=is_pub,
         )
         inserted.append(str(fc.id))

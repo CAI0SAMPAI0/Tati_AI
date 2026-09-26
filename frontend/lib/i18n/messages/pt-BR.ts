@@ -994,16 +994,16 @@ export const ptBR = {
       message: (p: { streak?: number } = {}) => `Você está com ${p.streak || 0} dias de ofensiva. Pratique agora para manter.`,
     },
     streak_milestone: {
-      title: 'Marco de ofensiva conquistado!',
-      message: (p: { streak?: number } = {}) => `Você alcançou ${p.streak || 0} dias seguidos. Continue nessa sequência.`,
+      title: 'Streak milestone unlocked!',
+      message: (p: { streak?: number } = {}) => `You reached ${p.streak || 0} consecutive days. Keep up the momentum!`,
     },
     streak_broken: {
-      title: 'Sua ofensiva foi quebrada',
-      message: (p: { streak?: number } = {}) => `Sua ofensiva anterior foi de ${p.streak || 0} dias. Recomece hoje.`,
+      title: 'Your streak was broken',
+      message: (p: { streak?: number } = {}) => `Your previous streak was ${p.streak || 0} days. Restart today!`,
     },
     trophy_earned: {
-      title: 'Novo troféu desbloqueado!',
-      message: (p: { trophy_name?: string } = {}) => `Você ganhou o troféu: ${p.trophy_name || ''}`,
+      title: 'Trophy Unlocked!',
+      message: (p: { trophy_name?: string } = {}) => `You unlocked the trophy: ${p.trophy_name || ''}`,
     },
   },
 

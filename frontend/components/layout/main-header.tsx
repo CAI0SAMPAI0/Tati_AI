@@ -1,12 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { Menu, Trophy, Flame, CircleAlert } from 'lucide-react';
+import { Menu, Trophy, Flame, CircleAlert, MessageSquareHeart, Bug } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { useStreakAndTrophies } from '@/hooks/useStreakAndTrophies';
 import { NotificationsDropdown } from './notifications-dropdown';
+import { StudentFeedbackModal } from '@/components/feedback/student-feedback-modal';
+import { DeveloperBugModal } from '@/components/feedback/developer-bug-modal';
 
 import { DEFAULT_AVATAR_URL } from '@/lib/constants/user';
 import Image from 'next/image';
@@ -19,6 +22,8 @@ interface MainHeaderProps {
 export function MainHeader({ onToggleMenu }: MainHeaderProps) {
   const { user } = useAuth();
   const avatarUrl = user?.avatar_url || (user as any)?.profile?.avatar_url || DEFAULT_AVATAR_URL;
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [isBugOpen, setIsBugOpen] = useState(false);
 
   const { currentStreak, isStreakActive, trophiesEarned, totalTrophies } = useStreakAndTrophies();
 
@@ -97,6 +102,26 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
               </>
             )}
 
+          <button
+            type="button"
+            onClick={() => setIsFeedbackOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold text-primary hover:bg-primary/10 transition-colors"
+            title="Enviar Feedback para Teacher Tatiana"
+          >
+            <MessageSquareHeart size={17} />
+            <span className="hidden xl:inline">Feedback Taty</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsBugOpen(true)}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-red-400 hover:bg-red-500/10 transition-colors"
+            title="Reportar problema ao programador"
+          >
+            <Bug size={16} />
+            <span className="hidden xl:inline">Bug Report</span>
+          </button>
+
           <NotificationsDropdown />
 
           <Link
@@ -120,6 +145,17 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
           </Link>
         </div>
       </div>
+
+      <StudentFeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+        cefrLevel={(user as any)?.level || 'A1'}
+      />
+
+      <DeveloperBugModal
+        isOpen={isBugOpen}
+        onClose={() => setIsBugOpen(false)}
+      />
     </header>
   );
 }

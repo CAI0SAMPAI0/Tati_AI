@@ -199,3 +199,24 @@ def sync_hub_materials_task():
         except Exception:
             pass
 
+
+@shared_task(name="apps.activities.tasks.run_cefr_schedules_task")
+def run_cefr_schedules_task():
+    """
+    Tarefa periódica que checa e executa os agendamentos ativos de geração de materiais CEFR.
+    """
+    try:
+        from .generator import CEFRGeneratorService
+        logger.info("[CEFR Scheduler] Executando verificação periódica de agendamentos...")
+        res = CEFRGeneratorService.check_and_run_schedules(force=False)
+        return res
+    except Exception as e:
+        logger.error(f"[CEFR Scheduler] Erro ao executar agendamentos CEFR: {e}", exc_info=True)
+        return {"success": False, "error": str(e)}
+    finally:
+        try:
+            from django.db import close_old_connections
+            close_old_connections()
+        except Exception:
+            pass
+

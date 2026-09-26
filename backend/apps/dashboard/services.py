@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Optional, Any, Dict, List
 from zoneinfo import ZoneInfo
 
+from django.core.cache import cache
 from django.db.models import Count, Max, Q
 from django.db.models.functions import TruncDate
 from ninja.errors import HttpError
@@ -68,6 +69,11 @@ def format_sp_time(dt_val) -> str:
 class DashboardService:
     @staticmethod
     def get_stats() -> dict:
+        cache_key = "dashboard_global_stats"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         today = date.today()
         base_users = User.objects.exclude(username__in=EXCLUDED_USERS)
         total_students = base_users.exclude(role="buyer").count()
@@ -83,12 +89,14 @@ class DashboardService:
             .count()
         )
 
-        return {
+        res = {
             "total_students": total_students,
             "total_buyers": total_buyers,
             "total_messages": messages_today,
             "active_today": active_today,
         }
+        cache.set(cache_key, res, 60)
+        return res
 
     @staticmethod
     def get_my_stats(username: str) -> dict:
@@ -174,6 +182,11 @@ class DashboardService:
 
     @staticmethod
     def get_students_list(search: str = None, level: str = None) -> list[dict]:
+        cache_key = f"dashboard_students_list_{search or 'all'}_{level or 'all'}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         users = User.objects.exclude(username__in=EXCLUDED_USERS).exclude(role="buyer")
         if search:
             users = (
@@ -306,10 +319,16 @@ class DashboardService:
         results.sort(key=lambda x: x["_sort_dt"], reverse=True)
         for r in results:
             del r["_sort_dt"]
+        cache.set(cache_key, results, 45)
         return results
 
     @staticmethod
     def get_difficulties_stats() -> dict:
+        cache_key = "dashboard_difficulties_stats"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         users = User.objects.exclude(username__in=EXCLUDED_USERS).exclude(role="buyer")
         counts = {"A1": 0, "A2": 0, "B1": 0, "B2": 0, "C1": 0, "C2": 0}
         for u in users:
@@ -318,7 +337,9 @@ class DashboardService:
                 counts[lvl] += 1
             else:
                 counts["A1"] += 1
-        return {"distribution": counts, "total": sum(counts.values()), "alerts": []}
+        res = {"distribution": counts, "total": sum(counts.values()), "alerts": []}
+        cache.set(cache_key, res, 60)
+        return res
 
     @staticmethod
     def get_flashcards_admin() -> list[dict]:
@@ -1189,6 +1210,22 @@ class DashboardService:
             "news": 0,
         }
 
+        # Pré-carrega cenários de simulação em lote para eliminar consultas N+1
+        needed_sim_ids = set()
+        for s in subs:
+            meta = s.metadata if isinstance(s.metadata, dict) else {}
+            sid = meta.get("scenario_id") or meta.get("simulation_id") or meta.get("activity_id")
+            if sid:
+                needed_sim_ids.add(str(sid))
+
+        scenario_name_map = {}
+        if needed_sim_ids:
+            try:
+                for sc in SimulationScenario.objects.filter(id__in=needed_sim_ids).only("id", "name"):
+                    scenario_name_map[str(sc.id)] = sc.name
+            except Exception:
+                pass
+
         seen_keys = set()
         mapped_submissions = []
         for s in subs:
@@ -1237,11 +1274,7 @@ class DashboardService:
                         or meta.get("activity_id")
                     )
                     if sim_id:
-                        try:
-                            sc = SimulationScenario.objects.filter(id=sim_id).first()
-                            title = sc.name if sc else "Conversational Simulation"
-                        except Exception:
-                            title = "Conversational Simulation"
+                        title = scenario_name_map.get(str(sim_id), "Conversational Simulation")
                     else:
                         title = "Conversational Simulation"
                 else:
@@ -1277,10 +1310,10 @@ class DashboardService:
         if user:
             prof = user.profile if isinstance(user.profile, dict) else {}
             leveling_list = list(prof.get("leveling_history") or [])
-            for alt_u in usernames:
-                if alt_u != username:
-                    alt_user = User.objects.filter(username=alt_u).first()
-                    if alt_user and isinstance(alt_user.profile, dict):
+            alt_usernames = [u for u in usernames if u != username]
+            if alt_usernames:
+                for alt_user in User.objects.filter(username__in=alt_usernames).only("username", "profile"):
+                    if isinstance(alt_user.profile, dict):
                         for item in alt_user.profile.get("leveling_history") or []:
                             if item not in leveling_list:
                                 leveling_list.append(item)

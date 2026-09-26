@@ -558,3 +558,47 @@ def test_student_whatsapp(request: HttpRequest, username: str):
     return DashboardService.send_test_whatsapp_to_student(
         username, sender_user=request.auth
     )
+
+
+#    FEEDBACKS DOS ALUNOS                                              
+
+
+@dashboard_router.get("/feedbacks", auth=auth_required)
+def get_student_feedbacks(
+    request: HttpRequest,
+    level: Optional[str] = None,
+    area: Optional[str] = None,
+    student: Optional[str] = None,
+    status: Optional[str] = None,
+):
+    """
+    Retorna feedbacks recebidos dos alunos filtrados por nível CEFR, área/categoria e aluno.
+    """
+    require_staff_user(request)
+    from apps.activities.services import StudentFeedbackService
+    return StudentFeedbackService.list_feedbacks(
+        level=level,
+        area=area,
+        student=student,
+        status=status,
+    )
+
+
+class FeedbackUpdateInput(BaseModel):
+    status: Optional[str] = None
+    teacher_reply: Optional[str] = None
+
+
+@dashboard_router.patch("/feedbacks/{feedback_id}", auth=auth_required)
+def update_student_feedback(
+    request: HttpRequest,
+    feedback_id: str,
+    payload: FeedbackUpdateInput,
+):
+    """
+    Atualiza status (ex: reviewed, resolved) ou adiciona resposta da professora Tatiana.
+    """
+    require_staff_user(request)
+    from apps.activities.services import StudentFeedbackService
+    return StudentFeedbackService.update_feedback(feedback_id, payload.dict(exclude_unset=True))
+

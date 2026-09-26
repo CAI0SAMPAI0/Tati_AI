@@ -27,6 +27,7 @@ simulation_router = Router(tags=["Simulations & Scenarios"])
 class SimStartInput(BaseModel):
     scenario_id: str
     accent: Optional[str] = "en-US"
+    level: Optional[str] = None
 
 
 class SimTranscribeInput(BaseModel):
@@ -40,6 +41,7 @@ class SimMessageInput(BaseModel):
     scenario_id: Optional[str] = ""
     conversation_id: Optional[str] = ""
     accent: Optional[str] = "en-US"
+    level: Optional[str] = None
 
 
 class SimEvaluateInput(BaseModel):
@@ -48,6 +50,67 @@ class SimEvaluateInput(BaseModel):
 
 
 # HELPERS
+
+
+def _clean_complete_reply(text: str) -> str:
+    """
+    Garante que a resposta da IA nunca termine cortada no meio de uma frase.
+    Se a última frase não tiver pontuação final (. ! ?), corta no último ponto válido.
+    """
+    t = text.strip()
+    if not t:
+        return t
+    if t[-1] in ('.', '!', '?', '"', '”', '’'):
+        return t
+    last_punct = max(t.rfind('.'), t.rfind('!'), t.rfind('?'))
+    if last_punct != -1 and last_punct > len(t) * 0.4:
+        return t[:last_punct + 1].strip()
+    return t
+
+
+def _get_level_prompt_rules(level: Optional[str]) -> str:
+    lvl = (level or "A2").strip().upper()
+    if lvl == "A1":
+        return (
+            "STUDENT CEFR LEVEL: A1 (Complete Beginner)\n"
+            "- Speak in very simple English. Use basic, everyday vocabulary only.\n"
+            "- Keep your response short: maximum 2 simple sentences (under 30 words).\n"
+            "- Do NOT use idioms, phrasal verbs, or complex grammatical structures.\n"
+            "- Be warm, patient, and ask exactly ONE very simple question at the end."
+        )
+    elif lvl == "A2":
+        return (
+            "STUDENT CEFR LEVEL: A2 (Elementary)\n"
+            "- Use simple, clear vocabulary and common sentence structures.\n"
+            "- Keep your response concise: 2 to 3 sentences (under 50 words).\n"
+            "- Keep questions straightforward and easy to understand.\n"
+            "- Be encouraging and ask exactly ONE clear question at the end."
+        )
+    elif lvl == "B1":
+        return (
+            "STUDENT CEFR LEVEL: B1 (Intermediate)\n"
+            "- Use natural conversational English with everyday expressions.\n"
+            "- Length: 2 to 3 sentences (under 60 words).\n"
+            "- Ask questions that invite the student to share opinions or describe experiences.\n"
+            "- End with exactly ONE clear question."
+        )
+    elif lvl == "B2":
+        return (
+            "STUDENT CEFR LEVEL: B2 (Upper Intermediate)\n"
+            "- Use natural, expressive conversational English with varied vocabulary and idioms.\n"
+            "- Length: 3 to 4 sentences (under 75 words).\n"
+            "- Engage the student with interesting, open-ended questions.\n"
+            "- End with exactly ONE engaging question."
+        )
+    else:  # C1 / C2
+        return (
+            f"STUDENT CEFR LEVEL: {lvl} (Advanced/Proficient)\n"
+            "- Speak naturally as an educated native speaker with nuanced vocabulary and idiomatic fluency.\n"
+            "- Challenge the student with thought-provoking dialogue.\n"
+            "- Length: 3 to 4 sentences (under 80 words).\n"
+            "- End with ONE relevant, high-level question."
+        )
+
 
 
 def _get_scenario_details(scenario_id: str) -> Optional[dict]:
@@ -192,6 +255,10 @@ async def start_simulation(request: HttpRequest, payload: SimStartInput):
     if not sc:
         raise HttpError(404, "Cenário não encontrado.")
 
+    user_level = getattr(user, "level", None) if user else None
+    student_level = payload.level or user_level or sc.get("difficulty") or "A2"
+    level_rules = _get_level_prompt_rules(student_level)
+
     conv_id = f"sim_{uuid.uuid4().hex[:10]}"
     sys_prompt = (
         sc.get("system_prompt") or f"You are simulating the scenario: {sc.get('name')}."
@@ -210,17 +277,27 @@ async def start_simulation(request: HttpRequest, payload: SimStartInput):
                     messages=[
                         {
                             "role": "system",
-                            "content": f"{sys_prompt}\nCRITICAL: Respond ENTIRELY in English. Introduce yourself in character and greet the user to start the conversation.",
+                            "content": (
+                                f"{sys_prompt}\n\n"
+                                f"{level_rules}\n\n"
+                                "CRITICAL INSTRUCTIONS:\n"
+                                "- Respond ENTIRELY in English.\n"
+                                "- Introduce yourself in character and greet the student warmly to begin.\n"
+                                "- Keep your greeting CONCISE (2 to 3 sentences max, under 50 words).\n"
+                                "- ALWAYS complete your thoughts and every sentence you start. NEVER leave a sentence unfinished or cut off mid-thought.\n"
+                                "- Ask exactly ONE simple, direct question to start the conversation."
+                            ),
                         },
                         {
                             "role": "user",
                             "content": "Hello! I am ready to start the scenario.",
                         },
                     ],
-                    max_tokens=150,
+                    max_tokens=400,
                     temperature=0.6,
                 )
             generated_text = res.choices[0].message.content.strip()
+            generated_text = _clean_complete_reply(generated_text)
             if generated_text:
                 initial_text = generated_text
                 break
@@ -291,6 +368,10 @@ async def send_simulation_message(request: HttpRequest, payload: SimMessageInput
     accent = payload.accent or "en-US"
 
     sc = await sync_to_async(_get_scenario_details)(scenario_id) if scenario_id else {}
+    user_level = getattr(user, "level", None) if user else None
+    student_level = payload.level or user_level or (sc.get("difficulty") if sc else None) or "A2"
+    level_rules = _get_level_prompt_rules(student_level)
+
     sys_prompt = (
         (sc.get("system_prompt") if sc else None)
         or "You are Teacher Tati conducting a real-world conversational English simulation. Respond entirely in English."
@@ -307,9 +388,11 @@ async def send_simulation_message(request: HttpRequest, payload: SimMessageInput
         except Exception:
             pass
 
-        history_msgs = Message.objects.filter(session_id=conv_id).order_by(
-            "-created_at"
-        )[:8]
+        history_msgs = (
+            Message.objects.filter(session_id=conv_id)
+            .only("id", "role", "content", "created_at")
+            .order_by("-created_at")[:8]
+        )
         return list(reversed(history_msgs))
 
     history = await sync_to_async(_save_user_msg_and_get_history)()
@@ -317,7 +400,15 @@ async def send_simulation_message(request: HttpRequest, payload: SimMessageInput
     messages_payload = [
         {
             "role": "system",
-            "content": f"{sys_prompt}\nCRITICAL: Respond ENTIRELY in natural English, stay strictly in character, keep answers engaging (1-3 sentences), and encourage the student.",
+            "content": (
+                f"{sys_prompt}\n\n"
+                f"{level_rules}\n\n"
+                "CRITICAL INSTRUCTIONS:\n"
+                "- Respond ENTIRELY in natural English, stay strictly in character.\n"
+                "- Keep answers engaging and concise (2 to 3 sentences, under 65 words).\n"
+                "- ALWAYS complete every sentence you start. NEVER leave a sentence unfinished or cut off mid-thought.\n"
+                "- Encourage the student and end with ONE clear question to pass the turn."
+            ),
         }
     ]
     for m in history:
@@ -331,10 +422,11 @@ async def send_simulation_message(request: HttpRequest, payload: SimMessageInput
                 res = await client.chat.completions.create(
                     model="openai/gpt-oss-120b",
                     messages=messages_payload,
-                    max_tokens=250,
+                    max_tokens=400,
                     temperature=0.6,
                 )
             reply_text = res.choices[0].message.content.strip()
+            reply_text = _clean_complete_reply(reply_text)
             if reply_text:
                 break
         except Exception as e:

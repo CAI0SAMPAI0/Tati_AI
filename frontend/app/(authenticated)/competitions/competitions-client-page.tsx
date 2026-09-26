@@ -38,13 +38,13 @@ export default function CompetitionsClientPage() {
   const { data: globalRanking = [], isLoading: globalLoading } = useQuery<RankingEntry[]>({
     queryKey: ['competitions-global-ranking'],
     queryFn: () => apiGet<RankingEntry[]>('/users/progress/ranking/top15'),
-    refetchInterval: 5000,
+    refetchInterval: 60000,
     placeholderData: (previousData) => previousData,
   });
   const { data: levelRankings, isLoading: levelLoading } = useQuery<Record<string, RankingEntry[]>>({
     queryKey: ['competitions-level-rankings'],
     queryFn: () => apiGet<Record<string, RankingEntry[]>>('/users/progress/ranking/by-level'),
-    refetchInterval: 5000,
+    refetchInterval: 60000,
     placeholderData: (previousData) => previousData,
   });
 
@@ -316,9 +316,9 @@ export default function CompetitionsClientPage() {
                   </span>
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-text mb-1">Simulations, Games and News</h3>
+                  <h3 className="text-sm font-bold text-text mb-1">Simulations, Games and , Musics and News</h3>
                   <p className="text-xs text-text-muted leading-relaxed">
-                    Do the simulations, games and news to earn points.
+                    Do the simulations, games, musics and news to earn points.
                   </p>
                 </div>
               </div>

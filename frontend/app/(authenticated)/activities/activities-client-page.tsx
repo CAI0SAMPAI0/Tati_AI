@@ -14,6 +14,10 @@ import {
   FileText,
   Gamepad2,
   Newspaper,
+  Music,
+  CheckSquare,
+  Keyboard,
+  Mic,
   ExternalLink,
   CheckCircle2,
   Clock,
@@ -55,7 +59,7 @@ const formatFallbackTitle = (item: any) => {
   return item.slug ? `Exercise ${item.slug}` : 'English Worksheet';
 };
 
-type TabType = 'grammar' | 'vocabulary' | 'listenings' | 'reading' | 'flashcards' | 'simulations' | 'games' | 'news';
+type TabType = 'grammar' | 'vocabulary' | 'listenings' | 'reading' | 'flashcards' | 'simulations' | 'games' | 'news' | 'musics';
 
 interface SimulationItem {
   id: string;
@@ -108,7 +112,35 @@ interface NewsItem {
   created_at?: string;
 }
 
+interface MusicItem {
+  id: string;
+  title: string;
+  artist: string;
+  genre?: string;
+  image: string;
+  fallback_image?: string;
+  url: string;
+  more?: string;
+  level?: string;
+  modes: {
+    choice: string;
+    typing: string;
+    karaoke: string;
+  };
+}
+
 const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B1+', 'B2', 'C1', 'C2'];
+const MUSIC_GENRES = [
+  'All',
+  'Pop',
+  'Rock',
+  'Hard Rock',
+  'Heavy Metal',
+  'Indie / Acoustic',
+  'Dance / Electronic',
+  'R&B / Soul',
+  'Classics',
+] as const;
 
 export default function ActivitiesClientPage() {
   const { user } = useAuth();
@@ -116,6 +148,7 @@ export default function ActivitiesClientPage() {
   const [activeTab, setActiveTab] = useState<TabType>('grammar');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'done'>('all');
+  const [musicGenre, setMusicGenre] = useState<string>('All');
   const [selectedActivity, setSelectedActivity] = useState<any | null>(null);
 
   const { sidebarOpen, toggleSidebar: handleToggleSidebar, closeSidebar: handleCloseSidebar } = useSidebarState();
@@ -138,7 +171,7 @@ export default function ActivitiesClientPage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedTab = localStorage.getItem('tati_last_activity_tab') as TabType;
-      if (savedTab && ['grammar', 'vocabulary', 'listenings', 'reading', 'flashcards', 'simulations', 'games', 'news'].includes(savedTab)) {
+      if (savedTab && ['grammar', 'vocabulary', 'listenings', 'reading', 'flashcards', 'simulations', 'games', 'news', 'musics'].includes(savedTab)) {
         setActiveTab(savedTab);
       }
       const savedLevel = sessionStorage.getItem('tati_activities_filter_level');
@@ -280,6 +313,20 @@ export default function ActivitiesClientPage() {
     enabled: activeTab === 'news',
   });
 
+  const { data: musicsRaw = [] } = useQuery<MusicItem[]>({
+    queryKey: ['activities-musics'],
+    queryFn: async () => {
+      try {
+        const res = await apiGet<MusicItem[]>(ENDPOINTS.ACTIVITIES_MUSICS);
+        if (Array.isArray(res) && res.length > 0) return res;
+      } catch (_) {}
+      const staticRes = await fetch('/data/lingoclip_musics.json');
+      return staticRes.json();
+    },
+    staleTime: 10 * 60 * 1000,
+    enabled: activeTab === 'musics',
+  });
+
   useQuery({
     queryKey: ['weekly-plan-v2'],
     queryFn: fetchWeeklyPlan,
@@ -414,6 +461,32 @@ export default function ActivitiesClientPage() {
     return filtered;
   }, [newsRaw, searchQuery, effectiveLevel]);
 
+  const musics = useMemo(() => {
+    if (!musicsRaw) return [];
+    let filtered = musicsRaw;
+    if (musicGenre !== 'All') {
+      filtered = filtered.filter((m) => (m.genre || 'Pop') === musicGenre);
+    }
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(
+        (m) =>
+          (m.title || '').toLowerCase().includes(q) ||
+          (m.artist || '').toLowerCase().includes(q)
+      );
+    }
+    if (statusFilter === 'done') {
+      filtered = filtered.filter(
+        (m) => completedActivityIds.has(m.id) || completedActivityIds.has(m.url)
+      );
+    } else if (statusFilter === 'pending') {
+      filtered = filtered.filter(
+        (m) => !(completedActivityIds.has(m.id) || completedActivityIds.has(m.url))
+      );
+    }
+    return filtered;
+  }, [musicsRaw, musicGenre, searchQuery, statusFilter, completedActivityIds]);
+
   // Mark completion handlers
   const handleMarkDone = async (item: any) => {
     const actId = item.url || item.slug || item.id;
@@ -504,6 +577,7 @@ export default function ActivitiesClientPage() {
     { id: 'vocabulary', icon: <Lightbulb size={18} />, label: 'Vocabulary', count: vocabularyItems.length },
     { id: 'listenings', icon: <Podcast size={18} />, label: 'Listening', count: listeningItems.length || podcasts.length },
     { id: 'reading', icon: <FileText size={18} />, label: 'Reading', count: readingItems.length },
+    { id: 'musics', icon: <Music size={18} />, label: 'Musics', count: musics.length },
     { id: 'flashcards', icon: <Layers size={18} />, label: 'Flashcards', count: flashcards.length },
     { id: 'simulations', icon: <Drama size={18} />, label: 'Simulations', count: simulations.length },
     { id: 'games', icon: <Gamepad2 size={18} />, label: 'Games', count: games.length },
@@ -658,20 +732,22 @@ export default function ActivitiesClientPage() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-stretch sm:items-center flex-wrap">
-              {/* Level Filter */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-text-subtle uppercase tracking-wider whitespace-nowrap">Level:</span>
-                <select
-                  value={filterLevel}
-                  onChange={(e) => handleFilterLevelChange(e.target.value)}
-                  className="px-3 py-2 bg-surface border border-border rounded-2xl text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all cursor-pointer text-text"
-                >
-                  <option value="All">All Levels</option>
-                  {CEFR_LEVELS.map((lvl) => (
-                    <option key={lvl} value={lvl}>{lvl}</option>
-                  ))}
-                </select>
-              </div>
+              {/* Level Filter - hidden for Musics tab since LingoClip manages levels */}
+              {activeTab !== 'musics' && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-text-subtle uppercase tracking-wider whitespace-nowrap">Level:</span>
+                  <select
+                    value={filterLevel}
+                    onChange={(e) => handleFilterLevelChange(e.target.value)}
+                    className="px-3 py-2 bg-surface border border-border rounded-2xl text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all cursor-pointer text-text"
+                  >
+                    <option value="All">All Levels</option>
+                    {CEFR_LEVELS.map((lvl) => (
+                      <option key={lvl} value={lvl}>{lvl}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Status Filter */}
               <div className="flex items-center gap-2">
@@ -700,20 +776,20 @@ export default function ActivitiesClientPage() {
             </div>
           </header>
 
-          <nav className="flex flex-col sm:flex-row flex-wrap gap-2 sm:overflow-x-auto pb-1 mb-8 scrollbar-none border-b border-border bg-bg z-10">
+          <nav className="flex flex-row overflow-x-auto pb-2 mb-8 scrollbar-none border-b border-border bg-bg z-10 gap-2 items-center flex-nowrap sm:flex-wrap">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'flex items-center gap-2.5 px-5 py-3 rounded-xl sm:rounded-t-xl sm:rounded-b-none text-sm font-bold transition-all whitespace-nowrap w-full sm:w-auto',
+                  'flex items-center shrink-0 gap-2 px-4 py-2.5 sm:px-5 sm:py-3 rounded-xl sm:rounded-t-xl sm:rounded-b-none text-sm font-bold transition-all whitespace-nowrap',
                   activeTab === tab.id
-                    ? 'bg-surface border border-border sm:border-b-bg text-primary'
-                    : 'text-text-muted hover:text-text border border-transparent',
+                    ? 'bg-surface border border-border sm:border-b-bg text-primary shadow-sm'
+                    : 'text-text-muted hover:text-text hover:bg-surface/50 border border-transparent',
                 )}
               >
                 {tab.icon}
-                {tab.label}
+                <span>{tab.label}</span>
                 {tab.count !== undefined && tab.count > 0 && (
                   <span className="bg-primary/10 text-primary text-[0.65rem] px-1.5 py-0.5 rounded-full font-bold">
                     {tab.count}
@@ -728,6 +804,243 @@ export default function ActivitiesClientPage() {
             {activeTab === 'vocabulary' && renderCategoryGrid(vocabularyItems, 'Vocabulary', <Lightbulb size={16} />)}
             {activeTab === 'listenings' && renderCategoryGrid(listeningItems, 'Listening', <Podcast size={16} />)}
             {activeTab === 'reading' && renderCategoryGrid(readingItems, 'Reading', <FileText size={16} />)}
+
+            {activeTab === 'musics' && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-bold text-text flex items-center gap-2">
+                      <Music className="text-primary" size={20} /> Musics & Lyrics (LingoClip)
+                    </h3>
+                    <p className="text-text-muted text-sm mt-0.5">
+                      Practice English singing along with your favorite safe songs! Choose among 3 game modes: <strong>Multiple Choice</strong>, <strong>Typing</strong> or <strong>Karaoke</strong>.
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold text-text-subtle bg-surface border border-border px-3 py-1.5 rounded-full w-fit">
+                    Levels chosen inside LingoClip
+                  </span>
+                </div>
+
+                {/* Genre Filter Pills */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none flex-nowrap sm:flex-wrap">
+                  {MUSIC_GENRES.map((g) => {
+                    const isSelected = musicGenre === g;
+                    return (
+                      <button
+                        key={g}
+                        onClick={() => {
+                          setMusicGenre(g);
+                          setVisibleCount(10);
+                        }}
+                        className={cn(
+                          'px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0',
+                          isSelected
+                            ? 'bg-primary text-white shadow-sm'
+                            : 'bg-surface hover:bg-surface-hover text-text-muted hover:text-text border border-border'
+                        )}
+                      >
+                        {g}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {musics.length > 0 ? (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {musics.slice(0, visibleCount).map((m) => {
+                        const isDone = completedActivityIds.has(m.id) || completedActivityIds.has(m.url);
+                        return (
+                          <div
+                            key={m.id}
+                            className="bg-surface border border-border rounded-2xl overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 transition-all group flex flex-col justify-between shadow-sm"
+                          >
+                            <div>
+                              {/* Image Preview with WebP and fallback */}
+                              <div
+                                onClick={() =>
+                                  setSelectedActivity({
+                                    id: m.id,
+                                    title: m.title,
+                                    artist: m.artist,
+                                    genre: m.genre,
+                                    image: m.image || m.fallback_image,
+                                    url: m.url,
+                                    category: 'musics',
+                                    source: 'LingoClip',
+                                    modes: m.modes,
+                                  })
+                                }
+                                className="h-40 overflow-hidden bg-bg-secondary relative cursor-pointer"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={m.image || m.fallback_image}
+                                  alt={m.title}
+                                  loading="lazy"
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  onError={(e) => {
+                                    if (m.fallback_image && (e.target as HTMLImageElement).src !== m.fallback_image) {
+                                      (e.target as HTMLImageElement).src = m.fallback_image;
+                                    }
+                                  }}
+                                />
+                                <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                                  <span className="text-[0.65rem] font-black bg-black/60 text-white px-2 py-0.5 rounded-full uppercase shadow backdrop-blur-sm">
+                                    LingoClip
+                                  </span>
+                                  {isDone ? (
+                                    <span className="flex items-center gap-1 bg-success text-white text-[0.65rem] font-bold px-2 py-0.5 rounded-full shadow">
+                                      <CheckCircle2 size={12} /> Completed
+                                    </span>
+                                  ) : (
+                                    <span className="flex items-center gap-1 bg-warning text-white text-[0.65rem] font-bold px-2 py-0.5 rounded-full shadow">
+                                      <Clock size={12} /> Pending
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Title & Artist */}
+                              <div className="p-4 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[0.65rem] font-bold bg-primary/10 text-primary px-2.5 py-0.5 rounded-full">
+                                    {m.genre || 'Pop'}
+                                  </span>
+                                  {m.more && (
+                                    <span className="text-[0.65rem] text-text-muted font-medium">
+                                      {m.more}
+                                    </span>
+                                  )}
+                                </div>
+                                <h4
+                                  onClick={() =>
+                                    setSelectedActivity({
+                                      id: m.id,
+                                      title: m.title,
+                                      artist: m.artist,
+                                      genre: m.genre,
+                                      image: m.image || m.fallback_image,
+                                      url: m.url,
+                                      category: 'musics',
+                                      source: 'LingoClip',
+                                      modes: m.modes,
+                                    })
+                                  }
+                                  className="text-base font-bold text-text line-clamp-1 group-hover:text-primary transition-colors cursor-pointer"
+                                >
+                                  {m.title}
+                                </h4>
+                                <p className="text-xs font-semibold text-text-muted line-clamp-1">
+                                  {m.artist}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* 3 Game Mode Buttons */}
+                            <div className="p-4 pt-0 space-y-3">
+                              <div className="border-t border-border/40 pt-3">
+                                <span className="text-[0.7rem] font-bold text-text-subtle uppercase tracking-wider block mb-2">
+                                  Game Modes:
+                                </span>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                  <a
+                                    href={m.modes?.choice || `https://lingoclip.app/lyrics/${m.id}?mode=mc#game/level`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="Multiple Choice mode"
+                                    className="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-bg hover:bg-primary/10 hover:border-primary/40 border border-border text-center transition-all group/btn"
+                                  >
+                                    <CheckSquare size={14} className="text-primary group-hover/btn:scale-110 transition-transform mb-1" />
+                                    <span className="text-[0.68rem] font-bold text-text group-hover/btn:text-primary leading-tight">
+                                      Multiple Choice
+                                    </span>
+                                  </a>
+
+                                  <a
+                                    href={m.modes?.typing || `https://lingoclip.app/lyrics/${m.id}?mode=tp#game/level`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="Typing mode (Fill in the blanks)"
+                                    className="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-bg hover:bg-primary/10 hover:border-primary/40 border border-border text-center transition-all group/btn"
+                                  >
+                                    <Keyboard size={14} className="text-primary group-hover/btn:scale-110 transition-transform mb-1" />
+                                    <span className="text-[0.68rem] font-bold text-text group-hover/btn:text-primary leading-tight">
+                                      Typing
+                                    </span>
+                                  </a>
+
+                                  <a
+                                    href={m.modes?.karaoke || `https://lingoclip.app/play/${m.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="Karaoke mode (Sing along)"
+                                    className="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-bg hover:bg-primary/10 hover:border-primary/40 border border-border text-center transition-all group/btn"
+                                  >
+                                    <Mic size={14} className="text-primary group-hover/btn:scale-110 transition-transform mb-1" />
+                                    <span className="text-[0.68rem] font-bold text-text group-hover/btn:text-primary leading-tight">
+                                      Karaoke
+                                    </span>
+                                  </a>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between pt-2 border-t border-border/40 text-[0.7rem]">
+                                <button
+                                  onClick={() =>
+                                    setSelectedActivity({
+                                      id: m.id,
+                                      title: m.title,
+                                      artist: m.artist,
+                                      genre: m.genre,
+                                      image: m.image || m.fallback_image,
+                                      url: m.url,
+                                      category: 'musics',
+                                      source: 'LingoClip',
+                                      modes: m.modes,
+                                    })
+                                  }
+                                  className="text-text-muted hover:text-primary font-medium flex items-center gap-1 transition-colors"
+                                >
+                                  <ExternalLink size={12} /> Details & Complete
+                                </button>
+
+                                {isDone ? (
+                                  <span className="font-bold text-success flex items-center gap-1 text-[0.65rem]">
+                                    <CheckCircle2 size={12} /> Completed
+                                  </span>
+                                ) : (
+                                  <span className="font-bold text-warning flex items-center gap-1 text-[0.65rem]">
+                                    <Clock size={12} /> Pending
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {musics.length > visibleCount && (
+                      <div className="flex justify-center pt-4">
+                        <button
+                          onClick={handleLoadMore}
+                          className="px-6 py-3 bg-surface hover:bg-surface-hover border border-border hover:border-primary/50 text-text font-bold text-sm rounded-2xl transition-all shadow-sm flex items-center gap-2 group"
+                        >
+                          <span>Load 10 More ({musics.length - visibleCount} remaining)</span>
+                          <ChevronDown size={16} className="group-hover:translate-y-0.5 transition-transform" />
+                        </button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
+                    <Music size={40} className="mx-auto mb-4 opacity-20" />
+                    <p>No musics found matching your search.</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {activeTab === 'flashcards' && (
               <div className="space-y-8">

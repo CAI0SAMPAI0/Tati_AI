@@ -371,9 +371,12 @@ function VoicePageContent() {
     setIsStarting(true);
     setError(null);
     try {
+      const userProfile = user?.profile as { level?: string; cefr_level?: string } | undefined;
+      const userLevel = user?.level || userProfile?.level || userProfile?.cefr_level || undefined;
       const res = await apiPost<any>('/simulation/start', {
         scenario_id: simulationId,
-        accent: ACCENTS[accentIndex].id
+        accent: ACCENTS[accentIndex].id,
+        level: userLevel
       });
       if (res.ok && res.data?.id) {
         const simData = res.data;
@@ -1013,22 +1016,6 @@ function VoicePageContent() {
             </div>
           ) : (
             <AnimatePresence mode="popLayout" initial={false}>
-              {simulationId && objectives.length > 0 && (
-                <MotionDiv key="simulation-objectives" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white dark:bg-[#111224] border border-border p-4 rounded-3xl mb-6 space-y-3 shadow-md">
-                  <p className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest">Mission Objectives</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {objectives.map(obj => {
-                      const isCompleted = completedObjectives.includes(obj.id);
-                      return (
-                        <div key={obj.id} className={cn("flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl border text-[0.7rem] transition-all font-bold tracking-tight", isCompleted ? "bg-success/15 border-success/30 text-success line-through" : "bg-surface dark:bg-[#111224]/80 border-border text-text-muted")}>
-                          {isCompleted ? <CheckCircle2 size={14} className="shrink-0 text-success" /> : <Circle size={14} className="shrink-0 text-text-subtle" />}
-                          <span className="truncate" title={obj.text}>{obj.text}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </MotionDiv>
-              )}
               {messages.length === 0 && !transcription ? (
                 <MotionDiv key="empty-state" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col items-center justify-center text-center opacity-40 gap-4 p-4">
                   <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 border-dashed border-primary/30 flex items-center justify-center">

@@ -285,7 +285,9 @@ def build_conversation_context(conversation_id: str, max_recent: int = 8) -> tup
     - Otimiza o consumo de tokens e previne limites de contexto.
     """
     all_msgs = list(
-        Message.objects.filter(session_id=conversation_id).order_by("created_at")[:60]
+        Message.objects.filter(session_id=conversation_id)
+        .only("id", "role", "content", "created_at")
+        .order_by("created_at")[:60]
     )
     if not all_msgs:
         return "", []
@@ -401,9 +403,11 @@ class ConversationService:
 
     @staticmethod
     def get_summary(user: User, conversation_id: str, lang: str = "pt") -> dict:
-        msgs = Message.objects.filter(session_id=conversation_id).order_by(
-            "created_at"
-        )[:25]
+        msgs = (
+            Message.objects.filter(session_id=conversation_id)
+            .only("role", "content")
+            .order_by("created_at")[:25]
+        )
         if not msgs:
             return {
                 "summary": "Nenhuma mensagem encontrada nesta conversa para resumir."

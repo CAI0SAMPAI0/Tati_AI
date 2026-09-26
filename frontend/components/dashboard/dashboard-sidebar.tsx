@@ -30,10 +30,11 @@ const NAV_ITEMS: Array<{ id: DashSection; icon: React.ReactNode; label: string }
   { id: 'news', icon: <Newspaper size={20} />, label: 'News' },
   { id: 'cefr', icon: <BookOpen size={20} />, label: 'CEFR Materials' },
   { id: 'premium', icon: <Zap size={20} />, label: "Taty's Materials" },
+  { id: 'feedbacks', icon: <MessageSquare size={20} />, label: 'Feedbacks' },
   { id: 'whatsapp', icon: <FaWhatsapp size={20} />, label: 'WhatsApp Config' },
 ];
 
-export type DashSection = 'overview' | 'students' | 'reports' | 'flashcards' | 'simulations' | 'games' | 'news' | 'premium' | 'cefr' | 'whatsapp';
+export type DashSection = 'overview' | 'students' | 'feedbacks' | 'reports' | 'flashcards' | 'simulations' | 'games' | 'news' | 'premium' | 'cefr' | 'whatsapp';
 
 interface DashboardSidebarProps {
   activeSection: DashSection;

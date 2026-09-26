@@ -132,16 +132,26 @@ class FlashcardService:
                         matched_topic = t
 
                 if matched:
-                    cards_list = [
-                        {
+                    all_matched_fronts = [c.front for c in matched]
+                    cards_list = []
+                    for c in matched:
+                        raw_opts = c.options if hasattr(c, "options") and isinstance(c.options, list) else []
+                        opts = [str(o).strip() for o in raw_opts if str(o).strip()]
+                        if c.front and c.front not in opts:
+                            opts.insert(0, c.front)
+                        for sib in all_matched_fronts:
+                            if sib != c.front and sib not in opts:
+                                opts.append(sib)
+                            if len(opts) >= 4:
+                                break
+                        cards_list.append({
                             "id": str(c.id),
                             "front": c.front,
                             "back": c.back,
                             "explanation": c.explanation or "No explanation provided.",
                             "image_url": c.image_url,
-                        }
-                        for c in matched
-                    ]
+                            "options": opts[:4],
+                        })
                     return {
                         "id": deck_id,
                         "title": f"CEFR {lvl}: {matched_topic}",
@@ -161,13 +171,32 @@ class FlashcardService:
         m = Module.objects.filter(id=module_id).first()
         if m:
             fc = m.flashcards if isinstance(m.flashcards, list) else []
+            all_m_fronts = [item.get("front", "") for item in fc if isinstance(item, dict)]
+            enhanced_fc = []
+            for item in fc:
+                if isinstance(item, dict):
+                    card_copy = dict(item)
+                    raw_opts = card_copy.get("options") or []
+                    opts = [str(o).strip() for o in raw_opts if str(o).strip()]
+                    front = card_copy.get("front", "")
+                    if front and front not in opts:
+                        opts.insert(0, front)
+                    for sib in all_m_fronts:
+                        if sib != front and sib not in opts:
+                            opts.append(sib)
+                        if len(opts) >= 4:
+                            break
+                    card_copy["options"] = opts[:4]
+                    enhanced_fc.append(card_copy)
+                else:
+                    enhanced_fc.append(item)
             return {
                 "id": str(m.id),
                 "title": m.title,
                 "description": m.description,
                 "level": m.level,
-                "flashcards": fc,
-                "card_count": len(fc),
+                "flashcards": enhanced_fc,
+                "card_count": len(enhanced_fc),
                 "lessons": [],
             }
 
@@ -463,7 +492,7 @@ class RankingService:
         scores = {}
 
         # 1. Base consolidada: pontuação do usuário (já agrega chat, voz, CEFR e atividades)
-        for u in User.objects.all():
+        for u in User.objects.only("username", "xp_data"):
             xp_data = u.xp_data if isinstance(u.xp_data, dict) else {}
             total = int(getattr(u, "total_xp", 0) or xp_data.get("xp", 0) or 0)
             legacy = int(xp_data.get("legacy_competition_points", 0) or 0)
@@ -478,7 +507,11 @@ class RankingService:
                 scores[u.username] = pts
 
         # 2. Para alunos legados ou registros sem bucket monthly_xp, computa a partir de ActivitySubmission
-        rows = list(ActivitySubmission.objects.all())
+        rows = list(
+            ActivitySubmission.objects.only(
+                "username", "score", "metadata", "created_at", "activity_type"
+            )
+        )
         for r in rows:
             if r.username in scores and scores[r.username] > 0:
                 # Evita dupla contagem: pontuação do usuário já está consolidada no bucket mensal
@@ -536,7 +569,9 @@ class RankingService:
             pass
 
         scores = cls._activity_scores(year=year, month=month, all_time=all_time)
-        all_users = User.objects.all()
+        all_users = User.objects.only(
+            "username", "name", "role", "level", "profile", "streak_data", "email", "phone"
+        )
         user_map = {u.username: u for u in all_users}
 
         students = []
@@ -1063,11 +1098,12 @@ class MonthlyCompetitionService:
             username = item["username"]
             pts = item["score"]
             medal = item["medal"]
+            pos_suffix = "1st" if pos == 1 else "2nd" if pos == 2 else "3rd" if pos == 3 else f"{pos}th"
 
-            title = f"{medal} Parabéns! Você conquistou o {pos}º Lugar na Competição Mensal!"
+            title = f"{medal} Congratulations! You won {pos_suffix} Place in the Monthly Competition!"
             body = (
-                f"Incrível dedicação! Você ficou em {pos}º Lugar no Ranking Geral de {month_label} "
-                f"com {pts} pontos de XP. Continue brilhando no novo ciclo deste mês! 🚀"
+                f"Incredible dedication! You finished in {pos_suffix} Place in the {month_label} Overall Ranking "
+                f"with {pts} XP. Keep shining in the new monthly cycle! 🚀"
             )
 
             try:
@@ -1095,10 +1131,10 @@ class MonthlyCompetitionService:
         )
         top1_name = top3[0]["name"] if len(top3) > 0 else "—"
 
-        title = f"🏆 Competição de {month_label} Encerrada!"
+        title = f"🏆 {month_label} Competition Closed!"
         body = (
-            f"O ciclo de {month_label} foi finalizado com {total_participants} alunos. "
-            f"1º Lugar: {top1_name}. O ranking do novo mês já está aberto!"
+            f"The {month_label} cycle has concluded with {total_participants} students. "
+            f"1st Place: {top1_name}. The new monthly ranking is now open!"
         )
 
         for admin in admin_users:
@@ -1634,7 +1670,9 @@ class TrophyService:
 
         # 3. Activity counts by category
         cat_counts = defaultdict(int)
-        user_subs = ActivitySubmission.objects.filter(username=username, status="completed")
+        user_subs = ActivitySubmission.objects.filter(
+            username=username, status="completed"
+        ).only("metadata", "activity_type")
         for s in user_subs:
             meta = s.metadata if isinstance(s.metadata, dict) else {}
             cat = (meta.get("category") or "").lower().strip()
@@ -1674,7 +1712,8 @@ class TrophyService:
         except Exception:
             pass
 
-        results = []
+        newly_unlocked_ids = []
+        results: list[TrophyOut] = []
 
         # Process system trophies (100% in English, covering all 7 activities, streaks & messages)
         for t in cls.SYSTEM_TROPHIES:
@@ -1697,13 +1736,8 @@ class TrophyService:
             is_unlocked = (t_id in unlocked_ids) or (prog >= target)
 
             if is_unlocked and t_id not in unlocked_ids:
-                try:
-                    UserTrophy.objects.get_or_create(
-                        username=username, trophy_id=t_id
-                    )
-                    unlocked_ids.add(t_id)
-                except Exception:
-                    pass
+                newly_unlocked_ids.append(t_id)
+                unlocked_ids.add(t_id)
 
             results.append(
                 TrophyOut(
@@ -1719,6 +1753,40 @@ class TrophyService:
                     target=target,
                 )
             )
+
+        if newly_unlocked_ids:
+            try:
+                UserTrophy.objects.bulk_create(
+                    [UserTrophy(username=username, trophy_id=tid) for tid in newly_unlocked_ids],
+                    ignore_conflicts=True,
+                )
+                from apps.notifications.services import NotificationDispatcher
+                from apps.notifications.models import Notification
+                for tid in newly_unlocked_ids:
+                    t_info = next((item for item in cls.SYSTEM_TROPHIES if item["id"] == tid), None)
+                    t_name = t_info["name"] if t_info else "New Achievement"
+                    t_desc = t_info["description"] if t_info else "You unlocked a new trophy!"
+                    t_icon = t_info.get("icon", "🏆") if t_info else "🏆"
+
+                    notif_title = f"{t_icon} Trophy Unlocked: {t_name}!"
+                    notif_body = f"Congratulations! You unlocked the trophy '{t_name}': {t_desc}"
+
+                    Notification.objects.create(
+                        username=username,
+                        category="trophy",
+                        title=notif_title,
+                        body=notif_body,
+                        is_read=False,
+                    )
+                    NotificationDispatcher.send_push_to_user(
+                        username=username,
+                        title=notif_title,
+                        body=notif_body,
+                        url="/achievements",
+                        tag="trophy-unlocked",
+                    )
+            except Exception as notif_err:
+                logger.warning(f"Error notifying unlocked trophies for {username}: {notif_err}")
 
         return results
 
@@ -2508,3 +2576,183 @@ class ExternalContentService:
             "worksheets": enriched,
             "source": "liveworksheets.com",
         }
+
+    @classmethod
+    def get_musics_content(cls) -> list[dict]:
+        data_file = os.path.join(cls.DATA_DIR, "lingoclip_musics.json")
+        if not os.path.exists(data_file):
+            return []
+        import json
+        with open(data_file, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+
+class StudentFeedbackService:
+    @staticmethod
+    def create_feedback(student_username: str, data: dict) -> dict:
+        from .models import StudentFeedback
+        from apps.authentication.models import User
+
+        student_name = data.get("student_name") or ""
+        cefr_level = data.get("cefr_level") or "A1"
+
+        if not student_name or not data.get("cefr_level"):
+            user = User.objects.filter(username=student_username).first()
+            if user:
+                if not student_name:
+                    student_name = f"{user.first_name} {user.last_name}".strip() or user.username
+                if not data.get("cefr_level") and hasattr(user, "cefr_level") and user.cefr_level:
+                    cefr_level = user.cefr_level
+
+        feedback = StudentFeedback.objects.create(
+            student_username=student_username,
+            student_name=student_name,
+            cefr_level=cefr_level.upper(),
+            area=data.get("area", "general").lower(),
+            activity_id=str(data.get("activity_id", "")),
+            activity_title=str(data.get("activity_title", "")),
+            rating=int(data.get("rating", 5)),
+            comment=str(data.get("comment", "")).strip(),
+            status="pending",
+        )
+        return {
+            "success": True,
+            "id": str(feedback.id),
+            "message": "Feedback enviado para a Tatiana com sucesso!",
+        }
+
+    @staticmethod
+    def list_feedbacks(level: str = None, area: str = None, student: str = None, status: str = None) -> list[dict]:
+        from .models import StudentFeedback
+        from django.db.models import Q
+
+        qs = StudentFeedback.objects.all().order_by("-created_at")
+
+        if level and level.lower() != "all":
+            qs = qs.filter(cefr_level__iexact=level.strip())
+
+        if area and area.lower() != "all":
+            qs = qs.filter(area__iexact=area.strip())
+
+        if student and student.strip():
+            term = student.strip()
+            qs = qs.filter(Q(student_username__icontains=term) | Q(student_name__icontains=term))
+
+        if status and status.lower() != "all":
+            qs = qs.filter(status__iexact=status.strip())
+
+        results = []
+        for f in qs:
+            results.append({
+                "id": str(f.id),
+                "student_username": f.student_username,
+                "student_name": f.student_name,
+                "cefr_level": f.cefr_level,
+                "area": f.area,
+                "activity_id": f.activity_id,
+                "activity_title": f.activity_title,
+                "rating": f.rating,
+                "comment": f.comment,
+                "teacher_reply": f.teacher_reply,
+                "status": f.status,
+                "created_at": f.created_at.isoformat() if f.created_at else None,
+            })
+        return results
+
+    @staticmethod
+    def update_feedback(feedback_id: str, updates: dict) -> dict:
+        from .models import StudentFeedback
+        fb = StudentFeedback.objects.filter(id=feedback_id).first()
+        if not fb:
+            raise HttpError(404, "Feedback não encontrado.")
+        if "status" in updates:
+            fb.status = updates["status"]
+        if "teacher_reply" in updates:
+            fb.teacher_reply = updates["teacher_reply"]
+        fb.save()
+        return {
+            "success": True,
+            "id": str(fb.id),
+            "status": fb.status,
+            "teacher_reply": fb.teacher_reply,
+        }
+
+
+class DeveloperBugService:
+    @staticmethod
+    def create_bug_report(user_info: dict, data: dict) -> dict:
+        from .models import DeveloperBugReport
+        from apps.notifications.services import BrevoEmailService
+
+        username = user_info.get("username", "anonymous")
+        name = user_info.get("name") or user_info.get("first_name", "") or username
+        email = user_info.get("email", "")
+
+        title = str(data.get("title", "")).strip() or "Problema reportado por aluno"
+        description = str(data.get("description", "")).strip()
+        image_urls = data.get("image_urls") or []
+        if isinstance(image_urls, str):
+            image_urls = [image_urls]
+        page_url = str(data.get("page_url", "")).strip()
+        user_agent = str(data.get("user_agent", "")).strip()
+
+        report = DeveloperBugReport.objects.create(
+            student_username=username,
+            student_name=name,
+            student_email=email,
+            title=title,
+            description=description,
+            image_urls=image_urls,
+            page_url=page_url,
+            user_agent=user_agent,
+            status="open",
+        )
+
+        dev_email = os.getenv("EMAIL_FEEDBACK", "cmsampaio71@gmail.com").strip()
+
+        images_html = ""
+        if image_urls:
+            images_html = "<h3>Screenshots / Anexos:</h3><div style='display:flex;flex-wrap:wrap;gap:10px;'>"
+            for img in image_urls:
+                images_html += f"<div style='margin-bottom:12px;'><a href='{img}' target='_blank'><img src='{img}' style='max-width:400px;border-radius:8px;border:1px solid #ddd;' alt='Bug Screenshot'/></a></div>"
+            images_html += "</div>"
+
+        html_body = f"""
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px;">
+            <div style="background-color: #ef4444; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h2 style="margin: 0; font-size: 20px;">🐛 Novo Bug Report - Tati AI</h2>
+            </div>
+            
+            <p><strong>Título:</strong> {title}</p>
+            <p><strong>Aluno:</strong> {name} (@{username})</p>
+            <p><strong>Email do Aluno:</strong> {email or 'Não informado'}</p>
+            <p><strong>Página / URL:</strong> <a href="{page_url}">{page_url}</a></p>
+            
+            <div style="background: #f8fafc; border-left: 4px solid #ef4444; padding: 12px 16px; margin: 20px 0; border-radius: 4px;">
+                <h4 style="margin-top: 0; color: #1e293b;">Descrição do Problema:</h4>
+                <p style="white-space: pre-wrap; margin-bottom: 0;">{description}</p>
+            </div>
+
+            {images_html}
+
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+            <p style="font-size: 11px; color: #94a3b8;">User Agent: {user_agent}<br/>ID do Registro: {report.id}</p>
+        </div>
+        """
+
+        try:
+            BrevoEmailService.send_email_detailed(
+                to_email=dev_email,
+                subject=f"[Tati AI Bug] {title} (@{username})",
+                html_content=html_body,
+                recipient_name="Desenvolvedor",
+            )
+        except Exception as e:
+            logger.error(f"[DeveloperBugService] Erro ao enviar email de bug: {e}")
+
+        return {
+            "success": True,
+            "id": str(report.id),
+            "message": "Relatório enviado diretamente ao desenvolvedor com sucesso!",
+        }
+

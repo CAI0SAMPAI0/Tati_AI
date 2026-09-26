@@ -36,11 +36,11 @@ RUN if [ -f "/tmp/build/backend/requirements.txt" ]; then \
 # Coleta arquivos estaticos
 RUN python manage.py collectstatic --noinput || true
 
-EXPOSE 7860 8080
+EXPOSE 7860 8080 8000
 
-# Healthcheck para Hugging Face Spaces / Railway
+# Healthcheck para Hugging Face Spaces / Railway / Docker Compose
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f -L http://localhost:${PORT:-7860}/health || curl -f -L http://localhost:8080/health || exit 1
+  CMD curl -f -L http://localhost:${PORT:-8000}/health || curl -f -L http://localhost:8080/health || curl -f -L http://localhost:7860/health || exit 1
 
-# Executa Gunicorn com Uvicorn workers suportando Hugging Face Spaces (7860) e Railway/Docker Compose ($PORT ou 8080)
-CMD ["sh", "-c", "BIND_ARGS=\"-b 0.0.0.0:7860\"; if [ -n \"$PORT\" ] && [ \"$PORT\" != \"7860\" ]; then BIND_ARGS=\"-b 0.0.0.0:${PORT} -b 0.0.0.0:7860\"; elif [ -z \"$PORT\" ]; then BIND_ARGS=\"-b 0.0.0.0:7860 -b 0.0.0.0:8080\"; fi; exec gunicorn app.asgi:application -w ${WORKERS:-1} -k uvicorn.workers.UvicornWorker $BIND_ARGS --forwarded-allow-ips '*' --timeout 120 --graceful-timeout 30 --access-logfile -"]
+# Executa Gunicorn com Uvicorn workers suportando porta 8000 por padrão, e $PORT no Hugging Face (7860) / Railway
+CMD ["sh", "-c", "BIND_PORT=\"${PORT:-8000}\"; exec gunicorn app.asgi:application -w ${WORKERS:-1} -k uvicorn.workers.UvicornWorker -b 0.0.0.0:${BIND_PORT} --forwarded-allow-ips '*' --timeout 120 --graceful-timeout 30 --access-logfile -"]

@@ -13,9 +13,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 ROOT_DIR = BASE_DIR.parent
 ENV_PATH = ROOT_DIR / ".env"
 if ENV_PATH.exists():
-    load_dotenv(dotenv_path=ENV_PATH)
+    load_dotenv(dotenv_path=ENV_PATH, interpolate=False)
 else:
-    load_dotenv()
+    load_dotenv(interpolate=False)
+
+for _pg_var in ("PGHOST", "PGDATABASE", "PGUSER", "PGPASSWORD", "PGPORT"):
+    _val = os.getenv(_pg_var)
+    if _val and ("${" in _val or "}" in _val or _val.strip() in ("}", "{")):
+        os.environ.pop(_pg_var, None)
 
 SECRET_KEY = os.getenv(
     "JWT_SECRET_KEY", "django-insecure-tati-ai-super-secret-key-2026"
@@ -100,26 +105,35 @@ WSGI_APPLICATION = "app.wsgi.application"
 ASGI_APPLICATION = "app.asgi.application"
 
 #    BANCO DE DADOS                                                     
-# Utiliza DATABASE_URL (Supabase PostgreSQL / Railway) ou fallback local SQLite
+def _clean_db_url(url: str | None) -> str | None:
+    if not url:
+        return None
+    cleaned = url.strip().strip('"').strip("'")
+    if "${" in cleaned or "}" in cleaned or "@}:" in cleaned:
+        return None
+    return cleaned
+
 DATABASE_URL = (
-    os.getenv("DATABASE_URL")
-    or os.getenv("SUPABASE_DB_URL")
-    or os.getenv("WHATSAPP_SESSIONS_POSTGRESQL_URL")
-    or os.getenv("POSTGRES_URL")
+    _clean_db_url(os.getenv("DATABASE_URL"))
+    or _clean_db_url(os.getenv("DATABASE_PUBLIC_URL"))
+    or _clean_db_url(os.getenv("SUPABASE_DB_URL"))
+    or _clean_db_url(os.getenv("WHATSAPP_SESSIONS_POSTGRESQL_URL"))
+    or _clean_db_url(os.getenv("POSTGRES_URL"))
 )
 if DATABASE_URL:
-    # Para o Supabase Pooler (limite estrito de 15 conexões simultâneas), fecha após cada requisição
+    os.environ["DATABASE_URL"] = DATABASE_URL
+    # Para o Supabase Pooler (limite estrito de conexões simultâneas no plano e timeouts do Supavisor),
+    # manter conexões abertas (conn_max_age > 0) causa 'SSL SYSCALL error: EOF detected' e esgotamento do pool
+    # de clientes em menos de 1 minuto. Deve ser 0 para fechar a cada requisição limpa.
     is_supabase = "supabase" in DATABASE_URL
-    conn_max_age = 0 if is_supabase else int(os.getenv("DB_CONN_MAX_AGE", "0"))
+    conn_max_age = 0 if is_supabase else int(os.getenv("DB_CONN_MAX_AGE", "60"))
     conn_health_checks = False if is_supabase else True
 
-    db_config = dj_database_url.config(
-        default=DATABASE_URL,
+    db_config = dj_database_url.parse(
+        DATABASE_URL,
         conn_max_age=conn_max_age,
         conn_health_checks=conn_health_checks,
     )
-    # Supabase Pooler: na porta 5432 roda em 'Session Mode' com limite estrito de 15 conexões (EMAXCONNSESSION).
-    # Na porta 6543 roda em 'Transaction Mode', permitindo conexões concorrentes sem esgotar o pool.
     if "pooler.supabase.com" in str(db_config.get("HOST", "")):
         if str(db_config.get("PORT", "")) in ("5432", ""):
             db_config["PORT"] = 6543
@@ -193,8 +207,29 @@ else:
 #    CELERY & BACKGROUND TASKS                                          
 from celery.schedules import crontab
 
-_RAW_CELERY_BROKER = os.getenv("CELERY_BROKER_URL")
-if _validate_redis_url(_RAW_CELERY_BROKER):
+def _validate_broker_url(url: str | None) -> bool:
+    if not url or not isinstance(url, str):
+        return False
+    clean_url = url.strip()
+    if not clean_url.startswith(("redis://", "rediss://", "amqp://", "amqps://")):
+        return False
+    if "{" in clean_url or "}" in clean_url or "$" in clean_url:
+        return False
+    try:
+        parsed = urlparse(clean_url)
+        _ = parsed.port
+        if not parsed.hostname:
+            return False
+        return True
+    except Exception:
+        return False
+
+_RAW_CELERY_BROKER = (
+    os.getenv("CELERY_BROKER_URL")
+    or os.getenv("RABBITMQ_URL")
+    or os.getenv("RABBITMQ_PRIVATE_URL")
+)
+if _validate_broker_url(_RAW_CELERY_BROKER):
     CELERY_BROKER_URL = _RAW_CELERY_BROKER
 elif IS_VALID_REDIS_URL:
     CELERY_BROKER_URL = REDIS_URL
@@ -212,6 +247,10 @@ CELERY_BEAT_SCHEDULE = {
     "sync-hub-materials-every-30-mins": {
         "task": "apps.activities.tasks.sync_hub_materials_task",
         "schedule": 1800.0,
+    },
+    "run-cefr-schedules-periodic": {
+        "task": "apps.activities.tasks.run_cefr_schedules_task",
+        "schedule": 900.0,  # A cada 15 minutos checa e executa agendamentos CEFR
     },
     "daily-streak-reminders-18h": {
         "task": "apps.notifications.tasks.send_daily_streak_reminders_task",

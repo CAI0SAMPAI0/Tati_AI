@@ -790,35 +790,38 @@ class NotificationDispatcher:
 
         # 2 horas de janela para evitar duplicatas acidentais
         two_hours_ago = datetime.now(timezone.utc) - timedelta(hours=2)
+        notif_title = "New Activity from Teacher Tatiana!"
+
+        existing_usernames = set(
+            Notification.objects.filter(
+                title=notif_title,
+                created_at__gte=two_hours_ago,
+            ).values_list("username", flat=True)
+        )
+
+        notifications_to_create = []
 
         for s in students:
             first_name = (
                 (s.name or s.username or "Student").strip().split()[0].capitalize()
             )
             target_level_str = "practice" if is_all_levels else f"your level ({level_tag})"
-            notif_title = "New Activity from Teacher Tatiana!"
             notif_body = f'Hello {first_name}! A new {activity_type} activity ("{title}") is now available for {target_level_str}. Come practice!'
 
             try:
-                # Evita criar duplicata se já existir idêntica recente
-                already_exists = Notification.objects.filter(
-                    username=s.username,
-                    title=notif_title,
-                    body=notif_body,
-                    created_at__gte=two_hours_ago,
-                ).exists()
-
-                if not already_exists:
-                    # 1. Salva no banco in-app (dropdown de notificações)
-                    Notification.objects.create(
-                        username=s.username,
-                        category="new_activity",
-                        title=notif_title,
-                        body=notif_body,
-                        is_read=False,
+                if s.username not in existing_usernames:
+                    notifications_to_create.append(
+                        Notification(
+                            username=s.username,
+                            category="new_activity",
+                            title=notif_title,
+                            body=notif_body,
+                            is_read=False,
+                        )
                     )
+                    existing_usernames.add(s.username)
 
-                # 2. Envia Push em segundo plano (tela de bloqueio / navegador)
+                # Envia Push em segundo plano (tela de bloqueio / navegador)
                 NotificationDispatcher.send_push_to_user(
                     username=s.username,
                     title=notif_title,
@@ -827,6 +830,14 @@ class NotificationDispatcher:
                     tag=f"new-act-{activity_type}",
                 )
                 sent_total += 1
+            except Exception as e:
+                logger.error(f"[Notify Activity] Falha ao despachar push para {s.username}: {e}")
+
+        if notifications_to_create:
+            try:
+                Notification.objects.bulk_create(notifications_to_create, batch_size=200)
+            except Exception as e:
+                logger.error(f"[Notify Activity] Erro no bulk_create de notificações: {e}")
 
                 # 3. WhatsApp desativado para novas atividades conforme diretriz
                 # (WhatsApp reservado apenas para: não perder ofensivas, nudge manual e relatório semanal)

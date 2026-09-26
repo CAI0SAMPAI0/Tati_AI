@@ -1,64 +1,80 @@
 version: '3.8'
 
 services:
-  db:
-    image: postgres:16-alpine
-    container_name: tati_ai_db
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB:       POSTGRES_USER:       POSTGRES_PASSWORD:     ports:
-      - '5432:5432'
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ']
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    container_name: tati_ai_redis
-    restart: unless-stopped
-    ports:
-      - '6379:6379'
-    healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: tati_ai_backend
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgres://\:\@db:5432/      REDIS_URL: redis://redis:6379/0
-      PORT: 8080
-      DJANGO_SETTINGS_MODULE: app.settings.production
+      - PORT=8000
+      - DJANGO_SETTINGS_MODULE=app.settings.development
+      - DEBUG=True
     ports:
-      - '8080:8080'
+      - '8000:8000'
+    volumes:
+      - ./backend:/app
+      - ./backend/media:/app/media
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
     container_name: tati_ai_frontend
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    env_file:
+      - .env
     environment:
-      PORT: 3000
-      NEXT_PUBLIC_API_URL: http://localhost:8080
+      - PORT=3000
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+      - NODE_ENV=production
     ports:
       - '3000:3000'
 
-volumes:
-  postgres_data:
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tati_ai_celery_worker
+    restart: unless-stopped
+    command: ["celery", "-A", "app", "worker", "-l", "info", "--concurrency=2"]
+    healthcheck:
+      disable: true
+    env_file:
+      - .env
+    environment:
+      - DJANGO_SETTINGS_MODULE=app.settings.development
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tati_ai_celery_beat
+    restart: unless-stopped
+    command: ["celery", "-A", "app", "beat", "-l", "info"]
+    healthcheck:
+      disable: true
+    env_file:
+      - .env
+    environment:
+      - DJANGO_SETTINGS_MODULE=app.settings.development
+    depends_on:
+      backend:
+        condition: service_healthy

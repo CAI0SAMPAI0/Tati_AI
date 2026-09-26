@@ -70,15 +70,30 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         const newNotifs = list.filter(n => !n.is_read && !lastNotifIds.current.has(n.id));
         newNotifs.forEach(n => {
           let shown = false;
-          // Toast AI generations or general notifications
-          if (n.category === 'new_activity' || n.category === 'correction' || n.category === 'ai_generation') {
-             toast.success(`${n.title}: ${n.body}`, { duration: 6000 });
+          let displayTitle = n.title;
+          let displayBody = n.body;
+
+          if (n.category === 'trophy' || n.category === 'achievements' || displayTitle.toLowerCase().includes('trof') || displayTitle.toLowerCase().includes('conquist')) {
+            if (displayTitle.includes('Parabéns! Você conquistou o') || displayTitle.includes('Parabens!')) {
+              displayTitle = displayTitle.replace(/Parab[eé]ns!\s*Voc[eé]\s*conquistou\s*o/gi, 'Congratulations! You won')
+                                         .replace(/º\s*Lugar\s*na\s*Competi[çc][ãa]o\s*Mensal!/gi, ' Place in the Monthly Competition!')
+                                         .replace('1º Lugar', '1st Place')
+                                         .replace('2º Lugar', '2nd Place')
+                                         .replace('3º Lugar', '3rd Place');
+            }
+            if (displayTitle.includes('Novo troféu desbloqueado') || displayTitle.includes('Marco de ofensiva conquistado')) {
+              displayTitle = '🏆 Trophy Unlocked!';
+            }
+            toast.success(`${displayTitle}: ${displayBody}`, { icon: '🏆', duration: 7000 });
+            shown = true;
+          } else if (n.category === 'new_activity' || n.category === 'correction' || n.category === 'ai_generation') {
+             toast.success(`${displayTitle}: ${displayBody}`, { duration: 6000 });
              shown = true;
           } else if (n.category === 'nudge') {
-             toast(`${n.title}: ${n.body}`, { icon: '🍎', duration: 8000 });
+             toast(`${displayTitle}: ${displayBody}`, { icon: '🍎', duration: 8000 });
              shown = true;
           } else if (n.category !== 'reminder') {
-             toast(`${n.title}: ${n.body}`, { icon: '🔔', duration: 5000 });
+             toast(`${displayTitle}: ${displayBody}`, { icon: '🔔', duration: 5000 });
              shown = true;
           }
           if (shown) {
@@ -238,7 +253,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         if (document.visibilityState === 'visible') {
           fetchNotifications(false);
         }
-      }, 30 * 1000);
+      }, 60 * 1000);
     };
 
     const stopPolling = () => {

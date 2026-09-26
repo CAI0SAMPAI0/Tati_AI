@@ -12,6 +12,7 @@ class Flashcard(models.Model):
     image_url = models.URLField(max_length=1000, blank=True, null=True)
     topic = models.CharField(max_length=100, blank=True, null=True)
     source_file = models.CharField(max_length=255, blank=True, null=True)
+    options = models.JSONField(default=list, blank=True, null=True)
     is_published = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
@@ -243,6 +244,7 @@ class CEFRSchedule(models.Model):
     selected_types = ArrayField(
         models.CharField(max_length=50), default=list, blank=True, null=True
     )
+    reference_ids = models.JSONField(default=list, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
 
@@ -273,3 +275,50 @@ class CEFRReference(models.Model):
 
     def __str__(self):
         return f"[{self.cefr_level}] {self.filename}"
+
+
+class StudentFeedback(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student_username = models.CharField(max_length=150, db_index=True)
+    student_name = models.CharField(max_length=255, blank=True, default="")
+    cefr_level = models.CharField(max_length=20, default="A1")
+    area = models.CharField(max_length=50, default="general")  # flashcards, games, grammar, listening, reading, simulations, music, general
+    activity_id = models.CharField(max_length=255, blank=True, default="")
+    activity_title = models.CharField(max_length=255, blank=True, default="")
+    rating = models.IntegerField(default=5)
+    comment = models.TextField()
+    teacher_reply = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=50, default="pending")  # pending, reviewed, resolved
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+
+    class Meta:
+        db_table = "student_feedbacks"
+        managed = False
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"[{self.cefr_level}][{self.area}] {self.student_name or self.student_username}: {self.comment[:30]}"
+
+
+class DeveloperBugReport(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student_username = models.CharField(max_length=150, db_index=True)
+    student_name = models.CharField(max_length=255, blank=True, default="")
+    student_email = models.CharField(max_length=255, blank=True, default="")
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    image_urls = models.JSONField(default=list, blank=True, null=True)
+    page_url = models.CharField(max_length=500, blank=True, default="")
+    user_agent = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=50, default="open")  # open, in_progress, resolved
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+
+    class Meta:
+        db_table = "developer_bug_reports"
+        managed = False
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"[Bug] {self.title} by {self.student_username}"
+

@@ -6,6 +6,7 @@ from typing import Optional
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from ninja.errors import HttpError
 
 from .models import UserOnboarding
@@ -243,6 +244,11 @@ class XPService:
 class GoalService:
     @staticmethod
     def list_goals(user: User) -> list[GoalOut]:
+        cache_key = f"user_goals_{user.username}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         now = datetime.now(timezone.utc)
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         week_start = today_start - timedelta(days=now.weekday())
@@ -280,19 +286,21 @@ class GoalService:
         ).count()
 
         # 5. Weekly study days active (target: 5)
-        week_dates = set(
-            m.created_at.date()
-            for m in Message.objects.filter(
-                username=user.username, role="user", created_at__gte=week_start
-            )
-            if m.created_at
-        )
+        msg_dates = Message.objects.filter(
+            username=user.username, role="user", created_at__gte=week_start
+        ).values_list("created_at", flat=True)
+        week_dates = {
+            dt.date() if hasattr(dt, "date") else datetime.fromisoformat(str(dt).replace("Z", "+00:00")).date()
+            for dt in msg_dates
+            if dt
+        }
+        sub_dates = ActivitySubmission.objects.filter(
+            username=user.username, created_at__gte=week_start
+        ).values_list("created_at", flat=True)
         week_dates.update(
-            s.created_at.date()
-            for s in ActivitySubmission.objects.filter(
-                username=user.username, created_at__gte=week_start
-            )
-            if s.created_at
+            dt.date() if hasattr(dt, "date") else datetime.fromisoformat(str(dt).replace("Z", "+00:00")).date()
+            for dt in sub_dates
+            if dt
         )
         weekly_days_count = len(week_dates)
 
@@ -310,7 +318,9 @@ class GoalService:
 
         # Count activity submissions by category
         cat_counts = defaultdict(int)
-        user_subs = ActivitySubmission.objects.filter(username=user.username, status="completed")
+        user_subs = ActivitySubmission.objects.filter(
+            username=user.username, status="completed"
+        ).only("metadata", "activity_type")
         for s in user_subs:
             meta = s.metadata if isinstance(s.metadata, dict) else {}
             cat = (meta.get("category") or "").lower().strip()
@@ -433,6 +443,7 @@ class GoalService:
                 )
             )
 
+        cache.set(cache_key, results, 30)
         return results
 
     @staticmethod

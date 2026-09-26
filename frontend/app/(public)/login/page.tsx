@@ -2,9 +2,12 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Bug } from 'lucide-react';
+import { DeveloperBugModal } from '@/components/feedback/developer-bug-modal';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +24,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showBugModal, setShowBugModal] = useState(false);
   const { saveSession } = useAuth();
 
   const router = useRouter();
@@ -553,8 +557,30 @@ export default function LoginPage() {
                 )}
               </form>
             )}
+
+            {/* Suporte Técnico / Reportar Bug / Baixar App */}
+            <div className="mt-7 pt-4 border-t border-border flex flex-col gap-2 text-center">
+              <button
+                type="button"
+                onClick={() => setShowBugModal(true)}
+                className="inline-flex items-center justify-center gap-1.5 text-xs text-text-muted hover:text-red-500 transition-colors py-1 cursor-pointer font-medium"
+              >
+                <Bug size={14} className="text-red-400" />
+                <span>Problemas para acessar? <strong className="underline underline-offset-2">Reportar Bug ao Desenvolvedor</strong></span>
+              </button>
+
+              <Link
+                href="/atualizar"
+                className="inline-flex items-center justify-center gap-1 text-[0.76rem] text-primary/80 hover:text-primary hover:underline transition-colors"
+              >
+                <span>Baixar ou Atualizar Aplicativo Android (APK)</span>
+              </Link>
+            </div>
           </div>
         </div>
+
+        {/* Modal de Bug Report para o Desenvolvedor */}
+        <DeveloperBugModal isOpen={showBugModal} onClose={() => setShowBugModal(false)} />
       </div>
     </main>
   );

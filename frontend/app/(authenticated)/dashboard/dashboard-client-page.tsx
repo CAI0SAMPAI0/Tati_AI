@@ -39,6 +39,9 @@ const GamesSection = dynamic(() => import('@/components/dashboard/games-section'
 const NewsSection = dynamic(() => import('@/components/dashboard/news-section'), {
   loading: () => <div className="h-48 flex items-center justify-center"><Spinner size="md" /></div>
 });
+const FeedbacksSection = dynamic(() => import('@/components/dashboard/feedbacks-section').then(mod => mod.FeedbacksSection), {
+  loading: () => <div className="h-48 flex items-center justify-center"><Spinner size="md" /></div>
+});
 import { StudentModal } from '@/components/dashboard/student-modal';
 import { apiGet } from '@/lib/api/client';
 
@@ -58,12 +61,12 @@ export default function DashboardClientPage() {
   // Get tab from URL or localStorage
   const getInitialTab = (): DashSection => {
     const tabParam = searchParams.get('tab') as DashSection;
-    if (tabParam && ['overview', 'students', 'reports', 'flashcards', 'simulations', 'games', 'news', 'premium', 'cefr', 'whatsapp'].includes(tabParam)) {
+    if (tabParam && ['overview', 'students', 'feedbacks', 'reports', 'flashcards', 'simulations', 'games', 'news', 'premium', 'cefr', 'whatsapp'].includes(tabParam)) {
       return tabParam;
     }
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('tati_last_dashboard_tab') as DashSection;
-      if (saved && ['overview', 'students', 'reports', 'flashcards', 'simulations', 'games', 'news', 'premium', 'cefr', 'whatsapp'].includes(saved)) {
+      if (saved && ['overview', 'students', 'feedbacks', 'reports', 'flashcards', 'simulations', 'games', 'news', 'premium', 'cefr', 'whatsapp'].includes(saved)) {
         return saved;
       }
     }
@@ -168,6 +171,7 @@ export default function DashboardClientPage() {
                   news: 'News',
                   cefr: 'CEFR Materials',
                   premium: 'Premium Hub',
+                  feedbacks: 'Feedbacks dos Alunos',
                   whatsapp: 'WhatsApp Connection'
                 }[activeSection] || activeSection}
               </h1>
@@ -183,6 +187,7 @@ export default function DashboardClientPage() {
                   news: 'News, reels and links for students',
                   cefr: 'Diagnose and generate from PDFs',
                   premium: 'Premium materials & payments',
+                  feedbacks: 'Opiniões e avaliações recebidas dos alunos',
                   whatsapp: 'Connect and manage WhatsApp WAHA sessions'
                 }[activeSection]}
               </p>
@@ -207,6 +212,7 @@ export default function DashboardClientPage() {
           {activeSection === 'games' && <GamesSection />}
           {activeSection === 'news' && <NewsSection />}
           {activeSection === 'flashcards' && <FlashcardsSection />}
+          {activeSection === 'feedbacks' && <FeedbacksSection />}
           {activeSection === 'cefr' && <CefrSection />}
           {activeSection === 'premium' && <PremiumSection />}
           {activeSection === 'whatsapp' && <WhatsappSection />}
