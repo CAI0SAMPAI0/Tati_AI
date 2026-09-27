@@ -185,7 +185,7 @@ export function ActivityViewerModal({
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <a
-                  href={activity.modes.choice || `https://lingoclip.app/lyrics/${activity.id}?mode=choice#game`}
+                  href={activity.modes.choice || `https://lingoclip.app/lyrics/${activity.id}?mode=mc&level=b1#game/level`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex flex-col items-center justify-center p-3 rounded-2xl bg-bg hover:bg-primary/5 hover:border-primary/40 border border-border transition-all text-center group shadow-sm"
@@ -198,7 +198,7 @@ export function ActivityViewerModal({
                 </a>
 
                 <a
-                  href={activity.modes.typing || `https://lingoclip.app/lyrics/${activity.id}?mode=write#game`}
+                  href={activity.modes.typing || `https://lingoclip.app/lyrics/${activity.id}?mode=tp&level=b1#game/level`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex flex-col items-center justify-center p-3 rounded-2xl bg-bg hover:bg-primary/5 hover:border-primary/40 border border-border transition-all text-center group shadow-sm"
@@ -211,7 +211,7 @@ export function ActivityViewerModal({
                 </a>
 
                 <a
-                  href={activity.modes.karaoke || `https://lingoclip.app/lyrics/${activity.id}?mode=karaoke#game`}
+                  href={activity.modes.karaoke || `https://lingoclip.app/lyrics/${activity.id}#game`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex flex-col items-center justify-center p-3 rounded-2xl bg-bg hover:bg-primary/5 hover:border-primary/40 border border-border transition-all text-center group shadow-sm"
@@ -220,7 +220,7 @@ export function ActivityViewerModal({
                     <Mic size={16} />
                   </div>
                   <span className="text-xs font-bold text-text group-hover:text-primary">Karaoke</span>
-                  <span className="text-[0.65rem] text-text-muted mt-0.5">Sing along</span>
+                  <span className="text-[0.65rem] text-text-muted mt-0.5">Sem nível (Cantar)</span>
                 </a>
               </div>
             </div>

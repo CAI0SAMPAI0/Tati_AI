@@ -165,6 +165,13 @@ export default function ActivitiesClientPage() {
     return userLevelNormalized && CEFR_LEVELS.includes(userLevelNormalized) ? userLevelNormalized : 'All';
   }, [filterLevel, userLevelNormalized]);
 
+  const userLingoLevel = useMemo(() => {
+    const lvl = (effectiveLevel !== 'All' ? effectiveLevel : userLevelNormalized || '').toUpperCase();
+    if (lvl.startsWith('C')) return 'a1';
+    if (lvl.startsWith('B')) return 'i1';
+    return 'b1';
+  }, [effectiveLevel, userLevelNormalized]);
+
   useEffect(() => {
     setVisibleCount(10);
   }, [activeTab, effectiveLevel, searchQuery, statusFilter]);
@@ -961,7 +968,11 @@ export default function ActivitiesClientPage() {
                                 </span>
                                 <div className="grid grid-cols-3 gap-1.5">
                                   <a
-                                    href={m.modes?.choice || `https://lingoclip.app/lyrics/${m.id}?mode=choice#game`}
+                                    href={
+                                      m.modes?.choice
+                                        ? m.modes.choice.replace('level=b1', `level=${userLingoLevel}`)
+                                        : `https://lingoclip.app/lyrics/${m.id}?mode=mc&level=${userLingoLevel}#game/level`
+                                    }
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     title="Modo Múltipla Escolha"
@@ -977,7 +988,11 @@ export default function ActivitiesClientPage() {
                                   </a>
 
                                   <a
-                                    href={m.modes?.typing || `https://lingoclip.app/lyrics/${m.id}?mode=write#game`}
+                                    href={
+                                      m.modes?.typing
+                                        ? m.modes.typing.replace('level=b1', `level=${userLingoLevel}`)
+                                        : `https://lingoclip.app/lyrics/${m.id}?mode=tp&level=${userLingoLevel}#game/level`
+                                    }
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     title="Modo Digitação (Completar a letra)"
@@ -993,10 +1008,10 @@ export default function ActivitiesClientPage() {
                                   </a>
 
                                   <a
-                                    href={m.modes?.karaoke || `https://lingoclip.app/lyrics/${m.id}?mode=karaoke#game`}
+                                    href={m.modes?.karaoke || `https://lingoclip.app/lyrics/${m.id}#game`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    title="Modo Karaokê (Cantar junto)"
+                                    title="Modo Karaokê (Cantar junto - sem nível)"
                                     onClick={() => {
                                       toast('Quando terminar a música no LingoClip, clique em "Concluir (+25 XP)" para garantir seus pontos!', { id: 'music-xp-tip', icon: '🎵', duration: 5000 });
                                     }}
