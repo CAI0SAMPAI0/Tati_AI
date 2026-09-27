@@ -749,7 +749,7 @@ export default function ActivitiesClientPage() {
           <header className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
               <h1 className="text-2xl md:text-3xl font-display font-bold text-text mb-2">My Activities</h1>
-              <p className="text-text-muted text-sm md:text-base max-w-2xl">
+              <p className="hidden lg:block text-text-muted text-sm md:text-base max-w-2xl">
                 Practice vocabulary, grammar, reading and listening. Track Completed vs Pending activities!
               </p>
             </div>
@@ -835,7 +835,7 @@ export default function ActivitiesClientPage() {
                     <h3 className="text-lg font-bold text-text flex items-center gap-2">
                       <Music className="text-primary" size={20} /> Musics & Lyrics (LingoClip)
                     </h3>
-                    <p className="text-text-muted text-sm mt-0.5">
+                    <p className="hidden lg:block text-text-muted text-sm mt-0.5">
                       Practice English singing along with your favorite safe songs! Choose among 3 game modes: <strong>Multiple Choice</strong>, <strong>Typing</strong> or <strong>Karaoke</strong>.
                     </p>
                   </div>

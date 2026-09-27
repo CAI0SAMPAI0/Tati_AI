@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Menu, Trophy, Flame, CircleAlert, MessageSquareHeart, Bug } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useState } from 'react';
@@ -17,9 +18,14 @@ import { cn } from '@/lib/utils';
 
 interface MainHeaderProps {
   onToggleMenu?: () => void;
+  hideStreakAndTrophies?: boolean;
 }
 
-export function MainHeader({ onToggleMenu }: MainHeaderProps) {
+export function MainHeader({ onToggleMenu, hideStreakAndTrophies }: MainHeaderProps) {
+  const pathname = usePathname();
+  const isSettings = pathname?.startsWith('/settings');
+  const isActivities = pathname?.startsWith('/activities');
+
   const { user } = useAuth();
   const avatarUrl = user?.avatar_url || (user as any)?.profile?.avatar_url || DEFAULT_AVATAR_URL;
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
@@ -28,6 +34,7 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
   const { currentStreak, isStreakActive, trophiesEarned, totalTrophies } = useStreakAndTrophies();
 
   const isHubOnly = (user as any)?.is_hub_only;
+  const shouldHideStreakAndTrophies = isHubOnly || isSettings || hideStreakAndTrophies;
 
   return (
     <header className="h-16 flex items-center justify-between px-1 border-b border-border bg-bg sticky top-0 z-50">
@@ -40,7 +47,14 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
             <Menu size={20} />
           </button>
         )}
-        <Link href={isHubOnly ? "/activities/hub" : "/chat"} prefetch={true} className="font-display text-lg font-bold tracking-tight pl-2">
+        <Link
+          href={isHubOnly ? "/activities/hub" : "/chat"}
+          prefetch={true}
+          className={cn(
+            "font-display font-bold tracking-tight pl-2 transition-all",
+            isActivities ? "text-sm sm:text-base md:text-base" : "text-base md:text-lg"
+          )}
+        >
           Teacher <span className="text-primary">Taty</span>
         </Link>
       </div>
@@ -60,7 +74,7 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
         </div>
 
         <div className="flex items-center gap-3 md:gap-5">
-          {!isHubOnly && (
+          {!shouldHideStreakAndTrophies && (
             <>
                 <Link
                   href="/achievements"
