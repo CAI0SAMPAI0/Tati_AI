@@ -206,3 +206,7 @@ class AICache:
     @classmethod
     def clear(cls):
         cls._MEMORY_STORE.clear()
+
+
+ai_cache = AICache()
+

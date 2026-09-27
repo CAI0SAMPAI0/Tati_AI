@@ -176,7 +176,14 @@ def call_meta_llama(
     return None
 
 
-def get_tati_system_prompt(user: User, difficulty: str = None, memory_summary: str = "", accent: str = None, origin: str = "chat") -> str:
+def get_tati_system_prompt(
+    user: User,
+    difficulty: str = None,
+    memory_summary: str = "",
+    accent: str = None,
+    origin: str = "chat",
+    student_message: str = "",
+) -> str:
     """
     Prompt Humanizado Anti-IA da Teacher Tatiana Duarte (Teacher Tati).
     Proíbe respostas robóticas, proíbe emojis (nem no texto nem no áudio),
@@ -250,6 +257,15 @@ def get_tati_system_prompt(user: User, difficulty: str = None, memory_summary: s
 Fatos e tópicos anteriores que você lembra sobre este aluno (use naturalmente sem parecer que leu um relatório):
 {memory_summary}"""
 
+    rag_context_section = ""
+    if student_message and not is_voice:
+        try:
+            from apps.chat.rag import rag_service
+            rag_data = rag_service.query(student_message, top_k=2)
+            rag_context_section = rag_data.get("context_block", "")
+        except Exception as e:
+            logger.debug(f"[RAG] Context retrieval error: {e}")
+
     prompt = PromptManager.get_prompt(
         "tati_system_prompt",
         name=name,
@@ -257,13 +273,14 @@ Fatos e tópicos anteriores que você lembra sobre este aluno (use naturalmente 
         level_guidelines=level_guidelines,
         accent_instruction=accent_instruction,
         voice_clause=voice_clause,
-        rag_context_section="",
+        rag_context_section=rag_context_section,
         memory_section=memory_section,
     )
     if not prompt:
         prompt = f"You are Tatiana Duarte (Teacher Tati) talking with {name} at CEFR Level {level}. {level_guidelines}\n{memory_section}"
 
     return prompt.strip()
+
 
 
 def build_conversation_context(conversation_id: str, max_recent: int = 8) -> tuple[str, list]:
@@ -565,7 +582,9 @@ class AIService:
             memory_summary=memory_summary,
             accent=user_accent,
             origin=origin or "chat",
+            student_message=clean_user_text,
         )
+
 
         messages_payload = [{"role": "system", "content": sys_prompt}]
 
