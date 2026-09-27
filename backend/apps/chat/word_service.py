@@ -91,6 +91,16 @@ class WordLookupService:
     def _fetch_ai_definition(cls, word: str) -> Dict[str, Any]:
         from django.conf import settings
         from shared.prompt_manager import PromptManager
+        from shared.ai_cache import AICache
+
+        clean_word = word.lower().strip()
+        cached = AICache.get_llm_response(f"word_definition:{clean_word}")
+        if cached:
+            try:
+                cached_data = json.loads(cached)
+                return cls._sanitize_data(cached_data, word)
+            except Exception:
+                pass
 
         system_instruction = PromptManager.get_prompt("word_analysis", section="System Instruction")
         if not system_instruction:
@@ -124,7 +134,9 @@ class WordLookupService:
                 raw_json = completion.choices[0].message.content or "{}"
                 data = json.loads(raw_json)
                 if data.get("translation") or data.get("english_definition"):
-                    return cls._sanitize_data(data, word)
+                    sanitized = cls._sanitize_data(data, word)
+                    AICache.set_llm_response(f"word_definition:{clean_word}", json.dumps(sanitized), ttl=604800)
+                    return sanitized
             except Exception as e:
                 logger.warning(f"[WordLookup] Groq key failed for '{word}': {e}")
 
