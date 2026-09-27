@@ -14,6 +14,8 @@ from apps.chat.models import SimulationScenario, CEFRSimulation, Conversation, M
 from apps.activities.models import ActivitySubmission
 from apps.users.services import XPService, StreakService
 from .audio_service import AudioService, get_groq_keys
+from django.conf import settings
+from shared.prompt_manager import PromptManager
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -268,12 +270,13 @@ async def start_simulation(request: HttpRequest, payload: SimStartInput):
         or f"Hello! Welcome to our session. Let's practice {sc.get('name')}."
     )
 
+    groq_model = getattr(settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"))
     keys = get_groq_keys()
     for key in keys:
         try:
             async with AsyncGroq(api_key=key) as client:
                 res = await client.chat.completions.create(
-                    model="openai/gpt-oss-120b",
+                    model=groq_model,
                     messages=[
                         {
                             "role": "system",
@@ -415,12 +418,13 @@ async def send_simulation_message(request: HttpRequest, payload: SimMessageInput
         messages_payload.append({"role": m.role, "content": m.content})
 
     reply_text = "That's interesting! Let's continue our conversation."
+    groq_model = getattr(settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"))
     keys = get_groq_keys()
     for key in keys:
         try:
             async with AsyncGroq(api_key=key) as client:
                 res = await client.chat.completions.create(
-                    model="openai/gpt-oss-120b",
+                    model=groq_model,
                     messages=messages_payload,
                     max_tokens=400,
                     temperature=0.6,
