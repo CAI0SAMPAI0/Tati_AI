@@ -193,3 +193,113 @@ class RateLimitMiddleware:
             return x_forwarded.split(",")[0].strip()
         return request.META.get("REMOTE_ADDR", "127.0.0.1")
 
+
+class StructuredLoggingMiddleware:
+    """
+    Middleware de Observabilidade e Auditoria Estruturada (JSON Logs).
+    - Injeta request_id único para rastreabilidade de ponta a ponta (frontend -> backend).
+    - Captura user_id, latência, endpoint, status_code e IP em formato JSON estruturado.
+    - Registra logs de auditoria para operações destrutivas ou de escrita sensíveis (DELETE, etc).
+    """
+
+    sync_capable = True
+    async_capable = True
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        if iscoroutinefunction(self.get_response):
+            markcoroutinefunction(self)
+        self.json_logger = logging.getLogger("structured_json")
+        self.audit_logger = logging.getLogger("audit")
+
+    def _extract_user_info(self, request):
+        user = getattr(request, "user", None)
+        if user and getattr(user, "is_authenticated", False):
+            return str(getattr(user, "id", "")), getattr(user, "username", "authenticated")
+        return "anonymous", "anonymous"
+
+    def _get_client_ip(self, request):
+        x_forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+        if x_forwarded:
+            return x_forwarded.split(",")[0].strip()
+        return request.META.get("REMOTE_ADDR", "127.0.0.1")
+
+    def _log_request(self, request, response, duration_ms, request_id):
+        path = request.path
+        if path.startswith(("/static", "/media", "/favicon.ico")) or path in ("/health", "/ping"):
+            return
+
+        import json
+        from datetime import datetime, timezone
+
+        user_id, username = self._extract_user_info(request)
+        status_code = getattr(response, "status_code", 500)
+
+        log_data = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "request_id": request_id,
+            "user_id": user_id,
+            "username": username,
+            "method": request.method,
+            "path": path,
+            "status_code": status_code,
+            "duration_ms": round(duration_ms, 2),
+            "ip": self._get_client_ip(request),
+        }
+
+        # Emite log JSON estruturado
+        self.json_logger.info(json.dumps(log_data))
+
+        # Auditoria de operações destrutivas ou administrativas
+        is_destructive = request.method in ("DELETE", "PATCH") or (
+            request.method == "POST" and any(k in path for k in ("/delete", "/reset", "/wipe", "/cancel", "/destroy", "/role", "/ban"))
+        )
+        if is_destructive:
+            audit_data = {
+                "audit_event": "DESTRUCTIVE_OPERATION",
+                **log_data,
+            }
+            self.audit_logger.warning(json.dumps(audit_data))
+
+    def __call__(self, request):
+        import uuid
+
+        request_id = (
+            request.headers.get("X-Request-ID")
+            or request.headers.get("x-request-id")
+            or str(uuid.uuid4())
+        )
+        request.request_id = request_id
+
+        start_time = time.perf_counter()
+        response = self.get_response(request)
+        duration_ms = (time.perf_counter() - start_time) * 1000
+
+        self._log_request(request, response, duration_ms, request_id)
+        if response:
+            response["X-Request-ID"] = request_id
+        return response
+
+    async def __acall__(self, request):
+        import uuid
+
+        request_id = (
+            request.headers.get("X-Request-ID")
+            or request.headers.get("x-request-id")
+            or str(uuid.uuid4())
+        )
+        request.request_id = request_id
+
+        start_time = time.perf_counter()
+        try:
+            response = await self.get_response(request)
+        except asyncio.CancelledError:
+            raise
+        duration_ms = (time.perf_counter() - start_time) * 1000
+
+        self._log_request(request, response, duration_ms, request_id)
+        if response:
+            response["X-Request-ID"] = request_id
+        return response
+
+

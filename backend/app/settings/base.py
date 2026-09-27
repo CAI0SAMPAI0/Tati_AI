@@ -71,7 +71,9 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "app.middleware.StructuredLoggingMiddleware",
 ]
+
 
 # Ativa debug_toolbar apenas se explicitamente habilitado via variável de ambiente (desativado por padrão em produção/HF)
 if os.getenv("ENABLE_DEBUG_TOOLBAR", "false").lower() in ("true", "1"):
@@ -340,7 +342,12 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
     "pragma",
     "if-modified-since",
     "if-none-match",
+    "x-request-id",
+    "x-load-test-secret",
 ]
+
+CORS_EXPOSE_HEADERS = ["x-request-id", "content-disposition", "content-type"]
+
 
 # Origens permitidas dinâmicas para Railway, Hugging Face Spaces e Vercel
 CORS_ALLOWED_ORIGIN_REGEXES = [
@@ -465,6 +472,17 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
+        "structured_json": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "audit": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
+
 

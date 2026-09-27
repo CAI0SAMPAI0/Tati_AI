@@ -36,13 +36,16 @@ def get_brevo_api_key() -> Optional[str]:
 
 def get_verified_sender_email() -> str:
     # Brevo exige que o remetente seja um e-mail verificado na conta Brevo
+    from django.conf import settings
+
+    fallback_email = getattr(settings, "DEFAULT_FROM_EMAIL", os.getenv("DEFAULT_FROM_EMAIL", "contato@tati-ai.com"))
     candidates = [
         os.getenv("BREVO_SENDER_EMAIL"),
         os.getenv("SMTP_FROM"),
         os.getenv("SMTP_USER"),
         os.getenv("RESEND_FROM"),
         os.getenv("login_smtp"),
-        "caio.matos@11607679.brevosend.com",
+        fallback_email,
     ]
     for email in candidates:
         if email and isinstance(email, str):
@@ -53,7 +56,8 @@ def get_verified_sender_email() -> str:
                 and "smtp-brevo" not in email_clean
             ):
                 return email_clean
-    return "caio.matos@11607679.brevosend.com"
+    return fallback_email
+
 
 
 class BrevoEmailService:

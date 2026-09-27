@@ -935,7 +935,9 @@ class MonthlyCompetitionService:
             recipients.add(env_from.strip().lower())
 
         if not recipients:
-            recipients.add("caiosampaiov@gmail.com")
+            fallback_admin = getattr(settings, "DEV_NOTIFICATION_EMAIL", "admin@tati-ai.com")
+            if fallback_admin and "@" in fallback_admin:
+                recipients.add(fallback_admin)
 
         top1 = top3[0] if len(top3) > 0 else None
         top2 = top3[1] if len(top3) > 1 else None
@@ -1808,13 +1810,15 @@ class HubService:
         purchased_ids = set()
 
         if user and isinstance(user, User):
+            admin_usernames = getattr(settings, "ADMIN_USERNAMES", ["programador", "admin", "professor", "professora"])
             if user.role in (
                 "programador",
                 "professor",
                 "admin",
                 "Admin",
-            ) or user.username in ("programador", "admin", "professor", "professora"):
+            ) or user.username in admin_usernames:
                 can_access_all = True
+
             else:
                 try:
                     from apps.payments.models import PremiumPurchase, Order
@@ -1887,13 +1891,15 @@ class HubService:
 
         has_access = False
         if user and isinstance(user, User):
+            admin_usernames = getattr(settings, "ADMIN_USERNAMES", ["programador", "admin", "professor", "professora"])
             if user.role in (
                 "programador",
                 "professor",
                 "admin",
                 "Admin",
-            ) or user.username in ("programador", "admin", "professor", "professora"):
+            ) or user.username in admin_usernames:
                 has_access = True
+
             else:
                 try:
                     from apps.payments.models import PremiumPurchase, Order
@@ -2767,7 +2773,8 @@ class DeveloperBugService:
             status="open",
         )
 
-        dev_email = os.getenv("EMAIL_FEEDBACK", "cmsampaio71@gmail.com").strip()
+        dev_email = os.getenv("EMAIL_FEEDBACK", getattr(settings, "DEV_NOTIFICATION_EMAIL", "admin@tati-ai.com")).strip()
+
 
         images_html = ""
         if image_urls:
