@@ -13,6 +13,12 @@ class NotificationsConfig(AppConfig):
         if any(ignored in cmd for ignored in ["migrate", "makemigrations", "collectstatic", "test", "compilemessages"]):
             return
 
+        # Permite desativar em ambientes que devem dormir (como instâncias dev ou secundárias na Railway)
+        import os
+        enable_scheduler = os.getenv("ENABLE_NOTIFICATION_SCHEDULER", "true").lower() in ("true", "1")
+        if not enable_scheduler:
+            return
+
         try:
             from .scheduler import BackgroundNotificationRunner
             BackgroundNotificationRunner.start()
