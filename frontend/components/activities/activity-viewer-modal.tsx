@@ -185,7 +185,7 @@ export function ActivityViewerModal({
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <a
-                  href={activity.modes.choice}
+                  href={activity.modes.choice || `https://lingoclip.app/lyrics/${activity.id}?mode=choice#game`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex flex-col items-center justify-center p-3 rounded-2xl bg-bg hover:bg-primary/5 hover:border-primary/40 border border-border transition-all text-center group shadow-sm"
@@ -198,7 +198,7 @@ export function ActivityViewerModal({
                 </a>
 
                 <a
-                  href={activity.modes.typing}
+                  href={activity.modes.typing || `https://lingoclip.app/lyrics/${activity.id}?mode=write#game`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex flex-col items-center justify-center p-3 rounded-2xl bg-bg hover:bg-primary/5 hover:border-primary/40 border border-border transition-all text-center group shadow-sm"
@@ -211,7 +211,7 @@ export function ActivityViewerModal({
                 </a>
 
                 <a
-                  href={activity.modes.karaoke}
+                  href={activity.modes.karaoke || `https://lingoclip.app/lyrics/${activity.id}?mode=karaoke#game`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex flex-col items-center justify-center p-3 rounded-2xl bg-bg hover:bg-primary/5 hover:border-primary/40 border border-border transition-all text-center group shadow-sm"
@@ -231,7 +231,7 @@ export function ActivityViewerModal({
             <div className="p-4 bg-success/10 border border-success/20 rounded-2xl flex items-start gap-3">
               <CheckCircle2 className="text-success shrink-0 mt-0.5" size={20} />
               <div>
-                <p className="text-sm font-bold text-success">Activity Completed!</p>
+                <p className="text-sm font-bold text-success">Activity Completed! (+25 XP)</p>
                 <p className="text-xs text-text-muted mt-0.5">
                   You have recorded completion for this exercise. To re-try or reset to pending, use the button below.
                 </p>
@@ -245,13 +245,13 @@ export function ActivityViewerModal({
                 <p className="text-xs text-text-muted mt-0.5">
                   {activity.modes ? (
                     <>
-                      Choose one of the game modes above, practice on <strong>LingoClip</strong>, and then click <strong>2. Mark as Completed</strong> to earn XP and maintain your streak!
+                      Choose one of the game modes above, practice on <strong>LingoClip</strong>, and then click <strong>2. Mark as Completed (+25 XP)</strong> to earn XP and maintain your streak!
                     </>
                   ) : (
                     <>
                       To mark this activity as <strong>Completed</strong>, click{' '}
                       <strong>1. Open on {sourceName}</strong>, finish the exercise on the website,
-                      and then click <strong>2. Mark as Completed</strong>.
+                      and then click <strong>2. Mark as Completed (+25 XP)</strong>.
                     </>
                   )}
                 </p>
@@ -303,7 +303,7 @@ export function ActivityViewerModal({
               </>
             ) : (
               <>
-                <CheckCircle2 size={18} /> 2. Mark as Completed
+                <CheckCircle2 size={18} /> 2. Mark as Completed (+25 XP)
               </>
             )}
           </button>

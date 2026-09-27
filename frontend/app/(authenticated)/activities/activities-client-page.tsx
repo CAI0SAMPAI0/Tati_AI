@@ -22,6 +22,7 @@ import {
   CheckCircle2,
   Clock,
   ChevronDown,
+  Award,
 } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
@@ -221,6 +222,7 @@ export default function ActivitiesClientPage() {
           if (sub.activity_id) set.add(sub.activity_id);
           if (sub.metadata?.url) set.add(sub.metadata.url);
           if (sub.metadata?.slug) set.add(sub.metadata.slug);
+          if (sub.metadata?.id) set.add(sub.metadata.id);
         }
       });
     }
@@ -493,24 +495,33 @@ export default function ActivitiesClientPage() {
     try {
       const res = await apiPost<{
         success?: boolean;
+        xp_earned?: number;
+        new_total_xp?: number;
         current_streak?: number;
         longest_streak?: number;
         trophies_earned?: number;
         total_trophies?: number;
       }>('/activities/submissions', {
         activity_id: actId,
-        activity_type: item.source || 'external',
+        activity_type: item.category || item.source || 'external',
         score: 100,
         metadata: {
+          id: item.id,
           title: item.title,
           url: item.url,
           slug: item.slug,
           status: 'done',
-          category: item.category,
+          category: item.category || 'general',
         },
       });
-      toast.success("Activity completed successfully!", { id: 'act-status' });
+      const streakData = res.data;
+      const earnedXp = streakData?.xp_earned ?? 25;
+      toast.success(`Activity completed! +${earnedXp} XP 🎉`, { id: 'act-status' });
       await refetchSubmissions();
+      queryClient.invalidateQueries({ queryKey: ['my-submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['user'] });
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+      queryClient.invalidateQueries({ queryKey: ['auth-user'] });
       queryClient.invalidateQueries({ queryKey: ['competitions-global-ranking'] });
       queryClient.invalidateQueries({ queryKey: ['competitions-level-rankings'] });
       queryClient.invalidateQueries({ queryKey: ['goals'] });
@@ -518,7 +529,6 @@ export default function ActivitiesClientPage() {
       queryClient.invalidateQueries({ queryKey: ['my-streak'] });
       queryClient.invalidateQueries({ queryKey: ['ranking-position'] });
 
-      const streakData = res.data;
       if (streakData && (typeof streakData.trophies_earned === 'number' || typeof streakData.current_streak === 'number')) {
         queryClient.setQueryData(['streak-data'], (old: any) => ({
           ...(old || {}),
@@ -531,6 +541,7 @@ export default function ActivitiesClientPage() {
 
       try {
         window.dispatchEvent(new CustomEvent('tati_activity_completed', { detail: { ...item, ...streakData } }));
+        window.dispatchEvent(new CustomEvent('tati_xp_updated', { detail: { xp_earned: earnedXp, total_xp: streakData?.new_total_xp } }));
         if (streakData && typeof streakData.trophies_earned === 'number') {
           window.dispatchEvent(new CustomEvent('tati_streak_updated', { detail: streakData }));
         }
@@ -545,10 +556,11 @@ export default function ActivitiesClientPage() {
     try {
       await apiPost('/activities/submissions', {
         activity_id: actId,
-        activity_type: item.source || 'external',
+        activity_type: item.category || item.source || 'external',
         score: 0,
         status: 'pending',
         metadata: {
+          id: item.id,
           title: item.title,
           url: item.url,
           slug: item.slug,
@@ -558,6 +570,10 @@ export default function ActivitiesClientPage() {
       });
       toast.success("Activity reverted to pending!", { id: 'act-status' });
       await refetchSubmissions();
+      queryClient.invalidateQueries({ queryKey: ['my-submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['user'] });
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+      queryClient.invalidateQueries({ queryKey: ['auth-user'] });
       queryClient.invalidateQueries({ queryKey: ['competitions-global-ranking'] });
       queryClient.invalidateQueries({ queryKey: ['competitions-level-rankings'] });
       queryClient.invalidateQueries({ queryKey: ['goals'] });
@@ -945,10 +961,13 @@ export default function ActivitiesClientPage() {
                                 </span>
                                 <div className="grid grid-cols-3 gap-1.5">
                                   <a
-                                    href={m.modes?.choice || `https://lingoclip.app/lyrics/${m.id}?mode=mc#game/level`}
+                                    href={m.modes?.choice || `https://lingoclip.app/lyrics/${m.id}?mode=choice#game`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    title="Multiple Choice mode"
+                                    title="Modo Múltipla Escolha"
+                                    onClick={() => {
+                                      toast('Quando terminar a música no LingoClip, clique em "Concluir (+25 XP)" para garantir seus pontos!', { id: 'music-xp-tip', icon: '🎵', duration: 5000 });
+                                    }}
                                     className="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-bg hover:bg-primary/10 hover:border-primary/40 border border-border text-center transition-all group/btn"
                                   >
                                     <CheckSquare size={14} className="text-primary group-hover/btn:scale-110 transition-transform mb-1" />
@@ -958,10 +977,13 @@ export default function ActivitiesClientPage() {
                                   </a>
 
                                   <a
-                                    href={m.modes?.typing || `https://lingoclip.app/lyrics/${m.id}?mode=tp#game/level`}
+                                    href={m.modes?.typing || `https://lingoclip.app/lyrics/${m.id}?mode=write#game`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    title="Typing mode (Fill in the blanks)"
+                                    title="Modo Digitação (Completar a letra)"
+                                    onClick={() => {
+                                      toast('Quando terminar a música no LingoClip, clique em "Concluir (+25 XP)" para garantir seus pontos!', { id: 'music-xp-tip', icon: '🎵', duration: 5000 });
+                                    }}
                                     className="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-bg hover:bg-primary/10 hover:border-primary/40 border border-border text-center transition-all group/btn"
                                   >
                                     <Keyboard size={14} className="text-primary group-hover/btn:scale-110 transition-transform mb-1" />
@@ -971,10 +993,13 @@ export default function ActivitiesClientPage() {
                                   </a>
 
                                   <a
-                                    href={m.modes?.karaoke || `https://lingoclip.app/play/${m.id}`}
+                                    href={m.modes?.karaoke || `https://lingoclip.app/lyrics/${m.id}?mode=karaoke#game`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    title="Karaoke mode (Sing along)"
+                                    title="Modo Karaokê (Cantar junto)"
+                                    onClick={() => {
+                                      toast('Quando terminar a música no LingoClip, clique em "Concluir (+25 XP)" para garantir seus pontos!', { id: 'music-xp-tip', icon: '🎵', duration: 5000 });
+                                    }}
                                     className="flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-bg hover:bg-primary/10 hover:border-primary/40 border border-border text-center transition-all group/btn"
                                   >
                                     <Mic size={14} className="text-primary group-hover/btn:scale-110 transition-transform mb-1" />
@@ -1002,17 +1027,44 @@ export default function ActivitiesClientPage() {
                                   }
                                   className="text-text-muted hover:text-primary font-medium flex items-center gap-1 transition-colors"
                                 >
-                                  <ExternalLink size={12} /> Details & Complete
+                                  <ExternalLink size={12} /> Details
                                 </button>
 
                                 {isDone ? (
-                                  <span className="font-bold text-success flex items-center gap-1 text-[0.65rem]">
-                                    <CheckCircle2 size={12} /> Completed
-                                  </span>
+                                  <button
+                                    onClick={() =>
+                                      handleMarkPending({
+                                        id: m.id,
+                                        title: m.title,
+                                        category: 'musics',
+                                        source: 'LingoClip',
+                                      })
+                                    }
+                                    title="Clique para desmarcar ou refazer"
+                                    className="font-bold text-success hover:text-warning flex items-center gap-1 text-[0.68rem] py-1 px-2.5 rounded-lg bg-success/10 hover:bg-warning/10 transition-colors"
+                                  >
+                                    <CheckCircle2 size={12} /> Concluído (+25 XP)
+                                  </button>
                                 ) : (
-                                  <span className="font-bold text-warning flex items-center gap-1 text-[0.65rem]">
-                                    <Clock size={12} /> Pending
-                                  </span>
+                                  <button
+                                    onClick={() =>
+                                      handleMarkDone({
+                                        id: m.id,
+                                        title: m.title,
+                                        artist: m.artist,
+                                        genre: m.genre,
+                                        image: m.image || m.fallback_image,
+                                        url: m.url,
+                                        category: 'musics',
+                                        source: 'LingoClip',
+                                        modes: m.modes,
+                                      })
+                                    }
+                                    title="Marcar como concluído e ganhar 25 XP"
+                                    className="font-bold text-primary hover:text-white bg-primary/10 hover:bg-primary border border-primary/20 hover:border-primary px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 text-[0.68rem] shadow-sm cursor-pointer"
+                                  >
+                                    <Award size={12} /> Concluir (+25 XP)
+                                  </button>
                                 )}
                               </div>
                             </div>

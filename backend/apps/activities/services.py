@@ -2329,6 +2329,10 @@ class SubmissionService:
 
         target_url = metadata.get("url") or str(activity_id)
         target_slug = metadata.get("slug") or str(activity_id)
+        target_id = metadata.get("id") or str(activity_id)
+        if target_id and "id" not in metadata:
+            metadata["id"] = str(target_id)
+
         status_req = (
             metadata.get("status")
             or data.get("status")
@@ -2349,6 +2353,7 @@ class SubmissionService:
                     Q(username=username)
                     & (
                         Q(metadata__activity_id=str(activity_id))
+                        | Q(metadata__id=str(target_id))
                         | Q(metadata__url=target_url)
                         | Q(metadata__slug=target_slug)
                     )
@@ -2375,6 +2380,7 @@ class SubmissionService:
                 Q(username=username)
                 & (
                     Q(metadata__activity_id=str(activity_id))
+                    | Q(metadata__id=str(target_id))
                     | Q(metadata__url=target_url)
                     | Q(metadata__slug=target_slug)
                 )
@@ -2400,6 +2406,7 @@ class SubmissionService:
             Q(username=username)
             & (
                 Q(metadata__activity_id=str(activity_id))
+                | Q(metadata__id=str(target_id))
                 | Q(metadata__url=target_url)
                 | Q(metadata__slug=target_slug)
             )
@@ -2410,6 +2417,7 @@ class SubmissionService:
             Q(username=username)
             & (
                 Q(metadata__activity_id=str(activity_id))
+                | Q(metadata__id=str(target_id))
                 | Q(metadata__url=target_url)
                 | Q(metadata__slug=target_slug)
             )
