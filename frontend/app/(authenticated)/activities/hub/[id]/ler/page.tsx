@@ -20,6 +20,7 @@ export default function ReadMaterialPage() {
   const [access, setAccess] = useState<SecureViewerAccess | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [statusMessage, setStatusMessage] = useState('Opening material...');
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -28,23 +29,60 @@ export default function ReadMaterialPage() {
       return;
     }
 
-    apiGet<SecureViewerAccess & { url?: string }>(`/activities/hub/${contentId}/access`)
-      .then((data) => {
-        if (!data.is_secure_viewer && data.url) {
-          window.location.replace(data.url);
-          return;
-        }
-        if (!data.is_secure_viewer) {
-          setError('This material does not use the secure viewer.');
-          return;
-        }
-        setAccess(data);
-      })
-      .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : 'Could not open the material.';
-        setError(message);
-      })
-      .finally(() => setLoading(false));
+    let isMounted = true;
+    let retryCount = 0;
+    const maxRetries = 12;
+
+    const fetchAccess = () => {
+      apiGet<SecureViewerAccess & { url?: string; processing_status?: string }>(`/activities/hub/${contentId}/access`)
+        .then((data) => {
+          if (!isMounted) return;
+
+          // Se estiver em processamento ou sincronizando páginas em background, aguarda e tenta novamente
+          const isProcessing =
+            data.processing_status === 'processing' ||
+            (data.is_secure_viewer && (!data.pages || data.pages.length === 0));
+
+          if (isProcessing) {
+            if (retryCount < maxRetries) {
+              retryCount++;
+              setStatusMessage(`Sincronizando páginas do material... (${retryCount}/${maxRetries})`);
+              setTimeout(fetchAccess, 2000);
+              return;
+            }
+          }
+
+          if (!data.is_secure_viewer && data.url) {
+            window.location.replace(data.url);
+            return;
+          }
+          if (!data.is_secure_viewer && (!data.pages || data.pages.length === 0)) {
+            setError('This material does not use the secure viewer.');
+            return;
+          }
+
+          setAccess(data);
+          setError('');
+        })
+        .catch((err: unknown) => {
+          if (!isMounted) return;
+          const message = err instanceof Error ? err.message : 'Could not open the material.';
+          setError(message);
+        })
+        .finally(() => {
+          if (isMounted && retryCount >= maxRetries) {
+            setLoading(false);
+          } else if (isMounted && access) {
+            setLoading(false);
+          }
+        });
+    };
+
+    fetchAccess();
+
+    return () => {
+      isMounted = false;
+    };
   }, [isLoaded, user, contentId, router]);
 
   const watermarkText = user?.email
@@ -71,8 +109,9 @@ export default function ReadMaterialPage() {
         </Link>
 
         {loading && (
-          <div className="flex min-h-[40vh] items-center justify-center">
+          <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3">
             <Loader2 className="animate-spin text-primary" size={36} />
+            <p className="text-sm font-medium text-text-muted animate-pulse">{statusMessage}</p>
           </div>
         )}
 

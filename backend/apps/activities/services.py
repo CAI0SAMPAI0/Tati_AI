@@ -1958,6 +1958,43 @@ class HubService:
             elif isinstance(raw_pages, list):
                 secure_pages = list(raw_pages)
 
+        # 1.1 Verificação de integridade do cache local de páginas em disco
+        media_root = getattr(settings, "MEDIA_ROOT", "/app/media")
+        local_dir = os.path.join(media_root, "hub_pages", content_id)
+        local_has_pages = False
+        if os.path.exists(local_dir):
+            try:
+                local_has_pages = any(
+                    f.startswith("page_") and f.endswith(".webp")
+                    for f in os.listdir(local_dir)
+                )
+            except Exception:
+                local_has_pages = False
+
+        # Auto-sync sob demanda: se o material é seguro ou possui content_source e não há páginas geradas / salvas em disco
+        if (not secure_pages or not local_has_pages) and (item.content_source or getattr(item, "is_secure", False)):
+            try:
+                from apps.activities.tasks import sync_material_pages
+                logger.info(
+                    f"[Hub] Auto-sincronizando sob demanda o material '{item.title}' ({content_id})..."
+                )
+                sync_ok = sync_material_pages(item, force=False)
+                if sync_ok:
+                    item.refresh_from_db()
+                    raw_pages = getattr(item, "secure_pages", None)
+                    if raw_pages:
+                        if isinstance(raw_pages, str):
+                            try:
+                                secure_pages = json.loads(raw_pages)
+                            except Exception:
+                                secure_pages = []
+                        elif isinstance(raw_pages, list):
+                            secure_pages = list(raw_pages)
+            except Exception as sync_err:
+                logger.warning(
+                    f"[Hub] Erro na auto-sincronização do material {content_id}: {sync_err}"
+                )
+
         external_links = []
         if (
             secure_pages
@@ -1986,6 +2023,20 @@ class HubService:
                 "title": item.title,
                 "external_links": external_links,
                 "has_access": True,
+                "processing_status": getattr(item, "processing_status", "ready"),
+            }
+
+        # Se ainda está processando conversão de páginas em background
+        if getattr(item, "is_secure", False) and getattr(item, "processing_status", "") == "processing":
+            return {
+                "type": "secure_images",
+                "pages": [],
+                "total_pages": 0,
+                "is_secure_viewer": True,
+                "title": item.title,
+                "external_links": [],
+                "has_access": True,
+                "processing_status": "processing",
             }
 
         # 2. Se for arquivo direto (PPTX, PDF no Storage)
