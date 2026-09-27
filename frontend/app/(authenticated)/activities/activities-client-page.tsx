@@ -1078,7 +1078,7 @@ export default function ActivitiesClientPage() {
                                     title="Marcar como concluído e ganhar 25 XP"
                                     className="font-bold text-primary hover:text-white bg-primary/10 hover:bg-primary border border-primary/20 hover:border-primary px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 text-[0.68rem] shadow-sm cursor-pointer"
                                   >
-                                    <Award size={12} /> Concluir (+25 XP)
+                                    <Award size={12} /> Mark as Completed (+25 XP)
                                   </button>
                                 )}
                               </div>
