@@ -29,6 +29,43 @@ class ActivitiesConfig(AppConfig):
             except Exception:
                 pass
 
+        def _ensure_user_trophies_schema():
+            import time
+            time.sleep(1)
+            try:
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        DO $$
+                        BEGIN
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_name = 'user_trophies' AND column_name = 'unlocked_at'
+                            ) THEN
+                                IF EXISTS (
+                                    SELECT 1 FROM information_schema.columns 
+                                    WHERE table_name = 'user_trophies' AND column_name = 'earned_at'
+                                ) THEN
+                                    ALTER TABLE user_trophies ADD COLUMN unlocked_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+                                    UPDATE user_trophies SET unlocked_at = earned_at WHERE unlocked_at IS NULL;
+                                ELSE
+                                    ALTER TABLE user_trophies ADD COLUMN unlocked_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+                                END IF;
+                            END IF;
+
+                            IF EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_name = 'user_trophies' AND column_name = 'trophy_id' AND data_type = 'uuid'
+                            ) THEN
+                                ALTER TABLE user_trophies ALTER COLUMN trophy_id TYPE VARCHAR(100) USING trophy_id::text;
+                            END IF;
+                        END $$;
+                    """)
+            except Exception:
+                pass
+
         import threading
         threading.Thread(target=_sanitize_legacy_levels, daemon=True).start()
+        threading.Thread(target=_ensure_user_trophies_schema, daemon=True).start()
+
 

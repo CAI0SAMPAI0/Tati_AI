@@ -142,3 +142,17 @@ Este documento registra todas as alterações efetuadas no projeto durante a spr
 - **Documentação de PRD**: `PRD.md` atualizado com todas as tarefas marcadas com `[X]`.
 - **Documentação de Configuração**: `CONFIGURACOES.md` atualizado com todas as variáveis de ambiente, ferramentas opcionais, comandos de teste e instruções para a equipe.
 - **Status do Repositório**: Commits atômicos realizados e push executado na branch `desenvolvimento`.
+
+---
+
+## [Correção Pós-Deploy] Resolução do Erro Recorrente de Troféus em Produção
+- **Causa Raiz Identificada nos Logs**:
+  Os logs do container de produção indicavam múltiplos warnings a cada consulta de `/users/streak`:
+  `Error notifying unlocked trophies for programador: column "unlocked_at" of relation "user_trophies" does not exist`
+  `column "trophy_id" is of type uuid but expression is of type character varying`
+  Isso acontecia porque a tabela `user_trophies` no PostgreSQL foi criada externamente com `earned_at` (em vez de `unlocked_at`) e `trophy_id` como `UUID` (em vez de aceitar slugs alfanuméricos como `streak-7`). Como o modelo possuía `managed = False`, o Django nunca sincronizou a estrutura.
+- **Solução Implementada**:
+  1. Executado script de migração DDL no PostgreSQL do Railway garantindo a coluna `unlocked_at TIMESTAMPTZ` (sincronizada com `earned_at`) e alterando `trophy_id` para `VARCHAR(100)` para suportar tanto UUIDs legados quanto novos slugs de conquistas.
+  2. Adicionada rotina de auto-cura (`_ensure_user_trophies_schema`) em background no `ready()` de [`backend/apps/activities/apps.py`](file:///C:/Users/caio/Projetos/Tati_AI/backend/apps/activities/apps.py) para que qualquer nova réplica ou banco garanta esse schema na inicialização de forma segura e transparente.
+  3. Validada a inserção e desbloqueio de troféus sem qualquer warning ou erro nos logs.
+
