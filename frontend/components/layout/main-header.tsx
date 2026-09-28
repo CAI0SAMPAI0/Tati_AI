@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Menu, Trophy, Flame, CircleAlert, MessageSquareHeart, Bug } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useState } from 'react';
@@ -17,9 +18,12 @@ import { cn } from '@/lib/utils';
 
 interface MainHeaderProps {
   onToggleMenu?: () => void;
+  hideStats?: boolean;
 }
 
-export function MainHeader({ onToggleMenu }: MainHeaderProps) {
+export function MainHeader({ onToggleMenu, hideStats }: MainHeaderProps) {
+  const pathname = usePathname();
+  const isSettings = hideStats || pathname === '/settings';
   const { user } = useAuth();
   const avatarUrl = user?.avatar_url || (user as any)?.profile?.avatar_url || DEFAULT_AVATAR_URL;
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
@@ -40,8 +44,22 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
             <Menu size={20} />
           </button>
         )}
-        <Link href={isHubOnly ? "/activities/hub" : "/chat"} prefetch={true} className="font-display text-lg font-bold tracking-tight pl-2">
-          Teacher <span className="text-primary">Taty</span>
+        <Link
+          href={isHubOnly ? "/activities/hub" : "/chat"}
+          prefetch={true}
+          className="flex items-center gap-2 font-display text-base sm:text-lg font-bold tracking-tight pl-2 hover:opacity-90 transition-opacity"
+        >
+          <div className="w-7 h-7 rounded-full overflow-hidden border border-primary/30 flex items-center justify-center bg-primary/10 shrink-0">
+            <img
+              src="/avatar/avatar_tati_normal.webp"
+              alt="Teacher Tati"
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.src = '/images/tati_logo.jpg';
+              }}
+            />
+          </div>
+          <span>Teacher <span className="text-primary">Taty</span></span>
         </Link>
       </div>
 
@@ -60,7 +78,7 @@ export function MainHeader({ onToggleMenu }: MainHeaderProps) {
         </div>
 
         <div className="flex items-center gap-3 md:gap-5">
-          {!isHubOnly && (
+          {!isHubOnly && !isSettings && (
             <>
                 <Link
                   href="/achievements"

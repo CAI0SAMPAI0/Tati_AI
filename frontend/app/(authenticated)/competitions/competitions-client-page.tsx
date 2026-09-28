@@ -316,9 +316,9 @@ export default function CompetitionsClientPage() {
                   </span>
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-text mb-1">Simulations, Games and , Musics and News</h3>
+                  <h3 className="text-sm font-bold text-text mb-1">Simulations, Games, Music and News</h3>
                   <p className="text-xs text-text-muted leading-relaxed">
-                    Do the simulations, games, musics and news to earn points.
+                    Do the simulations, games, music and news to earn points.
                   </p>
                 </div>
               </div>

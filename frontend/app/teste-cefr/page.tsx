@@ -554,9 +554,12 @@ export default function PublicCefrTestPage() {
                   <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-primary/20 bg-primary/10 shadow-sm">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src="/images/tati_logo.jpg"
+                      src="/avatar/avatar_tati_normal.webp"
                       alt="Teacher Tati AI"
-                      className="h-full w-full object-contain"
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = '/images/tati_logo.jpg';
+                      }}
                     />
                   </div>
                 )}
@@ -635,9 +638,12 @@ export default function PublicCefrTestPage() {
               <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-primary/20 bg-primary/10 shadow-sm">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/images/tati_logo.jpg"
+                  src="/avatar/avatar_tati_normal.webp"
                   alt="Teacher Tati AI"
-                  className="h-full w-full object-contain"
+                  className="h-full w-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = '/images/tati_logo.jpg';
+                  }}
                 />
               </div>
               <div className="inline-flex items-center gap-2 rounded-2xl bg-surface border border-border px-4 py-3 text-xs text-text-muted">

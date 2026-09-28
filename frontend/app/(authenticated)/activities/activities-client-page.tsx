@@ -600,7 +600,7 @@ export default function ActivitiesClientPage() {
     { id: 'vocabulary', icon: <Lightbulb size={18} />, label: 'Vocabulary', count: vocabularyItems.length },
     { id: 'listenings', icon: <Podcast size={18} />, label: 'Listening', count: listeningItems.length || podcasts.length },
     { id: 'reading', icon: <FileText size={18} />, label: 'Reading', count: readingItems.length },
-    { id: 'musics', icon: <Music size={18} />, label: 'Musics', count: musics.length },
+    { id: 'musics', icon: <Music size={18} />, label: 'Music', count: musics.length },
     { id: 'flashcards', icon: <Layers size={18} />, label: 'Flashcards', count: flashcards.length },
     { id: 'simulations', icon: <Drama size={18} />, label: 'Simulations', count: simulations.length },
     { id: 'games', icon: <Gamepad2 size={18} />, label: 'Games', count: games.length },
@@ -748,8 +748,20 @@ export default function ActivitiesClientPage() {
         <main className="p-4 md:p-8 max-w-7xl w-full mx-auto animate-fade-in">
           <header className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
-              <h1 className="text-2xl md:text-3xl font-display font-bold text-text mb-2">My Activities</h1>
-              <p className="text-text-muted text-sm md:text-base max-w-2xl">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-primary/30 shadow-sm shrink-0 bg-primary/10">
+                  <img
+                    src="/avatar/avatar_tati_normal.webp"
+                    alt="Teacher Tatiana"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = '/images/tati_logo.jpg';
+                    }}
+                  />
+                </div>
+                <h1 className="text-2xl md:text-3xl font-display font-bold text-text">My Activities</h1>
+              </div>
+              <p className="text-text-muted text-sm md:text-base max-w-2xl hidden lg:block">
                 Practice vocabulary, grammar, reading and listening. Track Completed vs Pending activities!
               </p>
             </div>
@@ -833,9 +845,9 @@ export default function ActivitiesClientPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h3 className="text-lg font-bold text-text flex items-center gap-2">
-                      <Music className="text-primary" size={20} /> Musics & Lyrics (LingoClip)
+                      <Music className="text-primary" size={20} /> Music & Lyrics (LingoClip)
                     </h3>
-                    <p className="text-text-muted text-sm mt-0.5">
+                    <p className="text-text-muted text-sm mt-0.5 hidden lg:block">
                       Practice English singing along with your favorite safe songs! Choose among 3 game modes: <strong>Multiple Choice</strong>, <strong>Typing</strong> or <strong>Karaoke</strong>.
                     </p>
                   </div>
@@ -1103,7 +1115,7 @@ export default function ActivitiesClientPage() {
                 ) : (
                   <div className="py-20 text-center text-text-muted border border-dashed border-border rounded-3xl bg-surface/30">
                     <Music size={40} className="mx-auto mb-4 opacity-20" />
-                    <p>No musics found matching your search.</p>
+                    <p>No music found matching your search.</p>
                   </div>
                 )}
               </div>

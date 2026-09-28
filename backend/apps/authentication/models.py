@@ -48,9 +48,8 @@ class UserManager(BaseUserManager):
         return self.create_user(username, email, password, **extra_fields)
 
 
-DEFAULT_AVATAR_URL = (
-    "https://img.magnific.com/premium-vector/account-icon-user-icon-vector-graphics_292645-552.jpg?semt=ais_hybrid&w=740&q=80"
-)
+DEFAULT_AVATAR_URL = "/avatar/avatar_tati_normal.webp"
+
 
 
 class User(AbstractBaseUser):
