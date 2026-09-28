@@ -176,3 +176,43 @@ Este documento registra todas as alterações efetuadas no projeto durante a spr
      - Todas as rotinas de disparo agendado (Streaks, relatórios de evolução, incentivo de inatividade e fechamento de competição mensal) continuam totalmente operacionais via webhooks seguros protegidos por token (`/api/notifications/cron/*`), permitindo acionamento via cron externo (ex: Railway Cron, Vercel Cron, GitHub Actions) sem manter a instância de API acordada 24/7.
 
 
+
+
+---
+
+## [Sprint 9] Restauração dos Avatares da Teacher Tati, Ajuste "Music 213" & Merge Produção/Desenvolvimento
+- **Problema Relatado**:
+  1. Em produção na branch `main`, os avatares da Teacher Tatiana não estavam aparecendo no Modo de Voz (`/voice`) e nas Atividades (`/activities`).
+  2. Na aba de músicas em Activities, aparecia "Musics 213", e a Teacher Tatiana solicitou a remoção do plural "s" para ficar "Music 213".
+  3. No modal de configurações (`/settings`), a topbar estava poluída com troféus e ofensivas (streaks).
+- **Causa Raiz Técnica**:
+  1. **Arquivos ausentes no frontend**: Os 14 arquivos `.webp` dos visemas e animações faciais da Tatiana (`avatar_tati_normal.webp`, `avatar_tati_meio.webp`, `avatar_tati_aberta.webp`, `avatar_tati_bem_aberta.webp`, `avatar_tati_ouvindo.webp`, `tati_piscando.webp`, `tati_surpresa.webp`, `frame_A.webp` a `frame_F.webp`) existiam apenas na pasta `backend/assets/avatar/` e nunca foram versionados na pasta `frontend/public/avatar/`. Como o build da Vercel só consome o diretório `frontend/`, esses arquivos resultavam em HTTP 404 em produção.
+  2. **Dependência síncrona de endpoint de backend no VoiceAvatar**: O componente `VoiceAvatar` usava `INITIAL_SRC = '/images/tati_logo.jpg'` e aguardava uma requisição de rede para `/avatar/frames`. Além disso, a função interna `getUrl` tentava prefixar qualquer caminho relativo com a URL do backend (`${API_BASE}/...`), causando falhas se a API estivesse inicializando ou se o container estivesse dormindo.
+  3. **Avatar padrão quebrado (`img.magnific.com`)**: Tanto o frontend (`frontend/lib/constants/user.ts`) quanto o backend (`backend/apps/authentication/models.py`) definiam `DEFAULT_AVATAR_URL` como uma URL externa inativa (`img.magnific.com`), fazendo com que qualquer usuário ou fallback de avatar quebrasse visualmente.
+- **Solução Implementada**:
+  1. **Cópia e versionamento estático de todos os frames**:
+     - Copiados os 14 frames `.webp` para `frontend/public/avatar/` e `frontend/public/images/avatar/`, garantindo entrega com 0ms de latência diretamente pelo CDN da Vercel.
+  2. **Modernização resiliente do `VoiceAvatar` (`frontend/components/chat/voice-avatar.tsx`)**:
+     - Definido `INITIAL_SRC = '/avatar/avatar_tati_normal.webp'`.
+     - Criado objeto `DEFAULT_FRAMES` estático local apontando para todos os 14 visemas locais.
+     - Atualizada a função `getUrl` para servir arquivos `/avatar/` e `/images/` diretamente sem direcionar para a API externa.
+     - Adicionadas tratativas de `onError` com fallback para evitar telas brancas ou ícones quebrados.
+  3. **Correção do `DEFAULT_AVATAR_URL`**:
+     - Atualizado em `frontend/lib/constants/user.ts` e `backend/apps/authentication/models.py` para `/avatar/avatar_tati_normal.webp`.
+  4. **Presença visual da Teacher Tati nas Atividades e Chat**:
+     - Inserido avatar da Tatiana no [`MainHeader`](file:///C:/Users/caio/Projetos/Tati_AI/frontend/components/layout/main-header.tsx) ao lado de "Teacher Taty".
+     - Inserido avatar da Tatiana no topo da [`SidebarActivities`](file:///C:/Users/caio/Projetos/Tati_AI/frontend/components/activities/sidebar-activities.tsx).
+     - Inserido avatar da Tatiana no título da página [`My Activities`](file:///C:/Users/caio/Projetos/Tati_AI/frontend/app/(authenticated)/activities/activities-client-page.tsx).
+     - Atualizadas as bolhas de chat de IA e tela inicial de boas-vindas para utilizar o avatar facial da Tatiana.
+  5. **Ajuste da Aba "Music 213"**:
+     - `activities-client-page.tsx`: Alterado `label: 'Musics'` para `label: 'Music'`, exibindo agora `Music 213`.
+     - Atualizado o título de `Musics & Lyrics (LingoClip)` para `Music & Lyrics (LingoClip)`.
+     - Ocultados textos de instrução secundários em telas `sm` e `md` (`hidden lg:block`).
+  6. **Topbar Responsiva & Settings Limpo**:
+     - No [`MainHeader`](file:///C:/Users/caio/Projetos/Tati_AI/frontend/components/layout/main-header.tsx), ocultados os troféus e ofensivas quando na rota `/settings`, eliminando poluição visual.
+     - Ajustado o tamanho da tipografia de "Teacher Taty" para `text-sm sm:text-base` nas rotas de atividades e telas menores.
+  7. **Deploy na Produção (`main`) & Sincronização (`desenvolvimento`)**:
+     - Commit e push executados com sucesso na branch `main`.
+     - Checkout para `desenvolvimento`, merge de `main` e resolução de conflitos mantendo todas as funcionalidades intactas.
+     - Validação TypeScript (`tsc --noEmit`) aprovada com 0 erros.
+     - Push final realizado na branch `desenvolvimento`.

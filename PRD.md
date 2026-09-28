@@ -81,3 +81,12 @@ Todas as 7 sprints de modernização e estabilização foram concluídas com suc
 - [X] **8.4** Aplicar salvaguardas em nível de código Python (`apps/notifications/apps.py` e `apps/notifications/scheduler.py`) para ignorar o início da thread `TatiNotificationScheduler` quando em modo serverless.
 - [X] **8.5** Validar `manage.py check` confirmando que em modo `SERVERLESS=true` nenhum loop de background é iniciado.
 
+### Sprint 9: Restauração de Avatares da Teacher Tati, Ajuste "Music 213" & Merge Produção/Desenvolvimento
+- [X] **9.1** Copiar e versionar todos os 14 frames/avatares da Teacher Tati (`.webp`) em `frontend/public/avatar/` e `frontend/public/images/avatar/`, resolvendo o erro em produção na Vercel (onde a pasta `backend/assets/avatar/` não era exportada).
+- [X] **9.2** Configurar `DEFAULT_FRAMES` estáticos locais e `INITIAL_SRC = '/avatar/avatar_tati_normal.webp'` no componente `VoiceAvatar`, além de corrigir `getUrl` para rotas estáticas locais `/avatar/` e adicionar tratativas de `onError`.
+- [X] **9.3** Substituir a URL quebrada de avatar padrão (`img.magnific.com`) por `/avatar/avatar_tati_normal.webp` no frontend (`frontend/lib/constants/user.ts`) e no backend (`backend/apps/authentication/models.py`).
+- [X] **9.4** Inserir avatar da Teacher Tati no header principal (`MainHeader`), na barra lateral de atividades (`SidebarActivities`), no título de "My Activities", nas mensagens de chat e na tela de teste de nivelamento CEFR.
+- [X] **9.5** Renomear a aba e textos de músicas de "Musics 213" para "Music 213" (`label: 'Music'`), além de atualizar `Music & Lyrics (LingoClip)` em conformidade com o pedido da Tatiana.
+- [X] **9.6** Realizar commit e push na branch `main` (produção) e sincronizar via `git merge` na branch `desenvolvimento`, com checagem de tipos TypeScript (`tsc --noEmit`) 100% aprovada e sem erros.
+
+
