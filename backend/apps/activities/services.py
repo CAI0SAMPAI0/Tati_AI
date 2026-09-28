@@ -6,6 +6,7 @@ import uuid
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from ninja.errors import HttpError
 
