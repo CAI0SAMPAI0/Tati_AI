@@ -133,6 +133,8 @@ class UserTrophy(models.Model):
     trophy_id = models.CharField(max_length=100)
     unlocked_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
+
+
     class Meta:
         db_table = "user_trophies"
         managed = False

@@ -48,7 +48,7 @@ class UserManager(BaseUserManager):
         return self.create_user(username, email, password, **extra_fields)
 
 
-DEFAULT_AVATAR_URL = "/avatar/avatar_tati_normal.webp"
+DEFAULT_AVATAR_URL = "/images/default-avatar.png"
 
 
 
@@ -152,6 +152,8 @@ class User(AbstractBaseUser):
         if isinstance(self.profile, dict):
             url = self.profile.get("avatar_url")
             if url and str(url).strip():
+                if "/avatar/avatar_tati" in str(url) and getattr(self, "role", "") != UserRole.TEACHER:
+                    return DEFAULT_AVATAR_URL
                 return url
         return DEFAULT_AVATAR_URL
 
@@ -211,7 +213,10 @@ class User(AbstractBaseUser):
 
     @property
     def is_superuser(self) -> bool:
-        return self.role == UserRole.PROGRAMADOR or self.username == "programador"
+        from django.conf import settings
+        prog_users = getattr(settings, "PROGRAMMER_USERNAMES", ["programador", "admin", "caio"])
+        return self.role == UserRole.PROGRAMADOR or self.username in prog_users
+
 
     @is_superuser.setter
     def is_superuser(self, val: bool):

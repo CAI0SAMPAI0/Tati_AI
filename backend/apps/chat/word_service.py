@@ -89,23 +89,31 @@ class WordLookupService:
 
     @classmethod
     def _fetch_ai_definition(cls, word: str) -> Dict[str, Any]:
-        system_instruction = (
-            "You are an expert English-Portuguese linguistic dictionary for English learners. "
-            "When given an English word, token, or expression, return a JSON object with keys:\n"
-            "- \"word\": the exact word\n"
-            "- \"lemma\": base dictionary form (infinitive or singular)\n"
-            "- \"partOfSpeech\": e.g. \"verb\", \"noun\", \"adjective\"\n"
-            "- \"phonetic\": IPA pronunciation, e.g. \"/rʌnz/\"\n"
-            "- \"translation\": clear, natural Portuguese translations separated by comma\n"
-            "- \"english_definition\": concise, accessible English definition\n"
-            "- \"portuguese_explanation\": helpful short tip in Portuguese about its usage or grammar\n"
-            "- \"example\": a short, natural example sentence in English\n"
-            "- \"example_pt\": Portuguese translation of the example\n"
-            "Respond with valid JSON ONLY. No markdown ticks, no emojis."
-        )
+        from django.conf import settings
+        from shared.prompt_manager import PromptManager
+        from shared.ai_cache import AICache
 
-        user_content = f"Define the word: {word}"
+        clean_word = word.lower().strip()
+        cached = AICache.get_llm_response(f"word_definition:{clean_word}")
+        if cached:
+            try:
+                cached_data = json.loads(cached)
+                return cls._sanitize_data(cached_data, word)
+            except Exception:
+                pass
 
+        system_instruction = PromptManager.get_prompt("word_analysis", section="System Instruction")
+        if not system_instruction:
+            system_instruction = (
+                "You are an expert English-Portuguese linguistic dictionary for English learners. "
+                "Respond with valid JSON ONLY. No markdown ticks, no emojis."
+            )
+
+        user_content = PromptManager.get_prompt("word_analysis", section="User Content", word=word)
+        if not user_content:
+            user_content = f"Define the word: {word}"
+
+        groq_model = getattr(settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"))
         keys = cls._get_groq_keys()
 
         for key in keys:
@@ -114,7 +122,7 @@ class WordLookupService:
 
                 client = Groq(api_key=key, timeout=9.0)
                 completion = client.chat.completions.create(
-                    model="openai/gpt-oss-20b",
+                    model=groq_model,
                     messages=[
                         {"role": "system", "content": system_instruction},
                         {"role": "user", "content": user_content},
@@ -126,7 +134,9 @@ class WordLookupService:
                 raw_json = completion.choices[0].message.content or "{}"
                 data = json.loads(raw_json)
                 if data.get("translation") or data.get("english_definition"):
-                    return cls._sanitize_data(data, word)
+                    sanitized = cls._sanitize_data(data, word)
+                    AICache.set_llm_response(f"word_definition:{clean_word}", json.dumps(sanitized), ttl=604800)
+                    return sanitized
             except Exception as e:
                 logger.warning(f"[WordLookup] Groq key failed for '{word}': {e}")
 

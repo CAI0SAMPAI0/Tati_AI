@@ -8,6 +8,8 @@ from typing import List, Dict, Any, Optional
 
 from groq import Groq
 from django.db import transaction
+from django.conf import settings
+from shared.prompt_manager import PromptManager
 
 from .models import Flashcard, CEFRSchedule
 from apps.chat.models import CEFRSimulation
@@ -79,35 +81,20 @@ class CEFRGeneratorService:
 
         cards_data = []
         if client:
-            prompt = f"""You are Teacher Tatiana Duarte, an expert ESL teacher.
-Generate {count} UNIQUE and DISTINCT educational flashcards for CEFR Level {lvl} on the topic: "{topic}".{ref_context}
-
-CRITICAL RULES:
-1. EVERYTHING MUST BE IN 100% ENGLISH. NEVER USE PORTUGUESE OR ANY OTHER LANGUAGE.
-2. "front": A UNIQUE English target word, expression or short phrase (1-4 words). NEVER repeat words or phrases.
-3. "back": A simple, clear definition or clue/hint in ENGLISH strictly suited for CEFR Level {lvl} (e.g. for Level A1/A2 use simple vocabulary; for B1/B2/C1 use appropriate level complexity).
-4. "options": A list of EXACTLY 4 distinct English choices suitable for Level {lvl}: exactly 1 correct answer (matching "front") and 3 plausible, realistic incorrect distractors from the same lexical category/theme.
-5. "explanation": A natural example sentence in English demonstrating real-world usage in context.
-6. "image_search_query": 2 to 4 concrete English keywords to search for a photo representing the situation, action or concept WITHOUT spoiling the answer and WITHOUT showing written words or labels (e.g., if front is 'Boarding pass', search for 'airport departure terminal gate' NOT 'boarding pass paper'; if front is 'Coffee', search for 'ceramic mug on wooden table' NOT 'coffee shop sign'; if front is an abstract phrase like 'In my opinion', search for 'colleagues discussing idea meeting').
-7. "image_prompt": A vivid photographic scene prompt for AI image generation illustrating the real-world action or concept. Strictly specify: realistic photography, bright natural lighting, highly pedagogical, strictly NO visible text, NO words, NO letters, NO labels, NO logos.
-8. All items must be completely distinct from one another.
-
-Return ONLY a JSON object in this exact format:
-{{
-  "flashcards": [
-    {{
-      "front": "target word in English",
-      "back": "simple definition or clue in English",
-      "options": ["target word in English", "distractor 1", "distractor 2", "distractor 3"],
-      "explanation": "natural example sentence in English",
-      "image_search_query": "contextual visual search terms with no spoilers",
-      "image_prompt": "clear visual scene prompt with no text or labels"
-    }}
-  ]
-}}"""
+            prompt = PromptManager.get_prompt(
+                "cefr_activity_generator",
+                section="Flashcards Generator",
+                count=count,
+                lvl=lvl,
+                topic=topic,
+                ref_context=ref_context,
+            )
+            groq_model = getattr(
+                settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+            )
             try:
                 res = client.chat.completions.create(
-                    model="openai/gpt-oss-120b",
+                    model=groq_model,
                     messages=[{"role": "user", "content": prompt}],
                     response_format={"type": "json_object"},
                     temperature=0.3,
@@ -250,9 +237,12 @@ Return ONLY a JSON object in this exact format:
   }},
   "goal": "The communicative mission the student must achieve (e.g. Ask for the price, order a meal, answer questions)."
 }}"""
+            groq_model = getattr(
+                settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+            )
             try:
                 res = client.chat.completions.create(
-                    model="openai/gpt-oss-120b",
+                    model=groq_model,
                     messages=[{"role": "user", "content": prompt}],
                     response_format={"type": "json_object"},
                     temperature=0.3,
@@ -410,9 +400,12 @@ Format ONLY as JSON:
     }}
   ]
 }}"""
+            groq_model = getattr(
+                settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+            )
             try:
                 res = client.chat.completions.create(
-                    model="openai/gpt-oss-120b",
+                    model=groq_model,
                     messages=[{"role": "user", "content": prompt}],
                     response_format={"type": "json_object"},
                     temperature=0.2,

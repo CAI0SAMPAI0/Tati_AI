@@ -71,7 +71,9 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "app.middleware.StructuredLoggingMiddleware",
 ]
+
 
 # Ativa debug_toolbar apenas se explicitamente habilitado via variável de ambiente (desativado por padrão em produção/HF)
 if os.getenv("ENABLE_DEBUG_TOOLBAR", "false").lower() in ("true", "1"):
@@ -340,7 +342,12 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
     "pragma",
     "if-modified-since",
     "if-none-match",
+    "x-request-id",
+    "x-load-test-secret",
 ]
+
+CORS_EXPOSE_HEADERS = ["x-request-id", "content-disposition", "content-type"]
+
 
 # Origens permitidas dinâmicas para Railway, Hugging Face Spaces e Vercel
 CORS_ALLOWED_ORIGIN_REGEXES = [
@@ -387,6 +394,27 @@ PROGRAMMER_USERNAMES = [
     for u in os.getenv("PROGRAMMER_USERNAMES", "programador,admin,caio").split(",")
     if u.strip()
 ]
+ADMIN_USERNAMES = [
+    u.strip()
+    for u in os.getenv("ADMIN_USERNAMES", "programador,admin,professor,professora").split(",")
+    if u.strip()
+]
+
+#    MODELAGEM DE IA E PROVEDORES                                       
+LLM_MODEL = os.getenv("LLM_MODEL", "meta-llama/Llama-3.1-8B-Instruct:novita")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "meta_llama")  # meta_llama, groq, gemini
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-large-en-v1.5")
+AI_CACHE_ENABLED = os.getenv("AI_CACHE_ENABLED", "true").lower() in ("true", "1", "yes")
+AI_CACHE_TTL = int(os.getenv("AI_CACHE_TTL", "86400"))
+
+#    NOTIFICAÇÕES & FEEDBACK EMAILS                                     
+DEV_NOTIFICATION_EMAIL = os.getenv(
+    "DEV_NOTIFICATION_EMAIL", os.getenv("EMAIL_FEEDBACK", "cmsampaio71@gmail.com")
+)
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL", "caio.matos@11607679.brevosend.com"
+)
 
 #    GOOGLE OAUTH & REDIRECTS                                           
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID") or os.getenv(
@@ -444,6 +472,17 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
+        "structured_json": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "audit": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
+
 

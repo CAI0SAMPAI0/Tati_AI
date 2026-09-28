@@ -25,7 +25,14 @@ export default function LerClientPage() {
       return data;
     },
     enabled: isLoaded && Boolean(token),
-    retry: false,
+    refetchInterval: (query) => {
+      const res = query.state.data as any;
+      if (res?.is_secure_viewer && (!res.pages || res.pages.length === 0 || res.processing_status === 'processing')) {
+        return 2000;
+      }
+      return false;
+    },
+    retry: 2,
   });
 
   if (isLoaded && !token) {

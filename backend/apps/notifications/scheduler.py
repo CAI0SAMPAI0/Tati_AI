@@ -69,6 +69,13 @@ class BackgroundNotificationRunner:
         with _scheduler_lock:
             if _scheduler_started:
                 return
+
+            is_serverless = os.getenv("SERVERLESS", "false").lower() in ("true", "1", "yes")
+            enable_scheduler = os.getenv("ENABLE_NOTIFICATION_SCHEDULER", "false" if is_serverless else "true").lower() in ("true", "1", "yes")
+            if is_serverless or not enable_scheduler:
+                logger.info("[Scheduler] Modo Serverless ou ENABLE_NOTIFICATION_SCHEDULER=false detectado. Agendador suspenso para permitir sleep.")
+                return
+
             _scheduler_started = True
 
         t = threading.Thread(target=cls._loop, name="TatiNotificationScheduler", daemon=True)

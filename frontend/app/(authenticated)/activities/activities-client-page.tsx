@@ -328,7 +328,7 @@ export default function ActivitiesClientPage() {
       try {
         const res = await apiGet<MusicItem[]>(ENDPOINTS.ACTIVITIES_MUSICS);
         if (Array.isArray(res) && res.length > 0) return res;
-      } catch (_) {}
+      } catch (_) { }
       const staticRes = await fetch('/data/lingoclip_musics.json');
       return staticRes.json();
     },
@@ -552,7 +552,7 @@ export default function ActivitiesClientPage() {
         if (streakData && typeof streakData.trophies_earned === 'number') {
           window.dispatchEvent(new CustomEvent('tati_streak_updated', { detail: streakData }));
         }
-      } catch (_) {}
+      } catch (_) { }
     } catch (e) {
       toast.error("Error completing activity.");
     }
@@ -589,7 +589,7 @@ export default function ActivitiesClientPage() {
       queryClient.invalidateQueries({ queryKey: ['ranking-position'] });
       try {
         window.dispatchEvent(new CustomEvent('tati_activity_completed', { detail: item }));
-      } catch (_) {}
+      } catch (_) { }
     } catch (e) {
       toast.error("Error reverting activity.");
     }
@@ -749,16 +749,6 @@ export default function ActivitiesClientPage() {
           <header className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-primary/30 shadow-sm shrink-0 bg-primary/10">
-                  <img
-                    src="/images/tati_logo.jpg"
-                    alt="Teacher Tatiana"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
-                </div>
                 <h1 className="text-2xl md:text-3xl font-display font-bold text-text">My Activities</h1>
               </div>
               <p className="text-text-muted text-sm md:text-base max-w-2xl hidden lg:block">
@@ -847,7 +837,7 @@ export default function ActivitiesClientPage() {
                     <h3 className="text-lg font-bold text-text flex items-center gap-2">
                       <Music className="text-primary" size={20} /> Music & Lyrics (LingoClip)
                     </h3>
-                    <p className="text-text-muted text-sm mt-0.5 hidden lg:block">
+                    <p className="hidden lg:block text-text-muted text-sm mt-0.5">
                       Practice English singing along with your favorite safe songs! Choose among 3 game modes: <strong>Multiple Choice</strong>, <strong>Typing</strong> or <strong>Karaoke</strong>.
                     </p>
                   </div>

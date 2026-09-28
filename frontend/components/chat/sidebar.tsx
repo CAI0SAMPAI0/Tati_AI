@@ -46,7 +46,10 @@ export function Sidebar({
   onClose,
 }: SidebarProps) {
   const { user, logout } = useAuth();
-  const avatarUrl = user?.avatar_url || (user as any)?.profile?.avatar_url || DEFAULT_AVATAR_URL;
+  const rawAvatar = user?.avatar_url || (user as any)?.profile?.avatar_url;
+  const avatarUrl = (!rawAvatar || (rawAvatar.includes('/avatar/avatar_tati') && (user as any)?.role !== 'teacher'))
+    ? DEFAULT_AVATAR_URL
+    : rawAvatar;
 
   const router = useRouter();
   const queryClient = useQueryClient();

@@ -29,6 +29,13 @@ interface RankingEntry {
   avatar_url?: string;
 }
 
+function getStudentAvatar(url?: string | null): string {
+  if (!url || url.includes('/avatar/avatar_tati')) {
+    return DEFAULT_AVATAR_URL;
+  }
+  return url;
+}
+
 export default function CompetitionsClientPage() {
   const { user } = useAuth();
   const { sidebarOpen, toggleSidebar: handleToggleSidebar, closeSidebar: handleCloseSidebar } = useSidebarState();
@@ -115,7 +122,7 @@ export default function CompetitionsClientPage() {
               <div className="flex flex-col items-center gap-3">
                 <div className="w-14 h-14 md:w-20 md:h-20 rounded-full border-4 border-slate-300 relative bg-bg-secondary overflow-hidden">
                   <img
-                    src={currentRanking[1]?.avatar_url || DEFAULT_AVATAR_URL}
+                    src={getStudentAvatar(currentRanking[1]?.avatar_url)}
                     alt=""
                     className="w-full h-full object-cover"
                     onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR_URL; }}
@@ -133,7 +140,7 @@ export default function CompetitionsClientPage() {
               <div className="flex flex-col items-center gap-4">
                 <div className="w-20 h-20 md:w-28 md:h-28 rounded-full border-4 border-yellow-400 relative shadow-glow shadow-yellow-400/25 scale-110 bg-bg-secondary overflow-hidden">
                   <img
-                    src={currentRanking[0]?.avatar_url || DEFAULT_AVATAR_URL}
+                    src={getStudentAvatar(currentRanking[0]?.avatar_url)}
                     alt=""
                     className="w-full h-full object-cover"
                     onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR_URL; }}
@@ -151,7 +158,7 @@ export default function CompetitionsClientPage() {
               <div className="flex flex-col items-center gap-3">
                 <div className="w-12 h-12 md:w-16 md:h-16 rounded-full border-4 border-orange-400 relative bg-bg-secondary overflow-hidden">
                   <img
-                    src={currentRanking[2]?.avatar_url || DEFAULT_AVATAR_URL}
+                    src={getStudentAvatar(currentRanking[2]?.avatar_url)}
                     alt=""
                     className="w-full h-full object-cover"
                     onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR_URL; }}
@@ -191,7 +198,7 @@ export default function CompetitionsClientPage() {
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary border border-primary/20 overflow-hidden shrink-0">
                             <img
-                              src={r.avatar_url || DEFAULT_AVATAR_URL}
+                              src={getStudentAvatar(r.avatar_url)}
                               alt=""
                               className="w-full h-full object-cover"
                               onError={(e) => {
