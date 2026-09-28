@@ -12,7 +12,7 @@ export interface VoiceAvatarProps {
   className?: string;
 }
 
-// ── Frames locais estáticos (0ms de latência, sem base64 pesado) ─────
+// ── Frames locais estáticos ──────────────────────────────────────────
 
 const FRAMES = {
   normal: '/avatar/avatar_tati_normal.webp',
@@ -73,7 +73,7 @@ export function VoiceAvatar({
       setCurrentFrame(FRAMES.normal);
 
       const scheduleBlink = () => {
-        const delay = 3200 + Math.random() * 2000;
+        const delay = 3500 + Math.random() * 2000;
         blinkTimer = setTimeout(() => {
           if (stateRef.current !== 'idle') return;
           setCurrentFrame(FRAMES.piscando);
@@ -81,7 +81,7 @@ export function VoiceAvatar({
             if (stateRef.current !== 'idle') return;
             setCurrentFrame(FRAMES.normal);
             scheduleBlink();
-          }, 150);
+          }, 160);
         }, delay);
       };
 
@@ -103,15 +103,26 @@ export function VoiceAvatar({
         if (stateRef.current !== 'processing') return;
         isBlink = !isBlink;
         setCurrentFrame(isBlink ? FRAMES.piscando : FRAMES.normal);
-      }, 2200) as any;
+      }, 2400) as any;
       return stopTimers;
     }
 
-    // ── 4. ESTADO: speaking (Tatiana falando → abrindo e fechando a boca) ──
+    // ── 4. ESTADO: speaking (Tatiana falando → cadência suave e humana de fala) ──
     if (state === 'speaking') {
-      // Ciclo contínuo de abrir e fechar a boca: normal -> meio -> bem_aberta -> meio
-      const mouthCycle = [FRAMES.normal, FRAMES.meio, FRAMES.bem_aberta, FRAMES.meio];
+      // Cadência conversacional orgânica e suave: a boca abre e fecha num ritmo natural
+      const mouthCycle = [
+        FRAMES.meio,
+        FRAMES.normal,
+        FRAMES.meio,
+        FRAMES.meio,
+        FRAMES.bem_aberta,
+        FRAMES.meio,
+        FRAMES.normal,
+        FRAMES.meio,
+      ];
       let cycleIdx = 0;
+      let smoothedAvg = 0;
+      let lastFrameChangeTime = 0;
 
       let usingWebAudio = false;
 
@@ -127,7 +138,7 @@ export function VoiceAvatar({
               const source = ctx.createMediaElementSource(audioElement);
               const analyser = ctx.createAnalyser();
               analyser.fftSize = 256;
-              analyser.smoothingTimeConstant = 0.15;
+              analyser.smoothingTimeConstant = 0.3; // Suavização sonora agradável
               source.connect(analyser);
               analyser.connect(ctx.destination);
               nodes = { ctx, analyser, source };
@@ -148,37 +159,44 @@ export function VoiceAvatar({
               nodes!.analyser.getByteFrequencyData(freqData);
               let sum = 0;
               for (let i = 0; i < freqData.length; i++) sum += freqData[i];
-              const avg = sum / freqData.length;
+              const rawAvg = sum / freqData.length;
+              smoothedAvg = smoothedAvg * 0.6 + rawAvg * 0.4;
 
-              // Se a Web Audio API detectar energia real de volume
-              if (avg >= 12) {
-                if (avg < 20) {
+              const now = Date.now();
+              // Amortecimento: segura cada frame no mínimo 140ms para evitar flickering
+              if (now - lastFrameChangeTime < 140) return;
+
+              if (smoothedAvg >= 12) {
+                lastFrameChangeTime = now;
+                if (smoothedAvg < 20) {
                   setCurrentFrame(FRAMES.normal);
-                } else if (avg < 50) {
+                } else if (smoothedAvg < 55) {
                   setCurrentFrame(FRAMES.meio);
                 } else {
                   setCurrentFrame(FRAMES.bem_aberta);
                 }
               } else {
-                // Fallback de cadência quando o volume retornado for 0 (áudio em data-URI ou CORS)
-                // Abre e fecha a boca dinamicamente enquanto o áudio estiver tocando!
-                cycleIdx = (cycleIdx + 1) % mouthCycle.length;
-                setCurrentFrame(mouthCycle[cycleIdx]);
+                // Cadência suave em 180ms
+                if (now - lastFrameChangeTime >= 180) {
+                  lastFrameChangeTime = now;
+                  cycleIdx = (cycleIdx + 1) % mouthCycle.length;
+                  setCurrentFrame(mouthCycle[cycleIdx]);
+                }
               }
-            }, 80);
+            }, 60);
           }
         } catch {
           usingWebAudio = false;
         }
       }
 
-      // Fallback sem Web Audio: abre e fecha a boca a cada 100ms
+      // Fallback sem Web Audio: cadência conversacional suave a cada 180ms
       if (!usingWebAudio) {
         mouthInterval = setInterval(() => {
           if (stateRef.current !== 'speaking') return;
           cycleIdx = (cycleIdx + 1) % mouthCycle.length;
           setCurrentFrame(mouthCycle[cycleIdx]);
-        }, 100);
+        }, 180);
       }
 
       return () => {
@@ -198,47 +216,46 @@ export function VoiceAvatar({
         className
       )}
     >
-      {/* Glow Blur */}
+      {/* Glow Blur Suave */}
       <div
         className={cn(
-          'absolute inset-[-30px] sm:inset-[-40px] rounded-full blur-[50px] transition-all duration-700 pointer-events-none z-0',
+          'absolute inset-[-30px] sm:inset-[-40px] rounded-full blur-[40px] transition-all duration-700 pointer-events-none z-0',
           state === 'idle' && 'opacity-0',
-          state === 'listening' && 'opacity-40 bg-emerald-500',
-          state === 'processing' && 'opacity-40 bg-amber-400',
-          state === 'speaking' && 'opacity-40 bg-primary'
+          state === 'listening' && 'opacity-25 bg-emerald-500',
+          state === 'processing' && 'opacity-25 bg-amber-400',
+          state === 'speaking' && 'opacity-25 bg-primary'
         )}
       />
 
-      {/* Ring 1 (Inner pulse) */}
+      {/* Ring 1 (Pulso interno suave) */}
       <div
         className={cn(
           'absolute inset-[-10px] sm:inset-[-14px] rounded-full pointer-events-none transition-colors duration-500 z-0',
-          state === 'idle' && 'border-2 border-primary/30 animate-ring-idle',
-          state === 'listening' && 'border-2 border-emerald-400/80 animate-ring-listen',
-          state === 'processing' && 'border-2 border-amber-400/70 animate-ring-process',
-          state === 'speaking' && 'border-2 border-primary/90 animate-ring-speak'
+          state === 'idle' && 'border-2 border-primary/25 animate-ring-idle',
+          state === 'listening' && 'border-2 border-emerald-400/70 animate-ring-listen',
+          state === 'processing' && 'border-2 border-amber-400/60 animate-ring-process',
+          state === 'speaking' && 'border-2 border-primary/75 animate-ring-speak'
         )}
       />
 
-      {/* Ring 2 (Outer pulse delayed) */}
+      {/* Ring 2 (Pulso externo mais sutil e com delay) */}
       <div
         className={cn(
           'absolute inset-[-20px] sm:inset-[-28px] rounded-full pointer-events-none transition-colors duration-500 z-0',
-          state === 'idle' && 'border-[1.5px] border-primary/15 animate-ring-idle-delayed',
-          state === 'listening' && 'border-[1.5px] border-emerald-400/40 animate-ring-listen-delayed',
-          state === 'processing' && 'border-[1.5px] border-amber-400/30 animate-ring-process-delayed',
-          state === 'speaking' && 'border-[1.5px] border-primary/50 animate-ring-speak-delayed'
+          state === 'idle' && 'border-[1.5px] border-primary/12 animate-ring-idle-delayed',
+          state === 'listening' && 'border-[1.5px] border-emerald-400/30 animate-ring-listen-delayed',
+          state === 'processing' && 'border-[1.5px] border-amber-400/25 animate-ring-process-delayed',
+          state === 'speaking' && 'border-[1.5px] border-primary/35 animate-ring-speak-delayed'
         )}
       />
 
-      {/* Main Avatar Circular Frame */}
-      <div className="w-full h-full rounded-full border-[4px] sm:border-[5px] md:border-[6px] border-primary shadow-[0_0_30px_rgba(124,58,237,0.35)] overflow-hidden bg-bg-secondary relative z-10 transition-transform duration-500 hover:scale-105">
+      {/* Frame Circular Principal */}
+      <div className="w-full h-full rounded-full border-[4px] sm:border-[5px] md:border-[6px] border-primary shadow-[0_0_24px_rgba(124,58,237,0.25)] overflow-hidden bg-bg-secondary relative z-10 transition-transform duration-500 hover:scale-105">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          key={currentFrame}
           src={currentFrame}
           alt="Teacher Tatiana"
-          className="w-full h-full object-cover object-top select-none pointer-events-none"
+          className="w-full h-full object-cover object-top select-none pointer-events-none transition-opacity duration-150"
         />
       </div>
     </div>
