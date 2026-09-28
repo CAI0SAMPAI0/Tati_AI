@@ -106,3 +106,10 @@ Todas as 7 sprints de modernização e estabilização foram concluídas com suc
   - Ícone das bolhas de mensagem do assistente (`frontend/components/chat/message-bubble.tsx`).
   - Bolhas do assistente e spinner no teste CEFR (`frontend/app/teste-cefr/page.tsx`).
 - [X] **10.5** Validar compilação do TypeScript `npm run typecheck` com 0 erros.
+
+### Sprint 11: Restauração da Logo Institucional nas Activities e Header & Guia de Variáveis de Ambiente
+- [X] **11.1** Substituir o avatar facial da Tatiana pela logo da marca ([`/images/tati_logo.jpg`](file:///C:/Users/caio/Projetos/Tati_AI/frontend/public/images/tati_logo.jpg)) no link da marca do header principal ([`frontend/components/layout/main-header.tsx`](file:///C:/Users/caio/Projetos/Tati_AI/frontend/components/layout/main-header.tsx)).
+- [X] **11.2** Substituir o avatar facial pela logo da marca no título "My Activities" ([`frontend/app/(authenticated)/activities/activities-client-page.tsx`](file:///C:/Users/caio/Projetos/Tati_AI/frontend/app/(authenticated)/activities/activities-client-page.tsx)).
+- [X] **11.3** Substituir o avatar facial pela logo da marca no cabeçalho da barra lateral de atividades ([`frontend/components/activities/sidebar-activities.tsx`](file:///C:/Users/caio/Projetos/Tati_AI/frontend/components/activities/sidebar-activities.tsx)).
+- [X] **11.4** Criar arquivo dedicado [`VARIAVEIS_ENV.md`](file:///C:/Users/caio/Projetos/Tati_AI/VARIAVEIS_ENV.md) na raiz do projeto contendo exclusivamente todas as variáveis de ambiente necessárias para o Backend e Frontend devidamente categorizadas.
+- [X] **11.5** Validação completa de tipos TypeScript (`npm run typecheck`) com 0 erros.

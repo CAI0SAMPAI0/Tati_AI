@@ -249,3 +249,22 @@ Este documento registra todas as alterações efetuadas no projeto durante a spr
      - `frontend/app/teste-cefr/page.tsx`: Restaurada a logo da Tatiana nas mensagens do assistente e no indicador de carregamento do teste de nivelamento.
 - **Validação**:
   - Compilação do TypeScript `npm run typecheck` executada com **0 erros**.
+
+
+---
+
+## [Sprint 11] Restauração da Logo Institucional nas Activities e Header & Guia de Variáveis de Ambiente
+- **Problema Relatado**:
+  1. No link da marca do header principal (`flex items-center gap-2 font-display text-base sm:text-lg font-bold tracking-tight pl-2 hover:opacity-90 transition-opacity`) e no título de "My Activities" (`flex items-center gap-3 mb-2`), ainda estava sendo renderizado o avatar facial em vez da logo institucional da Tatiana (`/images/tati_logo.jpg`).
+  2. O usuário solicitou um arquivo Markdown na branch de desenvolvimento contendo unicamente as variáveis de ambiente necessárias para o `.env`.
+- **Solução Implementada**:
+  1. **Header Principal (`frontend/components/layout/main-header.tsx`)**:
+     - Substituído `src="/avatar/avatar_tati_normal.webp"` por `src="/images/tati_logo.jpg"`.
+  2. **Página de Atividades (`frontend/app/(authenticated)/activities/activities-client-page.tsx`)**:
+     - Substituído `src="/avatar/avatar_tati_normal.webp"` por `src="/images/tati_logo.jpg"` no bloco `flex items-center gap-3 mb-2`.
+  3. **Sidebar de Atividades (`frontend/components/activities/sidebar-activities.tsx`)**:
+     - Substituído `src="/avatar/avatar_tati_normal.webp"` por `src="/images/tati_logo.jpg"` no cabeçalho "Teacher Taty - Activities Hub".
+  4. **Criação do `VARIAVEIS_ENV.md`**:
+     - Criado o arquivo na raiz contendo todas as variáveis do backend (Django, DB, Redis, IA/Groq/HuggingFace/Gemini, Serverless, WhatsApp WAHA, E-mails SMTP/Resend, Google OAuth, Mercado Pago) e do frontend (URLs de API, WebSocket, Hub, Sentry).
+- **Validação**:
+  - `npm run typecheck` executado com **0 erros**.
