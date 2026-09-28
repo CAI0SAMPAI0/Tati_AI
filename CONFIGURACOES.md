@@ -28,6 +28,13 @@ Você pode adicionar ou customizar as seguintes chaves no seu arquivo `.env` loc
 | `ENABLE_RATE_LIMIT` | `true` | Ativa o middleware de Rate Limiting por IP e por categoria de rota. |
 | `LOAD_TEST_BYPASS_SECRET` | `tati-load-test-bypass-key` | Chave de bypass de rate limiting enviada no header `X-Load-Test-Secret` para testes Locust. |
 
+### 1.3 Infraestrutura Serverless & Railway Sleep (Escala a Zero)
+| Variável | Valor Padrão | Descrição |
+|---|---|---|
+| `SERVERLESS` | `false` (`true` no `Dockerfile.api`) | Define se a instância opera como serverless. Quando ativa, suspende tarefas em background para permitir que o container durma após 10 min sem tráfego. |
+| `ENABLE_NOTIFICATION_SCHEDULER` | `true` (`false` no `Dockerfile.api`) | Ativa/desativa a thread interna de agendamento. Em instâncias serverless deve ser `false` para evitar requisições de keepalive ao WAHA que impedem o sleep. |
+| `CRON_TOKEN` | `cai0_based` | Token de autenticação para acionamento externo das rotinas de notificação via endpoints `/api/notifications/cron/*`. |
+
 ---
 
 ## 📚 2. Comandos Operacionais do RAG (Teacher Tatiana Materials)
@@ -136,3 +143,32 @@ Para validar rapidamente que tudo está operando perfeitamente:
    ```bash
    cd apps/hub-site && npx tsc --noEmit
    ```
+
+---
+
+## ⚡ 7. Configuração do Backend como Serverless no Railway (App Sleeping)
+
+Para garantir que seu serviço de backend entre em suspensão após 10 minutos de inatividade e economize recursos:
+
+1. **Arquivo Dockerfile no Serviço**:
+   No painel do Railway, nas configurações do serviço de API do Backend (**Settings > Build > Dockerfile Path**), aponte para:
+   ```
+   backend/Dockerfile.api
+   ```
+   *(ou `Dockerfile.api` caso o Root Directory esteja definido como `/backend`)*.
+
+2. **Ativação do Serverless**:
+   - Vá em **Settings > Deploy > Serverless** (ou **App Sleeping**).
+   - Ative a opção (Toggle **ON**).
+   - Defina o tempo de inatividade desejado (padrão: 10 minutos).
+
+3. **Por que antes não dormia?**
+   O `TatiNotificationScheduler` interno disparava um ping periódico para o WAHA na Render (`GET /api/sessions`) a cada 10 minutos e executava consultas ao PostgreSQL a cada 60s. O Railway monitora tráfego de rede de saída e pacotes TCP; por haver tráfego a cada 10m, o contador nunca alcançava os 10 minutos de inatividade. O `Dockerfile.api` desativa essas rotinas em background por padrão.
+
+4. **Como disparar rotinas agendadas (Streaks, relatórios, etc.) em modo Serverless?**
+   Você pode usar um serviço de Cron externo (como o próprio **Railway Cron**, **Vercel Cron** ou **GitHub Actions**) fazendo requisições HTTP para os webhooks com o header de autenticação:
+   ```bash
+   curl -X POST https://seu-backend.railway.app/api/notifications/cron/daily-streak \
+     -H "X-Cron-Token: cai0_based"
+   ```
+

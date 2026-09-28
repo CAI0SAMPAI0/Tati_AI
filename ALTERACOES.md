@@ -156,3 +156,23 @@ Este documento registra todas as alterações efetuadas no projeto durante a spr
   2. Adicionada rotina de auto-cura (`_ensure_user_trophies_schema`) em background no `ready()` de [`backend/apps/activities/apps.py`](file:///C:/Users/caio/Projetos/Tati_AI/backend/apps/activities/apps.py) para que qualquer nova réplica ou banco garanta esse schema na inicialização de forma segura e transparente.
   3. Validada a inserção e desbloqueio de troféus sem qualquer warning ou erro nos logs.
 
+---
+
+## [Otimização Railway Serverless] Atualização de `Dockerfile.api` & Permissão de Sleep (Escala a Zero)
+- **Causa Raiz Identificada**:
+  Na Railway, instâncias configuradas com Serverless (App-Sleeping) monitoram tráfego de saída e requisições para suspender o container após ~10 minutos de inatividade. O backend não entrava em modo de suspensão (sleep) porque:
+  1. O `BackgroundNotificationRunner` executava um loop contínuo em segundo plano a cada 30 segundos, disparando um ping HTTP periódico para o WAHA no Render (`https://waha-tati.onrender.com/api/sessions`) a cada 10 minutos (`[WAHA Keep Alive] Render WAHA ping response: 200`), resetando ininterruptamente o contador de inatividade da Railway.
+  2. O loop também consultava o banco de dados a cada 60 segundos buscando agendamentos CEFR ativos, gerando pacotes TCP de saída no PostgreSQL.
+  3. O `Dockerfile.api` anterior possuía `HEALTHCHECK --interval=30s` executando `curl` local interno a cada 30 segundos, além de utilizar a imagem legada `python:3.13-slim` com Daphne em vez da infraestrutura moderna de produção.
+- **Solução Implementada**:
+  1. **Atualização do `backend/Dockerfile.api`**:
+     - Atualizado com base em `backend/Dockerfile`: `python:3.14-slim`, dependências completas do sistema (compilação, LibreOffice, Poppler, ffmpeg), cópia resiliente do monorepo (`/tmp/build/`) e servidor ASGI de alta performance com Gunicorn + Uvicorn Workers.
+     - Definidas variáveis de ambiente padrão no container: `ENV ENABLE_NOTIFICATION_SCHEDULER=false` e `ENV SERVERLESS=true`.
+     - Removido o `HEALTHCHECK` interno de 30s do Dockerfile (o Railway utiliza seu próprio healthcheck externo via proxy durante rollouts, permitindo que o container atinja inatividade completa sem probes locais contínuos).
+  2. **Defesa em Duplo Nível no Código Python**:
+     - `backend/apps/notifications/apps.py`: Detecta `SERVERLESS=true` ou `ENABLE_NOTIFICATION_SCHEDULER=false` e ignora o início do `BackgroundNotificationRunner`.
+     - `backend/apps/notifications/scheduler.py`: Adicionada verificação idêntica em `BackgroundNotificationRunner.start()` para impedir instanciação da thread sob qualquer circunstância em ambientes serverless.
+  3. **Manutenção de Notificações sob Demanda**:
+     - Todas as rotinas de disparo agendado (Streaks, relatórios de evolução, incentivo de inatividade e fechamento de competição mensal) continuam totalmente operacionais via webhooks seguros protegidos por token (`/api/notifications/cron/*`), permitindo acionamento via cron externo (ex: Railway Cron, Vercel Cron, GitHub Actions) sem manter a instância de API acordada 24/7.
+
+

@@ -13,10 +13,13 @@ class NotificationsConfig(AppConfig):
         if any(ignored in cmd for ignored in ["migrate", "makemigrations", "collectstatic", "test", "compilemessages"]):
             return
 
-        # Permite desativar em ambientes que devem dormir (como instâncias dev ou secundárias na Railway)
+        # Permite desativar em ambientes que devem dormir (como instâncias serverless na Railway ou dev)
         import os
-        enable_scheduler = os.getenv("ENABLE_NOTIFICATION_SCHEDULER", "true").lower() in ("true", "1")
-        if not enable_scheduler:
+        is_serverless = os.getenv("SERVERLESS", "false").lower() in ("true", "1", "yes")
+        enable_scheduler = os.getenv("ENABLE_NOTIFICATION_SCHEDULER", "false" if is_serverless else "true").lower() in ("true", "1", "yes")
+        if is_serverless or not enable_scheduler:
+            import logging
+            logging.getLogger(__name__).info("[NotificationsConfig] Modo Serverless / ENABLE_NOTIFICATION_SCHEDULER=false detectado. Runner em background não será iniciado.")
             return
 
         try:

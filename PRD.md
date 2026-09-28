@@ -73,3 +73,11 @@ Todas as 7 sprints de modernização e estabilização foram concluídas com suc
 - [X] **7.2** Criar e manter `CONFIGURACOES.md` na raiz com guia prático das novas variáveis de ambiente, comandos de terminal e ferramentas necessárias.
 - [X] **7.3** Executar bateria completa de validações: `python backend/manage.py check` (0 erros), `npx tsc --noEmit` frontend e hub-site (0 erros), e benchmark RAG (96% de acerto).
 - [X] **7.4** Commits atômicos e push final na branch `desenvolvimento`.
+
+### Sprint 8: Otimização Railway Serverless & Atualização de `Dockerfile.api`
+- [X] **8.1** Atualizar `backend/Dockerfile.api` sincronizado com `backend/Dockerfile` (`python:3.14-slim`, Gunicorn + Uvicorn Workers, suporte resiliente ao monorepo).
+- [X] **8.2** Desativar rotinas de background contínuas (`ENV ENABLE_NOTIFICATION_SCHEDULER=false` e `ENV SERVERLESS=true`) para evitar o envio de pings a cada 10 min para o WAHA no Render (`[WAHA Keep Alive]`) e permitir a suspensão da máquina (escala a zero por inatividade).
+- [X] **8.3** Remover `HEALTHCHECK` interno de 30s do Dockerfile para eliminar requisições locais contínuas em localhost que impediriam a detecção de inatividade pelo proxy do Railway.
+- [X] **8.4** Aplicar salvaguardas em nível de código Python (`apps/notifications/apps.py` e `apps/notifications/scheduler.py`) para ignorar o início da thread `TatiNotificationScheduler` quando em modo serverless.
+- [X] **8.5** Validar `manage.py check` confirmando que em modo `SERVERLESS=true` nenhum loop de background é iniciado.
+
