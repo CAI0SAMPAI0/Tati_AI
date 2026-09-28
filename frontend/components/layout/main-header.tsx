@@ -18,14 +18,14 @@ import { cn } from '@/lib/utils';
 
 interface MainHeaderProps {
   onToggleMenu?: () => void;
+  hideStats?: boolean;
   hideStreakAndTrophies?: boolean;
 }
 
-export function MainHeader({ onToggleMenu, hideStreakAndTrophies }: MainHeaderProps) {
+export function MainHeader({ onToggleMenu, hideStats, hideStreakAndTrophies }: MainHeaderProps) {
   const pathname = usePathname();
-  const isSettings = pathname?.startsWith('/settings');
+  const isSettings = hideStats || hideStreakAndTrophies || pathname?.startsWith('/settings');
   const isActivities = pathname?.startsWith('/activities');
-
   const { user } = useAuth();
   const avatarUrl = user?.avatar_url || (user as any)?.profile?.avatar_url || DEFAULT_AVATAR_URL;
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
@@ -34,7 +34,7 @@ export function MainHeader({ onToggleMenu, hideStreakAndTrophies }: MainHeaderPr
   const { currentStreak, isStreakActive, trophiesEarned, totalTrophies } = useStreakAndTrophies();
 
   const isHubOnly = (user as any)?.is_hub_only;
-  const shouldHideStreakAndTrophies = isHubOnly || isSettings || hideStreakAndTrophies;
+  const shouldHideStreakAndTrophies = isHubOnly || isSettings;
 
   return (
     <header className="h-16 flex items-center justify-between px-1 border-b border-border bg-bg sticky top-0 z-50">
@@ -51,11 +51,21 @@ export function MainHeader({ onToggleMenu, hideStreakAndTrophies }: MainHeaderPr
           href={isHubOnly ? "/activities/hub" : "/chat"}
           prefetch={true}
           className={cn(
-            "font-display font-bold tracking-tight pl-2 transition-all",
-            isActivities ? "text-sm sm:text-base md:text-base" : "text-base md:text-lg"
+            "flex items-center gap-2 font-display font-bold tracking-tight pl-2 hover:opacity-90 transition-opacity",
+            isActivities ? "text-sm sm:text-base" : "text-base md:text-lg"
           )}
         >
-          Teacher <span className="text-primary">Taty</span>
+          <div className="w-7 h-7 rounded-full overflow-hidden border border-primary/30 flex items-center justify-center bg-primary/10 shrink-0">
+            <img
+              src="/avatar/avatar_tati_normal.webp"
+              alt="Teacher Tati"
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.src = '/images/tati_logo.jpg';
+              }}
+            />
+          </div>
+          <span>Teacher <span className="text-primary">Taty</span></span>
         </Link>
       </div>
 

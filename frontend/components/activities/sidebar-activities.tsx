@@ -110,10 +110,27 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <div className="flex items-center justify-between p-6 shrink-0">
-          <span className="text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest">
-            Main Menu
-          </span>
+        <div className="flex items-center justify-between p-4 px-6 shrink-0 border-b border-border/50">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full overflow-hidden border border-primary/30 flex items-center justify-center bg-primary/10 shrink-0">
+              <img
+                src="/avatar/avatar_tati_normal.webp"
+                alt="Teacher Tati"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = '/images/tati_logo.jpg';
+                }}
+              />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-display text-sm font-bold tracking-tight text-text">
+                Teacher <span className="text-primary">Taty</span>
+              </span>
+              <span className="text-[0.62rem] font-bold text-text-subtle uppercase tracking-widest">
+                Activities Hub
+              </span>
+            </div>
+          </div>
           <button
             aria-label="Close menu"
             onClick={onClose}

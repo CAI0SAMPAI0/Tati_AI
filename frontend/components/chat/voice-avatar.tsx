@@ -62,8 +62,24 @@ class AmplitudeSmoother {
 
 //  Component 
 
-const INITIAL_SRC = '/images/tati_logo.jpg';
+const INITIAL_SRC = '/avatar/avatar_tati_normal.webp';
 const MIN_HOLD_MS = 90;
+
+const DEFAULT_FRAMES: AvatarFrames = {
+  has_frames: true,
+  normal: '/avatar/avatar_tati_normal.webp',
+  meio: '/avatar/avatar_tati_meio.webp',
+  aberta: '/avatar/avatar_tati_aberta.webp',
+  bem_aberta: '/avatar/avatar_tati_bem_aberta.webp',
+  frame_A: '/avatar/frame_A.webp',
+  frame_B: '/avatar/frame_B.webp',
+  frame_C: '/avatar/frame_C.webp',
+  frame_D: '/avatar/frame_D.webp',
+  frame_E: '/avatar/frame_E.webp',
+  frame_F: '/avatar/frame_F.webp',
+  ouvindo: '/avatar/avatar_tati_ouvindo.webp',
+  piscando: '/avatar/tati_piscando.webp',
+};
 
 export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAvatarProps) {
   const { data: frames } = useQuery<AvatarFrames>({
@@ -80,7 +96,7 @@ export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAva
   const [blinkVisible, setBlinkVisible] = useState(false);
 
   // Refs (never cause stale closures) 
-  const framesRef = useRef<AvatarFrames | undefined>(undefined);
+  const framesRef = useRef<AvatarFrames>(DEFAULT_FRAMES);
   const currentMouthRef = useRef(INITIAL_SRC);   // source-of-truth for current mouth
   const mouthLevelRef = useRef<MouthLevel>(0);
   const lastChangeRef = useRef(0);
@@ -100,24 +116,28 @@ export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAva
   const reactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Keep framesRef in sync
-  useEffect(() => { framesRef.current = frames; }, [frames]);
+  // Keep framesRef in sync (prefer backend frames if loaded with valid frames, else DEFAULT_FRAMES)
+  useEffect(() => {
+    framesRef.current = (frames?.has_frames && frames.normal) ? frames : DEFAULT_FRAMES;
+  }, [frames]);
 
   // Helpers (STABLE — empty deps, use only refs) 
 
   const getUrl = useCallback((path?: string): string => {
     if (!path) return INITIAL_SRC;
-    if (path.startsWith('data:') || path.startsWith('http')) return path;
+    if (path.startsWith('data:') || path.startsWith('http') || path.startsWith('/avatar/') || path.startsWith('/images/')) {
+      return path;
+    }
     return `${API_BASE}${path.startsWith('/') ? path : '/' + path}`;
   }, []);
 
   // Preload all frames in browser cache eagerly to prevent lag/flicker
   useEffect(() => {
-    if (!frames || !frames.has_frames) return;
+    const f = (frames?.has_frames && frames.normal) ? frames : DEFAULT_FRAMES;
     const fields = [
-      frames.normal, frames.meio, frames.aberta, frames.bem_aberta,
-      frames.frame_A, frames.frame_B, frames.frame_C, frames.frame_D,
-      frames.frame_E, frames.frame_F, frames.ouvindo, frames.piscando
+      f.normal, f.meio, f.aberta, f.bem_aberta,
+      f.frame_A, f.frame_B, f.frame_C, f.frame_D,
+      f.frame_E, f.frame_F, f.ouvindo, f.piscando
     ];
     fields.forEach((path) => {
       if (path) {
@@ -156,10 +176,10 @@ export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAva
   }, []);
 
   // Initial frame
-
   useEffect(() => {
-    if (frames?.has_frames && frames.normal) {
-      const url = getUrl(frames.normal);
+    const f = (frames?.has_frames && frames.normal) ? frames : DEFAULT_FRAMES;
+    if (f.normal) {
+      const url = getUrl(f.normal);
       currentMouthRef.current = url;
       setMouthSrc(url);
     }
@@ -325,6 +345,11 @@ export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAva
         <img
           src={mouthSrc}
           alt="Teacher Tati"
+          onError={(e) => {
+            if (e.currentTarget.src !== INITIAL_SRC) {
+              e.currentTarget.src = INITIAL_SRC;
+            }
+          }}
           className="absolute inset-0 w-full h-full object-cover"
         />
 
@@ -335,6 +360,9 @@ export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAva
             src={reactionSrc}
             alt=""
             aria-hidden
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
             className="absolute inset-0 w-full h-full object-cover avatar-reaction"
           />
         )}
@@ -346,6 +374,9 @@ export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAva
             src={blinkUrl}
             alt=""
             aria-hidden
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
             className="absolute inset-0 w-full h-full object-cover"
           />
         )}
