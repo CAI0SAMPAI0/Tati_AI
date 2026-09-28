@@ -51,11 +51,11 @@ export function MainHeader({ onToggleMenu, hideStats }: MainHeaderProps) {
         >
           <div className="w-7 h-7 rounded-full overflow-hidden border border-primary/30 flex items-center justify-center bg-primary/10 shrink-0">
             <img
-              src="/avatar/avatar_tati_normal.webp"
+              src="/images/tati_logo.jpg"
               alt="Teacher Tati"
               className="w-full h-full object-cover"
               onError={(e) => {
-                e.currentTarget.src = '/images/tati_logo.jpg';
+                e.currentTarget.style.display = 'none';
               }}
             />
           </div>
