@@ -404,48 +404,48 @@ div:has(> div[data-hot-toast]) {
 }
 
 @keyframes ring-listen {
-  0%   { box-shadow: 0 0 0 0    rgba(52, 211, 153, 0.7); }
-  70%  { box-shadow: 0 0 0 16px rgba(52, 211, 153, 0); }
-  100% { box-shadow: 0 0 0 0    rgba(52, 211, 153, 0); }
+  0%   { box-shadow: 0 0 0 0    rgba(52, 211, 153, 0.5); opacity: 0.7; }
+  60%  { box-shadow: 0 0 0 12px rgba(52, 211, 153, 0);   opacity: 1; }
+  100% { box-shadow: 0 0 0 0    rgba(52, 211, 153, 0);   opacity: 0.7; }
 }
 
 @keyframes ring-process {
   0%, 100% { opacity: 0.5; transform: scale(1); }
-  50%       { opacity: 1;   transform: scale(1.03); }
+  50%       { opacity: 0.9; transform: scale(1.02); }
 }
 
 @keyframes ring-speak {
-  0%   { box-shadow: 0 0 0 0    rgba(124, 58, 237, 0.8); }
-  70%  { box-shadow: 0 0 0 16px rgba(124, 58, 237, 0); }
-  100% { box-shadow: 0 0 0 0    rgba(124, 58, 237, 0); }
+  0%   { box-shadow: 0 0 0 0    rgba(124, 58, 237, 0.55); opacity: 0.7; }
+  60%  { box-shadow: 0 0 0 14px rgba(124, 58, 237, 0);    opacity: 1; }
+  100% { box-shadow: 0 0 0 0    rgba(124, 58, 237, 0);    opacity: 0.7; }
 }
 
 .animate-ring-idle {
-  animation: ring-idle 2.5s ease-in-out infinite;
+  animation: ring-idle 3s ease-in-out infinite;
 }
 .animate-ring-idle-delayed {
-  animation: ring-idle 2.5s ease-in-out infinite 0.6s;
+  animation: ring-idle 3s ease-in-out infinite 0.8s;
 }
 
 .animate-ring-listen {
-  animation: ring-listen 0.8s ease-in-out infinite;
+  animation: ring-listen 1.4s ease-in-out infinite;
 }
 .animate-ring-listen-delayed {
-  animation: ring-listen 0.8s ease-in-out infinite 0.2s;
+  animation: ring-listen 1.4s ease-in-out infinite 0.35s;
 }
 
 .animate-ring-process {
-  animation: ring-process 1.4s ease-in-out infinite;
+  animation: ring-process 1.8s ease-in-out infinite;
 }
 .animate-ring-process-delayed {
-  animation: ring-process 1.4s ease-in-out infinite 0.4s;
+  animation: ring-process 1.8s ease-in-out infinite 0.5s;
 }
 
 .animate-ring-speak {
-  animation: ring-speak 0.5s ease-in-out infinite;
+  animation: ring-speak 1.2s ease-in-out infinite;
 }
 .animate-ring-speak-delayed {
-  animation: ring-speak 0.5s ease-in-out infinite 0.15s;
+  animation: ring-speak 1.2s ease-in-out infinite 0.3s;
 }
 
 
