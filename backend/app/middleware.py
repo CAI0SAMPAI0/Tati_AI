@@ -21,21 +21,24 @@ class NormalizePathMiddleware:
 
     def __init__(self, get_response):
         self.get_response = get_response
-        if iscoroutinefunction(self.get_response):
+        self.async_mode = iscoroutinefunction(self.get_response)
+        if self.async_mode:
             markcoroutinefunction(self)
 
-    def __call__(self, request):
+    def _normalize_request_path(self, request):
         if getattr(request, "path_info", "").startswith("//"):
             request.path_info = "/" + request.path_info.lstrip("/")
         if getattr(request, "path", "").startswith("//"):
             request.path = "/" + request.path.lstrip("/")
+
+    def __call__(self, request):
+        if self.async_mode:
+            return self.__acall__(request)
+        self._normalize_request_path(request)
         return self.get_response(request)
 
     async def __acall__(self, request):
-        if getattr(request, "path_info", "").startswith("//"):
-            request.path_info = "/" + request.path_info.lstrip("/")
-        if getattr(request, "path", "").startswith("//"):
-            request.path = "/" + request.path.lstrip("/")
+        self._normalize_request_path(request)
         return await self.get_response(request)
 
 
@@ -45,23 +48,33 @@ class PerformanceMiddleware:
 
     def __init__(self, get_response):
         self.get_response = get_response
-        if iscoroutinefunction(self.get_response):
+        self.async_mode = iscoroutinefunction(self.get_response)
+        if self.async_mode:
             markcoroutinefunction(self)
 
-    def __call__(self, request):
-        start_time = time.perf_counter()
-        initial_queries = len(connection.queries)
+    def _log_perf(self, request, response, duration_ms):
+        path = getattr(request, "path", "")
+        if not path.startswith(("/static", "/media")):
+            status = getattr(response, "status_code", "unknown")
+            method = getattr(request, "method", "UNKNOWN")
+            print(f"[PERF] {method} {path} -> {status} ({duration_ms:.1f}ms)")
 
+    def __call__(self, request):
+        if self.async_mode:
+            return self.__acall__(request)
+
+        start_time = time.perf_counter()
         response = self.get_response(request)
 
-        duration_ms = (time.perf_counter() - start_time) * 1000
-        if not request.path.startswith("/static") and not request.path.startswith(
-            "/media"
-        ):
-            print(
-                f"[PERF] {request.method} {request.path} -> {getattr(response, 'status_code', 'unknown')} ({duration_ms:.1f}ms)"
-            )
+        if asyncio.iscoroutine(response):
+            async def _perf_wrap(coro):
+                res = await coro
+                self._log_perf(request, res, (time.perf_counter() - start_time) * 1000)
+                return res
+            return _perf_wrap(response)
 
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        self._log_perf(request, response, duration_ms)
         return response
 
     async def __acall__(self, request):
@@ -72,13 +85,7 @@ class PerformanceMiddleware:
             raise
 
         duration_ms = (time.perf_counter() - start_time) * 1000
-        if not request.path.startswith("/static") and not request.path.startswith(
-            "/media"
-        ):
-            print(
-                f"[PERF] {request.method} {request.path} -> {getattr(response, 'status_code', 'unknown')} ({duration_ms:.1f}ms)"
-            )
-
+        self._log_perf(request, response, duration_ms)
         return response
 
 
@@ -95,21 +102,24 @@ class RateLimitMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         self.enabled = os.getenv("ENABLE_RATE_LIMIT", "true").lower() in ("true", "1")
-        if iscoroutinefunction(self.get_response):
+        self.async_mode = iscoroutinefunction(self.get_response)
+        if self.async_mode:
             markcoroutinefunction(self)
 
     def _check_rate_limit(self, request):
         if not self.enabled:
             return None
 
-        path = request.path.rstrip("/")
+        path = getattr(request, "path", "").rstrip("/")
 
         # Bypass para testes de carga autorizados (Locust / stress tests)
         bypass_secret = os.getenv("LOAD_TEST_BYPASS_SECRET", "tati-load-test-bypass-key")
+        headers = getattr(request, "headers", {})
+        meta = getattr(request, "META", {})
         req_bypass = (
-            request.headers.get("X-Load-Test-Secret")
-            or request.headers.get("x-load-test-secret")
-            or request.META.get("HTTP_X_LOAD_TEST_SECRET")
+            headers.get("X-Load-Test-Secret")
+            or headers.get("x-load-test-secret")
+            or meta.get("HTTP_X_LOAD_TEST_SECRET")
         )
         if req_bypass and req_bypass.strip() == bypass_secret.strip():
             return None
@@ -119,7 +129,7 @@ class RateLimitMiddleware:
             path.startswith(("/static", "/media", "/favicon.ico"))
             or path in ("", "/health", "/healthz", "/ping")
             or "/ws/" in path
-            or request.headers.get("Upgrade") == "websocket"
+            or headers.get("Upgrade") == "websocket"
         ):
             return None
 
@@ -173,6 +183,9 @@ class RateLimitMiddleware:
         return None
 
     def __call__(self, request):
+        if self.async_mode:
+            return self.__acall__(request)
+
         blocked = self._check_rate_limit(request)
         if blocked is not None:
             return blocked
@@ -188,10 +201,11 @@ class RateLimitMiddleware:
             raise
 
     def _get_client_ip(self, request):
-        x_forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+        meta = getattr(request, "META", {})
+        x_forwarded = meta.get("HTTP_X_FORWARDED_FOR")
         if x_forwarded:
             return x_forwarded.split(",")[0].strip()
-        return request.META.get("REMOTE_ADDR", "127.0.0.1")
+        return meta.get("REMOTE_ADDR", "127.0.0.1")
 
 
 class StructuredLoggingMiddleware:
@@ -207,7 +221,8 @@ class StructuredLoggingMiddleware:
 
     def __init__(self, get_response):
         self.get_response = get_response
-        if iscoroutinefunction(self.get_response):
+        self.async_mode = iscoroutinefunction(self.get_response)
+        if self.async_mode:
             markcoroutinefunction(self)
         self.json_logger = logging.getLogger("structured_json")
         self.audit_logger = logging.getLogger("audit")
@@ -219,13 +234,14 @@ class StructuredLoggingMiddleware:
         return "anonymous", "anonymous"
 
     def _get_client_ip(self, request):
-        x_forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+        meta = getattr(request, "META", {})
+        x_forwarded = meta.get("HTTP_X_FORWARDED_FOR")
         if x_forwarded:
             return x_forwarded.split(",")[0].strip()
-        return request.META.get("REMOTE_ADDR", "127.0.0.1")
+        return meta.get("REMOTE_ADDR", "127.0.0.1")
 
     def _log_request(self, request, response, duration_ms, request_id):
-        path = request.path
+        path = getattr(request, "path", "")
         if path.startswith(("/static", "/media", "/favicon.ico")) or path in ("/health", "/ping"):
             return
 
@@ -240,7 +256,7 @@ class StructuredLoggingMiddleware:
             "request_id": request_id,
             "user_id": user_id,
             "username": username,
-            "method": request.method,
+            "method": getattr(request, "method", "GET"),
             "path": path,
             "status_code": status_code,
             "duration_ms": round(duration_ms, 2),
@@ -251,8 +267,9 @@ class StructuredLoggingMiddleware:
         self.json_logger.info(json.dumps(log_data))
 
         # Auditoria de operações destrutivas ou administrativas
-        is_destructive = request.method in ("DELETE", "PATCH") or (
-            request.method == "POST" and any(k in path for k in ("/delete", "/reset", "/wipe", "/cancel", "/destroy", "/role", "/ban"))
+        method = getattr(request, "method", "GET")
+        is_destructive = method in ("DELETE", "PATCH") or (
+            method == "POST" and any(k in path for k in ("/delete", "/reset", "/wipe", "/cancel", "/destroy", "/role", "/ban"))
         )
         if is_destructive:
             audit_data = {
@@ -261,34 +278,50 @@ class StructuredLoggingMiddleware:
             }
             self.audit_logger.warning(json.dumps(audit_data))
 
-    def __call__(self, request):
+    def _get_or_create_request_id(self, request):
         import uuid
-
+        headers = getattr(request, "headers", {})
         request_id = (
-            request.headers.get("X-Request-ID")
-            or request.headers.get("x-request-id")
+            headers.get("X-Request-ID")
+            or headers.get("x-request-id")
+            or getattr(request, "request_id", None)
             or str(uuid.uuid4())
         )
         request.request_id = request_id
+        return request_id
+
+    def _attach_request_id(self, response, request_id):
+        if response is not None and hasattr(response, "__setitem__"):
+            try:
+                response["X-Request-ID"] = request_id
+            except (TypeError, ValueError):
+                pass
+
+    def __call__(self, request):
+        if self.async_mode:
+            return self.__acall__(request)
+
+        request_id = self._get_or_create_request_id(request)
 
         start_time = time.perf_counter()
         response = self.get_response(request)
-        duration_ms = (time.perf_counter() - start_time) * 1000
 
+        if asyncio.iscoroutine(response):
+            async def _logging_wrap(coro):
+                res = await coro
+                duration_ms = (time.perf_counter() - start_time) * 1000
+                self._log_request(request, res, duration_ms, request_id)
+                self._attach_request_id(res, request_id)
+                return res
+            return _logging_wrap(response)
+
+        duration_ms = (time.perf_counter() - start_time) * 1000
         self._log_request(request, response, duration_ms, request_id)
-        if response:
-            response["X-Request-ID"] = request_id
+        self._attach_request_id(response, request_id)
         return response
 
     async def __acall__(self, request):
-        import uuid
-
-        request_id = (
-            request.headers.get("X-Request-ID")
-            or request.headers.get("x-request-id")
-            or str(uuid.uuid4())
-        )
-        request.request_id = request_id
+        request_id = self._get_or_create_request_id(request)
 
         start_time = time.perf_counter()
         try:
@@ -298,8 +331,7 @@ class StructuredLoggingMiddleware:
         duration_ms = (time.perf_counter() - start_time) * 1000
 
         self._log_request(request, response, duration_ms, request_id)
-        if response:
-            response["X-Request-ID"] = request_id
+        self._attach_request_id(response, request_id)
         return response
 
 

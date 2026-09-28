@@ -268,3 +268,39 @@ Este documento registra todas as alterações efetuadas no projeto durante a spr
      - Criado o arquivo na raiz contendo todas as variáveis do backend (Django, DB, Redis, IA/Groq/HuggingFace/Gemini, Serverless, WhatsApp WAHA, E-mails SMTP/Resend, Google OAuth, Mercado Pago) e do frontend (URLs de API, WebSocket, Hub, Sentry).
 - **Validação**:
   - `npm run typecheck` executado com **0 erros**.
+
+---
+
+## [Sprint 12] Correção do Suporte ASGI (Uvicorn / Docker) nos Middlewares Django
+- **Problema Relatado**:
+  - Ao subir a aplicação no Docker com Uvicorn ASGI (`uvicorn.workers.UvicornWorker`), chamadas a `/health` e `/auth/login` retornavam HTTP 500:
+    ```text
+    File "/usr/local/lib/python3.14/site-packages/django/core/handlers/exception.py", line 42, in inner
+      response = await get_response(request)
+    File "/app/app/middleware.py", line 280, in __call__
+      response["X-Request-ID"] = request_id
+    TypeError: 'coroutine' object does not support item assignment
+    ```
+  - Além disso, os logs de performance mostravam `[PERF] GET /health -> unknown (0.1ms)`.
+- **Causa Raiz Técnica**:
+  - Em servidores ASGI (Uvicorn / Daphne), a cadeia de middlewares do Django opera em modo assíncrono, passando um handler `get_response` assíncrono (uma corrotina).
+  - Os middlewares customizados (`NormalizePathMiddleware`, `PerformanceMiddleware`, `RateLimitMiddleware` e `StructuredLoggingMiddleware`) declaravam `async_capable = True`, mas seus métodos `__call__` não checavam `if self.async_mode: return self.__acall__(request)`.
+  - Como no Python uma chamada direta a uma instância `instance(request)` sempre aciona `__call__`, o método síncrono `__call__` era executado. Ao invocar `self.get_response(request)` sem `await`, recebia um objeto `<coroutine>` não aguardado.
+  - No `StructuredLoggingMiddleware`, a linha `response["X-Request-ID"] = request_id` tentava indexar a corrotina como um dicionário, resultando em `TypeError: 'coroutine' object does not support item assignment`.
+  - No `PerformanceMiddleware`, `getattr(response, 'status_code', 'unknown')` retornava `'unknown'` porque a corrotina não possui atributo `status_code`.
+- **Solução Implementada**:
+  1. **Adoção do Padrão Oficial Django ASGI (`MiddlewareMixin`)**:
+     - Em todos os 4 middlewares de [`backend/app/middleware.py`](file:///C:/Users/caio/Projetos/Tati_AI/backend/app/middleware.py):
+       - No `__init__`: definido `self.async_mode = iscoroutinefunction(self.get_response)` e aplicado `markcoroutinefunction(self)`.
+       - No início de `__call__`: adicionada a delegação imediata `if self.async_mode: return self.__acall__(request)`.
+  2. **Defesa em Profundidade (Fail-Safe Wrapper)**:
+     - No `StructuredLoggingMiddleware` e `PerformanceMiddleware`, adicionado fallback `if asyncio.iscoroutine(response): return _async_wrap(...)` para garantir que, caso qualquer corrotina não aguardada venha de outro middleware na pilha, ela seja aguardada e tratada de forma transparente.
+     - Criado método `_attach_request_id` com checagem segura `hasattr(response, "__setitem__")` e tratamento de exceção.
+  3. **Validação E2E com `AsyncClient`**:
+     - Testes individuais assíncronos e síncronos dos 4 middlewares com 100% de sucesso.
+     - Simulação completa do pipeline ASGI via Django `AsyncClient`:
+       - `GET /health` -> HTTP 200, status `{"status": "ok", "database": "ok", ...}`, latência computada e header `X-Request-ID` injetado.
+       - `OPTIONS /auth/login` -> HTTP 405 (método não permitido para OPTIONS sem cors preflight directo) com `X-Request-ID`.
+       - `POST /auth/login` -> HTTP 401 (credenciais incorretas) em vez de 500, log JSON emitido e `X-Request-ID` presente.
+     - `manage.py check` executado com **0 erros**.
+
