@@ -229,7 +229,7 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
       {!isUser && (
         <div className="w-7 h-7 rounded-full border border-border overflow-hidden shrink-0 mt-1 shadow-sm bg-surface">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <Image src="/avatar/avatar_tati_normal.webp" alt="Tati" width={28} height={28} className="w-full h-full object-cover" />
+          <Image src="/images/tati_logo.jpg" alt="Tati" width={28} height={28} className="w-full h-full object-cover" />
         </div>
       )}
 
