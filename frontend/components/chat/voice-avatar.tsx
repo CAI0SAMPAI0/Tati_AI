@@ -1,318 +1,192 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { apiGet, API_BASE } from '@/lib/api/client';
+import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 // ── Types ────────────────────────────────────────────────────────────
 
-export interface AvatarFrames {
-  has_frames?: boolean;
-  normal?: string;
-  meio?: string;
-  aberta?: string;
-  bem_aberta?: string;
-  ouvindo?: string;
-  piscando?: string;
-  surpresa?: string;
-  frame_A?: string;
-  frame_B?: string;
-  frame_C?: string;
-  frame_D?: string;
-  frame_E?: string;
-  frame_F?: string;
-}
-
-interface VoiceAvatarProps {
+export interface VoiceAvatarProps {
   state: 'idle' | 'listening' | 'processing' | 'speaking';
   audioElement?: HTMLAudioElement | null;
   lastAssistantText?: string;
   className?: string;
 }
 
-// ── Default local asset frames (always available with 0 latency) ─────
+// ── Frames locais estáticos (0ms de latência, sem base64 pesado) ─────
 
-const DEFAULT_FRAMES: AvatarFrames = {
-  has_frames: true,
+const FRAMES = {
   normal: '/avatar/avatar_tati_normal.webp',
-  meio: '/avatar/avatar_tati_meio.webp',
-  aberta: '/avatar/avatar_tati_aberta.webp',
-  bem_aberta: '/avatar/avatar_tati_bem_aberta.webp',
   ouvindo: '/avatar/avatar_tati_ouvindo.webp',
+  meio: '/avatar/avatar_tati_meio.webp',
+  bem_aberta: '/avatar/avatar_tati_bem_aberta.webp',
   piscando: '/avatar/tati_piscando.webp',
-  surpresa: '/avatar/tati_surpresa.webp',
-  frame_A: '/avatar/frame_A.webp',
-  frame_B: '/avatar/frame_B.webp',
-  frame_C: '/avatar/frame_C.webp',
-  frame_D: '/avatar/frame_D.webp',
-  frame_E: '/avatar/frame_E.webp',
-  frame_F: '/avatar/frame_F.webp',
 };
 
-// ── Emotion detection ────────────────────────────────────────────────
+// ── Cache de nós Web Audio (evita erro de duplicar createMediaElementSource) ──
 
-const SURPRISE_RE = /!|uau|wow|incrível|incredible|que\b.{0,20}!/i;
-const POSITIVE_RE = /parabéns|congratulations|perfeito|perfect|excelente|excellent|maravilhoso|wonderful|fantástico|fantastic|ótimo|great|brilliant|😊|😄|😃|🎉|👏/i;
-
-function detectEmotion(text?: string): 'surprise' | 'positive' | 'neutral' {
-  if (!text) return 'neutral';
-  if (SURPRISE_RE.test(text)) return 'surprise';
-  if (POSITIVE_RE.test(text)) return 'positive';
-  return 'neutral';
-}
-
-function resolveFrameUrl(path?: string): string {
-  if (!path) return DEFAULT_FRAMES.normal!;
-  if (path.startsWith('data:') || path.startsWith('http') || path.startsWith('/avatar/') || path.startsWith('/images/')) {
-    return path;
-  }
-  return `${API_BASE}${path.startsWith('/') ? path : '/' + path}`;
-}
-
-// ── Web Audio Node Cache (prevents duplicate MediaElementAudioSourceNode) ──
-
-const mediaSourceCache = new WeakMap<
+const audioNodesCache = new WeakMap<
   HTMLAudioElement,
   {
     ctx: AudioContext;
-    source: MediaElementAudioSourceNode;
     analyser: AnalyserNode;
+    source: MediaElementAudioSourceNode;
   }
 >();
-
-function getAudioNodes(audio: HTMLAudioElement) {
-  let nodes = mediaSourceCache.get(audio);
-  if (!nodes) {
-    try {
-      const AudioCtxClass =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!AudioCtxClass) return null;
-
-      const ctx = new AudioCtxClass();
-      const source = ctx.createMediaElementSource(audio);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.2;
-
-      source.connect(analyser);
-      analyser.connect(ctx.destination);
-
-      nodes = { ctx, source, analyser };
-      mediaSourceCache.set(audio, nodes);
-    } catch {
-      return null;
-    }
-  }
-
-  if (nodes && nodes.ctx.state === 'suspended') {
-    nodes.ctx.resume().catch(() => {});
-  }
-  return nodes;
-}
-
-// ── Main Component ───────────────────────────────────────────────────
 
 export function VoiceAvatar({
   state,
   audioElement,
-  lastAssistantText,
   className,
 }: VoiceAvatarProps) {
-  // Query backend frames if custom frames exist, otherwise fallback to DEFAULT_FRAMES
-  const { data: remoteFrames } = useQuery<AvatarFrames>({
-    queryKey: ['avatar-frames'],
-    queryFn: () => apiGet<AvatarFrames>('/avatar/frames'),
-    staleTime: Infinity,
-  });
+  const [currentFrame, setCurrentFrame] = useState(FRAMES.normal);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
-  const framesRef = useRef<AvatarFrames>(DEFAULT_FRAMES);
+  // Pré-carrega todos os frames no cache do navegador para troca instantânea
   useEffect(() => {
-    framesRef.current =
-      remoteFrames?.has_frames && remoteFrames.normal ? remoteFrames : DEFAULT_FRAMES;
-  }, [remoteFrames]);
-
-  // Current frame state
-  const [currentFrame, setCurrentFrame] = useState<string>(DEFAULT_FRAMES.normal!);
-  const currentFrameRef = useRef(currentFrame);
-  currentFrameRef.current = currentFrame;
-
-  const setFrame = useCallback((frameKeyOrUrl: string) => {
-    const f = framesRef.current;
-    let url = frameKeyOrUrl;
-    if (frameKeyOrUrl in f) {
-      url = (f as Record<string, string | undefined>)[frameKeyOrUrl] || DEFAULT_FRAMES.normal!;
-    }
-    const resolved = resolveFrameUrl(url);
-    if (resolved && resolved !== currentFrameRef.current) {
-      currentFrameRef.current = resolved;
-      setCurrentFrame(resolved);
-    }
-  }, []);
-
-  // Preload all frames into browser cache for zero-latency switching
-  useEffect(() => {
-    const urls = Object.values(DEFAULT_FRAMES).filter(
-      (v): v is string => typeof v === 'string' && v.startsWith('/')
-    );
-    urls.forEach((url) => {
+    Object.values(FRAMES).forEach((src) => {
       const img = new Image();
-      img.src = url;
+      img.src = src;
     });
   }, []);
 
-  // ── State Animation Engine ──────────────────────────────────────────
-
   useEffect(() => {
-    let isCancelled = false;
-    let timerId: ReturnType<typeof setTimeout> | ReturnType<typeof setInterval> | null = null;
+    let blinkTimer: ReturnType<typeof setTimeout> | ReturnType<typeof setInterval> | null = null;
+    let mouthInterval: ReturnType<typeof setInterval> | null = null;
 
-    // 1. IDLE STATE: Tatiana looks normal and blinks naturally every 3.2s – 5.2s
+    const stopTimers = () => {
+      if (blinkTimer) {
+        clearTimeout(blinkTimer);
+        clearInterval(blinkTimer as any);
+        blinkTimer = null;
+      }
+      if (mouthInterval) {
+        clearInterval(mouthInterval);
+        mouthInterval = null;
+      }
+    };
+
+    stopTimers();
+
+    // ── 1. ESTADO: idle (Tatiana aguardando e piscando aleatoriamente) ──
     if (state === 'idle') {
-      setFrame('normal');
+      setCurrentFrame(FRAMES.normal);
 
-      const scheduleIdleBlink = () => {
+      const scheduleBlink = () => {
         const delay = 3200 + Math.random() * 2000;
-        timerId = setTimeout(() => {
-          if (isCancelled) return;
-          setFrame('piscando');
-          timerId = setTimeout(() => {
-            if (isCancelled) return;
-            setFrame('normal');
-            scheduleIdleBlink();
+        blinkTimer = setTimeout(() => {
+          if (stateRef.current !== 'idle') return;
+          setCurrentFrame(FRAMES.piscando);
+          blinkTimer = setTimeout(() => {
+            if (stateRef.current !== 'idle') return;
+            setCurrentFrame(FRAMES.normal);
+            scheduleBlink();
           }, 150);
         }, delay);
       };
 
-      scheduleIdleBlink();
-
-      return () => {
-        isCancelled = true;
-        if (timerId) clearTimeout(timerId);
-      };
+      scheduleBlink();
+      return stopTimers;
     }
 
-    // 2. LISTENING STATE: Tatiana tilts head attentively in 'ouvindo' pose
+    // ── 2. ESTADO: listening (Quando o usuário está falando → frame ouvindo) ──
     if (state === 'listening') {
-      setFrame('ouvindo');
-      return () => {
-        isCancelled = true;
-      };
+      setCurrentFrame(FRAMES.ouvindo);
+      return stopTimers;
     }
 
-    // 3. PROCESSING STATE: Thoughtful slow blinking indicating reflection
+    // ── 3. ESTADO: processing (Pensando / aguardando resposta com piscar lento) ──
     if (state === 'processing') {
-      setFrame('normal');
-      let isBlinking = false;
-      timerId = setInterval(() => {
-        if (isCancelled) return;
-        isBlinking = !isBlinking;
-        setFrame(isBlinking ? 'piscando' : 'normal');
-      }, 2200);
-
-      return () => {
-        isCancelled = true;
-        if (timerId) clearInterval(timerId);
-      };
+      setCurrentFrame(FRAMES.normal);
+      let isBlink = false;
+      blinkTimer = setInterval(() => {
+        if (stateRef.current !== 'processing') return;
+        isBlink = !isBlink;
+        setCurrentFrame(isBlink ? FRAMES.piscando : FRAMES.normal);
+      }, 2200) as any;
+      return stopTimers;
     }
 
-    // 4. SPEAKING STATE: Lip-sync with audio volume or natural cadence loop
+    // ── 4. ESTADO: speaking (Tatiana falando → abrindo e fechando a boca) ──
     if (state === 'speaking') {
-      const emotion = detectEmotion(lastAssistantText);
-      let cadenceIndex = 0;
+      // Ciclo contínuo de abrir e fechar a boca: normal -> meio -> bem_aberta -> meio
+      const mouthCycle = [FRAMES.normal, FRAMES.meio, FRAMES.bem_aberta, FRAMES.meio];
+      let cycleIdx = 0;
 
-      const CADENCE_FRAMES = [
-        'meio',
-        'frame_A',
-        'aberta',
-        'frame_B',
-        'meio',
-        'frame_C',
-        'bem_aberta',
-        'frame_D',
-        'normal',
-        'frame_E',
-        'meio',
-        'frame_F',
-      ];
+      let usingWebAudio = false;
 
-      // If emotion is surprise/excitement, show surprise expression briefly
-      let surpriseTimer: ReturnType<typeof setTimeout> | null = null;
-      if (emotion === 'surprise') {
-        setFrame('surpresa');
-        surpriseTimer = setTimeout(() => {
-          if (!isCancelled) setFrame('meio');
-        }, 350);
-      } else {
-        setFrame('meio');
+      if (audioElement) {
+        try {
+          let nodes = audioNodesCache.get(audioElement);
+          if (!nodes) {
+            const AudioCtxClass =
+              window.AudioContext ||
+              (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+            if (AudioCtxClass) {
+              const ctx = new AudioCtxClass();
+              const source = ctx.createMediaElementSource(audioElement);
+              const analyser = ctx.createAnalyser();
+              analyser.fftSize = 256;
+              analyser.smoothingTimeConstant = 0.15;
+              source.connect(analyser);
+              analyser.connect(ctx.destination);
+              nodes = { ctx, analyser, source };
+              audioNodesCache.set(audioElement, nodes);
+            }
+          }
+
+          if (nodes) {
+            if (nodes.ctx.state === 'suspended') {
+              nodes.ctx.resume().catch(() => {});
+            }
+            const freqData = new Uint8Array(nodes.analyser.frequencyBinCount);
+            usingWebAudio = true;
+
+            mouthInterval = setInterval(() => {
+              if (stateRef.current !== 'speaking') return;
+
+              nodes!.analyser.getByteFrequencyData(freqData);
+              let sum = 0;
+              for (let i = 0; i < freqData.length; i++) sum += freqData[i];
+              const avg = sum / freqData.length;
+
+              // Se a Web Audio API detectar energia real de volume
+              if (avg >= 12) {
+                if (avg < 20) {
+                  setCurrentFrame(FRAMES.normal);
+                } else if (avg < 50) {
+                  setCurrentFrame(FRAMES.meio);
+                } else {
+                  setCurrentFrame(FRAMES.bem_aberta);
+                }
+              } else {
+                // Fallback de cadência quando o volume retornado for 0 (áudio em data-URI ou CORS)
+                // Abre e fecha a boca dinamicamente enquanto o áudio estiver tocando!
+                cycleIdx = (cycleIdx + 1) % mouthCycle.length;
+                setCurrentFrame(mouthCycle[cycleIdx]);
+              }
+            }, 80);
+          }
+        } catch {
+          usingWebAudio = false;
+        }
       }
 
-      // Audio frequency setup
-      const audioNodes = audioElement ? getAudioNodes(audioElement) : null;
-      const freqData = audioNodes ? new Uint8Array(audioNodes.analyser.frequencyBinCount) : null;
-
-      // Real-time animation interval (~70ms)
-      const mouthInterval = setInterval(() => {
-        if (isCancelled) return;
-
-        // If audio element is paused or ended, close mouth to normal
-        if (audioElement && (audioElement.paused || audioElement.ended)) {
-          setFrame('normal');
-          return;
-        }
-
-        let avgVolume = 0;
-        if (audioNodes && freqData) {
-          try {
-            audioNodes.analyser.getByteFrequencyData(freqData);
-            let sum = 0;
-            for (let i = 0; i < freqData.length; i++) {
-              sum += freqData[i];
-            }
-            avgVolume = sum / freqData.length;
-          } catch {
-            avgVolume = 0;
-          }
-        }
-
-        if (avgVolume >= 12) {
-          // Dynamic mouth animation based on audio frequency energy
-          if (avgVolume < 18) {
-            setFrame('normal');
-          } else if (avgVolume < 65) {
-            const mediumPool = ['meio', 'frame_A', 'frame_C', 'frame_B'];
-            setFrame(mediumPool[cadenceIndex % mediumPool.length]);
-          } else {
-            const highPool = ['bem_aberta', 'aberta', 'frame_E', 'frame_D'];
-            setFrame(highPool[cadenceIndex % highPool.length]);
-          }
-          cadenceIndex++;
-        } else {
-          // Cadence fallback: ensures mouth animates whenever audio is playing
-          cadenceIndex++;
-          setFrame(CADENCE_FRAMES[cadenceIndex % CADENCE_FRAMES.length]);
-        }
-      }, 75);
-
-      // Periodic blink during long speech (every 4.5s)
-      const speechBlinkInterval = setInterval(() => {
-        if (isCancelled) return;
-        setFrame('piscando');
-        setTimeout(() => {
-          if (!isCancelled) setFrame('meio');
-        }, 120);
-      }, 4500);
+      // Fallback sem Web Audio: abre e fecha a boca a cada 100ms
+      if (!usingWebAudio) {
+        mouthInterval = setInterval(() => {
+          if (stateRef.current !== 'speaking') return;
+          cycleIdx = (cycleIdx + 1) % mouthCycle.length;
+          setCurrentFrame(mouthCycle[cycleIdx]);
+        }, 100);
+      }
 
       return () => {
-        isCancelled = true;
-        if (surpriseTimer) clearTimeout(surpriseTimer);
-        clearInterval(mouthInterval);
-        clearInterval(speechBlinkInterval);
-        setFrame('normal');
+        stopTimers();
+        setCurrentFrame(FRAMES.normal);
       };
     }
-  }, [state, audioElement, lastAssistantText, setFrame]);
+  }, [state, audioElement]);
 
   return (
     <div
@@ -361,14 +235,10 @@ export function VoiceAvatar({
       <div className="w-full h-full rounded-full border-[4px] sm:border-[5px] md:border-[6px] border-primary shadow-[0_0_30px_rgba(124,58,237,0.35)] overflow-hidden bg-bg-secondary relative z-10 transition-transform duration-500 hover:scale-105">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
+          key={currentFrame}
           src={currentFrame}
           alt="Teacher Tatiana"
-          className="w-full h-full object-cover object-top select-none pointer-events-none transition-opacity duration-75"
-          onError={(e) => {
-            if (e.currentTarget.src !== DEFAULT_FRAMES.normal) {
-              e.currentTarget.src = DEFAULT_FRAMES.normal!;
-            }
-          }}
+          className="w-full h-full object-cover object-top select-none pointer-events-none"
         />
       </div>
     </div>

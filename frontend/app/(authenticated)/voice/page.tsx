@@ -441,7 +441,6 @@ function VoicePageContent() {
   useEffect(() => {
     if (lastAudio && audioRef.current) {
       const audio = audioRef.current;
-      audio.pause();
       audio.src = `data:audio/mp3;base64,${lastAudio}`;
       audio.load();
       audio.play().catch(e => {
