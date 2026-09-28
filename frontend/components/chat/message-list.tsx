@@ -129,7 +129,7 @@ export function MessageList({ messages, isStreaming, streamingContent, conversat
       {showWelcome && (
         <div className="flex flex-col items-center justify-center py-12 text-center animate-fade-in">
           <div className="w-16 h-16 rounded-full border-[3px] border-primary/40 shadow-glow overflow-hidden mb-4">
-            <Image src="/avatar/avatar_tati_normal.webp" alt="Tati" width={64} height={64} className="w-full h-full object-cover" />
+            <Image src="/images/tati_logo.jpg" alt="Tati" width={64} height={64} className="w-full h-full object-cover" />
           </div>
           <h2 className="font-display text-xl font-bold mb-2">
             Welcome to Taty&apos;s Hub

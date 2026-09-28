@@ -1,69 +1,37 @@
 'use client';
 
-import { API_BASE, apiGet } from '@/lib/api/client';
-import { cn } from '@/lib/utils';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { apiGet, API_BASE } from '@/lib/api/client';
+import { cn } from '@/lib/utils';
 
-//  Types 
+// ── Types ────────────────────────────────────────────────────────────
 
-interface AvatarFrames {
+export interface AvatarFrames {
   has_frames?: boolean;
   normal?: string;
   meio?: string;
   aberta?: string;
   bem_aberta?: string;
+  ouvindo?: string;
+  piscando?: string;
+  surpresa?: string;
   frame_A?: string;
   frame_B?: string;
   frame_C?: string;
   frame_D?: string;
   frame_E?: string;
   frame_F?: string;
-  ouvindo?: string;
-  piscando?: string;
 }
-
-type MouthLevel = 0 | 1 | 2;
 
 interface VoiceAvatarProps {
   state: 'idle' | 'listening' | 'processing' | 'speaking';
   audioElement?: HTMLAudioElement | null;
   lastAssistantText?: string;
+  className?: string;
 }
 
-//  Emotion detection 
-
-const SURPRISE_RE = /!|uau|wow|incrível|incredible|que\b.{0,20}!/i;
-const POSITIVE_RE = /parabéns|congratulations|perfeito|perfect|excelente|excellent|maravilhoso|wonderful|fantástico|fantastic|ótimo|great|brilliant|😊|😄|😃|🎉|👏/i;
-
-function detectEmotion(text: string): 'surprise' | 'positive' | 'neutral' {
-  if (!text) return 'neutral';
-  if (SURPRISE_RE.test(text)) return 'surprise';
-  if (POSITIVE_RE.test(text)) return 'positive';
-  return 'neutral';
-}
-
-//  Amplitude smoothing (ring buffer) 
-
-class AmplitudeSmoother {
-  private buf: Float32Array;
-  private ptr = 0;
-  constructor(private size: number) {
-    this.buf = new Float32Array(size);
-  }
-  push(v: number): number {
-    this.buf[this.ptr] = v;
-    this.ptr = (this.ptr + 1) % this.size;
-    let s = 0;
-    for (let i = 0; i < this.size; i++) s += this.buf[i];
-    return s / this.size;
-  }
-}
-
-//  Component 
-
-const INITIAL_SRC = '/avatar/avatar_tati_normal.webp';
-const MIN_HOLD_MS = 90;
+// ── Default local asset frames (always available with 0 latency) ─────
 
 const DEFAULT_FRAMES: AvatarFrames = {
   has_frames: true,
@@ -71,327 +39,338 @@ const DEFAULT_FRAMES: AvatarFrames = {
   meio: '/avatar/avatar_tati_meio.webp',
   aberta: '/avatar/avatar_tati_aberta.webp',
   bem_aberta: '/avatar/avatar_tati_bem_aberta.webp',
+  ouvindo: '/avatar/avatar_tati_ouvindo.webp',
+  piscando: '/avatar/tati_piscando.webp',
+  surpresa: '/avatar/tati_surpresa.webp',
   frame_A: '/avatar/frame_A.webp',
   frame_B: '/avatar/frame_B.webp',
   frame_C: '/avatar/frame_C.webp',
   frame_D: '/avatar/frame_D.webp',
   frame_E: '/avatar/frame_E.webp',
   frame_F: '/avatar/frame_F.webp',
-  ouvindo: '/avatar/avatar_tati_ouvindo.webp',
-  piscando: '/avatar/tati_piscando.webp',
 };
 
-export function VoiceAvatar({ state, audioElement, lastAssistantText }: VoiceAvatarProps) {
-  const { data: frames } = useQuery<AvatarFrames>({
+// ── Emotion detection ────────────────────────────────────────────────
+
+const SURPRISE_RE = /!|uau|wow|incrível|incredible|que\b.{0,20}!/i;
+const POSITIVE_RE = /parabéns|congratulations|perfeito|perfect|excelente|excellent|maravilhoso|wonderful|fantástico|fantastic|ótimo|great|brilliant|😊|😄|😃|🎉|👏/i;
+
+function detectEmotion(text?: string): 'surprise' | 'positive' | 'neutral' {
+  if (!text) return 'neutral';
+  if (SURPRISE_RE.test(text)) return 'surprise';
+  if (POSITIVE_RE.test(text)) return 'positive';
+  return 'neutral';
+}
+
+function resolveFrameUrl(path?: string): string {
+  if (!path) return DEFAULT_FRAMES.normal!;
+  if (path.startsWith('data:') || path.startsWith('http') || path.startsWith('/avatar/') || path.startsWith('/images/')) {
+    return path;
+  }
+  return `${API_BASE}${path.startsWith('/') ? path : '/' + path}`;
+}
+
+// ── Web Audio Node Cache (prevents duplicate MediaElementAudioSourceNode) ──
+
+const mediaSourceCache = new WeakMap<
+  HTMLAudioElement,
+  {
+    ctx: AudioContext;
+    source: MediaElementAudioSourceNode;
+    analyser: AnalyserNode;
+  }
+>();
+
+function getAudioNodes(audio: HTMLAudioElement) {
+  let nodes = mediaSourceCache.get(audio);
+  if (!nodes) {
+    try {
+      const AudioCtxClass =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtxClass) return null;
+
+      const ctx = new AudioCtxClass();
+      const source = ctx.createMediaElementSource(audio);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.2;
+
+      source.connect(analyser);
+      analyser.connect(ctx.destination);
+
+      nodes = { ctx, source, analyser };
+      mediaSourceCache.set(audio, nodes);
+    } catch {
+      return null;
+    }
+  }
+
+  if (nodes && nodes.ctx.state === 'suspended') {
+    nodes.ctx.resume().catch(() => {});
+  }
+  return nodes;
+}
+
+// ── Main Component ───────────────────────────────────────────────────
+
+export function VoiceAvatar({
+  state,
+  audioElement,
+  lastAssistantText,
+  className,
+}: VoiceAvatarProps) {
+  // Query backend frames if custom frames exist, otherwise fallback to DEFAULT_FRAMES
+  const { data: remoteFrames } = useQuery<AvatarFrames>({
     queryKey: ['avatar-frames'],
     queryFn: () => apiGet<AvatarFrames>('/avatar/frames'),
     staleTime: Infinity,
   });
 
-  // Rendering state
-  // mouthSrc / mouthKey: changing key re-triggers fade-in CSS animation
-  const [mouthSrc, setMouthSrc] = useState(INITIAL_SRC);
-  const [mouthKey, setMouthKey] = useState(0);
-  const [reactionSrc, setReactionSrc] = useState<string | null>(null);
-  const [blinkVisible, setBlinkVisible] = useState(false);
-
-  // Refs (never cause stale closures) 
   const framesRef = useRef<AvatarFrames>(DEFAULT_FRAMES);
-  const currentMouthRef = useRef(INITIAL_SRC);   // source-of-truth for current mouth
-  const mouthLevelRef = useRef<MouthLevel>(0);
-  const lastChangeRef = useRef(0);
-  const pendingRef = useRef<string | null>(null);
-  const emotionRef = useRef<'surprise' | 'positive' | 'neutral'>('neutral');
-  const lastTextRef = useRef<string | undefined>(undefined);
-
-  // Audio refs
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const smootherRef = useRef(new AmplitudeSmoother(3)); // ~90ms at 30ms interval
-
-  // Timer refs
-  const mouthIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const blinkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const reactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Keep framesRef in sync (prefer backend frames if loaded with valid frames, else DEFAULT_FRAMES)
   useEffect(() => {
-    framesRef.current = (frames?.has_frames && frames.normal) ? frames : DEFAULT_FRAMES;
-  }, [frames]);
+    framesRef.current =
+      remoteFrames?.has_frames && remoteFrames.normal ? remoteFrames : DEFAULT_FRAMES;
+  }, [remoteFrames]);
 
-  // Helpers (STABLE — empty deps, use only refs) 
+  // Current frame state
+  const [currentFrame, setCurrentFrame] = useState<string>(DEFAULT_FRAMES.normal!);
+  const currentFrameRef = useRef(currentFrame);
+  currentFrameRef.current = currentFrame;
 
-  const getUrl = useCallback((path?: string): string => {
-    if (!path) return INITIAL_SRC;
-    if (path.startsWith('data:') || path.startsWith('http') || path.startsWith('/avatar/') || path.startsWith('/images/')) {
-      return path;
+  const setFrame = useCallback((frameKeyOrUrl: string) => {
+    const f = framesRef.current;
+    let url = frameKeyOrUrl;
+    if (frameKeyOrUrl in f) {
+      url = (f as Record<string, string | undefined>)[frameKeyOrUrl] || DEFAULT_FRAMES.normal!;
     }
-    return `${API_BASE}${path.startsWith('/') ? path : '/' + path}`;
+    const resolved = resolveFrameUrl(url);
+    if (resolved && resolved !== currentFrameRef.current) {
+      currentFrameRef.current = resolved;
+      setCurrentFrame(resolved);
+    }
   }, []);
 
-  // Preload all frames in browser cache eagerly to prevent lag/flicker
+  // Preload all frames into browser cache for zero-latency switching
   useEffect(() => {
-    const f = (frames?.has_frames && frames.normal) ? frames : DEFAULT_FRAMES;
-    const fields = [
-      f.normal, f.meio, f.aberta, f.bem_aberta,
-      f.frame_A, f.frame_B, f.frame_C, f.frame_D,
-      f.frame_E, f.frame_F, f.ouvindo, f.piscando
-    ];
-    fields.forEach((path) => {
-      if (path) {
-        const img = new Image();
-        img.src = getUrl(path);
-      }
+    const urls = Object.values(DEFAULT_FRAMES).filter(
+      (v): v is string => typeof v === 'string' && v.startsWith('/')
+    );
+    urls.forEach((url) => {
+      const img = new Image();
+      img.src = url;
     });
-  }, [frames, getUrl]);
-
-  /**
-   * changeMouth is STABLE (empty deps).
-   * Reads framesRef/currentMouthRef instead of state → no stale closure.
-   * Uses CSS animation for fade-in instead of manual opacity → no white screen.
-   */
-  const changeMouth = useCallback((newUrl: string) => {
-    if (!newUrl || newUrl === currentMouthRef.current) return;
-    currentMouthRef.current = newUrl;
-    setMouthSrc(newUrl);
   }, []);
 
-  const frameForLevel = useCallback((level: MouthLevel, emotion: 'surprise' | 'positive' | 'neutral'): string => {
-    const f = framesRef.current;
-    if (!f) return INITIAL_SRC;
-    if (level === 0) return getUrl(f.normal);
-    if (level === 1) return getUrl(f.meio ?? f.frame_A ?? f.normal);
-    // level 2 — only use wide-smile frames when text is actually positive
-    if (emotion === 'positive') return getUrl(f.bem_aberta ?? f.aberta ?? f.meio ?? f.normal);
-    return getUrl(f.meio ?? f.frame_A ?? f.normal);
-  }, [getUrl]); // framesRef is a ref, not a dep
+  // ── State Animation Engine ──────────────────────────────────────────
 
-  const nextLevel = useCallback((smoothed: number, cur: MouthLevel): MouthLevel => {
-    const target: MouthLevel = smoothed < 12 ? 0 : smoothed < 50 ? 1 : 2;
-    if (target > cur) return (cur + 1) as MouthLevel;
-    if (target < cur) return (cur - 1) as MouthLevel;
-    return cur;
-  }, []);
-
-  // Initial frame
   useEffect(() => {
-    const f = (frames?.has_frames && frames.normal) ? frames : DEFAULT_FRAMES;
-    if (f.normal) {
-      const url = getUrl(f.normal);
-      currentMouthRef.current = url;
-      setMouthSrc(url);
+    let isCancelled = false;
+    let timerId: ReturnType<typeof setTimeout> | ReturnType<typeof setInterval> | null = null;
+
+    // 1. IDLE STATE: Tatiana looks normal and blinks naturally every 3.2s – 5.2s
+    if (state === 'idle') {
+      setFrame('normal');
+
+      const scheduleIdleBlink = () => {
+        const delay = 3200 + Math.random() * 2000;
+        timerId = setTimeout(() => {
+          if (isCancelled) return;
+          setFrame('piscando');
+          timerId = setTimeout(() => {
+            if (isCancelled) return;
+            setFrame('normal');
+            scheduleIdleBlink();
+          }, 150);
+        }, delay);
+      };
+
+      scheduleIdleBlink();
+
+      return () => {
+        isCancelled = true;
+        if (timerId) clearTimeout(timerId);
+      };
     }
-  }, [frames, getUrl]);
 
-  // Emotion detection
-
-  useEffect(() => {
-    if (!lastAssistantText || lastAssistantText === lastTextRef.current) return;
-    lastTextRef.current = lastAssistantText;
-
-    const emotion = detectEmotion(lastAssistantText);
-    emotionRef.current = emotion;
-
-    const f = framesRef.current;
-    if (emotion === 'surprise' && f?.has_frames) {
-      const pool = [f.frame_B, f.frame_C, f.frame_D].filter(Boolean) as string[];
-      if (pool.length === 0) return;
-      const chosen = getUrl(pool[Math.floor(Math.random() * pool.length)]);
-      if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
-      setReactionSrc(chosen);
-      reactionTimerRef.current = setTimeout(() => setReactionSrc(null), 450);
+    // 2. LISTENING STATE: Tatiana tilts head attentively in 'ouvindo' pose
+    if (state === 'listening') {
+      setFrame('ouvindo');
+      return () => {
+        isCancelled = true;
+      };
     }
-  }, [lastAssistantText, getUrl]);
 
-  // Blink: independent timer, overlay layer
+    // 3. PROCESSING STATE: Thoughtful slow blinking indicating reflection
+    if (state === 'processing') {
+      setFrame('normal');
+      let isBlinking = false;
+      timerId = setInterval(() => {
+        if (isCancelled) return;
+        isBlinking = !isBlinking;
+        setFrame(isBlinking ? 'piscando' : 'normal');
+      }, 2200);
 
-  useEffect(() => {
-    const scheduleBlink = (): ReturnType<typeof setTimeout> => {
-      const delay = 3000 + Math.random() * 3000;
-      return setTimeout(() => {
-        if (!framesRef.current?.piscando) {
-          blinkTimerRef.current = scheduleBlink();
+      return () => {
+        isCancelled = true;
+        if (timerId) clearInterval(timerId);
+      };
+    }
+
+    // 4. SPEAKING STATE: Lip-sync with audio volume or natural cadence loop
+    if (state === 'speaking') {
+      const emotion = detectEmotion(lastAssistantText);
+      let cadenceIndex = 0;
+
+      const CADENCE_FRAMES = [
+        'meio',
+        'frame_A',
+        'aberta',
+        'frame_B',
+        'meio',
+        'frame_C',
+        'bem_aberta',
+        'frame_D',
+        'normal',
+        'frame_E',
+        'meio',
+        'frame_F',
+      ];
+
+      // If emotion is surprise/excitement, show surprise expression briefly
+      let surpriseTimer: ReturnType<typeof setTimeout> | null = null;
+      if (emotion === 'surprise') {
+        setFrame('surpresa');
+        surpriseTimer = setTimeout(() => {
+          if (!isCancelled) setFrame('meio');
+        }, 350);
+      } else {
+        setFrame('meio');
+      }
+
+      // Audio frequency setup
+      const audioNodes = audioElement ? getAudioNodes(audioElement) : null;
+      const freqData = audioNodes ? new Uint8Array(audioNodes.analyser.frequencyBinCount) : null;
+
+      // Real-time animation interval (~70ms)
+      const mouthInterval = setInterval(() => {
+        if (isCancelled) return;
+
+        // If audio element is paused or ended, close mouth to normal
+        if (audioElement && (audioElement.paused || audioElement.ended)) {
+          setFrame('normal');
           return;
         }
-        setBlinkVisible(true);
-        blinkTimerRef.current = setTimeout(() => {
-          setBlinkVisible(false);
-          blinkTimerRef.current = scheduleBlink();
-        }, 150);
-      }, delay);
-    };
 
-    blinkTimerRef.current = scheduleBlink();
-    return () => { if (blinkTimerRef.current) clearTimeout(blinkTimerRef.current); };
-  }, []); // runs once — reads framesRef internally
+        let avgVolume = 0;
+        if (audioNodes && freqData) {
+          try {
+            audioNodes.analyser.getByteFrequencyData(freqData);
+            let sum = 0;
+            for (let i = 0; i < freqData.length; i++) {
+              sum += freqData[i];
+            }
+            avgVolume = sum / freqData.length;
+          } catch {
+            avgVolume = 0;
+          }
+        }
 
-  // Mouth animation
+        if (avgVolume >= 12) {
+          // Dynamic mouth animation based on audio frequency energy
+          if (avgVolume < 18) {
+            setFrame('normal');
+          } else if (avgVolume < 65) {
+            const mediumPool = ['meio', 'frame_A', 'frame_C', 'frame_B'];
+            setFrame(mediumPool[cadenceIndex % mediumPool.length]);
+          } else {
+            const highPool = ['bem_aberta', 'aberta', 'frame_E', 'frame_D'];
+            setFrame(highPool[cadenceIndex % highPool.length]);
+          }
+          cadenceIndex++;
+        } else {
+          // Cadence fallback: ensures mouth animates whenever audio is playing
+          cadenceIndex++;
+          setFrame(CADENCE_FRAMES[cadenceIndex % CADENCE_FRAMES.length]);
+        }
+      }, 75);
 
-  useEffect(() => {
-    if (mouthIntervalRef.current) clearInterval(mouthIntervalRef.current);
+      // Periodic blink during long speech (every 4.5s)
+      const speechBlinkInterval = setInterval(() => {
+        if (isCancelled) return;
+        setFrame('piscando');
+        setTimeout(() => {
+          if (!isCancelled) setFrame('meio');
+        }, 120);
+      }, 4500);
 
-    if (state === 'listening') {
-      const url = getUrl(framesRef.current?.ouvindo ?? framesRef.current?.normal);
-      changeMouth(url);
-      mouthLevelRef.current = 0;
-      return;
+      return () => {
+        isCancelled = true;
+        if (surpriseTimer) clearTimeout(surpriseTimer);
+        clearInterval(mouthInterval);
+        clearInterval(speechBlinkInterval);
+        setFrame('normal');
+      };
     }
-
-    if (state !== 'speaking' || !audioElement || !framesRef.current?.has_frames) {
-      const url = getUrl(framesRef.current?.normal);
-      changeMouth(url);
-      mouthLevelRef.current = 0;
-      return;
-    }
-
-    // Web Audio setup
-    let usingAudio = false;
-    try {
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      const ctx = audioCtxRef.current;
-      if (ctx.state === 'suspended') ctx.resume();
-
-      // MediaElementSource can only be created once per element — reuse
-      if (!sourceRef.current) {
-        sourceRef.current = ctx.createMediaElementSource(audioElement);
-      }
-      if (!analyserRef.current) {
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 256;
-        sourceRef.current.connect(analyser);
-        analyser.connect(ctx.destination);
-        analyserRef.current = analyser;
-      }
-
-      smootherRef.current = new AmplitudeSmoother(3);
-      const freqData = new Uint8Array(analyserRef.current.frequencyBinCount);
-      usingAudio = true;
-
-      mouthIntervalRef.current = setInterval(() => {
-        if (!analyserRef.current) return;
-        analyserRef.current.getByteFrequencyData(freqData);
-        let sum = 0;
-        for (let i = 0; i < freqData.length; i++) sum += freqData[i];
-        const smoothed = smootherRef.current.push(sum / freqData.length);
-
-        const level = nextLevel(smoothed, mouthLevelRef.current);
-        mouthLevelRef.current = level;
-        changeMouth(frameForLevel(level, emotionRef.current));
-      }, 30);
-
-    } catch (_e) {
-      // ignore — fall through to CSS fallback
-    }
-
-    // Fallback: no Web Audio — simple toggle
-    if (!usingAudio) {
-      let toggle = false;
-      mouthIntervalRef.current = setInterval(() => {
-        toggle = !toggle;
-        const f = framesRef.current;
-        changeMouth(getUrl(toggle ? f?.meio ?? f?.normal : f?.normal));
-      }, 200);
-    }
-
-    return () => {
-      if (mouthIntervalRef.current) clearInterval(mouthIntervalRef.current);
-    };
-    // changeMouth, frameForLevel, nextLevel, getUrl are all stable (empty deps)
-  }, [state, audioElement, changeMouth, frameForLevel, nextLevel, getUrl]);
-
-  // Render 
-
-  const blinkUrl = framesRef.current?.piscando ? getUrl(framesRef.current.piscando) : null;
+  }, [state, audioElement, lastAssistantText, setFrame]);
 
   return (
-    <div className={cn(
-      'relative w-[140px] h-[140px] md:w-[220px] md:h-[220px] lg:w-[230px] lg:h-[290px] shrink-0 transition-all duration-1000 ease-in-out',
-      state === 'listening' && 'listening',
-      state === 'processing' && 'processing',
-      state === 'speaking' && 'speaking',
-    )}>
-      {/* Glow */}
-      <div className={cn(
-        'absolute inset-[-40px] rounded-full blur-[60px] transition-all duration-1000 opacity-0 z-0',
-        state === 'listening' && 'opacity-30 bg-success',
-        state === 'speaking' && 'opacity-30 bg-primary',
-        state === 'processing' && 'opacity-30 bg-warning',
-      )} />
+    <div
+      className={cn(
+        'relative w-[140px] h-[140px] sm:w-[200px] sm:h-[200px] md:w-[220px] md:h-[220px] lg:w-[230px] lg:h-[230px] shrink-0 transition-all duration-700 ease-in-out',
+        state === 'listening' && 'listening',
+        state === 'processing' && 'processing',
+        state === 'speaking' && 'speaking',
+        className
+      )}
+    >
+      {/* Glow Blur */}
+      <div
+        className={cn(
+          'absolute inset-[-30px] sm:inset-[-40px] rounded-full blur-[50px] transition-all duration-700 pointer-events-none z-0',
+          state === 'idle' && 'opacity-0',
+          state === 'listening' && 'opacity-40 bg-emerald-500',
+          state === 'processing' && 'opacity-40 bg-amber-400',
+          state === 'speaking' && 'opacity-40 bg-primary'
+        )}
+      />
 
-      {/* Rings */}
-      <div className={cn(
-        'absolute inset-[-15px] rounded-full border-[3px] border-primary/20 z-0',
-        state === 'idle' && 'animate-[ring-idle_4s_ease-in-out_infinite]',
-        state === 'listening' && 'border-success/60 animate-[ring-listen_1.2s_ease-in-out_infinite]',
-        state === 'processing' && 'border-warning/40 animate-[ring-process_1.8s_ease-in-out_infinite]',
-        state === 'speaking' && 'border-primary/80 animate-[ring-speak_0.7s_ease-in-out_infinite]',
-      )} />
-      <div className={cn(
-        'absolute inset-[-30px] rounded-full border-[2px] border-primary/10 z-0',
-        state === 'idle' && 'animate-[ring-idle_4s_ease-in-out_infinite_1s]',
-        state === 'listening' && 'border-success/30 animate-[ring-listen_1.2s_ease-in-out_infinite_0.4s]',
-        state === 'processing' && 'border-warning/15 animate-[ring-process_1.8s_ease-in-out_infinite_0.6s]',
-        state === 'speaking' && 'border-primary/40 animate-[ring-speak_0.7s_ease-in-out_infinite_0.25s]',
-      )} />
+      {/* Ring 1 (Inner pulse) */}
+      <div
+        className={cn(
+          'absolute inset-[-10px] sm:inset-[-14px] rounded-full pointer-events-none transition-colors duration-500 z-0',
+          state === 'idle' && 'border-2 border-primary/30 animate-ring-idle',
+          state === 'listening' && 'border-2 border-emerald-400/80 animate-ring-listen',
+          state === 'processing' && 'border-2 border-amber-400/70 animate-ring-process',
+          state === 'speaking' && 'border-2 border-primary/90 animate-ring-speak'
+        )}
+      />
 
-      <div className="w-full h-full rounded-full border-[6px] border-primary shadow-[0_0_60px_rgba(124,58,237,0.3)] overflow-hidden bg-bg-secondary relative z-10 transition-transform duration-500 hover:scale-105">
+      {/* Ring 2 (Outer pulse delayed) */}
+      <div
+        className={cn(
+          'absolute inset-[-20px] sm:inset-[-28px] rounded-full pointer-events-none transition-colors duration-500 z-0',
+          state === 'idle' && 'border-[1.5px] border-primary/15 animate-ring-idle-delayed',
+          state === 'listening' && 'border-[1.5px] border-emerald-400/40 animate-ring-listen-delayed',
+          state === 'processing' && 'border-[1.5px] border-amber-400/30 animate-ring-process-delayed',
+          state === 'speaking' && 'border-[1.5px] border-primary/50 animate-ring-speak-delayed'
+        )}
+      />
 
-        {/* Layer 1 — Boca (visema atual) */}
+      {/* Main Avatar Circular Frame */}
+      <div className="w-full h-full rounded-full border-[4px] sm:border-[5px] md:border-[6px] border-primary shadow-[0_0_30px_rgba(124,58,237,0.35)] overflow-hidden bg-bg-secondary relative z-10 transition-transform duration-500 hover:scale-105">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={mouthSrc}
-          alt="Teacher Tati"
+          src={currentFrame}
+          alt="Teacher Tatiana"
+          className="w-full h-full object-cover object-top select-none pointer-events-none transition-opacity duration-75"
           onError={(e) => {
-            if (e.currentTarget.src !== INITIAL_SRC) {
-              e.currentTarget.src = INITIAL_SRC;
+            if (e.currentTarget.src !== DEFAULT_FRAMES.normal) {
+              e.currentTarget.src = DEFAULT_FRAMES.normal!;
             }
           }}
-          className="absolute inset-0 w-full h-full object-cover"
         />
-
-        {/* Layer 2 — Reação emocional (surprise/choque) */}
-        {reactionSrc && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={reactionSrc}
-            alt=""
-            aria-hidden
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-            className="absolute inset-0 w-full h-full object-cover avatar-reaction"
-          />
-        )}
-
-        {/* Layer 3 — Piscar (overlay independente) */}
-        {blinkVisible && blinkUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={blinkUrl}
-            alt=""
-            aria-hidden
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-        )}
       </div>
-
-      <style jsx global>{`
-        @keyframes ring-idle    { 0%,100%{opacity:.4;transform:scale(1)} 50%{opacity:.8;transform:scale(1.02)} }
-        @keyframes ring-listen  { 0%{box-shadow:0 0 0 0 rgba(52,211,153,.6)} 70%{box-shadow:0 0 0 12px rgba(52,211,153,0)} 100%{box-shadow:0 0 0 0 rgba(52,211,153,0)} }
-        @keyframes ring-process { 0%,100%{opacity:.5;transform:scale(1)} 50%{opacity:1;transform:scale(1.03)} }
-        @keyframes ring-speak   { 0%{box-shadow:0 0 0 0 rgba(124,58,237,.6)} 70%{box-shadow:0 0 0 14px rgba(124,58,237,0)} 100%{box-shadow:0 0 0 0 rgba(124,58,237,0)} }
-        @keyframes mouthFadeIn  { from{opacity:.65} to{opacity:1} }
-        @keyframes reactionFade { 0%{opacity:0} 15%{opacity:1} 80%{opacity:1} 100%{opacity:0} }
-        .avatar-mouth    { animation: mouthFadeIn 80ms ease-out forwards; }
-        .avatar-reaction { animation: reactionFade 450ms ease-in-out forwards; }
-      `}</style>
     </div>
   );
 }

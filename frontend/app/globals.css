@@ -397,3 +397,55 @@ div:has(> div[data-hot-toast]) {
   z-index: 99999999 !important;
 }
 
+/* ── Voice Avatar Animations & Rings ── */
+@keyframes ring-idle {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50%       { opacity: 0.8; transform: scale(1.02); }
+}
+
+@keyframes ring-listen {
+  0%   { box-shadow: 0 0 0 0    rgba(52, 211, 153, 0.7); }
+  70%  { box-shadow: 0 0 0 16px rgba(52, 211, 153, 0); }
+  100% { box-shadow: 0 0 0 0    rgba(52, 211, 153, 0); }
+}
+
+@keyframes ring-process {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.03); }
+}
+
+@keyframes ring-speak {
+  0%   { box-shadow: 0 0 0 0    rgba(124, 58, 237, 0.8); }
+  70%  { box-shadow: 0 0 0 16px rgba(124, 58, 237, 0); }
+  100% { box-shadow: 0 0 0 0    rgba(124, 58, 237, 0); }
+}
+
+.animate-ring-idle {
+  animation: ring-idle 2.5s ease-in-out infinite;
+}
+.animate-ring-idle-delayed {
+  animation: ring-idle 2.5s ease-in-out infinite 0.6s;
+}
+
+.animate-ring-listen {
+  animation: ring-listen 0.8s ease-in-out infinite;
+}
+.animate-ring-listen-delayed {
+  animation: ring-listen 0.8s ease-in-out infinite 0.2s;
+}
+
+.animate-ring-process {
+  animation: ring-process 1.4s ease-in-out infinite;
+}
+.animate-ring-process-delayed {
+  animation: ring-process 1.4s ease-in-out infinite 0.4s;
+}
+
+.animate-ring-speak {
+  animation: ring-speak 0.5s ease-in-out infinite;
+}
+.animate-ring-speak-delayed {
+  animation: ring-speak 0.5s ease-in-out infinite 0.15s;
+}
+
+

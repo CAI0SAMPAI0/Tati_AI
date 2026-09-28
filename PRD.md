@@ -90,3 +90,19 @@ Todas as 7 sprints de modernização e estabilização foram concluídas com suc
 - [X] **9.6** Realizar commit e push na branch `main` (produção) e sincronizar via `git merge` na branch `desenvolvimento`, com checagem de tipos TypeScript (`tsc --noEmit`) 100% aprovada e sem erros.
 
 
+
+### Sprint 10: Restauração da Animação do VoiceAvatar & Restauração dos Logos no Chat
+- [X] **10.1** Restaurar a máquina de estados completa do `VoiceAvatar` (`frontend/components/chat/voice-avatar.tsx`) com frame único de alta performance:
+  - Estado `idle`: frame normal com piscadas aleatórias naturais (`scheduleIdleBlink`) a cada 3.2s a 5.2s (150ms).
+  - Estado `listening`: pose inclinada e atenta com frame `avatar_tati_ouvindo.webp` e anéis verdes pulsantes (`animate-ring-listen`).
+  - Estado `processing`: frame normal com piscadas lentas ("pensando") a cada 2.2s e anéis âmbar pulsantes (`animate-ring-process`).
+  - Estado `speaking`: anéis roxos pulsantes (`animate-ring-speak`), análise de volume de áudio em tempo real via Web Audio API e fallback resiliente de cadência de visemas a cada 75ms para nunca travar a boca mesmo se o navegador bloquear o stream.
+  - Suporte a detecção de emoção de surpresa com frame `tati_surpresa.webp` e piscadas naturais a cada 4.5s em falas longas.
+- [X] **10.2** Adicionar keyframes e classes de anéis em `frontend/app/globals.css` e `frontend/tailwind.config.ts` (`animate-ring-idle`, `animate-ring-listen`, `animate-ring-process`, `animate-ring-speak` e suas variações com delay).
+- [X] **10.3** Cache global de nós de Web Audio (`WeakMap<HTMLAudioElement, ...>`) evitando erros de `InvalidStateError` em trocas de estado.
+- [X] **10.4** Restaurar a logo institucional da Tatiana (`/images/tati_logo.jpg`) nos locais corretos do Chat:
+  - Header da barra lateral ao lado de "Taty's Hub" (`frontend/components/chat/sidebar.tsx`).
+  - Círculo de boas-vindas do chat (`frontend/components/chat/message-list.tsx`).
+  - Ícone das bolhas de mensagem do assistente (`frontend/components/chat/message-bubble.tsx`).
+  - Bolhas do assistente e spinner no teste CEFR (`frontend/app/teste-cefr/page.tsx`).
+- [X] **10.5** Validar compilação do TypeScript `npm run typecheck` com 0 erros.

@@ -216,3 +216,36 @@ Este documento registra todas as alterações efetuadas no projeto durante a spr
      - Checkout para `desenvolvimento`, merge de `main` e resolução de conflitos mantendo todas as funcionalidades intactas.
      - Validação TypeScript (`tsc --noEmit`) aprovada com 0 erros.
      - Push final realizado na branch `desenvolvimento`.
+
+
+---
+
+## [Sprint 10] Restauração da Animação do VoiceAvatar & Restauração dos Logos no Chat
+- **Problema Relatado**:
+  1. O avatar da Teacher Tatiana voltou a aparecer no `/voice`, mas sem as animações que existiam anteriormente (ouvindo, falando, piscando e anéis pulsantes).
+  2. No chat (sidebar header ao lado de "Taty's Hub", tela de boas-vindas e bolhas de mensagem), onde deveria constar a logo da Tatiana (`/images/tati_logo.jpg`), havia sido colocado o avatar facial, descaracterizando a identidade de marca.
+- **Causa Raiz Técnica**:
+  1. **Animações dos Rings Inativas**: O componente utilizava classes CSS arbitrárias como `animate-[ring-idle_4s_ease-in-out_infinite]` referenciando keyframes declarados dentro de uma tag `<style jsx global>`. No Next.js 14 App Router, o compilador do Tailwind não enxerga tags `<style jsx>`, fazendo com que nenhum dos keyframes fosse gerado e os anéis ficassem 100% estáticos.
+  2. **Arquitetura Frágil de 3 Camadas (`<img>`)**: Havia 3 elementos `<img>` empilhados (`mouthSrc`, `reactionSrc`, `blinkVisible`), criando sobreposição incorreta de imagens inteiras (todos os frames `.webp` são retratos completos de 256x256, e não sobreposições transparentes).
+  3. **Mouth Lock em Modo Web Audio**: Ao instanciar `ctx.createMediaElementSource(audioElement)`, se o contexto de áudio estivesse suspenso pelo navegador ou se o áudio fosse decodificado a partir de `data:audio/mp3;base64` ou CORS restrito, `getByteFrequencyData` retornava zeros. Como a flag `usingAudio` fora marcada como verdadeira, o fallback nunca era ativado, travando a boca no frame `normal` (fechada) durante toda a fala. Além disso, em trocas de estado para `listening` e `processing`, a animação não exibia o frame `ouvindo` com persistência ou o piscar reflexivo.
+- **Solução Implementada**:
+  1. **Restauração Fiel da Máquina de Estados Visual Original (`frontend/components/chat/voice-avatar.tsx`)**:
+     - **Estado `idle`**: Exibe frame `normal` e agenda piscadas aleatórias naturais (`scheduleIdleBlink`) a cada 3.2s a 5.2s, exibindo o frame `piscando` (`/avatar/tati_piscando.webp`) por 150ms e retornando para `normal`.
+     - **Estado `listening`**: Tatiana assume a pose de escuta com a cabeça inclinada e atenta (`/avatar/avatar_tati_ouvindo.webp`). Anéis pulsam em verde vivo com `animate-ring-listen` e `animate-ring-listen-delayed`.
+     - **Estado `processing`**: Exibe frame `normal` com piscadas reflexivas ("pensando") a cada 2.2s e anéis âmbar (`animate-ring-process` e `animate-ring-process-delayed`).
+     - **Estado `speaking`**: Anéis roxos com efeito sonoro pulsante intenso (`animate-ring-speak` e `animate-ring-speak-delayed`). Sincronia labial dinâmica: se o volume Web Audio estiver ativo e com energia (`avgVolume >= 12`), mapeia para visemas médios (`meio`, `frame_A`, `frame_B`, `frame_C`) e amplos (`bem_aberta`, `aberta`, `frame_E`, `frame_D`); se o volume for zero ou restrito pelo navegador, aciona loop de cadência orgânica a cada 75ms com a sequência fluida de visemas pedagógicos, garantindo que a boca **nunca fique travada** enquanto o áudio estiver tocando.
+     - Suporte a detecção de emoção de surpresa/entusiasmo via `detectEmotion` mostrando `/avatar/tati_surpresa.webp` nos primeiros 350ms de fala.
+     - Piscadas naturais breves (120ms) a cada 4.5s durante falas longas.
+  2. **Renderização de Frame Único de Alta Performance**:
+     - Eliminada a pilha de 3 imagens. Utilizado um único elemento `<img>` gerenciado por estado `currentFrame` com pré-carregamento imediato de todos os 14 frames no cache do navegador (0ms de latência e 0 flicker).
+     - Cache global `WeakMap<HTMLAudioElement, ...>` para garantir que `createMediaElementSource` nunca seja chamado duas vezes no mesmo elemento `<audio>`, prevenindo o erro `InvalidStateError`.
+  3. **Keyframes e Classes de Anéis Globais**:
+     - Keyframes `@keyframes ring-idle`, `ring-listen`, `ring-process`, `ring-speak` e classes `.animate-ring-*` adicionados a `frontend/app/globals.css`.
+     - Keyframes e utilitários de animação configurados também em `frontend/tailwind.config.ts`.
+  4. **Restauração da Logo da Tatiana (`/images/tati_logo.jpg`)**:
+     - `frontend/components/chat/sidebar.tsx`: Restaurada a imagem institucional `/images/tati_logo.jpg` no cabeçalho ao lado de "Taty's Hub".
+     - `frontend/components/chat/message-list.tsx`: Restaurada a imagem `/images/tati_logo.jpg` no círculo central de boas-vindas do Chat.
+     - `frontend/components/chat/message-bubble.tsx`: Restaurada a logo da Tatiana no avatar das mensagens do assistente.
+     - `frontend/app/teste-cefr/page.tsx`: Restaurada a logo da Tatiana nas mensagens do assistente e no indicador de carregamento do teste de nivelamento.
+- **Validação**:
+  - Compilação do TypeScript `npm run typecheck` executada com **0 erros**.

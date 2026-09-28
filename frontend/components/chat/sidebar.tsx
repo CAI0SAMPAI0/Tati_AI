@@ -107,12 +107,14 @@ export function Sidebar({
         {/* Header */}
         <div className="flex items-center justify-between p-4 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-full overflow-hidden border border-primary/30 flex items-center justify-center bg-primary/10 shrink-0">
-              <Image src="/avatar/avatar_tati_normal.webp" alt="Tati" width={28} height={28} className="w-full h-full object-cover"
+            <div className="w-7 h-7 rounded-lg overflow-hidden bg-primary/20 flex items-center justify-center text-primary">
+              <Image src="/images/tati_logo.jpg" alt="Tati" width={28} height={28} className="w-full h-full object-cover"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/images/tati_logo.jpg';
+                  (e.target as HTMLImageElement).style.display = 'none';
+                  (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
                 }}
               />
+              <span className="hidden text-xs font-bold">T</span>
             </div>
             <span className="font-display text-[0.9rem] font-bold tracking-tight">
               Taty's Hub
