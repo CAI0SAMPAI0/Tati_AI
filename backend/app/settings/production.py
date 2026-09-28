@@ -2,9 +2,10 @@ from .base import *
 
 DEBUG = False
 
-# Força HTTPS em produção (exceto health check para não quebrar healthcheck do Railway/Docker)
+# SSL é terminado no proxy reverso externo (Hugging Face Spaces, Railway, Cloudflare).
+# Redirecionamento forçado interno causa 301 nos health checks do ALB gerando erro 502/503.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "True").lower() in ("true", "1")
+SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "False").lower() in ("true", "1")
 SECURE_REDIRECT_EXEMPT = [r"^health/?$", r"^api/health/?$"]
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
