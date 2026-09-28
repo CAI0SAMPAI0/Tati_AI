@@ -27,7 +27,10 @@ export function MainHeader({ onToggleMenu, hideStats, hideStreakAndTrophies }: M
   const isSettings = hideStats || hideStreakAndTrophies || pathname?.startsWith('/settings');
   const isActivities = pathname?.startsWith('/activities');
   const { user } = useAuth();
-  const avatarUrl = user?.avatar_url || (user as any)?.profile?.avatar_url || DEFAULT_AVATAR_URL;
+  const rawAvatar = user?.avatar_url || (user as any)?.profile?.avatar_url;
+  const avatarUrl = (!rawAvatar || (rawAvatar.includes('/avatar/avatar_tati') && (user as any)?.role !== 'teacher'))
+    ? DEFAULT_AVATAR_URL
+    : rawAvatar;
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isBugOpen, setIsBugOpen] = useState(false);
 
@@ -55,33 +58,11 @@ export function MainHeader({ onToggleMenu, hideStats, hideStreakAndTrophies }: M
             isActivities ? "text-sm sm:text-base" : "text-base md:text-lg"
           )}
         >
-          <div className="w-7 h-7 rounded-full overflow-hidden border border-primary/30 flex items-center justify-center bg-primary/10 shrink-0">
-            <img
-              src="/images/tati_logo.jpg"
-              alt="Teacher Tati"
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-              }}
-            />
-          </div>
           <span>Teacher <span className="text-primary">Taty</span></span>
         </Link>
       </div>
 
       <div className="flex items-center gap-2 md:gap-4">
-        <div className="hidden sm:flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="gap-1.5 h-8 px-2.5">
-            <span className="text-[0.65rem] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-              Beta
-            </span>
-          </Button>
-          {!isHubOnly && (
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-text-subtle" aria-label="Informações">
-              <CircleAlert size={18} />
-            </Button>
-          )}
-        </div>
 
         <div className="flex items-center gap-3 md:gap-5">
           {!shouldHideStreakAndTrophies && (
@@ -151,7 +132,7 @@ export function MainHeader({ onToggleMenu, hideStats, hideStreakAndTrophies }: M
           <Link
             href="/profile"
             prefetch={true}
-            className="flex items-center gap-2 pl-2 border-l border-border hover:opacity-80 transition-opacity"
+            className="hidden md:flex items-center gap-2 pl-2 border-l border-border hover:opacity-80 transition-opacity"
           >
             <span className="hidden md:block text-xs font-semibold text-text truncate max-w-[100px]">
               {user?.name || user?.username}

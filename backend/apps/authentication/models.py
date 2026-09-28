@@ -48,7 +48,7 @@ class UserManager(BaseUserManager):
         return self.create_user(username, email, password, **extra_fields)
 
 
-DEFAULT_AVATAR_URL = "/avatar/avatar_tati_normal.webp"
+DEFAULT_AVATAR_URL = "/images/default-avatar.png"
 
 
 
@@ -152,6 +152,8 @@ class User(AbstractBaseUser):
         if isinstance(self.profile, dict):
             url = self.profile.get("avatar_url")
             if url and str(url).strip():
+                if "/avatar/avatar_tati" in str(url) and getattr(self, "role", "") != UserRole.TEACHER:
+                    return DEFAULT_AVATAR_URL
                 return url
         return DEFAULT_AVATAR_URL
 

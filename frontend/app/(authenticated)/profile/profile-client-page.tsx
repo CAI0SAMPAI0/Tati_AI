@@ -238,7 +238,7 @@ export default function ProfileClientPage() {
           <div className="relative group shrink-0">
             <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-primary to-accent p-0.5 overflow-hidden flex items-center justify-center shadow-md">
               <img
-                src={user?.avatar_url || DEFAULT_AVATAR_URL}
+                src={(!user?.avatar_url || user.avatar_url.includes('/avatar/avatar_tati')) ? DEFAULT_AVATAR_URL : user.avatar_url}
                 alt="Profile"
                 className="w-full h-full rounded-full object-cover"
                 onError={(e) => {
