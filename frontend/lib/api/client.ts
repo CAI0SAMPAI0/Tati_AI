@@ -173,32 +173,52 @@ async function request(path: string, options: RequestOptions = {}): Promise<Resp
   const method = (init.method ?? 'GET').toUpperCase();
   const defaultCache = method === 'GET' ? 'default' : 'no-store';
 
-  try {
-    const response = await fetch(url, {
-      cache: defaultCache,
-      ...init,
-      headers: buildHeaders(headers, auth),
-    });
+  const maxRetries = method === 'GET' ? 3 : 1;
+  let attempt = 0;
 
-    if (response.status !== 401 || !auth || !retry401 || _retried) {
+  while (attempt < maxRetries) {
+    attempt++;
+    try {
+      const response = await fetch(url, {
+        cache: defaultCache,
+        ...init,
+        headers: buildHeaders(headers, auth),
+      });
+
+      if (response.status === 401 && auth && retry401 && !_retried) {
+        const refreshed = await tryRefreshToken();
+        if (refreshed) {
+          return request(path, { ...options, _retried: true });
+        }
+
+        await sleep(800);
+        const retryResponse = await request(path, { ...options, retry401: false, _retried: true });
+        if (retryResponse.status === 401) {
+          onUnauthorized?.();
+        }
+        return retryResponse;
+      }
+
+      // Se for erro transitório do proxy da Hugging Face (502 Bad Gateway, 503, 504) e for GET, tenta novamente com backoff
+      if ((response.status === 502 || response.status === 503 || response.status === 504) && attempt < maxRetries) {
+        console.warn(`[API Client] Transient ${response.status} at ${url}. Retrying (${attempt}/${maxRetries})...`);
+        await sleep(attempt * 1200);
+        continue;
+      }
+
       return response;
+    } catch (err) {
+      if (attempt < maxRetries) {
+        console.warn(`[API Client] Network error at ${url}. Retrying (${attempt}/${maxRetries})...`);
+        await sleep(attempt * 1200);
+        continue;
+      }
+      console.error(`[API Client] Fetch failure at: ${url}`, err);
+      throw err;
     }
-
-    const refreshed = await tryRefreshToken();
-    if (refreshed) {
-      return request(path, { ...options, _retried: true });
-    }
-
-    await sleep(800);
-    const retryResponse = await request(path, { ...options, retry401: false, _retried: true });
-    if (retryResponse.status === 401) {
-      onUnauthorized?.();
-    }
-    return retryResponse;
-  } catch (err) {
-    console.error(`[API Client] Fetch failure at: ${url}`, err);
-    throw err;
   }
+
+  return fetch(url, { ...init, headers: buildHeaders(headers, auth) });
 }
 
 async function assertOk<T>(path: string, response: Response): Promise<T> {

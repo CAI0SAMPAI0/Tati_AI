@@ -23,7 +23,8 @@ import {
   BookOpen,
   Headphones,
   Gamepad2,
-  ListFilter
+  ListFilter,
+  Music,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 const MotionDiv = motion.div;
@@ -120,6 +121,8 @@ export default function GoalsClientPage() {
         return <Headphones size={20} />;
       case 'reading':
         return <BookOpen size={20} />;
+      case 'music':
+        return <Music size={20} />;
       case 'flashcards':
         return <Sparkles size={20} />;
       case 'simulations':
@@ -147,6 +150,7 @@ export default function GoalsClientPage() {
       case 'vocabulary': return 'Vocabulary Expansion';
       case 'listening': return 'Listening & Podcasts';
       case 'reading': return 'Reading Comprehension';
+      case 'music': return 'Music & Lyrics';
       case 'flashcards': return 'Flashcards Mastery';
       case 'simulations': return 'Real-World Simulations';
       case 'games': return 'Learning Games';

@@ -37,3 +37,11 @@ export async function registerUser(
 export async function fetchProfile(): Promise<User> {
   return apiGet<User>(HUB_ENDPOINTS.PROFILE);
 }
+
+export async function recordConsent(payload: {
+  accepted_terms: boolean;
+  parental_consent: boolean;
+}): Promise<User> {
+  const res = await apiPost<User>('/auth/consent', payload);
+  return res.data;
+}

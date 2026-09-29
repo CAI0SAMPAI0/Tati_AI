@@ -107,7 +107,7 @@ function NoResultsState() {
 }
 
 export default function CatalogPageClient() {
-  const { token } = useHubAuth();
+  const { token, user } = useHubAuth();
   const [filter, setFilter] = useState<FilterId>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [accessOverrides, setAccessOverrides] = useState<Record<string, boolean>>({});
@@ -129,9 +129,9 @@ export default function CatalogPageClient() {
   const catalog = catalogData ?? [];
 
   const { data: authenticatedCatalog } = useQuery<PremiumCatalogItem[]>({
-    queryKey: ['hub-public-catalog'],
+    queryKey: ['hub-public-catalog', user?.id || user?.username],
     queryFn: () => apiGet<PremiumCatalogItem[]>(HUB_ENDPOINTS.HUB_PUBLIC),
-    enabled: Boolean(token),
+    enabled: Boolean(token) && Boolean(user),
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });

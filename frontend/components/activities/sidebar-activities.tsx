@@ -110,7 +110,7 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <div className="flex items-center justify-between p-4 px-6 shrink-0 border-b border-border/50">
+        <div className="flex items-center justify-between p-4 px-6 shrink-0 mb-2">
           <div className="flex items-center gap-2.5">
             <div className="flex flex-col">
               <span className="font-display text-sm font-bold tracking-tight text-text">

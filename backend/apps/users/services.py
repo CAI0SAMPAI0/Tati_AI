@@ -242,192 +242,226 @@ class XPService:
 
 
 class GoalService:
+    WEEKLY_CATEGORIES = [
+        "grammar",
+        "vocabulary",
+        "listening",
+        "reading",
+        "music",
+        "flashcards",
+        "simulations",
+        "games",
+    ]
+
     @staticmethod
-    def list_goals(user: User) -> list[GoalOut]:
+    def get_week_start(tz_name: str = "America/Sao_Paulo") -> datetime:
+        """
+        Retorna o início da semana atual (Domingo às 00:00:00).
+        Domingo é o dia de reset semanal automático.
+        """
+        try:
+            tz = ZoneInfo(tz_name)
+        except Exception:
+            tz = timezone.utc
+        now = datetime.now(tz)
+        today_start = datetime(now.year, now.month, now.day, 0, 0, 0, tzinfo=tz)
+        # Python weekday(): Monday is 0, Sunday is 6
+        days_since_sunday = (now.weekday() + 1) % 7
+        return today_start - timedelta(days=days_since_sunday)
+
+    @classmethod
+    def get_current_week_key(cls, tz_name: str = "America/Sao_Paulo") -> str:
+        """
+        Identificador único para a semana vigente (ex: '2026-W39').
+        """
+        week_start = cls.get_week_start(tz_name)
+        return f"{week_start.year}-W{week_start.strftime('%U')}"
+
+    @classmethod
+    def get_weekly_category_counts(cls, user: User) -> dict[str, int]:
+        """
+        Contabiliza o progresso em cada uma das 8 categorias obrigatórias
+        a partir do último domingo (reset semanal automático).
+        A categoria News NÃO faz parte do Objetivo da Semana.
+        """
+        from apps.activities.models import ActivitySubmission
+        cat_counts = defaultdict(int)
+        week_start = cls.get_week_start(getattr(user, "timezone", "America/Sao_Paulo"))
+
+        user_subs = ActivitySubmission.objects.filter(
+            username=user.username,
+            status="completed",
+            created_at__gte=week_start,
+        ).only("metadata", "activity_type")
+
+        for s in user_subs:
+            meta = s.metadata if isinstance(s.metadata, dict) else {}
+            cat = (meta.get("category") or "").lower().strip()
+            act_type = (s.activity_type or "").lower().strip()
+
+            # Estrita exclusão de 'news' do Objetivo da Semana
+            if cat == "news" or "news" in act_type:
+                continue
+
+            if cat in ("grammar", "grammars") or "grammar" in act_type or "grammar" in cat:
+                cat_counts["grammar"] += 1
+            elif cat in ("vocabulary", "vocab", "vocabularies") or "vocab" in act_type or "vocab" in cat:
+                cat_counts["vocabulary"] += 1
+            elif cat in ("listening", "listenings", "podcast", "podcasts") or "listen" in act_type or "podcast" in act_type or "listen" in cat:
+                cat_counts["listening"] += 1
+            elif cat in ("reading", "readings") or "read" in act_type or "reading" in cat:
+                cat_counts["reading"] += 1
+            elif cat in ("music", "musics", "lingoclip", "lyrics") or "music" in act_type or "lingoclip" in act_type or "lyrics" in act_type or "music" in cat:
+                cat_counts["music"] += 1
+            elif cat in ("flashcard", "flashcards") or "flashcard" in act_type or "flashcard" in cat:
+                cat_counts["flashcards"] += 1
+            elif cat in ("simulation", "simulations", "scenario", "roleplay", "interview") or "simul" in act_type or "scenario" in act_type or "roleplay" in act_type or "interview" in act_type or "simul" in cat:
+                cat_counts["simulations"] += 1
+            elif cat in ("game", "games", "wordwall") or "game" in act_type or "wordwall" in act_type or "game" in cat:
+                cat_counts["games"] += 1
+
+        # Flashcards adicionais revisados na semana
+        try:
+            from apps.activities.models import UserFlashcardProgress
+            fc_prog = UserFlashcardProgress.objects.filter(
+                user_id=user.username,
+                reviewed_at__gte=week_start,
+            ).count()
+            cat_counts["flashcards"] = max(cat_counts["flashcards"], fc_prog)
+        except Exception:
+            pass
+
+        return {cat: cat_counts.get(cat, 0) for cat in cls.WEEKLY_CATEGORIES}
+
+    @classmethod
+    def is_weekly_goal_completed(cls, user: User) -> bool:
+        """
+        Retorna True se o aluno completou pelo menos 1 atividade em todas as 8 categorias da semana.
+        """
+        counts = cls.get_weekly_category_counts(user)
+        return all(counts.get(cat, 0) >= 1 for cat in cls.WEEKLY_CATEGORIES)
+
+    @classmethod
+    def get_weekly_goal_summary(cls, user: User) -> dict:
+        """
+        Sumário completo do Objetivo da Semana com categorias, progresso e bônus multiplicador.
+        """
+        week_start = cls.get_week_start(getattr(user, "timezone", "America/Sao_Paulo"))
+        counts = cls.get_weekly_category_counts(user)
+        completed_cats = [cat for cat in cls.WEEKLY_CATEGORIES if counts.get(cat, 0) >= 1]
+        is_completed = len(completed_cats) == len(cls.WEEKLY_CATEGORIES)
+
+        categories_dict = {}
+        category_labels = {
+            "grammar": "Grammar",
+            "vocabulary": "Vocabulary",
+            "listening": "Listening",
+            "reading": "Reading",
+            "music": "Music",
+            "flashcards": "Flashcards",
+            "simulations": "Simulations",
+            "games": "Games",
+        }
+
+        for cat in cls.WEEKLY_CATEGORIES:
+            prog = counts.get(cat, 0)
+            categories_dict[cat] = {
+                "name": category_labels.get(cat, cat.capitalize()),
+                "target": 1,
+                "progress": prog,
+                "is_completed": prog >= 1,
+            }
+
+        return {
+            "week_start": week_start.isoformat(),
+            "week_key": cls.get_current_week_key(getattr(user, "timezone", "America/Sao_Paulo")),
+            "total_categories": len(cls.WEEKLY_CATEGORIES),
+            "completed_categories": len(completed_cats),
+            "is_completed": is_completed,
+            "multiplier": 2 if is_completed else 1,
+            "bonus_applied": is_completed,
+            "categories": categories_dict,
+        }
+
+    @classmethod
+    def list_goals(cls, user: User) -> list[GoalOut]:
         cache_key = f"user_goals_{user.username}"
         cached = cache.get(cache_key)
         if cached is not None:
             return cached
 
-        now = datetime.now(timezone.utc)
-        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        week_start = today_start - timedelta(days=now.weekday())
-
-        from apps.activities.models import ActivitySubmission
-        from apps.chat.models import Message
-
-        # 1. Daily activities completed (target: 3)
-        daily_act_count = ActivitySubmission.objects.filter(
-            username=user.username,
-            created_at__gte=today_start,
-            status="completed",
-        ).count()
-
-        # 2. Weekly activities completed (target: 15)
-        weekly_act_count = ActivitySubmission.objects.filter(
-            username=user.username,
-            created_at__gte=week_start,
-            status="completed",
-        ).count()
-
-        # 3. Weekly simulations completed (target: 2)
-        weekly_sim_count = ActivitySubmission.objects.filter(
-            username=user.username,
-            activity_type__in=["simulation", "scenario", "interview", "roleplay"],
-            created_at__gte=week_start,
-            status="completed",
-        ).count()
-
-        # 4. Daily chat messages with AI (target: 20)
-        daily_msg_count = Message.objects.filter(
-            username=user.username,
-            role="user",
-            created_at__gte=today_start,
-        ).count()
-
-        # 5. Weekly study days active (target: 5)
-        msg_dates = Message.objects.filter(
-            username=user.username, role="user", created_at__gte=week_start
-        ).values_list("created_at", flat=True)
-        week_dates = {
-            dt.date() if hasattr(dt, "date") else datetime.fromisoformat(str(dt).replace("Z", "+00:00")).date()
-            for dt in msg_dates
-            if dt
-        }
-        sub_dates = ActivitySubmission.objects.filter(
-            username=user.username, created_at__gte=week_start
-        ).values_list("created_at", flat=True)
-        week_dates.update(
-            dt.date() if hasattr(dt, "date") else datetime.fromisoformat(str(dt).replace("Z", "+00:00")).date()
-            for dt in sub_dates
-            if dt
-        )
-        weekly_days_count = len(week_dates)
-
-        # 6. Vocabulary / Flashcards reviewed today (target: 10)
-        vocab_count = 0
-        try:
-            from apps.activities.models import UserFlashcardProgress
-
-            vocab_count = UserFlashcardProgress.objects.filter(
-                user_id=user.username,
-                reviewed_at__gte=today_start,
-            ).count()
-        except Exception:
-            pass
-
-        # Count activity submissions by category
-        cat_counts = defaultdict(int)
-        user_subs = ActivitySubmission.objects.filter(
-            username=user.username, status="completed"
-        ).only("metadata", "activity_type")
-        for s in user_subs:
-            meta = s.metadata if isinstance(s.metadata, dict) else {}
-            cat = (meta.get("category") or "").lower().strip()
-            act_type = (s.activity_type or "").lower().strip()
-            if cat in ("grammar", "vocabulary", "listening", "reading", "flashcards", "simulations", "games"):
-                cat_counts[cat] += 1
-            elif "grammar" in act_type or "grammar" in cat:
-                cat_counts["grammar"] += 1
-            elif "vocab" in act_type or "vocab" in cat:
-                cat_counts["vocabulary"] += 1
-            elif "listen" in act_type or "podcast" in act_type:
-                cat_counts["listening"] += 1
-            elif "read" in act_type:
-                cat_counts["reading"] += 1
-            elif "flashcard" in act_type:
-                cat_counts["flashcards"] += 1
-            elif "simul" in act_type or "scenario" in act_type or "roleplay" in act_type or "interview" in act_type:
-                cat_counts["simulations"] += 1
-            elif "game" in act_type or "wordwall" in act_type:
-                cat_counts["games"] += 1
-
-        try:
-            from apps.activities.models import UserFlashcardProgress
-
-            fc_prog = UserFlashcardProgress.objects.filter(user_id=user.username).count()
-            cat_counts["flashcards"] = max(cat_counts["flashcards"], fc_prog)
-        except Exception:
-            pass
+        counts = cls.get_weekly_category_counts(user)
 
         system_goals = [
             {
                 "type": "grammar",
                 "title": "Grammar Practice",
-                "description": "Complete 3 grammar exercises",
-                "target": 3,
-                "progress": cat_counts["grammar"],
+                "description": "Complete at least 1 grammar activity this week",
+                "target": 1,
+                "progress": counts.get("grammar", 0),
                 "period": "weekly",
             },
             {
                 "type": "vocabulary",
                 "title": "Vocabulary Expansion",
-                "description": "Complete 3 vocabulary exercises",
-                "target": 3,
-                "progress": cat_counts["vocabulary"],
+                "description": "Complete at least 1 vocabulary activity this week",
+                "target": 1,
+                "progress": counts.get("vocabulary", 0),
                 "period": "weekly",
             },
             {
                 "type": "listening",
                 "title": "Listening & Podcasts",
-                "description": "Complete 2 listening activities or podcasts",
-                "target": 2,
-                "progress": cat_counts["listening"],
+                "description": "Complete at least 1 listening or podcast activity this week",
+                "target": 1,
+                "progress": counts.get("listening", 0),
                 "period": "weekly",
             },
             {
                 "type": "reading",
                 "title": "Reading Comprehension",
-                "description": "Complete 2 reading exercises",
-                "target": 2,
-                "progress": cat_counts["reading"],
+                "description": "Complete at least 1 reading activity this week",
+                "target": 1,
+                "progress": counts.get("reading", 0),
+                "period": "weekly",
+            },
+            {
+                "type": "music",
+                "title": "Music & Lyrics",
+                "description": "Complete at least 1 music or lyrics challenge this week",
+                "target": 1,
+                "progress": counts.get("music", 0),
                 "period": "weekly",
             },
             {
                 "type": "flashcards",
                 "title": "Flashcards Mastery",
-                "description": "Review at least 10 flashcards",
-                "target": 10,
-                "progress": cat_counts["flashcards"],
-                "period": "daily",
+                "description": "Review flashcards or complete a flashcard session this week",
+                "target": 1,
+                "progress": counts.get("flashcards", 0),
+                "period": "weekly",
             },
             {
                 "type": "simulations",
                 "title": "Real-World Simulations",
-                "description": "Complete 2 conversation simulations or interviews",
-                "target": 2,
-                "progress": cat_counts["simulations"],
+                "description": "Complete at least 1 conversation simulation or interview this week",
+                "target": 1,
+                "progress": counts.get("simulations", 0),
                 "period": "weekly",
             },
             {
                 "type": "games",
                 "title": "Learning Games",
-                "description": "Play 2 interactive English learning games",
-                "target": 2,
-                "progress": cat_counts["games"],
-                "period": "weekly",
-            },
-            {
-                "type": "daily_messages",
-                "title": "Daily AI Conversation",
-                "description": "Send 20 practice messages in English today",
-                "target": 20,
-                "progress": daily_msg_count,
-                "period": "daily",
-            },
-            {
-                "type": "weekly_streak",
-                "title": "Weekly Consistency",
-                "description": "Study on at least 5 days this week",
-                "target": 5,
-                "progress": weekly_days_count,
+                "description": "Play at least 1 interactive English learning game this week",
+                "target": 1,
+                "progress": counts.get("games", 0),
                 "period": "weekly",
             },
         ]
 
         results = []
         for g in system_goals:
-            goal_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, f"system-goal-{g['type']}")
+            goal_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, f"weekly-goal-{g['type']}")
             prog = g["progress"]
             tgt = g["target"]
             results.append(

@@ -93,4 +93,6 @@ class ProfileUpdateInput(BaseModel):
     allow_whatsapp_notifications: Optional[bool] = None
     preferred_accent: Optional[str] = None
     accent: Optional[str] = None
+    autoplay_chat_audio: Optional[bool] = None
+    notification_preferences: Optional[dict] = None
     profile: Optional[dict] = None

@@ -55,7 +55,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (!token || !user) return;
     try {
       if (isInitial) setLoading(true);
-      const data = await apiGet<AppNotification[]>(ENDPOINTS.NOTIFICATIONS);
+      const data = await apiGet<AppNotification[]>(ENDPOINTS.NOTIFICATIONS).catch(() => [] as AppNotification[]);
       const rawList = Array.isArray(data) ? data : [];
       const uniqueMap = new Map<string, AppNotification>();
       rawList.forEach(n => {
@@ -119,8 +119,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       const currentIds = new Set(list.map(n => n.id));
       lastNotifIds.current = currentIds;
       initialLoadDone.current = true;
-    } catch (e) {
-      console.error('[Notifications] Fetch error:', e);
+    } catch (_) {
+      // Fail gracefully without spamming error logs
     } finally {
       if (isInitial) setLoading(false);
     }
@@ -149,9 +149,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     try {
       const registration = await navigator.serviceWorker.ready;
 
-      const keyData = await apiGet<{ public_key: string }>('/notifications/vapid-key');
+      const keyData = await apiGet<{ public_key: string }>('/notifications/vapid-key').catch(() => null);
       if (!keyData || !keyData.public_key) {
-        console.error('[Push] Failed to retrieve VAPID key from backend.');
         return;
       }
 
@@ -238,11 +237,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Atrasa o fetch inicial 3s para não competir com o render crítico da página
+    // Atrasa o fetch inicial 6s para deixar o render crítico e o chat carregarem primeiro
     const initialTimer = setTimeout(() => {
       fetchNotifications(true);
       subscribeToPush();
-    }, 3000);
+    }, 6000);
 
     // Poll a cada 15s, mas pausa quando a aba está em background
     let interval: ReturnType<typeof setInterval> | null = null;

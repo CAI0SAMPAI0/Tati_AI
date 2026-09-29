@@ -16,7 +16,7 @@ export default function LerClientPage() {
   const contentId = params.id as string;
 
   const { data: access, error, isLoading } = useQuery<SecureViewerAccess>({
-    queryKey: ['hub-secure-access', contentId],
+    queryKey: ['hub-secure-access', contentId, user?.id || user?.username],
     queryFn: async () => {
       const data = await fetchSecureAccess(contentId);
       if (!data.is_secure_viewer && data.url) {
@@ -24,7 +24,7 @@ export default function LerClientPage() {
       }
       return data;
     },
-    enabled: isLoaded && Boolean(token),
+    enabled: isLoaded && Boolean(token) && Boolean(user),
     refetchInterval: (query) => {
       const res = query.state.data as any;
       if (res?.is_secure_viewer && (!res.pages || res.pages.length === 0 || res.processing_status === 'processing')) {

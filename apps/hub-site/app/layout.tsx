@@ -4,6 +4,7 @@ import './globals.css';
 import { AuthProvider } from '@/components/auth-provider';
 import HubLayoutWrapper from '@/components/HubLayoutWrapper';
 import { QueryProvider } from '@/providers/query-provider';
+import { LgpdConsentModal } from '@/components/lgpd-consent-modal';
 
 const sora = Sora({
   subsets: ['latin'],
@@ -67,6 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <QueryProvider>
           <AuthProvider>
             <HubLayoutWrapper>{children}</HubLayoutWrapper>
+            <LgpdConsentModal />
           </AuthProvider>
         </QueryProvider>
       </body>

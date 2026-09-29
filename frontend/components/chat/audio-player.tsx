@@ -49,6 +49,22 @@ export function AudioPlayer({ url, base64, className, autoPlay, text, onAudioUpd
   }, []);
 
   useEffect(() => {
+    try {
+      const raw = localStorage.getItem('tati_settings');
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s.audioSpeed) {
+          const sp = parseFloat(s.audioSpeed) || 1;
+          setSpeed(sp);
+          if (audioRef.current) {
+            audioRef.current.playbackRate = sp;
+          }
+        }
+      }
+    } catch (_) {}
+  }, []);
+
+  useEffect(() => {
     setActiveBase64(base64);
   }, [base64]);
 
@@ -59,19 +75,24 @@ export function AudioPlayer({ url, base64, className, autoPlay, text, onAudioUpd
   const audioSrc = activeBase64 ? `data:audio/mp3;base64,${activeBase64}` : activeUrl;
 
   useEffect(() => {
-    if (autoPlay && audioRef.current && !isPlaying && audioSrc && autoPlayedSrcRef.current !== audioSrc) {
-      autoPlayedSrcRef.current = audioSrc;
-      window.dispatchEvent(
-        new CustomEvent('tati_pause_other_audio', { detail: { id: playerIdRef.current } })
-      );
-      audioRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch(() => {
-          // Navegadores podem bloquear autoplay sem interação prévia
-        });
+    if (autoPlay && !isPlaying) {
+      if (audioSrc && audioRef.current && autoPlayedSrcRef.current !== audioSrc) {
+        autoPlayedSrcRef.current = audioSrc;
+        window.dispatchEvent(
+          new CustomEvent('tati_pause_other_audio', { detail: { id: playerIdRef.current } })
+        );
+        audioRef.current
+          .play()
+          .then(() => setIsPlaying(true))
+          .catch((e) => {
+            console.log('Audio autoplay prevented by browser policy:', e);
+          });
+      } else if (!audioSrc && text && !isLoadingAudio && !autoPlayedSrcRef.current) {
+        autoPlayedSrcRef.current = 'loading';
+        togglePlay();
+      }
     }
-  }, [audioSrc, autoPlay, isPlaying]);
+  }, [audioSrc, autoPlay, isPlaying, text, isLoadingAudio]);
 
   useEffect(() => {
     const audio = audioRef.current;

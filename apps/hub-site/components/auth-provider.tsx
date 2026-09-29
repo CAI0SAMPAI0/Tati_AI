@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { fetchProfile } from '@tati/hub-core';
 import { ApiClientError } from '@tati/hub-core';
 import {
@@ -31,6 +32,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -39,7 +41,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearStoredSession();
     setUser(null);
     setToken(null);
-  }, []);
+    try {
+      queryClient.clear();
+    } catch (_) {}
+  }, [queryClient]);
 
   const refreshProfile = useCallback(async () => {
     const current = getStoredSession();
@@ -57,10 +62,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [logout]);
 
   const saveSession = useCallback((nextToken: string, nextUser: User) => {
+    try {
+      queryClient.clear();
+    } catch (_) {}
     saveStoredSession({ token: nextToken, user: nextUser });
     setToken(nextToken);
     setUser(nextUser);
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     syncAuthTokenCookieFromStorage();

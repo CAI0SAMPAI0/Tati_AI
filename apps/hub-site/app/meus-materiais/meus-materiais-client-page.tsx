@@ -13,7 +13,7 @@ export default function MyMaterialsClientPage() {
   const { user, isLoaded, token } = useHubAuth();
 
   const { data: items = [] } = useQuery<CatalogMaterial[]>({
-    queryKey: ['hub-my-materials'],
+    queryKey: ['hub-my-materials', user?.id || user?.username],
     queryFn: () =>
       apiGet<PremiumCatalogItem[]>(HUB_ENDPOINTS.HUB_PUBLIC).then((catalog) =>
         catalog
@@ -30,7 +30,7 @@ export default function MyMaterialsClientPage() {
             has_access: true,
           })),
       ),
-    enabled: isLoaded && Boolean(token),
+    enabled: isLoaded && Boolean(token) && Boolean(user),
   });
 
   if (!isLoaded) {

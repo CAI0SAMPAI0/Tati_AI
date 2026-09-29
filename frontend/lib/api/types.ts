@@ -29,6 +29,16 @@ export interface User {
     whatsapp_onboarded?: boolean;
     preferred_accent?: string;
     accent?: string;
+    autoplay_chat_audio?: boolean;
+    notification_preferences?: {
+      streaks?: { email: boolean; push: boolean };
+      challenges?: { email: boolean; push: boolean };
+      cefr?: { email: boolean; push: boolean };
+      [key: string]: any;
+    };
+    occupation?: string;
+    focus?: string;
+    [key: string]: any;
   };
 }
 

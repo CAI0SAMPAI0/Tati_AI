@@ -2481,10 +2481,16 @@ class SubmissionService:
             )
         ).delete()
 
-        # Diretriz Teacher Tatiana: 25 pontos para cada atividade concluída
-        # (grammar, listening, vocabulary, reading, flashcards, simulations, games e news)
-        xp_earned = 25 if score >= 70 else 5
+        # Diretriz Teacher Tatiana: 25 pontos base para cada atividade concluída
+        # Multiplicador 2x se o Objetivo da Semana já foi concluído na semana vigente
+        from apps.users.services import GoalService
+        is_weekly_completed = GoalService.is_weekly_goal_completed(user) if user and isinstance(user, User) else False
+        multiplier = 2 if is_weekly_completed else 1
+
+        base_xp = 25 if score >= 70 else 5
+        xp_earned = base_xp * multiplier
         metadata["points_awarded"] = xp_earned
+        metadata["multiplier_applied"] = multiplier
 
         if user and isinstance(user, User):
             # Apenas concede novos XP se o aluno ainda não havia concluído esta atividade antes
@@ -2500,6 +2506,25 @@ class SubmissionService:
             metadata=metadata,
         )
 
+        # Invalida cache de metas do usuário
+        cache.delete(f"user_goals_{username}")
+
+        # Bônus único de conclusão do Objetivo da Semana
+        weekly_bonus_awarded = False
+        if user and isinstance(user, User) and not is_weekly_completed:
+            # Verifica se completou agora com esta submissão
+            if GoalService.is_weekly_goal_completed(user):
+                week_key = GoalService.get_current_week_key()
+                xp_data = user.xp_data if isinstance(user.xp_data, dict) else {}
+                bonuses = list(xp_data.get("weekly_goal_bonuses") or [])
+                if week_key not in bonuses:
+                    bonuses.append(week_key)
+                    xp_data["weekly_goal_bonuses"] = bonuses
+                    user.xp_data = xp_data
+                    user.save(update_fields=["xp_data"])
+                    XPService.award_xp(user, 100, f"Bônus de conclusão do Objetivo da Semana ({week_key})")
+                    weekly_bonus_awarded = True
+
         total_xp = user.total_xp if user and isinstance(user, User) else 25
         streak_count = user.streak_count if user and isinstance(user, User) else 1
 
@@ -2514,6 +2539,8 @@ class SubmissionService:
             "success": True,
             "id": str(submission.id),
             "xp_earned": xp_earned,
+            "multiplier": multiplier,
+            "weekly_bonus_awarded": weekly_bonus_awarded,
             "new_total_xp": total_xp,
             "streak_count": streak_count,
             "current_streak": streak_count,

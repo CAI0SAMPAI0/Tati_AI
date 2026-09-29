@@ -14,12 +14,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { User } from '@/lib/api/types';
 import { ApiClientError, apiGet, registerUnauthorizedHandler } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
-
-function triggerPodcastWarmup() {
-  apiGet<{ ok: boolean }>(ENDPOINTS.ACTIVITIES_PODCASTS_WARMUP).catch(() => {
-    // Fire-and-forget: não bloqueia login nem navegação
-  });
-}
 import {
   clearStoredSession,
   getStoredSession,
@@ -84,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const saveSession = useCallback(async (newToken: string, newUser: User, newRefreshToken?: string | null): Promise<User> => {
     setIsBootstrappingProfile(true);
-    // Reiniciar o cache do React Query ao entrar/logar
+    // Reiniciar o cache do React Query apenas ao logar nova conta
     queryClient.clear();
     let savedUser = normalizeUserAvatar(newUser);
     // Persist token first so /profile can authenticate immediately.
@@ -102,17 +96,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setToken(newToken);
       setIsBootstrappingProfile(false);
-      triggerPodcastWarmup();
-
-      // Prefetch da tela de chat do usuário ao entrar
-      queryClient.prefetchQuery({
-        queryKey: ['due-vocab'],
-        queryFn: () => apiGet('/users/vocabulary/due'),
-      });
-      queryClient.prefetchQuery({
-        queryKey: ['payments-status'],
-        queryFn: () => apiGet(ENDPOINTS.PAYMENTS_STATUS),
-      });
     }
     return savedUser;
   }, [queryClient]);
@@ -152,26 +135,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Reiniciar cache ao carregar o estado inicial do usuário (entrada no sistema)
-    queryClient.clear();
-
     setToken(session.token);
     setUser(normalizeUserAvatar(session.user));
 
-    // ✅ CRÍTICO: Marca como carregado IMEDIATAMENTE com dados do localStorage.
+    // ✅ Marca como carregado IMEDIATAMENTE com dados do localStorage.
     // Isso elimina a network call do caminho crítico de renderização (LCP).
-    // A validação contra o backend acontece em background sem bloquear o UI.
     setIsLoaded(true);
-
-    // Prefetch da tela de chat do usuário ao entrar já logado
-    queryClient.prefetchQuery({
-      queryKey: ['due-vocab'],
-      queryFn: () => apiGet('/users/vocabulary/due'),
-    });
-    queryClient.prefetchQuery({
-      queryKey: ['payments-status'],
-      queryFn: () => apiGet(ENDPOINTS.PAYMENTS_STATUS),
-    });
 
     // Valida sessão no backend em background (não bloqueia renderização).
     // Se o token expirou (401), faz logout; erros de rede são ignorados.
@@ -180,7 +149,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const normalizedUser = normalizeUserAvatar(freshUser);
         setUser(normalizedUser);
         saveStoredSession({ token: session.token, user: normalizedUser, refreshToken: session.refreshToken });
-        triggerPodcastWarmup();
       })
       .catch((err) => {
         if (err instanceof ApiClientError && err.status === 401) {
@@ -189,7 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         // Erro de rede ou 404: mantém sessão atual sem derrubar o usuário
       });
-  }, [queryClient]);
+  }, []);
 
 
   useEffect(() => {

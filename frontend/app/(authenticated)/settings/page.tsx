@@ -39,6 +39,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState({
     audioSpeed: '1',
     wordTooltip: true,
+    tooltipMode: 'sentence', // 'sentence' | 'word'
     enterSend: true,
     autoplayChatAudio: false,
   });
@@ -78,8 +79,25 @@ export default function SettingsPage() {
     async function loadPrefs() {
       try {
         const data = await apiGet<any>('/users/notification-preferences');
-        if (data && data.streaks) {
-          setPrefs(data);
+        if (data) {
+          if (data.streaks) {
+            setPrefs({
+              streaks: data.streaks || { email: true, push: true },
+              challenges: data.challenges || { email: true, push: true },
+              cefr: data.cefr || { email: true, push: true },
+            });
+          }
+          if (typeof data.allow_whatsapp_notifications === 'boolean') {
+            setAllowWhatsappNotifications(data.allow_whatsapp_notifications);
+          } else if (typeof data.whatsapp_enabled === 'boolean') {
+            setAllowWhatsappNotifications(data.whatsapp_enabled);
+          }
+          if (typeof data.whatsapp_number === 'string' && data.whatsapp_number) {
+            setWhatsappNumber(data.whatsapp_number);
+          }
+          if (typeof data.autoplay_chat_audio === 'boolean') {
+            setSettings((prev) => ({ ...prev, autoplayChatAudio: data.autoplay_chat_audio }));
+          }
         }
       } catch (err) {
         console.error('Failed to load notification preferences:', err);
@@ -89,15 +107,31 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    const userAccent = user?.preferred_accent || (user?.profile as any)?.preferred_accent || (user?.profile as any)?.accent;
-    const stored = getStoredAccent();
-    if (stored && stored !== 'en-US') {
-      setSelectedAccent(stored);
-    } else if (userAccent) {
-      setSelectedAccent(userAccent);
-      saveStoredAccent(userAccent);
-    } else {
-      setSelectedAccent(stored || 'en-US');
+    if (user) {
+      const userAccent = user?.preferred_accent || (user?.profile as any)?.preferred_accent || (user?.profile as any)?.accent;
+      const stored = getStoredAccent();
+      if (stored && stored !== 'en-US') {
+        setSelectedAccent(stored);
+      } else if (userAccent) {
+        setSelectedAccent(userAccent);
+        saveStoredAccent(userAccent);
+      } else {
+        setSelectedAccent(stored || 'en-US');
+      }
+
+      const prof = user?.profile || {};
+      if (prof.whatsapp_number !== undefined) {
+        setWhatsappNumber(prof.whatsapp_number || '');
+      }
+      if (prof.allow_whatsapp_notifications !== undefined) {
+        setAllowWhatsappNotifications(Boolean(prof.allow_whatsapp_notifications));
+      }
+      if (prof.autoplay_chat_audio !== undefined) {
+        setSettings((prev) => ({ ...prev, autoplayChatAudio: Boolean(prof.autoplay_chat_audio) }));
+      }
+      if (prof.notification_preferences) {
+        setPrefs((prev) => ({ ...prev, ...prof.notification_preferences }));
+      }
     }
   }, [user]);
 
@@ -129,16 +163,27 @@ export default function SettingsPage() {
     localStorage.setItem('tati_settings', JSON.stringify(settings));
     saveStoredAccent(selectedAccent);
     try {
-      await apiPut('/users/notification-preferences', prefs);
+      await apiPut('/users/notification-preferences', {
+        ...prefs,
+        whatsapp_number: whatsappNumber.trim() || null,
+        allow_whatsapp_notifications: allowWhatsappNotifications,
+        whatsapp_enabled: allowWhatsappNotifications,
+        autoplay_chat_audio: Boolean(settings.autoplayChatAudio),
+        preferred_accent: selectedAccent,
+      });
 
-      await apiPut('/profile', {
+      const profileRes = await apiPut<any>('/profile/', {
         whatsapp_number: whatsappNumber.trim() || null,
         allow_whatsapp_notifications: allowWhatsappNotifications,
         preferred_accent: selectedAccent,
         accent: selectedAccent,
+        autoplay_chat_audio: Boolean(settings.autoplayChatAudio),
+        notification_preferences: prefs,
       });
 
-      if (user) {
+      if (profileRes.ok && profileRes.data) {
+        updateProfile(profileRes.data);
+      } else if (user) {
         updateProfile({
           ...user,
           preferred_accent: selectedAccent,
@@ -148,6 +193,8 @@ export default function SettingsPage() {
             allow_whatsapp_notifications: allowWhatsappNotifications,
             preferred_accent: selectedAccent,
             accent: selectedAccent,
+            autoplay_chat_audio: Boolean(settings.autoplayChatAudio),
+            notification_preferences: prefs,
           }
         });
       }
@@ -228,7 +275,12 @@ export default function SettingsPage() {
                 <Select
                   className="w-32"
                   value={settings.audioSpeed}
-                  onChange={(e) => setSettings({ ...settings, audioSpeed: e.target.value })}
+                  onChange={(e) => {
+                    const next = { ...settings, audioSpeed: e.target.value };
+                    setSettings(next);
+                    localStorage.setItem('tati_settings', JSON.stringify(next));
+                    window.dispatchEvent(new Event('tati_settings_changed'));
+                  }}
                   options={[
                     { value: '0.75', label: '0.75x' },
                     { value: '1', label: '1x' },
@@ -248,7 +300,12 @@ export default function SettingsPage() {
                   type="checkbox"
                   className="w-5 h-5 rounded-md border-border text-primary focus:ring-primary/20 transition-all accent-primary"
                   checked={Boolean(settings.autoplayChatAudio)}
-                  onChange={(e) => setSettings({ ...settings, autoplayChatAudio: e.target.checked })}
+                  onChange={(e) => {
+                    const next = { ...settings, autoplayChatAudio: e.target.checked };
+                    setSettings(next);
+                    localStorage.setItem('tati_settings', JSON.stringify(next));
+                    window.dispatchEvent(new Event('tati_settings_changed'));
+                  }}
                 />
               </label>
 
@@ -295,15 +352,81 @@ export default function SettingsPage() {
               <label className="flex items-center justify-between cursor-pointer group">
                 <div>
                   <p className="text-sm font-bold text-text mb-0.5">Word tooltip</p>
-                  <p className="text-xs text-text-muted">Click English words to see translation and pronunciation</p>
+                  <p className="text-xs text-text-muted">Click English words/sentences to see translation and pronunciation</p>
                 </div>
                 <input
                   type="checkbox"
                   className="w-5 h-5 rounded-md border-border text-primary focus:ring-primary/20 transition-all accent-primary"
                   checked={settings.wordTooltip}
-                  onChange={(e) => setSettings({ ...settings, wordTooltip: e.target.checked })}
+                  onChange={(e) => {
+                    const next = { ...settings, wordTooltip: e.target.checked };
+                    setSettings(next);
+                    localStorage.setItem('tati_settings', JSON.stringify(next));
+                    window.dispatchEvent(new Event('tati_settings_changed'));
+                  }}
                 />
               </label>
+
+              {settings.wordTooltip && (
+                <div className="pt-6 border-t border-border space-y-3">
+                  <div>
+                    <p className="text-sm font-bold text-text mb-0.5">Translation Mode</p>
+                    <p className="text-xs text-text-muted">
+                      Choose whether clicking text translates the entire sentence or individual words
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = { ...settings, tooltipMode: 'sentence' };
+                        setSettings(next);
+                        localStorage.setItem('tati_settings', JSON.stringify(next));
+                        window.dispatchEvent(new Event('tati_settings_changed'));
+                        toast.success('Translation mode: Full sentence');
+                      }}
+                      className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${
+                        settings.tooltipMode === 'sentence'
+                          ? 'border-primary bg-primary/10 text-primary shadow-sm ring-2 ring-primary/20'
+                          : 'border-border bg-bg hover:border-text-muted/30 text-text'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-bold">Sentence Translation</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-surface border border-border uppercase">
+                          Recommended
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-text-muted">
+                        Translates the full sentence, or up to the first period for long sentences.
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = { ...settings, tooltipMode: 'word' };
+                        setSettings(next);
+                        localStorage.setItem('tati_settings', JSON.stringify(next));
+                        window.dispatchEvent(new Event('tati_settings_changed'));
+                        toast.success('Translation mode: Individual words');
+                      }}
+                      className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${
+                        settings.tooltipMode === 'word'
+                          ? 'border-primary bg-primary/10 text-primary shadow-sm ring-2 ring-primary/20'
+                          : 'border-border bg-bg hover:border-text-muted/30 text-text'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-bold">Word Translation</span>
+                      </div>
+                      <span className="text-[11px] text-text-muted">
+                        Translates each word individually when clicked.
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <label className="flex items-center justify-between cursor-pointer group pt-6 border-t border-border">
                 <div>
@@ -314,7 +437,11 @@ export default function SettingsPage() {
                   type="checkbox"
                   className="w-5 h-5 rounded-md border-border text-primary focus:ring-primary/20 transition-all accent-primary"
                   checked={settings.enterSend}
-                  onChange={(e) => setSettings({ ...settings, enterSend: e.target.checked })}
+                  onChange={(e) => {
+                    const next = { ...settings, enterSend: e.target.checked };
+                    setSettings(next);
+                    localStorage.setItem('tati_settings', JSON.stringify(next));
+                  }}
                 />
               </label>
             </div>

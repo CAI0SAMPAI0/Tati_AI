@@ -560,6 +560,8 @@ def update_profile(request: HttpRequest, payload: ProfileUpdateInput):
         "focus",
         "preferred_accent",
         "accent",
+        "autoplay_chat_audio",
+        "notification_preferences",
     ]:
         if subfield in update_data and update_data[subfield] is not None:
             profile_dict[subfield] = update_data[subfield]

@@ -25,7 +25,9 @@ export default function HubHeader({ onToggleMenu }: HubHeaderProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const [imgError, setImgError] = useState(false);
   const displayName = user?.name ?? user?.username ?? 'Aluno';
+  const rawAvatar = user?.avatar_url || (user as any)?.profile?.avatar_url;
 
   return (
     <header className="sticky top-0 z-50 flex h-20 items-center justify-between border-b border-line bg-bg px-4 md:px-6">
@@ -46,10 +48,6 @@ export default function HubHeader({ onToggleMenu }: HubHeaderProps) {
       </div>
 
       <div className="flex items-center gap-2 md:gap-4">
-        <span className="hidden rounded border border-primary/20 bg-primary/10 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wider text-primary sm:inline">
-          Beta
-        </span>
-
         {user && (
           <div className="relative" ref={menuRef}>
             <button
@@ -59,9 +57,20 @@ export default function HubHeader({ onToggleMenu }: HubHeaderProps) {
               aria-expanded={menuOpen}
               aria-haspopup="menu"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
-                {getInitials(displayName)}
-              </span>
+              {rawAvatar && !imgError ? (
+                <span className="flex h-8 w-8 items-center justify-center rounded-full overflow-hidden border border-primary/20 bg-primary/10">
+                  <img
+                    src={rawAvatar}
+                    alt={displayName}
+                    className="h-full w-full object-cover"
+                    onError={() => setImgError(true)}
+                  />
+                </span>
+              ) : (
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
+                  {getInitials(displayName)}
+                </span>
+              )}
               <span className="hidden max-w-[120px] truncate text-sm font-semibold text-ink md:block">
                 {displayName.split(' ')[0]}
               </span>

@@ -6,7 +6,7 @@ import type { Message } from '@/lib/api/types';
 import { cn, parseAIResponse } from '@/lib/utils';
 import { ClickableText } from './clickable-text';
 import { AudioPlayer } from './audio-player';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Pencil, Check, X, Copy, RotateCcw, FileText, Download, ExternalLink, Presentation, FileCode2, File } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -105,17 +105,28 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
   }, [isUser, message.content]);
 
   // Verifica configuração de autoplay de áudio no chat - apenas para a última mensagem da Tati
-  const isAutoplay = useMemo(() => {
-    if (isUser || !isLastAssistant || typeof window === 'undefined') return false;
-    try {
-      const raw = localStorage.getItem('tati_settings');
-      if (raw) {
-        const s = JSON.parse(raw);
-        return Boolean(s.autoplayChatAudio);
-      }
-    } catch (_) {}
-    return false;
-  }, [isUser, isLastAssistant]);
+  const [autoplayEnabled, setAutoplayEnabled] = useState(false);
+
+  useEffect(() => {
+    const checkAutoplay = () => {
+      try {
+        const raw = localStorage.getItem('tati_settings');
+        if (raw) {
+          const s = JSON.parse(raw);
+          setAutoplayEnabled(Boolean(s.autoplayChatAudio));
+        }
+      } catch (_) {}
+    };
+    checkAutoplay();
+    window.addEventListener('tati_settings_changed', checkAutoplay);
+    window.addEventListener('storage', checkAutoplay);
+    return () => {
+      window.removeEventListener('tati_settings_changed', checkAutoplay);
+      window.removeEventListener('storage', checkAutoplay);
+    };
+  }, []);
+
+  const isAutoplay = !isUser && isLastAssistant && autoplayEnabled;
 
   // Has a file attachment (PDF, DOCX, PPTX) — no audio for these messages
   const hasFile = !!docData;

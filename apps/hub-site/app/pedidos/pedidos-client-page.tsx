@@ -28,9 +28,9 @@ export default function PedidosClientPage() {
   const { user, isLoaded, token } = useHubAuth();
 
   const { data: orders = [], error } = useQuery<HubOrder[]>({
-    queryKey: ['hub-orders'],
+    queryKey: ['hub-orders', user?.id || user?.username],
     queryFn: () => fetchMyOrders(),
-    enabled: isLoaded && Boolean(token),
+    enabled: isLoaded && Boolean(token) && Boolean(user),
   });
 
   if (!isLoaded) {

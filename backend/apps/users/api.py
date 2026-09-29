@@ -406,12 +406,32 @@ def get_notification_preferences(request: HttpRequest):
     """
     user = request.auth
     profile = user.profile if isinstance(user.profile, dict) else {}
+    custom_prefs = profile.get("notification_preferences") or {}
+
+    streaks = custom_prefs.get("streaks") or {
+        "email": profile.get("allow_email_notifications", True),
+        "push": profile.get("streak_alerts", True),
+    }
+    challenges = custom_prefs.get("challenges") or {
+        "email": profile.get("allow_email_notifications", True),
+        "push": True,
+    }
+    cefr = custom_prefs.get("cefr") or {
+        "email": profile.get("allow_email_notifications", True),
+        "push": True,
+    }
+
     return {
-        "whatsapp_enabled": profile.get("allow_whatsapp_notifications", True),
+        "whatsapp_enabled": profile.get("allow_whatsapp_notifications", False),
+        "allow_whatsapp_notifications": profile.get("allow_whatsapp_notifications", False),
         "email_enabled": profile.get("allow_email_notifications", True),
         "daily_reminder": profile.get("daily_reminder", True),
         "streak_alerts": profile.get("streak_alerts", True),
         "whatsapp_number": profile.get("whatsapp_number", ""),
+        "autoplay_chat_audio": profile.get("autoplay_chat_audio", False),
+        "streaks": streaks,
+        "challenges": challenges,
+        "cefr": cefr,
     }
 
 
@@ -423,6 +443,12 @@ class NotificationPreferencesInput(BaseModel):
     whatsapp_number: Optional[str] = None
     allow_whatsapp_notifications: Optional[bool] = None
     allow_email_notifications: Optional[bool] = None
+    streaks: Optional[dict] = None
+    challenges: Optional[dict] = None
+    cefr: Optional[dict] = None
+    autoplay_chat_audio: Optional[bool] = None
+    preferred_accent: Optional[str] = None
+    accent: Optional[str] = None
 
 
 @users_router.put("/notification-preferences", auth=auth_required)
@@ -456,6 +482,18 @@ def update_notification_preferences(
         profile["preferred_accent"] = data["preferred_accent"]
     if "accent" in data:
         profile["preferred_accent"] = data["accent"]
+    if "autoplay_chat_audio" in data:
+        profile["autoplay_chat_audio"] = data["autoplay_chat_audio"]
+
+    if "streaks" in data or "challenges" in data or "cefr" in data:
+        current_prefs = profile.get("notification_preferences") or {}
+        if "streaks" in data and isinstance(data["streaks"], dict):
+            current_prefs["streaks"] = data["streaks"]
+        if "challenges" in data and isinstance(data["challenges"], dict):
+            current_prefs["challenges"] = data["challenges"]
+        if "cefr" in data and isinstance(data["cefr"], dict):
+            current_prefs["cefr"] = data["cefr"]
+        profile["notification_preferences"] = current_prefs
 
     user.profile = profile
     user.save(update_fields=["profile"])

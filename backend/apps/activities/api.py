@@ -348,19 +348,23 @@ def get_hub_materials(request: HttpRequest, category: Optional[str] = None):
 @activities_router.get("/weekly-goal", auth=auth_optional)
 def get_weekly_goal(request: HttpRequest):
     """
-    Retorna a meta semanal de estudos e dias concluídos.
+    Retorna o Objetivo da Semana (8 categorias obrigatórias, reset aos domingos e bônus multiplicador).
     """
+    from apps.users.services import GoalService
     user = request.auth if isinstance(request.auth, User) else None
-    streak = user.streak_count if user else 0
-    xp = user.total_xp if user else 0
-    return {
-        "target_days": 5,
-        "completed_days": min(streak, 5),
-        "streak": streak,
-        "xp_goal": 150,
-        "current_xp": xp,
-        "is_completed": streak >= 5,
-    }
+    if not user:
+        return {
+            "week_start": None,
+            "total_categories": 8,
+            "completed_categories": 0,
+            "is_completed": False,
+            "multiplier": 1,
+            "categories": {
+                c: {"name": c.capitalize(), "target": 1, "progress": 0, "is_completed": False}
+                for c in ["grammar", "vocabulary", "listening", "reading", "music", "flashcards", "simulations", "games"]
+            },
+        }
+    return GoalService.get_weekly_goal_summary(user)
 
 
 @activities_router.get("/hub/{content_id}/access", auth=auth_optional)
