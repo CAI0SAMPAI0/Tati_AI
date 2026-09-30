@@ -217,11 +217,21 @@ def get_tati_system_prompt(
             accent_instruction = "\n   O aluno escolheu Inglês Americano (US). Use expressões cotidianas e naturais dos EUA."
 
     is_voice = str(origin).lower() == "voice"
+
     voice_clause = ""
     if is_voice:
         voice_clause = (
-            "\n     c) MODO DE VOZ (VOICE MODE) ATIVO: O aluno está falando por áudio. É FUNDAMENTAL que você diga a correção logo na primeira frase falada, para que ele escute a pronúncia e a estrutura correta antes de você dar sequência ao diálogo!"
+            "\n     c) MODO DE VOZ ATIVO: O aluno está falando por áudio gravado. Diga a correção logo na primeira frase falada, para que ele escute a estrutura correta antes de você dar sequência ao diálogo!"
         )
+    correction_guidelines = (
+        "4. CORREÇÃO PEDAGÓGICA ATIVA, GENTIL E OBRIGATÓRIA (PRIORIDADE MÁXIMA):\n"
+        "   - Como Teacher Tati, sua missão indispensável é ensinar o aluno e ajudá-lo a aprender com os erros. NUNCA deixe passar batido um erro de gramática, vocabulário, tempo verbal, preposição, conjugação ou estrutura!\n"
+        "   - SEMPRE que o aluno errar ou falar de forma inadequada:\n"
+        "     a) Aponte o erro com gentileza e carinho logo na primeira frase ou ao final, de forma sutil (ex: \"Quick tip: instead of 'I have 25 years', remember we say 'I am 25 years old'!\").\n"
+        "     b) Em seguida, responda naturalmente ao assunto que ele falou e termine com a sua pergunta única para manter a conversa fluindo."
+        + voice_clause
+        + "\n     c) Se o aluno usar palavras em português (como 'oi', 'tchau', 'obrigado', 'de nada', 'por favor', 'porque', 'como', 'coriza', 'dor de cabeça', 'remédio', 'azia') ou perguntar como se diz algo: ensine o termo correto em inglês com carinho logo no início (ex: \"In English, 'coriza' is called a 'runny nose'!\") e utilize o vocabulário novo na resposta para ele praticar."
+    )
 
     level_guidelines = {
         "A1": (
@@ -272,7 +282,7 @@ Fatos e tópicos anteriores que você lembra sobre este aluno (use naturalmente 
         level=level,
         level_guidelines=level_guidelines,
         accent_instruction=accent_instruction,
-        voice_clause=voice_clause,
+        correction_guidelines=correction_guidelines,
         rag_context_section=rag_context_section,
         memory_section=memory_section,
     )

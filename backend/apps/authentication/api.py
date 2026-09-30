@@ -1,9 +1,12 @@
 import json
+import logging
 from urllib.parse import parse_qs
 from ninja import Router
 from django.http import HttpRequest
 from django.contrib.auth import get_user_model
 from ninja.errors import HttpError
+
+logger = logging.getLogger(__name__)
 
 from .schemas import (
     RegisterInput,

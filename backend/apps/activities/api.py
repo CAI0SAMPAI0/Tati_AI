@@ -471,33 +471,48 @@ def get_listening_materials(request: HttpRequest, level: str = "A1"):
 @speech_router.post(
     "/verify-pronunciation", response=PronunciationVerifyOut, auth=auth_optional
 )
-def verify_pronunciation(request: HttpRequest, payload: PronunciationVerifyInput):
+async def verify_pronunciation(request: HttpRequest, payload: PronunciationVerifyInput):
     """
     Avalia a precisão fonética de uma frase falada pelo aluno.
     """
-    return SpeechService.verify_pronunciation(
-        target=payload.target_phrase,
-        spoken=payload.spoken_phrase,
-        threshold=payload.accuracy_threshold or 70.0,
-        audio_b64=payload.audio,
-        reference_text=payload.reference_text,
-    )
+    try:
+        return await SpeechService.verify_pronunciation_async(
+            target=payload.target_phrase,
+            spoken=payload.spoken_phrase,
+            threshold=payload.accuracy_threshold or 70.0,
+            audio_b64=payload.audio,
+            reference_text=payload.reference_text,
+        )
+    except Exception as e:
+        logger.error(f"[SpeechAPI] Erro ao verificar pronúncia: {e}", exc_info=True)
+        target = payload.target_phrase or payload.reference_text or ""
+        return PronunciationVerifyOut(
+            score=0.0,
+            transcription=payload.spoken_phrase or "",
+            words=[],
+            feedback="Could not process pronunciation at this moment. Please try again.",
+            correct_audio="",
+            target=target,
+            recognized=payload.spoken_phrase or "",
+            is_correct=False,
+            metadata={"accuracy_score": 0.0, "fluency_score": 0.0},
+        )
 
 
 @speech_router.post("/transcribe", auth=auth_optional)
-def speech_transcribe(request: HttpRequest, payload: dict):
+async def speech_transcribe(request: HttpRequest, payload: dict):
     """
     Transcreve áudio enviado pelo aluno.
     """
     from apps.chat.audio_service import AudioService
 
     audio_data = payload.get("audio") or ""
-    text = AudioService.transcribe_audio(audio_data)
+    text = await AudioService.transcribe_audio_async(audio_data)
     return {"text": text, "transcription": text}
 
 
 @speech_router.post("/tts", auth=auth_optional)
-def speech_tts(request: HttpRequest, payload: dict):
+async def speech_tts(request: HttpRequest, payload: dict):
     """
     Converte texto em áudio via Edge TTS.
     """
@@ -505,7 +520,7 @@ def speech_tts(request: HttpRequest, payload: dict):
 
     text = payload.get("text") or ""
     accent = payload.get("accent") or "en-US"
-    audio_b64 = AudioService.text_to_speech(text, accent=accent)
+    audio_b64 = await AudioService.text_to_speech_async(text, accent=accent)
     return {"audio": audio_b64, "audio_b64": audio_b64}
 
 

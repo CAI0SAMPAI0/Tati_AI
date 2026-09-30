@@ -10,15 +10,23 @@ import { ClickableText } from './clickable-text';
 interface VoiceMessageBubbleProps {
   message: Message;
   onWordClick?: (word: string, x: number, y: number) => void;
+  isSpeaking?: boolean;
+  isProcessing?: boolean;
 }
 
-export function VoiceMessageBubble({ message, onWordClick }: VoiceMessageBubbleProps) {
+export function VoiceMessageBubble({
+  message,
+  onWordClick,
+  isSpeaking,
+  isProcessing,
+}: VoiceMessageBubbleProps) {
   const isUser = message.role === 'user';
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [copied, setCopied] = useState(false);
 
   const parsed = parseAIResponse(message.content);
+  const displayReply = parsed.reply || message.content;
 
   const handleCopy = () => {
     const textToCopy = isUser ? message.content : parsed.reply;
@@ -64,6 +72,12 @@ export function VoiceMessageBubble({ message, onWordClick }: VoiceMessageBubbleP
     }
   };
 
+  const isTranscribing = isUser && (
+    message.content?.includes('Transcribing') ||
+    message.id.startsWith('live-temp-') ||
+    message.id.startsWith('voice-temp-')
+  );
+
   return (
     <div className={cn(
       "flex flex-col gap-1.5 max-w-[85%] md:max-w-[75%] animate-in fade-in slide-in-from-bottom-2 duration-700 group",
@@ -75,7 +89,7 @@ export function VoiceMessageBubble({ message, onWordClick }: VoiceMessageBubbleP
         </span>
       </div>
       <div className="flex items-end gap-2 relative">
-        {isUser && (
+        {isUser && !isTranscribing && (
           <button
             onClick={handleCopy}
             className="p-2 rounded-full border border-border bg-surface text-text-subtle hover:text-primary transition-all duration-300 opacity-0 group-hover:opacity-100 shadow-md flex items-center justify-center shrink-0"
@@ -91,13 +105,31 @@ export function VoiceMessageBubble({ message, onWordClick }: VoiceMessageBubbleP
             : "bg-surface/90 dark:bg-[#151726]/80 backdrop-blur-2xl border-border/60 dark:border-white/10 text-text rounded-tl-md hover:border-primary/30 shadow-primary/5",
         )}>
           {isUser ? (
-            message.content
+            isTranscribing ? (
+              <div className="flex items-center gap-2 text-primary font-medium text-xs sm:text-sm py-0.5">
+                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                <span className="italic">Transcribing audio...</span>
+              </div>
+            ) : (
+              message.content
+            )
+          ) : isProcessing ? (
+            <div className="flex items-center gap-2 py-1 px-1">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:-0.32s]" />
+                <span className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:-0.16s]" />
+                <span className="w-2 h-2 rounded-full bg-primary animate-bounce" />
+              </div>
+              <span className="text-xs text-text-subtle font-medium italic">Teacher Tati is preparing your answer...</span>
+            </div>
           ) : (
             <div className="flex flex-col gap-2">
-              <ClickableText
-                content={parsed.reply}
-                onWordClick={onWordClick || (() => { })}
-              />
+              <div className="inline">
+                <ClickableText
+                  content={displayReply}
+                  onWordClick={onWordClick || (() => { })}
+                />
+              </div>
               {parsed.correction && (
                 <div className="mt-2 text-xs bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/20 text-amber-700 dark:text-amber-300 rounded-xl p-2.5 flex items-start gap-2 max-w-full text-left">
                   <span className="text-base select-none">💡</span>
@@ -110,7 +142,7 @@ export function VoiceMessageBubble({ message, onWordClick }: VoiceMessageBubbleP
             </div>
           )}
         </div>
-        {!isUser && (
+        {!isUser && !isProcessing && (
           <div className="flex items-center gap-2">
             <button
               onClick={toggleAudio}

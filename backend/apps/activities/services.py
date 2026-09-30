@@ -3,10 +3,13 @@ import os
 import re
 import difflib
 import uuid
+import asyncio
+from asgiref.sync import async_to_sync
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from django.conf import settings
+from django.core.cache import cache
 from django.contrib.auth import get_user_model
 from ninja.errors import HttpError
 
@@ -2254,7 +2257,7 @@ class HubService:
 
 class SpeechService:
     @staticmethod
-    def verify_pronunciation(
+    async def verify_pronunciation_async(
         target: Optional[str] = None,
         spoken: Optional[str] = None,
         threshold: float = 70.0,
@@ -2269,7 +2272,7 @@ class SpeechService:
 
         if audio_b64 and not spoken_phrase:
             try:
-                spoken_phrase = AudioService.transcribe_audio(audio_b64) or ""
+                spoken_phrase = await AudioService.transcribe_audio_async(audio_b64) or ""
             except Exception as e:
                 logger.warning(f"Error transcribing pronunciation audio: {e}")
                 spoken_phrase = ""
@@ -2325,7 +2328,7 @@ class SpeechService:
         correct_audio = ""
         if target_phrase:
             try:
-                correct_audio = AudioService.text_to_speech(target_phrase)
+                correct_audio = await AudioService.text_to_speech_async(target_phrase)
             except Exception as e:
                 logger.warning(f"Error generating correct audio TTS: {e}")
 
@@ -2340,6 +2343,59 @@ class SpeechService:
             is_correct=is_correct,
             metadata={"accuracy_score": score, "fluency_score": max(50.0, score)},
         )
+
+    @classmethod
+    def verify_pronunciation(
+        cls,
+        target: Optional[str] = None,
+        spoken: Optional[str] = None,
+        threshold: float = 70.0,
+        audio_b64: Optional[str] = None,
+        reference_text: Optional[str] = None,
+    ) -> PronunciationVerifyOut:
+        try:
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+
+            if loop and loop.is_running():
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    future = pool.submit(
+                        lambda: asyncio.run(
+                            cls.verify_pronunciation_async(
+                                target=target,
+                                spoken=spoken,
+                                threshold=threshold,
+                                audio_b64=audio_b64,
+                                reference_text=reference_text,
+                            )
+                        )
+                    )
+                    return future.result(timeout=30)
+            else:
+                return async_to_sync(cls.verify_pronunciation_async)(
+                    target=target,
+                    spoken=spoken,
+                    threshold=threshold,
+                    audio_b64=audio_b64,
+                    reference_text=reference_text,
+                )
+        except Exception as e:
+            logger.error(f"[SpeechService] Erro ao verificar pronúncia: {e}", exc_info=True)
+            target_str = (reference_text or target or "").strip()
+            return PronunciationVerifyOut(
+                score=0.0,
+                transcription=spoken or "",
+                words=[],
+                feedback="Could not evaluate pronunciation at this moment. Please try again.",
+                correct_audio="",
+                target=target_str,
+                recognized=spoken or "",
+                is_correct=False,
+                metadata={"accuracy_score": 0.0, "fluency_score": 0.0},
+            )
 
 
 class SubmissionService:

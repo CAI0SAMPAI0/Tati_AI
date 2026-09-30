@@ -140,7 +140,13 @@ if DATABASE_URL:
         if str(db_config.get("PORT", "")) in ("5432", ""):
             db_config["PORT"] = 6543
 
-    db_config.setdefault("OPTIONS", {})["connect_timeout"] = 10
+    db_options = db_config.setdefault("OPTIONS", {})
+    db_options["connect_timeout"] = 10
+    # Keepalives TCP para proxies do PostgreSQL (Railway tokaido.proxy.rlwy.net, Supabase, etc.)
+    db_options["keepalives"] = 1
+    db_options["keepalives_idle"] = 30
+    db_options["keepalives_interval"] = 10
+    db_options["keepalives_count"] = 5
     DATABASES = {"default": db_config}
 else:
     DATABASES = {

@@ -12,7 +12,7 @@ except Exception:
 
 import zlib
 from django.core.cache import cache
-from django.db import connection, close_old_connections
+from django.db import connection, close_old_connections, OperationalError, DatabaseError
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +29,19 @@ def _acquire_db_advisory_lock(lock_key: str) -> bool:
     if connection.vendor != "postgresql":
         return True
     try:
+        close_old_connections()
         lock_id = zlib.crc32(lock_key.encode("utf-8"))
         with connection.cursor() as cursor:
             cursor.execute("SELECT pg_try_advisory_lock(%s);", [lock_id])
             row = cursor.fetchone()
             return bool(row and row[0])
+    except (OperationalError, DatabaseError) as e:
+        logger.warning(f"[Scheduler] Conexão instável ao tentar obter advisory lock '{lock_key}': {e}")
+        try:
+            connection.close()
+        except Exception:
+            pass
+        return False
     except Exception as e:
         logger.warning(f"[Scheduler] Erro ao tentar obter advisory lock '{lock_key}': {e}")
         return True
@@ -47,6 +55,11 @@ def _release_db_advisory_lock(lock_key: str) -> None:
         lock_id = zlib.crc32(lock_key.encode("utf-8"))
         with connection.cursor() as cursor:
             cursor.execute("SELECT pg_advisory_unlock(%s);", [lock_id])
+    except (OperationalError, DatabaseError):
+        try:
+            connection.close()
+        except Exception:
+            pass
     except Exception as e:
         logger.warning(f"[Scheduler] Erro ao liberar advisory lock '{lock_key}': {e}")
 
@@ -113,8 +126,8 @@ class BackgroundNotificationRunner:
                 if now_brt.day == 1 and now_brt.hour == 9:
                     cls._run_monthly_competition(now_brt)
 
-                # 6. Agendamentos pedagógicos CEFR (checa a cada minuto se coincide com agendamento ativo)
-                if tick % 2 == 0:
+                # 6. Agendamentos pedagógicos CEFR (checa a cada 5 minutos se coincide com agendamento ativo)
+                if tick % 10 == 0:
                     cls._run_cefr_schedules(now_brt)
 
             except Exception as e:
@@ -131,10 +144,24 @@ class BackgroundNotificationRunner:
     @classmethod
     def _run_cefr_schedules(cls, now_brt):
         try:
+            close_old_connections()
             from apps.activities.generator import CEFRGeneratorService
             CEFRGeneratorService.check_and_run_schedules(force=False)
+        except (OperationalError, DatabaseError) as db_err:
+            logger.warning(
+                f"[Scheduler] Falha transitória de conexão com banco de dados nos agendamentos CEFR ({db_err}). Resetando conexão..."
+            )
+            try:
+                connection.close()
+            except Exception:
+                pass
         except Exception as e:
-            logger.error(f"[Scheduler] Erro ao checar agendamentos CEFR: {e}")
+            logger.warning(f"[Scheduler] Erro ao checar agendamentos CEFR: {e}")
+        finally:
+            try:
+                close_old_connections()
+            except Exception:
+                pass
 
     @classmethod
     def _ping_waha(cls):

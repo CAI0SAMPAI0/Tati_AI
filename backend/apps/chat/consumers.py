@@ -348,12 +348,3 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                 except Exception:
                     logger.debug("[ChatWS] Não foi possível enviar erro ao cliente", exc_info=True)
 
-
-class LiveChatConsumer(AsyncJsonWebsocketConsumer):
-    async def connect(self):
-        await self.accept()
-
-    async def receive_json(self, content):
-        if content.get("type") == "ping":
-            await self.send_json({"type": "pong"})
-            return

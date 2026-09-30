@@ -217,10 +217,12 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
         break;
 
       case 'stream_end':
+        setMessages((prev) => prev.filter(m => !m.id || !m.id.startsWith('voice-temp-')));
         setState((curr) => curr === 'processing' ? 'idle' : curr);
         break;
 
       case 'error':
+        setMessages((prev) => prev.filter(m => !m.id || !m.id.startsWith('voice-temp-')));
         setState('idle');
         console.error('Voice WS Error:', msg.message);
         break;
@@ -270,12 +272,12 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
 
     setState('processing');
 
-    // Add optimistic user message
+    // Add optimistic user message indicating transcription in progress
     const tempUserMsg: Message = {
       id: `voice-temp-${Date.now()}`,
       conversation_id: convId,
       role: 'user',
-      content: '🎙 Recording...',
+      content: '🎙 Transcribing...',
       created_at: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, tempUserMsg]);

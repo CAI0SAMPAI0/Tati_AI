@@ -301,6 +301,7 @@ export function useChatSocket(conversationId: string | null) {
         break;
       case 'error':
         setIsStreaming(false);
+        setMessages((prev) => prev.filter(m => m.id !== 'user-audio-temp'));
         console.error('WS Error:', msg.message);
         break;
     }
@@ -410,7 +411,7 @@ export function useChatSocket(conversationId: string | null) {
         id: `user-audio-temp`,
         conversation_id: currentId || '',
         role: 'user',
-        content: 'Voice message',
+        content: '🎙 Transcribing...',
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, newUserMsg]);

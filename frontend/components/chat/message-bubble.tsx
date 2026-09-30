@@ -9,6 +9,7 @@ import { AudioPlayer } from './audio-player';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Pencil, Check, X, Copy, RotateCcw, FileText, Download, ExternalLink, Presentation, FileCode2, File } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '@/providers/auth-provider';
 
 interface MessageBubbleProps {
   message: Message;
@@ -104,6 +105,7 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
     };
   }, [isUser, message.content]);
 
+  const { user } = useAuth();
   // Verifica configuração de autoplay de áudio no chat - apenas para a última mensagem da Tati
   const [autoplayEnabled, setAutoplayEnabled] = useState(false);
 
@@ -111,10 +113,13 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
     const checkAutoplay = () => {
       try {
         const raw = localStorage.getItem('tati_settings');
+        let storedAutoplay = false;
         if (raw) {
           const s = JSON.parse(raw);
-          setAutoplayEnabled(Boolean(s.autoplayChatAudio));
+          storedAutoplay = Boolean(s.autoplayChatAudio);
         }
+        const profileAutoplay = Boolean((user?.profile as any)?.autoplay_chat_audio);
+        setAutoplayEnabled(storedAutoplay || profileAutoplay);
       } catch (_) {}
     };
     checkAutoplay();
@@ -124,9 +129,9 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
       window.removeEventListener('tati_settings_changed', checkAutoplay);
       window.removeEventListener('storage', checkAutoplay);
     };
-  }, []);
+  }, [user]);
 
-  const isAutoplay = !isUser && isLastAssistant && autoplayEnabled;
+  const isAutoplay = !isUser && Boolean(isLastAssistant && autoplayEnabled);
 
   // Has a file attachment (PDF, DOCX, PPTX) — no audio for these messages
   const hasFile = !!docData;
@@ -290,81 +295,108 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
             <>
               {isUser ? (
                 <div className="flex flex-col gap-2">
-                  {userAttachmentData.cleanText && (
-                    <p className="whitespace-pre-wrap">{userAttachmentData.cleanText}</p>
-                  )}
-                  {userAttachmentData.attachments.length > 0 && (
-                    <div className="flex flex-col gap-1.5 pt-1">
-                      {userAttachmentData.attachments.map((att, idx) => {
-                        const ext = att.name.split('.').pop()?.toLowerCase() || '';
-                        const isPdf = ext === 'pdf' || att.type?.includes('pdf');
-                        const isDoc = ['doc', 'docx'].includes(ext) || att.type?.includes('word') || att.type?.includes('officedocument');
-                        const isPpt = ['ppt', 'pptx'].includes(ext) || att.type?.includes('presentation') || att.type?.includes('powerpoint');
-
-                        return (
-                          <div
-                            key={idx}
-                            className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/15 border border-white/20 backdrop-blur-sm shadow-sm text-left max-w-full"
-                          >
-                            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
-                              {isPdf ? (
-                                <FileText size={16} className="text-white" />
-                              ) : isDoc ? (
-                                <FileCode2 size={16} className="text-white" />
-                              ) : isPpt ? (
-                                <Presentation size={16} className="text-white" />
-                              ) : (
-                                <File size={16} className="text-white" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-semibold text-white truncate" title={att.name}>
-                                {att.name}
-                              </p>
-                              <p className="text-[0.65rem] text-white/70 uppercase tracking-wider font-medium">
-                                {isPdf ? 'PDF Document' : isDoc ? 'Word Document' : isPpt ? 'Presentation' : ext ? `${ext.toUpperCase()} File` : 'Attachment'}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })}
+                  {message.content?.includes('Transcribing') || message.id === 'user-audio-temp' ? (
+                    <div className="flex items-center gap-2 py-0.5 text-white font-medium text-xs sm:text-sm">
+                      <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                      <span className="italic">Transcribing audio...</span>
                     </div>
+                  ) : (
+                    <>
+                      {userAttachmentData.cleanText && (
+                        <p className="whitespace-pre-wrap">{userAttachmentData.cleanText}</p>
+                      )}
+                      {userAttachmentData.attachments.length > 0 && (
+                        <div className="flex flex-col gap-1.5 pt-1">
+                          {userAttachmentData.attachments.map((att, idx) => {
+                            const ext = att.name.split('.').pop()?.toLowerCase() || '';
+                            const isPdf = ext === 'pdf' || att.type?.includes('pdf');
+                            const isDoc = ['doc', 'docx'].includes(ext) || att.type?.includes('word') || att.type?.includes('officedocument');
+                            const isPpt = ['ppt', 'pptx'].includes(ext) || att.type?.includes('presentation') || att.type?.includes('powerpoint');
+
+                            return (
+                              <div
+                                key={idx}
+                                className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/15 border border-white/20 backdrop-blur-sm shadow-sm text-left max-w-full"
+                              >
+                                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                                  {isPdf ? (
+                                    <FileText size={16} className="text-white" />
+                                  ) : isDoc ? (
+                                    <FileCode2 size={16} className="text-white" />
+                                  ) : isPpt ? (
+                                    <Presentation size={16} className="text-white" />
+                                  ) : (
+                                    <File size={16} className="text-white" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-semibold text-white truncate" title={att.name}>
+                                    {att.name}
+                                  </p>
+                                  <p className="text-[0.65rem] text-white/70 uppercase tracking-wider font-medium">
+                                    {isPdf ? 'PDF Document' : isDoc ? 'Word Document' : isPpt ? 'Presentation' : ext ? `${ext.toUpperCase()} File` : 'Attachment'}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
-                  {/* While streaming with no content yet, show animated dots */}
-                  {isStreaming && !parsed.reply ? (
-                    <div className="flex items-center gap-1.5 py-1 px-1">
-                      <span className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce [animation-delay:-0.32s]" />
-                      <span className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce [animation-delay:-0.16s]" />
-                      <span className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce" />
-                    </div>
-                  ) : (
-                    <>
-                      <ClickableText
-                        content={parsed.reply}
-                        onWordClick={onWordClick || (() => { })}
-                      />
-                      {/* Show animated dots at the end of text while streaming */}
-                      {isStreaming && (
+                  {/* While streaming or waiting for autoplay audio */}
+                  {isStreaming ? (
+                    autoplayEnabled ? (
+                      <div className="flex items-center gap-2 py-1 px-1 text-primary">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce [animation-delay:-0.32s]" />
+                          <span className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce [animation-delay:-0.16s]" />
+                          <span className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce" />
+                        </div>
+                        <span className="text-xs text-text-subtle font-medium italic">Teacher Tati is preparing audio...</span>
+                      </div>
+                    ) : !parsed.reply ? (
+                      <div className="flex items-center gap-1.5 py-1 px-1">
+                        <span className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce [animation-delay:-0.32s]" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce [animation-delay:-0.16s]" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce" />
+                      </div>
+                    ) : (
+                      <>
+                        <ClickableText
+                          content={parsed.reply}
+                          onWordClick={onWordClick || (() => { })}
+                        />
+                        {/* Show animated dots at the end of text while streaming */}
                         <span className="inline-flex gap-1 items-center ml-1.5 align-middle">
                           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.32s]" />
                           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.16s]" />
                           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" />
                         </span>
+                      </>
+                    )
+                  ) : (
+                    <>
+                      <div className="inline">
+                        <ClickableText
+                          content={parsed.reply}
+                          onWordClick={onWordClick || (() => { })}
+                        />
+                      </div>
+
+                      {parsed.correction && (
+                        <div className="mt-2 text-xs bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/20 text-amber-700 dark:text-amber-300 rounded-xl p-2.5 flex items-start gap-2 max-w-full text-left">
+                          <span className="text-base select-none">💡</span>
+                          <div className="flex-1">
+                            <span className="font-bold text-amber-800 dark:text-amber-200">Tati noticed: </span>
+                            <span className="italic">{parsed.correction}</span>
+                          </div>
+                        </div>
                       )}
                     </>
-                  )}
-
-                  {parsed.correction && (
-                    <div className="mt-2 text-xs bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/20 text-amber-700 dark:text-amber-300 rounded-xl p-2.5 flex items-start gap-2 max-w-full text-left">
-                      <span className="text-base select-none">💡</span>
-                      <div className="flex-1">
-                        <span className="font-bold text-amber-800 dark:text-amber-200">Tati noticed: </span>
-                        <span className="italic">{parsed.correction}</span>
-                      </div>
-                    </div>
                   )}
                 </div>
               )}

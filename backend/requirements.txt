@@ -13,6 +13,7 @@ psycopg2-binary>=2.9.9
 dj-database-url>=2.1.0
 
 # Async, WebSockets & Channels
+asgiref>=3.8.0
 channels>=4.0.0
 channels-redis>=4.2.0
 daphne>=4.1.0

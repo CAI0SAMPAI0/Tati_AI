@@ -13,9 +13,10 @@ interface AudioPlayerProps {
   autoPlay?: boolean;
   text?: string;
   onAudioUpdated?: (newBase64: string) => void;
+  onPlaybackProgress?: (progress: number, isPlaying: boolean) => void;
 }
 
-export function AudioPlayer({ url, base64, className, autoPlay, text, onAudioUpdated }: AudioPlayerProps) {
+export function AudioPlayer({ url, base64, className, autoPlay, text, onAudioUpdated, onPlaybackProgress }: AudioPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [activeBase64, setActiveBase64] = useState<string | undefined>(base64);
@@ -40,13 +41,14 @@ export function AudioPlayer({ url, base64, className, autoPlay, text, onAudioUpd
           audioRef.current.pause();
         }
         setIsPlaying(false);
+        onPlaybackProgress?.(1, false);
       }
     };
     window.addEventListener('tati_pause_other_audio', handleStopOther);
     return () => {
       window.removeEventListener('tati_pause_other_audio', handleStopOther);
     };
-  }, []);
+  }, [onPlaybackProgress]);
 
   useEffect(() => {
     try {
@@ -83,16 +85,20 @@ export function AudioPlayer({ url, base64, className, autoPlay, text, onAudioUpd
         );
         audioRef.current
           .play()
-          .then(() => setIsPlaying(true))
+          .then(() => {
+            setIsPlaying(true);
+            onPlaybackProgress?.(0.05, true);
+          })
           .catch((e) => {
             console.log('Audio autoplay prevented by browser policy:', e);
+            onPlaybackProgress?.(1, false);
           });
       } else if (!audioSrc && text && !isLoadingAudio && !autoPlayedSrcRef.current) {
         autoPlayedSrcRef.current = 'loading';
         togglePlay();
       }
     }
-  }, [audioSrc, autoPlay, isPlaying, text, isLoadingAudio]);
+  }, [audioSrc, autoPlay, isPlaying, text, isLoadingAudio, onPlaybackProgress]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -101,27 +107,41 @@ export function AudioPlayer({ url, base64, className, autoPlay, text, onAudioUpd
     const updateProgress = () => {
       const p = (audio.currentTime / audio.duration) * 100;
       setProgress(isNaN(p) ? 0 : p);
+      if (onPlaybackProgress && audio.duration > 0) {
+        onPlaybackProgress(audio.currentTime / audio.duration, !audio.paused);
+      }
     };
 
     const handleEnded = () => {
       setIsPlaying(false);
       setProgress(0);
+      onPlaybackProgress?.(1, false);
+    };
+
+    const handlePause = () => {
+      setIsPlaying(false);
+      if (onPlaybackProgress && audio.duration > 0) {
+        onPlaybackProgress(audio.currentTime / audio.duration, false);
+      }
     };
 
     audio.addEventListener('timeupdate', updateProgress);
     audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('pause', handlePause);
 
     return () => {
       audio.removeEventListener('timeupdate', updateProgress);
       audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('pause', handlePause);
     };
-  }, []);
+  }, [onPlaybackProgress]);
 
   const togglePlay = async () => {
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
+      onPlaybackProgress?.(audioRef.current.currentTime / (audioRef.current.duration || 1), false);
       return;
     }
 
@@ -148,7 +168,10 @@ export function AudioPlayer({ url, base64, className, autoPlay, text, onAudioUpd
                 new CustomEvent('tati_pause_other_audio', { detail: { id: playerIdRef.current } })
               );
               audioRef.current.play()
-                .then(() => setIsPlaying(true))
+                .then(() => {
+                  setIsPlaying(true);
+                  onPlaybackProgress?.(0.05, true);
+                })
                 .catch((e) => console.error('Play error after TTS fetch:', e));
             }
           }, 50);
@@ -166,7 +189,10 @@ export function AudioPlayer({ url, base64, className, autoPlay, text, onAudioUpd
         new CustomEvent('tati_pause_other_audio', { detail: { id: playerIdRef.current } })
       );
       audioRef.current.play()
-        .then(() => setIsPlaying(true))
+        .then(() => {
+          setIsPlaying(true);
+          onPlaybackProgress?.(0.05, true);
+        })
         .catch((err) => console.error('Play error:', err));
     }
   };

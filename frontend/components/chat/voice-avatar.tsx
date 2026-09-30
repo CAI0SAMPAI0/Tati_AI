@@ -81,7 +81,7 @@ export function VoiceAvatar({
             if (stateRef.current !== 'idle') return;
             setCurrentFrame(FRAMES.normal);
             scheduleBlink();
-          }, 160);
+          }, 140);
         }, delay);
       };
 
@@ -89,21 +89,41 @@ export function VoiceAvatar({
       return stopTimers;
     }
 
-    // ── 2. ESTADO: listening (Quando o usuário está falando → frame ouvindo) ──
+    // ── 2. ESTADO: listening (Quando o usuário está falando → frame ouvindo com piscar sutil) ──
     if (state === 'listening') {
       setCurrentFrame(FRAMES.ouvindo);
+      const scheduleListeningBlink = () => {
+        const delay = 3800 + Math.random() * 2500;
+        blinkTimer = setTimeout(() => {
+          if (stateRef.current !== 'listening') return;
+          setCurrentFrame(FRAMES.piscando);
+          blinkTimer = setTimeout(() => {
+            if (stateRef.current !== 'listening') return;
+            setCurrentFrame(FRAMES.ouvindo);
+            scheduleListeningBlink();
+          }, 140);
+        }, delay);
+      };
+      scheduleListeningBlink();
       return stopTimers;
     }
 
-    // ── 3. ESTADO: processing (Pensando / aguardando resposta com piscar lento) ──
+    // ── 3. ESTADO: processing (Pensando / aguardando resposta com piscar rápido e natural) ──
     if (state === 'processing') {
       setCurrentFrame(FRAMES.normal);
-      let isBlink = false;
-      blinkTimer = setInterval(() => {
-        if (stateRef.current !== 'processing') return;
-        isBlink = !isBlink;
-        setCurrentFrame(isBlink ? FRAMES.piscando : FRAMES.normal);
-      }, 2400) as any;
+      const scheduleProcessingBlink = () => {
+        const delay = 2200 + Math.random() * 1500;
+        blinkTimer = setTimeout(() => {
+          if (stateRef.current !== 'processing') return;
+          setCurrentFrame(FRAMES.piscando);
+          blinkTimer = setTimeout(() => {
+            if (stateRef.current !== 'processing') return;
+            setCurrentFrame(FRAMES.normal);
+            scheduleProcessingBlink();
+          }, 140); // Pisca rápido (140ms) - olhos fechados por apenas um instante
+        }, delay);
+      };
+      scheduleProcessingBlink();
       return stopTimers;
     }
 
