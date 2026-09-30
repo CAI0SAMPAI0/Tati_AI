@@ -2791,11 +2791,21 @@ class StudentFeedbackService:
             qs = qs.filter(status__iexact=status.strip())
 
         results = []
+        from apps.authentication.models import User
+        usernames = list({f.student_username for f in qs if f.student_username})
+        user_avatars = {}
+        if usernames:
+            for u in User.objects.filter(username__in=usernames):
+                av = getattr(u, "avatar_url", "")
+                if av and "default-avatar" not in av:
+                    user_avatars[u.username] = av
+
         for f in qs:
             results.append({
                 "id": str(f.id),
                 "student_username": f.student_username,
                 "student_name": f.student_name,
+                "student_avatar_url": user_avatars.get(f.student_username, ""),
                 "cefr_level": f.cefr_level,
                 "area": f.area,
                 "activity_id": f.activity_id,

@@ -30,6 +30,7 @@ interface StudentFeedbackItem {
   id: string;
   student_username: string;
   student_name: string;
+  student_avatar_url?: string;
   cefr_level: string;
   area: string;
   activity_id?: string;
@@ -224,8 +225,18 @@ export function FeedbacksSection() {
                   {/* Top line: Student, Level, Area, Status */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-primary to-accent text-white font-bold flex items-center justify-center text-sm shrink-0 shadow-sm">
-                        {(item.student_name || item.student_username || 'A')[0].toUpperCase()}
+                      <div className="w-10 h-10 rounded-2xl overflow-hidden shrink-0 shadow-sm border border-border/60">
+                        {item.student_avatar_url ? (
+                          <img
+                            src={item.student_avatar_url}
+                            alt={item.student_name || item.student_username}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-tr from-primary to-accent text-white font-bold flex items-center justify-center text-sm">
+                            {(item.student_name || item.student_username || 'A')[0].toUpperCase()}
+                          </div>
+                        )}
                       </div>
                       <div className="min-w-0">
                         <h4 className="font-bold text-text text-sm truncate">
