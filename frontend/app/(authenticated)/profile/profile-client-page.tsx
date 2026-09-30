@@ -19,35 +19,58 @@ import {
   Award,
   Bell,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  MessageSquareHeart,
+  Star,
+  CheckCircle2,
+  Clock,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
 import { DEFAULT_AVATAR_URL } from '@/lib/constants/user';
 import { apiPut, apiPost, apiUpload, apiGet } from '@/lib/api/client';
 import { User } from '@/lib/api/types';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { LEVEL_OPTIONS, normalizeLevel } from '@/lib/constants/levels';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 
-type Tab = 'personal' | 'achievements' | 'security' | 'plan';
+type Tab = 'personal' | 'achievements' | 'feedbacks' | 'security' | 'plan';
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'personal', label: 'Personal Info', icon: <UserIcon size={16} /> },
   { id: 'achievements', label: 'Achievements', icon: <Trophy size={16} /> },
+  { id: 'feedbacks', label: 'Respostas da Tatiana', icon: <MessageSquareHeart size={16} /> },
   { id: 'security', label: 'Security', icon: <Lock size={16} /> },
 ];
 
 export default function ProfileClientPage() {
   const { user, logout, updateProfile } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [tab, setTab] = useState<Tab>('personal');
+
+  useEffect(() => {
+    const tabParam = searchParams?.get('tab');
+    if (tabParam && ['personal', 'achievements', 'feedbacks', 'security', 'plan'].includes(tabParam)) {
+      setTab(tabParam as Tab);
+    }
+  }, [searchParams]);
+
+  const { data: myFeedbacks = [], isLoading: loadingFeedbacks, refetch: refetchFeedbacks } = useQuery<any[]>({
+    queryKey: ['my-student-feedbacks'],
+    queryFn: async () => {
+      return apiGet<any[]>('/activities/my-feedbacks');
+    },
+    enabled: tab === 'feedbacks',
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -228,6 +251,7 @@ export default function ProfileClientPage() {
             <p className="text-xs text-text-muted">
               {tab === 'personal' && 'Personal Information'}
               {tab === 'achievements' && 'Competition Score & Achievements'}
+              {tab === 'feedbacks' && 'Respostas da Teacher Tatiana'}
               {tab === 'security' && 'Security & Account Management'}
             </p>
           </div>
@@ -518,6 +542,152 @@ export default function ProfileClientPage() {
                   </div>
                 )}
               </div>
+            </section>
+          </div>
+        )}
+
+        {/* Tab: Respostas da Tatiana */}
+        {tab === 'feedbacks' && (
+          <div className="space-y-6">
+            <section className="bg-surface border border-border rounded-3xl p-6 md:p-8 space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <MessageSquareHeart size={22} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-text">Respostas da Teacher Tatiana</h2>
+                    <p className="text-xs text-text-muted">
+                      Acompanhe as opiniões que você enviou e o retorno pedagógico da professora.
+                    </p>
+                  </div>
+                </div>
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => refetchFeedbacks()}
+                  className="gap-2 shrink-0 self-end sm:self-auto"
+                >
+                  <RefreshCw size={14} className={loadingFeedbacks ? "animate-spin" : ""} /> Atualizar
+                </Button>
+              </div>
+
+              {loadingFeedbacks ? (
+                <div className="h-48 flex items-center justify-center">
+                  <Spinner size="lg" />
+                </div>
+              ) : myFeedbacks.length === 0 ? (
+                <div className="bg-bg border border-border rounded-2xl p-8 text-center space-y-3">
+                  <MessageSquareHeart size={36} className="mx-auto text-text-muted/40" />
+                  <h3 className="text-sm font-bold text-text">Nenhum feedback enviado ainda</h3>
+                  <p className="text-xs text-text-muted max-w-sm mx-auto">
+                    Ao praticar atividades ou simulações, clique no ícone de feedback para enviar comentários e dúvidas diretamente para a Tatiana.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {myFeedbacks.map((item: any) => {
+                    const hasReply = Boolean(item.teacher_reply && item.teacher_reply.trim());
+                    return (
+                      <div
+                        key={item.id}
+                        className={cn(
+                          "bg-bg border rounded-2xl p-5 space-y-4 transition-all",
+                          hasReply
+                            ? "border-primary/40 ring-1 ring-primary/10 shadow-sm"
+                            : "border-border/80"
+                        )}
+                      >
+                        {/* Top: Badges & Status */}
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-surface border border-border text-text">
+                              {item.area ? item.area.toUpperCase() : 'GERAL'}
+                            </span>
+                            {item.activity_title && (
+                              <span className="px-2.5 py-1 rounded-xl text-xs bg-surface border border-border text-text-muted truncate max-w-[220px]">
+                                {item.activity_title}
+                              </span>
+                            )}
+                            <span className="px-2 py-0.5 rounded-lg text-xs font-black bg-primary/10 text-primary border border-primary/20">
+                              {item.cefr_level || 'A1'}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-0.5">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  size={13}
+                                  className={cn(
+                                    star <= item.rating
+                                      ? "fill-amber-400 text-amber-400"
+                                      : "text-border fill-transparent"
+                                  )}
+                                />
+                              ))}
+                            </div>
+                            <span
+                              className={cn(
+                                "flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold border",
+                                hasReply
+                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                  : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                              )}
+                            >
+                              {hasReply ? <CheckCircle2 size={13} /> : <Clock size={13} />}
+                              <span>{hasReply ? "Respondido" : "Aguardando"}</span>
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Student Comment */}
+                        <div className="text-sm text-text leading-relaxed bg-surface/50 border border-border/60 rounded-xl p-3.5 italic">
+                          &ldquo;{item.comment}&rdquo;
+                        </div>
+
+                        {/* Teacher Reply */}
+                        {hasReply ? (
+                          <div className="bg-primary/5 border border-primary/25 rounded-2xl p-4 space-y-2">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-primary to-accent text-white font-bold flex items-center justify-center text-xs shadow-sm">
+                                T
+                              </div>
+                              <div>
+                                <span className="text-xs font-bold text-primary block leading-tight">Teacher Tatiana</span>
+                                <span className="text-[10px] text-text-muted">Professora & Pedagógico</span>
+                              </div>
+                            </div>
+                            <p className="text-xs md:text-sm text-text leading-relaxed whitespace-pre-wrap pl-10">
+                              {item.teacher_reply}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-text-muted italic flex items-center gap-1.5 pt-1">
+                            <Clock size={12} className="text-amber-400" />
+                            A Teacher Tatiana revisará sua mensagem em breve!
+                          </div>
+                        )}
+
+                        {/* Date */}
+                        {item.created_at && (
+                          <div className="text-[11px] text-text-muted/60 text-right pt-1">
+                            Enviado em {new Date(item.created_at).toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </section>
           </div>
         )}
