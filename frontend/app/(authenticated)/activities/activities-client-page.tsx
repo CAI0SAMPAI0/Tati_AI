@@ -23,6 +23,7 @@ import {
   Clock,
   ChevronDown,
   Award,
+  ArrowUp,
 } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
@@ -738,8 +739,22 @@ export default function ActivitiesClientPage() {
     );
   };
 
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 300);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
-    <div className="min-h-screen bg-bg flex flex-col md:flex-row overflow-x-hidden">
+    <div className="min-h-screen bg-bg flex flex-col md:flex-row overflow-x-clip">
       <SidebarActivities isOpen={sidebarOpen} onClose={handleCloseSidebar} />
 
       <div className={cn("flex-1 flex flex-col min-w-0 transition-all duration-300", sidebarOpen ? "md:ml-[280px]" : "md:ml-0")}>
@@ -1433,6 +1448,17 @@ export default function ActivitiesClientPage() {
         onMarkDone={handleMarkDone}
         onMarkPending={handleMarkPending}
       />
+
+      {/* Floating Scroll to Top Button */}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          aria-label="Voltar ao topo"
+          className="fixed bottom-6 right-6 z-50 p-3.5 rounded-2xl bg-primary text-white shadow-xl shadow-primary/25 border border-primary/40 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer animate-in fade-in zoom-in-90"
+        >
+          <ArrowUp size={20} className="stroke-[2.5]" />
+        </button>
+      )}
     </div>
   );
 }
