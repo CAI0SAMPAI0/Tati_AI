@@ -2819,16 +2819,125 @@ class StudentFeedbackService:
         return results
 
     @staticmethod
+    def list_student_feedbacks(student_username: str) -> list[dict]:
+        from .models import StudentFeedback
+        qs = StudentFeedback.objects.filter(student_username=student_username).order_by("-created_at")
+        results = []
+        for f in qs:
+            results.append({
+                "id": str(f.id),
+                "student_username": f.student_username,
+                "student_name": f.student_name,
+                "cefr_level": f.cefr_level,
+                "area": f.area,
+                "activity_id": f.activity_id,
+                "activity_title": f.activity_title,
+                "rating": f.rating,
+                "comment": f.comment,
+                "teacher_reply": f.teacher_reply,
+                "status": f.status,
+                "created_at": f.created_at.isoformat() if f.created_at else None,
+                "updated_at": f.updated_at.isoformat() if hasattr(f, "updated_at") and f.updated_at else None,
+            })
+        return results
+
+    @staticmethod
     def update_feedback(feedback_id: str, updates: dict) -> dict:
         from .models import StudentFeedback
+        from apps.authentication.models import User
         fb = StudentFeedback.objects.filter(id=feedback_id).first()
         if not fb:
             raise HttpError(404, "Feedback não encontrado.")
         if "status" in updates:
             fb.status = updates["status"]
+        
+        reply_added = False
         if "teacher_reply" in updates:
-            fb.teacher_reply = updates["teacher_reply"]
+            new_reply = str(updates["teacher_reply"]).strip()
+            if new_reply and new_reply != fb.teacher_reply:
+                reply_added = True
+            fb.teacher_reply = new_reply
+            if new_reply and fb.status == "pending":
+                fb.status = "reviewed"
+
         fb.save()
+
+        # If a reply was provided/updated, notify the student via Push, Email and In-App
+        if reply_added and fb.student_username:
+            try:
+                student = User.objects.filter(username=fb.student_username).first()
+                if student:
+                    student_first_name = (
+                        (student.name or student.username or "Student")
+                        .strip()
+                        .split()[0]
+                        .capitalize()
+                    )
+                    title = "Teacher Tatiana respondeu ao seu feedback!"
+                    activity_name = fb.activity_title or fb.area.capitalize()
+                    body = (
+                        f"Olá, {student_first_name}! A Teacher Tatiana respondeu ao seu feedback sobre '{activity_name}'. "
+                        "Acesse seu perfil para conferir."
+                    )
+
+                    # 1. In-App Notification
+                    try:
+                        from apps.notifications.models import Notification
+                        Notification.objects.create(
+                            username=student.username,
+                            category="feedback_reply",
+                            title=title,
+                            body=body,
+                        )
+                    except Exception as e:
+                        logger.warning(f"[FeedbackReply] Erro ao criar notificação in-app: {e}")
+
+                    # 2. Push Notification (FCM / WebPush)
+                    try:
+                        from apps.notifications.services import NotificationDispatcher
+                        NotificationDispatcher.send_push_to_user(
+                            student.username,
+                            title=title,
+                            body=body,
+                            url="/profile?tab=feedbacks",
+                            tag="feedback-reply",
+                        )
+                    except Exception as e:
+                        logger.warning(f"[FeedbackReply] Erro ao enviar push notification: {e}")
+
+                    # 3. Email via Brevo
+                    if student.email:
+                        try:
+                            from apps.notifications.services import BrevoEmailService
+                            highlight_html = f"""
+                            <div style="background-color: #f8fafc; border-left: 4px solid #6366f1; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+                                <div style="font-size: 11px; font-weight: 800; color: #6366f1; text-transform: uppercase; letter-spacing: 1px;">Sua Mensagem</div>
+                                <div style="font-size: 14px; color: #475569; margin: 4px 0 12px 0; font-style: italic;">&ldquo;{fb.comment}&rdquo;</div>
+                                <div style="font-size: 11px; font-weight: 800; color: #16a34a; text-transform: uppercase; letter-spacing: 1px;">Resposta da Teacher Tatiana</div>
+                                <div style="font-size: 15px; color: #1e293b; margin-top: 4px; font-weight: 600;">{fb.teacher_reply}</div>
+                            </div>
+                            """
+                            email_html = BrevoEmailService.build_standard_email_html(
+                                recipient_name=student_first_name,
+                                body_paragraphs=[
+                                    f"A Teacher Tatiana acabou de responder à mensagem que você enviou sobre <strong>{activity_name}</strong>.",
+                                    "Confira abaixo o resumo e acesse seu perfil no aplicativo para ver o histórico de feedbacks."
+                                ],
+                                action_url="https://tati-ai.vercel.app/profile?tab=feedbacks",
+                                action_label="Ver no App",
+                                highlight_card_html=highlight_html,
+                            )
+                            BrevoEmailService.send_email_detailed(
+                                to_email=student.email,
+                                subject=title,
+                                html_content=email_html,
+                                recipient_name=student_first_name,
+                            )
+                        except Exception as e:
+                            logger.warning(f"[FeedbackReply] Erro ao enviar e-mail via Brevo: {e}")
+            except Exception as outer_err:
+                logger.warning(f"[FeedbackReply] Erro geral ao notificar aluno: {outer_err}")
+
         return {
             "success": True,
             "id": str(fb.id),

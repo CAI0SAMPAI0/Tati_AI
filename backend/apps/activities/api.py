@@ -307,6 +307,17 @@ def submit_student_feedback(request: HttpRequest, payload: StudentFeedbackInput)
     )
 
 
+@activities_router.get("/my-feedbacks", auth=auth_required)
+def get_my_feedbacks(request: HttpRequest):
+    """
+    Retorna todos os feedbacks enviados pelo aluno autenticado e as respostas da Professora Tatiana.
+    """
+    from .services import StudentFeedbackService
+
+    username = getattr(request.auth, "username", "")
+    return StudentFeedbackService.list_student_feedbacks(username)
+
+
 @activities_router.post("/developer-bug-report", auth=auth_optional)
 def submit_developer_bug_report(request: HttpRequest, payload: DeveloperBugReportInput):
     """
