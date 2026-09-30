@@ -219,6 +219,13 @@ function VoicePageContent() {
     setCompletedObjectives
   } = useVoiceSocket(convId, simulationId);
 
+  const isTranscribing = messages.some(
+    (m) =>
+      m.role === 'user' &&
+      ((m.id && typeof m.id === 'string' && (m.id.startsWith('voice-temp-') || m.id.startsWith('live-temp-'))) ||
+        m.content?.includes('Transcribing'))
+  );
+
   useEffect(() => {
     if (activeConvId && activeConvId !== convId) {
       setConvId(activeConvId);
@@ -481,37 +488,37 @@ function VoicePageContent() {
         }}
       />
 
-      <MotionDiv initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} className="w-full md:w-[42%] lg:w-[38%] h-[38vh] sm:h-[40vh] md:h-full relative flex flex-col items-center justify-center p-4 sm:p-8 bg-white/95 dark:bg-[#0f1120]/95 border-b md:border-b-0 md:border-r border-border z-20 shadow-xl transition-all">
-        <div className="absolute top-4 sm:top-6 left-4 sm:left-6 flex items-center gap-4">
-          <button onClick={() => router.back()} className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-white dark:bg-[#1a1c2e] border border-border text-text hover:text-primary transition-all active:scale-95 shadow-sm group">
-            <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+      <MotionDiv initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} className="w-full md:w-[42%] lg:w-[38%] h-[34vh] sm:h-[32vh] md:h-full shrink-0 relative flex flex-col items-center justify-center px-2.5 pt-2 pb-1.5 sm:p-8 bg-white/95 dark:bg-[#0f1120]/95 border-b md:border-b-0 md:border-r border-border z-20 shadow-xl transition-all">
+        <div className="absolute top-2.5 sm:top-6 left-3 sm:left-6 flex items-center gap-4">
+          <button onClick={() => router.back()} className="flex items-center gap-2 px-2.5 sm:px-4 py-1 sm:py-2 rounded-xl bg-white dark:bg-[#1a1c2e] border border-border text-text hover:text-primary transition-all active:scale-95 shadow-sm group">
+            <ArrowLeft size={15} className="group-hover:-translate-x-1 transition-transform" />
             <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">Back</span>
           </button>
         </div>
 
-        <div className="absolute top-4 sm:top-6 right-4 sm:right-6 flex items-center gap-3">
+        <div className="absolute top-2.5 sm:top-6 right-3 sm:right-6 flex items-center gap-2 sm:gap-3">
           {simulationId && (
-            <button onClick={handleFinishSimulation} className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-success text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-success/90 transition-all active:scale-95 shadow-xl">
+            <button onClick={handleFinishSimulation} className="px-2.5 sm:px-4 py-1 sm:py-2 rounded-xl bg-success text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-success/90 transition-all active:scale-95 shadow-xl">
               Finish
             </button>
           )}
           {isLeveling && (
             <button
               onClick={handleFinishLeveling}
-              className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-primary text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 transition-all active:scale-95 shadow-xl flex items-center gap-1.5 cursor-pointer"
+              className="px-2.5 sm:px-4 py-1 sm:py-2 rounded-xl bg-primary text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 transition-all active:scale-95 shadow-xl flex items-center gap-1.5 cursor-pointer"
               title="Finish assessment and receive grade report"
             >
               <Target size={14} />
               <span>Finish Test</span>
             </button>
           )}
-          <button onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')} className="p-1.5 sm:p-2.5 rounded-xl bg-white dark:bg-[#1a1c2e] border border-border text-text-muted hover:text-primary transition-all active:scale-95 shadow-sm">
-            {resolvedTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          <button onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')} className="p-1 sm:p-2.5 rounded-xl bg-white dark:bg-[#1a1c2e] border border-border text-text-muted hover:text-primary transition-all active:scale-95 shadow-sm">
+            {resolvedTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
         </div>
 
-        <div className="flex flex-col items-center gap-2 sm:gap-8 mt-10 sm:mt-0">
-          <div className="cursor-pointer hover:scale-105 active:scale-95 transition-all duration-700 scale-[0.6] sm:scale-90 md:scale-100" onClick={() => {
+        <div className="flex flex-col items-center gap-1 sm:gap-8 mt-auto sm:mt-0 mb-1 sm:mb-0">
+          <div className="cursor-pointer hover:scale-105 active:scale-95 transition-all duration-700 w-[84px] h-[84px] sm:w-auto sm:h-auto flex items-center justify-center overflow-visible" onClick={() => {
             if (!convId) return;
             if (state === 'idle' && !audioRef.current?.src) startRecording();
             else if (state === 'speaking') togglePlayback();
@@ -520,23 +527,20 @@ function VoicePageContent() {
               audioRef.current.play().catch(() => { });
             }
           }}>
-            <VoiceAvatar
-              state={state}
-              audioElement={audioRef.current}
-              lastAssistantText={messages.filter(m => m.role === 'assistant').at(-1)?.content}
-            />
+            <div className="scale-[0.58] sm:scale-90 md:scale-100 origin-center shrink-0">
+              <VoiceAvatar
+                state={state}
+                audioElement={audioRef.current}
+                lastAssistantText={messages.filter(m => m.role === 'assistant').at(-1)?.content}
+              />
+            </div>
           </div>
-          <div className="text-center space-y-0.5 sm:space-y-3 px-4">
-            <h1 className="text-lg sm:text-3xl md:text-5xl font-black text-text tracking-tighter line-clamp-1 md:line-clamp-2">
+          <div className="text-center space-y-0.5 sm:space-y-3 px-2 sm:px-4">
+            <h1 className="text-base sm:text-3xl md:text-5xl font-black text-text tracking-tighter line-clamp-1 md:line-clamp-2">
               {simulationTitle || 'Teacher Tati'}
             </h1>
             <div className="flex flex-col items-center gap-2 w-full">
               <div className="flex items-center justify-center gap-2 flex-wrap">
-                <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-0.5 sm:py-1.5 rounded-full bg-success/10 border border-success/30 shadow-sm">
-                  <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                  <span className="text-[8px] sm:text-[10px] font-black text-success uppercase tracking-widest">{'Online'}</span>
-                </div>
-
                 <button
                   onClick={handleCycleAccent}
                   onWheel={handleWheelAccent}
@@ -689,9 +693,15 @@ function VoicePageContent() {
                   <div className="w-full flex flex-col gap-6 sm:gap-8">
                     {messages.map((m, idx) => {
                       const lastAssistantIdx = messages.map(msg => msg.role).lastIndexOf('assistant');
+                      const lastUserIdx = messages.map(msg => msg.role).lastIndexOf('user');
                       const isCurrentAssistant = idx === lastAssistantIdx;
                       const isCurrentSpeaking = state === 'speaking' && isCurrentAssistant;
-                      const isCurrentProcessing = state === 'processing' && isCurrentAssistant;
+                      const isCurrentProcessing =
+                        state === 'processing' &&
+                        isCurrentAssistant &&
+                        lastAssistantIdx > lastUserIdx &&
+                        !isTranscribing &&
+                        !m.content;
 
                       return (
                         <MotionDiv key={m.id || `msg-${idx}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full">
@@ -705,11 +715,21 @@ function VoicePageContent() {
                       );
                     })}
                   </div>
-                  {state === 'processing' && !messages.some(m => m.role === 'assistant') && (
-                    <div className="flex gap-2 items-center px-4 py-2 text-text-subtle animate-pulse">
-                      <div className="w-2 h-2 rounded-full bg-primary" />
-                      <div className="w-2 h-2 rounded-full bg-primary" style={{ animationDelay: '200ms' }} />
-                      <div className="w-2 h-2 rounded-full bg-primary" style={{ animationDelay: '400ms' }} />
+                  {state === 'processing' && !isTranscribing && (messages.length === 0 || messages[messages.length - 1].role === 'user') && (
+                    <div className="flex flex-col gap-1.5 max-w-[85%] md:max-w-[75%] animate-in fade-in slide-in-from-bottom-2 duration-300 mr-auto text-left">
+                      <div className="flex items-center gap-2 px-2">
+                        <span className="text-[0.55rem] font-black text-text-subtle uppercase tracking-[0.2em]">
+                          Teacher Tati
+                        </span>
+                      </div>
+                      <div className="px-5 py-3.5 rounded-[22px] rounded-tl-md bg-surface/90 dark:bg-[#151726]/80 backdrop-blur-2xl border border-border/60 dark:border-white/10 text-text shadow-xl flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce [animation-delay:-0.32s]" />
+                          <span className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce [animation-delay:-0.16s]" />
+                          <span className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce" />
+                        </div>
+                        <span className="text-xs text-text-subtle font-medium italic">Teacher Tati is preparing your answer...</span>
+                      </div>
                     </div>
                   )}
                   {transcription && state === 'listening' && (
@@ -762,7 +782,15 @@ function VoicePageContent() {
             </button>
           </div>
           <p className="text-center mt-4 sm:mt-6 text-[8px] sm:text-[10px] font-black uppercase tracking-[0.3em] sm:tracking-[0.5em] text-text-subtle animate-pulse">
-            {(!convId && simulationId) ? 'Start simulation above' : state === 'listening' ? '🎙 Listening…' : state === 'processing' ? '⏳ Processing…' : 'Tap to speak'}
+            {(!convId && simulationId)
+              ? 'Start simulation above'
+              : state === 'listening'
+              ? '🎙 Listening…'
+              : isTranscribing
+              ? '🎙 Transcribing audio…'
+              : state === 'processing'
+              ? '⏳ Preparing response…'
+              : 'Tap to speak'}
           </p>
         </footer>
       </MotionDiv>

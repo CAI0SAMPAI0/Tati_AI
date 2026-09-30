@@ -403,7 +403,9 @@ export function useChatSocket(conversationId: string | null) {
     });
     
     if (sent) {
-      setIsStreaming(true);
+      // Não ativar streaming aqui! Manter isStreaming false durante a transcrição do áudio do usuário.
+      // O streaming e o indicador de resposta da IA serão acionados quando o backend enviar 'stream_start'.
+      setIsStreaming(false);
       setStreamingContent('');
       streamingRef.current = '';
 

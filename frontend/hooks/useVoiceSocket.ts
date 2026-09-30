@@ -138,7 +138,10 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
             // Remove apenas as mensagens que EXPLICITAMENTE começam com o prefixo temporário
             // Mensagens sem ID ou com IDs normais são mantidas
             const filtered = prev.filter(m => {
-              if (m.id && typeof m.id === 'string' && m.id.startsWith('voice-temp-')) {
+              if (m.id && typeof m.id === 'string' && (m.id.startsWith('voice-temp-') || m.id.startsWith('live-temp-'))) {
+                return false;
+              }
+              if (m.role === 'user' && m.content?.includes('Transcribing')) {
                 return false;
               }
               return true;

@@ -113,7 +113,7 @@ export function VoiceMessageBubble({
             ) : (
               message.content
             )
-          ) : isProcessing ? (
+          ) : (isProcessing && !displayReply) ? (
             <div className="flex items-center gap-2 py-1 px-1">
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:-0.32s]" />
