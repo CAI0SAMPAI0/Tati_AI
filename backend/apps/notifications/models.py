@@ -37,3 +37,7 @@ class PushSubscription(models.Model):
 
     def __str__(self):
         return f"Push {self.username} ({self.id})"
+
+
+# Alias for compatibility with external/diagnostic scripts
+DeviceToken = PushSubscription
