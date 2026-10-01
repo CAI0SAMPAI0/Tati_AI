@@ -21,6 +21,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { CEFRLevel, CEFR_LABEL_MAP, CEFR_LEVELS } from '@/lib/constants/levels';
 import { cn } from '@/lib/utils';
+import { useSearchParams } from 'next/navigation';
 
 interface RankingEntry {
   username: string;
@@ -29,6 +30,21 @@ interface RankingEntry {
   level?: string;
   avatar_url?: string;
 }
+
+const MONTH_NAMES_EN: Record<number, string> = {
+  1: 'January',
+  2: 'February',
+  3: 'March',
+  4: 'April',
+  5: 'May',
+  6: 'June',
+  7: 'July',
+  8: 'August',
+  9: 'September',
+  10: 'October',
+  11: 'November',
+  12: 'December',
+};
 
 function getStudentAvatar(url?: string | null): string {
   if (!url || url.includes('/avatar/avatar_tati')) {
@@ -39,20 +55,47 @@ function getStudentAvatar(url?: string | null): string {
 
 export default function CompetitionsClientPage() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const { sidebarOpen, toggleSidebar: handleToggleSidebar, closeSidebar: handleCloseSidebar } = useSidebarState();
   const [rankingMode, setRankingMode] = useState<'global' | 'level'>('global');
   const [selectedLevelCat, setSelectedLevelLevelCat] = useState<CEFRLevel>('A1');
 
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1; // 1-12
+
+  // Previous month calculation
+  const prevDate = new Date(currentYear, currentMonth - 2, 1);
+  const prevYear = prevDate.getFullYear();
+  const prevMonth = prevDate.getMonth() + 1;
+
+  const cycleParam = searchParams.get('cycle');
+  const monthParam = searchParams.get('month');
+
+  const initialIsPrevious =
+    cycleParam === 'previous' ||
+    cycleParam === 'prev' ||
+    (monthParam !== null && Number(monthParam) === prevMonth);
+
+  const [selectedCycle, setSelectedCycle] = useState<'current' | 'previous'>(
+    initialIsPrevious ? 'previous' : 'current'
+  );
+
+  const queryParams =
+    selectedCycle === 'previous'
+      ? `?year=${prevYear}&month=${prevMonth}`
+      : '';
+
   const { data: globalRanking = [], isLoading: globalLoading } = useQuery<RankingEntry[]>({
-    queryKey: ['competitions-global-ranking'],
-    queryFn: () => apiGet<RankingEntry[]>('/users/progress/ranking/top15'),
-    refetchInterval: 60000,
+    queryKey: ['competitions-global-ranking', selectedCycle, prevYear, prevMonth],
+    queryFn: () => apiGet<RankingEntry[]>(`/users/progress/ranking/top15${queryParams}`),
+    refetchInterval: selectedCycle === 'current' ? 60000 : false,
     placeholderData: (previousData) => previousData,
   });
   const { data: levelRankings, isLoading: levelLoading } = useQuery<Record<string, RankingEntry[]>>({
-    queryKey: ['competitions-level-rankings'],
-    queryFn: () => apiGet<Record<string, RankingEntry[]>>('/users/progress/ranking/by-level'),
-    refetchInterval: 60000,
+    queryKey: ['competitions-level-rankings', selectedCycle, prevYear, prevMonth],
+    queryFn: () => apiGet<Record<string, RankingEntry[]>>(`/users/progress/ranking/by-level${queryParams}`),
+    refetchInterval: selectedCycle === 'current' ? 60000 : false,
     placeholderData: (previousData) => previousData,
   });
 
@@ -112,6 +155,100 @@ export default function CompetitionsClientPage() {
               </button>
             </div>
           </header>
+
+          {/* Cycle / Month Selector */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2 bg-surface border border-border rounded-2xl shadow-sm">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                onClick={() => setSelectedCycle('current')}
+                className={cn(
+                  "flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all",
+                  selectedCycle === 'current'
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-text-muted hover:text-text hover:bg-bg-secondary"
+                )}
+              >
+                <span className={cn("w-2 h-2 rounded-full", selectedCycle === 'current' ? "bg-emerald-300 animate-pulse" : "bg-text-subtle")} />
+                <span>Current Cycle ({MONTH_NAMES_EN[currentMonth]} {currentYear})</span>
+                <span className={cn("text-[0.6rem] px-1.5 py-0.5 rounded font-black uppercase tracking-wider", selectedCycle === 'current' ? "bg-white/20 text-white" : "bg-primary/10 text-primary")}>
+                  Live
+                </span>
+              </button>
+
+              <button
+                onClick={() => setSelectedCycle('previous')}
+                className={cn(
+                  "flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all",
+                  selectedCycle === 'previous'
+                    ? "bg-amber-500 text-white shadow-sm"
+                    : "text-text-muted hover:text-text hover:bg-bg-secondary"
+                )}
+              >
+                <span>🏆</span>
+                <span>Previous Cycle ({MONTH_NAMES_EN[prevMonth]} {prevYear})</span>
+                <span className={cn("text-[0.6rem] px-1.5 py-0.5 rounded font-black uppercase tracking-wider", selectedCycle === 'previous' ? "bg-white/20 text-white" : "bg-amber-500/10 text-amber-600 dark:text-amber-400")}>
+                  Concluded
+                </span>
+              </button>
+            </div>
+
+            <div className="text-[0.7rem] text-text-muted px-2 font-medium">
+              {selectedCycle === 'current' ? (
+                <span>Live Ranking • Resets monthly</span>
+              ) : (
+                <span>Concluded Cycle • Final Results</span>
+              )}
+            </div>
+          </div>
+
+          {/* Concluded Cycle Banner */}
+          {selectedCycle === 'previous' && (
+            <div className="bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/30 rounded-3xl p-5 md:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in duration-300">
+              <div className="flex items-start md:items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center text-2xl shrink-0 shadow-sm">
+                  🏆
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-base md:text-lg font-bold text-text">
+                      Final Official Results • {MONTH_NAMES_EN[prevMonth]} {prevYear}
+                    </h2>
+                    <span className="px-2.5 py-0.5 rounded-full text-[0.65rem] font-black uppercase tracking-wider bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                      Concluded
+                    </span>
+                  </div>
+                  <p className="text-xs md:text-sm text-text-muted mt-1 leading-relaxed">
+                    This competition has officially ended. Below are the finalized scores and podium champions for {MONTH_NAMES_EN[prevMonth]}.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedCycle('current')}
+                className="px-4 py-2.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-hover transition-colors shadow-sm shrink-0 flex items-center justify-center gap-2"
+              >
+                <span>View Current Live Cycle</span>
+              </button>
+            </div>
+          )}
+
+          {/* New Cycle Notice */}
+          {selectedCycle === 'current' && currentRanking.length <= 2 && (
+            <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-in fade-in duration-300">
+              <div className="flex items-center gap-2.5 text-text">
+                <span className="text-base">🚀</span>
+                <span>
+                  The <strong>{MONTH_NAMES_EN[currentMonth]} {currentYear}</strong> cycle has just begun! Practice activities, voice conversations, or quizzes to climb the leaderboard.
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedCycle('previous')}
+                className="text-primary hover:underline font-bold shrink-0 self-start sm:self-auto flex items-center gap-1 cursor-pointer"
+              >
+                <span>View {MONTH_NAMES_EN[prevMonth]} Winners</span>
+                <span>→</span>
+              </button>
+            </div>
+          )}
 
           {rankingMode === 'level' && (
             <div className="flex flex-wrap justify-center gap-2 animate-in fade-in slide-in-from-top-2 duration-500">
@@ -232,7 +369,9 @@ export default function CompetitionsClientPage() {
                   )) : (
                     <tr>
                       <td colSpan={3} className="px-6 py-20 text-center text-text-muted text-sm italic">
-                        No students in this category yet. Be the first!
+                        {selectedCycle === 'previous'
+                          ? 'No student participation records found for this previous cycle.'
+                          : 'No students in this category yet. Be the first!'}
                       </td>
                     </tr>
                   )}
@@ -317,13 +456,13 @@ export default function CompetitionsClientPage() {
                     <Flame size={18} />
                   </div>
                   <span className="px-2.5 py-1 rounded-full text-xs font-black bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                    Ofensiva Diária
+                    Daily Streak
                   </span>
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-text mb-1">Daily Streak (Ofensiva)</h3>
+                  <h3 className="text-sm font-bold text-text mb-1">Daily Streak</h3>
                   <p className="text-xs text-text-muted leading-relaxed">
-                    Entre e estude diariamente para manter sua sequência de dias ativa e desbloquear troféus exclusivos de consistência.
+                    Log in and study daily to keep your learning streak active and unlock exclusive consistency trophies.
                   </p>
                 </div>
               </div>
@@ -369,7 +508,7 @@ export default function CompetitionsClientPage() {
       {showScrollTop && (
         <button
           onClick={scrollToTop}
-          aria-label="Voltar ao topo"
+          aria-label="Back to top"
           className="fixed bottom-6 right-6 z-50 p-3.5 rounded-full bg-primary text-white shadow-xl hover:bg-primary-hover hover:scale-110 active:scale-95 transition-all duration-200 border border-primary/20 cursor-pointer"
         >
           <ArrowUp size={20} className="stroke-[2.5]" />

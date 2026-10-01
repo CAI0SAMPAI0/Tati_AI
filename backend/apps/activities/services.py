@@ -862,13 +862,47 @@ class MonthlyCompetitionService:
     ) -> dict:
         """
         Fecha a competição do mês anterior, extrai o Top 3 e notifica os Administradores e a Professora Tatiana por E-mail e WhatsApp.
+        Garante idempotência através do banco de dados e cache para evitar envios duplicados.
         """
+        from django.core.cache import cache
+        from apps.notifications.models import Notification
+
         if year is None or month is None:
             year, month = cls.get_previous_month()
 
         month_name = cls.MONTH_NAMES_PT.get(month, f"Mês {month}")
         month_label = f"{month_name} de {year}"
         cycle_key = f"{year}-{month:02d}"
+
+        cache_key = f"monthly_comp_closed_{cycle_key}"
+
+        if not force:
+            if cache.get(cache_key):
+                logger.info(
+                    f"[MonthlyCompetition] Ciclo {cycle_key} ({month_label}) já foi fechado anteriormente (cache). Pulando execução duplicada."
+                )
+                return {
+                    "ok": True,
+                    "status": "already_closed",
+                    "cycle": cycle_key,
+                    "month_label": month_label,
+                }
+
+            already_processed = Notification.objects.filter(
+                category="monthly_competition_close",
+                body__contains=f"cycle:{cycle_key}",
+            ).exists()
+            if already_processed:
+                cache.set(cache_key, True, timeout=86400 * 35)
+                logger.info(
+                    f"[MonthlyCompetition] Ciclo {cycle_key} ({month_label}) já foi fechado e notificado no banco de dados. Pulando execução duplicada."
+                )
+                return {
+                    "ok": True,
+                    "status": "already_closed",
+                    "cycle": cycle_key,
+                    "month_label": month_label,
+                }
 
         logger.info(
             f"[MonthlyCompetition] Fechando ciclo {cycle_key} ({month_label})..."
@@ -894,8 +928,22 @@ class MonthlyCompetitionService:
         # 4. Notifica administradores no in-app
         cls._notify_admin_in_app(month_label, top3, total_participants)
 
+        # 5. Salva sentinel no banco de dados e cache para garantir idempotência persistente
+        try:
+            Notification.objects.create(
+                username="system",
+                category="monthly_competition_close",
+                title=f"Monthly Competition {cycle_key} Closed",
+                body=f"cycle:{cycle_key} concluded with {total_participants} participants on {datetime.now(timezone.utc).isoformat()}",
+            )
+        except Exception as e:
+            logger.warning(f"[MonthlyCompetition] Erro ao salvar registro de fechamento do ciclo no banco: {e}")
+
+        cache.set(cache_key, True, timeout=86400 * 35)
+
         return {
             "ok": True,
+            "status": "closed",
             "cycle": cycle_key,
             "month_label": month_label,
             "top3": top3,
@@ -917,31 +965,28 @@ class MonthlyCompetitionService:
         from django.conf import settings
 
         recipients = set()
-        for e in getattr(settings, "SUPERADMIN_EMAILS", []):
-            if e and "@" in e:
-                recipients.add(e.strip().lower())
 
-        # Busca e-mails de admins/professores no banco
+        # Apenas administradores e professores cadastrados no banco de dados
         admin_users = User.objects.filter(
-            role__in=["professor", "admin", "programador"]
+            role__in=["professor", "admin", "programador"],
         )
         for u in admin_users:
             if u.email and "@" in u.email:
                 recipients.add(u.email.strip().lower())
 
-        env_from = (
-            os.getenv("SMTP_FROM")
-            or os.getenv("SMTP_USER")
-            or os.getenv("login_smtp")
-            or os.getenv("BREVO_SENDER_EMAIL")
-        )
-        if env_from and "@" in env_from and not env_from.endswith("@smtp-brevo.com"):
-            recipients.add(env_from.strip().lower())
+        # Emails em SUPERADMIN_EMAILS só são incluídos se o usuário existir no banco
+        for e in getattr(settings, "SUPERADMIN_EMAILS", []):
+            if e and "@" in e:
+                clean_email = e.strip().lower()
+                if User.objects.filter(email__iexact=clean_email).exists():
+                    recipients.add(clean_email)
 
+        # Nota: env_from NÃO deve ser adicionado aqui (pois é apenas a credencial SMTP do remetente)
         if not recipients:
             fallback_admin = getattr(settings, "DEV_NOTIFICATION_EMAIL", "admin@tati-ai.com")
             if fallback_admin and "@" in fallback_admin:
-                recipients.add(fallback_admin)
+                if User.objects.filter(email__iexact=fallback_admin).exists():
+                    recipients.add(fallback_admin)
 
         top1 = top3[0] if len(top3) > 0 else None
         top2 = top3[1] if len(top3) > 1 else None
@@ -990,7 +1035,7 @@ class MonthlyCompetitionService:
             body_paragraphs=[
                 f"The monthly English learning competition for <strong>{month_label}</strong> has officially concluded. Here are the 3 highest scoring students for the cycle:"
             ],
-            action_url=f"{frontend_url}/competitions",
+            action_url=f"{frontend_url}/competitions?cycle=previous",
             action_label="View Full Leaderboard in App",
             highlight_card_html=highlight_content,
         )

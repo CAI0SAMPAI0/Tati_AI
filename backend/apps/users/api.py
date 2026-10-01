@@ -315,36 +315,48 @@ def get_fluency_evolution(request: HttpRequest):
 
 
 @users_router.get("/progress/ranking/by-level", auth=auth_optional)
-def get_ranking_by_level(request: HttpRequest):
+def get_ranking_by_level(
+    request: HttpRequest,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+):
     """
     Retorna o ranking de alunos agrupado por nível CEFR (A1 a C2).
     """
     user = request.auth if isinstance(request.auth, User) else None
     from apps.activities.services import RankingService
 
-    return RankingService.get_ranking_by_level(user)
+    return RankingService.get_ranking_by_level(user, year=year, month=month)
 
 
 @users_router.get("/progress/ranking/top15", auth=auth_optional)
-def get_ranking_top15(request: HttpRequest):
+def get_ranking_top15(
+    request: HttpRequest,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+):
     """
     Retorna a lista dos 15 melhores alunos do ranking global.
     """
     user = request.auth if isinstance(request.auth, User) else None
     from apps.activities.services import RankingService
 
-    return RankingService.get_top15(user)
+    return RankingService.get_top15(user, year=year, month=month)
 
 
 @users_router.get("/progress/ranking/position", auth=auth_optional)
-def get_ranking_position(request: HttpRequest):
+def get_ranking_position(
+    request: HttpRequest,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+):
     """
     Retorna a posição e pontuação do aluno no ranking geral.
     """
     user = request.auth if isinstance(request.auth, User) else None
     from apps.activities.services import RankingService
 
-    return RankingService.get_user_position(user)
+    return RankingService.get_user_position(user, year=year, month=month)
 
 
 @users_router.get("/progress/ranking/winners", auth=auth_optional)

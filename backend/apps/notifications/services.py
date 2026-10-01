@@ -732,6 +732,71 @@ class NotificationDispatcher:
 
         return {"sent": sent_count, "failed": failed_count}
 
+    @classmethod
+    def dispatch_to_user(
+        cls,
+        username: str,
+        title: str,
+        body: str,
+        category: str = "general",
+        url: str = "/notifications",
+        send_push: bool = True,
+        send_whatsapp: bool = False,
+    ) -> dict:
+        """
+        Despacha notificação in-app (Notification), push notification (FCM / WebPush)
+        e opcionalmente WhatsApp (WahaWhatsAppService) para um usuário específico.
+        """
+        results = {"in_app": False, "push": None, "whatsapp": None}
+
+        # 1. In-app notification
+        try:
+            notif = Notification.objects.create(
+                username=username,
+                category=category,
+                title=title,
+                body=body,
+            )
+            results["in_app"] = True
+            results["notification_id"] = str(notif.id)
+        except Exception as e:
+            logger.warning(
+                f"[NotificationDispatcher] Erro ao criar in-app notification para {username}: {e}"
+            )
+
+        # 2. Push notification (FCM / WebPush)
+        if send_push:
+            try:
+                push_res = cls.send_push_to_user(
+                    username=username,
+                    title=title,
+                    body=body,
+                    url=url,
+                    tag=f"tati-{category}",
+                )
+                results["push"] = push_res
+            except Exception as e:
+                logger.warning(
+                    f"[NotificationDispatcher] Erro ao disparar push para {username}: {e}"
+                )
+
+        # 3. WhatsApp (opcional)
+        if send_whatsapp:
+            try:
+                target_user = User.objects.filter(username=username).first()
+                if target_user and getattr(target_user, "phone", None):
+                    clean_phone = "".join(c for c in str(target_user.phone) if c.isdigit())
+                    if len(clean_phone) >= 10:
+                        wa_msg = f"*{title}*\n\n{body}"
+                        wa_res = WahaWhatsAppService.send_message(clean_phone, wa_msg)
+                        results["whatsapp"] = wa_res
+            except Exception as e:
+                logger.warning(
+                    f"[NotificationDispatcher] Erro ao enviar WhatsApp para {username}: {e}"
+                )
+
+        return results
+
     @staticmethod
     def notify_students_for_activity(
         activity_type: str,

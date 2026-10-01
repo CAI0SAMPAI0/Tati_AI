@@ -165,12 +165,16 @@ def get_podcast_detail(request: HttpRequest, podcast_id: str):
 
 
 @activities_router.get("/ranking", response=List[RankingUserOut], auth=auth_optional)
-def get_ranking(request: HttpRequest):
+def get_ranking(
+    request: HttpRequest,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+):
     """
-    Retorna a tabela de líderes semanal com base no XP acumulado.
+    Retorna a tabela de líderes semanal ou mensal com base no XP acumulado.
     """
     user = request.auth or User(username="aluno", role="student")
-    return RankingService.get_ranking(user)
+    return RankingService.get_ranking(user, year=year, month=month)
 
 
 #    TROFÉUS & CONQUISTAS                                               
