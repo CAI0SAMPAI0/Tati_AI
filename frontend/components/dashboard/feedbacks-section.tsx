@@ -43,15 +43,15 @@ interface StudentFeedbackItem {
 }
 
 const AREAS = [
-  { id: 'all', label: 'All Areas', icon: Filter },
+  { id: 'all', label: 'Todas as Áreas', icon: Filter },
   { id: 'flashcards', label: 'Flashcards', icon: Layers },
-  { id: 'games', label: 'Games', icon: Gamepad2 },
-  { id: 'grammar', label: 'Grammar', icon: BookOpen },
+  { id: 'games', label: 'Jogos / Games', icon: Gamepad2 },
+  { id: 'grammar', label: 'Gramática', icon: BookOpen },
   { id: 'listening', label: 'Listening', icon: Headphones },
   { id: 'reading', label: 'Reading', icon: BookOpen },
-  { id: 'simulations', label: 'AI Simulations', icon: Drama },
-  { id: 'music', label: 'Music', icon: Music },
-  { id: 'general', label: 'General', icon: MessageSquareHeart },
+  { id: 'simulations', label: 'Simulações IA', icon: Drama },
+  { id: 'music', label: 'Músicas', icon: Music },
+  { id: 'general', label: 'Geral', icon: MessageSquareHeart },
 ];
 
 export function FeedbacksSection() {
@@ -84,10 +84,10 @@ export function FeedbacksSection() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-student-feedbacks'] });
-      toast.success('Feedback updated successfully!');
+      toast.success('Feedback atualizado com sucesso!');
     },
     onError: () => {
-      toast.error('Error updating feedback.');
+      toast.error('Erro ao atualizar feedback.');
     },
   });
 
@@ -116,15 +116,15 @@ export function FeedbacksSection() {
             <MessageSquareHeart size={26} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-text">Student Feedback</h1>
+            <h1 className="text-2xl font-bold text-text">Feedbacks dos Alunos</h1>
             <p className="text-sm text-text-muted">
-              Review opinions, ratings, and pedagogical suggestions submitted by students about activities.
+              Acompanhe as opiniões, avaliações e sugestões enviadas pelos alunos sobre as atividades.
             </p>
           </div>
         </div>
 
         <Button variant="secondary" onClick={() => refetch()} className="gap-2 shrink-0">
-          <RefreshCw size={16} /> Refresh
+          <RefreshCw size={16} /> Atualizar
         </Button>
       </div>
 
@@ -138,7 +138,7 @@ export function FeedbacksSection() {
               type="text"
               value={searchStudent}
               onChange={e => setSearchStudent(e.target.value)}
-              placeholder="Search by student name or username..."
+              placeholder="Buscar por nome ou usuário do aluno..."
               className="w-full bg-bg border border-border rounded-2xl pl-10 pr-4 py-2.5 text-sm text-text outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all placeholder:text-text-muted/40"
             />
           </div>
@@ -149,9 +149,9 @@ export function FeedbacksSection() {
               onChange={e => setFilterStatus(e.target.value)}
               className="bg-bg border border-border rounded-2xl px-4 py-2.5 text-sm text-text font-medium outline-none focus:border-primary"
             >
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="reviewed">Reviewed</option>
+              <option value="all">Todos os Status</option>
+              <option value="pending">Pendentes</option>
+              <option value="reviewed">Respondidos</option>
             </select>
 
             <select
@@ -159,7 +159,7 @@ export function FeedbacksSection() {
               onChange={e => setFilterLevel(e.target.value)}
               className="bg-bg border border-border rounded-2xl px-4 py-2.5 text-sm text-text font-medium outline-none focus:border-primary"
             >
-              <option value="all">All Levels</option>
+              <option value="all">Todos os Níveis</option>
               {LEVEL_OPTIONS.map(lvl => (
                 <option key={lvl.value} value={lvl.value}>
                   {lvl.label}
@@ -172,7 +172,7 @@ export function FeedbacksSection() {
         {/* Row 2: Area Category Pills */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
           <span className="text-xs font-bold text-text-muted uppercase tracking-wider shrink-0 mr-1">
-            Area:
+            Área:
           </span>
           {AREAS.map(a => {
             const Icon = a.icon;
@@ -204,9 +204,9 @@ export function FeedbacksSection() {
       ) : feedbacks.length === 0 ? (
         <div className="bg-surface border border-border rounded-3xl p-12 text-center space-y-3 shadow-sm">
           <MessageSquareHeart size={44} className="mx-auto text-text-muted/40" />
-          <h3 className="text-base font-bold text-text">No feedback found</h3>
+          <h3 className="text-base font-bold text-text">Nenhum feedback encontrado</h3>
           <p className="text-sm text-text-muted max-w-sm mx-auto">
-            There are no feedbacks matching the selected filters or students have not yet sent messages in this category.
+            Não há feedbacks com os filtros selecionados ou os alunos ainda não enviaram recados nesta categoria.
           </p>
         </div>
       ) : (
@@ -258,10 +258,10 @@ export function FeedbacksSection() {
                             ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
                             : 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
                         )}
-                        title={isReviewed ? 'Click to mark as pending' : 'Click to mark as reviewed'}
+                        title={isReviewed ? 'Clique para marcar como pendente' : 'Clique para marcar como respondido'}
                       >
                         {isReviewed ? <CheckCircle2 size={13} /> : <Clock size={13} />}
-                        <span>{isReviewed ? 'Reviewed' : 'Pending'}</span>
+                        <span>{isReviewed ? 'Respondido' : 'Pendente'}</span>
                       </button>
                     </div>
                   </div>
@@ -299,7 +299,7 @@ export function FeedbacksSection() {
                   {/* Teacher Reply Section */}
                   {item.teacher_reply && (
                     <div className="bg-primary/5 border border-primary/20 rounded-2xl p-3 text-xs space-y-1">
-                      <span className="font-bold text-primary block">Teacher Tatiana's Reply:</span>
+                      <span className="font-bold text-primary block">Resposta da Teacher Tatiana:</span>
                       <p className="text-text-subtle leading-relaxed whitespace-pre-wrap">{item.teacher_reply}</p>
                     </div>
                   )}
@@ -310,7 +310,7 @@ export function FeedbacksSection() {
                   <div className="flex items-center justify-between text-[11px] text-text-muted">
                     <span>
                       {item.created_at
-                        ? new Date(item.created_at).toLocaleDateString('en-US', {
+                        ? new Date(item.created_at).toLocaleDateString('pt-BR', {
                             day: '2-digit',
                             month: 'short',
                             year: 'numeric',
@@ -325,7 +325,7 @@ export function FeedbacksSection() {
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      placeholder="Write pedagogical response to student..."
+                      placeholder="Escreva a resposta ou orientação pedagógica para o aluno..."
                       value={replyTexts[item.id] !== undefined ? replyTexts[item.id] : item.teacher_reply || ''}
                       onChange={e => setReplyTexts(prev => ({ ...prev, [item.id]: e.target.value }))}
                       className="flex-1 bg-bg border border-border rounded-xl px-3 py-1.5 text-xs text-text outline-none focus:border-primary"
@@ -336,7 +336,7 @@ export function FeedbacksSection() {
                       disabled={updateMutation.isPending}
                       className="px-3 text-xs gap-1.5 h-8 shrink-0"
                     >
-                      <Send size={12} /> Save
+                      <Send size={12} /> Salvar
                     </Button>
                   </div>
                 </div>

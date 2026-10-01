@@ -171,7 +171,7 @@ export default function DashboardClientPage() {
                   news: 'News',
                   cefr: 'CEFR Materials',
                   premium: 'Premium Hub',
-                  feedbacks: 'Student Feedback',
+                  feedbacks: 'Feedbacks dos Alunos',
                   whatsapp: 'WhatsApp Connection'
                 }[activeSection] || activeSection}
               </h1>
@@ -187,7 +187,7 @@ export default function DashboardClientPage() {
                   news: 'News, reels and links for students',
                   cefr: 'Diagnose and generate from PDFs',
                   premium: 'Premium materials & payments',
-                  feedbacks: 'Opinions and reviews submitted by students',
+                  feedbacks: 'Opiniões e avaliações recebidas dos alunos',
                   whatsapp: 'Connect and manage WhatsApp WAHA sessions'
                 }[activeSection]}
               </p>
