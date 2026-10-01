@@ -319,7 +319,7 @@ def cron_monthly_competition(
 ):
     """
     Webhook seguro executado no dia 1 de cada mês às 00:05 (Horário de Brasília).
-    Fecha a competição do mês anterior, calcula o Top 3 e envia relatório para o Admin por E-mail e WhatsApp.
+    Fecha a competição do mês anterior, calcula o Top 3 e envia relatório para o Admin por E-mail (WhatsApp exclusivo para ofensivas).
     """
     from ninja.errors import HttpError
     from apps.activities.services import MonthlyCompetitionService

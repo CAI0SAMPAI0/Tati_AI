@@ -917,10 +917,11 @@ class MonthlyCompetitionService:
             year, month, month_label, top3, total_participants
         )
 
-        # 2. Envia WhatsApp para a Professora Tatiana / Admin
-        whatsapp_result = cls._send_admin_whatsapp(
-            year, month, month_label, top3, total_participants
-        )
+        # 2. WhatsApp para ranking desativado conforme diretriz (WhatsApp é exclusivo para ofensivas/streaks)
+        whatsapp_result = {
+            "status": "disabled",
+            "reason": "whatsapp_reserved_for_streaks_only",
+        }
 
         # 3. Notifica e premia os 3 alunos vencedores no in-app
         cls._award_and_notify_winners(month_label, top3)
@@ -1071,74 +1072,17 @@ class MonthlyCompetitionService:
         top3: list[dict],
         total_participants: int,
     ) -> dict:
-        from apps.notifications.services import WahaWhatsAppService
-
-        target_phones = set()
-        admin_users = User.objects.filter(
-            role__in=["professor", "admin", "programador"]
+        """
+        Envio de ranking via WhatsApp desativado conforme diretriz:
+        o WhatsApp é de uso estrito e exclusivo para lembretes de ofensivas (streaks).
+        """
+        logger.info(
+            "[MonthlyCompetition] Envio de ranking via WhatsApp está desativado (WhatsApp exclusivo para ofensivas/streaks)."
         )
-        for u in admin_users:
-            ph = getattr(u, "phone", "") or ""
-            if ph and len(ph) >= 10:
-                target_phones.add(ph.strip())
-
-        env_phones = (
-            os.getenv("ADMIN_PHONE")
-            or os.getenv("TATIANA_PHONE")
-            or os.getenv("SUPERADMIN_PHONES")
-        )
-        if env_phones:
-            for p in env_phones.split(","):
-                clean = "".join(c for c in p if c.isdigit())
-                if len(clean) >= 10:
-                    target_phones.add(clean)
-
-        if not target_phones:
-            return {
-                "status": "skipped",
-                "reason": "Nenhum telefone de admin configurado",
-            }
-
-        top1 = top3[0] if len(top3) > 0 else None
-        top2 = top3[1] if len(top3) > 1 else None
-        top3_item = top3[2] if len(top3) > 2 else None
-
-        t1_str = (
-            f"{top1['name']} ({top1['level']}) — {top1['score']} XP"
-            if top1
-            else "—"
-        )
-        t2_str = (
-            f"{top2['name']} ({top2['level']}) — {top2['score']} XP"
-            if top2
-            else "—"
-        )
-        t3_str = (
-            f"{top3_item['name']} ({top3_item['level']}) — {top3_item['score']} XP"
-            if top3_item
-            else "—"
-        )
-
-        msg = (
-            f"🏆 *Resultado da Competição Mensal — Teacher Tati*\n"
-            f"📅 *Ciclo:* {month_label}\n\n"
-            f"Confira os 3 alunos com maior pontuação no mês passado:\n\n"
-            f"🥇 *1º Lugar:* {t1_str}\n"
-            f"🥈 *2º Lugar:* {t2_str}\n"
-            f"🥉 *3º Lugar:* {t3_str}\n\n"
-            f"👥 *Total de participantes:* {total_participants} alunos\n"
-            f"🔄 O ranking foi reiniciado para o novo ciclo deste mês!"
-        )
-
-        results = {}
-        for phone in target_phones:
-            try:
-                res = WahaWhatsAppService.send_message(phone, msg)
-                results[phone] = res
-            except Exception as e:
-                results[phone] = False
-
-        return {"results": results}
+        return {
+            "status": "disabled",
+            "reason": "whatsapp_reserved_for_streaks_only",
+        }
 
     @classmethod
     def _award_and_notify_winners(cls, month_label: str, top3: list[dict]):
@@ -1164,7 +1108,7 @@ class MonthlyCompetitionService:
                     body=body,
                     category="trophy",
                     send_push=True,
-                    send_whatsapp=True,
+                    send_whatsapp=False,
                 )
             except Exception as e:
                 logger.error(
