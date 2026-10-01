@@ -209,7 +209,7 @@ export default function SettingsPage() {
   if (!mounted) return null;
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="min-h-screen bg-bg overflow-x-clip">
       <MainHeader />
 
       <main className="max-w-3xl mx-auto p-4 md:p-8 space-y-8 pb-20 animate-fade-in">

@@ -9,10 +9,10 @@ import { API_BASE, apiGet } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
-import { BookOpen, CalendarDays, Download, Flame, Lightbulb, MessageSquare, Snowflake, Trophy, Type, History, ArrowRight } from 'lucide-react';
+import { BookOpen, CalendarDays, Download, Flame, Lightbulb, MessageSquare, Snowflake, Trophy, Type, History, ArrowRight, ArrowUp } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { getStoredSession } from '@/lib/api/auth';
 
@@ -210,8 +210,22 @@ export default function ProgressClientPage() {
   const currentLevel = (user?.level || xpData?.level || 'A1').toUpperCase();
   const levelGradient = LEVEL_COLORS[currentLevel] || LEVEL_COLORS.A1;
 
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 200);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
-    <div className="min-h-screen bg-bg flex flex-col md:flex-row overflow-x-hidden">
+    <div className="min-h-screen bg-bg flex flex-col md:flex-row overflow-x-clip">
       <SidebarActivities isOpen={sidebarOpen} onClose={handleCloseSidebar} />
 
       <div className={cn("flex-1 flex flex-col min-w-0 transition-all duration-300", sidebarOpen ? "md:ml-[280px]" : "md:ml-0")}>
@@ -508,6 +522,16 @@ export default function ProgressClientPage() {
           </div>
         </main>
       </div>
+
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          aria-label="Voltar ao topo"
+          className="fixed bottom-6 right-6 z-50 p-3.5 rounded-full bg-primary text-white shadow-xl hover:bg-primary-hover hover:scale-110 active:scale-95 transition-all duration-200 border border-primary/20 cursor-pointer"
+        >
+          <ArrowUp size={20} className="stroke-[2.5]" />
+        </button>
+      )}
     </div>
   );
 }

@@ -46,7 +46,7 @@ type Tab = 'personal' | 'achievements' | 'feedbacks' | 'security' | 'plan';
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'personal', label: 'Personal Info', icon: <UserIcon size={16} /> },
   { id: 'achievements', label: 'Achievements', icon: <Trophy size={16} /> },
-  { id: 'feedbacks', label: 'Respostas da Tatiana', icon: <MessageSquareHeart size={16} /> },
+  { id: 'feedbacks', label: "Tatiana's Replies", icon: <MessageSquareHeart size={16} /> },
   { id: 'security', label: 'Security', icon: <Lock size={16} /> },
 ];
 
@@ -251,7 +251,7 @@ export default function ProfileClientPage() {
             <p className="text-xs text-text-muted">
               {tab === 'personal' && 'Personal Information'}
               {tab === 'achievements' && 'Competition Score & Achievements'}
-              {tab === 'feedbacks' && 'Respostas da Teacher Tatiana'}
+              {tab === 'feedbacks' && "Teacher Tatiana's Replies"}
               {tab === 'security' && 'Security & Account Management'}
             </p>
           </div>
@@ -556,9 +556,9 @@ export default function ProfileClientPage() {
                     <MessageSquareHeart size={22} />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-text">Respostas da Teacher Tatiana</h2>
+                    <h2 className="text-xl font-bold text-text">Teacher Tatiana's Replies</h2>
                     <p className="text-xs text-text-muted">
-                      Acompanhe as opiniões que você enviou e o retorno pedagógico da professora.
+                      Track the feedback you submitted and the teacher's pedagogical response.
                     </p>
                   </div>
                 </div>
@@ -569,7 +569,7 @@ export default function ProfileClientPage() {
                   onClick={() => refetchFeedbacks()}
                   className="gap-2 shrink-0 self-end sm:self-auto"
                 >
-                  <RefreshCw size={14} className={loadingFeedbacks ? "animate-spin" : ""} /> Atualizar
+                  <RefreshCw size={14} className={loadingFeedbacks ? "animate-spin" : ""} /> Refresh
                 </Button>
               </div>
 
@@ -580,9 +580,9 @@ export default function ProfileClientPage() {
               ) : myFeedbacks.length === 0 ? (
                 <div className="bg-bg border border-border rounded-2xl p-8 text-center space-y-3">
                   <MessageSquareHeart size={36} className="mx-auto text-text-muted/40" />
-                  <h3 className="text-sm font-bold text-text">Nenhum feedback enviado ainda</h3>
+                  <h3 className="text-sm font-bold text-text">No feedback submitted yet</h3>
                   <p className="text-xs text-text-muted max-w-sm mx-auto">
-                    Ao praticar atividades ou simulações, clique no ícone de feedback para enviar comentários e dúvidas diretamente para a Tatiana.
+                    When practicing activities or simulations, click the feedback icon to send comments and questions directly to Tatiana.
                   </p>
                 </div>
               ) : (
@@ -601,9 +601,9 @@ export default function ProfileClientPage() {
                       >
                         {/* Top: Badges & Status */}
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex flex-wrap items-center gap-2">
+                           <div className="flex flex-wrap items-center gap-2">
                             <span className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-surface border border-border text-text">
-                              {item.area ? item.area.toUpperCase() : 'GERAL'}
+                              {item.area ? item.area.toUpperCase() : 'GENERAL'}
                             </span>
                             {item.activity_title && (
                               <span className="px-2.5 py-1 rounded-xl text-xs bg-surface border border-border text-text-muted truncate max-w-[220px]">
@@ -638,7 +638,7 @@ export default function ProfileClientPage() {
                               )}
                             >
                               {hasReply ? <CheckCircle2 size={13} /> : <Clock size={13} />}
-                              <span>{hasReply ? "Respondido" : "Aguardando"}</span>
+                              <span>{hasReply ? "Replied" : "Pending"}</span>
                             </span>
                           </div>
                         </div>
@@ -657,7 +657,7 @@ export default function ProfileClientPage() {
                               </div>
                               <div>
                                 <span className="text-xs font-bold text-primary block leading-tight">Teacher Tatiana</span>
-                                <span className="text-[10px] text-text-muted">Professora & Pedagógico</span>
+                                <span className="text-[10px] text-text-muted">Teacher & Pedagogical Team</span>
                               </div>
                             </div>
                             <p className="text-xs md:text-sm text-text leading-relaxed whitespace-pre-wrap pl-10">
@@ -667,14 +667,14 @@ export default function ProfileClientPage() {
                         ) : (
                           <div className="text-xs text-text-muted italic flex items-center gap-1.5 pt-1">
                             <Clock size={12} className="text-amber-400" />
-                            A Teacher Tatiana revisará sua mensagem em breve!
+                            Teacher Tatiana will review your message soon!
                           </div>
                         )}
 
                         {/* Date */}
                         {item.created_at && (
                           <div className="text-[11px] text-text-muted/60 text-right pt-1">
-                            Enviado em {new Date(item.created_at).toLocaleDateString('pt-BR', {
+                            Submitted on {new Date(item.created_at).toLocaleDateString('en-US', {
                               day: '2-digit',
                               month: 'short',
                               year: 'numeric',

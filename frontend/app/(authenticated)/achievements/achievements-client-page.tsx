@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Trophy,
@@ -18,6 +18,7 @@ import {
   BookMarked,
   Layers,
   Gamepad2,
+  ArrowUp,
 } from 'lucide-react';
 import { MainHeader } from '@/components/layout/main-header';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
@@ -109,8 +110,22 @@ export default function AchievementsClientPage() {
   const isActive = (streak?.current_streak ?? 0) > 0;
   const userScore = positionData?.score ?? stats?.total_xp ?? stats?.score ?? stats?.xp ?? 0;
 
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 200);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
-    <div className="min-h-screen bg-bg flex flex-col md:flex-row overflow-x-hidden">
+    <div className="min-h-screen bg-bg flex flex-col md:flex-row overflow-x-clip">
       <SidebarActivities isOpen={sidebarOpen} onClose={handleCloseSidebar} />
       <div className={cn("flex-1 flex flex-col min-w-0 transition-all duration-300", sidebarOpen ? "md:ml-[280px]" : "md:ml-0")}>
         <MainHeader onToggleMenu={handleToggleSidebar} />
@@ -219,7 +234,17 @@ export default function AchievementsClientPage() {
             </div>
           </div>
         </main>
-      </div >
-    </div >
+      </div>
+
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          aria-label="Voltar ao topo"
+          className="fixed bottom-6 right-6 z-50 p-3.5 rounded-full bg-primary text-white shadow-xl hover:bg-primary-hover hover:scale-110 active:scale-95 transition-all duration-200 border border-primary/20 cursor-pointer"
+        >
+          <ArrowUp size={20} className="stroke-[2.5]" />
+        </button>
+      )}
+    </div>
   );
 }
