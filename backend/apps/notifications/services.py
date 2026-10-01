@@ -1209,24 +1209,44 @@ class NotificationSchedulerService:
             </table>
         </div>
         """
+
+        # Generate and attach PDF report
+        attachments = None
+        try:
+            import base64
+            from apps.users.progress_report import ProgressReportGenerator
+            pdf_path = ProgressReportGenerator.generate_student_report(user.username)
+            if os.path.exists(pdf_path):
+                with open(pdf_path, "rb") as f:
+                    b64_pdf = base64.b64encode(f.read()).decode("utf-8")
+                attachments = [{
+                    "name": f"TatiAI_Weekly_Report_{user.username}.pdf",
+                    "content": b64_pdf
+                }]
+        except Exception as e:
+            logger.error(f"[WeeklyReport] Failed to attach PDF to email for {user.username}: {e}")
+
         html = BrevoEmailService.build_standard_email_html(
             recipient_name=first_name,
             body_paragraphs=[
                 "Here is your weekly summary of your English learning journey.",
+                "Your personalized Learning Evolution Report (PDF) with your completed activities, category summary, and pedagogical insights is attached to this email!",
                 "Consistency is the key to fluency, and every session brings you closer to your goals. Keep up the great work!"
             ],
-            action_url="https://tati-ai.vercel.app/dashboard",
-            action_label="View Full Evolution Report",
+            action_url="https://tati-ai.vercel.app/progress",
+            action_label="View Your Progress on Tati AI",
             highlight_card_html=stats_card_html,
         )
 
         email_diag = (
-            BrevoEmailService.send_email_detailed(email, title, html, first_name)
+            BrevoEmailService.send_email_detailed(
+                email, title, html, first_name, attachments=attachments
+            )
             if email
             else {}
         )
         push_diag = NotificationDispatcher.send_push_to_user(
-            user.username, title, body, url="/dashboard", tag="weekly-report"
+            user.username, title, body, url="/progress", tag="weekly-report"
         )
         Notification.objects.create(
             username=user.username,
@@ -1245,7 +1265,7 @@ class NotificationSchedulerService:
                 f"Study time: {mins_studied} min\n"
                 f"Completed activities: {acts_done}\n"
                 f"New words: +{vocab_learned}\n\n"
-                f"Check your full report here: https://tati-ai.vercel.app/dashboard"
+                f"Your PDF report is in your email! Check your progress here: https://tati-ai.vercel.app/progress"
             )
             wa_sent = WahaWhatsAppService.send_message(
                 phone_number=student_phone,

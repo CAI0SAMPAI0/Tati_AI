@@ -5,16 +5,15 @@ import { MainHeader } from '@/components/layout/main-header';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useSidebarState } from '@/hooks/useSidebarState';
-import { API_BASE, apiGet } from '@/lib/api/client';
+import { apiGet, apiPost } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
-import { BookOpen, CalendarDays, Download, Flame, Lightbulb, MessageSquare, Snowflake, Trophy, Type, History, ArrowRight, ArrowUp } from 'lucide-react';
+import { BookOpen, CalendarDays, Flame, Lightbulb, MessageSquare, Snowflake, Trophy, Type, History, ArrowRight, ArrowUp, Mail } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useMemo, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { getStoredSession } from '@/lib/api/auth';
 
 const ActivityBarChart = dynamic(() => import('@/components/charts/activity-bar-chart'), {
   ssr: false,
@@ -108,7 +107,7 @@ export default function ProgressClientPage() {
   const { user } = useAuth();
   const { sidebarOpen, toggleSidebar: handleToggleSidebar, closeSidebar: handleCloseSidebar } = useSidebarState();
   const [period, setPeriod] = useState<Period>('weekly');
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [isSendingReport, setIsSendingReport] = useState(false);
 
   const { data: xpData, isLoading: xpLoading } = useQuery<XpData>({
     queryKey: ['my-stats'],
@@ -167,43 +166,25 @@ export default function ProgressClientPage() {
     return [];
   }, [period, weeklyReport, monthlyReport]);
 
-  const handleDownloadReport = async () => {
-    setIsDownloading(true);
+  const handleSendReportEmail = async () => {
+    setIsSendingReport(true);
     try {
-      const session = getStoredSession();
-      const token = session?.token || (typeof window !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('access_token')) : null);
-      const base = (API_BASE || '').replace(/\/+$/, '');
-      const downloadEndpoint = `${base}/users/progress/report/download${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-
-      // Se estiver no aplicativo Flutter (APK), abre diretamente o download no navegador externo
-      if (typeof window !== 'undefined' && (window as any).flutter_inappwebview?.callHandler) {
-        (window as any).flutter_inappwebview.callHandler('openExternalUrl', downloadEndpoint);
-        toast.success('Iniciando download no navegador...');
-        return;
-      }
-
-      const response = await fetch(downloadEndpoint, {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-
-      if (!response.ok) throw new Error('Download failed');
-
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = `TatiAI_Report_${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(downloadUrl);
-      toast.success('Report downloaded successfully!');
-    } catch (err) {
+      const res = await apiPost<{ success?: boolean; message?: string; email?: string }>(
+        '/users/progress/report/send-email',
+        {}
+      );
+      const targetEmail = res.data?.email || user?.email;
+      toast.success(
+        targetEmail
+          ? `PDF Report sent to your email (${targetEmail})! 📬`
+          : 'PDF Report sent to your email! 📬',
+        { duration: 6000 }
+      );
+    } catch (err: any) {
       console.error(err);
-      toast.error('Error downloading report. Please try again.');
+      toast.error(err?.message || 'Error sending report to email. Please try again.');
     } finally {
-      setIsDownloading(false);
+      setIsSendingReport(false);
     }
   };
 
@@ -245,16 +226,16 @@ export default function ProgressClientPage() {
             </div>
 
             <Button
-              onClick={handleDownloadReport}
-              disabled={isDownloading}
+              onClick={handleSendReportEmail}
+              disabled={isSendingReport}
               className="gap-2 bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 rounded-2xl px-6 py-6 font-bold transition-all active:scale-[0.98]"
             >
-              {isDownloading ? (
+              {isSendingReport ? (
                 <span className="animate-spin mr-2">⏳</span>
               ) : (
-                <Download size={18} />
+                <Mail size={18} />
               )}
-              Download PDF Report
+              Send PDF Report on Email
             </Button>
           </header>
 

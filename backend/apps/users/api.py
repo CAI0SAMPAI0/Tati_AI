@@ -380,6 +380,73 @@ def download_progress_report(request: HttpRequest, lang: str = "pt-BR"):
     )
 
 
+@users_router.post("/progress/report/send-email", auth=auth_required)
+def send_progress_report_email(request: HttpRequest):
+    """
+    Gera o PDF do relatório de evolução com logo e métricas de atividades,
+    e envia anexado por e-mail para o aluno via Brevo.
+    """
+    import base64
+    import os
+    from .progress_report import ProgressReportGenerator
+    from apps.notifications.services import BrevoEmailService
+
+    user = request.auth
+    email = user.email
+    if not email:
+        raise HttpError(400, "User does not have a registered email address.")
+
+    try:
+        pdf_path = ProgressReportGenerator.generate_student_report(user.username)
+        if not os.path.exists(pdf_path):
+            raise HttpError(500, "Failed to generate PDF report file.")
+
+        with open(pdf_path, "rb") as f:
+            pdf_bytes = f.read()
+        b64_pdf = base64.b64encode(pdf_bytes).decode("utf-8")
+
+        first_name = (user.name or user.username or "Student").strip().split()[0].capitalize()
+        subject = "Your Learning Evolution Report - Teacher Tatiana Duarte"
+
+        html = BrevoEmailService.build_standard_email_html(
+            recipient_name=first_name,
+            body_paragraphs=[
+                "Your personalized English Learning Evolution Report has been generated!",
+                "Attached to this email, you will find your detailed PDF report with your weekly and monthly completed activities, learning insights, and consistency metrics.",
+                "Consistency is key to reaching fluency. Keep up the great practice!"
+            ],
+            action_url="https://tati-ai.vercel.app/progress",
+            action_label="View Your Progress on Tati AI",
+            title_header="Teacher Tatiana Duarte",
+            subtitle_header="Your Personal AI English Tutor",
+        )
+
+        send_res = BrevoEmailService.send_email_detailed(
+            to_email=email,
+            subject=subject,
+            html_content=html,
+            recipient_name=first_name,
+            attachments=[{
+                "name": f"TatiAI_Report_{user.username}.pdf",
+                "content": b64_pdf
+            }]
+        )
+
+        if not send_res.get("success", False):
+            raise HttpError(500, "Failed to send email with attached PDF report.")
+
+        return {
+            "success": True,
+            "message": f"Report sent to {email}",
+            "email": email,
+        }
+    except HttpError:
+        raise
+    except Exception as e:
+        logger.error(f"[ReportEmail] Error sending progress report to {user.username}: {e}")
+        raise HttpError(500, f"Error generating or sending report: {str(e)}")
+
+
 @users_router.get(
     "/progress/daily-summary", response=DailySummaryOut, auth=auth_required
 )
