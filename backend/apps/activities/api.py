@@ -13,7 +13,7 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-from apps.authentication.security import auth_required, auth_optional
+from apps.authentication.security import auth_required, auth_optional, require_teacher
 from .schemas import (
     FlashcardReviewInput,
     FlashcardReviewOut,
@@ -356,7 +356,7 @@ def get_hub_materials(request: HttpRequest, category: Optional[str] = None):
     """
     Lista os materiais digitais interativos e livros da Teacher Tati.
     """
-    user = request.auth if isinstance(request.auth, User) else User(role="student")
+    user = request.auth if isinstance(request.auth, User) else None
     return HubService.list_materials(user, category)
 
 
@@ -400,7 +400,7 @@ def public_catalog(request: HttpRequest, category: Optional[str] = None):
     """
     Catálogo público de materiais e livros para visitantes e alunos.
     """
-    user = request.auth if isinstance(request.auth, User) else User(role="student")
+    user = request.auth if isinstance(request.auth, User) else None
     return HubService.list_materials(user, category)
 
 
@@ -701,6 +701,7 @@ def get_hub_page(
             get_client,
             apply_watermark,
             _RAW_IMAGE_CACHE,
+            safe_download_supabase_storage,
         )
 
         raw_pages = []
@@ -758,41 +759,24 @@ def get_hub_page(
             except Exception:
                 pass
 
-        # 3. Tenta baixar do Supabase (e salva no disco local para cache futuro)
+        # 3. Tenta baixar do Supabase de forma segura e autenticada
         if not file_data and 0 <= page_index < len(raw_pages):
-            try:
-                db = get_client()
-                file_data = db.storage.from_("hub-secure-pages").download(storage_path)
-                if file_data:
-                    _RAW_IMAGE_CACHE[storage_path] = file_data
-                    os.makedirs(local_dir, exist_ok=True)
+            file_data = safe_download_supabase_storage(
+                bucket="hub-secure-pages",
+                path=storage_path,
+                is_private=True,
+                timeout=12.0,
+            )
+            if file_data:
+                _RAW_IMAGE_CACHE[storage_path] = file_data
+                os.makedirs(local_dir, exist_ok=True)
+                try:
                     with open(local_file, "wb") as f:
                         f.write(file_data)
-            except Exception as err:
-                logger.info(
-                    f"[Hub] Download via client falhou ({err}), tentando via HTTP direto..."
-                )
-                try:
-                    supa_url = getattr(
-                        settings,
-                        "SUPABASE_URL",
-                        "https://gkziqqjswecteekanwnv.supabase.co",
-                    ).rstrip("/")
-                    public_img_url = f"{supa_url}/storage/v1/object/public/hub-secure-pages/{storage_path}"
-                    with httpx.Client(timeout=10.0) as client:
-                        resp = client.get(public_img_url)
-                        if resp.status_code == 200:
-                            file_data = resp.content
-                            _RAW_IMAGE_CACHE[storage_path] = file_data
-                            os.makedirs(local_dir, exist_ok=True)
-                            with open(local_file, "wb") as f:
-                                f.write(file_data)
-                except Exception as e2:
-                    logger.warning(
-                        f"[Hub] Erro ao baixar página do Supabase {storage_path}: {e2}"
-                    )
+                except Exception as write_err:
+                    logger.warning(f"[Hub] Erro ao gravar cache local: {write_err}")
 
-        # 4. Se o Supabase falhou (ex: 402 Payment Required), dispara auto-sync em background para não travar a requisição HTTP
+        # 4. Se não houver arquivo e existir content_source, dispara auto-sync em background para regeneração sob demanda
         if not file_data and content_source:
             try:
                 import threading
@@ -809,21 +793,14 @@ def get_hub_page(
                     f"[Hub] Erro no auto-sync de emergência para {content_id}: {sync_err}"
                 )
 
-        # 5. Fallback para preview caso a página específica não esteja disponível e seja a primeira página
+        # 5. Fallback para preview público caso a página específica não esteja disponível e seja a primeira página
         if not file_data and preview_path and page_index == 0:
-            try:
-                supa_url = getattr(
-                    settings, "SUPABASE_URL", "https://gkziqqjswecteekanwnv.supabase.co"
-                ).rstrip("/")
-                preview_img_url = (
-                    f"{supa_url}/storage/v1/object/public/hub-previews/{preview_path}"
-                )
-                with httpx.Client(timeout=8.0) as client:
-                    resp = client.get(preview_img_url)
-                    if resp.status_code == 200:
-                        file_data = resp.content
-            except Exception:
-                pass
+            file_data = safe_download_supabase_storage(
+                bucket="hub-previews",
+                path=preview_path,
+                is_private=False,
+                timeout=8.0,
+            )
 
         # 6. Se ainda assim não houver imagem física, gera dinamicamente a página com marca d'água evitando 404/500
         if not file_data:
@@ -1154,6 +1131,7 @@ def get_cefr_schedules(request: HttpRequest):
                 "materials_per_execution": s.materials_per_execution,
                 "selected_types": s.selected_types or ["flashcards", "simulations"],
                 "reference_ids": s.reference_ids if isinstance(s.reference_ids, list) else [],
+                "topic_plan": s.topic_plan if isinstance(s.topic_plan, list) else [],
             }
             for s in schedules
         ],
@@ -1168,6 +1146,7 @@ class CEFRScheduleSchema(BaseModel):
     materials_per_execution: Optional[int] = 5
     selected_types: Optional[List[str]] = ["flashcards", "simulations"]
     reference_ids: Optional[List[str]] = []
+    topic_plan: Optional[List[Dict[str, Any]]] = []
 
 
 class CEFRFlashcardGroupSaveSchema(BaseModel):
@@ -1178,8 +1157,9 @@ class CEFRFlashcardGroupSaveSchema(BaseModel):
     flashcards: List[Dict[str, Any]]
 
 
-@cefr_admin_router.post("/schedules", auth=auth_optional)
+@cefr_admin_router.post("/schedules", auth=auth_required)
 def create_cefr_schedule(request: HttpRequest, payload: CEFRScheduleSchema):
+    require_teacher(request.auth)
     from .models import CEFRSchedule
 
     s = CEFRSchedule.objects.create(
@@ -1190,14 +1170,16 @@ def create_cefr_schedule(request: HttpRequest, payload: CEFRScheduleSchema):
         materials_per_execution=payload.materials_per_execution,
         selected_types=payload.selected_types,
         reference_ids=payload.reference_ids or [],
+        topic_plan=payload.topic_plan or [],
     )
     return {"success": True, "data": {"id": str(s.id)}}
 
 
-@cefr_admin_router.put("/schedules/{schedule_id}", auth=auth_optional)
+@cefr_admin_router.put("/schedules/{schedule_id}", auth=auth_required)
 def update_cefr_schedule(
     request: HttpRequest, schedule_id: str, payload: CEFRScheduleSchema
 ):
+    require_teacher(request.auth)
     from .models import CEFRSchedule
 
     s = CEFRSchedule.objects.filter(id=schedule_id).first()
@@ -1210,12 +1192,15 @@ def update_cefr_schedule(
     s.materials_per_execution = payload.materials_per_execution
     s.selected_types = payload.selected_types
     s.reference_ids = payload.reference_ids or []
+    if payload.topic_plan is not None:
+        s.topic_plan = payload.topic_plan
     s.save()
     return {"success": True, "data": {"id": str(s.id)}}
 
 
-@cefr_admin_router.delete("/schedules/{schedule_id}", auth=auth_optional)
+@cefr_admin_router.delete("/schedules/{schedule_id}", auth=auth_required)
 def delete_cefr_schedule(request: HttpRequest, schedule_id: str):
+    require_teacher(request.auth)
     from .models import CEFRSchedule
 
     s = CEFRSchedule.objects.filter(id=schedule_id).first()
@@ -1225,11 +1210,12 @@ def delete_cefr_schedule(request: HttpRequest, schedule_id: str):
     raise HttpError(404, "Agendamento não encontrado.")
 
 
-@cefr_admin_router.get("/extract-topics", auth=auth_optional)
+@cefr_admin_router.get("/extract-topics", auth=auth_required)
 def extract_cefr_topics(request: HttpRequest, reference_ids: Optional[str] = None):
     """
     Extrai tópicos e subtemas pedagógicos reais dos materiais indexados usando IA e alinhados ao nível CEFR.
     """
+    require_teacher(request.auth)
     from .generator import CEFRGeneratorService
     from .models import CEFRReference
 
@@ -1258,14 +1244,15 @@ def extract_cefr_topics(request: HttpRequest, reference_ids: Optional[str] = Non
             return res
 
     # 4. Fallback contextualizado se não houver referências
-    return CEFRGeneratorService.extract_topics_from_references([])
+    return CEFRGeneratorService.extract_topics_from_references([], fallback_level=level)
 
 
-@cefr_admin_router.post("/schedules/{schedule_id}/run-now", auth=auth_optional)
+@cefr_admin_router.post("/schedules/{schedule_id}/run-now", auth=auth_required)
 def run_cefr_schedule_now(request: HttpRequest, schedule_id: str):
     """
     Executa imediatamente um agendamento específico (disparo manual para testes e validação).
     """
+    require_teacher(request.auth)
     from .models import CEFRSchedule
     from .generator import CEFRGeneratorService
 
@@ -1277,7 +1264,7 @@ def run_cefr_schedule_now(request: HttpRequest, schedule_id: str):
     return res
 
 
-@cefr_admin_router.post("/generate-flashcards", auth=auth_optional)
+@cefr_admin_router.post("/generate-flashcards", auth=auth_required)
 def generate_cefr_flashcards(
     request: HttpRequest,
     level: str = "A1",
@@ -1285,12 +1272,19 @@ def generate_cefr_flashcards(
     count: int = 5,
     title: Optional[str] = None,
     reference_ids: Optional[str] = None,
+    items: Optional[str] = None,
 ):
     """
     Gera baralho de flashcards a partir do tópico e nível CEFR utilizando IA.
     """
+    require_teacher(request.auth)
     from .generator import CEFRGeneratorService
     import uuid
+
+    topic_context = None
+    if items:
+        sub_items = [i.strip() for i in items.split(",") if i.strip()]
+        topic_context = {"topic": topic, "items": sub_items}
 
     cards = CEFRGeneratorService.generate_flashcards(
         level=level,
@@ -1298,6 +1292,7 @@ def generate_cefr_flashcards(
         count=count,
         title=title,
         reference_ids=reference_ids,
+        topic_context=topic_context,
     )
     return {
         "success": True,
@@ -1306,7 +1301,7 @@ def generate_cefr_flashcards(
     }
 
 
-@cefr_admin_router.post("/generate-simulations", auth=auth_optional)
+@cefr_admin_router.post("/generate-simulations", auth=auth_required)
 def generate_cefr_simulations(
     request: HttpRequest,
     level: str = "A1",
@@ -1314,18 +1309,26 @@ def generate_cefr_simulations(
     count: int = 1,
     title: Optional[str] = None,
     reference_ids: Optional[str] = None,
+    items: Optional[str] = None,
 ):
     """
     Gera cenários de simulação interativa baseados no nível CEFR utilizando IA.
     """
+    require_teacher(request.auth)
     from .generator import CEFRGeneratorService
     import uuid
+
+    topic_context = None
+    if items:
+        sub_items = [i.strip() for i in items.split(",") if i.strip()]
+        topic_context = {"topic": topic, "items": sub_items}
 
     sims = CEFRGeneratorService.generate_simulations(
         level=level,
         topic=topic,
         count=count,
         title=title,
+        topic_context=topic_context,
     )
     sim_id = str(sims[0].id) if sims else str(uuid.uuid4())
     return {"success": True, "task_id": str(uuid.uuid4()), "simulation_id": sim_id}
@@ -1345,7 +1348,7 @@ class CEFRReferenceUpdateSchema(BaseModel):
     filename: Optional[str] = None
 
 
-@cefr_admin_router.post("/upload-material", auth=auth_optional)
+@cefr_admin_router.post("/upload-material", auth=auth_required)
 def upload_cefr_material(
     request: HttpRequest,
     files: List[UploadedFile] = File(...),
@@ -1355,6 +1358,7 @@ def upload_cefr_material(
     Faz upload e indexação de arquivos de referência didática (PDF, DOCX, TXT).
     Extrai e indexa os chunks imediatamente no banco (cefr_documents) para extração de tópicos com IA.
     """
+    require_teacher(request.auth)
     from .models import CEFRReference
     from .assets_service import CloudinaryService
     from django.db import connection
@@ -1436,14 +1440,15 @@ def upload_cefr_material(
     return {"success": True, "results": results}
 
 
-@cefr_admin_router.patch("/references/{reference_id}", auth=auth_optional)
-@cefr_admin_router.put("/references/{reference_id}", auth=auth_optional)
+@cefr_admin_router.patch("/references/{reference_id}", auth=auth_required)
+@cefr_admin_router.put("/references/{reference_id}", auth=auth_required)
 def update_cefr_reference(
     request: HttpRequest, reference_id: str, body: CEFRReferenceUpdateSchema
 ):
     """
     Atualiza metadados (como cefr_level e filename) de um documento de referência didática.
     """
+    require_teacher(request.auth)
     from .models import CEFRReference
 
     ref = CEFRReference.objects.filter(id=reference_id).first()
@@ -1472,24 +1477,26 @@ def update_cefr_reference(
     }
 
 
-@cefr_admin_router.delete("/references/{reference_id}", auth=auth_optional)
+@cefr_admin_router.delete("/references/{reference_id}", auth=auth_required)
 def delete_cefr_reference(request: HttpRequest, reference_id: str):
     """
     Exclui um documento de referência didática.
     """
+    require_teacher(request.auth)
     from .models import CEFRReference
 
     CEFRReference.objects.filter(id=reference_id).delete()
     return {"success": True, "message": "Reference deleted successfully."}
 
 
-@cefr_admin_router.put("/flashcards/group", auth=auth_optional)
+@cefr_admin_router.put("/flashcards/group", auth=auth_required)
 def toggle_publish_flashcard_group(
     request: HttpRequest, level: str, topic: str, is_published: bool
 ):
     """
     Aprova ou retorna para rascunho um baralho de flashcards do curador.
     """
+    require_teacher(request.auth)
     from .models import Flashcard
 
     updated = Flashcard.objects.filter(level__iexact=level, topic__iexact=topic).update(
@@ -1498,11 +1505,12 @@ def toggle_publish_flashcard_group(
     return {"success": True, "updated": updated}
 
 
-@cefr_admin_router.delete("/flashcards/group", auth=auth_optional)
+@cefr_admin_router.delete("/flashcards/group", auth=auth_required)
 def delete_flashcard_group(request: HttpRequest, level: str, topic: str):
     """
     Exclui um grupo inteiro de flashcards por nível e tópico.
     """
+    require_teacher(request.auth)
     from .models import Flashcard
 
     deleted = Flashcard.objects.filter(
@@ -1511,11 +1519,12 @@ def delete_flashcard_group(request: HttpRequest, level: str, topic: str):
     return {"success": True, "message": f"Deleted group {topic}"}
 
 
-@cefr_admin_router.post("/flashcards/group/save", auth=auth_optional)
+@cefr_admin_router.post("/flashcards/group/save", auth=auth_required)
 def save_flashcard_group(request: HttpRequest, body: CEFRFlashcardGroupSaveSchema):
     """
     Salva as edições feitas em um grupo de flashcards pelo curador.
     """
+    require_teacher(request.auth)
     from .models import Flashcard
     import uuid
 
@@ -1569,11 +1578,12 @@ def save_flashcard_group(request: HttpRequest, body: CEFRFlashcardGroupSaveSchem
     return {"success": True, "inserted": len(inserted)}
 
 
-@cefr_admin_router.put("/simulations/{sim_id}", auth=auth_optional)
+@cefr_admin_router.put("/simulations/{sim_id}", auth=auth_required)
 def update_cefr_simulation(request: HttpRequest, sim_id: str, payload: dict):
     """
     Atualiza status, nível ou conteúdo de uma simulação CEFR.
     """
+    require_teacher(request.auth)
     from apps.chat.models import CEFRSimulation
 
     clean_id = sim_id.replace("cefr_sim_", "")
@@ -1612,11 +1622,12 @@ def update_cefr_simulation(request: HttpRequest, sim_id: str, payload: dict):
     return {"success": True, "data": {"id": str(cs.id), "level": cs.level}}
 
 
-@cefr_admin_router.delete("/simulations/{sim_id}", auth=auth_optional)
+@cefr_admin_router.delete("/simulations/{sim_id}", auth=auth_required)
 def delete_cefr_simulation(request: HttpRequest, sim_id: str):
     """
     Exclui uma simulação CEFR.
     """
+    require_teacher(request.auth)
     from apps.chat.models import CEFRSimulation
 
     clean_id = sim_id.replace("cefr_sim_", "")

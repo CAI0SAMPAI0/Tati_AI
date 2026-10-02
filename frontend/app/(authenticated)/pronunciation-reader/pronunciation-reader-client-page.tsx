@@ -272,52 +272,154 @@ export default function PronunciationReaderClientPage() {
     }
   };
 
+  const isOperatingRef = useRef(false);
+
+  // Limpeza completa de recursos de áudio no desmonte do componente
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.stop();
+        } catch (_) {}
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        try {
+          audioContextRef.current.close();
+        } catch (_) {}
+        audioContextRef.current = null;
+      }
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+      }
+    };
+  }, []);
+
   const getSupportedMimeType = (): string => {
+    if (typeof window === 'undefined' || typeof MediaRecorder === 'undefined') {
+      return '';
+    }
     const types = [
       'audio/webm;codecs=opus',
       'audio/webm',
-      'audio/ogg;codecs=opus',
+      'audio/mp4;codecs=mp4a.40.2',
       'audio/mp4',
+      'audio/aac',
+      'audio/ogg;codecs=opus',
     ];
     for (const type of types) {
-      if (MediaRecorder.isTypeSupported(type)) return type;
+      try {
+        if (typeof MediaRecorder.isTypeSupported === 'function' && MediaRecorder.isTypeSupported(type)) {
+          return type;
+        }
+      } catch (_) {}
     }
     return '';
   };
 
   const startRecording = async () => {
+    if (isOperatingRef.current || isRecording) return;
+    isOperatingRef.current = true;
+
     setResult(null);
     setRecordingError(null);
+
+    // 1. Limpa qualquer gravação ou stream anterior que ainda esteja em aberto
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (_) {}
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      try {
+        audioContextRef.current.close();
+      } catch (_) {}
+      audioContextRef.current = null;
+    }
+
+    // 2. Validação de suporte à API do Navegador
+    if (
+      typeof window === 'undefined' ||
+      !navigator?.mediaDevices?.getUserMedia ||
+      typeof MediaRecorder === 'undefined'
+    ) {
+      setRecordingError(
+        'Your browser does not support audio recording. Please use an updated version of Safari, Chrome or Edge.'
+      );
+      isOperatingRef.current = false;
+      return;
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // 3. Solicitação de permissão de microfone dentro do gesto do usuário
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
       streamRef.current = stream;
 
-      const audioContext = new AudioContext();
-      const source = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 2048;
-      source.connect(analyser);
+      // 4. Inicializa Web Audio API para o waveform (se suportado e seguro no iOS)
+      try {
+        const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtxClass) {
+          const audioContext = new AudioCtxClass();
+          if (audioContext.state === 'suspended') {
+            await audioContext.resume();
+          }
+          const source = audioContext.createMediaStreamSource(stream);
+          const analyser = audioContext.createAnalyser();
+          analyser.fftSize = 2048;
+          source.connect(analyser);
 
-      audioContextRef.current = audioContext;
-      analyserRef.current = analyser;
+          audioContextRef.current = audioContext;
+          analyserRef.current = analyser;
+          drawWaveform();
+        }
+      } catch (audioCtxErr) {
+        console.warn('AudioContext waveform não disponível, continuando gravação:', audioCtxErr);
+      }
 
+      // 5. Configura MediaRecorder com mimeType compatível com o navegador atual (incluindo Mobile Safari)
       const mimeType = getSupportedMimeType();
-      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const options = mimeType ? { mimeType } : undefined;
+      const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      mediaRecorder.ondataavailable = (e: BlobEvent) => {
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
       };
 
       mediaRecorder.onstop = async () => {
         try {
-          stream.getTracks().forEach(t => t.stop());
-          audioContext.close();
+          // Finaliza e libera tracks do microfone agora que o recorder terminou com segurança
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach(t => t.stop());
+            streamRef.current = null;
+          }
+          if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+            try {
+              audioContextRef.current.close();
+            } catch (_) {}
+            audioContextRef.current = null;
+          }
+          cancelAnimationFrame(animFrameRef.current);
 
           const elapsed = Date.now() - recordingStartRef.current;
-          if (elapsed < 1500) {
-            setRecordingError('Recording too short. Please hold the button for at least 2 seconds.');
+          if (elapsed < 1200) {
+            setRecordingError('Recording too short. Please speak for at least 2 seconds.');
             setIsRecording(false);
             return;
           }
@@ -328,70 +430,70 @@ export default function PronunciationReaderClientPage() {
             return;
           }
 
-          const blob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
+          // Monta o blob com o tipo retornado pelo MediaRecorder
+          const effectiveMime = mediaRecorder.mimeType || mimeType || 'audio/webm';
+          const blob = new Blob(audioChunksRef.current, { type: effectiveMime });
+
+          // Converte diretamente para base64 sem instanciar novo AudioContext assíncrono (evita NotAllowedError no Safari/iOS)
           const arrayBuffer = await blob.arrayBuffer();
+          const base64 = uint8ToBase64(new Uint8Array(arrayBuffer));
 
-          let wavBuffer: ArrayBuffer;
-          try {
-            const audioCtx = new AudioContext();
-            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-
-            const offlineCtx = new OfflineAudioContext(1, audioBuffer.length, audioBuffer.sampleRate);
-            const offlineSource = offlineCtx.createBufferSource();
-            offlineSource.buffer = audioBuffer;
-            offlineSource.connect(offlineCtx.destination);
-            offlineSource.start();
-
-            const rendered = await offlineCtx.startRendering();
-            wavBuffer = exportWavRaw(rendered.getChannelData(0), rendered.sampleRate);
-            audioCtx.close();
-          } catch (decodeErr) {
-            console.error('Audio decode error, sending raw:', decodeErr);
-            wavBuffer = arrayBuffer;
-          }
-
-          const base64 = uint8ToBase64(new Uint8Array(wavBuffer));
           const activeText = getActiveText();
           await evaluatePronunciation(base64, activeText);
-        } catch (err) {
+        } catch (err: any) {
           console.error('Audio processing error:', err);
           setRecordingError('Error processing audio. Please try again.');
+        } finally {
           setIsRecording(false);
+          isOperatingRef.current = false;
         }
       };
 
-      mediaRecorder.onerror = (e) => {
+      mediaRecorder.onerror = (e: any) => {
         console.error('MediaRecorder error:', e);
-        setRecordingError('Recording error. Please check your microphone.');
+        setRecordingError('Recording error occurred. Please check your microphone.');
         setIsRecording(false);
+        isOperatingRef.current = false;
       };
 
+      // Dispara o início da gravação com fatiamento em tempo real
       mediaRecorder.start(250);
       recordingStartRef.current = Date.now();
       setIsRecording(true);
-      drawWaveform();
     } catch (err: any) {
       console.error('Microphone access error:', err);
-      if (err.name === 'NotAllowedError') {
-        setRecordingError('Microphone access denied. Please allow microphone access in your browser settings.');
-      } else if (err.name === 'NotFoundError') {
-        setRecordingError('No microphone found. Please connect a microphone.');
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setRecordingError(
+          'Microphone access denied. On Mobile Safari / iOS, tap "aA" or the lock icon in the address bar, open Website Settings, and allow Microphone access.'
+        );
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        setRecordingError('No microphone found. Please connect or enable your microphone.');
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        setRecordingError('Microphone is busy or being used by another app. Please close other audio apps and try again.');
       } else {
-        setRecordingError('Could not access microphone. Please try again.');
+        setRecordingError(err.message || 'Could not access microphone. Please try again.');
       }
+      setIsRecording(false);
+    } finally {
+      isOperatingRef.current = false;
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-    }
     cancelAnimationFrame(animFrameRef.current);
-    setIsRecording(false);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (stopErr) {
+        console.error('Error stopping recorder:', stopErr);
+      }
+    } else {
+      setIsRecording(false);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+    }
   };
 
   const evaluatePronunciation = async (audioBase64: string, referenceText: string) => {
@@ -406,18 +508,21 @@ export default function PronunciationReaderClientPage() {
         ENDPOINTS.SPEECH_VERIFY_PRONUNCIATION,
         body
       );
-      if (res.ok) {
+      if (res.ok && res.data) {
         setResult(res.data);
-        setHistory(prev => [...prev, {
-          sentence: referenceText || '(free speech)',
-          score: res.data.score,
-        }]);
+        setHistory(prev => [
+          ...prev,
+          {
+            sentence: referenceText || '(free speech)',
+            score: res.data.score,
+          },
+        ]);
       } else {
-        setRecordingError('Evaluation failed. Please try again.');
+        setRecordingError('Evaluation failed. Please try speaking clearly and try again.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Pronunciation evaluation error:', err);
-      setRecordingError('Error evaluating pronunciation. Please try again.');
+      setRecordingError('Error evaluating pronunciation. Please check your connection and try again.');
     } finally {
       setIsEvaluating(false);
     }

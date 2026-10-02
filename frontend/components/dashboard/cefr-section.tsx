@@ -30,7 +30,8 @@ import {
   CheckSquare,
   Square,
   Search,
-  Play
+  Play,
+  RotateCcw
 } from 'lucide-react';
 import { apiUpload, apiPost, apiGet, apiDelete, apiPut, apiPatch } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
@@ -85,7 +86,44 @@ export function CefrSection() {
   const [scheduleReferenceIds, setScheduleReferenceIds] = useState<string[]>([]);
   const [runningScheduleId, setRunningScheduleId] = useState<string | null>(null);
 
-  // Top-level tabs
+const TOPIC_PLAN_STORAGE_KEY = 'tati_cefr_schedule_topic_plan_draft';
+const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
+
+  // Topic Plan state (4-week cycle) & auto-extraction
+  const [scheduleTopicPlan, setScheduleTopicPlan] = useState<
+    Array<{
+      topic: string;
+      items: string[];
+      weeks: { '1': number; '2': number; '3': number; '4': number };
+      communicative_goal?: string;
+      source_file?: string;
+      reference_id?: string;
+      level?: string;
+    }>
+  >([]);
+  const [scheduleAvailableTopics, setScheduleAvailableTopics] = useState<
+    Array<{
+      topic: string;
+      items: string[];
+      count?: number;
+      source_file?: string;
+      reference_id?: string;
+      level?: string;
+    }>
+  >([]);
+  const [loadingScheduleTopics, setLoadingScheduleTopics] = useState(false);
+  const [showAddCustomTopic, setShowAddCustomTopic] = useState(false);
+  const [topicPlanSearch, setTopicPlanSearch] = useState('');
+  const [topicPlanFilter, setTopicPlanFilter] = useState<'all' | 'selected'>('all');
+  const [newPlanTopicName, setNewPlanTopicName] = useState('');
+  const [newPlanTopicItems, setNewPlanTopicItems] = useState('');
+  const [newPlanWeek1, setNewPlanWeek1] = useState(5);
+  const [newPlanWeek2, setNewPlanWeek2] = useState(0);
+  const [newPlanWeek3, setNewPlanWeek3] = useState(3);
+  const [newPlanWeek4, setNewPlanWeek4] = useState(2);
+  const [manualTopicContext, setManualTopicContext] = useState<{ topic: string; items: string[] } | null>(null);
+
+  // Abas superiores
   const [activeMainTab, setActiveMainTab] = useState<'configure' | 'curator'>('configure');
 
   // Curator Panel states
@@ -402,10 +440,104 @@ export function CefrSection() {
     }
   };
 
+  const fetchScheduleTopics = async (refIds?: string[]) => {
+    setLoadingScheduleTopics(true);
+    try {
+      const ids = refIds !== undefined ? refIds : scheduleReferenceIds;
+      let url = '/cefr/admin/extract-topics';
+      if (ids && ids.length > 0) {
+        const params = ids.map(id => `reference_ids=${encodeURIComponent(id)}`).join('&');
+        url += `?${params}`;
+      }
+      const res = await apiGet<{
+        success: boolean;
+        topics?: Array<{
+          topic: string;
+          items: string[];
+          count?: number;
+          source_file?: string;
+          reference_id?: string;
+          level?: string;
+        }>;
+      }>(url);
+      if (res && res.topics && res.topics.length > 0) {
+        setScheduleAvailableTopics(prev => {
+          const map = new Map<string, {
+            topic: string;
+            items: string[];
+            count?: number;
+            source_file?: string;
+            reference_id?: string;
+            level?: string;
+          }>();
+          prev.forEach(t => map.set(t.topic.trim().toLowerCase(), t));
+          res.topics!.forEach(t => {
+            const key = t.topic.trim().toLowerCase();
+            if (!map.has(key)) {
+              map.set(key, t);
+            } else {
+              const existing = map.get(key)!;
+              if (!existing.source_file && t.source_file) {
+                map.set(key, { ...existing, source_file: t.source_file, reference_id: t.reference_id, level: t.level });
+              }
+            }
+          });
+          return Array.from(map.values());
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching schedule topics:', err);
+    } finally {
+      setLoadingScheduleTopics(false);
+    }
+  };
+
+  // Restore draft topic plan and references on mount
+  useEffect(() => {
+    try {
+      const savedPlan = localStorage.getItem(TOPIC_PLAN_STORAGE_KEY);
+      if (savedPlan) {
+        const parsed = JSON.parse(savedPlan);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setScheduleTopicPlan(parsed);
+        }
+      }
+      const savedRefs = localStorage.getItem(SCHEDULE_REFS_STORAGE_KEY);
+      if (savedRefs) {
+        const parsed = JSON.parse(savedRefs);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setScheduleReferenceIds(parsed);
+        }
+      }
+    } catch (_) {}
+  }, []);
+
+  // Persist draft topic plan to localStorage
+  useEffect(() => {
+    if (!editingScheduleId) {
+      try {
+        localStorage.setItem(TOPIC_PLAN_STORAGE_KEY, JSON.stringify(scheduleTopicPlan));
+      } catch (_) {}
+    }
+  }, [scheduleTopicPlan, editingScheduleId]);
+
+  // Persist draft references and trigger automatic topic extraction
+  useEffect(() => {
+    if (!editingScheduleId) {
+      try {
+        localStorage.setItem(SCHEDULE_REFS_STORAGE_KEY, JSON.stringify(scheduleReferenceIds));
+      } catch (_) {}
+    }
+    if (scheduleReferenceIds.length > 0) {
+      fetchScheduleTopics(scheduleReferenceIds);
+    }
+  }, [scheduleReferenceIds, editingScheduleId]);
+
   useEffect(() => {
     fetchReferences();
     fetchSchedules();
     fetchGeneratedContent();
+    fetchScheduleTopics();
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -535,17 +667,205 @@ export function CefrSection() {
     );
   };
 
+  const allAvailableTopics = useMemo(() => {
+    const list = [...scheduleAvailableTopics];
+    scheduleTopicPlan.forEach(p => {
+      if (!list.some(a => a.topic.trim().toLowerCase() === p.topic.trim().toLowerCase())) {
+        list.push({
+          topic: p.topic,
+          items: p.items || [],
+          source_file: p.source_file,
+          reference_id: p.reference_id,
+          level: p.level,
+        });
+      }
+    });
+    return list;
+  }, [scheduleAvailableTopics, scheduleTopicPlan]);
+
+  const activeTopicPlanCount = useMemo(() => {
+    return scheduleTopicPlan.filter(tp => Object.values(tp.weeks).some(v => (v || 0) > 0)).length;
+  }, [scheduleTopicPlan]);
+
+  const weekSummary = useMemo(() => {
+    const counts = { '1': 0, '2': 0, '3': 0, '4': 0 };
+    scheduleTopicPlan.forEach(p => {
+      (['1', '2', '3', '4'] as const).forEach(w => {
+        counts[w] += p.weeks[w] || 0;
+      });
+    });
+    return counts;
+  }, [scheduleTopicPlan]);
+
+  const filteredAvailableTopics = useMemo(() => {
+    return allAvailableTopics.filter(t => {
+      const planEntry = scheduleTopicPlan.find(p => p.topic.trim().toLowerCase() === t.topic.trim().toLowerCase());
+      const isSelected = planEntry && Object.values(planEntry.weeks).some(v => (v || 0) > 0);
+      if (topicPlanFilter === 'selected' && !isSelected) return false;
+      if (!topicPlanSearch.trim()) return true;
+      const q = topicPlanSearch.toLowerCase();
+      const inName = t.topic.toLowerCase().includes(q);
+      const inItems = (t.items || []).some(item => item.toLowerCase().includes(q));
+      return inName || inItems;
+    });
+  }, [allAvailableTopics, scheduleTopicPlan, topicPlanFilter, topicPlanSearch]);
+
+  const toggleTopicWeek = (topicName: string, items: string[], week: '1' | '2' | '3' | '4') => {
+    const defaultCount = scheduleLimit || 5;
+    const sourceMeta = allAvailableTopics.find(t => t.topic.trim().toLowerCase() === topicName.trim().toLowerCase());
+    setScheduleTopicPlan(prev => {
+      const idx = prev.findIndex(p => p.topic.trim().toLowerCase() === topicName.trim().toLowerCase());
+      if (idx >= 0) {
+        const current = prev[idx];
+        const currentVal = current.weeks[week] || 0;
+        const newVal = currentVal > 0 ? 0 : defaultCount;
+        const updatedWeeks = { ...current.weeks, [week]: newVal };
+        const hasAny = Object.values(updatedWeeks).some(v => v > 0);
+        if (!hasAny) {
+          return prev.filter((_, i) => i !== idx);
+        }
+        return prev.map((item, i) => (i === idx ? { ...item, weeks: updatedWeeks } : item));
+      } else {
+        return [
+          ...prev,
+          {
+            topic: topicName,
+            items: items || [],
+            weeks: {
+              '1': week === '1' ? defaultCount : 0,
+              '2': week === '2' ? defaultCount : 0,
+              '3': week === '3' ? defaultCount : 0,
+              '4': week === '4' ? defaultCount : 0,
+            },
+            source_file: sourceMeta?.source_file,
+            reference_id: sourceMeta?.reference_id,
+            level: sourceMeta?.level,
+          },
+        ];
+      }
+    });
+  };
+
+  const setTopicWeekCount = (topicName: string, items: string[], week: '1' | '2' | '3' | '4', count: number) => {
+    const val = Math.max(0, count);
+    const sourceMeta = allAvailableTopics.find(t => t.topic.trim().toLowerCase() === topicName.trim().toLowerCase());
+    setScheduleTopicPlan(prev => {
+      const idx = prev.findIndex(p => p.topic.trim().toLowerCase() === topicName.trim().toLowerCase());
+      if (idx >= 0) {
+        const current = prev[idx];
+        const updatedWeeks = { ...current.weeks, [week]: val };
+        const hasAny = Object.values(updatedWeeks).some(v => v > 0);
+        if (!hasAny) {
+          return prev.filter((_, i) => i !== idx);
+        }
+        return prev.map((item, i) => (i === idx ? { ...item, weeks: updatedWeeks } : item));
+      } else if (val > 0) {
+        return [
+          ...prev,
+          {
+            topic: topicName,
+            items: items || [],
+            weeks: {
+              '1': week === '1' ? val : 0,
+              '2': week === '2' ? val : 0,
+              '3': week === '3' ? val : 0,
+              '4': week === '4' ? val : 0,
+            },
+            source_file: sourceMeta?.source_file,
+            reference_id: sourceMeta?.reference_id,
+            level: sourceMeta?.level,
+          },
+        ];
+      }
+      return prev;
+    });
+  };
+
+  const handleAutoDistributeTopics = () => {
+    if (allAvailableTopics.length === 0) {
+      toast.error('No topics available to distribute.');
+      return;
+    }
+    const defaultCount = scheduleLimit || 5;
+    const distributed = allAvailableTopics.map((t, idx) => {
+      const weekNum = String((idx % 4) + 1) as '1' | '2' | '3' | '4';
+      return {
+        topic: t.topic,
+        items: t.items || [],
+        weeks: {
+          '1': weekNum === '1' ? defaultCount : 0,
+          '2': weekNum === '2' ? defaultCount : 0,
+          '3': weekNum === '3' ? defaultCount : 0,
+          '4': weekNum === '4' ? defaultCount : 0,
+        },
+        source_file: t.source_file,
+        reference_id: t.reference_id,
+        level: t.level,
+      };
+    });
+    setScheduleTopicPlan(distributed);
+    toast.success(`Distributed ${distributed.length} topics evenly across Weeks 1 to 4!`);
+  };
+
+  const handleClearTopicPlan = () => {
+    setScheduleTopicPlan([]);
+    try {
+      localStorage.removeItem(TOPIC_PLAN_STORAGE_KEY);
+    } catch (_) {}
+    toast.success('Topic plan cleared.');
+  };
+
+  const handleAddCustomPlanTopic = () => {
+    if (!newPlanTopicName.trim()) {
+      toast.error('Please enter a topic name.');
+      return;
+    }
+    const items = newPlanTopicItems
+      .split(',')
+      .map(i => i.trim())
+      .filter(Boolean);
+
+    const defaultCount = scheduleLimit || 5;
+    const w1 = Number(newPlanWeek1) || 0;
+    const w2 = Number(newPlanWeek2) || 0;
+    const w3 = Number(newPlanWeek3) || 0;
+    const w4 = Number(newPlanWeek4) || 0;
+    const finalW1 = (w1 === 0 && w2 === 0 && w3 === 0 && w4 === 0) ? defaultCount : w1;
+
+    setScheduleTopicPlan(prev => [
+      ...prev.filter(p => p.topic.trim().toLowerCase() !== newPlanTopicName.trim().toLowerCase()),
+      {
+        topic: newPlanTopicName.trim(),
+        items,
+        weeks: {
+          '1': finalW1,
+          '2': w2,
+          '3': w3,
+          '4': w4,
+        },
+      },
+    ]);
+    setNewPlanTopicName('');
+    setNewPlanTopicItems('');
+    setShowAddCustomTopic(false);
+    toast.success('Custom topic added to the 4-week plan!');
+  };
+
   const handleSaveSchedule = async () => {
     if (scheduleWeekdays.length === 0) {
-      toast.error('Please select at least one day of the week for scheduling.');
+      toast.error('Please select at least one day of the week for the schedule.');
       return;
     }
     if (scheduleTypes.length === 0) {
-      toast.error('Please select at least one type of material to generate.');
+      toast.error('Please select at least one material type to generate.');
       return;
     }
     setSavingSchedule(true);
     try {
+      const activeTopicPlan = scheduleTopicPlan.filter(tp =>
+        Object.values(tp.weeks).some(v => (v || 0) > 0)
+      );
+
       const body = {
         active: scheduleActive,
         weekdays: scheduleWeekdays,
@@ -553,7 +873,8 @@ export function CefrSection() {
         weekly_frequency: 1,
         materials_per_execution: scheduleLimit,
         selected_types: scheduleTypes,
-        reference_ids: scheduleReferenceIds
+        reference_ids: scheduleReferenceIds,
+        topic_plan: activeTopicPlan,
       };
 
       let res;
@@ -564,14 +885,21 @@ export function CefrSection() {
       }
 
       if (res.ok) {
+        try {
+          localStorage.removeItem(TOPIC_PLAN_STORAGE_KEY);
+          localStorage.removeItem(SCHEDULE_REFS_STORAGE_KEY);
+        } catch (_) {}
         toast.success(editingScheduleId ? 'Schedule updated successfully!' : 'Schedule configured successfully!');
         setScheduleWeekdays([]);
         setScheduleTime('06:00');
         setScheduleLimit(5);
         setScheduleTypes(['flashcards', 'simulations']);
         setScheduleReferenceIds([]);
+        setScheduleTopicPlan([]);
         setEditingScheduleId(null);
         setScheduleActive(true);
+        setShowAddCustomTopic(false);
+        setTopicPlanSearch('');
         fetchSchedules();
       } else {
         toast.error(editingScheduleId ? 'Error updating schedule.' : 'Error creating schedule.');
@@ -591,6 +919,7 @@ export function CefrSection() {
     setScheduleActive(sch.active);
     setScheduleTypes(sch.selected_types || ['flashcards', 'simulations']);
     setScheduleReferenceIds(sch.reference_ids || []);
+    setScheduleTopicPlan(sch.topic_plan || []);
   };
 
   const handleCancelEditSchedule = () => {
@@ -601,6 +930,7 @@ export function CefrSection() {
     setScheduleActive(true);
     setScheduleTypes(['flashcards', 'simulations']);
     setScheduleReferenceIds([]);
+    setScheduleTopicPlan([]);
   };
 
   const handleToggleSchedule = async (id: string, currentActive: boolean) => {
@@ -676,6 +1006,9 @@ export function CefrSection() {
         selectedRefIds.forEach(id => {
           finalEndpoint += `&reference_ids=${id}`;
         });
+      }
+      if (manualTopicContext?.items && manualTopicContext.items.length > 0) {
+        finalEndpoint += `&items=${encodeURIComponent(manualTopicContext.items.join(','))}`;
       }
 
       const res = await apiPost<{ success: boolean; task_id?: string }>(finalEndpoint, null);
@@ -1235,22 +1568,23 @@ export function CefrSection() {
                                 );
                               })}
                             </div>
-                            {selectedSubtopics.length > 0 && (
-                              <button
-                                onClick={() => {
-                                  const fullTopic = `${t.topic}: ${selectedSubtopics.join(', ')}`;
-                                  setTopic(fullTopic);
-                                  setShowTopicSelector(false);
-                                  setExtractedTopics([]);
-                                  setExpandedTopicIdx(null);
-                                  setSelectedSubtopics([]);
-                                  toast.success(`Topic set with ${selectedSubtopics.length} subtopics`);
-                                }}
-                                className="px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary/90 transition-all"
-                              >
-                                Use {selectedSubtopics.length} selected
-                              </button>
-                            )}
+                              {selectedSubtopics.length > 0 && (
+                                <button
+                                  onClick={() => {
+                                    const fullTopic = `${t.topic}: ${selectedSubtopics.join(', ')}`;
+                                    setTopic(fullTopic);
+                                    setManualTopicContext({ topic: t.topic, items: selectedSubtopics });
+                                    setShowTopicSelector(false);
+                                    setExtractedTopics([]);
+                                    setExpandedTopicIdx(null);
+                                    setSelectedSubtopics([]);
+                                    toast.success(`Tópico configurado com ${selectedSubtopics.length} subtemas`);
+                                  }}
+                                  className="px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary/90 transition-all"
+                                >
+                                  Usar {selectedSubtopics.length} selecionados
+                                </button>
+                              )}
                           </div>
                         )}
                       </div>
@@ -1422,6 +1756,324 @@ export function CefrSection() {
                   )}
                 </div>
 
+                {/* Topic Plan Configuration (4-Week Cycle) */}
+                <div className="space-y-3 pt-3 border-t border-border/60">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-xs font-bold text-text-subtle uppercase flex items-center gap-1.5">
+                      <Layers size={13} className="text-primary" />
+                      Topic Plan (4-Week Cycle)
+                    </label>
+                    <span className="text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                      {activeTopicPlanCount} topic{activeTopicPlanCount !== 1 ? 's' : ''} configured
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-text-muted">
+                    Topics are automatically extracted from your reference materials. Simply select which week(s) each topic should be generated in (Week 1, Week 2, Week 3, Week 4).
+                  </p>
+
+                  {/* Weekly Distribution Summary Pills */}
+                  <div className="grid grid-cols-4 gap-1.5 p-2 bg-bg/80 border border-border/60 rounded-xl text-center">
+                    {(['1', '2', '3', '4'] as const).map(w => (
+                      <div
+                        key={w}
+                        className={`py-1 px-1.5 rounded-lg border text-[11px] transition-all ${
+                          weekSummary[w] > 0
+                            ? 'bg-primary/10 border-primary/30 text-primary font-bold'
+                            : 'bg-surface/50 border-border/40 text-text-muted'
+                        }`}
+                      >
+                        <span className="block text-[10px] uppercase font-semibold">Week {w}</span>
+                        <span className="text-xs font-bold">{weekSummary[w]}</span>
+                        <span className="text-[9px] block opacity-70">items</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Actions Toolbar */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={handleAutoDistributeTopics}
+                        disabled={allAvailableTopics.length === 0}
+                        className="px-2.5 py-1.5 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                        title="Distribute topics evenly across Weeks 1 to 4"
+                      >
+                        <Sparkles size={12} className="text-amber-400" />
+                        Auto-Distribute (1/Week)
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => fetchScheduleTopics(scheduleReferenceIds)}
+                        disabled={loadingScheduleTopics}
+                        className="px-2 py-1.5 bg-surface border border-border hover:bg-surface-hover rounded-lg text-xs font-medium text-text-subtle flex items-center gap-1 transition-colors disabled:opacity-50"
+                        title="Re-extract topics from reference materials"
+                      >
+                        {loadingScheduleTopics ? <Loader2 size={12} className="animate-spin text-primary" /> : <RotateCcw size={12} />}
+                        Refresh
+                      </button>
+
+                      {activeTopicPlanCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleClearTopicPlan}
+                          className="px-2 py-1.5 bg-surface border border-border hover:bg-red-500/10 hover:text-red-400 rounded-lg text-xs font-medium text-text-muted transition-colors"
+                          title="Clear all week assignments"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowAddCustomTopic(prev => !prev)}
+                      className="px-2.5 py-1.5 bg-surface border border-border hover:bg-primary/5 hover:border-primary/30 rounded-lg text-xs font-medium text-primary flex items-center gap-1 transition-colors"
+                    >
+                      <Plus size={12} />
+                      {showAddCustomTopic ? 'Close Custom' : '+ Custom Topic'}
+                    </button>
+                  </div>
+
+                  {/* Collapsible Add Custom Topic Form */}
+                  {showAddCustomTopic && (
+                    <div className="p-3 bg-bg border border-dashed border-primary/40 rounded-xl space-y-2 animate-in fade-in duration-150">
+                      <div className="text-[11px] font-bold text-primary flex items-center gap-1">
+                        <Plus size={12} />
+                        Add Custom Topic to Plan
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Topic Name (e.g., Work, Jobs and Occupations)"
+                        value={newPlanTopicName}
+                        onChange={e => setNewPlanTopicName(e.target.value)}
+                        className="w-full text-xs bg-surface border border-border rounded-lg px-2.5 py-1.5 text-text outline-none focus:ring-1 focus:ring-primary"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Items / expressions separated by comma (e.g., teacher, doctor, engineer)"
+                        value={newPlanTopicItems}
+                        onChange={e => setNewPlanTopicItems(e.target.value)}
+                        className="w-full text-xs bg-surface border border-border rounded-lg px-2.5 py-1.5 text-text outline-none focus:ring-1 focus:ring-primary"
+                      />
+                      <div className="grid grid-cols-4 gap-2 text-[10px]">
+                        {[
+                          { label: 'Week 1', val: newPlanWeek1, set: setNewPlanWeek1 },
+                          { label: 'Week 2', val: newPlanWeek2, set: setNewPlanWeek2 },
+                          { label: 'Week 3', val: newPlanWeek3, set: setNewPlanWeek3 },
+                          { label: 'Week 4', val: newPlanWeek4, set: setNewPlanWeek4 },
+                        ].map((sw, sIdx) => (
+                          <div key={sIdx} className="space-y-0.5 text-center">
+                            <span className="text-text-muted">{sw.label}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              max="30"
+                              value={sw.val}
+                              onChange={e => sw.set(Math.max(0, parseInt(e.target.value) || 0))}
+                              className="w-full text-center bg-surface border border-border rounded px-1 py-0.5 text-xs text-text outline-none focus:ring-1 focus:ring-primary"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={handleAddCustomPlanTopic}
+                          className="flex-1 py-1.5 bg-primary text-white hover:bg-primary-hover rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors shadow-xs"
+                        >
+                          <Plus size={13} />
+                          Add to Plan
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddCustomTopic(false)}
+                          className="px-3 py-1.5 bg-surface border border-border hover:bg-surface-hover rounded-lg text-xs font-medium text-text-subtle transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Search & Filter for Topics */}
+                  {allAvailableTopics.length > 3 && (
+                    <div className="flex items-center gap-2 pt-1">
+                      <div className="relative flex-1">
+                        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+                        <input
+                          type="text"
+                          placeholder="Search topics or vocabulary items..."
+                          value={topicPlanSearch}
+                          onChange={e => setTopicPlanSearch(e.target.value)}
+                          className="w-full pl-7 pr-2.5 py-1 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-muted outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1 text-[11px] shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setTopicPlanFilter('all')}
+                          className={`px-2 py-0.5 rounded-md font-medium transition-colors ${
+                            topicPlanFilter === 'all'
+                              ? 'bg-primary/10 text-primary font-bold'
+                              : 'text-text-muted hover:text-text'
+                          }`}
+                        >
+                          All ({allAvailableTopics.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTopicPlanFilter('selected')}
+                          className={`px-2 py-0.5 rounded-md font-medium transition-colors ${
+                            topicPlanFilter === 'selected'
+                              ? 'bg-primary/10 text-primary font-bold'
+                              : 'text-text-muted hover:text-text'
+                          }`}
+                        >
+                          Selected ({activeTopicPlanCount})
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Topics List with Week Selection Buttons */}
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    {loadingScheduleTopics && allAvailableTopics.length === 0 ? (
+                      <div className="flex items-center justify-center py-6 text-xs text-text-muted gap-2 border border-dashed border-border rounded-xl">
+                        <Loader2 size={14} className="animate-spin text-primary" />
+                        <span>Extracting topics from reference materials...</span>
+                      </div>
+                    ) : filteredAvailableTopics.length === 0 ? (
+                      <div className="text-center py-6 text-xs text-text-muted border border-dashed border-border rounded-xl space-y-1">
+                        <p>{topicPlanSearch ? 'No topics match your search.' : 'No topics available yet.'}</p>
+                        <button
+                          type="button"
+                          onClick={() => fetchScheduleTopics(scheduleReferenceIds)}
+                          className="text-primary hover:underline font-semibold"
+                        >
+                          Click to extract topics
+                        </button>
+                      </div>
+                    ) : (
+                      filteredAvailableTopics.map((item, idx) => {
+                        const planEntry = scheduleTopicPlan.find(
+                          p => p.topic.trim().toLowerCase() === item.topic.trim().toLowerCase()
+                        );
+                        const isAnyWeekActive = planEntry && Object.values(planEntry.weeks).some(v => (v || 0) > 0);
+
+                        return (
+                          <div
+                            key={idx}
+                            className={`p-2.5 rounded-xl border transition-all space-y-2 ${
+                              isAnyWeekActive
+                                ? 'bg-primary/[0.04] border-primary/30 shadow-xs'
+                                : 'bg-surface/60 border-border/70 hover:border-border'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                {isAnyWeekActive ? (
+                                  <CheckCircle2 size={13} className="text-primary shrink-0" />
+                                ) : (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-border shrink-0 ml-1 mr-0.5" />
+                                )}
+                                <span className="text-xs font-semibold text-text truncate">
+                                  {item.topic}
+                                </span>
+                                {item.source_file && (
+                                  <span
+                                    className="text-[10px] text-text-muted bg-surface/80 px-1.5 py-0.5 rounded border border-border/50 shrink-0 truncate max-w-[130px]"
+                                    title={`Source: ${item.source_file}`}
+                                  >
+                                    {item.source_file}
+                                  </span>
+                                )}
+                              </div>
+                              {isAnyWeekActive && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setScheduleTopicPlan(prev =>
+                                      prev.filter(p => p.topic.trim().toLowerCase() !== item.topic.trim().toLowerCase())
+                                    );
+                                  }}
+                                  className="text-text-muted hover:text-red-400 p-0.5 rounded transition-colors"
+                                  title="Remove from plan"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Subtopics / Vocabulary Badges */}
+                            {item.items && item.items.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {item.items.slice(0, 4).map((it, iIdx) => (
+                                  <span
+                                    key={iIdx}
+                                    className="text-[10px] bg-bg border border-border/60 text-text-subtle px-1.5 py-0.5 rounded"
+                                  >
+                                    {it}
+                                  </span>
+                                ))}
+                                {item.items.length > 4 && (
+                                  <span className="text-[10px] text-text-muted self-center">
+                                    +{item.items.length - 4}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Week Selection Toggle Buttons */}
+                            <div className="grid grid-cols-4 gap-1.5 pt-1 border-t border-border/40">
+                              {(['1', '2', '3', '4'] as const).map(w => {
+                                const currentCount = planEntry?.weeks?.[w] || 0;
+                                const isActive = currentCount > 0;
+
+                                return (
+                                  <div key={w} className="flex flex-col items-center gap-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleTopicWeek(item.topic, item.items || [], w)}
+                                      className={`w-full py-1 px-1 rounded-lg text-[11px] font-bold border transition-all text-center select-none ${
+                                        isActive
+                                          ? 'bg-primary text-white border-primary shadow-xs'
+                                          : 'bg-surface border-border/80 text-text-subtle hover:border-primary/40 hover:text-text'
+                                      }`}
+                                    >
+                                      Week {w}
+                                    </button>
+
+                                    {isActive && (
+                                      <div className="flex items-center gap-1 w-full justify-center">
+                                        <input
+                                          type="number"
+                                          min="1"
+                                          max="30"
+                                          value={currentCount}
+                                          onChange={e => {
+                                            const val = Math.max(0, parseInt(e.target.value) || 0);
+                                            setTopicWeekCount(item.topic, item.items || [], w, val);
+                                          }}
+                                          className="w-12 text-center text-[10px] font-semibold bg-bg border border-primary/40 rounded px-1 py-0.5 text-primary outline-none focus:ring-1 focus:ring-primary"
+                                          title={`Number of items for Week ${w}`}
+                                        />
+                                        <span className="text-[9px] text-text-muted">qty</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
                 {/* Material Types */}
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-text-subtle uppercase">Material Types</label>
@@ -1583,6 +2235,16 @@ export function CefrSection() {
                             <p className="text-[11px] text-text-muted">
                               Uses all uploaded reference files
                             </p>
+                          )}
+                          {/* 4-Week Topic Plan Indicator */}
+                          {sch.topic_plan && sch.topic_plan.length > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap pt-0.5 text-xs text-text-subtle">
+                              <Layers size={12} className="text-primary" />
+                              <span className="font-semibold text-[11px]">Topic Plan:</span>
+                              <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold border border-primary/20">
+                                {sch.topic_plan.length} topic{sch.topic_plan.length > 1 ? 's' : ''} (4-week cycle)
+                              </span>
+                            </div>
                           )}
                         </div>
 

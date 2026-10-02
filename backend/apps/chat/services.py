@@ -223,6 +223,25 @@ def get_tati_system_prompt(
         voice_clause = (
             "\n     c) MODO DE VOZ ATIVO: O aluno está falando por áudio gravado. Diga a correção logo na primeira frase falada, para que ele escute a estrutura correta antes de você dar sequência ao diálogo!"
         )
+    # Contexto de horário de Brasília / local do usuário para saudações precisas
+    time_instruction = ""
+    try:
+        from zoneinfo import ZoneInfo
+        from datetime import datetime
+        tz_name = "America/Sao_Paulo"
+        if user and hasattr(user, "profile") and isinstance(user.profile, dict):
+            tz_name = user.profile.get("timezone") or tz_name
+        tz = ZoneInfo(tz_name)
+        now_local = datetime.now(tz)
+        hour = now_local.hour
+        period = "morning" if 5 <= hour < 12 else ("afternoon" if 12 <= hour < 18 else "evening")
+        time_instruction = (
+            f"\n   - HORÁRIO LOCAL ATUAL (BRASÍLIA): {now_local.strftime('%I:%M %p')} ({period}). "
+            f"Se você for usar cumprimentos temporais, use obrigatoriamente 'Good {period}' (NUNCA diga 'Good morning' à tarde ou à noite)."
+        )
+    except Exception:
+        time_instruction = ""
+
     correction_guidelines = (
         "4. CORREÇÃO PEDAGÓGICA ATIVA, GENTIL E OBRIGATÓRIA (PRIORIDADE MÁXIMA):\n"
         "   - Como Teacher Tati, sua missão indispensável é ensinar o aluno e ajudá-lo a aprender com os erros. NUNCA deixe passar batido um erro de gramática, vocabulário, tempo verbal, preposição, conjugação ou estrutura!\n"
@@ -230,6 +249,7 @@ def get_tati_system_prompt(
         "     a) Aponte o erro com gentileza e carinho logo na primeira frase ou ao final, de forma sutil (ex: \"Quick tip: instead of 'I have 25 years', remember we say 'I am 25 years old'!\").\n"
         "     b) Em seguida, responda naturalmente ao assunto que ele falou e termine com a sua pergunta única para manter a conversa fluindo."
         + voice_clause
+        + time_instruction
         + "\n     c) Se o aluno usar palavras em português (como 'oi', 'tchau', 'obrigado', 'de nada', 'por favor', 'porque', 'como', 'coriza', 'dor de cabeça', 'remédio', 'azia') ou perguntar como se diz algo: ensine o termo correto em inglês com carinho logo no início (ex: \"In English, 'coriza' is called a 'runny nose'!\") e utilize o vocabulário novo na resposta para ele praticar."
     )
 
@@ -586,15 +606,66 @@ class AIService:
             user_accent = user_pref or "en-US"
         user_accent = user_accent or "en-US"
 
-        sys_prompt = get_tati_system_prompt(
-            user,
-            difficulty,
-            memory_summary=memory_summary,
-            accent=user_accent,
-            origin=origin or "chat",
-            student_message=clean_user_text,
-        )
+        # Verifica se esta conversa é uma simulação de cenário (Activities / Simulations / Voice)
+        is_simulation = False
+        sim_scenario = None
+        try:
+            from .models import SimulationScenario
+            conv = Conversation.objects.filter(id=conversation_id).first()
+            if conv and (conv.is_simulation or conv.simulation_id):
+                is_simulation = True
+                if conv.simulation_id:
+                    sim_scenario = SimulationScenario.objects.filter(id=conv.simulation_id).first()
+            elif str(conversation_id).startswith("sim_"):
+                is_simulation = True
+                sim_scenario = SimulationScenario.objects.filter(id=str(conversation_id).replace("sim_", "")).first()
+        except Exception as sim_check_err:
+            logger.debug(f"[Simulation Check] {sim_check_err}")
 
+        # Contexto de horário de Brasília / local
+        period = "morning"
+        time_instruction = ""
+        try:
+            from zoneinfo import ZoneInfo
+            from datetime import datetime
+            user_tz = "America/Sao_Paulo"
+            if user and hasattr(user, "profile") and isinstance(user.profile, dict):
+                user_tz = user.profile.get("timezone") or user_tz
+            tz = ZoneInfo(user_tz)
+            now_local = datetime.now(tz)
+            hour = now_local.hour
+            period = "morning" if 5 <= hour < 12 else ("afternoon" if 12 <= hour < 18 else "evening")
+            time_instruction = (
+                f"- CURRENT LOCAL TIME IN BRASÍLIA / BRAZIL: {now_local.strftime('%I:%M %p')} ({period}). "
+                f"If you use a time-based greeting, you MUST say 'Good {period}' (NEVER say 'Good morning' in the afternoon or evening!).\n"
+            )
+        except Exception:
+            pass
+
+        if is_simulation and sim_scenario:
+            student_level = difficulty or getattr(user, "level", None) or sim_scenario.difficulty or "A2"
+            from apps.chat.simulation_api import _get_level_prompt_rules
+            level_rules = _get_level_prompt_rules(student_level)
+            scenario_prompt = sim_scenario.system_prompt or f"You are roleplaying in the scenario: {sim_scenario.name}."
+            sys_prompt = (
+                f"{scenario_prompt}\n\n"
+                f"{level_rules}\n\n"
+                f"{time_instruction}\n"
+                "CRITICAL INSTRUCTIONS:\n"
+                "- Respond ENTIRELY in natural English, staying strictly in character for this scenario.\n"
+                "- Keep answers engaging and concise (2 to 3 sentences, under 65 words).\n"
+                "- ALWAYS complete every sentence you start. NEVER leave a sentence unfinished or cut off mid-thought.\n"
+                "- Advance the scenario naturally and end with ONE clear question to pass the turn to the student."
+            )
+        else:
+            sys_prompt = get_tati_system_prompt(
+                user,
+                difficulty,
+                memory_summary=memory_summary,
+                accent=user_accent,
+                origin=origin or "chat",
+                student_message=clean_user_text,
+            )
 
         messages_payload = [{"role": "system", "content": sys_prompt}]
 
@@ -755,8 +826,13 @@ class AIService:
                     on_token(word + " ")
                     time.sleep(0.02)
 
-        # 6. Garante remoção total de emojis no texto final
+        # 6. Garante remoção total de emojis no texto final e correção de saudação temporal
         reply_text = strip_emojis(reply_text)
+        try:
+            from apps.chat.simulation_api import _fix_time_greeting
+            reply_text = _fix_time_greeting(reply_text, period)
+        except Exception:
+            pass
 
         # 7. Anexa a tag de documento para persistência perene no histórico do banco
         if generated_doc:
@@ -776,20 +852,29 @@ class AIService:
             doc_meta_json = json.dumps(doc_dict)
             reply_text = f"{reply_text}\n\n[ATTACHED_DOCUMENT:{doc_meta_json}]"
 
-        # 8. Gera áudio via Edge TTS (com texto limpo de emojis e com o sotaque selecionado)
-        from .audio_service import AudioService
-
-        clean_tts_reply = re.sub(r"\[ATTACHED_DOCUMENT:.*?\]", "", reply_text, flags=re.DOTALL).strip()
-        audio_b64 = AudioService.text_to_speech(clean_tts_reply, accent=user_accent)
-
-        # 9. Salva resposta da Teacher Tati no banco de dados
+        # 8. Salva resposta textual da Teacher Tati no banco de dados antes do TTS (garante persistência mesmo com desconexão)
         msg = Message.objects.create(
             session_id=conversation_id,
             username=user.username,
             role="assistant",
             content=reply_text,
-            audio_b64=audio_b64,
+            audio_b64=None,
         )
+
+        # 9. Gera áudio via Edge TTS de forma resiliente
+        from .audio_service import AudioService
+
+        clean_tts_reply = re.sub(r"\[ATTACHED_DOCUMENT:.*?\]", "", reply_text, flags=re.DOTALL).strip()
+        audio_b64 = None
+        try:
+            audio_b64 = AudioService.text_to_speech(clean_tts_reply, accent=user_accent)
+        except Exception as tts_err:
+            logger.warning(f"[Chat] Falha no TTS (mensagem textual salva com sucesso): {tts_err}")
+
+        # Atualiza áudio no banco se gerado com sucesso
+        if audio_b64:
+            msg.audio_b64 = audio_b64
+            msg.save(update_fields=["audio_b64"])
 
         # 10. Atualiza XP e Streak (30 XP para modo voz, 15 XP para chat)
         if origin == "voice":
@@ -812,3 +897,91 @@ class AIService:
             "document": generated_doc,
             "pdf_b64": generated_doc.get("pdf_b64", "") if generated_doc else "",
         }
+
+    @classmethod
+    def generate_conversation_title(cls, conversation_id: str, user_text: str) -> Optional[str]:
+        """
+        Gera dinamicamente um título curto e contextual (4 a 8 palavras em inglês pedagógico)
+        após a primeira mensagem do usuário, atualizando o banco de dados se o título atual
+        for um placeholder ('Nova Conversa com a Teacher Tati', 'Voice Conversation', etc.)
+        ou truncamento inicial. Preserva títulos de simulações, nivelamento e títulos customizados.
+        """
+        try:
+            conv = Conversation.objects.filter(id=conversation_id).only("id", "title", "is_simulation").first()
+            if not conv or conv.is_simulation:
+                return None
+
+            current_title = (conv.title or "").strip()
+            # Nunca alterar nivelamentos, simulações ou títulos já customizados
+            if current_title.startswith("CEFR Leveling") or current_title.startswith("Simulation:"):
+                return None
+
+            placeholder_titles = {
+                "",
+                "Nova Conversa com a Teacher Tati",
+                "Conversa com a Teacher Tati",
+                "Voice Conversation",
+                "Vocal Message...",
+                "Taty's Hub",
+            }
+
+            is_placeholder = (
+                current_title in placeholder_titles
+                or (current_title.endswith("...") and len(current_title) <= 25)
+            )
+            if not is_placeholder:
+                return None
+
+            generated_title = None
+            keys = get_groq_keys()
+
+            if keys and user_text and len(user_text.strip()) > 3:
+                prompt = (
+                    "You are Teacher Tatiana Duarte's pedagogical assistant. "
+                    "Generate a natural, encouraging conversation title (4 to 8 words, educational English, "
+                    "no quotes, no emojis, no trailing punctuation) summarizing the topic of this student message:\n\n"
+                    f"Student message: {user_text[:250]}\n\n"
+                    "Title:"
+                )
+                groq_model = getattr(settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"))
+                for key in keys:
+                    try:
+                        client = Groq(api_key=key, timeout=8.0)
+                        completion = client.chat.completions.create(
+                            model=groq_model,
+                            messages=[{"role": "user", "content": prompt}],
+                            max_tokens=25,
+                            temperature=0.3,
+                        )
+                        cand = (completion.choices[0].message.content or "").strip()
+                        cand = re.sub(r'["\'`\.\?!]', '', cand).strip()
+                        words = cand.split()
+                        if 3 <= len(words) <= 10:
+                            generated_title = " ".join(words)
+                            break
+                    except Exception as g_err:
+                        logger.warning(f"[Chat Title] Falha na chamada do Groq: {g_err}")
+
+            # Fallback inteligente com as primeiras palavras significativas da mensagem
+            if not generated_title:
+                clean_words = [w for w in re.findall(r"[A-Za-z0-9']+", user_text) if len(w) > 1]
+                if clean_words:
+                    stopwords = {"hi", "hello", "hey", "the", "a", "an", "is", "am", "are", "i", "my", "me", "to", "for", "in", "on"}
+                    meaningful = [w for w in clean_words if w.lower() not in stopwords]
+                    chosen = meaningful[:6] if len(meaningful) >= 3 else clean_words[:6]
+                    raw_phrase = " ".join(chosen).capitalize()
+                    if len(raw_phrase.split()) >= 2:
+                        generated_title = f"Practicing: {raw_phrase}"
+                    else:
+                        generated_title = f"Conversation about {raw_phrase}"
+                else:
+                    generated_title = "English Practice with Teacher Tati"
+
+            if generated_title:
+                Conversation.objects.filter(id=conversation_id).update(title=generated_title)
+                logger.info(f"[Chat Title] Título gerado com sucesso para conversa {conversation_id}: '{generated_title}'")
+                return generated_title
+        except Exception as err:
+            logger.error(f"[Chat Title] Erro ao gerar título de conversa: {err}", exc_info=True)
+        return None
+

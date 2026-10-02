@@ -299,6 +299,26 @@ export function useChatSocket(conversationId: string | null) {
           } catch (_) {}
         }
         break;
+      case 'new_title':
+        if (msg.title) {
+          const targetConvId = msg.conversation_id || currentId;
+          if (targetConvId) {
+            queryClient.setQueryData(['conversations'], (old: any) => {
+              if (!old || !old.pages) return old;
+              const newPages = old.pages.map((page: any[]) =>
+                page.map((c) => (c.id === targetConvId ? { ...c, title: msg.title } : c))
+              );
+              return { ...old, pages: newPages };
+            });
+            queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            try {
+              window.dispatchEvent(new CustomEvent('tati_chat_title_updated', {
+                detail: { conversation_id: targetConvId, title: msg.title }
+              }));
+            } catch (_) {}
+          }
+        }
+        break;
       case 'error':
         setIsStreaming(false);
         setMessages((prev) => prev.filter(m => m.id !== 'user-audio-temp'));
@@ -330,6 +350,30 @@ export function useChatSocket(conversationId: string | null) {
     };
   }, [socket, handleMessage]);
 
+  const ensureConversation = useCallback(async () => {
+    if (convIdRef.current) return convIdRef.current;
+    try {
+      const res = await apiPost<any>('/chat/conversations', {
+        title: 'Nova Conversa com a Teacher Tati',
+      });
+      if (res.ok && res.data?.id) {
+        const newId = res.data.id;
+        convIdRef.current = newId;
+        if (typeof window !== 'undefined') {
+          const url = new URL(window.location.href);
+          url.searchParams.set('conv_id', newId);
+          window.history.replaceState({}, '', url.toString());
+          window.dispatchEvent(new CustomEvent('tati_conversation_created', { detail: { conversation_id: newId } }));
+        }
+        queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        return newId;
+      }
+    } catch (err) {
+      console.error('Error ensuring conversation:', err);
+    }
+    return null;
+  }, [queryClient]);
+
   const sendMessage = useCallback(async (text: string, overrideConvId?: string) => {
     if (!socket) return;
     
@@ -341,7 +385,10 @@ export function useChatSocket(conversationId: string | null) {
       return;
     }
 
-    const currentId = overrideConvId ?? convIdRef.current;
+    let currentId = overrideConvId ?? convIdRef.current;
+    if (!currentId) {
+      currentId = await ensureConversation();
+    }
     if (overrideConvId) {
       convIdRef.current = overrideConvId;
     }
@@ -387,7 +434,10 @@ export function useChatSocket(conversationId: string | null) {
       return;
     }
 
-    const currentId = overrideConvId ?? convIdRef.current;
+    let currentId = overrideConvId ?? convIdRef.current;
+    if (!currentId) {
+      currentId = await ensureConversation();
+    }
     if (overrideConvId) {
       convIdRef.current = overrideConvId;
     }
@@ -491,6 +541,7 @@ export function useChatSocket(conversationId: string | null) {
     messages,
     setMessages,
     isStreaming,
+    setIsStreaming,
     streamingContent,
     isConnected,
     sendMessage,

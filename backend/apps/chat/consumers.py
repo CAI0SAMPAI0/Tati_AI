@@ -7,10 +7,13 @@ from django.db import close_old_connections
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from apps.authentication.security import decode_token
 from apps.chat.services import AIService
-from apps.chat.models import Conversation
+from apps.chat.models import Conversation, Message
 from shared.async_db import aget_user_by_username
 
 logger = logging.getLogger(__name__)
+
+# Conjunto global para proteger tarefas de geração em background mesmo se o socket desconectar
+_BACKGROUND_GENERATION_TASKS: set[asyncio.Task] = set()
 
 
 class ChatConsumer(AsyncJsonWebsocketConsumer):
@@ -66,12 +69,8 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             f"[ChatWS] Desconectado: {getattr(self, 'username', 'anon')} (Code: {close_code})"
         )
 
-        if hasattr(self, "_active_tasks") and self._active_tasks:
-            for task in self._active_tasks:
-                task.cancel()
-            await asyncio.gather(*self._active_tasks, return_exceptions=True)
-            self._active_tasks.clear()
-
+        # Não cancela tarefas ativas em andamento para garantir que a geração e persistência no banco
+        # continuem até o fim (satisfaz requisito 12.2.1). send_json já se torna no-op via self._disconnected.
         try:
             await sync_to_async(close_old_connections)()
         except Exception:
@@ -199,7 +198,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             token_queue = asyncio.Queue()
 
             def queue_event(event):
-                if self._disconnected or loop.is_closed():
+                if loop.is_closed():
                     return
                 try:
                     loop.call_soon_threadsafe(token_queue.put_nowait, event)
@@ -236,7 +235,28 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
 
             worker_task = asyncio.create_task(asyncio.to_thread(run_generation))
             self._active_tasks.add(worker_task)
+            _BACKGROUND_GENERATION_TASKS.add(worker_task)
             worker_task.add_done_callback(self._active_tasks.discard)
+            worker_task.add_done_callback(_BACKGROUND_GENERATION_TASKS.discard)
+
+            # Geração de título contextual em background (não bloqueia stream/TTS)
+            async def generate_title_async():
+                try:
+                    generated_title = await sync_to_async(AIService.generate_conversation_title)(conv_id, text_content)
+                    if generated_title and not getattr(self, "_disconnected", False):
+                        await self.send_json(
+                            {
+                                "type": "new_title",
+                                "title": generated_title,
+                                "conversation_id": conv_id,
+                            }
+                        )
+                except Exception as t_err:
+                    logger.debug(f"[ChatWS] Erro ao gerar título em background: {t_err}")
+
+            title_task = asyncio.create_task(generate_title_async())
+            self._active_tasks.add(title_task)
+            title_task.add_done_callback(self._active_tasks.discard)
 
             res = None
 
@@ -288,12 +308,19 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             # 1. Finaliza o stream de texto imediatamente para remover as reticências e comitar a resposta na tela sem atraso
             await self.send_json({"type": "stream_end", "model": model_used})
 
-            # 2. Se não tiver áudio gerado, gera áudio via Edge TTS de forma assíncrona
-            if not audio_b64:
+            # 2. Se não tiver áudio gerado e a origem for voz ou se solicitado, gera áudio via Edge TTS
+            if not audio_b64 and origin == "voice":
                 clean_reply_text = re.sub(r"\[ATTACHED_DOCUMENT:.*?\]", "", reply_text, flags=re.DOTALL).strip()
                 audio_b64 = await AudioService.text_to_speech_async(
                     clean_reply_text, accent=accent
                 )
+                if audio_b64:
+                    def _update_audio():
+                        msg_to_update = Message.objects.filter(session_id=conv_id, role="assistant").order_by("-created_at").first()
+                        if msg_to_update and not msg_to_update.audio_b64:
+                            msg_to_update.audio_b64 = audio_b64
+                            msg_to_update.save(update_fields=["audio_b64"])
+                    await sync_to_async(_update_audio)()
 
             # 3. Envia o áudio para a mensagem recém-criada
             if audio_b64:

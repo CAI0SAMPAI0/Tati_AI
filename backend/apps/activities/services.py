@@ -1802,16 +1802,20 @@ class HubService:
         can_access_all = False
         purchased_ids = set()
 
-        if user and isinstance(user, User):
-            admin_usernames = getattr(settings, "ADMIN_USERNAMES", ["programador", "admin", "professor", "professora"])
-            if user.role in (
-                "programador",
-                "professor",
-                "admin",
-                "Admin",
-            ) or user.username in admin_usernames:
-                can_access_all = True
+        is_student = False
+        admin_usernames = getattr(
+            settings,
+            "ADMIN_USERNAMES",
+            ["programador", "admin", "professor", "professora"],
+        )
 
+        if user and isinstance(user, User):
+            role = str(getattr(user, "role", "") or "").lower()
+            if role in ("student", "aluno"):
+                is_student = True
+            elif role in ("programador", "professor", "admin") or user.username in admin_usernames:
+                can_access_all = True
+                is_student = True
             else:
                 try:
                     from apps.payments.models import PremiumPurchase, Order
@@ -1857,12 +1861,23 @@ class HubService:
             elif not thumb and m.is_secure:
                 thumb = f"{base_url}/activities/hub/{m.id}/pages/0"
 
+            p_student = float(
+                m.price_students if m.price_students is not None else (m.price or 0.0)
+            )
+            p_buyer = float(
+                m.price_buyers if m.price_buyers is not None else (m.price or 0.0)
+            )
+            # Para não aluno / visitante, o preço padrão é price_buyers (R$ 9,99 para Verb Tenses)
+            effective_price = p_student if is_student else p_buyer
+
             results.append(
                 HubMaterialOut(
                     id=str(m.id),
                     title=m.title,
                     description=m.description or "",
-                    price=float(m.price or 0.0),
+                    price=effective_price,
+                    price_students=p_student,
+                    price_buyers=p_buyer,
                     type=m.type or "book",
                     thumbnail_url=thumb or None,
                     emoji=m.emoji or "📚",
@@ -1871,13 +1886,14 @@ class HubService:
                     is_secure=m.is_secure,
                     has_access=can_access_all
                     or (str(m.id) in purchased_ids)
-                    or float(m.price or 0.0) == 0.0,
+                    or float(effective_price) == 0.0,
                 )
             )
         return results
 
     @staticmethod
     def get_content_access(user: Optional[User], content_id: str) -> dict:
+        content_id = str(content_id)
         item = PremiumContent.objects.filter(id=content_id).first()
         if not item:
             raise HttpError(404, "Material não encontrado.")

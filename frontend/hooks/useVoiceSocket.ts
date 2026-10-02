@@ -31,7 +31,7 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
     try {
       const { apiPost } = await import('@/lib/api/client');
       const res = await apiPost<any>('/chat/conversations', {
-        title: 'Voice Conversation',
+        title: 'Nova Conversa com a Teacher Tati',
         is_simulation: !!simulationId,
         simulation_id: simulationId || undefined,
       });
@@ -56,6 +56,61 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
   }, [simulationId]);
 
 
+  const voicePollTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const stopVoicePolling = useCallback(() => {
+    if (voicePollTimerRef.current) {
+      clearInterval(voicePollTimerRef.current);
+      voicePollTimerRef.current = null;
+    }
+  }, []);
+
+  const checkAndPollPendingVoice = useCallback((history: Message[]) => {
+    stopVoicePolling();
+    const convId = convIdRef.current;
+    if (!convId || !history || history.length === 0) return;
+
+    const lastMsg = history[history.length - 1];
+    if (lastMsg.role === 'user') {
+      setState('processing');
+      let attempts = 0;
+      const maxAttempts = 18;
+
+      voicePollTimerRef.current = setInterval(async () => {
+        attempts++;
+        try {
+          const fresh = await apiGet<Message[]>(ENDPOINTS.CONVERSATION_MESSAGES(convId));
+          if (fresh && fresh.length > 0) {
+            const freshLast = fresh[fresh.length - 1];
+            if (freshLast.role === 'assistant') {
+              setMessages(fresh);
+              setState('idle');
+              if (freshLast.audio_b64) {
+                setLastAudio(freshLast.audio_b64);
+              }
+              stopVoicePolling();
+              import('@/lib/db/indexedDB').then(({ saveMessagesLocal }) => {
+                saveMessagesLocal(convId, fresh);
+              });
+              return;
+            }
+          }
+        } catch (_) {}
+
+        if (attempts >= maxAttempts) {
+          stopVoicePolling();
+          setState('idle');
+        }
+      }, 1500);
+    }
+  }, [stopVoicePolling]);
+
+  useEffect(() => {
+    return () => {
+      stopVoicePolling();
+    };
+  }, [stopVoicePolling]);
+
   // Carregar histórico inicial se houver convId
   useEffect(() => {
     setCompletedObjectives([]);
@@ -68,6 +123,7 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
         getMessagesLocal(conversationId).then((cachedMsgs) => {
           if (cachedMsgs.length > 0) {
             setMessages(cachedMsgs);
+            checkAndPollPendingVoice(cachedMsgs);
           }
         });
       }).catch(err => console.error('IndexedDB load error in voice hook:', err));
@@ -78,27 +134,47 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
           // Só atualiza se houver histórico real para não sobrescrever a mensagem inicial das simulações
           if (history && history.length > 0) {
             setMessages(history);
+            checkAndPollPendingVoice(history);
             
             // Salva no cache local
             import('@/lib/db/indexedDB').then(({ saveMessagesLocal }) => {
               saveMessagesLocal(conversationId, history);
             }).catch(err => console.error('IndexedDB save error in voice hook:', err));
-
-            // Se a última mensagem for da IA e tiver áudio, toca ela (saudação inicial de simulação)
-            const lastMsg = history[history.length - 1];
-            if (lastMsg && lastMsg.role === 'assistant' && lastMsg.audio_b64) {
-              setLastAudio(lastMsg.audio_b64);
-              setState('speaking');
-            }
           }
         })
         .catch(err => console.error('Error fetching voice history:', err));
     } else {
+      stopVoicePolling();
       setMessages([]);
       setActiveConvId(null);
       convIdRef.current = null;
     }
-  }, [conversationId]);
+  }, [conversationId, checkAndPollPendingVoice, stopVoicePolling]);
+
+  // Revalidação em segundo plano ao retornar para a aba (Visibility / Focus)
+  useEffect(() => {
+    const handleRevalidate = () => {
+      if (document.visibilityState === 'visible' && convIdRef.current) {
+        apiGet<Message[]>(ENDPOINTS.CONVERSATION_MESSAGES(convIdRef.current))
+          .then((history) => {
+            if (history && history.length > 0) {
+              setMessages(history);
+              checkAndPollPendingVoice(history);
+              import('@/lib/db/indexedDB').then(({ saveMessagesLocal }) => {
+                if (convIdRef.current) saveMessagesLocal(convIdRef.current, history);
+              });
+            }
+          })
+          .catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', handleRevalidate);
+    window.addEventListener('focus', handleRevalidate);
+    return () => {
+      document.removeEventListener('visibilitychange', handleRevalidate);
+      window.removeEventListener('focus', handleRevalidate);
+    };
+  }, [checkAndPollPendingVoice]);
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSaveRef = useRef<{ conversationId: string; messages: Message[] } | null>(null);
@@ -216,6 +292,17 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
       case 'simulation_state':
         if (msg.completed_objectives) {
           setCompletedObjectives(msg.completed_objectives);
+        }
+        break;
+
+      case 'new_title':
+        if (msg.title) {
+          const targetConvId = msg.conversation_id || currentId;
+          try {
+            window.dispatchEvent(new CustomEvent('tati_chat_title_updated', {
+              detail: { conversation_id: targetConvId, title: msg.title }
+            }));
+          } catch (_) {}
         }
         break;
 

@@ -247,6 +247,7 @@ class CEFRSchedule(models.Model):
         models.CharField(max_length=50), default=list, blank=True, null=True
     )
     reference_ids = models.JSONField(default=list, blank=True, null=True)
+    topic_plan = models.JSONField(default=list, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
 

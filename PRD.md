@@ -113,3 +113,125 @@ Todas as 7 sprints de modernização e estabilização foram concluídas com suc
 - [X] **11.3** Substituir o avatar facial pela logo da marca no cabeçalho da barra lateral de atividades ([`frontend/components/activities/sidebar-activities.tsx`](file:///C:/Users/caio/Projetos/Tati_AI/frontend/components/activities/sidebar-activities.tsx)).
 - [X] **11.4** Criar arquivo dedicado [`VARIAVEIS_ENV.md`](file:///C:/Users/caio/Projetos/Tati_AI/VARIAVEIS_ENV.md) na raiz do projeto contendo exclusivamente todas as variáveis de ambiente necessárias para o Backend e Frontend devidamente categorizadas.
 - [X] **11.5** Validação completa de tipos TypeScript (`npm run typecheck`) com 0 erros.
+
+### Sprint 12: Títulos, CEFR, Imagens, Voz e Validação
+
+- [X] **12.1** Títulos Dinâmicos de Conversa:
+  - [X] **12.1.1** Frontend: Criação de voz/chat com placeholder inicial estável ("Nova Conversa com a Teacher Tati"), eliminando "Voice Conversation" e "Vocal Message...".
+  - [X] **12.1.2** Backend: Geração de título contextual em background após a primeira mensagem (LLM 4–8 palavras em inglês pedagógico sem aspas, com fallback para primeiras palavras significativas). Preservar títulos customizados/CEFR/Simulation.
+  - [X] **12.1.3** Backend: Emissão do evento WebSocket `{ type: "new_title", title, conversation_id }`.
+  - [X] **12.1.4** Frontend: Captura do evento `new_title` em `useChatSocket`, `useVoiceSocket` e atualização reativa do estado e do cache React Query da lista de conversas (`conversation-list`).
+
+- [X] **12.2** Persistência de Mensagens vs Reprodução de Áudio (Chat/Voice):
+  - [X] **12.2.1** Backend: Em `ChatConsumer.disconnect`, não cancelar a task de geração em andamento; marcar `_disconnected = True` e suprimir envios no socket fechado.
+  - [X] **12.2.2** Backend: Em `generate_reply`, persistir a mensagem textual do assistente no banco antes do TTS; atualizar `audio_b64` após o TTS (mesmo se o cliente desconectar, o texto fica salvo).
+  - [X] **12.2.3** Frontend Voz (`useVoiceSocket`): Prevenir autoplay do último áudio ao carregar histórico; tocar apenas áudio de `audio_response` recebido na sessão atual (página visível / socket conectado nesta visita).
+  - [X] **12.2.4** Frontend Chat Textual: Não iniciar reprodução de áudio automaticamente ao carregar ou alternar conversas.
+
+- [X] **12.3** CEFR Materials — Seleção Humana & Plano Semanal (`topic_plan`):
+  - [X] **12.3.1** Backend Model & Migration: Adicionar campo JSON `topic_plan` em `CEFRSchedule` (`backend/apps/activities/models.py`) com migration `RunSQL ALTER TABLE cefr_schedules ADD COLUMN IF NOT EXISTS topic_plan jsonb DEFAULT '[]'`. Schema do plano: `[{ "topic": "Work, Jobs and Occupations", "items": ["teacher"], "weeks": { "1": 5, "2": 0, "3": 3, "4": 2 } }]`. Ciclo de 4 semanas: `week = ((hoje - cycle_start).days // 7) % 4 + 1`, usando `created_at` do schedule como `cycle_start`.
+  - [X] **12.3.2** Backend Schema: Estender `CEFRScheduleSchema` em `backend/apps/activities/api.py` para suportar `topic_plan`.
+  - [X] **12.3.3** Backend Generator: Em `run_single_schedule`, se `topic_plan` não estiver vazio, proibir `random.choice`; gerar só tópicos com `weeks[semana_atual] > 0`, respeitando `count`, passando `topic + items` como contexto compartilhado. Sem plano: fallback legado mantido e documentado.
+  - [X] **12.3.4** Backend Generator: Aceitar `topic_context: { topic, items, communicative_goal }` em `generate_flashcards` e interpolar no prompt (não apenas string livre).
+  - [X] **12.3.5** Frontend (`cefr-section.tsx`): No modal de agendamento CEFR, permitir selecionar múltiplos tópicos extraídos e configurar a distribuição de cards nas 4 semanas (`topic_plan`). Na geração manual, manter seletor e enviar objeto de tópico contextual.
+  - [X] **12.3.6** Segurança: Aplicar `require_teacher` nas rotas `/cefr/admin/*` mutáveis (upload, generate, schedules, run-now) e autenticação no GET de extração.
+
+- [X] **12.4** Pipeline Inteligente de Imagens:
+  - [X] **12.4.1** Backend (`image_service.py`): Montar query composta com tópico + intenção + 2–4 palavras-chave dos items (não apenas frases meta-ação como "Ask about...").
+  - [X] **12.4.2** Backend: Buscar 5–8 candidatos no Unsplash/Pexels (`per_page=5..8`).
+  - [X] **12.4.3** Backend: Rankear candidatos via similaridade de cosseno com `EmbeddingService` entre o contexto educacional e o texto/alt/descrição dos candidatos; descartar scores baixos e selecionar o melhor. Fallback para FLUX e por fim URL de estudo. Não alterar URLs já persistidos.
+
+- [X] **12.5** Validação Estrita de Flashcards & Retry:
+  - [X] **12.5.1** Backend (`generator.py`): Implementar função pura de validação de flashcards (exatamente 4 opções distintas, front presente exatamente 1x, sem fillers "Alternative N").
+  - [X] **12.5.2** Backend: Implementar retry LLM (1–2x com temperatura baixa) ao gerar flashcards inválidos; se persistir inválido, descartar o card com log em vez de inventar distratores falsos.
+  - [X] **12.5.3** Testes Automatizados: Criar testes unitários pytest para a validadora de flashcards.
+
+- [X] **12.6** Otimização de Prompts CEFR:
+  - [X] **12.6.1** Atualizar `backend/ai/prompts/cefr_activity_generator.md` com bloco de contexto `{topic_id}`, `{topic}`, `{items}`, `{communicative_goal}` compartilhado e instrução para `image_search_query` focar na cena do tópico (não meta-ações).
+
+- [X] **12.7** Validação Completa, Testes E2E & Limpeza:
+  - [X] **12.7.1** Criar teste E2E local com Playwright na raiz (`tests/e2e/tati-flow.spec.ts`) cobrindo login (credenciais via `E2E_USERNAME` / `E2E_PASSWORD`), dashboard, navegação no chat e lista de conversas.
+  - [X] **12.7.2** Tradução de comentários JSX de inglês para português nos arquivos de frontend modificados.
+  - [X] **12.7.3** Validação estática completa: `npx tsc --noEmit` (0 erros) no frontend e `python manage.py check` (0 erros) no backend.
+  - [X] **12.7.4** Atualizar checklist do `PRD.md` com todos os itens marcados `[X]` após validação aprovada.
+
+---
+
+### 🔍 Causas-raiz e Arquitetura da Sprint 12
+
+```mermaid
+flowchart LR
+  voiceStart["Voice ensureConversation"] -->|"title: Nova Conversa com a Teacher Tati"| apiCreate["POST /chat/conversations"]
+  chatStart["Chat handleSend"] -->|"title: Nova Conversa com a Teacher Tati"| apiCreate
+  apiCreate --> dbTitle["Conversation.title persistido"]
+  firstMsg["Primeira mensagem / STT"] --> generateReply["AIService.generate_reply"]
+  generateReply --> wsTokens["stream tokens"]
+  generateReply -->|"background task"| newTitle["WS type: new_title & DB update"]
+```
+
+#### Diretrizes e Regras de Escopo:
+- **Títulos de conversa**: Não apenas substituir a string estática, mas gerar dinamicamente o título por IA após a 1ª mensagem sem bloquear o stream.
+- **Persistência de IA**: Ao desconectar WebSocket, a task de geração do assistente continua e grava a resposta no banco; áudio do histórico não toca sozinho ao recarregar a página.
+- **CEFR Seleção Humana**: A IA não sorteia tópicos aleatoriamente no agendamento; o professor define o `topic_plan` com a quantidade de cards em cada uma das 4 semanas do ciclo.
+- **Imagens**: Query contextual rica e ranking semântico com embeddings para evitar imagens desconexas do tema.
+- **Flashcards**: Validação pura de 4 opções sem opções sintéticas ("Alternative N") com retry LLM.
+- **Segurança**: Proteger rotas `/cefr/admin/*` com `require_teacher`.
+- **Fora de escopo**: Não reescrever RAG, Dockerfile, avatares ou componentes fora do fluxo afetado. Sem `git commit` ou `git push` nesta sprint.
+
+---
+
+### Sprint 13: Correções Críticas de Backend e Infraestrutura
+
+- [X] **13.1** Dependências & Imports Opcionais (Google API Client):
+  - [X] **13.1.1** Declarar oficialmente `google-api-python-client` e `google-auth` em `backend/requirements.txt`.
+  - [X] **13.1.2** Isolar imports de Google Drive em `apps/activities/secure_document_service.py` para nunca quebrar a inicialização do módulo ou rotas de acesso (`/activities/hub/{content_id}/access`) caso a dependência ou credencial não estejam disponíveis.
+  - [X] **13.1.3** Validar que `GET /activities/hub/{content_id}/access` responde sem erro 500 mesmo em ambiente sem Google Drive configurado.
+- [X] **13.2** SecureDoc & Conversão Confiável com LibreOffice (Issue #7699442342):
+  - [X] **13.2.1** Substituir perfil fixo `-env:UserInstallation=file:///tmp/libreoffice_profile` por perfil temporário único por execução (`tempfile.mkdtemp(prefix="soffice_profile_")`), eliminando conflitos de concorrência e arquivos `.lock` residuais (causa real do exit code 1).
+  - [X] **13.2.2** Configurar formatação adequada de URI multiplataforma (Windows e Linux) e variáveis de ambiente `HOME` / `USERPROFILE`.
+  - [X] **13.2.3** Adicionar tratamento explícito de timeout, validação do PDF gerado e limpeza segura em bloco `finally`.
+- [X] **13.3** Arquitetura Resiliente do Supabase Storage:
+  - [X] **13.3.1** Eliminar erro `'dict' object has no attribute 'text'` decorrente do tratamento incorreto de exceções HTTP no cliente Supabase/storage3.
+  - [X] **13.3.2** Tratar adequadamente respostas HTTP 402 (Payment Required/Quota Exceeded) e 404/403 do Supabase Storage.
+  - [X] **13.3.3** Distinguir buckets privados (`hub-secure-pages`) de públicos (`hub-previews`), utilizando URLs autenticadas via `SUPABASE_SERVICE_ROLE_KEY` e proibindo fallbacks inseguros para URLs públicas em buckets privados.
+  - [X] **13.3.4** Garantir fallback transparente para cache local em `MEDIA_ROOT/hub_pages/{content_id}/` e auto-sincronização sob demanda via `sync_material_pages`.
+- [X] **13.4** Regras de Acesso e Preços do Hub no Backend:
+  - [X] **13.4.1** Corrigir `public_catalog` e `get_hub_materials` em `backend/apps/activities/api.py` para não forçar `User(role="student")` em requisições não autenticadas (`request.auth is None`).
+  - [X] **13.4.2** Atualizar `HubService.list_materials` para resolver o preço baseado no estado real do usuário: não alunos / não autenticados recebem `price_buyers` (R$ 9,99 para "Verb Tenses"); alunos matriculados recebem `price_students` (R$ 5,00).
+  - [X] **13.4.3** Estender `HubMaterialOut` para incluir explicitamente `price_students` e `price_buyers`.
+
+---
+
+### Sprint 14: Correções de Frontend, Mobile e Experiência
+
+- [X] **14.1** Resolução do `NotAllowedError` em `/pronunciation-reader` (Issue #7725069764):
+  - [X] **14.1.1** Eliminar instanciação desnecessária de `AudioContext` fora do gesto do usuário no callback assíncrono `onstop` (causa primária do `NotAllowedError` no Safari/iOS).
+  - [X] **14.1.2** Gerenciar ciclo de vida do microfone com cleanup seguro de tracks do `MediaStream` e prevenção de sessões simultâneas de gravação.
+  - [X] **14.1.3** Tratar adequadamente rejeições de permissão (`NotAllowedError`, `NotFoundError`) exibindo mensagens amigáveis e orientações de configuração no navegador/iOS.
+  - [X] **14.1.4** Preservar integração com `POST /speech/verify-pronunciation` com envio direto do áudio base64 codificado.
+- [X] **14.2** Preços e Consistência de Acesso no Frontend (Hub Site & Portal):
+  - [X] **14.2.1** Sincronizar catálogo do `apps/hub-site` com `price_buyers` e `price_students` retornados pela API, garantindo que "Verb Tenses" exiba R$ 9,99 para usuários visitantes.
+  - [X] **14.2.2** Validar responsividade e compatibilidade mobile para o fluxo de checkout e leitura segura de materiais.
+- [X] **14.3** Auditoria Frontend:
+  - [X] **14.3.1** Prevenir vazamento de recursos (MediaStreams, listeners de animação) no desmonte dos componentes.
+  - [X] **14.3.2** Validação de compilação TypeScript (`npx tsc --noEmit`) sem erros.
+
+---
+
+### Sprint 15: Integração, Testes e Estabilização Final
+
+- [X] **15.1** Extração e Distribuição de Tópicos (Topic Plan 4-Week Cycle):
+  - [X] **15.1.1** Backend: Extrair tópicos didáticos por arquivo de referência sem corte artificial de tokens, preservando metadados de origem (`source_file`, `reference_id`) e permitindo múltiplos tópicos por documento.
+  - [X] **15.1.2** Backend: No `run_single_schedule`, garantir que cada tópico atribuído à semana gere seus próprios flashcards (ex: 2 tópicos * 2 cards = 4 flashcards) e simulações contextuais.
+  - [X] **15.1.3** Backend: Manter validação estrita de flashcards (exatamente 4 opções, 1 correta, 3 incorretas, sem repetição ou fillers).
+  - [X] **15.1.4** Frontend (`cefr-section.tsx`): Disparar extração de tópicos automaticamente ao selecionar materiais de referência e exibir os tópicos disponíveis no seletor.
+  - [X] **15.1.5** Frontend: Permitir atribuição de tópicos para múltiplas semanas (Week 1 a 4) e múltiplos tópicos por semana sem perda no reload (persistência de rascunho em `localStorage`).
+- [X] **15.2** Testes Automatizados Unitários e de Integração:
+  - [X] **15.2.1** Testes de backend: validação de flashcards, resolução de preços do Hub para não alunos, endpoint de acesso seguro e extração de tópicos.
+- [X] **15.3** Validação E2E com Playwright:
+  - [X] **15.3.1** Bateria de testes E2E cobrindo login, catálogo de materiais (preço de não aluno R$ 9,99), acesso seguro, leitor de pronúncia e agendador CEFR.
+- [X] **15.4** Validação Final e Auditoria do PRD:
+  - [X] **15.4.1** Executar checagens de integridade estática (`python manage.py check`, `tsc --noEmit`).
+  - [X] **15.4.2** Validação cruzada de cada item do PRD antes de marcar `[X]`.
+
+

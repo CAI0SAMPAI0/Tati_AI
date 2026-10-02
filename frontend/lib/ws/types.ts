@@ -25,6 +25,7 @@ export interface WsIncomingMessage {
   token?: string; // for stream_token
   text?: string; // for transcription
   title?: string;
+  conversation_id?: string;
   audio?: string; // base64
   pdf_b64?: string; // base64
   filename?: string;

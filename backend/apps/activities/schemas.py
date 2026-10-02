@@ -68,6 +68,8 @@ class HubMaterialOut(BaseModel):
     is_featured: bool = False
     is_secure: bool = True
     has_access: bool = False
+    price_students: Optional[float] = None
+    price_buyers: Optional[float] = None
 
 
 class TrophyOut(BaseModel):

@@ -32,6 +32,7 @@
   "author": "Teacher Tati Team",
   "license": "MIT",
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "playwright": "^1.63.0",
     "uglify-js": "^3.17.0"
   },

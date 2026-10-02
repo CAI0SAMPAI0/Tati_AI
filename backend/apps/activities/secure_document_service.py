@@ -19,19 +19,94 @@ def get_client():
     return create_client(url, key)
 
 
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
+import pathlib
+import tempfile
+import httpx
 from pdf2image import convert_from_path
 from PIL import Image, ImageDraw, ImageFont
 
 PREVIEW_BUCKET = "hub-previews"
 SECURE_BUCKET = "hub-secure-pages"
-_RAW_IMAGE_CACHE = {}
+_RAW_IMAGE_CACHE: dict[str, bytes] = {}
+
+
+def safe_download_supabase_storage(
+    bucket: str,
+    path: str,
+    is_private: bool = True,
+    timeout: float = 15.0,
+) -> bytes | None:
+    """
+    Baixa objeto do Supabase Storage de maneira segura, resiliente e tipada.
+    Distingue buckets privados (autenticados via service_role_key) de públicos.
+    Trata status 402 (Payment Required/Quota Exceeded) e 404 sem lançar exceções não tratadas.
+    """
+    clean_path = path.lstrip("/")
+    base_url = (
+        getattr(settings, "SUPABASE_URL", os.getenv("SUPABASE_URL", "")) or ""
+    ).rstrip("/")
+    if not base_url:
+        logging.warning("[Supabase Storage] SUPABASE_URL não configurada.")
+        return None
+
+    key = getattr(
+        settings,
+        "SUPABASE_SERVICE_ROLE_KEY",
+        os.getenv("SUPABASE_SERVICE_ROLE_KEY", os.getenv("SUPABASE_KEY", "")),
+    )
+
+    if is_private:
+        # Buckets privados devem obrigatoriamente usar endpoint autenticado com token do backend
+        url = f"{base_url}/storage/v1/object/{bucket}/{clean_path}"
+        headers = {
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+        }
+    else:
+        url = f"{base_url}/storage/v1/object/public/{bucket}/{clean_path}"
+        headers = {"apikey": key} if key else {}
+
+    try:
+        with httpx.Client(timeout=timeout) as client:
+            resp = client.get(url, headers=headers)
+            if resp.status_code == 200:
+                return resp.content
+            elif resp.status_code == 402:
+                logging.warning(
+                    f"[Supabase Storage] Status 402 Payment Required para '{bucket}/{clean_path}'. "
+                    "Cota de armazenamento ou tráfego do Supabase atingida. Usando cache local/regeneração."
+                )
+                return None
+            elif resp.status_code == 404:
+                logging.info(
+                    f"[Supabase Storage] Objeto '{clean_path}' não encontrado no bucket '{bucket}' (404)."
+                )
+                return None
+            elif resp.status_code in (401, 403):
+                logging.warning(
+                    f"[Supabase Storage] Status {resp.status_code} Não autorizado para '{bucket}/{clean_path}'. "
+                    "Verifique SUPABASE_SERVICE_ROLE_KEY."
+                )
+                return None
+            else:
+                logging.warning(
+                    f"[Supabase Storage] Erro HTTP {resp.status_code} ao baixar '{bucket}/{clean_path}': {resp.text[:150]}"
+                )
+                return None
+    except Exception as exc:
+        logging.warning(
+            f"[Supabase Storage] Exceção de rede ao baixar '{bucket}/{clean_path}': {exc}"
+        )
+        return None
 
 
 def _convert_to_pdf(input_path: str, output_dir: str) -> str | None:
-    """Usa LibreOffice para converter arquivos (PPTX, DOCX) em PDF."""
+    """
+    Usa LibreOffice para converter arquivos (PPTX, DOCX) em PDF de forma confiável.
+    Utiliza um perfil temporário único por execução para evitar conflitos de concorrência (.lock),
+    garante variáveis de ambiente adequadas para headless e limpa recursos no bloco finally.
+    """
+    temp_profile_dir = None
     try:
         soffice_path = (
             "libreoffice"
@@ -50,11 +125,26 @@ def _convert_to_pdf(input_path: str, output_dir: str) -> str | None:
                     soffice_path = p
                     break
 
-        if not soffice_path:
-            soffice_path = "soffice"
+        if not soffice_path or (not shutil.which(soffice_path) and not os.path.exists(soffice_path)):
+            logging.warning(
+                f"[SecureDoc] Binário do LibreOffice ('{soffice_path}') não encontrado no sistema."
+            )
+            return None
+
+        # Perfil temporário isolado por conversão (elimina exit code 1 por arquivos .lock)
+        temp_profile_dir = tempfile.mkdtemp(prefix="soffice_profile_")
+        profile_uri = pathlib.Path(temp_profile_dir).as_uri()
+
+        env = os.environ.copy()
+        if "HOME" not in env:
+            env["HOME"] = temp_profile_dir
+        if "USERPROFILE" in env and not env.get("HOME"):
+            env["HOME"] = env["USERPROFILE"]
+        # Informa Java para rodar headless se invocado por extensões do LibreOffice
+        env["JAVA_TOOL_OPTIONS"] = "-Djava.awt.headless=true"
 
         logging.info(
-            f"[SecureDoc] Convertendo {input_path} para PDF usando {soffice_path}..."
+            f"[SecureDoc] Convertendo {input_path} para PDF usando {soffice_path} (perfil: {profile_uri})..."
         )
 
         cmd = [
@@ -63,7 +153,7 @@ def _convert_to_pdf(input_path: str, output_dir: str) -> str | None:
             "--invisible",
             "--nodefault",
             "--nofirststartwizard",
-            "-env:UserInstallation=file:///tmp/libreoffice_profile",
+            f"-env:UserInstallation={profile_uri}",
             "--convert-to",
             "pdf",
             "--outdir",
@@ -75,7 +165,8 @@ def _convert_to_pdf(input_path: str, output_dir: str) -> str | None:
             cmd,
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=90,
+            env=env,
         )
 
         base_name = os.path.splitext(os.path.basename(input_path))[0]
@@ -83,15 +174,21 @@ def _convert_to_pdf(input_path: str, output_dir: str) -> str | None:
 
         if result.returncode != 0 or not os.path.exists(pdf_path):
             logging.error(
-                f"[SecureDoc] LibreOffice falhou (code {result.returncode}): stdout={result.stdout} stderr={result.stderr}"
+                f"[SecureDoc] LibreOffice retorno={result.returncode}: stdout={result.stdout.strip()} stderr={result.stderr.strip()}"
             )
 
-        if os.path.exists(pdf_path):
+        if os.path.exists(pdf_path) and os.path.getsize(pdf_path) > 0:
             return pdf_path
         return None
-    except Exception as e:
-        logging.error(f"[SecureDoc] Erro na conversão para PDF: {e}")
+    except subprocess.TimeoutExpired:
+        logging.error(f"[SecureDoc] Timeout expirado (90s) na conversão LibreOffice de {input_path}")
         return None
+    except Exception as e:
+        logging.error(f"[SecureDoc] Erro inesperado na conversão para PDF: {e}")
+        return None
+    finally:
+        if temp_profile_dir and os.path.exists(temp_profile_dir):
+            shutil.rmtree(temp_profile_dir, ignore_errors=True)
 
 
 def extract_links_from_pdf(pdf_path: str) -> list[dict[str, Any]]:
@@ -189,11 +286,18 @@ class SecureDocumentService:
         self.drive_service = None
         if sa_path and os.path.exists(sa_path):
             try:
+                from google.oauth2 import service_account
+                from googleapiclient.discovery import build
+
                 credentials = service_account.Credentials.from_service_account_file(
                     sa_path,
                     scopes=["https://www.googleapis.com/auth/drive.file"],
                 )
                 self.drive_service = build("drive", "v3", credentials=credentials)
+            except ImportError:
+                logging.info(
+                    "[SecureDoc] google-api-python-client não instalado. Backup secundário do Drive desativado."
+                )
             except Exception as e:
                 logging.info(f"[SecureDoc] Erro ao inicializar Google Drive: {e}")
 
@@ -230,6 +334,8 @@ class SecureDocumentService:
             return None
 
         try:
+            from googleapiclient.http import MediaFileUpload
+
             file_metadata = {"name": filename, "parents": [self.drive_folder_id]}
             media = MediaFileUpload(local_path, resumable=True)
             file = (
@@ -242,6 +348,9 @@ class SecureDocumentService:
                 .execute()
             )
             return file.get("id")
+        except ImportError:
+            logging.warning("[SecureDoc] googleapiclient não disponível para upload no Drive.")
+            return None
         except Exception as e:
             logging.info(f"[SecureDoc] Erro no upload para o Drive: {e}")
             return None

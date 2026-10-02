@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { apiGet, apiPost, apiPatch } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
@@ -62,10 +62,21 @@ export default function ChatClientPage() {
     setCurrentConvId(nextConvId);
   }, [searchParams]);
 
+  useEffect(() => {
+    const handleTitleUpdated = (e: any) => {
+      if (e.detail?.conversation_id && e.detail.conversation_id === currentConvId && e.detail?.title) {
+        setConvTitle(e.detail.title);
+      }
+    };
+    window.addEventListener('tati_chat_title_updated', handleTitleUpdated as EventListener);
+    return () => window.removeEventListener('tati_chat_title_updated', handleTitleUpdated as EventListener);
+  }, [currentConvId]);
+
   const {
     messages,
     setMessages,
     isStreaming,
+    setIsStreaming,
     streamingContent,
     sendMessage,
     sendAudio,
@@ -73,12 +84,68 @@ export default function ChatClientPage() {
     sendFiles,
   } = useChatSocket(currentConvId);
 
+  const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, []);
+
+  const checkAndPollPendingAssistant = useCallback((msgs: Message[]) => {
+    stopPolling();
+    if (!currentConvId || !msgs || msgs.length === 0) return;
+
+    const lastMsg = msgs[msgs.length - 1];
+    if (lastMsg.role === 'user') {
+      // O usuário enviou mensagem e a IA ainda está gerando em segundo plano!
+      setIsStreaming(true);
+      let attempts = 0;
+      const maxAttempts = 18; // ~27s máx
+
+      pollTimerRef.current = setInterval(async () => {
+        attempts++;
+        try {
+          const freshMsgs = await apiGet<Message[]>(ENDPOINTS.CONVERSATION_MESSAGES(currentConvId));
+          if (freshMsgs && freshMsgs.length > 0) {
+            const freshLast = freshMsgs[freshMsgs.length - 1];
+            if (freshLast.role === 'assistant') {
+              setMessages(freshMsgs);
+              setIsStreaming(false);
+              stopPolling();
+              import('@/lib/db/indexedDB').then(({ saveMessagesLocal }) => {
+                saveMessagesLocal(currentConvId, freshMsgs);
+              });
+              queryClient.invalidateQueries({ queryKey: ['conversations'] });
+              return;
+            }
+          }
+        } catch (_) {}
+
+        if (attempts >= maxAttempts) {
+          stopPolling();
+          setIsStreaming(false);
+        }
+      }, 1500);
+    } else {
+      setIsStreaming(false);
+    }
+  }, [currentConvId, setIsStreaming, setMessages, stopPolling, queryClient]);
+
+  useEffect(() => {
+    return () => {
+      stopPolling();
+    };
+  }, [stopPolling]);
+
   useEffect(() => {
     if (currentConvId) {
       import('@/lib/db/indexedDB').then(({ getMessagesLocal }) => {
         getMessagesLocal(currentConvId).then((cachedMsgs) => {
           if (cachedMsgs.length > 0) {
             setMessages(cachedMsgs);
+            checkAndPollPendingAssistant(cachedMsgs);
           }
         });
       }).catch(err => console.error('IndexedDB load error:', err));
@@ -87,6 +154,7 @@ export default function ChatClientPage() {
         .then((msgs) => {
           if (msgs.length > 0) {
             setMessages(msgs);
+            checkAndPollPendingAssistant(msgs);
             import('@/lib/db/indexedDB').then(({ saveMessagesLocal }) => {
               saveMessagesLocal(currentConvId, msgs);
             }).catch(err => console.error('IndexedDB save error:', err));
@@ -95,11 +163,37 @@ export default function ChatClientPage() {
         .catch((err) => console.error('Error loading messages:', err));
       setSummary(null);
     } else {
+      stopPolling();
       setMessages([]);
       setConvTitle("Taty's Hub");
       setSummary(null);
     }
-  }, [currentConvId, setMessages]);
+  }, [currentConvId, setMessages, checkAndPollPendingAssistant, stopPolling]);
+
+  // Revalidação em segundo plano ao retornar para a aba (Visibility / Focus)
+  useEffect(() => {
+    const handleRevalidate = () => {
+      if (document.visibilityState === 'visible' && currentConvId) {
+        apiGet<Message[]>(ENDPOINTS.CONVERSATION_MESSAGES(currentConvId))
+          .then((msgs) => {
+            if (msgs && msgs.length > 0) {
+              setMessages(msgs);
+              checkAndPollPendingAssistant(msgs);
+              import('@/lib/db/indexedDB').then(({ saveMessagesLocal }) => {
+                saveMessagesLocal(currentConvId, msgs);
+              });
+            }
+          })
+          .catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', handleRevalidate);
+    window.addEventListener('focus', handleRevalidate);
+    return () => {
+      document.removeEventListener('visibilitychange', handleRevalidate);
+      window.removeEventListener('focus', handleRevalidate);
+    };
+  }, [currentConvId, checkAndPollPendingAssistant, setMessages]);
 
   const handleSelectConv = useCallback((id: string) => {
     if (window.innerWidth < 768) {
@@ -168,7 +262,7 @@ export default function ChatClientPage() {
     if (!convId) {
       try {
         const res = await apiPost<Conversation>(ENDPOINTS.CONVERSATIONS, {
-          title: text.substring(0, 20) + '...'
+          title: 'Nova Conversa com a Teacher Tati'
         });
         if (res.ok) {
           convId = res.data.id;
@@ -177,11 +271,11 @@ export default function ChatClientPage() {
           setConvTitle(res.data.title);
           router.replace(`/chat?conv_id=${convId}`, { scroll: false });
         } else {
-          console.error('Failed to create conversation:', res.data);
+          console.error('Falha ao criar conversa:', res.data);
           return;
         }
       } catch (err) {
-        console.error('Error creating conversation:', err);
+        console.error('Erro ao criar conversa:', err);
         return;
       }
     }
@@ -197,7 +291,7 @@ export default function ChatClientPage() {
     if (!convId) {
       try {
         const res = await apiPost<Conversation>(ENDPOINTS.CONVERSATIONS, {
-          title: 'Vocal Message...'
+          title: 'Nova Conversa com a Teacher Tati'
         });
         if (res.ok) {
           convId = res.data.id;
@@ -206,11 +300,11 @@ export default function ChatClientPage() {
           setConvTitle(res.data.title);
           router.replace(`/chat?conv_id=${convId}`, { scroll: false });
         } else {
-          toast.error('Could not create conversation for audio.');
+          toast.error('Não foi possível criar a conversa para o áudio.');
           return;
         }
       } catch (err) {
-        console.error('Error creating conversation for audio:', err);
+        console.error('Erro ao criar conversa para áudio:', err);
         return;
       }
     }
@@ -232,13 +326,13 @@ export default function ChatClientPage() {
         setMessages((prev) => prev.map(m =>
           m.id === messageId ? { ...m, content: newContent } : m
         ));
-        toast.success('Message updated.');
+        toast.success('Mensagem atualizada.');
       } else {
-        toast.error('Could not update message.');
+        toast.error('Não foi possível atualizar a mensagem.');
       }
     } catch (err) {
-      console.error('Error editing message:', err);
-      toast.error('Error connecting to server.');
+      console.error('Erro ao editar mensagem:', err);
+      toast.error('Erro ao conectar com o servidor.');
     }
   };
 
@@ -246,7 +340,7 @@ export default function ChatClientPage() {
     if (!currentConvId) {
       try {
         const convRes = await apiPost<Conversation>(ENDPOINTS.CONVERSATIONS, {
-          title: content.substring(0, 20) + '...'
+          title: 'Nova Conversa com a Teacher Tati'
         });
         if (convRes.ok) {
           const newId = convRes.data.id;
@@ -256,11 +350,11 @@ export default function ChatClientPage() {
           router.replace(`/chat?conv_id=${newId}`, { scroll: false });
           sendMessage(content, newId);
         } else {
-          toast.error('Could not create conversation for resend.');
+          toast.error('Não foi possível criar conversa para reenvio.');
         }
       } catch (err) {
-        console.error('Error creating conversation for resend:', err);
-        toast.error('Error creating conversation.');
+        console.error('Erro ao criar conversa para reenvio:', err);
+        toast.error('Erro ao criar conversa.');
       }
     } else {
       sendMessage(content, currentConvId);

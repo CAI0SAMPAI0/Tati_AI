@@ -8,6 +8,10 @@ from ninja.errors import HttpError
 from pydantic import BaseModel
 from groq import AsyncGroq
 from asgiref.sync import sync_to_async
+import os
+import re
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from apps.authentication.security import auth_optional
 from apps.chat.models import SimulationScenario, CEFRSimulation, Conversation, Message
@@ -52,6 +56,51 @@ class SimEvaluateInput(BaseModel):
 
 
 # HELPERS
+
+
+def _get_time_greeting_context(user=None) -> dict:
+    tz_str = "America/Sao_Paulo"
+    if user and hasattr(user, "profile") and isinstance(user.profile, dict):
+        tz_str = user.profile.get("timezone") or tz_str
+    try:
+        tz = ZoneInfo(tz_str)
+    except Exception:
+        tz = ZoneInfo("America/Sao_Paulo")
+
+    now = datetime.now(tz)
+    hour = now.hour
+    if 5 <= hour < 12:
+        period = "morning"
+    elif 12 <= hour < 18:
+        period = "afternoon"
+    else:
+        period = "evening"
+
+    greeting = f"Good {period}"
+    instruction = (
+        f"CURRENT LOCAL TIME IN BRASÍLIA / BRAZIL: {now.strftime('%I:%M %p')} ({period}). "
+        f"If you use a time-based greeting, you MUST say '{greeting}' (NEVER say 'Good morning' in the afternoon or evening!)."
+    )
+    return {
+        "now": now,
+        "hour": hour,
+        "period": period,
+        "greeting": greeting,
+        "instruction": instruction,
+    }
+
+
+def _fix_time_greeting(text: str, period: str) -> str:
+    if not text:
+        return text
+    target = f"Good {period}"
+    if period in ("afternoon", "evening"):
+        text = re.sub(r"\bGood morning\b", target, text, flags=re.IGNORECASE)
+    if period in ("morning", "evening"):
+        text = re.sub(r"\bGood afternoon\b", target, text, flags=re.IGNORECASE)
+    if period in ("morning", "afternoon"):
+        text = re.sub(r"\bGood evening\b", target, text, flags=re.IGNORECASE)
+    return text
 
 
 def _clean_complete_reply(text: str) -> str:
@@ -265,10 +314,15 @@ async def start_simulation(request: HttpRequest, payload: SimStartInput):
     sys_prompt = (
         sc.get("system_prompt") or f"You are simulating the scenario: {sc.get('name')}."
     )
+    time_ctx = _get_time_greeting_context(user)
+    period = time_ctx["period"]
+    time_instruction = time_ctx["instruction"]
+
     initial_text = (
         sc.get("initial_message")
         or f"Hello! Welcome to our session. Let's practice {sc.get('name')}."
     )
+    initial_text = _fix_time_greeting(initial_text, period)
 
     groq_model = getattr(settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"))
     keys = get_groq_keys()
@@ -283,9 +337,11 @@ async def start_simulation(request: HttpRequest, payload: SimStartInput):
                             "content": (
                                 f"{sys_prompt}\n\n"
                                 f"{level_rules}\n\n"
+                                f"{time_instruction}\n\n"
                                 "CRITICAL INSTRUCTIONS:\n"
                                 "- Respond ENTIRELY in English.\n"
                                 "- Introduce yourself in character and greet the student warmly to begin.\n"
+                                f"- Use the accurate time of day greeting ({time_ctx['greeting']}).\n"
                                 "- Keep your greeting CONCISE (2 to 3 sentences max, under 50 words).\n"
                                 "- ALWAYS complete your thoughts and every sentence you start. NEVER leave a sentence unfinished or cut off mid-thought.\n"
                                 "- Ask exactly ONE simple, direct question to start the conversation."
@@ -301,6 +357,7 @@ async def start_simulation(request: HttpRequest, payload: SimStartInput):
                 )
             generated_text = res.choices[0].message.content.strip()
             generated_text = _clean_complete_reply(generated_text)
+            generated_text = _fix_time_greeting(generated_text, period)
             if generated_text:
                 initial_text = generated_text
                 break
@@ -400,12 +457,17 @@ async def send_simulation_message(request: HttpRequest, payload: SimMessageInput
 
     history = await sync_to_async(_save_user_msg_and_get_history)()
 
+    time_ctx = _get_time_greeting_context(user)
+    period = time_ctx["period"]
+    time_instruction = time_ctx["instruction"]
+
     messages_payload = [
         {
             "role": "system",
             "content": (
                 f"{sys_prompt}\n\n"
                 f"{level_rules}\n\n"
+                f"{time_instruction}\n\n"
                 "CRITICAL INSTRUCTIONS:\n"
                 "- Respond ENTIRELY in natural English, stay strictly in character.\n"
                 "- Keep answers engaging and concise (2 to 3 sentences, under 65 words).\n"
@@ -431,6 +493,7 @@ async def send_simulation_message(request: HttpRequest, payload: SimMessageInput
                 )
             reply_text = res.choices[0].message.content.strip()
             reply_text = _clean_complete_reply(reply_text)
+            reply_text = _fix_time_greeting(reply_text, period)
             if reply_text:
                 break
         except Exception as e:
