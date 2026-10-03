@@ -79,7 +79,7 @@ export function CefrSection() {
   const [scheduleActive, setScheduleActive] = useState(true);
   const [scheduleWeekdays, setScheduleWeekdays] = useState<string[]>([]);
   const [scheduleTime, setScheduleTime] = useState('06:00');
-  const [scheduleLimit, setScheduleLimit] = useState(5);
+  const [scheduleLimit, setScheduleLimit] = useState(10);
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   const [scheduleTypes, setScheduleTypes] = useState<string[]>(['flashcards', 'simulations']);
@@ -117,7 +117,7 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
   const [topicPlanFilter, setTopicPlanFilter] = useState<'all' | 'selected'>('all');
   const [newPlanTopicName, setNewPlanTopicName] = useState('');
   const [newPlanTopicItems, setNewPlanTopicItems] = useState('');
-  const [newPlanWeek1, setNewPlanWeek1] = useState(5);
+  const [newPlanWeek1, setNewPlanWeek1] = useState(10);
   const [newPlanWeek2, setNewPlanWeek2] = useState(0);
   const [newPlanWeek3, setNewPlanWeek3] = useState(3);
   const [newPlanWeek4, setNewPlanWeek4] = useState(2);
@@ -440,15 +440,41 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
     }
   };
 
+  const handleToggleScheduleReference = (ref: any) => {
+    const isSelected = scheduleReferenceIds.includes(ref.id);
+    let nextIds: string[];
+    if (isSelected) {
+      nextIds = scheduleReferenceIds.filter(id => id !== ref.id);
+      setScheduleReferenceIds(nextIds);
+      // Remove imediatamente tópicos deste arquivo da lista disponível e do plano de 4 semanas
+      setScheduleAvailableTopics(prev =>
+        prev.filter(t => t.reference_id !== ref.id && t.source_file !== ref.filename)
+      );
+      setScheduleTopicPlan(prev =>
+        prev.filter(tp => tp.reference_id !== ref.id && tp.source_file !== ref.filename)
+      );
+      if (nextIds.length === 0) {
+        setScheduleAvailableTopics([]);
+      } else {
+        fetchScheduleTopics(nextIds);
+      }
+    } else {
+      nextIds = [...scheduleReferenceIds, ref.id];
+      setScheduleReferenceIds(nextIds);
+      fetchScheduleTopics(nextIds);
+    }
+  };
+
   const fetchScheduleTopics = async (refIds?: string[]) => {
+    const ids = refIds !== undefined ? refIds : scheduleReferenceIds;
+    if (!ids || ids.length === 0) {
+      setScheduleAvailableTopics([]);
+      return;
+    }
     setLoadingScheduleTopics(true);
     try {
-      const ids = refIds !== undefined ? refIds : scheduleReferenceIds;
-      let url = '/cefr/admin/extract-topics';
-      if (ids && ids.length > 0) {
-        const params = ids.map(id => `reference_ids=${encodeURIComponent(id)}`).join('&');
-        url += `?${params}`;
-      }
+      const params = ids.map(id => `reference_ids=${encodeURIComponent(id)}`).join('&');
+      const url = `/cefr/admin/extract-topics?${params}&require_selected=true`;
       const res = await apiGet<{
         success: boolean;
         topics?: Array<{
@@ -461,29 +487,11 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
         }>;
       }>(url);
       if (res && res.topics && res.topics.length > 0) {
-        setScheduleAvailableTopics(prev => {
-          const map = new Map<string, {
-            topic: string;
-            items: string[];
-            count?: number;
-            source_file?: string;
-            reference_id?: string;
-            level?: string;
-          }>();
-          prev.forEach(t => map.set(t.topic.trim().toLowerCase(), t));
-          res.topics!.forEach(t => {
-            const key = t.topic.trim().toLowerCase();
-            if (!map.has(key)) {
-              map.set(key, t);
-            } else {
-              const existing = map.get(key)!;
-              if (!existing.source_file && t.source_file) {
-                map.set(key, { ...existing, source_file: t.source_file, reference_id: t.reference_id, level: t.level });
-              }
-            }
-          });
-          return Array.from(map.values());
-        });
+        const allowedIds = new Set(ids);
+        const filtered = res.topics.filter(t => !t.reference_id || allowedIds.has(t.reference_id));
+        setScheduleAvailableTopics(filtered);
+      } else {
+        setScheduleAvailableTopics([]);
       }
     } catch (err) {
       console.error('Error fetching schedule topics:', err);
@@ -530,6 +538,8 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
     }
     if (scheduleReferenceIds.length > 0) {
       fetchScheduleTopics(scheduleReferenceIds);
+    } else {
+      setScheduleAvailableTopics([]);
     }
   }, [scheduleReferenceIds, editingScheduleId]);
 
@@ -537,7 +547,6 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
     fetchReferences();
     fetchSchedules();
     fetchGeneratedContent();
-    fetchScheduleTopics();
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -670,6 +679,10 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
   const allAvailableTopics = useMemo(() => {
     const list = [...scheduleAvailableTopics];
     scheduleTopicPlan.forEach(p => {
+      // Se o tópico foi extraído de um arquivo, só inclui se o arquivo ainda estiver selecionado
+      if (p.reference_id && !scheduleReferenceIds.includes(p.reference_id)) {
+        return;
+      }
       if (!list.some(a => a.topic.trim().toLowerCase() === p.topic.trim().toLowerCase())) {
         list.push({
           topic: p.topic,
@@ -681,7 +694,7 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
       }
     });
     return list;
-  }, [scheduleAvailableTopics, scheduleTopicPlan]);
+  }, [scheduleAvailableTopics, scheduleTopicPlan, scheduleReferenceIds]);
 
   const activeTopicPlanCount = useMemo(() => {
     return scheduleTopicPlan.filter(tp => Object.values(tp.weeks).some(v => (v || 0) > 0)).length;
@@ -711,7 +724,7 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
   }, [allAvailableTopics, scheduleTopicPlan, topicPlanFilter, topicPlanSearch]);
 
   const toggleTopicWeek = (topicName: string, items: string[], week: '1' | '2' | '3' | '4') => {
-    const defaultCount = scheduleLimit || 5;
+    const defaultCount = scheduleLimit || 10;
     const sourceMeta = allAvailableTopics.find(t => t.topic.trim().toLowerCase() === topicName.trim().toLowerCase());
     setScheduleTopicPlan(prev => {
       const idx = prev.findIndex(p => p.topic.trim().toLowerCase() === topicName.trim().toLowerCase());
@@ -786,7 +799,7 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
       toast.error('No topics available to distribute.');
       return;
     }
-    const defaultCount = scheduleLimit || 5;
+    const defaultCount = scheduleLimit || 10;
     const distributed = allAvailableTopics.map((t, idx) => {
       const weekNum = String((idx % 4) + 1) as '1' | '2' | '3' | '4';
       return {
@@ -825,7 +838,7 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
       .map(i => i.trim())
       .filter(Boolean);
 
-    const defaultCount = scheduleLimit || 5;
+    const defaultCount = scheduleLimit || 10;
     const w1 = Number(newPlanWeek1) || 0;
     const w2 = Number(newPlanWeek2) || 0;
     const w3 = Number(newPlanWeek3) || 0;
@@ -892,7 +905,7 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
         toast.success(editingScheduleId ? 'Schedule updated successfully!' : 'Schedule configured successfully!');
         setScheduleWeekdays([]);
         setScheduleTime('06:00');
-        setScheduleLimit(5);
+        setScheduleLimit(10);
         setScheduleTypes(['flashcards', 'simulations']);
         setScheduleReferenceIds([]);
         setScheduleTopicPlan([]);
@@ -915,7 +928,7 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
     setEditingScheduleId(sch.id);
     setScheduleWeekdays(sch.weekdays || []);
     setScheduleTime(sch.execution_time.slice(0, 5));
-    setScheduleLimit(sch.materials_per_execution || 5);
+    setScheduleLimit(sch.materials_per_execution || 10);
     setScheduleActive(sch.active);
     setScheduleTypes(sch.selected_types || ['flashcards', 'simulations']);
     setScheduleReferenceIds(sch.reference_ids || []);
@@ -926,7 +939,7 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
     setEditingScheduleId(null);
     setScheduleWeekdays([]);
     setScheduleTime('06:00');
-    setScheduleLimit(5);
+    setScheduleLimit(10);
     setScheduleActive(true);
     setScheduleTypes(['flashcards', 'simulations']);
     setScheduleReferenceIds([]);
@@ -1683,54 +1696,68 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
                 </div>
 
                 {/* Target Reference Files Selection */}
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-text-subtle uppercase flex items-center gap-1.5">
                       <FileText size={13} className="text-primary" />
                       Target Reference Files & Levels
                     </label>
-                    <span className="text-[11px] text-text-muted">
+                    <span className="text-[11px] font-semibold text-primary">
                       {scheduleReferenceIds.length > 0
                         ? `${scheduleReferenceIds.length} file(s) selected`
-                        : 'All files (Automatic)'}
+                        : 'No files selected'}
                     </span>
                   </div>
-                  <p className="text-[11px] text-text-muted">
-                    Select which reference files the AI will read. The system will automatically generate materials for the CEFR levels of the selected files.
-                  </p>
+
+                  {/* Guia Explicativo Pedagógico para Teacher Tatiana */}
+                  <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl space-y-1.5 text-xs">
+                    <div className="font-bold text-primary flex items-center gap-1.5 text-xs">
+                      Como funciona a seleção:
+                    </div>
+                    <ul className="text-text-subtle text-[11px] space-y-1 list-disc list-inside leading-relaxed">
+                      <li><strong className="text-text">Arquivos Selecionados:</strong> Marque abaixo apenas os livros/PDFs que deseja usar. A IA lerá exclusivamente o conteúdo desses arquivos.</li>
+                      <li><strong className="text-text">Nível CEFR Automático:</strong> O nível (A1, A2, B1, B2) é definido automaticamente a partir do material escolhido.</li>
+                      <li><strong className="text-text">Extração e Remoção Dinâmica:</strong> Apenas os tópicos dos arquivos marcados aparecem no plano abaixo. Ao desmarcar um arquivo, seus tópicos são removidos imediatamente.</li>
+                    </ul>
+                  </div>
 
                   {references.length === 0 ? (
                     <div className="p-3 bg-bg rounded-xl border border-dashed border-border text-center text-xs text-text-muted">
-                      No files uploaded yet. Upload materials above to link them here.
+                      Nenhum arquivo enviado ainda. Faça upload de materiais na aba de cima para vinculá-los aqui.
                     </div>
                   ) : (
-                    <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 border border-border/60 rounded-xl p-2 bg-bg/50">
+                    <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1 border border-border/60 rounded-xl p-2 bg-bg/50">
                       {references.map((r: any) => {
                         const isSelected = scheduleReferenceIds.includes(r.id);
                         return (
                           <div
                             key={r.id}
-                            onClick={() => {
-                              setScheduleReferenceIds(prev =>
-                                isSelected ? prev.filter(id => id !== r.id) : [...prev, r.id]
-                              );
-                            }}
-                            className={`flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer transition-all ${
+                            onClick={() => handleToggleScheduleReference(r)}
+                            className={`flex items-center justify-between p-2.5 rounded-lg border text-xs cursor-pointer transition-all ${
                               isSelected
-                                ? 'bg-primary/10 border-primary/40 text-text'
+                                ? 'bg-primary/10 border-primary/50 text-text ring-1 ring-primary/30 shadow-xs'
                                 : 'bg-surface border-border/70 text-text-subtle hover:border-border'
                             }`}
                           >
-                            <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
                               <input
                                 type="checkbox"
                                 checked={isSelected}
                                 onChange={() => {}}
-                                className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary/20 bg-bg cursor-pointer pointer-events-none"
+                                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20 bg-bg cursor-pointer pointer-events-none"
                               />
-                              <span className="truncate font-medium">{r.filename}</span>
+                              <div className="min-w-0 flex-1">
+                                <span className={`truncate block font-medium ${isSelected ? 'text-primary font-bold' : ''}`}>
+                                  {r.filename}
+                                </span>
+                                {isSelected && (
+                                  <span className="text-[10px] text-primary/80 font-medium">
+                                    ✓ Selecionado para extração de tópicos
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border shrink-0 ${getLevelBadgeStyle(r.cefr_level)}`}>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border shrink-0 ${getLevelBadgeStyle(r.cefr_level)}`}>
                               {r.cefr_level}
                             </span>
                           </div>
@@ -1741,17 +1768,22 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
 
                   {/* Level summary indicator */}
                   {scheduleReferenceIds.length > 0 && (
-                    <div className="flex items-center gap-1.5 flex-wrap pt-1 text-xs">
-                      <span className="text-[11px] text-text-subtle font-medium">Will generate for levels:</span>
-                      {Array.from(new Set(
-                        references
-                          .filter(r => scheduleReferenceIds.includes(r.id))
-                          .map(r => r.cefr_level?.toUpperCase() || 'A1')
-                      )).sort().map(lvl => (
-                        <span key={lvl} className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getLevelBadgeStyle(lvl)}`}>
-                          {lvl}
-                        </span>
-                      ))}
+                    <div className="p-2.5 bg-bg/90 border border-primary/30 rounded-xl space-y-1.5 text-xs">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[11px] text-text-subtle font-semibold">Níveis Identificados Automaticamente:</span>
+                        {Array.from(new Set(
+                          references
+                            .filter(r => scheduleReferenceIds.includes(r.id))
+                            .map(r => r.cefr_level?.toUpperCase() || 'A1')
+                        )).sort().map(lvl => (
+                          <span key={lvl} className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getLevelBadgeStyle(lvl)}`}>
+                            Nível {lvl}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="text-[11px] text-text-muted">
+                        A IA irá gerar os baralhos e simulações para os níveis acima com base nos tópicos selecionados no ciclo de 4 semanas.
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1833,7 +1865,7 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
                       className="px-2.5 py-1.5 bg-surface border border-border hover:bg-primary/5 hover:border-primary/30 rounded-lg text-xs font-medium text-primary flex items-center gap-1 transition-colors"
                     >
                       <Plus size={12} />
-                      {showAddCustomTopic ? 'Close Custom' : '+ Custom Topic'}
+                      {showAddCustomTopic ? 'Close Custom' : 'Custom Topic'}
                     </button>
                   </div>
 
@@ -1946,15 +1978,28 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
                         <span>Extracting topics from reference materials...</span>
                       </div>
                     ) : filteredAvailableTopics.length === 0 ? (
-                      <div className="text-center py-6 text-xs text-text-muted border border-dashed border-border rounded-xl space-y-1">
-                        <p>{topicPlanSearch ? 'No topics match your search.' : 'No topics available yet.'}</p>
-                        <button
-                          type="button"
-                          onClick={() => fetchScheduleTopics(scheduleReferenceIds)}
-                          className="text-primary hover:underline font-semibold"
-                        >
-                          Click to extract topics
-                        </button>
+                      <div className="text-center py-6 text-xs text-text-muted border border-dashed border-border rounded-xl space-y-1.5 p-4">
+                        {scheduleReferenceIds.length === 0 ? (
+                          <>
+                            <p className="font-semibold text-text">Nenhum arquivo de referência selecionado.</p>
+                            <p className="text-[11px] text-text-muted max-w-sm mx-auto">
+                              Selecione um ou mais arquivos em "Target Reference Files & Levels" acima para extrair automaticamente os tópicos desses materiais.
+                            </p>
+                          </>
+                        ) : topicPlanSearch ? (
+                          <p>Nenhum tópico encontrado para a busca "{topicPlanSearch}".</p>
+                        ) : (
+                          <>
+                            <p className="font-semibold text-text">Nenhum tópico extraído ainda.</p>
+                            <button
+                              type="button"
+                              onClick={() => fetchScheduleTopics(scheduleReferenceIds)}
+                              className="text-primary hover:underline font-semibold"
+                            >
+                              Clique para extrair tópicos dos arquivos selecionados
+                            </button>
+                          </>
+                        )}
                       </div>
                     ) : (
                       filteredAvailableTopics.map((item, idx) => {
@@ -1984,10 +2029,15 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
                                 </span>
                                 {item.source_file && (
                                   <span
-                                    className="text-[10px] text-text-muted bg-surface/80 px-1.5 py-0.5 rounded border border-border/50 shrink-0 truncate max-w-[130px]"
+                                    className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20 shrink-0 truncate max-w-[150px] font-medium"
                                     title={`Source: ${item.source_file}`}
                                   >
-                                    {item.source_file}
+                                    📄 {item.source_file}
+                                  </span>
+                                )}
+                                {item.level && (
+                                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border shrink-0 ${getLevelBadgeStyle(item.level)}`}>
+                                    {item.level}
                                   </span>
                                 )}
                               </div>
@@ -2079,8 +2129,8 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
                   <label className="text-xs font-bold text-text-subtle uppercase">Material Types</label>
                   <div className="flex flex-col gap-2">
                     {[
-                      { value: 'flashcards', label: 'Flashcards (10 cards per level)' },
-                      { value: 'simulations', label: 'Simulations (1 roleplay per level)' }
+                      { value: 'flashcards', label: 'Flashcards' },
+                      { value: 'simulations', label: 'Simulations' }
                     ].map(type => {
                       const isChecked = scheduleTypes.includes(type.value);
                       return (
@@ -2120,18 +2170,18 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
 
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-text-subtle uppercase flex items-center gap-1">
-                      Materials to Generate
+                      Quantidade de Cards a Gerar por Baralho (Deck Size)
                     </label>
                     <input
                       type="number"
                       min="1"
-                      max="30"
+                      max="50"
                       value={scheduleLimit}
-                      onChange={e => setScheduleLimit(Math.max(1, Math.min(30, parseInt(e.target.value) || 1)))}
-                      className="w-full bg-bg border border-border rounded-xl px-3 py-2.5 text-text focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                      onChange={e => setScheduleLimit(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+                      className="w-full bg-bg border border-border rounded-xl px-3 py-2.5 text-text focus:ring-2 focus:ring-primary/20 outline-none transition-all font-semibold"
                     />
                     <p className="text-[11px] text-text-muted">
-                      Items created per level each run (1 to 30)
+                      Quantidade exata de flashcards que a IA criará por baralho (ex: 10 cards com frente, verso, opções, explicações e imagens).
                     </p>
                   </div>
                 </div>

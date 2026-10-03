@@ -129,7 +129,7 @@ class CEFRGeneratorService:
         cls,
         level: str = "A1",
         topic: str = "General",
-        count: int = 5,
+        count: int = 10,
         title: Optional[str] = None,
         reference_ids: Optional[str] = None,
         topic_context: Optional[Dict[str, Any]] = None,
@@ -171,9 +171,16 @@ class CEFRGeneratorService:
                 ref_context += "\n" + "\n".join(context_notes)
 
         client = cls._get_groq_client()
-        groq_model = getattr(
-            settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        configured_model = getattr(
+            settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
         )
+        candidate_models = [
+            configured_model,
+            "openai/gpt-oss-120b",
+            "openai/gpt-oss-20b",
+            "qwen/qwen3.8-27b",
+        ]
+        groq_model = candidate_models[0]
 
         cards_data = []
         if client:
@@ -185,61 +192,58 @@ class CEFRGeneratorService:
                 topic=topic,
                 ref_context=ref_context,
             )
-            try:
-                res = client.chat.completions.create(
-                    model=groq_model,
-                    messages=[{"role": "user", "content": prompt}],
-                    response_format={"type": "json_object"},
-                    temperature=0.3,
-                )
-                parsed = json.loads(res.choices[0].message.content)
-                cards_data = parsed.get("flashcards", [])
-            except Exception as e:
-                logger.error(f"[CEFR Generator] Erro ao chamar Groq: {e}")
+            for m_candidate in candidate_models:
+                try:
+                    res = client.chat.completions.create(
+                        model=m_candidate,
+                        messages=[{"role": "user", "content": prompt}],
+                        response_format={"type": "json_object"},
+                        temperature=0.3,
+                    )
+                    parsed = json.loads(res.choices[0].message.content)
+                    items = parsed.get("flashcards", [])
+                    if items:
+                        cards_data = items
+                        groq_model = m_candidate
+                        break
+                except Exception as e:
+                    logger.warning(f"[CEFR Generator] Erro ao chamar Groq com modelo {m_candidate}: {e}")
 
         # Fallback se a IA não retornar o total solicitado
-        if not cards_data:
-            cards_data = [
-                {
-                    "front": f"To practice {topic.lower()}",
-                    "back": f"To do an activity regularly to improve your skill in {topic.lower()}.",
-                    "options": [
-                        f"To practice {topic.lower()}",
-                        f"To ignore {topic.lower()}",
-                        f"To finish {topic.lower()}",
-                        f"To forget {topic.lower()}",
-                    ],
-                    "explanation": f"I practice talking about {topic.lower()} every day.",
-                    "image_search_query": f"{topic.lower()} student learning book",
-                    "image_prompt": f"A dedicated student studying {topic.lower()} at a tidy desk, realistic photo, no text",
-                },
-                {
-                    "front": f"Key expression for {topic.lower()}",
-                    "back": f"A helpful phrase you use when discussing {topic.lower()}.",
-                    "options": [
-                        f"Key expression for {topic.lower()}",
-                        f"Grammar mistake in {topic.lower()}",
-                        f"Silent break during {topic.lower()}",
-                        f"Random question about {topic.lower()}",
-                    ],
-                    "explanation": f"This is an important expression for everyday communication.",
-                    "image_search_query": f"two friends talking smiling outdoors",
-                    "image_prompt": f"Two friends smiling and having a pleasant conversation, realistic photo, no text",
-                },
-                {
-                    "front": f"Ask about {topic.lower()}",
-                    "back": f"To request information or help regarding {topic.lower()}.",
-                    "options": [
-                        f"Ask about {topic.lower()}",
-                        f"Refuse to answer about {topic.lower()}",
-                        f"Write letters about {topic.lower()}",
-                        f"Whisper quietly about {topic.lower()}",
-                    ],
-                    "explanation": f"Can I ask you a question about {topic.lower()}?",
-                    "image_search_query": f"person asking friendly question",
-                    "image_prompt": f"A person raising their hand politely in an interactive workshop, realistic photo, no text",
-                },
+        if not cards_data or len(cards_data) < count:
+            existing_fronts = {str(c.get("front", "")).strip().lower() for c in cards_data}
+            base_templates = [
+                ("Essential vocabulary for {topic}", "A core word or phrase frequently used in real-world discussions about {topic}.", "Understanding this concept is fundamental for daily conversations."),
+                ("To practice {topic}", "To perform activities or speaking drills regularly to enhance your fluency in {topic}.", "I practice talking about {topic} every week to gain confidence."),
+                ("Key expression for {topic}", "A highly useful idiomatic or communicative phrase when discussing {topic}.", "Native speakers use this expression frequently when engaging in {topic}."),
+                ("Ask about {topic}", "To request information, guidance or clarification regarding {topic}.", "Excuse me, could you give me more details about {topic}?"),
+                ("Describing {topic}", "To explain the main characteristics, details or opinions about {topic}.", "She gave a vivid description of {topic} during the group discussion."),
+                ("Action plan for {topic}", "A practical strategy or organized steps taken to handle {topic}.", "We created a practical action plan to master {topic} step by step."),
+                ("Common situation in {topic}", "A typical everyday scenario that learners encounter regarding {topic}.", "This is a very common situation when you deal with {topic} abroad."),
+                ("Solving issues with {topic}", "How to communicate solutions, overcome challenges and handle doubts in {topic}.", "Good communication helps in solving most issues related to {topic}."),
+                ("Useful phrases for {topic}", "Practical phrases that help you speak more naturally about {topic}.", "Reviewing these useful phrases makes talking about {topic} effortless."),
+                ("Review and mastery of {topic}", "Consolidating your vocabulary and communicative skills in {topic}.", "Consistent review leads to complete mastery of {topic}.")
             ]
+            for f_tmpl, b_tmpl, exp_tmpl in base_templates:
+                if len(cards_data) >= count:
+                    break
+                front_val = f_tmpl.format(topic=topic.lower()).strip()
+                if front_val.lower() in existing_fronts:
+                    continue
+                existing_fronts.add(front_val.lower())
+                cards_data.append({
+                    "front": front_val,
+                    "back": b_tmpl.format(topic=topic.lower()).strip(),
+                    "options": [
+                        front_val,
+                        f"Unrelated phrase for {topic.lower()}",
+                        f"Grammar mistake in {topic.lower()}",
+                        f"Opposite meaning in {topic.lower()}"
+                    ],
+                    "explanation": exp_tmpl.format(topic=topic.lower()).strip(),
+                    "image_search_query": f"{topic.lower()} discussion communication",
+                    "image_prompt": f"Realistic educational photo representing {topic.lower()} with natural lighting and no text",
+                })
 
         # Validação estrita e retry com LLM para cada card
         validated_cards = []
@@ -396,19 +400,29 @@ Return ONLY a JSON object in this exact format:
   }},
   "goal": "The communicative mission the student must achieve (e.g. Ask for the price, order a meal, answer questions)."
 }}"""
-            groq_model = getattr(
-                settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+            configured_model = getattr(
+                settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
             )
-            try:
-                res = client.chat.completions.create(
-                    model=groq_model,
-                    messages=[{"role": "user", "content": prompt}],
-                    response_format={"type": "json_object"},
-                    temperature=0.3,
-                )
-                sim_data = json.loads(res.choices[0].message.content)
-            except Exception as e:
-                logger.error(f"[CEFR Generator] Erro ao gerar simulação com Groq: {e}")
+            candidate_models = [
+                configured_model,
+                "openai/gpt-oss-120b",
+                "openai/gpt-oss-20b",
+                "qwen/qwen3.8-27b",
+            ]
+            for m_candidate in candidate_models:
+                try:
+                    res = client.chat.completions.create(
+                        model=m_candidate,
+                        messages=[{"role": "user", "content": prompt}],
+                        response_format={"type": "json_object"},
+                        temperature=0.3,
+                    )
+                    parsed = json.loads(res.choices[0].message.content)
+                    if parsed and parsed.get("scenario"):
+                        sim_data = parsed
+                        break
+                except Exception as e:
+                    logger.warning(f"[CEFR Generator] Erro ao gerar simulação com Groq ({m_candidate}): {e}")
 
         if not sim_data:
             sim_data = {
@@ -668,7 +682,7 @@ Format strictly as JSON:
         import random
 
         types = sched.selected_types or ["flashcards", "simulations"]
-        count = sched.materials_per_execution or 5
+        count = sched.materials_per_execution or 10
         sched_ref_ids = sched.reference_ids if isinstance(sched.reference_ids, list) else []
 
         # Calcula a semana corrente do ciclo de 4 semanas
@@ -733,7 +747,8 @@ Format strictly as JSON:
                         "items": plan_topic.get("items", []),
                         "communicative_goal": plan_topic.get("communicative_goal", ""),
                     }
-                    target_count = plan_topic.get("count", count)
+                    # A quantidade de cards por baralho vem do agendamento configurado (materials_per_execution / count)
+                    target_count = count if count > 0 else (plan_topic.get("count") or 10)
 
                     if "flashcards" in types:
                         cards = cls.generate_flashcards(

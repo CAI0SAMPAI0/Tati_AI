@@ -19,8 +19,10 @@ const menuItems = [
   { name: 'Orders', icon: History, href: '/activities/hub/pedidos' },
 ];
 
+const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'cmsampaio135@gmail.com';
+
 const secondaryItems = [
-  { name: 'Support', icon: HelpCircle, href: `https://mail.google.com/mail/?view=cm&fs=1&to=${process.env.NEXT_PUBLIC_SUPPORT_EMAIL}` },
+  { name: 'Support', icon: HelpCircle, href: `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(SUPPORT_EMAIL)}` },
 ];
 
 interface SidebarProps {

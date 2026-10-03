@@ -409,7 +409,7 @@ ADMIN_USERNAMES = [
 #    MODELAGEM DE IA E PROVEDORES                                       
 LLM_MODEL = os.getenv("LLM_MODEL", "meta-llama/Llama-3.1-8B-Instruct:novita")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "meta_llama")  # meta_llama, groq, gemini
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-large-en-v1.5")
 AI_CACHE_ENABLED = os.getenv("AI_CACHE_ENABLED", "true").lower() in ("true", "1", "yes")
 AI_CACHE_TTL = int(os.getenv("AI_CACHE_TTL", "86400"))

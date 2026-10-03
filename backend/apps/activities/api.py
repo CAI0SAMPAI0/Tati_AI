@@ -1229,13 +1229,26 @@ def extract_cefr_topics(request: HttpRequest, reference_ids: Optional[str] = Non
     if not all_ref_ids and reference_ids:
         all_ref_ids = [r.strip() for r in reference_ids.split(",") if r.strip()]
 
+    # Se require_selected=true ou referências vazias forem explicitamente passadas, não injeta tópicos padrão
+    require_selected = request.GET.get("require_selected", "false").lower() in ("true", "1")
+    if require_selected and not all_ref_ids:
+        return {"success": True, "level": "", "topics": []}
+
     # 2. Se referências foram fornecidas, extrai tópicos diretamente dos arquivos usando IA
     if all_ref_ids:
         res = CEFRGeneratorService.extract_topics_from_references(all_ref_ids)
-        if res and res.get("topics"):
+        if res and isinstance(res.get("topics"), list):
+            # Garante que só retornem tópicos pertencentes aos arquivos selecionados
+            cleaned_set = set(all_ref_ids)
+            filtered_topics = [
+                t for t in res["topics"]
+                if not t.get("reference_id") or str(t.get("reference_id")) in cleaned_set
+            ]
+            res["topics"] = filtered_topics
             return res
+        return {"success": True, "level": "", "topics": []}
 
-    # 3. Se não houver IDs específicos, busca os materiais mais recentes do nível solicitado
+    # 3. Se não houver IDs específicos e require_selected não estiver ativo, busca os materiais mais recentes do nível solicitado
     level = request.GET.get("level") or "A1"
     refs = list(CEFRReference.objects.filter(cefr_level__iexact=level)[:3])
     if refs:
