@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import {
   Upload,
   FileText,
@@ -13,7 +12,6 @@ import {
   Trash2,
   Info,
   Layers,
-  FileIcon,
   X,
   Calendar,
   Clock,
@@ -21,7 +19,6 @@ import {
   ToggleLeft,
   ToggleRight,
   Pencil,
-  Check,
   Eye,
   EyeOff,
   Plus,
@@ -31,12 +28,24 @@ import {
   Square,
   Search,
   Play,
-  RotateCcw
+  RotateCcw,
+  Compass,
+  MessageSquare,
+  GraduationCap,
+  Award,
+  Crown,
+  ChevronRight,
+  ChevronLeft,
+  PenLine,
+  FileBox,
+  Sliders,
 } from 'lucide-react';
 import { apiUpload, apiPost, apiGet, apiDelete, apiPut, apiPatch } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
 import { DialogModal } from '@/components/ui/dialog-modal';
 import { LEVEL_OPTIONS } from '@/lib/constants/levels';
+import { CEFR_LEVELS_METADATA } from './flashcards-section';
+import { ENDPOINTS } from '@/lib/api/endpoints';
 import toast from 'react-hot-toast';
 
 const WEEKDAYS_OPTIONS = [
@@ -140,6 +149,12 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
   const [savingEdit, setSavingEdit] = useState(false);
   const [generatingCardImages, setGeneratingCardImages] = useState<Record<number, boolean>>({});
   const [uploadingCardImages, setUploadingCardImages] = useState<Record<number, boolean>>({});
+  const [editModalStep, setEditModalStep] = useState<1 | 2>(1);
+  const [cefrImageErrors, setCefrImageErrors] = useState<Record<number, boolean>>({});
+  const [showAiGenCefr, setShowAiGenCefr] = useState(false);
+  const [cefrAiTheme, setCefrAiTheme] = useState('');
+  const [cefrAiWithImages, setCefrAiWithImages] = useState(true);
+  const [isGeneratingCefrCards, setIsGeneratingCefrCards] = useState(false);
   const [extractingTopics, setExtractingTopics] = useState(false);
   const [extractedTopics, setExtractedTopics] = useState<any[]>([]);
   const [showTopicSelector, setShowTopicSelector] = useState(false);
@@ -221,21 +236,101 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
     }
   };
 
+  const handleCreateNewFlashcardGroup = () => {
+    setEditingItem({ isNew: true });
+    setEditingItemType('flashcard');
+    setEditModalStep(1);
+    setCefrImageErrors({});
+    setShowAiGenCefr(false);
+    setCefrAiTheme('');
+    setEditForm({
+      old_level: 'A1',
+      old_topic: '',
+      new_level: 'A1',
+      new_topic: '',
+      description: '',
+      flashcards: [
+        { front: '', back: '', explanation: '', image_url: '' }
+      ]
+    });
+  };
+
   const handleStartEditFlashcardGroup = (group: any) => {
     setEditingItem(group);
     setEditingItemType('flashcard');
+    setEditModalStep(1);
+    setCefrImageErrors({});
+    setShowAiGenCefr(false);
+    setCefrAiTheme(group.topic || '');
     setEditForm({
       old_level: group.level,
       old_topic: group.topic,
       new_level: group.level,
       new_topic: group.topic,
+      description: group.description || '',
       flashcards: group.cards.map((c: any) => ({
         front: c.front || '',
         back: c.back || '',
         explanation: c.explanation || '',
-        image_url: c.image_url || ''
+        image_url: c.image_url || '',
+        is_published: c.is_published ?? true
       }))
     });
+  };
+
+  const handleGenerateCefrWithAI = async () => {
+    if (!cefrAiTheme.trim()) {
+      toast.error('Informe um tema para gerar com IA.');
+      return;
+    }
+    setIsGeneratingCefrCards(true);
+    try {
+      const res = await apiPost<{ success: boolean; task_id?: string }>(ENDPOINTS.ADMIN_MODULE_GENERATE_FLASHCARDS, {
+        theme: cefrAiWithImages ? `IMG:${cefrAiTheme}` : cefrAiTheme,
+        instructions: '',
+        levels: [editForm.new_level || 'A1'],
+        card_count: 5,
+      });
+      if (res.ok && res.data.success && res.data.task_id) {
+        const taskId = res.data.task_id;
+        toast.loading('Generating flashcards with AI...', { id: taskId });
+        const MAX_POLL_RETRIES = 60;
+        let pollRetries = 0;
+        const pollInterval = setInterval(async () => {
+          try {
+            pollRetries++;
+            if (pollRetries > MAX_POLL_RETRIES) {
+              clearInterval(pollInterval);
+              setIsGeneratingCefrCards(false);
+              toast.error('Generation timed out.', { id: taskId });
+              return;
+            }
+            const statusRes = await apiGet<{ status: string; error?: string }>(`/tasks/status/${taskId}`);
+            if (statusRes && statusRes.status === 'success') {
+              clearInterval(pollInterval);
+              setIsGeneratingCefrCards(false);
+              toast.success('Flashcards generated successfully!', { id: taskId });
+              setShowAiGenCefr(false);
+              fetchGeneratedContent(true);
+            } else if (statusRes && statusRes.status === 'failed') {
+              clearInterval(pollInterval);
+              setIsGeneratingCefrCards(false);
+              toast.error(`Failed: ${statusRes.error || 'Unknown error'}`, { id: taskId });
+            }
+          } catch (err: any) {
+            clearInterval(pollInterval);
+            setIsGeneratingCefrCards(false);
+            toast.error(`Error: ${err.message}`, { id: taskId });
+          }
+        }, 2000);
+      } else {
+        setIsGeneratingCefrCards(false);
+        toast.error('Error generating flashcards with AI.');
+      }
+    } catch {
+      setIsGeneratingCefrCards(false);
+      toast.error('Unexpected error generating flashcards.');
+    }
   };
 
   const handleStartEditItem = (item: any, type: 'flashcard' | 'exercise' | 'simulation') => {
@@ -253,17 +348,28 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
 
   const handleSaveEditItem = async () => {
     if (!editingItem || !editingItemType) return;
+    if (editingItemType === 'flashcard' && !editForm.new_topic?.trim()) {
+      toast.error('Deck title/topic is required');
+      return;
+    }
     setSavingEdit(true);
     try {
       let res;
       if (editingItemType === 'flashcard') {
-        res = await apiPost<any>(`/cefr/admin/flashcards/group/save`, editForm);
+        const payload = {
+          old_level: editingItem?.isNew ? editForm.new_level : editForm.old_level,
+          old_topic: editingItem?.isNew ? editForm.new_topic : editForm.old_topic,
+          new_level: editForm.new_level,
+          new_topic: editForm.new_topic,
+          flashcards: editForm.flashcards || []
+        };
+        res = await apiPost<any>(`/cefr/admin/flashcards/group/save`, payload);
       } else if (editingItemType === 'simulation') {
         res = await apiPut<any>(`/cefr/admin/simulations/${editingItem.id}`, editForm);
       }
 
       if (res && res.ok) {
-        toast.success('Material updated successfully!');
+        toast.success(editingItem?.isNew ? 'New deck created successfully!' : 'Material updated successfully!');
         setEditingItem(null);
         setEditingItemType(null);
         setEditForm({});
@@ -281,7 +387,27 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
   const updateCefrCardImageUrl = (idx: number, url: string) => {
     const newCards = [...(editForm.flashcards || [])];
     newCards[idx] = { ...newCards[idx], image_url: url };
-    setEditForm({ ...editForm, flashcards: newCards });
+    setEditForm((prev: any) => ({ ...prev, flashcards: newCards }));
+  };
+
+  const handleCefrUrlUpload = async (idx: number, url: string) => {
+    if (!url || !url.startsWith('http')) return;
+    if (url.includes('res.cloudinary.com')) return;
+
+    setUploadingCardImages(prev => ({ ...prev, [idx]: true }));
+    setCefrImageErrors(prev => ({ ...prev, [idx]: false }));
+
+    try {
+      const res = await apiPost<{ url: string }>('/flashcard-assets/upload-image-from-url', { url });
+      if (res.ok && res.data?.url) {
+        setCefrImageErrors(prev => ({ ...prev, [idx]: false }));
+        updateCefrCardImageUrl(idx, res.data.url);
+      }
+    } catch (err) {
+      console.warn(`[CEFR] Keeping direct URL for card ${idx}:`, err);
+    } finally {
+      setUploadingCardImages(prev => ({ ...prev, [idx]: false }));
+    }
   };
 
   const generateCefrCardImage = async (idx: number) => {
@@ -289,11 +415,19 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
     const prompt = card?.front || card?.back;
     if (!prompt) return toast.error('Front or Back required for AI image');
     setGeneratingCardImages(prev => ({ ...prev, [idx]: true }));
+    setCefrImageErrors(prev => ({ ...prev, [idx]: false }));
     try {
-      const res = await apiPost<{ url: string }>('/flashcard-assets/ai-image', { prompt });
+      const res = await apiPost<{ url: string }>('/flashcard-assets/ai-image', {
+        prompt,
+        front: card?.front,
+        back: card?.back,
+        topic: editForm.new_topic || editForm.old_topic,
+        explanation: card?.explanation,
+      });
       if (res.ok && res.data?.url) {
+        setCefrImageErrors(prev => ({ ...prev, [idx]: false }));
         updateCefrCardImageUrl(idx, res.data.url);
-        toast.success('Image generated!');
+        toast.success('Image ready!');
       } else {
         toast.error((res.data as any)?.detail || 'Failed to generate image');
       }
@@ -307,11 +441,13 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
   const uploadCefrCardImage = async (idx: number, file: File) => {
     if (!file) return;
     setUploadingCardImages(prev => ({ ...prev, [idx]: true }));
+    setCefrImageErrors(prev => ({ ...prev, [idx]: false }));
     try {
       const formData = new FormData();
       formData.append('file', file);
       const res = await apiUpload<{ url: string }>('/flashcard-assets/upload-image', formData);
       if (res.ok && res.data?.url) {
+        setCefrImageErrors(prev => ({ ...prev, [idx]: false }));
         updateCefrCardImageUrl(idx, res.data.url);
         toast.success('Image uploaded!');
       } else {
@@ -322,6 +458,25 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
     } finally {
       setUploadingCardImages(prev => ({ ...prev, [idx]: false }));
     }
+  };
+
+  const addCefrManualCard = () => {
+    const current = editForm.flashcards || [];
+    setEditForm((prev: any) => ({
+      ...prev,
+      flashcards: [...current, { front: '', back: '', explanation: '', image_url: '' }]
+    }));
+  };
+
+  const removeCefrCard = (idx: number) => {
+    const newCards = (editForm.flashcards || []).filter((_: any, index: number) => index !== idx);
+    setEditForm((prev: any) => ({ ...prev, flashcards: newCards }));
+  };
+
+  const updateCefrCard = (idx: number, field: string, value: string) => {
+    const newCards = [...(editForm.flashcards || [])];
+    newCards[idx] = { ...newCards[idx], [field]: value };
+    setEditForm((prev: any) => ({ ...prev, flashcards: newCards }));
   };
 
   const groupedFlashcards = useMemo(() => {
@@ -2326,7 +2481,7 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
                               }`}
                             title="Edit schedule"
                           >
-                            <Pencil size={16} />
+                            <PenLine size={16} />
                           </button>
                           <button
                             onClick={() => handleToggleSchedule(sch.id, sch.active)}
@@ -2435,6 +2590,17 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
                     {tab.label}
                   </button>
                 ))}
+
+                {activeCuratorTab === 'flashcards' && (
+                  <button
+                    type="button"
+                    onClick={handleCreateNewFlashcardGroup}
+                    className="flex items-center gap-1.5 text-xs font-bold text-white bg-primary hover:bg-primary/90 transition-all px-3.5 py-2 rounded-xl shadow-sm cursor-pointer ml-1"
+                  >
+                    <Plus size={15} />
+                    <span>New Deck</span>
+                  </button>
+                )}
 
                 {((activeCuratorTab === 'flashcards' ? activeGroupedFlashcards : activeSimulations).length > 0) && (
                   <button
@@ -2638,12 +2804,12 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
                                     <Square size={20} />
                                   )}
                                 </button>
-                                <div className="bg-indigo-500/10 w-10 h-10 rounded-xl flex items-center justify-center text-indigo-400">
-                                  <Layers size={20} />
+                                <div className="bg-primary/10 w-10 h-10 rounded-xl flex items-center justify-center text-primary">
+                                  <FileBox size={20} />
                                 </div>
                               </div>
                               <div className="flex flex-col items-end gap-1">
-                                <span className="text-[0.65rem] font-bold px-2 py-0.5 rounded-full bg-indigo-500/5 border border-indigo-500/20 text-indigo-400">
+                                <span className="text-[0.65rem] font-bold px-2 py-0.5 rounded-full bg-primary/5 border border-primary/20 text-primary">
                                   {group.cards.length} cards
                                 </span>
                                 <span className={cn(
@@ -2665,20 +2831,27 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
                               </p>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-2 mt-auto pt-2">
-                              <button onClick={() => handleStartEditFlashcardGroup(group)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title="Edit">
-                                <Pencil size={16} />
+                            <div className="grid grid-cols-4 gap-2 mt-auto pt-2">
+                              <button onClick={() => handleStartEditFlashcardGroup(group)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border cursor-pointer" title="Edit">
+                                <PenLine size={16} />
                               </button>
-                              <button onClick={() => handleTogglePublishFlashcardGroup(group)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title={group.is_published ? "Unpublish (Draft)" : "Publish"}>
+                              <button onClick={() => handleTogglePublishFlashcardGroup(group)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border cursor-pointer" title={group.is_published ? "Unpublish (Draft)" : "Publish"}>
                                 {group.is_published ? <EyeOff size={16} /> : <Eye size={16} />}
                               </button>
                               <button
                                 onClick={() => handleDeleteFlashcardGroup(group)}
-                                className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle border border-border"
+                                className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-danger/10 hover:text-danger transition-all text-text-subtle border border-border cursor-pointer"
                                 title="Delete"
                               >
                                 <Trash2 size={16} />
                               </button>
+                              <a
+                                href="/activities"
+                                className="flex items-center justify-center p-2 rounded-lg bg-primary text-white hover:bg-primary/90 transition-all border border-transparent"
+                                title="View student activities"
+                              >
+                                <Play size={16} />
+                              </a>
                             </div>
                           </div>
                         );
@@ -2752,8 +2925,8 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
                             </div>
 
                             <div className="grid grid-cols-3 gap-2 mt-auto pt-2">
-                              <button onClick={() => handleStartEditItem(sim, 'simulation')} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title="Edit">
-                                <Pencil size={16} />
+                              <button onClick={() => handleStartEditItem(sim, 'simulation')} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border cursor-pointer" title="Edit">
+                                <PenLine size={16} />
                               </button>
                               <button onClick={() => handleTogglePublishSimulation(sim.id, sim.is_published)} className="flex items-center justify-center p-2 rounded-lg bg-bg-secondary hover:bg-primary/10 hover:text-primary transition-all text-text-subtle border border-border" title={sim.is_published ? "Unpublish (Draft)" : "Publish"}>
                                 {sim.is_published ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -2778,11 +2951,495 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
         </div>
       )}
 
-      {/*     CURATOR EDIT DIALOG MODAL     */}
+      {/* ========================================================================= */}
+      {/* CEFR FLASHCARD EDIT MODAL (FIGMA REDESIGN) */}
+      {/* ========================================================================= */}
       <DialogModal
-        isOpen={editingItem !== null}
+        isOpen={editingItem !== null && editingItemType === 'flashcard'}
         onClose={() => { setEditingItem(null); setEditingItemType(null); }}
-        title={`Edit Generated ${editingItemType ? editingItemType.charAt(0).toUpperCase() + editingItemType.slice(1) : ''}`}
+        hideDefaultHeader={true}
+        size="2xl"
+        className="max-w-5xl"
+        contentClassName="p-0"
+        customHeader={
+          <div className="flex flex-col gap-4 p-5 sm:p-6 pb-4 border-b border-border/60 shrink-0 bg-surface">
+            {/* Top Header Row */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-inner shrink-0">
+                  <Layers size={24} className="text-primary" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black tracking-widest text-primary uppercase block">
+                    FLASHCARD DECK
+                  </span>
+                  <h2 className="text-xl sm:text-2xl font-black text-text tracking-tight">
+                    {editingItem?.isNew ? 'New deck' : 'Edit deck'}
+                  </h2>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    Update deck name, category, CEFR level and flashcards
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => { setEditingItem(null); setEditingItemType(null); }}
+                className="p-2 hover:bg-surface-hover rounded-full transition-colors text-text-muted hover:text-text cursor-pointer"
+                title="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Stepper Tabs */}
+            <div className="flex items-center justify-center sm:justify-start gap-2 pt-2 border-t border-border/40">
+              <button
+                type="button"
+                onClick={() => setEditModalStep(1)}
+                className={cn(
+                  "flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer text-left",
+                  editModalStep === 1
+                    ? "bg-primary/10 border border-primary/25"
+                    : "hover:bg-surface-hover opacity-75"
+                )}
+              >
+                <div
+                  className={cn(
+                    "w-7 h-7 rounded-full flex items-center justify-center text-xs font-black transition-all",
+                    editModalStep === 1
+                      ? "bg-primary text-white shadow-sm shadow-primary/30"
+                      : "bg-surface border border-border text-text-muted"
+                  )}
+                >
+                  1
+                </div>
+                <div>
+                  <span className={cn("text-xs font-bold block", editModalStep === 1 ? "text-primary" : "text-text")}>
+                    Basic details
+                  </span>
+                  <span className="text-[10px] text-text-muted block">
+                    Topic & CEFR Level
+                  </span>
+                </div>
+              </button>
+
+              <div className="w-8 sm:w-12 h-0.5 bg-border shrink-0" />
+
+              <button
+                type="button"
+                onClick={() => setEditModalStep(2)}
+                className={cn(
+                  "flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer text-left",
+                  editModalStep === 2
+                    ? "bg-primary/10 border border-primary/25"
+                    : "hover:bg-surface-hover opacity-75"
+                )}
+              >
+                <div
+                  className={cn(
+                    "w-7 h-7 rounded-full flex items-center justify-center text-xs font-black transition-all",
+                    editModalStep === 2
+                      ? "bg-primary text-white shadow-sm shadow-primary/30"
+                      : "bg-surface border border-border text-text-muted"
+                  )}
+                >
+                  2
+                </div>
+                <div>
+                  <span className={cn("text-xs font-bold block", editModalStep === 2 ? "text-primary" : "text-text")}>
+                    Cards
+                  </span>
+                  <span className="text-[10px] text-text-muted block">
+                    {editForm.flashcards?.length || 0} cards added
+                  </span>
+                </div>
+              </button>
+            </div>
+          </div>
+        }
+      >
+        <div className="p-5 sm:p-6 space-y-6">
+          {editModalStep === 1 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Left Column: Form Details & CEFR Level Selection */}
+              <div className="lg:col-span-7 space-y-5">
+                {/* Section 1: Deck Information */}
+                <div className="bg-surface/60 border border-border/70 rounded-2xl p-4 sm:p-5 space-y-4">
+                  <div className="flex items-center gap-2.5 mb-1">
+                    <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                      <PenLine size={16} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-extrabold text-text uppercase tracking-wider">
+                        Deck Information
+                      </h4>
+                      <p className="text-[11px] text-text-muted">
+                        Topic and settings for this CEFR material
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-text">Deck Topic</label>
+                      <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                        Required
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      value={editForm.new_topic || ''}
+                      onChange={(e) => setEditForm({ ...editForm, new_topic: e.target.value })}
+                      placeholder="Ex: Health & Diet, Daily Routines..."
+                      className="w-full bg-surface border border-border rounded-xl px-3.5 py-2.5 text-sm text-text focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-text">Description / Objective</label>
+                      <span className="text-[10px] font-medium text-text-muted">
+                        {(editForm.description || '').length}/200
+                      </span>
+                    </div>
+                    <textarea
+                      rows={2}
+                      value={editForm.description || ''}
+                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                      maxLength={200}
+                      placeholder="Essential vocabulary for target communicative situations..."
+                      className="w-full bg-surface border border-border rounded-xl px-3.5 py-2 text-sm text-text focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Section 2: Target CEFR Level */}
+                <div className="bg-surface/60 border border-border/70 rounded-2xl p-4 sm:p-5 space-y-3">
+                  <div className="flex items-center gap-2.5 mb-1">
+                    <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                      <GraduationCap size={16} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-extrabold text-text uppercase tracking-wider">
+                        Target CEFR Level
+                      </h4>
+                      <p className="text-[11px] text-text-muted">
+                        Select the proficiency level this deck is designed for
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 2x3 Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+                    {CEFR_LEVELS_METADATA.map((lvl) => {
+                      const isSelected = (editForm.new_level || '').toUpperCase() === lvl.code;
+                      const Icon = lvl.icon;
+                      return (
+                        <button
+                          key={lvl.code}
+                          type="button"
+                          onClick={() => setEditForm({ ...editForm, new_level: lvl.code })}
+                          className={cn(
+                            "rounded-2xl border p-3 flex flex-col justify-between text-left transition-all relative select-none cursor-pointer group",
+                            isSelected
+                              ? "border-primary bg-primary/10 shadow-sm ring-2 ring-primary/25"
+                              : "border-border bg-surface hover:border-primary/40 hover:bg-surface-hover"
+                          )}
+                        >
+                          <div className="flex items-start justify-between w-full mb-1">
+                            <div className={cn("w-7 h-7 rounded-xl flex items-center justify-center", lvl.bgColor, lvl.color)}>
+                              <Icon size={14} />
+                            </div>
+                            {isSelected && (
+                              <CheckCircle2 size={16} className="text-primary fill-primary/20" />
+                            )}
+                          </div>
+                          <div>
+                            <span className="font-extrabold text-xs text-text block">
+                              {lvl.code} - {lvl.label}
+                            </span>
+                            <p className="text-[10px] text-text-muted mt-0.5 line-clamp-2 leading-tight">
+                              {lvl.desc}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1 text-[11px] text-text-subtle">
+                    <Info size={13} className="text-primary shrink-0" />
+                    <span>Selected level determines vocabulary complexity and difficulty standards.</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Live Preview */}
+              <div className="lg:col-span-5">
+                <div className="bg-gradient-to-b from-surface via-surface/80 to-bg border border-border/80 rounded-3xl p-6 flex flex-col items-center text-center space-y-4 shadow-sm sticky top-2">
+                  {/* 3D Stack Graphic */}
+                  <div className="relative pt-2 pb-1">
+                    <div className="absolute w-32 h-24 bg-primary/20 rounded-2xl -rotate-6 transform -translate-y-1 -translate-x-1" />
+                    <div className="absolute w-32 h-24 bg-violet-600/25 rounded-2xl rotate-3 transform translate-y-0.5 translate-x-1" />
+                    <div className="relative w-36 h-26 bg-gradient-to-br from-primary via-violet-600 to-indigo-700 rounded-2xl shadow-xl shadow-primary/25 p-3 flex flex-col items-center justify-center text-white transition-all transform hover:scale-105">
+                      <Layers size={24} className="text-white drop-shadow mb-1" />
+                      <span className="text-[9px] font-black tracking-widest uppercase opacity-95">
+                        FLASHCARD DECK
+                      </span>
+                      <span className="text-[9px] opacity-80 mt-0.5 font-bold">
+                        {(editForm.flashcards || []).length} Cards
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Live Preview Info */}
+                  <div className="space-y-1 w-full">
+                    <span className="text-[10px] font-black tracking-widest text-primary uppercase bg-primary/10 px-2.5 py-0.5 rounded-full inline-block">
+                      LIVE PREVIEW
+                    </span>
+                    <h3 className="text-base font-black text-text truncate max-w-full px-2">
+                      {editForm.new_topic || 'Untitled Deck'}
+                    </h3>
+                    <p className="text-xs text-text-muted line-clamp-2 px-3">
+                      {editForm.description || 'Target CEFR proficiency deck.'}
+                    </p>
+                  </div>
+
+                  {/* Metrics Row */}
+                  <div className="grid grid-cols-2 gap-2.5 w-full pt-1">
+                    <div className="bg-surface border border-border/80 rounded-xl p-2.5 flex items-center gap-2 text-left">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <FileBox size={16} />
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-bold text-text-muted uppercase block">Cards</span>
+                        <span className="text-xs font-black text-text">{(editForm.flashcards || []).length}</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-surface border border-border/80 rounded-xl p-2.5 flex items-center gap-2 text-left">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                        <GraduationCap size={16} />
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-bold text-text-muted uppercase block">Level</span>
+                        <span className="text-xs font-black text-text truncate max-w-[80px] block">
+                          {editForm.new_level || 'A1'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action preview cards link */}
+                  <button
+                    type="button"
+                    onClick={() => setEditModalStep(2)}
+                    className="w-full py-2.5 px-4 bg-surface hover:bg-surface-hover border border-border rounded-xl text-xs font-bold text-primary flex items-center justify-between group transition-all cursor-pointer shadow-sm"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Layers size={14} />
+                      Preview Cards ({(editForm.flashcards || []).length})
+                    </span>
+                    <ChevronRight size={15} className="group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Step 2: Cards Management */
+            <div className="space-y-4">
+              {/* Step 2 Header & Action Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-surface/60 border border-border/70 rounded-2xl">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                    <Layers size={16} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-text uppercase tracking-wider">
+                      Cards Management
+                    </h4>
+                    <span className="text-[11px] text-text-muted">
+                      {(editForm.flashcards || []).length} cards in this deck
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAiGenCefr(!showAiGenCefr)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer",
+                      showAiGenCefr
+                        ? "bg-primary text-white border-primary shadow-sm"
+                        : "bg-surface hover:bg-surface-hover border-border text-primary"
+                    )}
+                  >
+                    <Sparkles size={13} />
+                    {showAiGenCefr ? 'Hide AI' : 'Generate with AI'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={addCefrManualCard}
+                    className="px-3 py-1.5 rounded-xl bg-primary text-white text-xs font-bold flex items-center gap-1.5 hover:bg-primary/90 shadow-sm transition-all cursor-pointer"
+                  >
+                    <Plus size={14} /> Add Card
+                  </button>
+                </div>
+              </div>
+
+              {/* Collapsible AI Gen Box */}
+              {showAiGenCefr && (
+                <div className="p-4 bg-primary/5 rounded-2xl border border-primary/20 space-y-3 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-bold text-primary flex items-center gap-1.5">
+                      <Sparkles size={14} /> AI Flashcard Generator
+                    </h5>
+                    <span className="text-[10px] text-text-muted">
+                      Generates balanced cards for selected level ({editForm.new_level || 'A1'})
+                    </span>
+                  </div>
+                  <textarea
+                    placeholder="Enter theme or topic (e.g. Travel Vocabulary, Business Phrasal Verbs, Restaurant Food)..."
+                    className="w-full min-h-[60px] p-3 bg-surface border border-border rounded-xl text-xs outline-none focus:border-primary transition-all resize-none"
+                    value={cefrAiTheme}
+                    onChange={(e) => setCefrAiTheme(e.target.value)}
+                  />
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <label className="flex items-center gap-2 text-xs text-text-muted cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={cefrAiWithImages}
+                        onChange={(e) => setCefrAiWithImages(e.target.checked)}
+                        className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                      />
+                      <span>Generate realistic image for each card</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleGenerateCefrWithAI}
+                      disabled={isGeneratingCefrCards || !cefrAiTheme.trim()}
+                      className="px-3.5 py-1.5 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary/90 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      {isGeneratingCefrCards ? (
+                        <>
+                          <Loader2 size={13} className="animate-spin" />
+                          <span>Generating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={13} />
+                          <span>Generate Cards</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Cards List */}
+              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                {(editForm.flashcards || []).length === 0 ? (
+                  <div className="py-12 text-center border border-dashed border-border rounded-2xl bg-surface/30">
+                    <Layers size={28} className="text-text-muted/40 mx-auto mb-2" />
+                    <p className="text-xs font-bold text-text-muted">No flashcards in this deck yet</p>
+                    <p className="text-[11px] text-text-subtle mt-0.5">Click "Add Card" or generate them using AI above</p>
+                    <button
+                      type="button"
+                      onClick={addCefrManualCard}
+                      className="mt-3 px-3 py-1.5 rounded-xl bg-surface hover:bg-surface-hover border border-border text-xs font-bold text-text flex items-center gap-1.5 mx-auto transition-all cursor-pointer"
+                    >
+                      <Plus size={13} /> Add First Card
+                    </button>
+                  </div>
+                ) : (
+                  (editForm.flashcards || []).map((card: any, idx: number) => (
+                    <CuratorFlashcardItem
+                      key={idx}
+                      card={card}
+                      idx={idx}
+                      isGenerating={generatingCardImages[idx] || false}
+                      isUploading={uploadingCardImages[idx] || false}
+                      hasImageError={cefrImageErrors[idx] || false}
+                      onUpdate={updateCefrCard}
+                      onRemove={removeCefrCard}
+                      onImageUpload={uploadCefrCardImage}
+                      onGenerateImage={generateCefrCardImage}
+                      onUrlUpload={handleCefrUrlUpload}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Footer Navigation Bar */}
+          <div className="pt-4 border-t border-border/80 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs text-text-muted">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Draft status: Changes will update this CEFR flashcard set</span>
+            </div>
+
+            <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+              {editModalStep === 1 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => { setEditingItem(null); setEditingItemType(null); }}
+                    className="px-4 py-2 bg-surface hover:bg-surface-hover border border-border text-text rounded-xl font-bold text-xs transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditModalStep(2)}
+                    className="px-5 py-2 bg-primary text-white rounded-xl font-bold text-xs hover:bg-primary/90 shadow-md shadow-primary/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Next: Cards</span>
+                    <ChevronRight size={14} />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setEditModalStep(1)}
+                    className="px-4 py-2 bg-surface hover:bg-surface-hover border border-border text-text rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <ChevronLeft size={14} />
+                    <span>Back to Details</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveEditItem}
+                    disabled={savingEdit}
+                    className="px-6 py-2 bg-primary text-white rounded-xl font-bold text-xs hover:bg-primary/90 shadow-md shadow-primary/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {savingEdit ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <span>Save Changes</span>
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </DialogModal>
+
+      {/* ========================================================================= */}
+      {/* SIMULATION EDIT DIALOG MODAL */}
+      {/* ========================================================================= */}
+      <DialogModal
+        isOpen={editingItem !== null && editingItemType === 'simulation'}
+        onClose={() => { setEditingItem(null); setEditingItemType(null); }}
+        title="Edit Simulation Material"
         size="xl"
       >
         <div className="space-y-4">
@@ -2791,10 +3448,10 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
               <label className="block text-xs font-bold text-text-subtle uppercase mb-1">Topic</label>
               <input
                 type="text"
-                value={editingItemType === 'simulation' ? (editForm.topic || '') : (editForm.new_topic || '')}
+                value={editForm.topic || ''}
                 onChange={(e) => setEditForm({
                   ...editForm,
-                  [editingItemType === 'simulation' ? 'topic' : 'new_topic']: e.target.value
+                  topic: e.target.value
                 })}
                 className="w-full bg-bg border border-border rounded-xl px-4 py-2.5 text-text focus:ring-2 focus:ring-primary/20 outline-none transition-all"
               />
@@ -2802,10 +3459,10 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
             <div>
               <label className="block text-xs font-bold text-text-subtle uppercase mb-1">CEFR Level</label>
               <select
-                value={editingItemType === 'simulation' ? (editForm.level || '') : (editForm.new_level || '')}
+                value={editForm.level || 'A1'}
                 onChange={(e) => setEditForm({
                   ...editForm,
-                  [editingItemType === 'simulation' ? 'level' : 'new_level']: e.target.value
+                  level: e.target.value
                 })}
                 className="w-full bg-bg border border-border rounded-xl px-4 py-2.5 text-text focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer"
               >
@@ -2816,73 +3473,22 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
             </div>
           </div>
 
-          {editingItemType === 'flashcard' && (
-            <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-bold text-primary flex items-center gap-2">
-                  <Layers size={16} /> Flashcards ({(editForm.flashcards || []).length})
-                </h4>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const current = editForm.flashcards || [];
-                    setEditForm({
-                      ...editForm,
-                      flashcards: [...current, { front: '', back: '', explanation: '', image_url: '' }]
-                    });
-                  }}
-                  className="px-3 py-1 bg-surface border border-border rounded-lg text-xs font-bold text-primary hover:bg-surface-hover flex items-center gap-1"
-                >
-                  <Plus size={12} /> Add Card
-                </button>
-              </div>
-
-              <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
-                {(editForm.flashcards || []).map((card: any, idx: number) => (
-                  <CuratorFlashcardItem
-                    key={idx}
-                    card={card}
-                    idx={idx}
-                    onUpdate={(i, field, value) => {
-                      const newCards = [...(editForm.flashcards || [])];
-                      newCards[i] = { ...newCards[i], [field]: value };
-                      setEditForm((prev: any) => ({ ...prev, flashcards: newCards }));
-                    }}
-                    onRemove={(i) => {
-                      const newCards = (editForm.flashcards || []).filter((_: any, index: number) => index !== i);
-                      setEditForm((prev: any) => ({ ...prev, flashcards: newCards }));
-                    }}
-                    onImageUpload={(i, url) => {
-                      const newCards = [...(editForm.flashcards || [])];
-                      newCards[i] = { ...newCards[i], image_url: url };
-                      setEditForm((prev: any) => ({ ...prev, flashcards: newCards }));
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {editingItemType === 'simulation' && (
-            <>
-              <div>
-                <label className="block text-xs font-bold text-text-subtle uppercase mb-1">Scenario Description / System Prompt</label>
-                <textarea
-                  value={editForm.scenario || ''}
-                  onChange={(e) => setEditForm({ ...editForm, scenario: e.target.value })}
-                  className="w-full bg-bg border border-border rounded-xl px-4 py-2.5 text-text focus:ring-2 focus:ring-primary/20 outline-none transition-all min-h-[150px] resize-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-text-subtle uppercase mb-1">Goal Description</label>
-                <textarea
-                  value={editForm.goal || ''}
-                  onChange={(e) => setEditForm({ ...editForm, goal: e.target.value })}
-                  className="w-full bg-bg border border-border rounded-xl px-4 py-2.5 text-text focus:ring-2 focus:ring-primary/20 outline-none transition-all min-h-[100px] resize-none"
-                />
-              </div>
-            </>
-          )}
+          <div>
+            <label className="block text-xs font-bold text-text-subtle uppercase mb-1">Scenario Description / System Prompt</label>
+            <textarea
+              value={editForm.scenario || ''}
+              onChange={(e) => setEditForm({ ...editForm, scenario: e.target.value })}
+              className="w-full bg-bg border border-border rounded-xl px-4 py-2.5 text-text focus:ring-2 focus:ring-primary/20 outline-none transition-all min-h-[150px] resize-none"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-text-subtle uppercase mb-1">Goal Description</label>
+            <textarea
+              value={editForm.goal || ''}
+              onChange={(e) => setEditForm({ ...editForm, goal: e.target.value })}
+              className="w-full bg-bg border border-border rounded-xl px-4 py-2.5 text-text focus:ring-2 focus:ring-primary/20 outline-none transition-all min-h-[100px] resize-none"
+            />
+          </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <button
@@ -2906,116 +3512,202 @@ const SCHEDULE_REFS_STORAGE_KEY = 'tati_cefr_schedule_refs_draft';
 }
 
 interface CuratorFlashcardItemProps {
-  card: any;
+  card: { front: string; back: string; explanation?: string; image_url?: string };
   idx: number;
+  isGenerating: boolean;
+  isUploading: boolean;
+  hasImageError: boolean;
   onUpdate: (idx: number, field: string, value: string) => void;
   onRemove: (idx: number) => void;
-  onImageUpload: (idx: number, url: string) => void;
+  onImageUpload: (idx: number, file: File) => void;
+  onGenerateImage: (idx: number) => void;
+  onUrlUpload: (idx: number, url: string) => void;
 }
 
 const CuratorFlashcardItem = React.memo(function CuratorFlashcardItem({
   card,
   idx,
+  isGenerating,
+  isUploading,
+  hasImageError,
   onUpdate,
   onRemove,
   onImageUpload,
+  onGenerateImage,
+  onUrlUpload,
 }: CuratorFlashcardItemProps) {
+  // Extrai URL limpa se o usuário colar link do Google Imagens
+  const handleImageUrlChange = (rawUrl: string) => {
+    let cleanUrl = rawUrl.trim();
+    if (cleanUrl.includes('imgres?q=') || cleanUrl.includes('google.com/imgres')) {
+      try {
+        const urlObj = new URL(cleanUrl);
+        const imgParam = urlObj.searchParams.get('imgurl');
+        if (imgParam) {
+          cleanUrl = decodeURIComponent(imgParam);
+        }
+      } catch {
+        const match = cleanUrl.match(/[?&]imgurl=([^&]+)/);
+        if (match && match[1]) {
+          cleanUrl = decodeURIComponent(match[1]);
+        }
+      }
+    }
+    onUpdate(idx, 'image_url', cleanUrl);
+  };
+
   return (
-    <div className="p-4 bg-surface border border-border rounded-xl space-y-3 relative group">
-      <button
-        type="button"
-        onClick={() => onRemove(idx)}
-        className="absolute top-2 right-2 p-1 text-text-subtle hover:text-danger opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
-        title="Remove Card"
-      >
-        <Trash2 size={14} />
-      </button>
-
-      <div className="grid grid-cols-[80px,1fr,1fr] gap-3 items-start">
-        <div
-          className="w-[80px] h-[80px] rounded-lg bg-input border border-border overflow-hidden flex items-center justify-center relative cursor-pointer group/img"
-          onClick={() => {
-            const input = document.getElementById(`cefr-file-${idx}`) as HTMLInputElement;
-            input?.click();
-          }}
-          title="Click to upload image"
-        >
-          {card.image_url ? (
-            <img
-              key={card.image_url}
-              src={card.image_url}
-              alt=""
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <ImageIcon size={20} className="text-text-muted opacity-30" />
-            </div>
-          )}
-          <input
-            type="file"
-            id={`cefr-file-${idx}`}
-            className="hidden"
-            accept="image/*"
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              const formDataUpload = new FormData();
-              formDataUpload.append('file', file);
-              const res = await apiUpload<{ url: string }>('/flashcard-assets/upload-image', formDataUpload);
-              if (res.ok && res.data?.url) {
-                onImageUpload(idx, res.data.url);
-                toast.success('Image uploaded!');
-              }
-              e.target.value = '';
-            }}
-          />
-        </div>
-
-        <div>
-          <label className="block text-[10px] font-bold text-text-subtle uppercase mb-1">Front (Term)</label>
-          <input
-            type="text"
-            value={card.front || ''}
-            onChange={(e) => onUpdate(idx, 'front', e.target.value)}
-            className="w-full bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text focus:ring-1 focus:ring-primary/20 outline-none"
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] font-bold text-text-subtle uppercase mb-1">Back (Definition)</label>
-          <input
-            type="text"
-            value={card.back || ''}
-            onChange={(e) => onUpdate(idx, 'back', e.target.value)}
-            className="w-full bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text focus:ring-1 focus:ring-primary/20 outline-none"
-          />
-        </div>
+    <div className="p-3.5 bg-surface border border-border/80 rounded-2xl flex flex-col sm:flex-row gap-3 items-start sm:items-center group hover:border-primary/40 transition-all">
+      {/* Number Badge */}
+      <div className="w-5 text-[11px] font-black text-text-subtle text-center shrink-0 hidden sm:block">
+        #{idx + 1}
       </div>
 
-      <div>
-        <label className="block text-[10px] font-bold text-text-subtle uppercase mb-1">Explanation</label>
-        <textarea
-          value={card.explanation || ''}
-          onChange={(e) => onUpdate(idx, 'explanation', e.target.value)}
-          className="w-full bg-bg border border-border rounded-lg px-3 py-1 text-xs text-text focus:ring-1 focus:ring-primary/20 outline-none resize-none min-h-[50px]"
+      {/* Image Preview / Upload */}
+      <div
+        className="w-16 h-16 rounded-xl bg-input border border-border overflow-hidden flex items-center justify-center relative cursor-pointer group/img shrink-0"
+        onClick={() => document.getElementById(`cefr-file-upload-${idx}`)?.click()}
+        title="Click to upload image file"
+      >
+        {card.image_url && !hasImageError ? (
+          <img
+            key={card.image_url}
+            src={card.image_url}
+            alt=""
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-muted/20">
+            <ImageIcon size={18} className="text-text-muted opacity-40" />
+          </div>
+        )}
+
+        {/* Overlay with Upload Icon */}
+        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/img:opacity-100 transition-all flex items-center justify-center">
+          <Upload size={14} className="text-white" />
+        </div>
+
+        {(isGenerating || isUploading) && (
+          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+            <Loader2 size={16} className="text-primary animate-spin" />
+          </div>
+        )}
+
+        <input
+          type="file"
+          id={`cefr-file-upload-${idx}`}
+          className="hidden"
+          accept="image/*"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) onImageUpload(idx, file);
+            e.target.value = '';
+          }}
         />
       </div>
 
-      <div className="space-y-2">
-        <label className="block text-[10px] font-bold text-text-subtle uppercase mb-1">Image URL</label>
-        <div className="flex items-center gap-2">
+      {/* Text Inputs Column */}
+      <div className="flex-1 w-full space-y-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div>
+            <label className="block text-[10px] font-bold text-text-subtle uppercase mb-0.5">
+              Front (Term)
+            </label>
+            <input
+              className="w-full bg-surface border border-border rounded-lg px-2.5 py-1 text-xs text-text outline-none focus:border-primary transition-all"
+              placeholder="Word or phrase"
+              value={card.front || ''}
+              onChange={(e) => onUpdate(idx, 'front', e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-bold text-text-subtle uppercase mb-0.5">
+              Back (Meaning / Translation)
+            </label>
+            <input
+              className="w-full bg-surface border border-border rounded-lg px-2.5 py-1 text-xs text-text outline-none focus:border-primary transition-all"
+              placeholder="Definition or meaning"
+              value={card.back || ''}
+              onChange={(e) => onUpdate(idx, 'back', e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-bold text-text-subtle uppercase mb-0.5">
+            Explanation / Example Context
+          </label>
           <input
-            type="text"
-            placeholder="Paste image URL..."
-            value={card.image_url || ''}
-            onChange={(e) => onUpdate(idx, 'image_url', e.target.value)}
-            className="flex-1 bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text focus:ring-1 focus:ring-primary/20 outline-none"
+            className="w-full bg-surface border border-border rounded-lg px-2.5 py-1 text-xs text-text outline-none focus:border-primary transition-all placeholder:text-[11px]"
+            placeholder="Usage context, sentence, or phonetic tip..."
+            value={card.explanation || ''}
+            onChange={(e) => onUpdate(idx, 'explanation', e.target.value)}
           />
         </div>
+
+        {/* Image URL Input & Action Buttons */}
+        <div>
+          <label className="block text-[10px] font-bold text-text-subtle uppercase mb-0.5">
+            Image URL (paste any web link or generate with AI)
+          </label>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="text"
+              className="flex-1 bg-surface border border-border rounded-lg px-2.5 py-1 text-xs text-text outline-none focus:border-primary transition-all placeholder:text-[11px]"
+              placeholder="Paste image URL from the internet..."
+              value={card.image_url || ''}
+              onChange={(e) => handleImageUrlChange(e.target.value)}
+              onBlur={(e) => onUrlUpload(idx, e.target.value)}
+            />
+            {card.image_url && (
+              <button
+                type="button"
+                onClick={() => onUpdate(idx, 'image_url', '')}
+                className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-surface-hover transition-all cursor-pointer"
+                title="Clear Image URL"
+              >
+                <X size={12} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => onGenerateImage(idx)}
+              disabled={isGenerating}
+              className={cn(
+                "p-1.5 px-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-all text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer",
+                isGenerating && "animate-pulse opacity-50"
+              )}
+              title="Search and generate specific image with AI"
+            >
+              <Sparkles size={12} />
+              <span className="hidden sm:inline text-[11px]">AI Search</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => document.getElementById(`cefr-file-upload-${idx}`)?.click()}
+              className="p-1.5 px-2 rounded-lg bg-surface border border-border text-text hover:text-primary hover:border-primary transition-all text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer"
+              title="Upload image from your device"
+            >
+              <Upload size={12} />
+              <span className="hidden sm:inline text-[11px]">Upload</span>
+            </button>
+          </div>
+        </div>
       </div>
+
+      {/* Delete Action */}
+      <button
+        type="button"
+        onClick={() => onRemove(idx)}
+        className="text-text-subtle hover:text-danger p-2 rounded-xl hover:bg-danger/10 transition-all self-end sm:self-center shrink-0 cursor-pointer"
+        title="Remove Flashcard"
+      >
+        <Trash2 size={15} />
+      </button>
     </div>
   );
 });

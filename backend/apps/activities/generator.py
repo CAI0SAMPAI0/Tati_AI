@@ -269,8 +269,8 @@ Fix this flashcard according to these STRICT RULES:
 2. "back": Clear English definition suited for CEFR Level {lvl} (>= 5 characters).
 3. "options": EXACTLY 4 distinct English options. "front" MUST appear in "options" exactly once. The other 3 options MUST be plausible, realistic English words/expressions in the same lexical field. NEVER use "Alternative N", "Option A", "None of the above", or placeholders.
 4. "explanation": Example sentence in English demonstrating natural context (>= 5 characters).
-5. "image_search_query": 2-4 concrete English visual search terms with no spoilers.
-6. "image_prompt": Photographic visual prompt with no text, letters or logos.
+5. "image_search_query": 2-4 specific, concrete English visual terms representing the exact card item/action (e.g. for diet -> "fresh healthy salad food", NEVER stethoscope/doctor).
+6. "image_prompt": Photographic visual prompt depicting the exact card concept with natural lighting, strictly no text, no letters, no logos, no watermark, and no unrelated medical equipment.
 
 Return ONLY a JSON object:
 {{

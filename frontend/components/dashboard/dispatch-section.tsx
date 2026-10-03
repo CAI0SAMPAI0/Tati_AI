@@ -197,7 +197,7 @@ export function DispatchSection() {
       {/* Column 1 & 2: Students Selection */}
       <div className="lg:col-span-2 bg-surface border border-border rounded-2xl flex flex-col h-[70vh] overflow-hidden shadow-sm">
         {/* Topbar: Search & Filters */}
-        <div className="p-5 border-b border-border space-y-4 shrink-0 bg-surface/50 backdrop-blur-md">
+        <div className="p-5 border-b border-border space-y-4 shrink-0 bg-surface">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-text flex items-center gap-2">
               <Users size={18} className="text-primary" />
@@ -257,7 +257,7 @@ export function DispatchSection() {
             </div>
           ) : (
             <table className="w-full text-left border-collapse">
-              <thead className="bg-bg-secondary/50 text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest sticky top-0 z-10 backdrop-blur-md">
+              <thead className="bg-bg-secondary text-[0.65rem] font-bold text-text-subtle uppercase tracking-widest sticky top-0 z-10">
                 <tr>
                   <th className="px-5 py-3.5 w-12">
                     <input 

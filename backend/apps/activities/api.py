@@ -858,35 +858,72 @@ def upload_flashcard_image(request: HttpRequest, file: UploadedFile = File(...))
 @flashcard_assets_router.post("/upload-image-from-url", auth=auth_optional)
 def upload_flashcard_image_from_url(request: HttpRequest, payload: dict):
     """
-    Salva imagem no Cloudinary a partir de uma URL.
+    Salva imagem no Cloudinary a partir de uma URL ou retorna a própria URL se Cloudinary falhar.
     """
     from .assets_service import CloudinaryService
 
-    image_url = payload.get("url")
+    image_url = (payload.get("url") or "").strip()
     if not image_url:
         raise HttpError(400, "URL é obrigatória.")
-    url = CloudinaryService.upload_from_url(image_url)
-    return {"url": url}
+    try:
+        url = CloudinaryService.upload_from_url(image_url)
+        return {"url": url or image_url}
+    except Exception as e:
+        logger.warning(f"[Cloudinary] Falha ao persistir imagem externa '{image_url}': {e}. Usando URL original.")
+        return {"url": image_url}
 
 
 @flashcard_assets_router.post("/ai-image", auth=auth_optional)
 def generate_flashcard_ai_image(request: HttpRequest, payload: dict):
     """
-    Gera imagem com IA (FLUX.1-dev) para flashcards sem spoilers de texto e salva no Cloudinary.
+    Gera imagem específica e direta com IA (FLUX.1-dev / Unsplash) sem spoilers e sem imagens aleatórias.
     """
     from .image_service import ImageResolverService
 
     prompt = (payload.get("prompt") or "").strip()
+    front = (payload.get("front") or "").strip()
+    back = (payload.get("back") or "").strip()
     topic = (payload.get("topic") or "").strip() or None
-    if not prompt:
-        raise HttpError(400, "Prompt é obrigatório.")
+    explanation = (payload.get("explanation") or "").strip() or None
 
-    # 1. Tenta gerar via FLUX.1-dev
-    url = ImageResolverService.generate_flux_image(prompt, topic=topic)
+    term = front or prompt
+    if not term:
+        raise HttpError(400, "Termo ou prompt é obrigatório.")
 
-    # 2. Se FLUX falhar ou demorar, faz fallback inteligente sem spoilers
+    # Constrói visual_prompt específico e direto
+    visual_subject = term
+    clean_lower = f"{term} {back} {topic or ''}".lower()
+    is_diet_or_food = any(k in clean_lower for k in ["diet", "food", "nutrition", "salad", "meal", "eating", "fruit", "vegetable", "snack"])
+
+    if is_diet_or_food:
+        visual_prompt = (
+            f"A realistic, appetizing, educational photograph of {term} with fresh healthy food, "
+            f"salad, fruits and vegetables on a wooden kitchen table, bright natural sunlight, "
+            f"clean background, strictly NO stethoscope, NO doctor, NO hospital, NO medicine, NO medical equipment, NO text"
+        )
+    elif back and len(back) > 5:
+        visual_prompt = (
+            f"A clear, realistic educational photography illustrating {term} ({back}), "
+            f"bright natural lighting, highly pedagogical, clean background, strictly NO visible text, NO letters, NO words"
+        )
+    else:
+        visual_prompt = (
+            f"A clear, realistic educational photography illustrating {term}, "
+            f"bright natural lighting, highly pedagogical, clean background, strictly NO visible text, NO letters, NO words"
+        )
+
+    # 1. Tenta gerar via FLUX.1-dev com visual_prompt
+    url = ImageResolverService.generate_flux_image(term, topic=topic, visual_prompt=visual_prompt)
+
+    # 2. Se FLUX falhar ou não estiver disponível, busca imagem direta e específica
     if not url:
-        url = ImageResolverService.resolve_image(prompt, topic=topic)
+        url = ImageResolverService.resolve_image(
+            term=term,
+            topic=topic,
+            search_query=term if is_diet_or_food else None,
+            visual_prompt=visual_prompt,
+            explanation=explanation or back
+        )
 
     return {"url": url}
 

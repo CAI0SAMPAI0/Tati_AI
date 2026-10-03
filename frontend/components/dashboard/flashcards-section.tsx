@@ -18,6 +18,20 @@ import {
   CheckSquare,
   Square,
   CheckCircle2,
+  Compass,
+  BookOpen,
+  MessageSquare,
+  GraduationCap,
+  Award,
+  Crown,
+  ChevronRight,
+  ChevronLeft,
+  Info,
+  Check,
+  X,
+  Sliders,
+  ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 import { apiGet, apiDelete, apiPost, apiPut, apiUpload } from '@/lib/api/client';
 
@@ -29,6 +43,63 @@ import toast from 'react-hot-toast';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import { LEVEL_OPTIONS, LEVEL_FILTER_OPTIONS, normalizeLevel, levelLabel } from '@/lib/constants/levels';
 import { cn } from '@/lib/utils';
+
+export const CEFR_LEVELS_METADATA = [
+  {
+    code: 'A1',
+    label: 'Beginner',
+    desc: 'Basic phrases & everyday expressions',
+    icon: Compass,
+    color: 'text-emerald-500',
+    bgColor: 'bg-emerald-500/10',
+    borderColor: 'border-emerald-500/20',
+  },
+  {
+    code: 'A2',
+    label: 'Elementary',
+    desc: 'Simple, routine daily exchanges',
+    icon: BookOpen,
+    color: 'text-sky-500',
+    bgColor: 'bg-sky-500/10',
+    borderColor: 'border-sky-500/20',
+  },
+  {
+    code: 'B1',
+    label: 'Intermediate',
+    desc: 'Work, school, leisure & travel topics',
+    icon: MessageSquare,
+    color: 'text-blue-500',
+    bgColor: 'bg-blue-500/10',
+    borderColor: 'border-blue-500/20',
+  },
+  {
+    code: 'B2',
+    label: 'Upper Intermediate',
+    desc: 'Complex ideas & spontaneous discussion',
+    icon: GraduationCap,
+    color: 'text-violet-500',
+    bgColor: 'bg-violet-500/10',
+    borderColor: 'border-violet-500/20',
+  },
+  {
+    code: 'C1',
+    label: 'Advanced',
+    desc: 'Nuanced, flexible & fluent expression',
+    icon: Award,
+    color: 'text-purple-500',
+    bgColor: 'bg-purple-500/10',
+    borderColor: 'border-purple-500/20',
+  },
+  {
+    code: 'C2',
+    label: 'Mastery',
+    desc: 'Near-native precision & subtlety',
+    icon: Crown,
+    color: 'text-amber-500',
+    bgColor: 'bg-amber-500/10',
+    borderColor: 'border-amber-500/20',
+  },
+];
 
 interface FlashcardDeck {
   id: string;
@@ -87,6 +158,8 @@ export function FlashcardsSection() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDeck, setEditingDeck] = useState<FlashcardDeck | null>(null);
   const [formData, setFormData] = useState<FormState>(EMPTY_FORM);
+  const [activeStep, setActiveStep] = useState<1 | 2>(1);
+  const [showAiGen, setShowAiGen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedDeckIds, setSelectedDeckIds] = useState<string[]>([]);
@@ -177,6 +250,8 @@ export function FlashcardsSection() {
   };
 
   const openModal = async (deck?: FlashcardDeck) => {
+    setActiveStep(1);
+    setShowAiGen(false);
     if (deck) {
       setEditingDeck(deck);
       try {
@@ -289,25 +364,19 @@ export function FlashcardsSection() {
 
   const handleUrlUpload = async (idx: number, url: string) => {
     if (!url || !url.startsWith('http')) return;
-    // Prevent re-uploading if it's already a Cloudinary URL
     if (url.includes('res.cloudinary.com')) return;
-    
+
     setUploadingImages(prev => ({ ...prev, [idx]: true }));
     setImageErrors(prev => ({ ...prev, [idx]: false }));
-    
+
     try {
-      console.log(`[Flashcards] Uploading image from URL for card ${idx}...`);
       const res = await apiPost<{ url: string }>('/flashcard-assets/upload-image-from-url', { url });
-      
       if (res.ok && res.data?.url) {
         setImageErrors(prev => ({ ...prev, [idx]: false }));
         updateCard(idx, 'image_url', res.data.url);
-        toast.success('Image saved securely!');
-      } else {
-        console.error(`[Flashcards] URL upload failed:`, res);
       }
     } catch (err) {
-      console.error(`[Flashcards] URL upload error:`, err);
+      console.warn(`[Flashcards] Keeping direct URL for card ${idx}:`, err);
     } finally {
       setUploadingImages(prev => ({ ...prev, [idx]: false }));
     }
@@ -320,14 +389,17 @@ export function FlashcardsSection() {
 
     setGeneratingImages(prev => ({ ...prev, [idx]: true }));
     setImageErrors(prev => ({ ...prev, [idx]: false }));
-    
+
     try {
-      console.log(`[Flashcards] Generating image for: ${prompt}`);
-      const res = await apiPost<{ url: string }>('/flashcard-assets/ai-image', { prompt });
-      console.log(`[Flashcards] Generation result:`, res);
-      
+      const res = await apiPost<{ url: string }>('/flashcard-assets/ai-image', {
+        prompt,
+        front: card.front,
+        back: card.back,
+        topic: formData.title,
+      });
+
       if (res.ok && res.data?.url) {
-        setImageErrors(prev => ({ ...prev, [idx]: false })); // Reset error
+        setImageErrors(prev => ({ ...prev, [idx]: false }));
         updateCard(idx, 'image_url', res.data.url);
         toast.success('Image ready!');
       } else {
@@ -437,7 +509,7 @@ export function FlashcardsSection() {
     }
   };
 
-  const set = (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+  const set = (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setFormData((prev) => ({ ...prev, [field]: e.target.value }));
 
   if (isLoading) return <div className="py-20 flex justify-center"><Spinner /></div>;
@@ -618,73 +690,381 @@ export function FlashcardsSection() {
       <DialogModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingDeck ? 'Edit Deck' : 'New Deck'}
-      >
-        <div className="space-y-4">
-            <Input
-              label={'Deck Title'}
-              value={formData.title}
-              onChange={set('title')}
-              placeholder="Ex: Business Vocabulary"
-            />
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="mb-4">
-                <label className="block text-[0.73rem] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">Levels</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {LEVEL_OPTIONS.map(opt => {
-                    const isActive = formData.levels.map((l) => l.toUpperCase()).includes(opt.value.toUpperCase());
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => handleToggleLevel(opt.value)}
-                        className={`px-2.5 py-1 rounded-lg text-[0.7rem] font-bold uppercase tracking-wider border transition-all ${
-                          isActive
-                            ? 'bg-primary/15 text-primary border-primary/30'
-                            : 'bg-surface text-text-muted border-border hover:border-border-focus'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    );
-                  })}
+        size="2xl"
+        hideDefaultHeader={true}
+        className="max-w-5xl"
+        contentClassName="p-0"
+        customHeader={
+          <div className="flex flex-col gap-4 p-5 sm:p-6 pb-4 border-b border-border/60 shrink-0 bg-surface">
+            {/* Top Header Row */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-inner shrink-0">
+                  <Layers size={24} className="text-primary" />
                 </div>
-                <p className="text-[0.65rem] text-text-subtle mt-1.5">
-                  Select which levels can see this deck. If none selected, it shows for all.
-                </p>
+                <div>
+                  <span className="text-[10px] font-black tracking-widest text-primary uppercase block">
+                    FLASHCARD DECK
+                  </span>
+                  <h2 className="text-xl sm:text-2xl font-black text-text tracking-tight">
+                    {editingDeck ? 'Edit deck' : 'New deck'}
+                  </h2>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    Update deck name, category, CEFR level and flashcards
+                  </p>
+                </div>
               </div>
-
-              <Input
-                label="Target Card Count"
-                type="number"
-                value={String(formData.card_count)}
-                onChange={set('card_count')}
-                min="1"
-                max="100"
-              />
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="p-2 hover:bg-surface-hover rounded-full transition-colors text-text-muted hover:text-text cursor-pointer"
+                title="Close"
+              >
+                <X size={20} />
+              </button>
             </div>
 
-            <Input
-              label={'Description'}
-              value={formData.description}
-              onChange={set('description')}
-              placeholder="Optional description"
-            />
+            {/* Stepper Tabs */}
+            <div className="flex items-center justify-center sm:justify-start gap-2 pt-2 border-t border-border/40">
+              <button
+                type="button"
+                onClick={() => setActiveStep(1)}
+                className={cn(
+                  "flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer text-left",
+                  activeStep === 1
+                    ? "bg-primary/10 border border-primary/25"
+                    : "hover:bg-surface-hover opacity-75"
+                )}
+              >
+                <div
+                  className={cn(
+                    "w-7 h-7 rounded-full flex items-center justify-center text-xs font-black transition-all",
+                    activeStep === 1
+                      ? "bg-primary text-white shadow-sm shadow-primary/30"
+                      : "bg-surface border border-border text-text-muted"
+                  )}
+                >
+                  1
+                </div>
+                <div>
+                  <span className={cn("text-xs font-bold block", activeStep === 1 ? "text-primary" : "text-text")}>
+                    Basic details
+                  </span>
+                  <span className="text-[10px] text-text-muted block">
+                    Title & CEFR Level
+                  </span>
+                </div>
+              </button>
 
-            {/* Manual Cards Section */}
-            <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-bold text-primary flex items-center gap-2">
-                  <Layers size={16} /> Manual Cards ({formData.flashcards.length})
-                </h4>
-                <Button variant="secondary" size="sm" onClick={addManualCard} className="h-7 text-[0.65rem] gap-1">
-                  <Plus size={12} /> Add Card
-                </Button>
+              <div className="w-8 sm:w-12 h-0.5 bg-border shrink-0" />
+
+              <button
+                type="button"
+                onClick={() => setActiveStep(2)}
+                className={cn(
+                  "flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer text-left",
+                  activeStep === 2
+                    ? "bg-primary/10 border border-primary/25"
+                    : "hover:bg-surface-hover opacity-75"
+                )}
+              >
+                <div
+                  className={cn(
+                    "w-7 h-7 rounded-full flex items-center justify-center text-xs font-black transition-all",
+                    activeStep === 2
+                      ? "bg-primary text-white shadow-sm shadow-primary/30"
+                      : "bg-surface border border-border text-text-muted"
+                  )}
+                >
+                  2
+                </div>
+                <div>
+                  <span className={cn("text-xs font-bold block", activeStep === 2 ? "text-primary" : "text-text")}>
+                    Cards
+                  </span>
+                  <span className="text-[10px] text-text-muted block">
+                    {formData.flashcards.length} cards added
+                  </span>
+                </div>
+              </button>
+            </div>
+          </div>
+        }
+      >
+        <div className="p-5 sm:p-6 space-y-6">
+          {activeStep === 1 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Left Column: Form Details & CEFR Level Selection */}
+              <div className="lg:col-span-7 space-y-5">
+                {/* Section 1: Deck Information */}
+                <div className="bg-surface/60 border border-border/70 rounded-2xl p-4 sm:p-5 space-y-4">
+                  <div className="flex items-center gap-2.5 mb-1">
+                    <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                      <PenLine size={16} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-extrabold text-text uppercase tracking-wider">
+                        Deck Information
+                      </h4>
+                      <p className="text-[11px] text-text-muted">
+                        Title, description and target settings for this deck
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-text">Deck Title</label>
+                      <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                        Required
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      value={formData.title}
+                      onChange={set('title')}
+                      placeholder="Ex: A1 Daily Routines"
+                      className="w-full bg-surface border border-border rounded-xl px-3.5 py-2.5 text-sm text-text focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-text">Description</label>
+                      <span className="text-[10px] font-medium text-text-muted">
+                        {formData.description.length}/200
+                      </span>
+                    </div>
+                    <textarea
+                      rows={2}
+                      value={formData.description}
+                      onChange={set('description')}
+                      maxLength={200}
+                      placeholder="Essential vocabulary for everyday activities and conversations..."
+                      className="w-full bg-surface border border-border rounded-xl px-3.5 py-2 text-sm text-text focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Section 2: Target CEFR Level */}
+                <div className="bg-surface/60 border border-border/70 rounded-2xl p-4 sm:p-5 space-y-3">
+                  <div className="flex items-center gap-2.5 mb-1">
+                    <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                      <GraduationCap size={16} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-extrabold text-text uppercase tracking-wider">
+                        Target CEFR Level
+                      </h4>
+                      <p className="text-[11px] text-text-muted">
+                        Select the proficiency level this deck is designed for
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 2x3 Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+                    {CEFR_LEVELS_METADATA.map((lvl) => {
+                      const isSelected = formData.levels.map(l => l.toUpperCase()).includes(lvl.code);
+                      const Icon = lvl.icon;
+                      return (
+                        <button
+                          key={lvl.code}
+                          type="button"
+                          onClick={() => handleToggleLevel(lvl.code)}
+                          className={cn(
+                            "rounded-2xl border p-3 flex flex-col justify-between text-left transition-all relative select-none cursor-pointer group",
+                            isSelected
+                              ? "border-primary bg-primary/10 shadow-sm ring-2 ring-primary/25"
+                              : "border-border bg-surface hover:border-primary/40 hover:bg-surface-hover"
+                          )}
+                        >
+                          <div className="flex items-start justify-between w-full mb-1">
+                            <div className={cn("w-7 h-7 rounded-xl flex items-center justify-center", lvl.bgColor, lvl.color)}>
+                              <Icon size={14} />
+                            </div>
+                            {isSelected && (
+                              <CheckCircle2 size={16} className="text-primary fill-primary/20" />
+                            )}
+                          </div>
+                          <div>
+                            <span className="font-extrabold text-xs text-text block">
+                              {lvl.code} - {lvl.label}
+                            </span>
+                            <p className="text-[10px] text-text-muted mt-0.5 line-clamp-2 leading-tight">
+                              {lvl.desc}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1 text-[11px] text-text-subtle">
+                    <Info size={13} className="text-primary shrink-0" />
+                    <span>Selected level determines vocabulary difficulty and sentence structure.</span>
+                  </div>
+                </div>
               </div>
 
+              {/* Right Column: Live Preview */}
+              <div className="lg:col-span-5">
+                <div className="bg-gradient-to-b from-surface via-surface/80 to-bg border border-border/80 rounded-3xl p-6 flex flex-col items-center text-center space-y-4 shadow-sm sticky top-2">
+                  {/* 3D Stack Graphic */}
+                  <div className="relative pt-2 pb-1">
+                    <div className="absolute w-32 h-24 bg-primary/20 rounded-2xl -rotate-6 transform -translate-y-1 -translate-x-1" />
+                    <div className="absolute w-32 h-24 bg-violet-600/25 rounded-2xl rotate-3 transform translate-y-0.5 translate-x-1" />
+                    <div className="relative w-36 h-26 bg-gradient-to-br from-primary via-violet-600 to-indigo-700 rounded-2xl shadow-xl shadow-primary/25 p-3 flex flex-col items-center justify-center text-white transition-all transform hover:scale-105">
+                      <Layers size={24} className="text-white drop-shadow mb-1" />
+                      <span className="text-[9px] font-black tracking-widest uppercase opacity-95">
+                        FLASHCARD DECK
+                      </span>
+                      <span className="text-[9px] opacity-80 mt-0.5 font-bold">
+                        {formData.flashcards.length} Cards
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Live Preview Info */}
+                  <div className="space-y-1 w-full">
+                    <span className="text-[10px] font-black tracking-widest text-primary uppercase bg-primary/10 px-2.5 py-0.5 rounded-full inline-block">
+                      LIVE PREVIEW
+                    </span>
+                    <h3 className="text-base font-black text-text truncate max-w-full px-2">
+                      {formData.title || 'Untitled Deck'}
+                    </h3>
+                    <p className="text-xs text-text-muted line-clamp-2 px-3">
+                      {formData.description || 'No description provided yet.'}
+                    </p>
+                  </div>
+
+                  {/* Metrics Row */}
+                  <div className="grid grid-cols-2 gap-2.5 w-full pt-1">
+                    <div className="bg-surface border border-border/80 rounded-xl p-2.5 flex items-center gap-2 text-left">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <FileBox size={16} />
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-bold text-text-muted uppercase block">Cards</span>
+                        <span className="text-xs font-black text-text">{formData.flashcards.length}</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-surface border border-border/80 rounded-xl p-2.5 flex items-center gap-2 text-left">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                        <GraduationCap size={16} />
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-bold text-text-muted uppercase block">Level</span>
+                        <span className="text-xs font-black text-text truncate max-w-[80px] block">
+                          {formData.levels.length > 0 ? formData.levels.join(', ') : 'All'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action preview cards link */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveStep(2)}
+                    className="w-full py-2.5 px-4 bg-surface hover:bg-surface-hover border border-border rounded-xl text-xs font-bold text-primary flex items-center justify-between group transition-all cursor-pointer shadow-sm"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Layers size={14} />
+                      Preview Cards ({formData.flashcards.length})
+                    </span>
+                    <ChevronRight size={15} className="group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Step 2: Cards Management */
+            <div className="space-y-4">
+              {/* Step 2 Header & Action Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-surface/60 border border-border/70 rounded-2xl">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                    <Layers size={16} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-text uppercase tracking-wider">
+                      Cards Management
+                    </h4>
+                    <span className="text-[11px] text-text-muted">
+                      {formData.flashcards.length} cards in this deck
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAiGen(!showAiGen)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer",
+                      showAiGen
+                        ? "bg-primary text-white border-primary shadow-sm"
+                        : "bg-surface hover:bg-surface-hover border-border text-primary"
+                    )}
+                  >
+                    <Sparkles size={13} />
+                    {showAiGen ? 'Hide AI' : 'Generate with AI'}
+                  </button>
+
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={addManualCard}
+                    className="h-8 text-xs font-bold gap-1.5 rounded-xl"
+                  >
+                    <Plus size={14} /> Add Card
+                  </Button>
+                </div>
+              </div>
+
+              {/* Collapsible AI Gen Box */}
+              {showAiGen && (
+                <div className="p-4 bg-primary/5 rounded-2xl border border-primary/20 space-y-3 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-bold text-primary flex items-center gap-1.5">
+                      <Sparkles size={14} /> AI Flashcard Generator
+                    </h5>
+                    <span className="text-[10px] text-text-muted">
+                      Generates balanced cards for selected levels
+                    </span>
+                  </div>
+                  <textarea
+                    placeholder="Enter theme or topic (e.g. Travel Vocabulary, Business Phrasal Verbs, Restaurant Food)..."
+                    className="w-full min-h-[60px] p-3 bg-surface border border-border rounded-xl text-xs outline-none focus:border-primary transition-all resize-none"
+                    value={formData.ai_theme}
+                    onChange={(e) => setFormData(prev => ({ ...prev, ai_theme: e.target.value }))}
+                  />
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <label className="flex items-center gap-2 text-xs text-text-muted cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.ai_with_images}
+                        onChange={(e) => setFormData(prev => ({ ...prev, ai_with_images: e.target.checked }))}
+                        className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                      />
+                      <span>Generate realistic image for each card</span>
+                    </label>
+                    <Button
+                      size="sm"
+                      onClick={handleGenerateWithAI}
+                      loading={isGenerating}
+                      disabled={!formData.ai_theme.trim()}
+                      className="gap-1.5 text-xs font-bold"
+                    >
+                      <Sparkles size={13} /> Generate Cards
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Cards List */}
               {formData.flashcards.length > 0 ? (
-                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
+                <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1.5 custom-scrollbar">
                   {formData.flashcards.map((card, idx) => (
                     <ManualCardItem
                       key={idx}
@@ -702,48 +1082,76 @@ export function FlashcardsSection() {
                   ))}
                 </div>
               ) : (
-                <p className="text-[0.65rem] text-text-muted italic text-center py-1">No manual cards added yet.</p>
+                <div className="py-12 text-center border border-dashed border-border rounded-2xl bg-surface/30">
+                  <Layers size={28} className="text-text-muted/40 mx-auto mb-2" />
+                  <p className="text-xs font-bold text-text-muted">No flashcards in this deck yet</p>
+                  <p className="text-[11px] text-text-subtle mt-0.5">Click "Add Card" or generate them using AI above</p>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={addManualCard}
+                    className="mt-3 text-xs gap-1.5"
+                  >
+                    <Plus size={13} /> Add First Card
+                  </Button>
+                </div>
               )}
             </div>
+          )}
 
-            <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 space-y-3">
-              <h4 className="text-sm font-bold text-primary flex items-center gap-2">
-                <Sparkles size={16} /> {'AI Generation'}
-              </h4>
-              <textarea
-                placeholder={'E.g.: Verbs of Movement, Travel...'}
-                className="w-full min-h-[60px] p-3.5 bg-surface border border-border rounded-xl text-sm outline-none focus:border-primary/50 transition-all resize-none mb-2"
-                value={formData.ai_theme}
-                onChange={(e) => setFormData(prev => ({ ...prev, ai_theme: e.target.value }))}
-              />
-              <div className="flex items-center gap-2 mb-2 px-1">
-                <input 
-                  type="checkbox" 
-                  id="ai_with_images"
-                  checked={formData.ai_with_images}
-                  onChange={(e) => setFormData(prev => ({ ...prev, ai_with_images: e.target.checked }))}
-                  className="rounded border-border text-primary focus:ring-primary h-4 w-4"
-                />
-                <label htmlFor="ai_with_images" className="text-xs font-medium text-text-muted cursor-pointer">
-                  Generate images for all cards (Slower)
-                </label>
-              </div>
+          {/* Modal Footer */}
+          <div className="flex items-center justify-between gap-3 pt-4 border-t border-border/50 shrink-0">
+            <div className="flex items-center gap-2 text-xs text-text-muted">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <span className="text-[11px] font-medium hidden sm:inline">Changes are saved as draft</span>
+            </div>
+
+            <div className="flex items-center gap-2.5">
               <Button
                 variant="secondary"
-                className="w-full gap-2"
-                onClick={handleGenerateWithAI}
-                loading={isGenerating}
-                disabled={!formData.ai_theme.trim()}
+                onClick={() => setIsModalOpen(false)}
+                className="text-xs font-bold px-4"
               >
-                <Sparkles size={14} />
-                {'Generate Cards'}
+                Cancel
               </Button>
-            </div>
 
-            <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-border">
-                <Button variant="secondary" onClick={() => setIsModalOpen(false)}>{'Cancel'}</Button>
-                <Button onClick={handleSave} loading={isSaving}>{'Save'}</Button>
+              {activeStep === 1 ? (
+                <>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setActiveStep(2)}
+                    className="text-xs font-bold gap-1 px-4 text-primary hover:bg-primary/10"
+                  >
+                    Next: Cards <ChevronRight size={14} />
+                  </Button>
+                  <Button
+                    onClick={handleSave}
+                    loading={isSaving}
+                    className="text-xs font-bold gap-1.5 px-5 bg-primary shadow-sm shadow-primary/20"
+                  >
+                    <Check size={14} /> Save Deck
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setActiveStep(1)}
+                    className="text-xs font-bold gap-1 px-4"
+                  >
+                    <ChevronLeft size={14} /> Back to Details
+                  </Button>
+                  <Button
+                    onClick={handleSave}
+                    loading={isSaving}
+                    className="text-xs font-bold gap-1.5 px-5 bg-primary shadow-sm shadow-primary/20"
+                  >
+                    <Check size={14} /> Save Changes
+                  </Button>
+                </>
+              )}
             </div>
+          </div>
         </div>
       </DialogModal>
     </div>
@@ -775,13 +1183,39 @@ const ManualCardItem = React.memo(function ManualCardItem({
   onGenerateImage,
   onUrlUpload,
 }: ManualCardItemProps) {
+  // Extrai URL limpa se o usuário colar link do Google Imagens
+  const handleImageUrlChange = (rawUrl: string) => {
+    let cleanUrl = rawUrl.trim();
+    if (cleanUrl.includes('imgres?q=') || cleanUrl.includes('google.com/imgres')) {
+      try {
+        const urlObj = new URL(cleanUrl);
+        const imgParam = urlObj.searchParams.get('imgurl');
+        if (imgParam) {
+          cleanUrl = decodeURIComponent(imgParam);
+        }
+      } catch {
+        // Fallback para regex
+        const match = cleanUrl.match(/[?&]imgurl=([^&]+)/);
+        if (match && match[1]) {
+          cleanUrl = decodeURIComponent(match[1]);
+        }
+      }
+    }
+    onUpdate(idx, 'image_url', cleanUrl);
+  };
+
   return (
-    <div className="grid grid-cols-[50px,1fr,1fr,auto] gap-2 items-center bg-surface p-2 rounded-xl border border-border group">
+    <div className="p-3 bg-surface border border-border/80 rounded-2xl flex flex-col sm:flex-row gap-3 items-start sm:items-center group hover:border-primary/40 transition-all">
+      {/* Number Badge */}
+      <div className="w-5 text-[11px] font-black text-text-subtle text-center shrink-0 hidden sm:block">
+        #{idx + 1}
+      </div>
+
       {/* Image Preview / Upload */}
       <div 
-        className="w-[50px] h-[50px] rounded-lg bg-input border border-border overflow-hidden flex items-center justify-center relative cursor-pointer group/img"
+        className="w-16 h-16 rounded-xl bg-input border border-border overflow-hidden flex items-center justify-center relative cursor-pointer group/img shrink-0"
         onClick={() => document.getElementById(`file-upload-${idx}`)?.click()}
-        title="Click to upload image"
+        title="Click to upload image file"
       >
         {card.image_url && !hasImageError ? (
           <img 
@@ -789,20 +1223,23 @@ const ManualCardItem = React.memo(function ManualCardItem({
             src={card.image_url} 
             alt="" 
             className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <ImageIcon size={16} className="text-text-muted opacity-30" />
+          <div className="w-full h-full flex items-center justify-center bg-muted/20">
+            <ImageIcon size={18} className="text-text-muted opacity-40" />
           </div>
         )}
         
         {/* Overlay with Upload Icon */}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-all flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/img:opacity-100 transition-all flex items-center justify-center">
           <Upload size={14} className="text-white" />
         </div>
 
         {(isGenerating || isUploading) && (
-          <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
             <Loader2 size={16} className="text-primary animate-spin" />
           </div>
         )}
@@ -820,59 +1257,92 @@ const ManualCardItem = React.memo(function ManualCardItem({
         />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <input 
-          className="bg-transparent border-b border-border text-xs py-1 outline-none focus:border-primary transition-all"
-          placeholder="Front (term)"
-          value={card.front}
-          onChange={(e) => onUpdate(idx, 'front', e.target.value)}
-        />
-      </div>
-      <div className="flex flex-col gap-1">
-        <input 
-          className="bg-transparent border-b border-border text-xs py-1 outline-none focus:border-primary transition-all"
-          placeholder="Back (meaning)"
-          value={card.back}
-          onChange={(e) => onUpdate(idx, 'back', e.target.value)}
-        />
-        <div className="flex items-center gap-2 mt-1">
-          <input 
-            className="flex-1 bg-transparent border-b border-border text-[0.6rem] py-0.5 outline-none focus:border-primary transition-all opacity-70"
-            placeholder="Image URL"
-            value={card.image_url || ''}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val.includes('imgres?q=')) {
-                const urlParams = new URLSearchParams(val.split('?')[1]);
-                const imgUrl = urlParams.get('imgurl');
-                if (imgUrl) {
-                  onUpdate(idx, 'image_url', decodeURIComponent(imgUrl));
-                  return;
-                }
-              }
-              onUpdate(idx, 'image_url', val);
-            }}
-            onBlur={(e) => {
-              onUrlUpload(idx, e.target.value);
-            }}
-          />
-          <button 
-            type="button"
-            onClick={() => onGenerateImage(idx)}
-            disabled={isGenerating}
-            className={`p-1 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-all ${isGenerating ? 'animate-pulse' : ''}`}
-            title="Generate/Search Image"
-          >
-            <Sparkles size={10} />
-          </button>
+      {/* Text Inputs Column */}
+      <div className="flex-1 w-full space-y-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div>
+            <label className="block text-[10px] font-bold text-text-subtle uppercase mb-0.5">
+              Front (Term)
+            </label>
+            <input 
+              className="w-full bg-surface border border-border rounded-lg px-2.5 py-1 text-xs text-text outline-none focus:border-primary transition-all"
+              placeholder="Word or phrase"
+              value={card.front}
+              onChange={(e) => onUpdate(idx, 'front', e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-bold text-text-subtle uppercase mb-0.5">
+              Back (Meaning / Translation)
+            </label>
+            <input 
+              className="w-full bg-surface border border-border rounded-lg px-2.5 py-1 text-xs text-text outline-none focus:border-primary transition-all"
+              placeholder="Definition or meaning"
+              value={card.back}
+              onChange={(e) => onUpdate(idx, 'back', e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Image URL Input & Action Buttons */}
+        <div>
+          <label className="block text-[10px] font-bold text-text-subtle uppercase mb-0.5">
+            Image URL (paste any web link or generate with AI)
+          </label>
+          <div className="flex items-center gap-1.5">
+            <input 
+              type="text"
+              className="flex-1 bg-surface border border-border rounded-lg px-2.5 py-1 text-xs text-text outline-none focus:border-primary transition-all placeholder:text-[11px]"
+              placeholder="Paste image URL from the internet..."
+              value={card.image_url || ''}
+              onChange={(e) => handleImageUrlChange(e.target.value)}
+              onBlur={(e) => onUrlUpload(idx, e.target.value)}
+            />
+            {card.image_url && (
+              <button
+                type="button"
+                onClick={() => onUpdate(idx, 'image_url', '')}
+                className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-surface-hover transition-all"
+                title="Clear Image URL"
+              >
+                <X size={12} />
+              </button>
+            )}
+            <button 
+              type="button"
+              onClick={() => onGenerateImage(idx)}
+              disabled={isGenerating}
+              className={cn(
+                "p-1.5 px-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-all text-xs font-bold flex items-center gap-1 shrink-0",
+                isGenerating && "animate-pulse opacity-50"
+              )}
+              title="Search and generate specific image with AI"
+            >
+              <Sparkles size={12} />
+              <span className="hidden sm:inline text-[11px]">AI Search</span>
+            </button>
+            <button 
+              type="button"
+              onClick={() => document.getElementById(`file-upload-${idx}`)?.click()}
+              className="p-1.5 px-2 rounded-lg bg-surface border border-border text-text hover:text-primary hover:border-primary transition-all text-xs font-bold flex items-center gap-1 shrink-0"
+              title="Upload image from your device"
+            >
+              <Upload size={12} />
+              <span className="hidden sm:inline text-[11px]">Upload</span>
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Delete Action */}
       <button 
         type="button" 
         onClick={() => onRemove(idx)} 
-        className="text-text-subtle hover:text-danger p-1 self-center"
+        className="text-text-subtle hover:text-danger p-2 rounded-xl hover:bg-danger/10 transition-all self-end sm:self-center shrink-0 cursor-pointer"
+        title="Remove Flashcard"
       >
-        <Trash2 size={12} />
+        <Trash2 size={15} />
       </button>
     </div>
   );
