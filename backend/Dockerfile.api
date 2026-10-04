@@ -2,7 +2,7 @@
 # Baseado na estrutura de produção de backend/Dockerfile com ASGI (Gunicorn + Uvicorn Workers).
 # Desativa schedulers internos em background e loops de keepalive (ex: WAHA ping) para
 # permitir que a instância durma automaticamente após 10 minutos de inatividade sem requisições externas.
-FROM python:3.14-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
