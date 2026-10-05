@@ -92,7 +92,7 @@ export function DashboardSidebar({ activeSection, onSetSection, isOpen, onClose 
       {/* Overlay para mobile */}
       <div
         className={cn(
-          'fixed inset-0 bg-black/60 backdrop-blur-[2px] z-[60] transition-opacity md:hidden',
+          'fixed inset-0 bg-black/60 z-[60] transition-opacity md:hidden',
           isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}
         onClick={onClose}

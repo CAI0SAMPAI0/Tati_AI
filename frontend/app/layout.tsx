@@ -51,6 +51,7 @@ export default function RootLayout({
           name="google-site-verification"
           content="2pUtbPwWrV8Q1kdAj8fmkYUIY7a-BI0NRj_WKjAHoLM"
         />
+        <meta name="google" content="notranslate" />
         <link rel="icon" href="/images/tati_logo.jpg" />
 
         {/* Preconnect ao backend para reduzir latência de rede nas primeiras requests */}

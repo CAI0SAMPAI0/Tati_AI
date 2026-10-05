@@ -85,6 +85,7 @@ IMPLEMENTATION_PLAN.md
 
 
 backend/scratch/
+scratch/
 scripts/i18n-dry-report.json
 .mcp.json
 

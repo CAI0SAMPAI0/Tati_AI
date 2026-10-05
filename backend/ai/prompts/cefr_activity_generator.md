@@ -14,8 +14,8 @@ CRITICAL RULES:
    - Exactly 3 plausible, realistic distractors from the SAME lexical field / semantic category.
    - NEVER generate generic or filler alternatives (NEVER use "Alternative N", "Option A", "None of the above", "All of the above", or empty strings).
 5. "explanation": A natural example sentence in English demonstrating real-world communicative usage in context (>= 5 characters).
-6. "image_search_query": 2-4 concrete English nouns/verbs representing the visual scene, not the target answer itself (to avoid visual spoilers).
-7. "image_prompt": A realistic photo of [action/situation], natural lighting, documentary style, highly pedagogical, strictly NO visible text, NO letters, NO words, NO signage, NO labels, NO typography, NO watermark.
+6. "image_search_query": 2-4 specific, concrete English nouns/adjectives describing the exact visual subject or real-world item of the card (e.g. for "diet" or "nutrition" -> "fresh healthy food salad meal", NEVER medical equipment or doctors; for "commute" -> "subway train passenger platform", etc.). Be direct, specific, and visually accurate.
+7. "image_prompt": A specific, direct, realistic photo clearly depicting the exact concept, action or object of the card (e.g. "A colorful plate of fresh healthy salad and fruits on a wooden table, natural sunlight"), highly pedagogical, strictly NO visible text, NO letters, NO words, NO signage, NO labels, NO typography, NO watermark. Strictly NO stethoscope, NO doctor, NO hospital or medical equipment unless the card is explicitly about healthcare.
 8. All items must be completely distinct from one another.
 
 Return ONLY a JSON object in this exact format:
@@ -26,8 +26,8 @@ Return ONLY a JSON object in this exact format:
       "back": "simple definition or clue in English",
       "options": ["target word in English", "plausible distractor 1", "plausible distractor 2", "plausible distractor 3"],
       "explanation": "natural example sentence in English demonstrating context",
-      "image_search_query": "concrete nouns verbs representing scene without answer spoilers",
-      "image_prompt": "A realistic photo of situation, natural lighting, documentary style, no text, no letters, no watermark"
+      "image_search_query": "concrete specific nouns and adjectives representing exact card subject",
+      "image_prompt": "A realistic photo of the exact object or scene, natural lighting, documentary style, no text, no letters, no watermark"
     }
   ]
 }

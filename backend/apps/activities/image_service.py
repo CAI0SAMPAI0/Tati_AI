@@ -16,6 +16,8 @@ def _cache_key(term: str) -> str:
 
 CURATED_THEME_FALLBACKS: Dict[str, str] = {
     "food": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "diet": "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=800&q=80",
+    "nutrition": "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=800&q=80",
     "restaurant": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80",
     "travel": "https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=800&q=80",
     "airport": "https://images.unsplash.com/photo-1520437358207-323b43b50729?auto=format&fit=crop&w=800&q=80",
@@ -23,7 +25,10 @@ CURATED_THEME_FALLBACKS: Dict[str, str] = {
     "work": "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80",
     "job": "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80",
     "doctor": "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=800&q=80",
-    "health": "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=800&q=80",
+    "hospital": "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=800&q=80",
+    "stethoscope": "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=800&q=80",
+    "health": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=800&q=80",
+    "fitness": "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=800&q=80",
     "family": "https://images.unsplash.com/photo-1511895426328-dc8714191300?auto=format&fit=crop&w=800&q=80",
     "routine": "https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=800&q=80",
     "shopping": "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=800&q=80",
@@ -43,20 +48,33 @@ class ImageResolverService:
         explanation: Optional[str] = None,
     ) -> str:
         """
-        Compõe query de busca estruturada: tópico + intenção + 2-4 keywords concretas.
-        Evita termos genéricos isolados como 'study' para prevenir imagens desconexas.
+        Compõe query de busca estruturada e específica para o sujeito visual real do card.
+        Evita poluir termos específicos com tópicos genéricos (ex: não junta 'health' a 'diet/salad').
         """
+        clean_term = term.strip()
+
+        # Se houver search_query explícito e específico
         if search_query and len(search_query.strip()) >= 3:
             sq = search_query.strip()
+            # Se já possui keywords concretas (2+ palavras), usa diretamente
+            if len(sq.split()) >= 2:
+                return sq
+            # Se for palavra única de comida/dieta, adiciona contexto de alimentos saudáveis sem 'health'
+            if any(k in sq.lower() for k in ["diet", "food", "salad", "meal", "fruit", "nutrition"]):
+                return f"healthy fresh food {sq}"
             if topic and topic.lower() not in sq.lower():
                 return f"{topic} {sq}"
             return sq
 
-        clean_term = term.strip()
         stop_words = {"to", "a", "an", "the", "in", "on", "at", "of", "for", "with", "and", "is", "are"}
         words = [w.strip(".,;:?!\"'") for w in clean_term.split()]
         content_words = [w for w in words if w.lower() not in stop_words and len(w) > 1]
         term_keywords = " ".join(content_words) if content_words else clean_term
+
+        # Detecta termos de dieta/alimentação
+        combined_text = f"{clean_term} {explanation or ''}".lower()
+        if any(w in combined_text for w in ["diet", "nutrition", "food", "salad", "meal", "eating", "fruit", "vegetable"]):
+            return f"healthy fresh food {term_keywords}".strip()
 
         extra_keywords = []
         if explanation:
@@ -68,7 +86,7 @@ class ImageResolverService:
             extra_keywords = exp_tokens[:2]
 
         parts = []
-        if topic:
+        if topic and not any(w in topic.lower() for w in ["general", "all", "deck", "vocabulary"]):
             parts.append(topic.strip())
         parts.append(term_keywords)
         if extra_keywords:
@@ -272,8 +290,12 @@ class ImageResolverService:
     def get_curated_fallback(cls, topic: Optional[str] = None, term: Optional[str] = None) -> str:
         """
         Retorna uma imagem educacional curada pelo tema (nunca um placeholder cinza genérico).
+        Garante que termos de dieta e alimentação nunca caiam em estetoscópios ou imagens médicas.
         """
         search_str = f"{topic or ''} {term or ''}".lower()
+        if any(w in search_str for w in ["diet", "nutrition", "food", "salad", "meal", "eating", "fruit", "vegetable", "snack"]):
+            return CURATED_THEME_FALLBACKS["diet"]
+
         for key, url in CURATED_THEME_FALLBACKS.items():
             if key != "default" and key in search_str:
                 return url

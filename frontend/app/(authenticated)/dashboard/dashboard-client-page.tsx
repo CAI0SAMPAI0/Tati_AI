@@ -151,7 +151,7 @@ export default function DashboardClientPage() {
       />
 
       <div className={cn("flex-1 flex flex-col min-w-0 bg-bg-secondary/30 relative h-screen transition-all duration-300", sidebarOpen ? "md:pl-[280px]" : "md:pl-0")}>
-        <header className="h-16 border-b border-border bg-bg/80 backdrop-blur-md sticky top-0 z-40 px-4 md:px-8 flex items-center justify-between">
+        <header className="h-16 border-b border-border bg-surface sticky top-0 z-40 px-4 md:px-8 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button 
               onClick={handleToggleSidebar}

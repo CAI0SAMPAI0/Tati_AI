@@ -9,12 +9,26 @@ import { cn } from '@/lib/utils';
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title: string;
+  title?: string;
   children: React.ReactNode;
-  size?: 'md' | 'lg' | 'xl';
+  size?: 'md' | 'lg' | 'xl' | '2xl';
+  hideDefaultHeader?: boolean;
+  customHeader?: React.ReactNode;
+  className?: string;
+  contentClassName?: string;
 }
 
-export function DialogModal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
+export function DialogModal({
+  isOpen,
+  onClose,
+  title = '',
+  children,
+  size = 'md',
+  hideDefaultHeader = false,
+  customHeader,
+  className,
+  contentClassName,
+}: ModalProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -51,10 +65,11 @@ export function DialogModal({ isOpen, onClose, title, children, size = 'md' }: M
     };
   }, [isOpen, onClose]);
 
-  const maxWidthClasses = {
+  const maxWidthClasses: Record<string, string> = {
     md: 'max-w-lg',
     lg: 'max-w-2xl',
     xl: 'max-w-4xl',
+    '2xl': 'max-w-5xl',
   };
 
   if (!mounted) return null;
@@ -85,22 +100,27 @@ export function DialogModal({ isOpen, onClose, title, children, size = 'md' }: M
             transition={{ duration: 0.18, ease: 'easeOut' }}
             onClick={(e) => e.stopPropagation()}
             className={cn(
-              "relative w-full bg-surface dark:bg-[#121424] border border-border/80 dark:border-white/10 rounded-3xl shadow-2xl p-4 sm:p-6 flex flex-col z-10 max-h-[90vh] md:max-h-[86vh] overflow-hidden transform-gpu",
-              maxWidthClasses[size]
+              "relative w-full bg-surface dark:bg-[#121424] border border-border/80 dark:border-white/10 rounded-3xl shadow-2xl p-4 sm:p-6 flex flex-col z-10 max-h-[92vh] md:max-h-[88vh] overflow-hidden transform-gpu",
+              maxWidthClasses[size] || 'max-w-lg',
+              className
             )}
           >
-            <div className="flex justify-between items-center mb-3 sm:mb-4 pb-2 border-b border-border/40 shrink-0">
-              <h2 className="text-lg sm:text-xl font-black text-text tracking-tight">{title}</h2>
-              <button 
-                onClick={onClose} 
-                className="p-1.5 sm:p-2 hover:bg-surface-hover dark:hover:bg-white/10 rounded-full transition-colors text-text-muted hover:text-text cursor-pointer"
-                title="Close"
-              >
-                <X size={18} />
-              </button>
-            </div>
+            {customHeader ? (
+              customHeader
+            ) : !hideDefaultHeader ? (
+              <div className="flex justify-between items-center mb-3 sm:mb-4 pb-2 border-b border-border/40 shrink-0">
+                <h2 className="text-lg sm:text-xl font-black text-text tracking-tight">{title}</h2>
+                <button 
+                  onClick={onClose} 
+                  className="p-1.5 sm:p-2 hover:bg-surface-hover dark:hover:bg-white/10 rounded-full transition-colors text-text-muted hover:text-text cursor-pointer"
+                  title="Close"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            ) : null}
             
-            <div className="flex-1 min-h-0 overflow-y-auto pr-1 sm:pr-2 custom-scrollbar">
+            <div className={cn("flex-1 min-h-0 overflow-y-auto pr-1 sm:pr-2 custom-scrollbar", contentClassName)}>
               {children}
             </div>
           </motion.div>

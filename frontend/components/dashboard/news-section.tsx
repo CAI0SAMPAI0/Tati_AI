@@ -352,7 +352,7 @@ export default function NewsSection() {
                   <button
                     type="button"
                     onClick={() => toggleSelectNews(n.id)}
-                    className="absolute top-2 left-2 z-10 bg-surface/90 backdrop-blur-sm rounded-lg p-1 text-text-muted hover:text-primary transition-all shadow"
+                    className="absolute top-2 left-2 z-10 bg-surface rounded-lg p-1 text-text-muted hover:text-primary transition-all shadow"
                     title={isSelected ? "Deselect" : "Select"}
                   >
                     {isSelected ? <CheckSquare size={16} className="text-primary" /> : <Square size={16} />}
@@ -372,8 +372,8 @@ export default function NewsSection() {
                     </div>
                   )}
                   <span className={cn(
-                    'absolute top-2 right-2 text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider shadow backdrop-blur-sm',
-                    n.is_published ? 'bg-success/90 text-white border-success' : 'bg-warning/90 text-white border-warning'
+                    'absolute top-2 right-2 text-[0.6rem] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider shadow',
+                    n.is_published ? 'bg-success text-white border-success' : 'bg-warning text-white border-warning'
                   )}>
                     {n.is_published ? 'Published' : 'Draft'}
                   </span>

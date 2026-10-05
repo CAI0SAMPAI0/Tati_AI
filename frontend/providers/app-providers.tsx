@@ -7,6 +7,10 @@ import { Toaster } from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 
 import { AppUpdateDetector } from '@/components/app-update-detector';
+import { setupDomResilience } from '@/lib/dom-resilience';
+
+// Aplica patch de resiliência DOM para prevenir erros de remoção de nós causados por tradutores/extensões
+setupDomResilience();
 
 const RegisterServiceWorker = dynamic(
   () => import('@/components/pwa/register-sw').then(m => m.RegisterServiceWorker as any),
