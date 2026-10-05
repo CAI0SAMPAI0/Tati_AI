@@ -24,7 +24,8 @@ VOICE_ACCENT_MAP = {
     "en-PH": "en-PH-RosaNeural",
     "en-NG": "en-NG-EzinneNeural",
     "en-CN": "zh-CN-XiaoxiaoNeural",
-    "en-JP": "ja-JP-NanamiNeural",
+    "en-HK": "en-HK-YanNeural",
+    "en-JP": "en-HK-YanNeural",
 }
 
 
@@ -187,6 +188,8 @@ class AudioService:
             norm_accent = "en-NG"
         elif lower_acc in ["en-cn", "cn", "chinese", "chines", "zh-cn"]:
             norm_accent = "en-CN"
+        elif lower_acc in ["en-hk", "hk", "hong-kong", "hong kong"]:
+            norm_accent = "en-HK"
         elif lower_acc in ["en-jp", "jp", "japanese", "japones", "ja-jp"]:
             norm_accent = "en-JP"
 
