@@ -23,12 +23,15 @@ import {
 import { DEFAULT_AVATAR_URL } from '@/lib/constants/user';
 
 function normalizeUserAvatar(source: User): User {
+  if (!source || typeof source !== 'object') {
+    return { username: 'student', avatar_url: DEFAULT_AVATAR_URL } as User;
+  }
   const profileAvatar = (source as User & { profile?: { avatar_url?: string } })?.profile?.avatar_url;
   let chosenAvatar = source.avatar_url || profileAvatar || DEFAULT_AVATAR_URL;
-  if (chosenAvatar.includes('/avatar/avatar_tati') && (source as any).role !== 'teacher') {
+  if (typeof chosenAvatar === 'string' && chosenAvatar.includes('/avatar/avatar_tati') && (source as any).role !== 'teacher') {
     chosenAvatar = DEFAULT_AVATAR_URL;
   }
-  return { ...source, avatar_url: chosenAvatar };
+  return { ...source, avatar_url: typeof chosenAvatar === 'string' ? chosenAvatar : DEFAULT_AVATAR_URL };
 }
 
 interface AuthState {

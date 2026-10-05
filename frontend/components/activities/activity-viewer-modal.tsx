@@ -120,7 +120,10 @@ export function ActivityViewerModal({
       />
 
       {/* Modal card */}
-      <div className="bg-surface border border-border rounded-3xl max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden transform-gpu animate-in zoom-in-95 duration-200">
+      <div
+        translate="no"
+        className="notranslate bg-surface border border-border rounded-3xl max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden transform-gpu animate-in zoom-in-95 duration-200"
+      >
         {/* Header - Fixed */}
         <div className="p-6 pb-4 border-b border-border/40 shrink-0 relative">
           {/* Close button */}
@@ -268,20 +271,20 @@ export function ActivityViewerModal({
                 router.push(activity.route!);
                 onClose();
               }}
-              className="flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-bg hover:bg-bg-secondary border border-border text-text font-bold text-sm transition-all shadow-sm group"
+              className="flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-bg hover:bg-bg-secondary border border-border text-text font-bold text-sm transition-all shadow-sm group cursor-pointer"
             >
               <ExternalLink size={18} className="text-primary group-hover:scale-110 transition-transform" />
-              1. Open Activity
+              <span>1. Open Activity</span>
             </button>
           ) : (
             <a
               href={targetUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-bg hover:bg-bg-secondary border border-border text-text font-bold text-sm transition-all shadow-sm group text-center"
+              className="flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-bg hover:bg-bg-secondary border border-border text-text font-bold text-sm transition-all shadow-sm group text-center cursor-pointer"
             >
               <ExternalLink size={18} className="text-primary group-hover:scale-110 transition-transform" />
-              1. Open on {sourceName}
+              <span>1. Open on {sourceName}</span>
             </a>
           )}
 
@@ -289,7 +292,7 @@ export function ActivityViewerModal({
             onClick={handleToggleDone}
             disabled={loading}
             className={cn(
-              'flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-2xl text-white font-bold text-sm transition-all shadow-md',
+              'flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-2xl text-white font-bold text-sm transition-all shadow-md cursor-pointer',
               isDone
                 ? 'bg-bg-secondary text-text-muted hover:bg-warning/20 hover:text-warning border border-border'
                 : 'bg-success hover:bg-success/90 shadow-success/20'
@@ -299,11 +302,13 @@ export function ActivityViewerModal({
               <RefreshCw size={18} className="animate-spin" />
             ) : isDone ? (
               <>
-                <Clock size={18} /> Revert to Pending
+                <Clock size={18} />
+                <span>Revert to Pending</span>
               </>
             ) : (
               <>
-                <CheckCircle2 size={18} /> 2. Mark as Completed (+25 XP)
+                <CheckCircle2 size={18} />
+                <span>2. Mark as Completed (+25 XP)</span>
               </>
             )}
           </button>
@@ -316,14 +321,16 @@ export function ActivityViewerModal({
             onClick={() => setIsFeedbackOpen(true)}
             className="hover:text-primary transition-colors flex items-center gap-1.5 cursor-pointer font-medium"
           >
-            <MessageSquareHeart size={14} className="text-primary" /> Send feedback to Tatiana
+            <MessageSquareHeart size={14} className="text-primary" />
+            <span>Send feedback to Tatiana</span>
           </button>
           <button
             type="button"
             onClick={() => setIsBugOpen(true)}
             className="hover:text-red-400 transition-colors flex items-center gap-1.5 cursor-pointer font-medium"
           >
-            <Bug size={14} className="text-red-400" /> Report issue
+            <Bug size={14} className="text-red-400" />
+            <span>Report issue</span>
           </button>
         </div>
       </div>

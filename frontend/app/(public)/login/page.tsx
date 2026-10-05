@@ -4,8 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Script from 'next/script';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Bug } from 'lucide-react';
 import { DeveloperBugModal } from '@/components/feedback/developer-bug-modal';
 
@@ -28,7 +27,6 @@ export default function LoginPage() {
   const { saveSession } = useAuth();
 
   const router = useRouter();
-  const googleBtnRef = useRef<HTMLDivElement>(null);
 
   // Login state
   const [loginId, setLoginId] = useState('');
@@ -61,13 +59,18 @@ export default function LoginPage() {
     const handleGoogleMessage = (event: MessageEvent) => {
       if (event.data && event.data.type === 'GOOGLE_AUTH_SUCCESS' && event.data.token) {
         const isHub = new URLSearchParams(window.location.search).get('access') === 'hub';
-        saveSession(event.data.token, event.data.user || { username: 'student' }).then((savedUser) => {
-          if (isHub || event.data.user?.is_hub_only || (savedUser as any)?.is_hub_only) {
-            window.location.href = process.env.NEXT_PUBLIC_HUB_SITE_URL || 'http://localhost:3001/materiais';
-          } else {
-            router.replace('/chat');
-          }
-        });
+        saveSession(event.data.token, event.data.user || { username: 'student' })
+          .then((savedUser) => {
+            if (isHub || event.data.user?.is_hub_only || (savedUser as any)?.is_hub_only) {
+              window.location.href = process.env.NEXT_PUBLIC_HUB_SITE_URL || 'http://localhost:3001/materiais';
+            } else {
+              router.replace('/chat');
+            }
+          })
+          .catch((err) => {
+            console.error('[Login] Google message saveSession error:', err);
+            setError('Erro ao salvar sessão.');
+          });
       }
     };
     window.addEventListener('message', handleGoogleMessage);
@@ -93,66 +96,30 @@ export default function LoginPage() {
       // Limpa os parâmetros da URL
       window.history.replaceState({}, '', window.location.pathname);
 
-      saveSession(token, userObj || { username: 'student' }, refreshToken).then((savedUser) => {
-        if (isHub || userObj?.is_hub_only || (savedUser as any)?.is_hub_only) {
-          window.location.href = process.env.NEXT_PUBLIC_HUB_SITE_URL || 'http://localhost:3001/materiais';
-        } else {
-          router.replace('/chat');
-        }
-      });
+      saveSession(token, userObj || { username: 'student' }, refreshToken)
+        .then((savedUser) => {
+          if (isHub || userObj?.is_hub_only || (savedUser as any)?.is_hub_only) {
+            window.location.href = process.env.NEXT_PUBLIC_HUB_SITE_URL || 'http://localhost:3001/materiais';
+          } else {
+            router.replace('/chat');
+          }
+        })
+        .catch((err) => {
+          console.error('[Login] URL token saveSession error:', err);
+          setError('Erro ao validar sessão. Faça login novamente.');
+        });
       return () => window.removeEventListener('message', handleGoogleMessage);
     }
 
     const credential = params.get('credential');
     if (credential) {
-      handleGoogleCredential({ credential });
+      handleGoogleCredential({ credential }).catch(() => {});
       window.history.replaceState({}, '', window.location.pathname);
     }
 
     return () => window.removeEventListener('message', handleGoogleMessage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saveSession, router]);
-
-  // Google OAuth
-  const googleInitializedRef = useRef(false);
-  useEffect(() => {
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    if (!clientId) return;
-
-    const initGoogle = (retries = 0) => {
-      if (typeof window === 'undefined') return;
-      const g = (window as any).google;
-      if (!g?.accounts?.id) {
-        if (retries < 30) setTimeout(() => initGoogle(retries + 1), 500);
-        return;
-      }
-
-      if (!googleInitializedRef.current) {
-        g.accounts.id.initialize({
-          client_id: clientId,
-          callback: handleGoogleCredential,
-          auto_select: false,
-          cancel_on_tap_outside: true,
-          ux_mode: 'popup',
-        });
-        googleInitializedRef.current = true;
-      }
-
-      if (googleBtnRef.current) {
-        g.accounts.id.renderButton(googleBtnRef.current, {
-          type: 'standard',
-          shape: 'rectangular',
-          theme: 'filled_black',
-          text: 'continue_with',
-          size: 'large',
-          width: googleBtnRef.current.clientWidth || 320,
-        });
-      }
-    };
-
-    initGoogle();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleGoogleCredential = useCallback(async (response: { credential: string }) => {
     clearMessages();
@@ -192,13 +159,19 @@ export default function LoginPage() {
         (window as any).flutter_inappwebview
           .callHandler('googleLogin')
           .then(async (res: any) => {
-            if (res && res.token && res.user) {
-              await saveSession(res.token, res.user);
-              router.push('/chat');
-            } else if (res && res.success) {
-              router.push('/chat');
-            } else {
+            try {
+              if (res && res.token && res.user) {
+                await saveSession(res.token, res.user);
+                router.push('/chat');
+              } else if (res && res.success) {
+                router.push('/chat');
+              } else {
+                setLoading(false);
+              }
+            } catch (sessionErr) {
+              console.error('[Login] Flutter google session error:', sessionErr);
               setLoading(false);
+              setError('Erro ao salvar sessão.');
             }
           })
           .catch(() => {
@@ -340,9 +313,6 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-bg relative overflow-hidden py-4 px-4">
-      {/* Script from Next.js to load Google Identity Services */}
-      <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
-
       {/* Ambient glow */}
       <div className="fixed -top-[20%] -left-[10%] w-[65%] h-[65%] pointer-events-none -z-10" style={{ background: 'radial-gradient(ellipse, hsla(258, 80%, 50%, 0.14) 0%, transparent 70%)' }} />
 
@@ -430,7 +400,6 @@ export default function LoginPage() {
                     </svg>
                     <span>{'Continue with Google'}</span>
                   </button>
-                  <div ref={googleBtnRef} className="hidden pointer-events-none" />
                 </div>
                 <div className="flex items-center gap-3 mb-4 text-text-subtle text-[0.73rem] tracking-wider">
                   <span className="flex-1 h-px bg-border" />
