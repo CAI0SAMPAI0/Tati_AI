@@ -25,7 +25,7 @@ VOICE_ACCENT_MAP = {
     "en-NG": "en-NG-EzinneNeural",
     "en-CN": "zh-CN-XiaoxiaoNeural",
     "en-HK": "en-HK-YanNeural",
-    "en-JP": "en-HK-YanNeural",
+    "en-JP": "en-JP-NanamiNeural",
 }
 
 
