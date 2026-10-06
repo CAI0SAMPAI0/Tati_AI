@@ -16,7 +16,7 @@ export const ACCENTS: AccentOption[] = [
   { id: 'en-ZA', label: '🇿🇦 South African', shortLabel: 'ZA', desc: 'South Africa (Leah)', flag: '🇿🇦' },
   { id: 'en-NZ', label: '🇳🇿 New Zealand', shortLabel: 'NZ', desc: 'New Zealand (Molly)', flag: '🇳🇿' },
   { id: 'en-CN', label: '🇨🇳 Chinese Accent', shortLabel: 'CN', desc: 'Chinese English (Xiaoxiao)', flag: '🇨🇳' },
-  { id: 'en-JP', label: '🇯🇵 Japanese Accent', shortLabel: 'JP', desc: 'Japanese / Asian English (Yan)', flag: '🇯🇵' },
+  { id: 'en-KR', label: '🇰🇷 Korean Accent', shortLabel: 'KR', desc: 'Korean English (SunHi)', flag: '🇰🇷' },
 ];
 
 export const DEFAULT_ACCENT = 'en-US';
