@@ -25,8 +25,12 @@ VOICE_ACCENT_MAP = {
     "en-NG": "en-NG-EzinneNeural",
     "en-CN": "zh-CN-XiaoxiaoNeural",
     "en-HK": "en-HK-YanNeural",
+<<<<<<< HEAD
     "en-KR": "ko-KR-SunHiNeural",
     "en-JP": "ko-KR-SunHiNeural",
+=======
+    "en-JP": "en-JP-NanamiNeural",
+>>>>>>> hermes-fix
 }
 
 

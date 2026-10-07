@@ -472,7 +472,8 @@ async def send_simulation_message(request: HttpRequest, payload: SimMessageInput
                 "- Respond ENTIRELY in natural English, stay strictly in character.\n"
                 "- Keep answers engaging and concise (2 to 3 sentences, under 65 words).\n"
                 "- ALWAYS complete every sentence you start. NEVER leave a sentence unfinished or cut off mid-thought.\n"
-                "- Encourage the student and end with ONE clear question to pass the turn."
+                "- Encourage the student and end with ONE clear question to pass the turn.\n"
+                "- Punctual, discreet pedagogical feedback: If the student makes a clear grammar, agreement, verb tense, preposition, or vocabulary error, politely and discreetly point it out AT THE VERY END of your response. NEVER use terms like 'Quick Tip' or formal correction labels. Instead, naturally mention that it sounds more natural in another way (e.g., 'By the way, it sounds more natural to say \"...\" instead of \"...\"')."
             ),
         }
     ]
