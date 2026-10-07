@@ -324,7 +324,7 @@ async def start_simulation(request: HttpRequest, payload: SimStartInput):
     )
     initial_text = _fix_time_greeting(initial_text, period)
 
-    groq_model = getattr(settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"))
+    groq_model = getattr(settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"))
     keys = get_groq_keys()
     for key in keys:
         try:
@@ -481,7 +481,7 @@ async def send_simulation_message(request: HttpRequest, payload: SimMessageInput
         messages_payload.append({"role": m.role, "content": m.content})
 
     reply_text = "That's interesting! Let's continue our conversation."
-    groq_model = getattr(settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"))
+    groq_model = getattr(settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"))
     keys = get_groq_keys()
     for key in keys:
         try:

@@ -58,7 +58,7 @@ LLM_MODEL=meta-llama/Llama-3.1-8B-Instruct:novita
 LLM_PROVIDER=meta_llama
 
 # Modelo rápido da Groq para simulações, atividades e dicionário
-GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_MODEL=openai/gpt-oss-120b
 
 # Modelo de embeddings para o RAG
 EMBEDDING_MODEL=BAAI/bge-large-en-v1.5

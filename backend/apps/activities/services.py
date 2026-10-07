@@ -1989,11 +1989,22 @@ class HubService:
         # Auto-sync sob demanda: se o material é seguro ou possui content_source e não há páginas geradas / salvas em disco
         if (not secure_pages or not local_has_pages) and (item.content_source or getattr(item, "is_secure", False)):
             try:
-                from apps.activities.tasks import sync_material_pages
+                from apps.activities.tasks import sync_material_pages, is_sync_running
                 logger.info(
                     f"[Hub] Auto-sincronizando sob demanda o material '{item.title}' ({content_id})..."
                 )
-                sync_ok = sync_material_pages(item, force=False)
+                if secure_pages:
+                    # Quantidade de páginas já conhecida: aquece o cache local em background.
+                    # As requisições de página aguardam o mesmo sync (lock por material).
+                    if not is_sync_running(content_id):
+                        import threading
+
+                        threading.Thread(
+                            target=sync_material_pages, args=(item,), daemon=True
+                        ).start()
+                    sync_ok = False
+                else:
+                    sync_ok = sync_material_pages(item, force=False)
                 if sync_ok:
                     item.refresh_from_db()
                     raw_pages = getattr(item, "secure_pages", None)

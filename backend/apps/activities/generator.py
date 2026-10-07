@@ -478,7 +478,7 @@ Return ONLY a JSON object in this exact format:
         all_consolidated_topics: List[Dict[str, Any]] = []
         client = cls._get_groq_client()
         groq_model = getattr(
-            settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+            settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
         )
 
         for ref in refs:
@@ -580,7 +580,7 @@ Format strictly as JSON:
     }}
   ]
 }}"""
-                for candidate_model in [groq_model, "llama-3.3-70b-versatile", "openai/gpt-oss-120b"]:
+                for candidate_model in [groq_model, "openai/gpt-oss-120b", "qwen/qwen3.8-27b"]:
                     try:
                         res = client.chat.completions.create(
                             model=candidate_model,

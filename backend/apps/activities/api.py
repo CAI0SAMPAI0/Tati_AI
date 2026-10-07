@@ -638,29 +638,19 @@ def proxy_activity_image(request: HttpRequest, url: str):
     )
 
 
-def _generate_fallback_hub_page(title: str, page_number: int, email: str) -> bytes:
-    import html
-
-    safe_title = html.escape(title or "Material Didático Tati AI")
-    safe_email = html.escape(email or "Aluno Tati AI")
-    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1131" viewBox="0 0 800 1131">
-  <defs>
-    <pattern id="wm" width="280" height="180" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
-      <text x="20" y="90" fill="rgba(148, 163, 184, 0.12)" font-size="14" font-weight="bold" font-family="system-ui, sans-serif">{safe_email}</text>
-    </pattern>
-  </defs>
-  <rect width="800" height="1131" fill="#0f172a"/>
-  <rect width="800" height="1131" fill="url(#wm)"/>
-  <rect x="40" y="40" width="720" height="1051" rx="16" fill="#1e293b" stroke="#334155" stroke-width="2"/>
-  <circle cx="400" cy="380" r="50" fill="#8b5cf6" fill-opacity="0.15" stroke="#8b5cf6" stroke-width="2"/>
-  <path d="M385 365h30v30h-30z" fill="none" stroke="#a78bfa" stroke-width="2"/>
-  <path d="M392 375h16M392 382h16" stroke="#a78bfa" stroke-width="2" stroke-linecap="round"/>
-  <text x="400" y="470" text-anchor="middle" fill="#f8fafc" font-size="22" font-weight="bold" font-family="system-ui, sans-serif">{safe_title}</text>
-  <text x="400" y="510" text-anchor="middle" fill="#94a3b8" font-size="16" font-family="system-ui, sans-serif">Página {page_number}</text>
-  <text x="400" y="550" text-anchor="middle" fill="#64748b" font-size="13" font-family="system-ui, sans-serif">Material seguro sincronizado</text>
-  <text x="400" y="1040" text-anchor="middle" fill="#64748b" font-size="12" font-family="system-ui, sans-serif">Licenciado exclusivamente para {safe_email}</text>
-</svg>"""
-    return svg.encode("utf-8")
+def _hub_page_unavailable(retry_after: int = 5) -> HttpResponse:
+    """
+    Página ainda não disponível (conversão em andamento ou falha temporária).
+    Nunca devolve placeholder/imagem falsa: o visualizador mostra "carregando" e re-tenta.
+    `no-store` impede que o navegador/CDN guarde a resposta de indisponibilidade.
+    """
+    return HttpResponse(
+        status=503,
+        headers={
+            "Retry-After": str(retry_after),
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
+    )
 
 
 @activities_router.get("/hub/{content_id}/pages/{page_index}", auth=auth_optional)
@@ -669,7 +659,8 @@ def get_hub_page(
 ):
     """
     Retorna a página de um documento seguro do Hub com marca d'água do email.
-    Garante que o arquivo sempre exista e nunca retorne 500 ou 404 quebrando o visualizador.
+    Se a página real ainda não existir, regenera sob demanda; enquanto não houver imagem real
+    responde 503 (re-tentável), nunca uma página placeholder.
     """
     email = "Aluno Tati AI"
     title = "Material Didático"
@@ -776,21 +767,26 @@ def get_hub_page(
                 except Exception as write_err:
                     logger.warning(f"[Hub] Erro ao gravar cache local: {write_err}")
 
-        # 4. Se não houver arquivo e existir content_source, dispara auto-sync em background para regeneração sob demanda
+        # 4. Se não houver arquivo e existir content_source, regenera sob demanda.
+        # O sync é protegido por lock por material: as requisições simultâneas das demais
+        # páginas aguardam a mesma conversão (em vez de disparar várias instâncias do LibreOffice).
         if not file_data and content_source:
             try:
-                import threading
                 from .tasks import sync_material_pages
                 from .models import PremiumContent
 
                 m = PremiumContent.objects.filter(id=content_id).first()
-                if m:
-                    threading.Thread(
-                        target=sync_material_pages, args=(m,), daemon=True
-                    ).start()
+                if m and sync_material_pages(m, wait_timeout=100.0):
+                    file_data = _RAW_IMAGE_CACHE.get(
+                        f"{content_id}/page_{page_index + 1}.webp"
+                    )
+                    if not file_data and os.path.exists(local_file):
+                        with open(local_file, "rb") as f:
+                            file_data = f.read()
+                        _RAW_IMAGE_CACHE[storage_path] = file_data
             except Exception as sync_err:
                 logger.warning(
-                    f"[Hub] Erro no auto-sync de emergência para {content_id}: {sync_err}"
+                    f"[Hub] Erro no auto-sync sob demanda para {content_id}: {sync_err}"
                 )
 
         # 5. Fallback para preview público caso a página específica não esteja disponível e seja a primeira página
@@ -802,14 +798,10 @@ def get_hub_page(
                 timeout=8.0,
             )
 
-        # 6. Se ainda assim não houver imagem física, gera dinamicamente a página com marca d'água evitando 404/500
+        # 6. Sem imagem real: nunca devolve placeholder. Responde 503 (sem cache) para o
+        # visualizador exibir "carregando" e re-tentar até a página real ficar pronta.
         if not file_data:
-            fallback_svg = _generate_fallback_hub_page(title, page_index + 1, email)
-            return HttpResponse(
-                fallback_svg,
-                content_type="image/svg+xml",
-                headers={"Cache-Control": "public, max-age=60"},
-            )
+            return _hub_page_unavailable()
 
         try:
             watermarked = apply_watermark(file_data, email)
@@ -830,12 +822,7 @@ def get_hub_page(
         logger.error(
             f"[Hub] Erro inesperado em get_hub_page para {content_id} pág {page_index}: {fatal_err}"
         )
-        fallback_svg = _generate_fallback_hub_page(title, page_index + 1, email)
-        return HttpResponse(
-            fallback_svg,
-            content_type="image/svg+xml",
-            headers={"Cache-Control": "public, max-age=60"},
-        )
+        return _hub_page_unavailable()
 
 
 #    FLASHCARD ASSETS & CLOUDINARY UPLOAD                               

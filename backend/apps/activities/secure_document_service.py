@@ -3,6 +3,9 @@ import io
 import os
 import shutil
 import subprocess
+import threading
+import time
+import zipfile
 from typing import Any
 
 from django.conf import settings
@@ -100,51 +103,117 @@ def safe_download_supabase_storage(
         return None
 
 
-def _convert_to_pdf(input_path: str, output_dir: str) -> str | None:
+# Serializa as execuções do LibreOffice no processo: instâncias simultâneas (várias páginas
+# requisitadas ao mesmo tempo) disputavam o mesmo arquivo e derrubavam o soffice com
+# "WrappedTargetRuntimeException / Unspecified Application Error".
+_SOFFICE_LOCK = threading.Lock()
+_SOFFICE_MAX_ATTEMPTS = 3
+_SOFFICE_TIMEOUT = 120
+
+_OFFICE_EXTENSIONS = (
+    ".pptx", ".ppt", ".pps", ".ppsx", ".odp",
+    ".docx", ".doc", ".odt", ".rtf",
+    ".xlsx", ".xls", ".ods",
+)
+
+
+def detect_document_extension(data: bytes, hint_name: str = "") -> str:
     """
-    Usa LibreOffice para converter arquivos (PPTX, DOCX) em PDF de forma confiável.
-    Utiliza um perfil temporário único por execução para evitar conflitos de concorrência (.lock),
-    garante variáveis de ambiente adequadas para headless e limpa recursos no bloco finally.
+    Detecta a extensão real do documento a partir dos magic bytes.
+    O LibreOffice escolhe o filtro de importação pela extensão; um DOCX salvo como
+    `.pptx` (ou vice-versa) faz o soffice abortar com WrappedTargetRuntimeException.
     """
-    temp_profile_dir = None
+    hint_ext = os.path.splitext((hint_name or "").split("?")[0])[1].lower()
+
+    if data.startswith(b"%PDF"):
+        return ".pdf"
+
+    if data.startswith(b"PK\x03\x04"):
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as zf:
+                names = zf.namelist()
+                if "mimetype" in names:
+                    mime = zf.read("mimetype").decode("ascii", "ignore").strip()
+                    if "presentation" in mime:
+                        return ".odp"
+                    if "spreadsheet" in mime:
+                        return ".ods"
+                    if "text" in mime:
+                        return ".odt"
+                if any(n.startswith("ppt/") for n in names):
+                    return ".ppsx" if hint_ext == ".ppsx" else ".pptx"
+                if any(n.startswith("word/") for n in names):
+                    return ".docx"
+                if any(n.startswith("xl/") for n in names):
+                    return ".xlsx"
+        except Exception:
+            pass
+        return hint_ext if hint_ext in _OFFICE_EXTENSIONS else ".pptx"
+
+    if data.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+        # Formato binário OLE (Office 97-2003)
+        if hint_ext in (".ppt", ".pps", ".doc", ".xls"):
+            return hint_ext
+        head = data[: 1024 * 1024]
+        if b"P\x00o\x00w\x00e\x00r\x00P\x00o\x00i\x00n\x00t" in head:
+            return ".ppt"
+        if b"W\x00o\x00r\x00d\x00D\x00o\x00c\x00u\x00m\x00e\x00n\x00t" in head:
+            return ".doc"
+        if b"W\x00o\x00r\x00k\x00b\x00o\x00o\x00k" in head:
+            return ".xls"
+        return ".ppt"
+
+    if data.lstrip().startswith(b"{\\rtf"):
+        return ".rtf"
+
+    return hint_ext if hint_ext in _OFFICE_EXTENSIONS else ".pptx"
+
+
+def _find_soffice() -> str | None:
+    soffice_path = (
+        "libreoffice"
+        if shutil.which("libreoffice")
+        else ("soffice" if shutil.which("soffice") else None)
+    )
+    if not soffice_path:
+        possible_paths = [
+            "/usr/bin/libreoffice",
+            "/usr/bin/soffice",
+            r"C:\Program Files\LibreOffice\program\soffice.exe",
+            r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+        ]
+        for p in possible_paths:
+            if os.path.exists(p):
+                soffice_path = p
+                break
+
+    if not soffice_path or (
+        not shutil.which(soffice_path) and not os.path.exists(soffice_path)
+    ):
+        return None
+    return soffice_path
+
+
+def _run_soffice_once(
+    soffice_path: str, input_path: str, work_dir: str, attempt: int
+) -> str | None:
+    """Executa uma única conversão em diretório isolado com perfil descartável."""
+    temp_profile_dir = tempfile.mkdtemp(prefix="soffice_profile_")
     try:
-        soffice_path = (
-            "libreoffice"
-            if shutil.which("libreoffice")
-            else ("soffice" if shutil.which("soffice") else None)
-        )
-        if not soffice_path:
-            possible_paths = [
-                "/usr/bin/libreoffice",
-                "/usr/bin/soffice",
-                r"C:\Program Files\LibreOffice\program\soffice.exe",
-                r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
-            ]
-            for p in possible_paths:
-                if os.path.exists(p):
-                    soffice_path = p
-                    break
-
-        if not soffice_path or (not shutil.which(soffice_path) and not os.path.exists(soffice_path)):
-            logging.warning(
-                f"[SecureDoc] Binário do LibreOffice ('{soffice_path}') não encontrado no sistema."
-            )
-            return None
-
-        # Perfil temporário isolado por conversão (elimina exit code 1 por arquivos .lock)
-        temp_profile_dir = tempfile.mkdtemp(prefix="soffice_profile_")
         profile_uri = pathlib.Path(temp_profile_dir).as_uri()
 
         env = os.environ.copy()
-        if "HOME" not in env:
-            env["HOME"] = temp_profile_dir
-        if "USERPROFILE" in env and not env.get("HOME"):
-            env["HOME"] = env["USERPROFILE"]
+        # HOME gravável e isolado: o soffice grava ~/.config e caches mesmo com UserInstallation
+        env["HOME"] = temp_profile_dir
+        env["TMPDIR"] = temp_profile_dir
+        # Backend gráfico "headless puro" (sem X11/GTK)
+        env["SAL_USE_VCLPLUGIN"] = "svp"
         # Informa Java para rodar headless se invocado por extensões do LibreOffice
         env["JAVA_TOOL_OPTIONS"] = "-Djava.awt.headless=true"
 
         logging.info(
-            f"[SecureDoc] Convertendo {input_path} para PDF usando {soffice_path} (perfil: {profile_uri})..."
+            f"[SecureDoc] Convertendo {input_path} para PDF usando {soffice_path} "
+            f"(perfil: {profile_uri}, tentativa {attempt}/{_SOFFICE_MAX_ATTEMPTS})..."
         )
 
         cmd = [
@@ -153,11 +222,13 @@ def _convert_to_pdf(input_path: str, output_dir: str) -> str | None:
             "--invisible",
             "--nodefault",
             "--nofirststartwizard",
+            "--nolockcheck",
+            "--norestore",
             f"-env:UserInstallation={profile_uri}",
             "--convert-to",
             "pdf",
             "--outdir",
-            output_dir,
+            work_dir,
             input_path,
         ]
 
@@ -165,36 +236,101 @@ def _convert_to_pdf(input_path: str, output_dir: str) -> str | None:
             cmd,
             capture_output=True,
             text=True,
-            timeout=90,
+            timeout=_SOFFICE_TIMEOUT,
             env=env,
         )
 
         base_name = os.path.splitext(os.path.basename(input_path))[0]
-        pdf_path = os.path.join(output_dir, f"{base_name}.pdf")
-
-        if result.returncode != 0 or not os.path.exists(pdf_path):
-            logging.error(
-                f"[SecureDoc] LibreOffice retorno={result.returncode}: stdout={result.stdout.strip()} stderr={result.stderr.strip()}"
-            )
+        pdf_path = os.path.join(work_dir, f"{base_name}.pdf")
 
         if os.path.exists(pdf_path) and os.path.getsize(pdf_path) > 0:
+            if result.returncode != 0:
+                logging.info(
+                    f"[SecureDoc] LibreOffice retornou {result.returncode}, mas o PDF foi gerado corretamente."
+                )
             return pdf_path
+
+        log = logging.error if attempt >= _SOFFICE_MAX_ATTEMPTS else logging.warning
+        log(
+            f"[SecureDoc] LibreOffice retorno={result.returncode} (tentativa {attempt}/{_SOFFICE_MAX_ATTEMPTS}): "
+            f"stdout={result.stdout.strip()} stderr={result.stderr.strip()}"
+        )
         return None
     except subprocess.TimeoutExpired:
-        logging.error(f"[SecureDoc] Timeout expirado (90s) na conversão LibreOffice de {input_path}")
+        log = logging.error if attempt >= _SOFFICE_MAX_ATTEMPTS else logging.warning
+        log(
+            f"[SecureDoc] Timeout ({_SOFFICE_TIMEOUT}s) na conversão LibreOffice de {input_path} "
+            f"(tentativa {attempt}/{_SOFFICE_MAX_ATTEMPTS})"
+        )
+        return None
+    finally:
+        shutil.rmtree(temp_profile_dir, ignore_errors=True)
+
+
+def _convert_to_pdf(input_path: str, output_dir: str) -> str | None:
+    """
+    Usa LibreOffice para converter arquivos (PPTX, DOCX, ...) em PDF de forma confiável.
+
+    - Serializa as execuções (lock de processo) para nunca rodar dois soffice ao mesmo tempo;
+    - Copia o arquivo para um diretório de trabalho isolado e com a extensão correta
+      (detectada pelos magic bytes), evitando que outra thread sobrescreva o arquivo
+      durante a leitura;
+    - Usa perfil temporário único por tentativa e re-tenta em caso de falha.
+    Retorna o caminho do PDF dentro de `output_dir` ou None.
+    """
+    work_dir = None
+    try:
+        soffice_path = _find_soffice()
+        if not soffice_path:
+            logging.warning("[SecureDoc] Binário do LibreOffice não encontrado no sistema.")
+            return None
+
+        if not os.path.exists(input_path) or os.path.getsize(input_path) == 0:
+            logging.error(f"[SecureDoc] Arquivo de entrada inexistente ou vazio: {input_path}")
+            return None
+
+        with open(input_path, "rb") as f:
+            data = f.read()
+        ext = detect_document_extension(data, input_path)
+        base_name = os.path.splitext(os.path.basename(input_path))[0]
+        if ext == ".pdf":
+            os.makedirs(output_dir, exist_ok=True)
+            final_pdf = os.path.join(output_dir, f"{base_name}.pdf")
+            if os.path.abspath(final_pdf) != os.path.abspath(input_path):
+                shutil.copyfile(input_path, final_pdf)
+            return final_pdf
+
+        work_dir = tempfile.mkdtemp(prefix="soffice_work_")
+        isolated_input = os.path.join(work_dir, f"{base_name}{ext}")
+        with open(isolated_input, "wb") as f:
+            f.write(data)
+
+        with _SOFFICE_LOCK:
+            for attempt in range(1, _SOFFICE_MAX_ATTEMPTS + 1):
+                pdf_tmp = _run_soffice_once(soffice_path, isolated_input, work_dir, attempt)
+                if pdf_tmp:
+                    os.makedirs(output_dir, exist_ok=True)
+                    final_pdf = os.path.join(output_dir, f"{base_name}.pdf")
+                    shutil.move(pdf_tmp, final_pdf)
+                    return final_pdf
+                if attempt < _SOFFICE_MAX_ATTEMPTS:
+                    time.sleep(1.5 * attempt)
         return None
     except Exception as e:
         logging.error(f"[SecureDoc] Erro inesperado na conversão para PDF: {e}")
         return None
     finally:
-        if temp_profile_dir and os.path.exists(temp_profile_dir):
-            shutil.rmtree(temp_profile_dir, ignore_errors=True)
+        if work_dir and os.path.exists(work_dir):
+            shutil.rmtree(work_dir, ignore_errors=True)
 
 
 def extract_links_from_pdf(pdf_path: str) -> list[dict[str, Any]]:
     extracted_links = []
     try:
-        import fitz
+        try:
+            import pymupdf as fitz
+        except ImportError:
+            import fitz
 
         doc = fitz.open(pdf_path)
         for page_idx, page in enumerate(doc):

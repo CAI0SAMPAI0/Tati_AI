@@ -13,7 +13,7 @@ Você pode adicionar ou customizar as seguintes chaves no seu arquivo `.env` loc
 |---|---|---|
 | `LLM_MODEL` | `meta-llama/Llama-3.1-8B-Instruct:novita` | Nome do modelo principal de conversação da Teacher Tati. |
 | `LLM_PROVIDER` | `meta_llama` | Provedor de IA ativo (`meta_llama`, `groq`, `gemini`). |
-| `GROQ_MODEL` | `llama-3.3-70b-versatile` | Modelo utilizado em tarefas rápidas, geração de atividades e dicionário. |
+| `GROQ_MODEL` | `openai/gpt-oss-120b` | Modelo utilizado em tarefas rápidas, geração de atividades e dicionário. |
 | `EMBEDDING_MODEL` | `BAAI/bge-large-en-v1.5` | Modelo de embeddings para o RAG (compatível com HuggingFace Inference API). |
 | `AI_CACHE_ENABLED` | `true` | Ativa cache multi-nível (Redis/Upstash + Memória RAM) para queries de IA. |
 | `AI_CACHE_TTL` | `86400` | Tempo de vida padrão do cache em segundos (24 horas). |

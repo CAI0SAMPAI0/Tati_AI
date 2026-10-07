@@ -552,8 +552,6 @@ class AIService:
                 "openai/gpt-oss-120b",
                 "qwen/qwen3.8-27b",
                 "openai/gpt-oss-20b",
-                "llama-3.3-70b-versatile",
-                "llama-3.1-8b-instant",
             ]
             seen = set()
             models_to_try = [m for m in candidate_models if not (m in seen or seen.add(m))]
@@ -767,8 +765,6 @@ class AIService:
                 "openai/gpt-oss-120b",
                 "qwen/qwen3.8-27b",
                 "openai/gpt-oss-20b",
-                "llama-3.3-70b-versatile",
-                "llama-3.1-8b-instant",
             ]
             seen_models = set()
             groq_models = [m for m in candidate_groq_models if not (m in seen_models or seen_models.add(m))]
@@ -1011,7 +1007,7 @@ class AIService:
                     f"Student message: {user_text[:250]}\n\n"
                     "Title:"
                 )
-                groq_model = getattr(settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"))
+                groq_model = getattr(settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"))
                 for key in keys:
                     try:
                         client = Groq(api_key=key, timeout=8.0)
