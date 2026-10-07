@@ -30,7 +30,7 @@ RUN if [ -f "/tmp/build/backend/requirements.txt" ]; then \
       cp -r /tmp/build/. ./; \
     fi \
     && rm -rf /tmp/build \
-    && pip install --no-cache-dir --upgrade pip \
+    && pip install --upgrade pip && pip --version \
     && pip install --no-cache-dir -r requirements.txt
 
 # Coleta arquivos estaticos
