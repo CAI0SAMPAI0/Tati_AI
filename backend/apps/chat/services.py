@@ -4,6 +4,7 @@ import os
 import re
 import uuid
 import warnings
+import time
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
@@ -45,6 +46,8 @@ LLAMA_MODEL_NAME = getattr(
 GROQ_API_KEY = os.getenv("GROQ_API_KEY") or os.getenv("GROQ_API_KEY_1")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY_1")
 
+_HF_CREDITS_DEPLETED_UNTIL: float = 0.0
+
 if GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
@@ -59,10 +62,16 @@ def call_meta_llama(
     on_token: Optional[Callable[[str], None]] = None,
 ) -> Optional[str]:
     """
-    Executa a chamada prioritária ao modelo Meta Llama 3.1 8B Instruct via Hugging Face Router API.
+    Executa a chamada ao modelo Meta Llama 3.1 8B Instruct via Hugging Face Router API.
     Suporta streaming em tempo real token-a-token se on_token for fornecido.
     Tenta primeiro via InferenceClient e possui fallback HTTP nativo via httpx.
+    Possui proteção automática para erro 402 (Payment Required / créditos esgotados).
     """
+    global _HF_CREDITS_DEPLETED_UNTIL
+    now = time.time()
+    if now < _HF_CREDITS_DEPLETED_UNTIL:
+        return None
+
     token = (
         os.getenv("HF_TOKEN_LLAMA")
         or os.getenv("HF_TOKEN")
@@ -112,6 +121,14 @@ def call_meta_llama(
                 if candidate:
                     return candidate
     except Exception as hf_err:
+        err_msg = str(hf_err).lower()
+        if "402" in err_msg or "payment required" in err_msg or "depleted your monthly included credits" in err_msg:
+            _HF_CREDITS_DEPLETED_UNTIL = now + 3600
+            logger.warning(
+                "[AI] Hugging Face Router: Créditos de inferência esgotados (402 Payment Required). "
+                "Pausando chamadas ao Hugging Face por 1 hora e ativando fallback automático."
+            )
+            return None
         logger.warning(
             f"[AI] Meta Llama via InferenceClient falhou: {hf_err}. Tentando via router httpx..."
         )
@@ -133,6 +150,12 @@ def call_meta_llama(
             data["stream"] = True
             with httpx.Client(timeout=20.0) as http_client:
                 with http_client.stream("POST", url, headers=headers, json=data) as resp:
+                    if resp.status_code == 402:
+                        _HF_CREDITS_DEPLETED_UNTIL = now + 3600
+                        logger.warning(
+                            "[AI] Hugging Face Router (httpx) retornou 402 Payment Required. Pausando HF por 1h."
+                        )
+                        return None
                     if resp.status_code == 200:
                         tokens = []
                         for line in resp.iter_lines():
@@ -158,6 +181,12 @@ def call_meta_llama(
         else:
             with httpx.Client(timeout=20.0) as http_client:
                 resp = http_client.post(url, headers=headers, json=data)
+                if resp.status_code == 402:
+                    _HF_CREDITS_DEPLETED_UNTIL = now + 3600
+                    logger.warning(
+                        "[AI] Hugging Face Router (httpx) retornou 402 Payment Required. Pausando HF por 1h."
+                    )
+                    return None
                 if resp.status_code == 200:
                     body = resp.json()
                     choices = body.get("choices") or []
@@ -171,6 +200,9 @@ def call_meta_llama(
                         f"[AI] Meta Llama via httpx retornou status {resp.status_code}: {resp.text[:200]}"
                     )
     except Exception as http_err:
+        err_msg = str(http_err).lower()
+        if "402" in err_msg or "payment required" in err_msg:
+            _HF_CREDITS_DEPLETED_UNTIL = now + 3600
         logger.warning(f"[AI] Meta Llama via httpx falhou: {http_err}")
 
     return None
@@ -501,42 +533,70 @@ class AIService:
             {"role": "user", "content": user_content},
         ]
 
-        # 1. Llama
-        try:
-            candidate = call_meta_llama(messages_payload, temperature=0.7, max_tokens=400)
-            if candidate:
-                return strip_emojis(candidate.strip())
-        except Exception:
-            pass
+        provider = getattr(settings, "LLM_PROVIDER", os.getenv("LLM_PROVIDER", "groq")).lower()
 
-        # 2. Groq
-        keys = get_groq_keys()
-        for g_model in ["openai/gpt-oss-20b", "qwen/qwen3.6-27b"]:
-            for key in keys:
-                try:
-                    client = Groq(api_key=key, timeout=10.0)
-                    chat_completion = client.chat.completions.create(
-                        messages=messages_payload,
-                        model=g_model,
-                        temperature=0.7,
-                        max_tokens=400,
-                    )
-                    ans = chat_completion.choices[0].message.content or ""
-                    if ans.strip():
-                        return strip_emojis(ans.strip())
-                except Exception:
-                    pass
-
-        # 3. Gemini
-        if GEMINI_API_KEY and genai:
+        def _qr_llama():
             try:
-                model = genai.GenerativeModel("gemini-1.5-flash")
-                prompt_full = f"{sys_prompt}\n\nUser: {user_content}"
-                res = model.generate_content(prompt_full)
-                if res and hasattr(res, "text") and res.text:
-                    return strip_emojis(res.text.strip())
+                candidate = call_meta_llama(messages_payload, temperature=0.7, max_tokens=400)
+                if candidate:
+                    return strip_emojis(candidate.strip())
             except Exception:
                 pass
+            return None
+
+        def _qr_groq():
+            keys = get_groq_keys()
+            configured_groq = getattr(settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"))
+            candidate_models = [
+                configured_groq,
+                "openai/gpt-oss-120b",
+                "qwen/qwen3.8-27b",
+                "openai/gpt-oss-20b",
+                "llama-3.3-70b-versatile",
+                "llama-3.1-8b-instant",
+            ]
+            seen = set()
+            models_to_try = [m for m in candidate_models if not (m in seen or seen.add(m))]
+            for g_model in models_to_try:
+                for key in keys:
+                    try:
+                        client = Groq(api_key=key, timeout=10.0)
+                        chat_completion = client.chat.completions.create(
+                            messages=messages_payload,
+                            model=g_model,
+                            temperature=0.7,
+                            max_tokens=400,
+                        )
+                        ans = chat_completion.choices[0].message.content or ""
+                        if ans.strip():
+                            return strip_emojis(ans.strip())
+                    except Exception:
+                        pass
+            return None
+
+        def _qr_gemini():
+            if GEMINI_API_KEY and genai:
+                try:
+                    model = genai.GenerativeModel("gemini-1.5-flash")
+                    prompt_full = f"{sys_prompt}\n\nUser: {user_content}"
+                    res = model.generate_content(prompt_full)
+                    if res and hasattr(res, "text") and res.text:
+                        return strip_emojis(res.text.strip())
+                except Exception:
+                    pass
+            return None
+
+        if provider == "groq":
+            steps = [_qr_groq, _qr_gemini, _qr_llama]
+        elif provider == "gemini":
+            steps = [_qr_gemini, _qr_groq, _qr_llama]
+        else:
+            steps = [_qr_llama, _qr_groq, _qr_gemini]
+
+        for step in steps:
+            res = step()
+            if res:
+                return res
 
         return (
             "Student demonstrates active participation and positive engagement in conversational topics. "
@@ -684,37 +744,36 @@ class AIService:
 
         reply_text = ""
         model_used = ""
+        provider = getattr(settings, "LLM_PROVIDER", os.getenv("LLM_PROVIDER", "groq")).lower()
 
-        # 3. Tentativa prioritária: Meta Llama 3.1-8B-Instruct via Hugging Face Router
-        try:
-            candidate = call_meta_llama(
-                messages_payload, temperature=0.7, max_tokens=500, on_token=on_token
-            )
-            if candidate:
-                reply_text = candidate
-                model_used = LLAMA_MODEL_NAME
-                print(f"[AI Model] Resposta gerada via Meta Llama: {LLAMA_MODEL_NAME}")
-                logger.info(f"[AI Model] Resposta gerada via Meta Llama: {LLAMA_MODEL_NAME}")
-        except Exception as llama_err:
-            logger.warning(f"[AI] Falha inesperada no Meta Llama: {llama_err}")
+        def _step_llama():
+            try:
+                candidate = call_meta_llama(
+                    messages_payload, temperature=0.7, max_tokens=500, on_token=on_token
+                )
+                if candidate:
+                    print(f"[AI Model] Resposta gerada via Meta Llama: {LLAMA_MODEL_NAME}")
+                    logger.info(f"[AI Model] Resposta gerada via Meta Llama: {LLAMA_MODEL_NAME}")
+                    return candidate, LLAMA_MODEL_NAME
+            except Exception as llama_err:
+                logger.warning(f"[AI] Falha inesperada no Meta Llama: {llama_err}")
+            return "", ""
 
-        # 4. Fallback: Groq (com rotação de chaves e proteção contra Rate Limits)
-        if not reply_text:
-            if HF_TOKEN_LLAMA:
-                print(f"[AI Model] Meta Llama indisponível ou falhou. Ativando fallback para Groq...")
-                logger.warning(f"[AI Model] Meta Llama indisponível ou falhou. Ativando fallback para Groq...")
-
+        def _step_groq():
             keys = get_groq_keys()
-            groq_models = [
-                "openai/gpt-oss-20b",
+            configured_groq = getattr(settings, "GROQ_MODEL", os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"))
+            candidate_groq_models = [
+                configured_groq,
                 "openai/gpt-oss-120b",
-                "qwen/qwen3.6-27b",
                 "qwen/qwen3.8-27b",
+                "openai/gpt-oss-20b",
+                "llama-3.3-70b-versatile",
+                "llama-3.1-8b-instant",
             ]
+            seen_models = set()
+            groq_models = [m for m in candidate_groq_models if not (m in seen_models or seen_models.add(m))]
 
             for g_model in groq_models:
-                if reply_text:
-                    break
                 for key in keys:
                     try:
                         client = Groq(api_key=key, timeout=15.0)
@@ -736,11 +795,9 @@ class AIService:
                                         on_token(tok)
                             candidate = "".join(tokens).strip()
                             if candidate:
-                                reply_text = candidate
-                                model_used = f"groq/{g_model}"
                                 print(f"[AI Model] Resposta gerada via Groq: {g_model}")
                                 logger.info(f"[AI Model] Resposta gerada via Groq: {g_model}")
-                                break
+                                return candidate, f"groq/{g_model}"
                         else:
                             chat_completion = client.chat.completions.create(
                                 messages=messages_payload,
@@ -751,20 +808,18 @@ class AIService:
                             candidate = chat_completion.choices[0].message.content or ""
                             candidate = strip_emojis(candidate.strip())
                             if candidate:
-                                reply_text = candidate
-                                model_used = f"groq/{g_model}"
                                 print(f"[AI Model] Resposta gerada via Groq: {g_model}")
                                 logger.info(f"[AI Model] Resposta gerada via Groq: {g_model}")
-                                break
+                                return candidate, f"groq/{g_model}"
                     except Exception as mod_err:
                         logger.warning(
                             f"[AI] Groq model {g_model} failed with key {key[:10]}: {mod_err}"
                         )
+            return "", ""
 
-        # 5. Fallback: Gemini (caso Groq esteja sob limite ou indisponível)
-        if not reply_text and GEMINI_API_KEY and genai:
-            print(f"[AI Model] Groq indisponível. Ativando fallback para Gemini...")
-            logger.warning(f"[AI Model] Groq indisponível. Ativando fallback para Gemini...")
+        def _step_gemini():
+            if not (GEMINI_API_KEY and genai):
+                return "", ""
             gemini_models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]
             for gem_model in gemini_models:
                 try:
@@ -781,22 +836,35 @@ class AIService:
                                     on_token(tok)
                         candidate = "".join(tokens).strip()
                         if candidate:
-                            reply_text = candidate
-                            model_used = f"gemini/{gem_model}"
                             print(f"[AI Model] Resposta gerada via Gemini: {gem_model}")
                             logger.info(f"[AI Model] Resposta gerada via Gemini: {gem_model}")
-                            break
+                            return candidate, f"gemini/{gem_model}"
                     else:
                         response = model.generate_content(prompt_full)
                         candidate = strip_emojis(response.text.strip())
                         if candidate:
-                            reply_text = candidate
-                            model_used = f"gemini/{gem_model}"
                             print(f"[AI Model] Resposta gerada via Gemini: {gem_model}")
                             logger.info(f"[AI Model] Resposta gerada via Gemini: {gem_model}")
-                            break
+                            return candidate, f"gemini/{gem_model}"
                 except Exception as e:
                     logger.warning(f"[AI] Gemini model {gem_model} failed: {e}")
+            return "", ""
+
+        # Ordem de tentativa respeitando LLM_PROVIDER
+        if provider == "groq":
+            pipeline_steps = [_step_groq, _step_gemini, _step_llama]
+        elif provider == "gemini":
+            pipeline_steps = [_step_gemini, _step_groq, _step_llama]
+        else:
+            pipeline_steps = [_step_llama, _step_groq, _step_gemini]
+
+        for step in pipeline_steps:
+            if reply_text:
+                break
+            candidate, m_used = step()
+            if candidate:
+                reply_text = candidate
+                model_used = m_used
 
         # 6. Fallback de contingência humanizado (Teacher Tati acolhedora, zero emojis, zero erro)
         if not reply_text:

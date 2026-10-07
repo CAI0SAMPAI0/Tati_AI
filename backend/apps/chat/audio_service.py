@@ -210,12 +210,26 @@ class AudioService:
             async for chunk in communicate.stream():
                 if chunk["type"] == "audio":
                     buf.write(chunk["data"])
-            if buf.tell() == 0:
-                return ""
-            return base64.b64encode(buf.getvalue()).decode()
+            if buf.tell() > 0:
+                return base64.b64encode(buf.getvalue()).decode()
         except Exception as e:
-            logger.error(f"[AudioService] Erro no TTS Assíncrono: {e}", exc_info=True)
-            return ""
+            logger.warning(
+                f"[AudioService] Erro no TTS com a voz '{voice}': {e}. Tentando fallback en-US-JennyNeural..."
+            )
+            if voice != "en-US-JennyNeural":
+                try:
+                    communicate = edge_tts.Communicate(cleaned, "en-US-JennyNeural")
+                    buf = io.BytesIO()
+                    async for chunk in communicate.stream():
+                        if chunk["type"] == "audio":
+                            buf.write(chunk["data"])
+                    if buf.tell() > 0:
+                        return base64.b64encode(buf.getvalue()).decode()
+                except Exception as fb_err:
+                    logger.error(f"[AudioService] Erro no TTS fallback: {fb_err}", exc_info=True)
+            else:
+                logger.error(f"[AudioService] Erro no TTS Assíncrono: {e}", exc_info=True)
+        return ""
 
     @classmethod
     def text_to_speech(cls, text: str, accent: str = "en-US") -> str:
