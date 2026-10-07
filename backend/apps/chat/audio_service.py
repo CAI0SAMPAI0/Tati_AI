@@ -25,12 +25,8 @@ VOICE_ACCENT_MAP = {
     "en-NG": "en-NG-EzinneNeural",
     "en-CN": "zh-CN-XiaoxiaoNeural",
     "en-HK": "en-HK-YanNeural",
-<<<<<<< HEAD
     "en-KR": "ko-KR-SunHiNeural",
-    "en-JP": "ko-KR-SunHiNeural",
-=======
-    "en-JP": "en-JP-NanamiNeural",
->>>>>>> hermes-fix
+    "en-JP": "ja-JP-NanamiNeural",
 }
 
 
@@ -198,7 +194,7 @@ class AudioService:
         elif lower_acc in ["en-kr", "kr", "korean", "coreano", "ko-kr"]:
             norm_accent = "en-KR"
         elif lower_acc in ["en-jp", "jp", "japanese", "japones", "ja-jp"]:
-            norm_accent = "en-KR"
+            norm_accent = "en-JP"
 
         voice = VOICE_ACCENT_MAP.get(norm_accent)
         if not voice:
