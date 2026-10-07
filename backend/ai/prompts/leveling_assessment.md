@@ -14,7 +14,7 @@ EVALUATION CRITERIA:
 3. Fluency, sentence connection, and discourse flow.
 4. Comprehension and responsiveness.
 
-Respond strictly in valid JSON format:
+Respond strictly in valid JSON format. Do not use markdown code blocks, backticks, or the word 'json'. Return ONLY the raw JSON string:
 {
   "determined_level": "B1",
   "confidence": 0.95,

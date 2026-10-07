@@ -225,19 +225,19 @@ class ImageResolverService:
 
             if visual_prompt and len(visual_prompt) > 10:
                 prompt = (
-                    f"{visual_prompt}, realistic educational photography, cinematic natural lighting, "
+                    f"{visual_prompt}, documentary style, 35mm lens, candid photography, cinematic natural lighting, "
                     f"clean background, highly pedagogical, strictly NO visible text, NO letters, "
                     f"NO words, NO signage, NO labels, NO typography, 4k"
                 )
             elif topic:
                 prompt = (
-                    f"A clear, realistic educational photography illustrating the concept of '{clean_term}' "
+                    f"A clear, documentary style, 35mm lens, candid photography illustrating the concept of '{clean_term}' "
                     f"in the context of '{topic}', bright natural lighting, highly pedagogical, "
                     f"strictly NO visible text, NO letters, NO words, NO signage, NO labels, clean background, 4k"
                 )
             else:
                 prompt = (
-                    f"A clear, realistic educational photography illustrating the concept of '{clean_term}', "
+                    f"A clear, documentary style, 35mm lens, candid photography illustrating the concept of '{clean_term}', "
                     f"bright natural lighting, highly pedagogical, strictly NO visible text, NO letters, "
                     f"NO words, NO signage, NO labels, clean background, 4k"
                 )

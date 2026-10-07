@@ -41,7 +41,17 @@ Generate {count} comprehensive, highly educational grammar exercise questions fo
 CRITICAL RULES:
 1. Everything in English except brief Portuguese tips if essential for Level A1/A2.
 2. Provide concise pedagogical explanations for each answer option.
-3. Return valid JSON only.
+3. Return ONLY a JSON object in this exact format, with no markdown code blocks:
+{
+  "questions": [
+    {
+      "question": "The question text, e.g. sentence with a ___ blank",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "answer": "The correct option (must exactly match one of the options)",
+      "explanation": "Concise pedagogical explanation"
+    }
+  ]
+}
 ```
 
 ## Reading Generator
@@ -52,7 +62,18 @@ Generate a high-quality reading comprehension passage and {count} questions for 
 CRITICAL RULES:
 1. Engaging, real-world text aligned with CEFR guidelines for level {lvl}.
 2. Multiple choice questions assessing main idea, vocabulary in context, and specific details.
-3. Return valid JSON only.
+3. Return ONLY a JSON object in this exact format, with no markdown code blocks:
+{
+  "passage": "The full reading comprehension text...",
+  "questions": [
+    {
+      "question": "Question about the text?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "answer": "The correct option",
+      "explanation": "Why this is correct based on the text"
+    }
+  ]
+}
 ```
 
 ## Vocabulary Generator
@@ -62,5 +83,15 @@ Generate {count} contextual vocabulary exercises for CEFR Level {lvl} on the top
 
 CRITICAL RULES:
 1. Focus on high-frequency collocations, phrasal verbs, and authentic usage.
-2. Return valid JSON only.
+2. Return ONLY a JSON object in this exact format, with no markdown code blocks:
+{
+  "questions": [
+    {
+      "question": "Sentence testing vocabulary with a ___ blank",
+      "options": ["word1", "word2", "word3", "word4"],
+      "answer": "correct word",
+      "explanation": "Definition and usage context"
+    }
+  ]
+}
 ```
