@@ -108,7 +108,7 @@ def get_gemini_client():
                 from google import genai
                 _gemini_client = genai.Client(api_key=api_key.strip())
             except Exception as e:
-                logger.error(f"[AudioService] Erro ao instanciar genai.Client: {e}")
+                logger.error(f"[AudioService] Erro ao instanciar genai.Client: {e}", exc_info=True)
     return _gemini_client
 
 
@@ -218,7 +218,7 @@ class AudioService:
                 return ""
             return base64.b64encode(buf.getvalue()).decode()
         except Exception as e:
-            logger.error(f"[AudioService] Erro no TTS Assíncrono: {e}")
+            logger.error(f"[AudioService] Erro no TTS Assíncrono: {e}", exc_info=True)
             return ""
 
     @classmethod
