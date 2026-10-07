@@ -506,19 +506,49 @@ Return ONLY a JSON object in this exact format:
                     f"[CEFR Generator] Erro ao consultar cefr_documents para {ref.filename}: {e}"
                 )
 
-            # 2. Se não houver chunks e storage_url existir, faz download e extrai
-            if not text_found and ref.storage_url:
+            # 2. Se não houver chunks, busca primeiro no volume local e depois via storage_url
+            if not text_found:
                 try:
                     import io, requests, pypdf
+                    raw_bytes = None
 
-                    logger.info(
-                        f"[CEFR Generator] Baixando e extraindo texto para {ref.filename} de {ref.storage_url[:50]}..."
-                    )
-                    resp = requests.get(ref.storage_url, timeout=20)
-                    if resp.status_code == 200:
-                        reader = pypdf.PdfReader(io.BytesIO(resp.content))
-                        pages_text = [p.extract_text() or "" for p in reader.pages]
-                        full_pdf_text = "\n".join(pages_text).strip()
+                    # 2.1 Verifica se o arquivo existe salvo no volume local
+                    cefr_dir = os.path.join(settings.MEDIA_ROOT, "cefr_references")
+                    candidate_local = [
+                        os.path.join(cefr_dir, f"{ref.id}_{ref.filename}"),
+                        os.path.join(cefr_dir, ref.filename),
+                    ]
+                    for loc_path in candidate_local:
+                        if os.path.exists(loc_path) and os.path.getsize(loc_path) > 0:
+                            with open(loc_path, "rb") as lf:
+                                raw_bytes = lf.read()
+                            logger.info(f"[CEFR Generator] Lendo arquivo CEFR direto do volume local: {loc_path}")
+                            break
+
+                    # 2.2 Se não estiver local, baixa da URL
+                    if not raw_bytes and ref.storage_url:
+                        logger.info(
+                            f"[CEFR Generator] Baixando e extraindo texto para {ref.filename} de {ref.storage_url[:50]}..."
+                        )
+                        resp = requests.get(ref.storage_url, timeout=20)
+                        if resp.status_code == 200:
+                            raw_bytes = resp.content
+                            # Salva no volume para consultas futuras
+                            try:
+                                os.makedirs(cefr_dir, exist_ok=True)
+                                with open(candidate_local[0], "wb") as sf:
+                                    sf.write(raw_bytes)
+                            except Exception:
+                                pass
+
+                    if raw_bytes:
+                        if ref.filename.lower().endswith(".pdf"):
+                            reader = pypdf.PdfReader(io.BytesIO(raw_bytes))
+                            pages_text = [p.extract_text() or "" for p in reader.pages]
+                            full_pdf_text = "\n".join(pages_text).strip()
+                        else:
+                            full_pdf_text = raw_bytes.decode("utf-8", errors="ignore").strip()
+
                         if full_pdf_text:
                             text_found = full_pdf_text
                             chunk_size = 1200

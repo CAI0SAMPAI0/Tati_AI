@@ -191,37 +191,6 @@ def _sync_from_source(content: PremiumContent, content_id: str, local_dir: str) 
         shutil.rmtree(work_dir, ignore_errors=True)
 
 
-def _sync_from_supabase(content: PremiumContent, content_id: str, local_dir: str) -> bool:
-    """Restaura páginas já geradas do Supabase Storage (quando acessível)."""
-    from .secure_document_service import safe_download_supabase_storage
-
-    raw_pages = getattr(content, "secure_pages", None) or []
-    if isinstance(raw_pages, str):
-        try:
-            raw_pages = json.loads(raw_pages)
-        except Exception:
-            raw_pages = []
-
-    for storage_path in raw_pages:
-        if not (isinstance(storage_path, str) and storage_path.endswith(".webp")):
-            continue
-        filename = os.path.basename(storage_path)
-        dest = os.path.join(local_dir, filename)
-        if os.path.exists(dest) and os.path.getsize(dest) > 0:
-            continue
-        data = safe_download_supabase_storage(
-            bucket="hub-secure-pages", path=storage_path, is_private=True, timeout=12.0
-        )
-        if not data:
-            # Supabase indisponível (402/404/...): não adianta tentar as demais páginas
-            break
-        with open(dest, "wb") as f:
-            f.write(data)
-        _RAW_IMAGE_CACHE[storage_path] = data
-
-    return bool(_list_local_pages(local_dir))
-
-
 def sync_material_pages(
     content: PremiumContent,
     force: bool = False,
@@ -281,15 +250,7 @@ def sync_material_pages(
             _LAST_SYNC_FAILURE.pop(content_id, None)
             return True
 
-        # 3. Tenta baixar do Supabase caso esteja acessível
-        try:
-            if _sync_from_supabase(content, content_id, local_dir):
-                _LAST_SYNC_FAILURE.pop(content_id, None)
-                return True
-        except Exception as e:
-            logger.warning(f"[HubSync] Supabase download falhou para {content.title}: {e}")
-
-        # Páginas antigas ainda válidas em disco (ex.: sync forçado que falhou)
+        # Páginas antigas ainda válidas em disco no volume
         if _list_local_pages(local_dir):
             return True
 

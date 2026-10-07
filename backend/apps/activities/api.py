@@ -750,24 +750,7 @@ def get_hub_page(
             except Exception:
                 pass
 
-        # 3. Tenta baixar do Supabase de forma segura e autenticada
-        if not file_data and 0 <= page_index < len(raw_pages):
-            file_data = safe_download_supabase_storage(
-                bucket="hub-secure-pages",
-                path=storage_path,
-                is_private=True,
-                timeout=12.0,
-            )
-            if file_data:
-                _RAW_IMAGE_CACHE[storage_path] = file_data
-                os.makedirs(local_dir, exist_ok=True)
-                try:
-                    with open(local_file, "wb") as f:
-                        f.write(file_data)
-                except Exception as write_err:
-                    logger.warning(f"[Hub] Erro ao gravar cache local: {write_err}")
-
-        # 4. Se não houver arquivo e existir content_source, regenera sob demanda.
+        # 3. Se não houver arquivo no disco do volume e existir content_source, sincroniza sob demanda.
         # O sync é protegido por lock por material: as requisições simultâneas das demais
         # páginas aguardam a mesma conversão (em vez de disparar várias instâncias do LibreOffice).
         if not file_data and content_source:
@@ -789,16 +772,7 @@ def get_hub_page(
                     f"[Hub] Erro no auto-sync sob demanda para {content_id}: {sync_err}"
                 )
 
-        # 5. Fallback para preview público caso a página específica não esteja disponível e seja a primeira página
-        if not file_data and preview_path and page_index == 0:
-            file_data = safe_download_supabase_storage(
-                bucket="hub-previews",
-                path=preview_path,
-                is_private=False,
-                timeout=8.0,
-            )
-
-        # 6. Sem imagem real: nunca devolve placeholder. Responde 503 (sem cache) para o
+        # 4. Sem imagem real: nunca devolve placeholder. Responde 503 (sem cache) para o
         # visualizador exibir "carregando" e re-tentar até a página real ficar pronta.
         if not file_data:
             return _hub_page_unavailable()
@@ -1428,8 +1402,9 @@ def upload_cefr_material(
             if full_text[i : i + chunk_size].strip()
         ]
 
+        ref_id = uuid.uuid4()
         ref = CEFRReference.objects.create(
-            id=uuid.uuid4(),
+            id=ref_id,
             filename=f.name,
             storage_url=storage_url,
             cefr_level=ref_level,
@@ -1437,6 +1412,16 @@ def upload_cefr_material(
             file_size=len(content),
             chunks_indexed=len(chunks),
         )
+
+        # Salva o arquivo original diretamente no volume persistente
+        try:
+            cefr_dir = os.path.join(settings.MEDIA_ROOT, "cefr_references")
+            os.makedirs(cefr_dir, exist_ok=True)
+            local_ref_path = os.path.join(cefr_dir, f"{ref_id}_{f.name}")
+            with open(local_ref_path, "wb") as rf:
+                rf.write(content)
+        except Exception as write_err:
+            logger.warning(f"Erro ao salvar arquivo CEFR no volume local: {write_err}")
 
         if chunks:
             try:

@@ -227,8 +227,7 @@ class SyncMaterialPagesTest(SimpleTestCase):
         self.assertTrue(all(results))
 
     def test_failure_returns_false_and_respects_cooldown(self):
-        with patch.object(tasks, "_sync_from_source", return_value=False) as src, \
-                patch.object(tasks, "_sync_from_supabase", return_value=False):
+        with patch.object(tasks, "_sync_from_source", return_value=False) as src:
             self.assertFalse(tasks.sync_material_pages(self.content))
             self.assertFalse(tasks.sync_material_pages(self.content))
             self.assertEqual(src.call_count, 1)
@@ -258,8 +257,7 @@ class SyncMaterialPagesTest(SimpleTestCase):
 
         with patch.object(tasks.httpx, "Client", FakeClient), \
                 patch.object(sds, "_convert_to_pdf", return_value=None), \
-                patch.object(tasks, "convert_from_path") as render, \
-                patch.object(tasks, "_sync_from_supabase", return_value=False):
+                patch.object(tasks, "convert_from_path") as render:
             self.assertFalse(tasks.sync_material_pages(self.content))
             render.assert_not_called()
 

@@ -383,7 +383,8 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+_default_media = "/app/media" if os.path.exists("/app") else (BASE_DIR / "media")
+MEDIA_ROOT = os.getenv("MEDIA_ROOT", str(_default_media))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

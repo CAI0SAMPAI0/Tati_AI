@@ -1848,16 +1848,12 @@ class HubService:
         base_url = os.getenv(
             "API_URL", "https://caio007-tati-ai-backend.hf.space"
         ).rstrip("/")
-        supa_storage = "https://gkziqqjswecteekanwnv.supabase.co/storage/v1/object/public/hub-secure-pages"
 
         results = []
         for m in qs:
             thumb = m.thumbnail_url or ""
             if thumb and not thumb.startswith("http"):
-                if thumb.endswith(".webp") and "/" in thumb:
-                    thumb = f"{base_url}/activities/hub/{m.id}/pages/0"
-                else:
-                    thumb = f"{supa_storage}/{thumb.lstrip('/')}"
+                thumb = f"{base_url}/activities/hub/{m.id}/pages/0"
             elif not thumb and m.is_secure:
                 thumb = f"{base_url}/activities/hub/{m.id}/pages/0"
 
