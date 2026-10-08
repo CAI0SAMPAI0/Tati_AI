@@ -9,7 +9,7 @@ import { apiGet, apiPost } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
-import { BookOpen, CalendarDays, Flame, Lightbulb, MessageSquare, Snowflake, Trophy, Type, History, ArrowRight, ArrowUp, Mail } from 'lucide-react';
+import { BookOpen, CalendarDays, Flame, MessageSquare, Snowflake, Trophy, Type, History, ArrowRight, ArrowUp, Mail } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useMemo, useState, useEffect } from 'react';

@@ -1,6 +1,6 @@
 import { AppProviders } from '@/providers/app-providers';
 import type { Metadata } from 'next';
-import { DM_Sans, Sora } from 'next/font/google';
+import { DM_Sans, Sora, Lora } from 'next/font/google';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -30,6 +30,14 @@ const dmSans = DM_Sans({
   preload: true,
 });
 
+const lora = Lora({
+  subsets: ['latin'],
+  variable: '--font-lora',
+  display: 'swap',
+  weight: ['400', '600', '700'],
+  style: ['normal', 'italic'],
+});
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
 
 export default function RootLayout({
@@ -41,7 +49,7 @@ export default function RootLayout({
     <html
       lang="en-US"
       suppressHydrationWarning
-      className={`${sora.variable} ${dmSans.variable}`}
+      className={`${sora.variable} ${dmSans.variable} ${lora.variable}`}
     >
       <head>
         <meta name="mobile-web-app-capable" content="yes" />

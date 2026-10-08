@@ -5,11 +5,11 @@ import { usePrefetch } from '@/hooks/usePrefetch';
 import {
   BookMarked,
   ChevronRight,
+  ClipboardCheck,
   LayoutGrid,
   LogOut,
   Plus,
   Settings,
-  Target,
   Trash2,
   X,
 } from 'lucide-react';
@@ -178,13 +178,32 @@ export function Sidebar({
         {onStartLeveling && (
           <button
             onClick={onStartLeveling}
-            className="mx-3 mb-2 flex items-center gap-2.5 px-3.5 py-2 bg-gradient-to-r from-purple-500/10 via-primary/15 to-purple-500/10 border border-primary/40 rounded-lg text-primary text-[0.82rem] font-bold hover:bg-primary/25 hover:border-primary transition-all active:translate-y-[1px] shadow-sm"
+            className="mx-3 mb-2 flex items-center justify-between gap-3 px-3.5 py-2 bg-gradient-to-r from-purple-500/10 via-primary/15 to-purple-500/10 border border-primary/40 rounded-lg text-primary hover:bg-primary/25 hover:border-primary transition-all active:translate-y-[1px] shadow-sm text-left min-w-[240px]"
             title="Start your CEFR English Leveling Challenge"
           >
-            <Target size={15} className="text-primary shrink-0" strokeWidth={2.2} />
-            <span className="truncate">🎯 Leveling Assessment</span>
+            {/* Lado Esquerdo: Ícone + Textos */}
+            <div className="flex items-center gap-3">
+              {/* Ícone */}
+              <ClipboardCheck size={18} className="text-primary shrink-0" strokeWidth={2.2} />
+
+              {/* Container dos Textos (Alinhados em coluna) */}
+              <span className="flex flex-col items-start leading-tight">
+                <span className="text-[0.82rem] font-bold truncate">
+                  Leveling Assessment
+                </span>
+                <span className="text-[0.7rem] font-normal opacity-80 hidden md:block">
+                  A1 to B2 · CEFR Test
+                </span>
+              </span>
+            </div>
+
+            {/* Lado Direito: Badge NEW */}
+            <span className="ml-auto text-[0.65rem] font-extrabold tracking-wider bg-purple-500/20 text-purple-600 px-1.5 py-0.5 rounded-xl uppercase border border-purple-500/30 animate-pulse">
+              NEW
+            </span>
           </button>
         )}
+
 
         <div className="h-px bg-border mx-3 my-2 shrink-0" />
 

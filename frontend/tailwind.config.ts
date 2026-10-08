@@ -50,9 +50,18 @@ const config: Config = {
         catPurple: 'var(--cat-purple)',
         catGreen: 'var(--cat-green)',
         catOrange: 'var(--cat-orange)',
+        // Design System tokens
+        background: 'var(--bg)',
+        foreground: 'var(--text)',
+        heading: 'var(--text)',
+        'on-primary': '#ffffff',
+        'control-border': 'var(--border)',
+        focus: 'var(--primary)',
       },
       fontFamily: {
         display: ['var(--font-display)', 'Sora', 'sans-serif'],
+        editorial: ['var(--font-lora)', 'Lora', 'Georgia', 'serif'],
+        lora: ['var(--font-lora)', 'Lora', 'Georgia', 'serif'],
         body: ['var(--font-body)', 'DM Sans', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },

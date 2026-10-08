@@ -117,6 +117,14 @@ export function ChatTopbar({
           <Menu size={20} />
         </button>
 
+        <Image
+          src="/images/tati_logo.jpg"
+          alt="Taty's Hub"
+          width={30}
+          height={30}
+          priority
+          className="hidden md:rounded-full object-cover object-top border-[3px] border-purple-300/50 mb-0 mx-auto"
+        />
         <h1 className="text-[0.875rem] font-bold text-text truncate">
           {title || "Taty's Hub"}
         </h1>
@@ -127,7 +135,7 @@ export function ChatTopbar({
         <Link
           href="/achievements"
           prefetch={true}
-          className="hidden md:flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-surface border border-border hover:border-primary/40 text-xs font-bold transition-all active:scale-95 shadow-xs"
+          className="hidden md:flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-[#AE8243] dark:bg-[#2E2519] text-white border border-border hover:border-primary/40 text-xs font-bold transition-all active:scale-95 shadow-xs"
           title={`Streak: ${currentStreak} days (${isStreakActive ? 'Active' : 'Inactive'})`}
         >
           <div className={cn(
@@ -154,7 +162,7 @@ export function ChatTopbar({
         <Link
           href="/achievements"
           prefetch={true}
-          className="hidden md:flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-surface border border-border hover:border-primary/40 text-xs font-bold transition-all active:scale-95 shadow-xs text-yellow-500"
+          className="hidden md:flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-[#EAF0F3] dark:bg-[#1C2B35] border border-border hover:border-primary/40 text-xs font-bold transition-all active:scale-95 shadow-xs text-yellow-500"
           title="Achievements"
         >
           <Trophy size={15} fill="currentColor" />
@@ -222,7 +230,7 @@ export function ChatTopbar({
             className="flex gap-1.5 px-3 py-1.5 h-auto text-xs font-bold"
           >
             <BookMarked size={14} className="text-primary" />
-            <span className="hidden sm:inline">My Activities</span>
+            <span className="hidden sm:inline">Activities</span>
           </Button>
         )}
 
@@ -247,7 +255,7 @@ export function ChatTopbar({
           title="Voice Mode"
         >
           <Mic size={14} className="text-primary" />
-          <span className="hidden sm:inline">Voice Mode</span>
+          <span className="hidden sm:inline">Voice</span>
         </Button>
       </div>
     </header>

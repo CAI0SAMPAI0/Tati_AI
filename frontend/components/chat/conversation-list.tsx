@@ -1,8 +1,8 @@
 'use client';
 
-import React, { memo, useMemo, useState } from 'react';
+import React, { memo, useMemo } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
-import { MessageSquare, Trash2, X } from 'lucide-react';
+import { MessageSquare, X } from 'lucide-react';
 import { apiGet, apiDelete } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import type { Conversation } from '@/lib/api/types';
@@ -145,17 +145,16 @@ export const ConversationList = memo(function ConversationList({ currentId, onSe
                   className={cn(
                     'group relative flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors',
                     c.id === currentId
-                      ? 'bg-primary/15 text-text'
-                      : 'text-text-muted hover:bg-surface-hover hover:text-text'
+                      ? 'bg-primary text-text'
+                      : 'text-text-muted hover:bg-surface-hover-list-chat hover:text-text'
                   )}
                 >
-                  <MessageSquare size={14} className="shrink-0 text-text-subtle" />
                   <span className="flex-1 text-[0.82rem] truncate leading-tight">
                     {c.title}
                   </span>
                   <button
                     onClick={(e) => handleDelete(e, c.id)}
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:text-danger transition-opacity"
+                    className="opacity-20 group-hover:opacity-100 p-1 hover:text-danger transition-opacity"
                     title={'Delete'}
                   >
                     <X size={12} strokeWidth={2.5} />

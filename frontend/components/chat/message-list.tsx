@@ -1,5 +1,5 @@
 import type { Message } from '@/lib/api/types';
-import { ArrowRight, BookOpen, Target } from 'lucide-react';
+import { ArrowRight, AudioLines, ClipboardCheck } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -127,45 +127,67 @@ export function MessageList({ messages, isStreaming, streamingContent, conversat
   return (
     <div ref={containerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin">
       {showWelcome && (
-        <div className="flex flex-col items-center justify-center py-12 text-center animate-fade-in">
-          <div className="w-16 h-16 rounded-full border-[3px] border-primary/40 shadow-glow overflow-hidden mb-4">
-            <Image src="/images/tati_logo.jpg" alt="Tati" width={64} height={64} className="w-full h-full object-cover" />
+        <div className="flex flex-col items-center justify-center py-8 md:py-12 text-center animate-fade-in max-w-2xl mx-auto px-4 w-full">
+          <div className="w-16 h-16 rounded-full border-[3px] border-primary/40 shadow-glow overflow-hidden mb-5">
+            <Image
+              src="/images/tati_logo.jpg"
+              alt="Logo da Tatiana"
+              width={64}
+              height={64}
+              className="w-full h-full object-cover"
+              priority
+              unoptimized
+            />
           </div>
-          <h2 className="font-display text-xl font-bold mb-2">
-            Welcome to Taty&apos;s Hub
-          </h2>
-          <p className="text-sm text-text-muted max-w-[320px] mb-6">
-            Your AI English learning hub. Let&apos;s practice together?
-          </p>
+
+          <header className="space-y-3 mb-8">
+            <h1 className="font-editorial text-[32px] md:text-[36px] leading-tight text-primary font-normal">
+              Welcome to Taty&apos;s Hub
+            </h1>
+
+            <p className="text-[15px] leading-relaxed text-muted max-w-md mx-auto">
+              Your AI English learning hub. Let&apos;s practice together?
+            </p>
+          </header>
 
           {onStartLeveling && (
-            <div className="w-full max-w-sm mb-5 p-4 bg-gradient-to-br from-primary/15 via-surface to-purple-500/10 border border-primary/40 rounded-2xl text-left shadow-lg hover:border-primary transition-all">
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="p-1.5 rounded-lg bg-primary/20 text-primary">
-                  <Target size={16} />
+            <article className="w-full rounded-2xl border border-border bg-surface p-6 text-left shadow-sm hover:border-primary/40 transition-all mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                    <ClipboardCheck size={18} />
+                  </span>
+                  <h2 className="text-lg font-bold text-heading">CEFR Leveling Test</h2>
+                </div>
+                <span className="text-[0.65rem] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                  NEW
                 </span>
-                <span className="font-bold text-sm text-text">CEFR Leveling Test</span>
-                <span className="ml-auto text-[0.65rem] font-black uppercase px-2 py-0.5 rounded-full bg-primary text-white">New</span>
               </div>
-              <p className="text-xs text-text-muted mb-3 leading-relaxed">
-                Discover your exact English level (A1 to B2) in a quick conversational challenge with Taty's Hub. You'll receive your score and diagnostic report by email!
+
+              <p className="mt-2 text-sm leading-relaxed text-muted">
+                Discover your exact English level (A1 to B2) in a quick conversational challenge with Taty&apos;s Hub.. You'll receive your score and diagnostic report by email!
               </p>
+
               <button
+                type="button"
                 onClick={onStartLeveling}
-                className="w-full py-2.5 px-4 rounded-xl bg-primary text-white text-xs font-bold shadow-md shadow-primary/25 hover:bg-primary/90 active:scale-98 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                className="mt-6 w-full rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-on-primary hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-focus active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm shadow-primary/20"
               >
                 <span>Start Leveling Challenge</span>
-                <ArrowRight size={14} />
+                <ArrowRight size={16} />
               </button>
-            </div>
+            </article>
           )}
-          <button
-            onClick={() => router.push('/pronunciation-reader')}
-            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-dim border border-primary/30 rounded-full text-[0.8rem] text-primary font-semibold hover:bg-primary hover:text-white transition-all cursor-pointer"
-          >
-            <BookOpen size={14} />
-            Pronunciation Practice
-          </button>
+
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => router.push('/pronunciation-reader')}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-surface border border-border rounded-xl text-xs text-muted hover:text-foreground hover:border-primary/40 transition-all cursor-pointer font-medium"
+            >
+              <AudioLines size={14} className="text-primary" />
+              Pronunciation Practice
+            </button>
+          </div>
         </div>
       )}
 

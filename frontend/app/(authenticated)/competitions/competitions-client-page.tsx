@@ -12,9 +12,9 @@ import {
   MessageSquare,
   Mic,
   Sparkles,
-  Target,
   Zap,
-  ArrowUp
+  ArrowUp,
+  Goal
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -436,7 +436,7 @@ export default function CompetitionsClientPage() {
               <div className="p-4 rounded-2xl bg-bg-secondary/40 border border-border/80 flex flex-col justify-between gap-3 hover:border-primary/40 transition-all group">
                 <div className="flex items-start justify-between gap-2">
                   <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                    <Target size={18} />
+                    <Goal size={18} />
                   </div>
                   <span className="px-2.5 py-1 rounded-full text-xs font-black bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                     +25 pts / day (1x)

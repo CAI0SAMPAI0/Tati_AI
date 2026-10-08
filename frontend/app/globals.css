@@ -12,8 +12,8 @@
   --surface-hover: hsl(250 20% 96%);
   --card: hsl(0 0% 100%);
 
-  --primary: hsl(258 80% 58%);
-  --primary-hover: hsl(258 80% 50%);
+  --primary: #825e8a;
+  --primary-hover: #795B80;
   --primary-dim: hsla(258 80% 58% / 0.12);
   --primary-glow: hsla(258 80% 58% / 0.25);
 
@@ -59,6 +59,7 @@
   --bg-secondary: hsl(250 25% 10%);
   --surface: hsl(250 22% 13%);
   --surface-hover: hsl(250 20% 16%);
+  --surface-hover-list-chat: #795b8082;
   --card: hsl(250 22% 13%);
   
   --border: hsla(258 40% 55% / 0.18);

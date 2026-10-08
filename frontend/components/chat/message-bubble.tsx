@@ -252,10 +252,10 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
       <div className={cn('flex flex-col gap-1', isUser ? 'items-end' : 'items-start')}>
         <div
           className={cn(
-            'relative px-4 py-2.5 rounded-2xl text-[0.9375rem] leading-relaxed break-words shadow-sm transition-all',
+            'relative px-4 py-3 rounded-2xl text-[0.9375rem] leading-relaxed break-words shadow-xs transition-all',
             isUser
-              ? 'bg-primary text-white rounded-br-sm'
-              : 'bg-surface border border-border text-text rounded-bl-sm hover:border-primary/20'
+              ? 'bg-primary text-on-primary rounded-br-xs font-normal'
+              : 'bg-surface border border-border text-foreground rounded-bl-xs hover:border-primary/25'
           )}
         >
           {isEditing ? (

@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertCircle, CheckCircle2, Clock, MessageSquare, Mic, Sparkles, Target, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ClipboardCheck, Clock, MessageSquare, Mic, Sparkles, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -99,7 +99,7 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
         <div className="px-6 py-5 border-b border-border/60 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/20 border border-primary/40 flex items-center justify-center text-primary shadow-sm">
-              <Target size={22} strokeWidth={2.2} />
+              <ClipboardCheck size={22} strokeWidth={2.2} />
             </div>
             <div>
               <h2 className="text-lg font-bold text-text flex items-center gap-2">
@@ -301,7 +301,7 @@ export function LevelingModal({ isOpen, onClose, onStart, loading = false }: Lev
               </>
             ) : (
               <>
-                {mode === 'voice' ? <Mic size={15} /> : <Target size={15} />}
+                {mode === 'voice' ? <Mic size={15} /> : <ClipboardCheck size={15} />}
                 Start in {mode === 'voice' ? 'Voice Mode' : 'Chat Mode'} ({isCustom && customValue ? customValue : selectedCount} questions)
               </>
             )}

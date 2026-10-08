@@ -236,7 +236,7 @@ export default function SettingsPage() {
                   <p className="text-sm font-bold text-text mb-0.5">Theme</p>
                   <p className="text-xs text-text-muted">Light, dark or match your device</p>
                 </div>
-                <div className="flex flex-wrap p-1 bg-bg border border-border rounded-xl gap-1">
+                <div className="flex flex-wrap p-1 bg-bg border border-border rounded-xl gap-9">
                   <button
                     onClick={() => setTheme('light')}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all ${theme === 'light' ? 'bg-primary text-white shadow-glow' : 'text-text-muted hover:text-text'}`}

@@ -1,6 +1,6 @@
 'use client';
 
-import { Mic, Send } from 'lucide-react';
+import { ArrowUp, Mic } from 'lucide-react';
 import React, { memo, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 
@@ -120,73 +120,79 @@ export const ChatInput = memo(function ChatInput({ onSend, onSendAudio, disabled
   };
 
   return (
-    <div className="p-2 md:p-4 border-t border-border bg-bg shrink-0">
-      <div className="max-w-4xl mx-auto relative">
-        <div
-          className={cn(
-            "flex items-end gap-2 bg-surface border rounded-xl p-2 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-all border-border"
-          )}
-        >
-          {isRecording ? (
-            <div className="flex-1 flex items-center justify-center py-2 h-[40px] text-primary animate-pulse font-medium">
-              Recording... {formatTime(recordingTime)}
+    <div className="p-2 md:p-4 bg-transparent shrink-0">
+      <div className="max-w-3xl mx-auto relative">
+        <label className="block relative">
+          <span className="sr-only">Your message</span>
+          <div
+            className={cn(
+              "flex items-end gap-2.5 bg-surface border rounded-2xl p-3 md:p-3.5 border-border shadow-sm focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-all",
+              isRecording && "border-red-500/40 ring-2 ring-red-500/10"
+            )}
+          >
+            {isRecording ? (
+              <div className="flex-1 flex items-center justify-center py-2 h-[42px] text-red-500 animate-pulse font-medium text-sm">
+                Recording audio... {formatTime(recordingTime)}
+              </div>
+            ) : (
+              <textarea
+                ref={textareaRef}
+                rows={1}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Type your message..."
+                className="flex-1 bg-transparent border-none outline-none text-base text-foreground placeholder:text-muted py-1.5 px-1 resize-none min-h-[38px] max-h-[140px] scrollbar-none leading-relaxed"
+                disabled={disabled || isStreaming}
+              />
+            )}
+
+            <div className="flex items-center gap-1.5 shrink-0 pb-0.5">
+              {isRecording ? (
+                <button
+                  aria-label='Stop recording'
+                  type="button"
+                  onClick={stopRecording}
+                  className="p-2.5 rounded-xl bg-red-500 text-white hover:bg-red-600 transition-all shadow-sm active:scale-95 cursor-pointer"
+                  title="Stop recording"
+                >
+                  <div className="w-4 h-4 rounded-xs bg-current" />
+                </button>
+              ) : (
+                <button
+                  aria-label='Record audio'
+                  type="button"
+                  onClick={startRecording}
+                  disabled={disabled || isStreaming}
+                  className={cn(
+                    "p-2.5 rounded-xl text-muted hover:bg-surface-hover hover:text-foreground transition-colors disabled:opacity-40 cursor-pointer",
+                    !text.trim() && "hover:text-primary"
+                  )}
+                  title="Record audio"
+                >
+                  <Mic size={19} />
+                </button>
+              )}
+
+              {!isRecording && (
+                <button
+                  onClick={handleSend}
+                  aria-label="Send message"
+                  disabled={!text.trim() || disabled || isStreaming}
+                  className={cn(
+                    'p-2.5 rounded-xl bg-primary text-on-primary transition-all active:scale-95 disabled:opacity-30 disabled:scale-100 disabled:pointer-events-none shadow-sm cursor-pointer',
+                    text.trim() && 'hover:bg-primary-hover shadow-primary/20'
+                  )}
+                  title="Send"
+                >
+                  <ArrowUp size={18} />
+                </button>
+              )}
             </div>
-          ) : (
-            <textarea
-              ref={textareaRef}
-              rows={1}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Type your message..."
-              className="flex-1 bg-transparent border-none outline-none text-[0.9375rem] text-text py-2 resize-none min-h-[40px] max-h-[140px] scrollbar-none"
-              disabled={disabled || isStreaming}
-            />
-          )}
-
-          {isRecording ? (
-            <button
-              aria-label='Parar gravação'
-              type="button"
-              onClick={stopRecording}
-              className="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-glow-red"
-              title="Stop recording"
-            >
-              <div className="w-5 h-5 rounded-sm bg-current" />
-            </button>
-          ) : (
-            <button
-              aria-label='Gravar áudio'
-              type="button"
-              onClick={startRecording}
-              disabled={disabled || isStreaming}
-              className={cn(
-                "p-2 rounded-lg text-text-subtle hover:bg-primary/10 hover:text-primary transition-colors disabled:opacity-40",
-                !text.trim() && "text-primary"
-              )}
-              title="Record audio"
-            >
-              <Mic size={20} />
-            </button>
-          )}
-
-          {!isRecording && (
-            <button
-              onClick={handleSend}
-              aria-label="Enviar mensagem"
-              disabled={!text.trim() || disabled || isStreaming}
-              className={cn(
-                'p-2.5 rounded-lg bg-primary text-white transition-all active:scale-95 disabled:opacity-40 disabled:scale-100 disabled:pointer-events-none',
-                text.trim() && 'hover:bg-primary-hover shadow-glow'
-              )}
-              title="Send"
-            >
-              <Send size={20} />
-            </button>
-          )}
-        </div>
-        <p className="mt-2 text-[0.7rem] text-center text-text-subtle">
-          Taty's Hub practices English with you · Enter to send · Shift+Enter for new line
+          </div>
+        </label>
+        <p className="mt-2 text-[0.7rem] text-center text-muted">
+          Taty&apos;s Hub practices English with you · Enter to send · Shift+Enter for new line
         </p>
       </div>
     </div>
