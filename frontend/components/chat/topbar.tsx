@@ -135,7 +135,7 @@ export function ChatTopbar({
         <Link
           href="/achievements"
           prefetch={true}
-          className="hidden md:flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-[#AE8243] dark:bg-[#2E2519] text-white border border-border hover:border-primary/40 text-xs font-bold transition-all active:scale-95 shadow-xs"
+          className="hidden md:flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-[#fff0dc9a] dark:bg-[#2E2519] text-white border border-border hover:border-primary/40 text-xs font-bold transition-all active:scale-95 shadow-xs"
           title={`Streak: ${currentStreak} days (${isStreakActive ? 'Active' : 'Inactive'})`}
         >
           <div className={cn(

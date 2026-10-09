@@ -103,6 +103,30 @@ def create_refresh_token(data: Dict[str, Any]) -> str:
     return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
 
+def create_hub_page_token(
+    username: str,
+    content_id: str,
+    email: Optional[str] = None,
+    expires_minutes: int = 120,
+) -> str:
+    """
+    Gera um token com escopo restrito exclusivamente para visualização de páginas
+    de um material didático específico do Hub.
+    Não pode ser usado como token de autenticação em outros endpoints da API.
+    """
+    expire = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+    payload = {
+        "sub": username,
+        "token_type": "hub_page_view",
+        "cid": str(content_id),
+        "scope": f"hub_read:{content_id}",
+        "email": email or "",
+        "exp": expire,
+        "iat": datetime.now(timezone.utc),
+    }
+    return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+
 def decode_token(token: str) -> Optional[Dict[str, Any]]:
     """
     Decodifica e valida assinatura e expiração do JWT.
@@ -125,11 +149,16 @@ class AuthBearer(HttpBearer):
     """
     Autenticador Bearer Token para endpoints Django-Ninja.
     Injeta o objeto User autenticado em request.auth.
+    Rejeita tokens restritos de visualização de páginas (hub_page_view).
     """
 
     def authenticate(self, request, token: str) -> Optional[Any]:
         payload = decode_token(token)
         if not payload:
+            return None
+
+        # Tokens restritos de visualização de páginas não podem autenticar a API geral
+        if payload.get("token_type") == "hub_page_view":
             return None
 
         username = payload.get("sub")
@@ -152,6 +181,7 @@ class OptionalAuthBearer:
     """
     Bearer opcional que nunca rejeita a requisição, permitindo acesso anônimo.
     Injeta o usuário em request.auth se o token for válido, ou True se ausente/inválido.
+    Tokens restritos de visualização de páginas são ignorados para a API geral.
     """
 
     def __call__(self, request):
@@ -165,7 +195,11 @@ class OptionalAuthBearer:
             if len(parts) == 2 and parts[0].lower() == "bearer":
                 token = parts[1]
                 payload = decode_token(token)
-                if payload and payload.get("sub"):
+                if (
+                    payload
+                    and payload.get("token_type") != "hub_page_view"
+                    and payload.get("sub")
+                ):
                     user = User.objects.filter(username=payload["sub"]).first()
                     if user:
                         request.user = user
@@ -175,7 +209,11 @@ class OptionalAuthBearer:
         query_token = request.GET.get("token")
         if query_token:
             payload = decode_token(query_token)
-            if payload and payload.get("sub"):
+            if (
+                payload
+                and payload.get("token_type") != "hub_page_view"
+                and payload.get("sub")
+            ):
                 user = User.objects.filter(username=payload["sub"]).first()
                 if user:
                     request.user = user

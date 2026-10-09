@@ -2035,10 +2035,13 @@ class HubService:
             ).rstrip("/")
             token_param = ""
             if user:
-                from apps.authentication.security import create_access_token
-                page_token = create_access_token(
-                    {"sub": user.username, "scope": f"hub_read:{content_id}"},
-                    expires_delta=timedelta(hours=6),
+                from apps.authentication.security import create_hub_page_token
+                user_email = getattr(user, "email", "") or getattr(user, "username", "")
+                page_token = create_hub_page_token(
+                    username=user.username,
+                    content_id=content_id,
+                    email=user_email,
+                    expires_minutes=120,
                 )
                 token_param = f"?token={page_token}"
             page_urls = [

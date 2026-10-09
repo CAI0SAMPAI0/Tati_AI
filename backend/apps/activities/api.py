@@ -718,8 +718,49 @@ def get_hub_page(
         from apps.authentication.security import decode_token
 
         payload = decode_token(token)
-        if payload:
-            user = User.objects.filter(username=payload.get("sub")).first()
+        if not payload:
+            return HttpResponse(
+                json.dumps({"detail": "Token de visualização inválido ou expirado."}),
+                status=401,
+                content_type="application/json",
+            )
+
+        # Validação estrita de isolamento: o token DEVE pertencer exatamente a este content_id
+        token_cid = str(payload.get("cid") or "")
+        token_scope = str(payload.get("scope") or "")
+        expected_scope = f"hub_read:{content_id}"
+
+        if (token_cid and token_cid != str(content_id)) or (
+            token_scope and token_scope != expected_scope
+        ):
+            return HttpResponse(
+                json.dumps(
+                    {
+                        "detail": "Acesso negado: este token não é válido para este material."
+                    },
+                    ensure_ascii=False,
+                ),
+                status=403,
+                content_type="application/json; charset=utf-8",
+            )
+
+        if not token_cid and not token_scope:
+            return HttpResponse(
+                json.dumps(
+                    {
+                        "detail": "Acesso negado: token sem autorização para este material."
+                    },
+                    ensure_ascii=False,
+                ),
+                status=403,
+                content_type="application/json; charset=utf-8",
+            )
+
+        username = payload.get("sub")
+        if username:
+            user = User.objects.filter(username=username).first()
+        if payload.get("email"):
+            email = payload.get("email")
     if (
         not user
         and getattr(request, "auth", None)

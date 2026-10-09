@@ -126,3 +126,43 @@ class AuthenticationSecurityTestCase(TestCase):
         with self.assertRaises(HttpError):
             ConversationService.get_messages(attacker, 'conv_victim_1')
 
+    def test_hub_page_token_isolation_and_idor_protection(self):
+        from apps.authentication.security import create_hub_page_token, AuthBearer
+        from apps.activities.api import get_hub_page
+        from django.test import RequestFactory
+        from app.urls import protected_media_serve
+
+        # 1. Criação do token restrito
+        content_a = "6588b80b-7e8f-4638-a0f4-39fdb2670532"
+        content_b = "11111111-2222-3333-4444-555555555555"
+
+        page_token_a = create_hub_page_token(
+            username="programador",
+            content_id=content_a,
+            email="programador@tati.ai",
+        )
+        decoded = decode_token(page_token_a)
+        self.assertEqual(decoded.get("token_type"), "hub_page_view")
+        self.assertEqual(decoded.get("cid"), content_a)
+        self.assertEqual(decoded.get("scope"), f"hub_read:{content_a}")
+
+        # 2. Token de página NUNCA pode autenticar chamadas gerais da API
+        rf = RequestFactory()
+        req_api = rf.get("/api/users/me", HTTP_AUTHORIZATION=f"Bearer {page_token_a}")
+        auth_bearer = AuthBearer()
+        authenticated_user = auth_bearer.authenticate(req_api, page_token_a)
+        self.assertIsNone(authenticated_user)
+
+        # 3. Tentativa de IDOR no visualizador do Hub:
+        # Usar o token gerado para content_a em content_b DEVE retornar 403 imediatamente
+        req_page_tampered = rf.get(f"/activities/hub/{content_b}/pages/1?token={page_token_a}")
+        response_tampered = get_hub_page(req_page_tampered, content_id=content_b, page_index=1, token=page_token_a)
+        self.assertEqual(response_tampered.status_code, 403)
+        self.assertIn("este token não é válido", response_tampered.content.decode("utf-8"))
+
+        # 4. Acesso direto a /media/hub_pages/... deve ser bloqueado com 403
+        req_direct_media = rf.get(f"/media/hub_pages/{content_a}/page_1.webp")
+        response_direct = protected_media_serve(req_direct_media, f"hub_pages/{content_a}/page_1.webp")
+        self.assertEqual(response_direct.status_code, 403)
+        self.assertIn("Acesso direto bloqueado", response_direct.content.decode("utf-8"))
+
