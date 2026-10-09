@@ -139,6 +139,78 @@ def _get_google_redirect_uri(request: HttpRequest) -> str:
     return f"{proto}://{host}/auth/google/callback"
 
 
+def _is_allowed_frontend_origin(origin: str) -> bool:
+    """
+    Valida rigorosamente se a origem informada pertence ao ecossistema oficial da plataforma,
+    prevenindo ataques de Open Redirect e vazamento de tokens OAuth2.
+    Utiliza configurações dinâmicas de ambiente (FRONTEND_URL, CORS_ALLOWED_ORIGINS,
+    CORS_ALLOWED_ORIGIN_REGEXES e ALLOWED_FRONTEND_ORIGINS) sem expor domínios hardcoded em código.
+    """
+    if not origin:
+        return False
+    try:
+        import re
+        from urllib.parse import urlparse
+        from django.conf import settings
+
+        parsed = urlparse(origin)
+        if parsed.scheme not in ("http", "https"):
+            return False
+
+        hostname = (parsed.hostname or "").lower()
+        if not hostname:
+            return False
+
+        port_suffix = f":{parsed.port}" if parsed.port else ""
+        canonical_origin = f"{parsed.scheme}://{hostname}{port_suffix}"
+
+        # 1. FRONTEND_URL configurado nas settings ou variável de ambiente
+        frontend_url = (
+            getattr(settings, "FRONTEND_URL", "")
+            or os.getenv("FRONTEND_URL", "")
+            or ""
+        ).rstrip("/")
+        if frontend_url and canonical_origin == frontend_url:
+            return True
+
+        # 2. CORS_ALLOWED_ORIGINS definido centralizadamente
+        allowed_origins = getattr(settings, "CORS_ALLOWED_ORIGINS", [])
+        if canonical_origin in allowed_origins:
+            return True
+
+        # 3. Origens adicionais configuradas no ambiente
+        env_origins = [
+            o.strip().rstrip("/")
+            for o in os.getenv("ALLOWED_FRONTEND_ORIGINS", "").split(",")
+            if o.strip()
+        ]
+        if canonical_origin in env_origins:
+            return True
+
+        # 4. Domínios providos dinamicamente pela hospedagem (Railway / Vercel)
+        railway_domain = (os.getenv("RAILWAY_PUBLIC_DOMAIN") or os.getenv("RAILWAY_STATIC_URL") or "").strip().lower()
+        if railway_domain and (hostname == railway_domain or canonical_origin == f"https://{railway_domain}"):
+            return True
+
+        vercel_url = (os.getenv("VERCEL_URL") or "").strip().lower()
+        if vercel_url and (hostname == vercel_url or canonical_origin == f"https://{vercel_url}"):
+            return True
+
+        # 5. Regexes de CORS permitidas definidas centralizadamente no settings
+        origin_regexes = getattr(settings, "CORS_ALLOWED_ORIGIN_REGEXES", [])
+        for pattern in origin_regexes:
+            if re.match(pattern, canonical_origin):
+                return True
+
+        # 6. Desenvolvimento local apenas se DEBUG estiver ativo
+        if getattr(settings, "DEBUG", False) and hostname in ("localhost", "127.0.0.1") and parsed.scheme == "http":
+            return True
+
+        return False
+    except Exception:
+        return False
+
+
 def _build_google_auth_data(request: HttpRequest) -> tuple[str, str]:
     import os
     import uuid
@@ -157,11 +229,13 @@ def _build_google_auth_data(request: HttpRequest) -> tuple[str, str]:
         )
 
     state = str(uuid.uuid4())
-    origin = (
+    raw_origin = (
         request.GET.get("origin", "").strip()
         or request.headers.get("Origin", "").strip()
         or request.headers.get("Referer", "").strip()
     )
+    # Valida rigorosamente a origem contra open redirect
+    origin = raw_origin if _is_allowed_frontend_origin(raw_origin) else ""
     access = request.GET.get("access", "").strip()
     cache.set(f"google_oauth_state_{state}", {"ready": False}, timeout=600)
     cache.set(
@@ -321,18 +395,19 @@ def google_oauth_callback(
     from urllib.parse import quote
 
     origin_meta = cache.get(f"google_oauth_origin_{state}") or {}
-    frontend_origin = origin_meta.get("origin")
+    raw_origin = origin_meta.get("origin")
+    frontend_origin = raw_origin if _is_allowed_frontend_origin(raw_origin) else ""
     is_hub = (
         origin_meta.get("access") == "hub"
         or bool(user_dict.get("is_hub_only"))
         or user_dict.get("role") == "buyer"
     )
 
-    if not frontend_origin or "accounts.google.com" in frontend_origin or "google.com" in frontend_origin:
+    if not frontend_origin:
         frontend_origin = (
             getattr(settings, "FRONTEND_URL", "")
             or os.getenv("FRONTEND_URL", "")
-            or "https://stunning-tranquility-production-4c54.up.railway.app"
+            or "https://tati-ai.vercel.app"
         )
 
     # Objeto de usuário enxuto e seguro para transferência via URL / bridge
@@ -363,6 +438,7 @@ def google_oauth_callback(
     safe_user_obj_js = safe_user_json
     username_val_js = json.dumps(username_val)
     redirect_target_js = json.dumps(redirect_target)
+    frontend_origin_js = json.dumps(frontend_origin)
 
     html = f"""
     <!DOCTYPE html>
@@ -440,10 +516,10 @@ def google_oauth_callback(
                 }}
             }} catch(e) {{}}
 
-            // 3. Notifica janela pai caso seja popup Web
+            // 3. Notifica janela pai caso seja popup Web com origem segura estrita
             try {{
                 if (window.opener) {{
-                    window.opener.postMessage({{ type: 'GOOGLE_AUTH_SUCCESS', token: {jwt_token_js}, refreshToken: {refresh_token_js}, user: {safe_user_obj_js} }}, '*');
+                    window.opener.postMessage({{ type: 'GOOGLE_AUTH_SUCCESS', token: {jwt_token_js}, refreshToken: {refresh_token_js}, user: {safe_user_obj_js} }}, {frontend_origin_js});
                     window.close();
                 }}
             }} catch(e) {{}}

@@ -112,17 +112,19 @@ class RateLimitMiddleware:
 
         path = getattr(request, "path", "").rstrip("/")
 
-        # Bypass para testes de carga autorizados (Locust / stress tests)
-        bypass_secret = os.getenv("LOAD_TEST_BYPASS_SECRET", "tati-load-test-bypass-key")
         headers = getattr(request, "headers", {})
         meta = getattr(request, "META", {})
-        req_bypass = (
-            headers.get("X-Load-Test-Secret")
-            or headers.get("x-load-test-secret")
-            or meta.get("HTTP_X_LOAD_TEST_SECRET")
-        )
-        if req_bypass and req_bypass.strip() == bypass_secret.strip():
-            return None
+
+        # Bypass para testes de carga autorizados apenas se chave configurada no ambiente
+        bypass_secret = (os.getenv("LOAD_TEST_BYPASS_SECRET") or "").strip()
+        if bypass_secret and len(bypass_secret) >= 16:
+            req_bypass = (
+                headers.get("X-Load-Test-Secret")
+                or headers.get("x-load-test-secret")
+                or meta.get("HTTP_X_LOAD_TEST_SECRET")
+            )
+            if req_bypass and req_bypass.strip() == bypass_secret:
+                return None
 
         # Ignora arquivos estáticos, media, websocket e healthchecks
         if (

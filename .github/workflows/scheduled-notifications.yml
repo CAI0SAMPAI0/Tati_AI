@@ -31,7 +31,7 @@ jobs:
           # 1. Notificações gerais e streak
           curl -X POST "https://caio007-tati-ai-backend.hf.space/api/v1/notifications/send-all-test" \
             -H "Content-Type: application/json" \
-            -H "X-Cron-Token: cai0_based" \
+            -H "X-Cron-Token: ${{ secrets.CRON_TOKEN }}" \
             --max-time 30 || true
 
           # 2. Se for dia 1 do mês ou acionado manualmente para monthly_competition, fecha competição e envia Top 3
@@ -40,7 +40,7 @@ jobs:
             echo "Executando fechamento de competição mensal e envio do Top 3..."
             curl -X POST "https://caio007-tati-ai-backend.hf.space/api/v1/notifications/cron/monthly-competition" \
               -H "Content-Type: application/json" \
-              -H "X-Cron-Token: cai0_based" \
+              -H "X-Cron-Token: ${{ secrets.CRON_TOKEN }}" \
               --max-time 30 || true
           fi
           

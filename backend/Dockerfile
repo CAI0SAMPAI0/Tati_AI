@@ -36,6 +36,13 @@ RUN if [ -f "/tmp/build/backend/requirements.txt" ]; then \
 # Coleta arquivos estaticos
 RUN python manage.py collectstatic --noinput || true
 
+# Cria usuário não-privilegiado para isolamento de segurança
+RUN useradd -m -u 1000 appuser \
+    && mkdir -p /app/media /app/staticfiles \
+    && chown -R appuser:appuser /app
+
+USER appuser
+
 EXPOSE 7860 8080 8000
 
 # Healthcheck para Hugging Face Spaces / Railway / Docker Compose

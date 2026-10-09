@@ -114,6 +114,10 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+# Alias de retrocompatibilidade
+decode_jwt_token = decode_token
+
+
 #    AUTENTICAÇÃO NINJA (HTTPBEARER)                                    
 
 

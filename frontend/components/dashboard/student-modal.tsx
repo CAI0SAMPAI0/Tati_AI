@@ -323,8 +323,8 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                   <Sparkles size={24} />
                 </div>
                 <div>
-                  <h4 className="font-bold text-text">{'🧠 Generate Insight'}</h4>
-                  <p className="text-xs text-text-muted mt-1">{'Click 🧠 Generate Insight to analyze this student\'s history or Grammar Errors to see recurring mistakes.'}</p>
+                  <h4 className="font-bold text-text">{'Generate Insight'}</h4>
+                  <p className="text-xs text-text-muted mt-1">{'Click Generate Insight to analyze this student\'s history or Grammar Errors to see recurring mistakes.'}</p>
                 </div>
                 <div className="flex gap-2 w-full">
                   <Button
@@ -472,34 +472,7 @@ export function StudentModal({ isOpen, onClose, student, onUpdate }: StudentModa
                     </div>
                   </div>
 
-                  {/* Module Progress */}
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-bold text-text-muted uppercase tracking-widest">Syllabus Progress</h4>
-                    <div className="space-y-2.5 max-h-[160px] overflow-y-auto pr-1">
-                      {(!analytics.module_progress || analytics.module_progress.length === 0) ? (
-                        <p className="text-xs text-text-muted italic">No module progression found.</p>
-                      ) : (
-                        analytics.module_progress.map((mod: any) => (
-                          <div key={mod.module_id} className="p-3 bg-bg-secondary/40 border border-border/80 rounded-xl space-y-1.5">
-                            <div className="flex justify-between items-center text-xs">
-                              <span className="font-bold text-text truncate max-w-[70%]">{mod.title}</span>
-                              <span className="text-[0.65rem] font-bold text-text-muted">
-                                {mod.completed_quizzes}/{mod.total_quizzes} {mod.type_label || "Quizzes"}
-                              </span>
-                            </div>
-                            <div className="w-full bg-border/40 h-2 rounded-full overflow-hidden">
-                              <div
-                                className="bg-primary h-full rounded-full transition-all duration-500"
-                                style={{ width: `${mod.progress_pct}%` }}
-                              />
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Risk Alert & Nudge Panel */}
+                  {/* Alerta de risco e envio de notificações */}
                   <div className={cn(
                     "p-4 border rounded-2xl space-y-3",
                     localStudent.risk_level !== 'active'

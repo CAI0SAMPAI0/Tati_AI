@@ -144,7 +144,14 @@ class AuthService:
         prof["reset_token"] = reset_token
         prof["reset_token_expires"] = expires_at
         user.profile = prof
-        user.save(update_fields=["profile"])
+        if hasattr(user, "reset_token"):
+            user.reset_token = reset_token
+        if hasattr(user, "reset_token_expires"):
+            user.reset_token_expires = expires_at
+        update_fields = ["profile"]
+        if hasattr(user, "reset_token") and hasattr(user, "reset_token_expires"):
+            update_fields.extend(["reset_token", "reset_token_expires"])
+        user.save(update_fields=update_fields)
 
         from apps.notifications.services import BrevoEmailService
 
@@ -179,7 +186,6 @@ class AuthService:
         return {
             "ok": True,
             "message": "Se o e-mail existir, você receberá instruções de redefinição.",
-            "reset_token": reset_token,
         }
 
     @classmethod
@@ -191,32 +197,38 @@ class AuthService:
                 400, "Senha inválida ou token ausente. Mínimo de 6 caracteres."
             )
 
-        users = User.objects.all()
-        target_user = None
-        for u in users:
-            prof = u.profile if isinstance(u.profile, dict) else {}
-            if prof.get("reset_token") == token:
-                expires_str = prof.get("reset_token_expires")
-                if expires_str:
-                    try:
-                        exp = datetime.fromisoformat(expires_str)
-                        if datetime.now(timezone.utc) > exp:
-                            raise HttpError(
-                                400, "Token expirado. Solicite uma nova redefinição."
-                            )
-                    except (ValueError, TypeError):
-                        pass
-                target_user = u
-                break
+        target_user = User.objects.filter(reset_token=token).first()
+        if not target_user:
+            users = User.objects.all()
+            for u in users:
+                prof = u.profile if isinstance(u.profile, dict) else {}
+                if prof.get("reset_token") == token:
+                    target_user = u
+                    break
 
         if not target_user:
             raise HttpError(400, "Token inválido ou expirado.")
 
-        target_user.set_password(new_password)
         prof = target_user.profile if isinstance(target_user.profile, dict) else {}
+        expires_str = prof.get("reset_token_expires") or getattr(target_user, "reset_token_expires", None)
+        if expires_str:
+            try:
+                exp = datetime.fromisoformat(str(expires_str))
+                if datetime.now(timezone.utc) > exp:
+                    raise HttpError(
+                        400, "Token expirado. Solicite uma nova redefinição."
+                    )
+            except (ValueError, TypeError):
+                pass
+
+        target_user.set_password(new_password)
         prof.pop("reset_token", None)
         prof.pop("reset_token_expires", None)
         target_user.profile = prof
+        if hasattr(target_user, "reset_token"):
+            target_user.reset_token = None
+        if hasattr(target_user, "reset_token_expires"):
+            target_user.reset_token_expires = None
         target_user.save()
 
         return {"ok": True, "message": "Senha redefinida com sucesso."}
@@ -225,6 +237,21 @@ class AuthService:
     def register_student(cls, data: RegisterInput) -> TokenResponse:
         username = data.username.strip().lower()
         email = data.email.strip().lower()
+
+        reserved_usernames = {
+            "admin",
+            "administrator",
+            "programador",
+            "programmer",
+            "professor",
+            "professora",
+            "root",
+            "system",
+            "tati",
+            "tatiana",
+        }
+        if username in reserved_usernames:
+            raise HttpError(400, "Este nome de usuário é reservado.")
 
         if User.objects.filter(username=username).exists():
             raise HttpError(400, "Este nome de usuário já está em uso.")

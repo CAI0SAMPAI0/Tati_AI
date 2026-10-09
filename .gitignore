@@ -194,3 +194,5 @@ docs-questionario/
 *.jks
 *.keystore
 key.properties
+
+audits/

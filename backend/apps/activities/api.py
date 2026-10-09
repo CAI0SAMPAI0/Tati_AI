@@ -413,12 +413,12 @@ def catalog_checkout(request: HttpRequest, payload: CheckoutInput):
     return HubService.process_checkout(user, payload.dict())
 
 
-@catalog_router.post("/checkout/{payment_id}/cancel", auth=auth_optional)
+@catalog_router.post("/checkout/{payment_id}/cancel", auth=auth_required)
 def catalog_checkout_cancel(request: HttpRequest, payment_id: str):
     """
-    Cancela pedido/cobrança pendente do checkout.
+    Cancela pedido/cobrança pendente do checkout pertencente ao usuário autenticado.
     """
-    return HubService.cancel_checkout(payment_id)
+    return HubService.cancel_checkout(request.auth, payment_id)
 
 
 @catalog_router.get("/checkout/{payment_id}/status", auth=auth_optional)
@@ -577,8 +577,56 @@ def list_musics(request: HttpRequest):
     return ExternalContentService.get_musics_content()
 
 
+import ipaddress
+import socket
+from urllib.parse import urlparse
+
 # Cache em memória para os proxies de imagem das atividades
 _ACTIVITY_IMAGE_CACHE = {}
+_ALLOWED_ACTIVITY_DOMAINS = ("test-english.com", "liveworksheets.com")
+
+
+def _is_safe_activity_image_url(url: str) -> bool:
+    """
+    Valida rigorosamente a URL de imagem para evitar SSRF:
+    1. Esquema estritamente http ou https.
+    2. Hostname restrito a domínios de worksheets educacionais autorizados.
+    3. Bloqueia resolução para IPs privados, loopback, link-local e metadados de nuvem.
+    """
+    if not url:
+        return False
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = (parsed.hostname or "").lower()
+        if not hostname:
+            return False
+
+        is_allowed = False
+        for domain in _ALLOWED_ACTIVITY_DOMAINS:
+            if hostname == domain or hostname.endswith("." + domain):
+                is_allowed = True
+                break
+        if not is_allowed:
+            return False
+
+        # Prevenção contra SSRF e DNS rebinding para redes internas / metadados
+        addr_info = socket.getaddrinfo(hostname, None)
+        for item in addr_info:
+            ip_str = item[4][0]
+            ip = ipaddress.ip_address(ip_str)
+            if (
+                ip.is_private
+                or ip.is_loopback
+                or ip.is_link_local
+                or ip.is_reserved
+                or ip.is_multicast
+            ):
+                return False
+        return True
+    except Exception:
+        return False
 
 
 @activities_router.get("/test-english/image-proxy", auth=auth_optional)
@@ -586,9 +634,10 @@ _ACTIVITY_IMAGE_CACHE = {}
 def proxy_activity_image(request: HttpRequest, url: str):
     """
     Proxy de imagens para TestEnglish e LiveWorksheets evitando bloqueio de CORS/hotlinking.
+    Protegido contra SSRF por whitelist de domínios e bloqueio de IPs privados/loopback.
     """
-    if not url:
-        return HttpResponse(status=400)
+    if not url or not _is_safe_activity_image_url(url):
+        return HttpResponse("URL inválida ou não permitida.", status=400)
 
     if url in _ACTIVITY_IMAGE_CACHE:
         body, content_type = _ACTIVITY_IMAGE_CACHE[url]
@@ -611,7 +660,7 @@ def proxy_activity_image(request: HttpRequest, url: str):
     }
     try:
         with httpx.Client(
-            headers=headers, follow_redirects=True, timeout=10.0
+            headers=headers, follow_redirects=False, timeout=10.0
         ) as client:
             resp = client.get(url)
             if resp.status_code == 200:
@@ -664,29 +713,40 @@ def get_hub_page(
     """
     email = "Aluno Tati AI"
     title = "Material Didático"
+    user = None
+    if token:
+        from apps.authentication.security import decode_token
+
+        payload = decode_token(token)
+        if payload:
+            user = User.objects.filter(username=payload.get("sub")).first()
+    if (
+        not user
+        and getattr(request, "auth", None)
+        and isinstance(request.auth, User)
+    ):
+        user = request.auth
+    if (
+        not user
+        and getattr(request, "user", None)
+        and getattr(request.user, "is_authenticated", False)
+    ):
+        user = request.user
+
+    # Validação obrigatória de autorização para o material solicitado
     try:
-        user = None
-        if token:
-            from apps.authentication.security import decode_jwt_token
+        HubService.get_content_access(user, content_id)
+    except HttpError as auth_err:
+        return HttpResponse(
+            json.dumps({"detail": getattr(auth_err, "message", "Acesso bloqueado.")}),
+            status=getattr(auth_err, "status_code", 403),
+            content_type="application/json",
+        )
 
-            payload = decode_jwt_token(token)
-            if payload:
-                user = User.objects.filter(username=payload.get("sub")).first()
-        if (
-            not user
-            and getattr(request, "auth", None)
-            and isinstance(request.auth, User)
-        ):
-            user = request.auth
-        if (
-            not user
-            and getattr(request, "user", None)
-            and getattr(request.user, "is_authenticated", False)
-        ):
-            user = request.user
+    if user:
+        email = getattr(user, "email", "") or getattr(user, "username", "Tati AI")
 
-        if user:
-            email = getattr(user, "email", "") or getattr(user, "username", "Tati AI")
+    try:
 
         from apps.activities.secure_document_service import (
             get_client,
@@ -804,11 +864,12 @@ def get_hub_page(
 flashcard_assets_router = Router(tags=["Flashcard Assets"])
 
 
-@flashcard_assets_router.post("/upload-image", auth=auth_optional)
+@flashcard_assets_router.post("/upload-image", auth=auth_required)
 def upload_flashcard_image(request: HttpRequest, file: UploadedFile = File(...)):
     """
     Faz upload de imagem para o Cloudinary para os flashcards.
     """
+    require_teacher(request.auth)
     from .assets_service import CloudinaryService
 
     content = file.read()
@@ -816,11 +877,12 @@ def upload_flashcard_image(request: HttpRequest, file: UploadedFile = File(...))
     return {"url": url}
 
 
-@flashcard_assets_router.post("/upload-image-from-url", auth=auth_optional)
+@flashcard_assets_router.post("/upload-image-from-url", auth=auth_required)
 def upload_flashcard_image_from_url(request: HttpRequest, payload: dict):
     """
     Salva imagem no Cloudinary a partir de uma URL ou retorna a própria URL se Cloudinary falhar.
     """
+    require_teacher(request.auth)
     from .assets_service import CloudinaryService
 
     image_url = (payload.get("url") or "").strip()
@@ -834,11 +896,12 @@ def upload_flashcard_image_from_url(request: HttpRequest, payload: dict):
         return {"url": image_url}
 
 
-@flashcard_assets_router.post("/ai-image", auth=auth_optional)
+@flashcard_assets_router.post("/ai-image", auth=auth_required)
 def generate_flashcard_ai_image(request: HttpRequest, payload: dict):
     """
     Gera imagem específica e direta com IA (FLUX.1-dev / Unsplash) sem spoilers e sem imagens aleatórias.
     """
+    require_teacher(request.auth)
     from .image_service import ImageResolverService
 
     prompt = (payload.get("prompt") or "").strip()
@@ -909,11 +972,12 @@ class AdminPremiumIn(Schema):
     is_active: Optional[bool] = True
 
 
-@admin_premium_router.get("", auth=auth_optional)
+@admin_premium_router.get("", auth=auth_required)
 def list_admin_premium(request: HttpRequest):
     """
     Lista todos os materiais do Hub e da Loja Premium para o painel da professora.
     """
+    require_teacher(request.auth)
     from .models import PremiumContent
 
     materials = PremiumContent.objects.all().order_by("-created_at")
@@ -937,11 +1001,12 @@ def list_admin_premium(request: HttpRequest):
     ]
 
 
-@admin_premium_router.post("/upload", auth=auth_optional)
+@admin_premium_router.post("/upload", auth=auth_required)
 def upload_premium_file(request: HttpRequest, file: UploadedFile = File(...)):
     """
     Upload de material digital (PDF/DOC/Vídeo) para o Cloudinary.
     """
+    require_teacher(request.auth)
     from .assets_service import CloudinaryService
 
     content = file.read()
@@ -949,22 +1014,24 @@ def upload_premium_file(request: HttpRequest, file: UploadedFile = File(...)):
     return {"file_path": url, "url": url}
 
 
-@admin_premium_router.post("/sync", auth=auth_optional)
+@admin_premium_router.post("/sync", auth=auth_required)
 def sync_all_premium_materials(request: HttpRequest):
     """
     Sincroniza e garante o cache local em disco de todos os materiais do Hub.
     """
+    require_teacher(request.auth)
     from .tasks import sync_hub_materials_task
 
     result = sync_hub_materials_task()
     return {"success": True, "result": result}
 
 
-@admin_premium_router.post("/{content_id}/sync", auth=auth_optional)
+@admin_premium_router.post("/{content_id}/sync", auth=auth_required)
 def sync_single_premium_material(request: HttpRequest, content_id: str):
     """
     Força a sincronização e extração de links de um material específico.
     """
+    require_teacher(request.auth)
     from .models import PremiumContent
     from .tasks import sync_material_pages
 
@@ -975,8 +1042,9 @@ def sync_single_premium_material(request: HttpRequest, content_id: str):
     return {"success": ok, "id": str(m.id), "title": m.title}
 
 
-@admin_premium_router.post("", auth=auth_optional)
+@admin_premium_router.post("", auth=auth_required)
 def create_admin_premium(request: HttpRequest, payload: AdminPremiumIn):
+    require_teacher(request.auth)
     from .models import PremiumContent
     import uuid
 
@@ -1008,10 +1076,11 @@ def create_admin_premium(request: HttpRequest, payload: AdminPremiumIn):
     return {"success": True, "id": str(m.id), "title": m.title}
 
 
-@admin_premium_router.put("/{content_id}", auth=auth_optional)
+@admin_premium_router.put("/{content_id}", auth=auth_required)
 def update_admin_premium(
     request: HttpRequest, content_id: str, payload: AdminPremiumIn
 ):
+    require_teacher(request.auth)
     from .models import PremiumContent
 
     m = PremiumContent.objects.filter(id=content_id).first()
@@ -1036,8 +1105,9 @@ def update_admin_premium(
     return {"success": True, "id": str(m.id), "title": m.title}
 
 
-@admin_premium_router.delete("/{content_id}", auth=auth_optional)
+@admin_premium_router.delete("/{content_id}", auth=auth_required)
 def delete_admin_premium(request: HttpRequest, content_id: str):
+    require_teacher(request.auth)
     from .models import PremiumContent
 
     m = PremiumContent.objects.filter(id=content_id).first()

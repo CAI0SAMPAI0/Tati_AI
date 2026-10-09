@@ -213,9 +213,7 @@ class User(AbstractBaseUser):
 
     @property
     def is_superuser(self) -> bool:
-        from django.conf import settings
-        prog_users = getattr(settings, "PROGRAMMER_USERNAMES", ["programador", "admin", "caio"])
-        return self.role == UserRole.PROGRAMADOR or self.username in prog_users
+        return self.role in (UserRole.PROGRAMADOR, "admin", "Admin")
 
 
     @is_superuser.setter

@@ -120,12 +120,10 @@ class _TatiAppScreenState extends State<TatiAppScreen> {
   // Modo dev: falso por padrão para o APK de produção
   static const bool isDevMode = bool.fromEnvironment('DEV_MODE', defaultValue: false);
 
-  // Frontend URL: em dev aponta para o Railway; em produção para Vercel
+  // Frontend URL: pode ser sobrescrito via --dart-define=APP_URL=...
   final String appUrl = const String.fromEnvironment(
     'APP_URL',
-    defaultValue: isDevMode
-        ? "https://stunning-tranquility-production-4c54.up.railway.app"
-        : "https://tati-ai.vercel.app",
+    defaultValue: "https://tati-ai.vercel.app",
   );
 
   // Backend API URL: em dev aponta para o Railway; em produção para HF Space

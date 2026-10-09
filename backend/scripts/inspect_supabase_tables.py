@@ -1,6 +1,11 @@
+import os
+import sys
 import psycopg2
 
-supa_url = "postgresql://postgres.gkziqqjswecteekanwnv:supermamaco089@aws-1-sa-east-1.pooler.supabase.com:5432/postgres"
+supa_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
+if not supa_url:
+    print("ERRO: Configure a variável de ambiente SUPABASE_DB_URL ou DATABASE_URL.")
+    sys.exit(1)
 
 print("Connecting to Supabase...")
 conn = psycopg2.connect(supa_url, connect_timeout=15)

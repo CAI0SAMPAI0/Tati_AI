@@ -4,10 +4,12 @@ import os
 sys.stdout.reconfigure(line_buffering=True)
 
 import psycopg2
-from psycopg2.extras import execute_batch, Json
+SUPABASE_URL = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
+RAILWAY_URL = os.getenv("RAILWAY_URL") or os.getenv("DATABASE_PUBLIC_URL")
 
-SUPABASE_URL = "postgresql://postgres.gkziqqjswecteekanwnv:supermamaco089@aws-1-sa-east-1.pooler.supabase.com:5432/postgres"
-RAILWAY_URL = "postgresql://postgres:aakPfdixjEzbCwClziOwkzYsVaELoQBv@127.0.0.1:54264/railway"
+if not SUPABASE_URL or not RAILWAY_URL:
+    print("ERRO: Configure as variáveis de ambiente SUPABASE_DB_URL e RAILWAY_URL.")
+    sys.exit(1)
 
 def get_table_schema_ddl(cur, table_name):
     cur.execute("""

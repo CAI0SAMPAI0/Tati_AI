@@ -33,3 +33,96 @@ class AuthenticationSecurityTestCase(TestCase):
         self.assertEqual(user.username, 'caiotests')
         self.assertEqual(user.level, 'B1')
         self.assertEqual(user.role, 'student')
+
+    def test_forgot_password_does_not_leak_reset_token(self):
+        from apps.authentication.services import AuthService
+        user = User.objects.create(
+            username='forgot_user',
+            email='forgot@example.com',
+            password=hash_password('Password123!'),
+        )
+        res = AuthService.process_forgot_password('forgot@example.com')
+        self.assertTrue(res.get('ok'))
+        self.assertNotIn('reset_token', res)
+
+    def test_oauth_origin_validation(self):
+        from apps.authentication.api import _is_allowed_frontend_origin
+        self.assertTrue(_is_allowed_frontend_origin('https://tati-ai.vercel.app'))
+        self.assertTrue(_is_allowed_frontend_origin('https://tati-hub.vercel.app'))
+        self.assertTrue(_is_allowed_frontend_origin('http://localhost:3000'))
+        self.assertFalse(_is_allowed_frontend_origin('https://evil-attacker.com'))
+        self.assertFalse(_is_allowed_frontend_origin('http://attacker.com/evil'))
+        self.assertFalse(_is_allowed_frontend_origin('javascript:alert(1)'))
+
+    def test_ssrf_image_proxy_validation(self):
+        from apps.activities.api import _is_safe_activity_image_url
+        self.assertTrue(_is_safe_activity_image_url('https://test-english.com/images/exercise1.webp'))
+        self.assertTrue(_is_safe_activity_image_url('https://files.liveworksheets.com/worksheets/sample.jpg'))
+        # Malicious / internal IP targets
+        self.assertFalse(_is_safe_activity_image_url('http://169.254.169.254/latest/meta-data/'))
+        self.assertFalse(_is_safe_activity_image_url('http://127.0.0.1:8000/admin'))
+        self.assertFalse(_is_safe_activity_image_url('http://10.0.0.1/secret'))
+        self.assertFalse(_is_safe_activity_image_url('http://attacker.com/exploit.jpg'))
+        self.assertFalse(_is_safe_activity_image_url('file:///etc/passwd'))
+
+    def test_mercado_pago_price_tampering_and_subscription_policy(self):
+        import os
+        from ninja.errors import HttpError
+        from apps.payments.services import MercadoPagoService, are_subscriptions_active
+        from apps.activities.models import PremiumContent
+
+        student = User.objects.create(username='student1', email='student1@test.com', role=UserRole.STUDENT)
+        buyer = User.objects.create(username='buyer1', email='buyer1@test.com', role=UserRole.BUYER)
+
+        # 1. Materiais avulsos salvos no dashboard pela Tatiana (com preço para aluno e visitante)
+        material = PremiumContent.objects.create(
+            id='mat_gramatica_1',
+            title='Material Gramática',
+            price=29.90,
+            price_students=10.00,
+            price_buyers=25.00,
+        )
+
+        # Preço para aluno: R$ 10.00 (mesmo que envie 0.01)
+        student_price = MercadoPagoService.resolve_server_price(student, 'hub', str(material.id), requested_amount=0.01)
+        self.assertEqual(student_price, 10.00)
+
+        # Preço para comprador externo: R$ 25.00 (mesmo que envie 0.01)
+        buyer_price = MercadoPagoService.resolve_server_price(buyer, 'hub', str(material.id), requested_amount=0.01)
+        self.assertEqual(buyer_price, 25.00)
+
+        # 2. Mensalidades bloqueadas antes de março de 2027
+        with self.assertRaises(HttpError):
+            MercadoPagoService.resolve_server_price(student, 'subscription', 'monthly', requested_amount=49.90)
+
+        # 3. Se explicitamente ativada no ambiente, plano mensal aplica preço fixo do servidor (49.90)
+        os.environ['SUBSCRIPTION_BILLING_ENABLED'] = 'true'
+        try:
+            active_price = MercadoPagoService.resolve_server_price(student, 'subscription', 'monthly', requested_amount=0.01)
+            self.assertEqual(active_price, 49.90)
+        finally:
+            os.environ.pop('SUBSCRIPTION_BILLING_ENABLED', None)
+
+    def test_reserved_username_registration_rejected(self):
+        from apps.authentication.services import AuthService
+        from apps.authentication.schemas import RegisterInput
+        from ninja.errors import HttpError
+        data = RegisterInput(username='admin', email='newadmin@test.com', name='Admin', password='Password123!', level='B1')
+        with self.assertRaises(HttpError):
+            AuthService.register_student(data)
+
+    def test_superuser_not_granted_by_username_alone(self):
+        user = User.objects.create(username='caio', email='caio@test.com', role=UserRole.STUDENT)
+        self.assertFalse(user.is_superuser)
+
+    def test_chat_idor_access_blocked(self):
+        from apps.chat.services import ConversationService
+        from apps.chat.models import Conversation
+        from ninja.errors import HttpError
+        victim = User.objects.create(username='victim_user', email='victim@test.com')
+        attacker = User.objects.create(username='attacker_user', email='attacker@test.com')
+        conv = Conversation.objects.create(id='conv_victim_1', username='victim_user', title='Victim Chat')
+        # Attacker tries to read victim's conversation messages
+        with self.assertRaises(HttpError):
+            ConversationService.get_messages(attacker, 'conv_victim_1')
+

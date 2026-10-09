@@ -43,6 +43,8 @@ jobs:
 
           # Remove assets/images from the Space directory (assets are served from frontend)
           rm -rf hf_space_dir/assets/images || true
+          # Remove internal migration/inspection scripts from the Space directory
+          rm -rf hf_space_dir/scripts || true
           
           # Enter the Space directory
           cd hf_space_dir

@@ -62,13 +62,49 @@ def get_current_user_payment_status(request: HttpRequest):
 def get_payment_plans(request: HttpRequest):
     """
     Retorna os planos de assinatura disponíveis na plataforma.
+    Inclui status de disponibilidade (cobrança após fevereiro de 2027).
     """
+    import os
+    from django.conf import settings
+    from .services import are_subscriptions_active
+
+    active = are_subscriptions_active()
+    start_date_str = getattr(
+        settings,
+        "SUBSCRIPTION_BILLING_START_DATE",
+        os.getenv("SUBSCRIPTION_BILLING_START_DATE", "2027-03-01"),
+    )
+    notice = (
+        None
+        if active
+        else f"Disponível para contratação a partir de {start_date_str} (após fev/2027)."
+    )
+
     return [
+        {
+            "id": "full",
+            "name": "Plano Ilimitado",
+            "price": 49.90,
+            "period": "mês",
+            "available": active,
+            "available_from": start_date_str,
+            "notice": notice,
+            "features": [
+                "Acesso Ilimitado à Teacher Tati",
+                "Simulações CEFR",
+                "Flashcards com SRS",
+                "Podcasts Interativos",
+                "Suporte WhatsApp",
+            ],
+        },
         {
             "id": "monthly",
             "name": "Plano Mensal",
             "price": 49.90,
             "period": "mês",
+            "available": active,
+            "available_from": start_date_str,
+            "notice": notice,
             "features": [
                 "Acesso Ilimitado à Teacher Tati",
                 "Simulações CEFR",
@@ -83,6 +119,9 @@ def get_payment_plans(request: HttpRequest):
             "price": 129.90,
             "period": "3 meses",
             "popular": True,
+            "available": active,
+            "available_from": start_date_str,
+            "notice": notice,
             "features": [
                 "Tudo do plano mensal",
                 "Desconto de 15%",
@@ -95,6 +134,9 @@ def get_payment_plans(request: HttpRequest):
             "name": "Plano Anual",
             "price": 399.90,
             "period": "ano",
+            "available": active,
+            "available_from": start_date_str,
+            "notice": notice,
             "features": [
                 "Tudo do plano trimestral",
                 "Melhor Custo-Benefício (Economize 35%)",
@@ -107,8 +149,25 @@ def get_payment_plans(request: HttpRequest):
 @payments_router.post("/subscribe", auth=auth_required)
 def subscribe_plan(request: HttpRequest, payload: dict):
     """
-    Inicia assinatura de plano.
+    Inicia assinatura de plano (disponível somente após fevereiro de 2027).
     """
+    import os
+    from django.conf import settings
+    from ninja.errors import HttpError
+    from .services import are_subscriptions_active
+
+    if not are_subscriptions_active():
+        start_date_str = getattr(
+            settings,
+            "SUBSCRIPTION_BILLING_START_DATE",
+            os.getenv("SUBSCRIPTION_BILLING_START_DATE", "2027-03-01"),
+        )
+        raise HttpError(
+            400,
+            f"As assinaturas de planos só estarão disponíveis para contratação após fevereiro de 2027 "
+            f"(início previsto: {start_date_str}). Atualmente apenas a aquisição de materiais do Hub está habilitada.",
+        )
+
     return {"ok": True, "message": "Iniciando assinatura..."}
 
 

@@ -355,24 +355,35 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 CORS_EXPOSE_HEADERS = ["x-request-id", "content-disposition", "content-type"]
 
 
-# Origens permitidas dinâmicas para Railway, Hugging Face Spaces e Vercel
+# Origens permitidas dinâmicas para Railway, Hugging Face Spaces e Vercel (estritamente prefixadas)
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://.*\.railway\.app$",
-    r"^https://.*\.up\.railway\.app$",
-    r"^https://.*\.vercel\.app$",
-    r"^https://.*\.hf\.space$",
+    r"^https://tati-ai(-[a-z0-9\-]+)?\.vercel\.app$",
+    r"^https://tati-hub(-[a-z0-9\-]+)?\.vercel\.app$",
+    r"^https://tati-ai-git-[a-z0-9\-]+\.vercel\.app$",
+    r"^https://[a-z0-9\-]+\.up\.railway\.app$",
+    r"^https://caio007-tati-ai-backend\.hf\.space$",
     r"^http://localhost(:\d+)?$",
     r"^http://127\.0\.0\.1(:\d+)?$",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://*.railway.app",
-    "https://*.up.railway.app",
-    "https://*.vercel.app",
-    "https://*.hf.space",
+    "https://tati-ai.vercel.app",
+    "https://tati-hub.vercel.app",
+    "https://caio007-tati-ai-backend.hf.space",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
+
+_railway_domain = (os.getenv("RAILWAY_PUBLIC_DOMAIN") or os.getenv("RAILWAY_STATIC_URL") or "").strip().rstrip("/")
+if _railway_domain:
+    _clean_rw = _railway_domain if _railway_domain.startswith(("http://", "https://")) else f"https://{_railway_domain}"
+    if _clean_rw not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_clean_rw)
+
+_extra_csrf = [o.strip() for o in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
+for _origin in _extra_csrf:
+    if _origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_origin)
 
 #    INTERNACIONALIZAÇÃO & TEMPO                                        
 LANGUAGE_CODE = "pt-br"
@@ -398,12 +409,12 @@ SUPERADMIN_EMAILS = [
 ]
 PROGRAMMER_USERNAMES = [
     u.strip()
-    for u in os.getenv("PROGRAMMER_USERNAMES", "programador,admin,caio").split(",")
+    for u in os.getenv("PROGRAMMER_USERNAMES", "").split(",")
     if u.strip()
 ]
 ADMIN_USERNAMES = [
     u.strip()
-    for u in os.getenv("ADMIN_USERNAMES", "programador,admin,professor,professora").split(",")
+    for u in os.getenv("ADMIN_USERNAMES", "").split(",")
     if u.strip()
 ]
 
@@ -491,5 +502,16 @@ LOGGING = {
         },
     },
 }
+
+#    POLÍTICA DE COBRANÇAS E MENSALIDADES                               
+# Conforme modelo de negócio, mensalidades/assinaturas só serão cobradas após fevereiro de 2027.
+# Por padrão, início configurado para 01/03/2027 (ajustável via SUBSCRIPTION_BILLING_START_DATE).
+# Materiais do Hub cadastrados pela professora Tatiana continuam disponíveis com os preços do catálogo.
+SUBSCRIPTION_BILLING_START_DATE = os.getenv(
+    "SUBSCRIPTION_BILLING_START_DATE", "2027-03-01"
+)
+SUBSCRIPTION_BILLING_ENABLED = os.getenv(
+    "SUBSCRIPTION_BILLING_ENABLED", "false"
+).lower() in ("true", "1", "yes")
 
 

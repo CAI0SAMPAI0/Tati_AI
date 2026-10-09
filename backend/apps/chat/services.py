@@ -31,6 +31,7 @@ from .audio_service import strip_emojis, EMOJI_REGEX
 logger = logging.getLogger(__name__)
 
 from django.conf import settings
+from ninja.errors import HttpError
 from shared.prompt_manager import PromptManager
 
 # Configuração dos clientes de IA
@@ -444,11 +445,13 @@ class ConversationService:
 
     @staticmethod
     def get_messages(user: User, conversation_id: str) -> List[MessageOut]:
-        msgs = Message.objects.filter(session_id=conversation_id)
-        if user and hasattr(user, "username") and user.username:
-            user_msgs = msgs.filter(username=user.username)
-            if user_msgs.exists():
-                msgs = user_msgs
+        conv = Conversation.objects.filter(id=conversation_id).first()
+        if not conv:
+            raise HttpError(404, "Conversa não encontrada.")
+        if conv.username != user.username and not getattr(user, "is_teacher", False):
+            raise HttpError(403, "Acesso não autorizado a esta conversa.")
+
+        msgs = Message.objects.filter(session_id=conversation_id).order_by("created_at")
         return [
             MessageOut(
                 id=m.id,
@@ -463,14 +466,24 @@ class ConversationService:
 
     @staticmethod
     def delete_conversation(user: User, conversation_id: str) -> dict:
-        Conversation.objects.filter(id=conversation_id, username=user.username).delete()
-        Message.objects.filter(
-            session_id=conversation_id, username=user.username
-        ).delete()
+        conv = Conversation.objects.filter(id=conversation_id).first()
+        if not conv:
+            raise HttpError(404, "Conversa não encontrada.")
+        if conv.username != user.username and not getattr(user, "is_teacher", False):
+            raise HttpError(403, "Acesso não autorizado a esta conversa.")
+
+        conv.delete()
+        Message.objects.filter(session_id=conversation_id).delete()
         return {"ok": True, "message": "Conversa removida com sucesso."}
 
     @staticmethod
     def get_summary(user: User, conversation_id: str, lang: str = "pt") -> dict:
+        conv = Conversation.objects.filter(id=conversation_id).first()
+        if not conv:
+            raise HttpError(404, "Conversa não encontrada.")
+        if conv.username != user.username and not getattr(user, "is_teacher", False):
+            raise HttpError(403, "Acesso não autorizado a esta conversa.")
+
         msgs = (
             Message.objects.filter(session_id=conversation_id)
             .only("role", "content")
@@ -640,6 +653,11 @@ class AIService:
         # Processamento de arquivos (desativado conforme diretriz pedagógica de foco em conversação)
         files_extracted_text = ""
         generated_doc = None
+
+        # Verifica autorização na conversa se ela já existir
+        conv = Conversation.objects.filter(id=conversation_id).first()
+        if conv and conv.username != user.username and not getattr(user, "is_teacher", False):
+            raise HttpError(403, "Acesso não autorizado a esta conversa.")
 
         # 1. Salva mensagem do usuário
         Message.objects.create(

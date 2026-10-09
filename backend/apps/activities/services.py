@@ -2033,8 +2033,16 @@ class HubService:
             base_url = os.getenv(
                 "API_URL", "https://caio007-tati-ai-backend.hf.space"
             ).rstrip("/")
+            token_param = ""
+            if user:
+                from apps.authentication.security import create_access_token
+                page_token = create_access_token(
+                    {"sub": user.username, "scope": f"hub_read:{content_id}"},
+                    expires_delta=timedelta(hours=6),
+                )
+                token_param = f"?token={page_token}"
             page_urls = [
-                f"{base_url}/activities/hub/{content_id}/pages/{i}"
+                f"{base_url}/activities/hub/{content_id}/pages/{i}{token_param}"
                 for i in range(len(secure_pages))
             ]
             return {
@@ -2216,16 +2224,33 @@ class HubService:
             }
 
     @classmethod
-    def cancel_checkout(cls, payment_id: str) -> dict:
+    def cancel_checkout(cls, user: User, payment_id: str) -> dict:
         from django.db import connection
+
+        payment_id = str(payment_id).strip()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT username, status FROM orders WHERE asaas_id = %s LIMIT 1",
+                [payment_id],
+            )
+            order_row = cursor.fetchone()
+
+        if not order_row:
+            raise HttpError(404, "Pedido não encontrado.")
+
+        order_username, order_status = order_row[0], order_row[1]
+        is_owner = bool(user and hasattr(user, "username") and user.username == order_username)
+        is_staff = getattr(user, "is_teacher", False) or getattr(user, "is_staff", False)
+
+        if not is_owner and not is_staff:
+            raise HttpError(403, "Acesso não autorizado para cancelar este pedido.")
+
+        if order_status == "confirmed":
+            raise HttpError(400, "Não é possível cancelar um pedido já aprovado e confirmado.")
 
         with connection.cursor() as cursor:
             cursor.execute(
-                "UPDATE orders SET status = 'cancelled' WHERE asaas_id = %s",
-                [payment_id],
-            )
-            cursor.execute(
-                "UPDATE premium_purchases SET status = 'revoked' WHERE asaas_payment_id = %s",
+                "UPDATE orders SET status = 'cancelled' WHERE asaas_id = %s AND status != 'confirmed'",
                 [payment_id],
             )
         return {"ok": True, "message": "Pedido cancelado com sucesso."}

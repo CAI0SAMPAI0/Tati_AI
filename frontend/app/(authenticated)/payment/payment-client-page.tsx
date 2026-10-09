@@ -22,6 +22,9 @@ interface Plan {
   description: string;
   features: string[];
   highlight?: boolean;
+  available?: boolean;
+  available_from?: string;
+  notice?: string;
 }
 
 interface SubscribeResponse {
@@ -124,16 +127,32 @@ export default function PaymentClientPage() {
                       ))}
                     </div>
 
-                    <Button 
-                      className="w-full h-16 text-lg font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all mt-4" 
-                      onClick={() => setSelectedPlan(plan)}
-                    >
-                      Assinar Agora
-                    </Button>
+                    {plan.available === false ? (
+                      <div className="space-y-2 mt-4">
+                        <Button 
+                          className="w-full h-16 text-base font-black rounded-2xl opacity-75 cursor-not-allowed bg-surface-raised border border-border" 
+                          disabled
+                        >
+                          Disponível após Fev/2027
+                        </Button>
+                        <p className="text-[11px] text-center text-primary font-semibold px-4">
+                          {plan.notice || 'Cobranças de mensalidades estarão ativas a partir de março de 2027. Os materiais avulsos já podem ser adquiridos no Hub!'}
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <Button 
+                          className="w-full h-16 text-lg font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all mt-4" 
+                          onClick={() => setSelectedPlan(plan)}
+                        >
+                          Assinar Agora
+                        </Button>
 
-                    <p className="text-[10px] text-center text-text-subtle font-medium px-4">
-                      Assinatura mensal recorrente. Cancele quando quiser diretamente no painel.
-                    </p>
+                        <p className="text-[10px] text-center text-text-subtle font-medium px-4">
+                          Assinatura mensal recorrente. Cancele quando quiser diretamente no painel.
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}

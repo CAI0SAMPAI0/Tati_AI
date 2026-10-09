@@ -1,7 +1,7 @@
 import os
 import re
 import logging
-from typing import List, Optional
+from typing import List, Optional, Any
 from .models import DocumentChunk
 from .chunking import SmartChunker
 

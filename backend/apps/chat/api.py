@@ -242,8 +242,8 @@ class TranscribeInput(BaseModel):
 #    SÍNTESE DE VOZ & TTS                                               
 
 
-@chat_router.post("/synthesize-voice", auth=auth_optional)
-@chat_router.post("/tts", auth=auth_optional)
+@chat_router.post("/synthesize-voice", auth=auth_required)
+@chat_router.post("/tts", auth=auth_required)
 async def synthesize_voice(request: HttpRequest, payload: TTSInput):
     """
     Sintetiza áudio falado com a voz da Teacher Tati via Edge TTS assíncrono respeitando o sotaque preferido do usuário.
@@ -273,7 +273,7 @@ async def synthesize_voice(request: HttpRequest, payload: TTSInput):
 #    TRANSCRIÇÃO DE VOZ (STT)                                           
 
 
-@chat_router.post("/transcribe", auth=auth_optional)
+@chat_router.post("/transcribe", auth=auth_required)
 async def transcribe_chat_voice(request: HttpRequest, payload: TranscribeInput):
     """
     Transcreve áudio do aluno usando Whisper Large V3 assíncrono.

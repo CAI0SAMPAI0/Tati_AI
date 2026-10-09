@@ -3,7 +3,7 @@ from ninja import Router
 from django.http import HttpRequest
 from django.contrib.auth import get_user_model
 
-from apps.authentication.security import auth_required, auth_optional
+from apps.authentication.security import auth_required, auth_optional, require_teacher
 from .schemas import (
     NotificationOut,
     SubscribePushInput,
@@ -16,7 +16,7 @@ User = get_user_model()
 notifications_router = Router(tags=["Notifications"])
 
 
-#    NOTIFICAÇÕES IN-APP                                                
+# NOTIFICAÇÕES IN-APP                                                
 
 
 @notifications_router.get("", response=List[NotificationOut], auth=auth_required)
@@ -76,6 +76,7 @@ def broadcast_notification(request: HttpRequest, payload: dict):
     Permite à professora ou administrador enviar uma notificação personalizada para alunos de um nível ou todos.
     Ex: payload = {"title": "Título", "activity_type": "Grammar", "levels": ["B1"], "is_published": True}
     """
+    require_teacher(request.auth)
     from .services import NotificationDispatcher
 
     activity_type = payload.get("activity_type", "Atividade")
@@ -99,8 +100,9 @@ def broadcast_notification(request: HttpRequest, payload: dict):
 @notifications_router.post("/send-email", auth=auth_required)
 def send_email(request: HttpRequest, payload: SendEmailInput):
     """
-    Envia e-mail transacional via API do Brevo com fallbacks automáticos.
+    Envia e-mail transacional via API do Brevo com fallbacks automáticos (restrito a professores/admins).
     """
+    require_teacher(request.auth)
     diag = BrevoEmailService.send_email_detailed(
         to_email=payload.to_email,
         subject=payload.subject,
@@ -132,34 +134,6 @@ def get_email_status(request: HttpRequest):
     }
 
 
-def _validate_cron_access(request: HttpRequest) -> bool:
-    import os
-
-    cron_secret = os.getenv("CRON_SECRET", "tati-ai-cron-secret-2026")
-    header_secret = request.headers.get("X-Cron-Secret") or request.headers.get(
-        "x-cron-secret"
-    )
-    auth_header = request.headers.get("Authorization", "")
-    query_secret = request.GET.get("secret")
-
-    if (
-        (header_secret and header_secret == cron_secret)
-        or (auth_header and f"Bearer {cron_secret}" in auth_header)
-        or (query_secret and query_secret == cron_secret)
-    ):
-        return True
-
-    # Se estiver autenticado como staff/admin/programador
-    if (
-        request.auth
-        and hasattr(request.auth, "is_staff")
-        and (request.auth.is_staff or getattr(request.auth, "is_programmer", False))
-    ):
-        return True
-
-    return False
-
-
 @notifications_router.post("/test", auth=auth_required)
 @notifications_router.post("/send-all-test", auth=auth_required)
 def send_test_notification(
@@ -171,6 +145,7 @@ def send_test_notification(
     Dispara notificação de teste controlada.
     Por padrão envia apenas 1 tipo solicitado ('streak_reminder', 'weekly_report', 'inactivity_nudge', 'streak_broken', 'streak_milestone', 'new_activity' ou 'all').
     """
+    require_teacher(request.auth)
     from django.contrib.auth import get_user_model
     from ninja.errors import HttpError
     from .services import NotificationSchedulerService
@@ -210,6 +185,7 @@ def trigger_streak_reminders(request: HttpRequest):
     """
     Disparo manual dos lembretes de ofensiva (Streak) para todos os alunos ativos que ainda não praticaram hoje (Horário de Brasília).
     """
+    require_teacher(request.auth)
     from .services import NotificationSchedulerService
 
     return NotificationSchedulerService.send_daily_streak_reminders_to_all_active_students()
@@ -220,6 +196,7 @@ def trigger_weekly_reports(request: HttpRequest):
     """
     Disparo manual dos relatórios semanais de evolução para todos os alunos ativos.
     """
+    require_teacher(request.auth)
     from .services import NotificationSchedulerService
 
     return NotificationSchedulerService.send_weekly_reports_to_all_active_students()
@@ -230,6 +207,7 @@ def trigger_inactivity_nudges(request: HttpRequest):
     """
     Disparo manual dos lembretes de inatividade (3 a 14 dias sem estudo).
     """
+    require_teacher(request.auth)
     from .services import NotificationSchedulerService
 
     return NotificationSchedulerService.send_inactivity_nudges_to_all_inactive_students()
@@ -242,14 +220,22 @@ def _validate_cron_access(request: HttpRequest) -> bool:
     """
     Valida token secreto do cron via header (X-Cron-Token ou Authorization) ou query param ?token=.
     Também permite se o usuário logado for admin/programador/professor.
+    Não aceita valores padrão hardcoded para evitar acesso não autorizado.
     """
     import os
 
-    expected = (os.getenv("CRON_TOKEN") or "cai0_based").strip()
+    expected = (os.getenv("CRON_TOKEN") or os.getenv("CRON_SECRET") or "").strip()
+    if not expected:
+        logger.error("[Cron] CRON_TOKEN ou CRON_SECRET não configurado.")
+        return False
+
     token = (
         request.headers.get("X-Cron-Token")
-        or request.GET.get("token")
         or request.headers.get("x-cron-token")
+        or request.headers.get("X-Cron-Secret")
+        or request.headers.get("x-cron-secret")
+        or request.GET.get("token")
+        or request.GET.get("secret")
     )
     if token and token.strip() == expected:
         return True
@@ -337,6 +323,7 @@ def trigger_monthly_competition_close(
     """
     Disparo manual do fechamento mensal e envio do Top 3 para Administradores e Professora Tatiana.
     """
+    require_teacher(request.auth)
     from apps.activities.services import MonthlyCompetitionService
 
     return MonthlyCompetitionService.close_and_notify_admin(year=year, month=month)
@@ -368,8 +355,9 @@ def get_monthly_top3(
 @notifications_router.post("/send-whatsapp", auth=auth_required)
 def send_whatsapp(request: HttpRequest, payload: SendWhatsAppInput):
     """
-    Envia mensagem de texto no WhatsApp via instância WAHA.
+    Envia mensagem de texto no WhatsApp via instância WAHA (restrito a professores/admins).
     """
+    require_teacher(request.auth)
     success = WahaWhatsAppService.send_message(
         phone_number=payload.phone_number,
         message=payload.message,

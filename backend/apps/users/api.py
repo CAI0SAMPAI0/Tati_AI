@@ -5,7 +5,7 @@ from ninja.errors import HttpError
 from pydantic import BaseModel
 
 from apps.authentication.models import User
-from apps.authentication.security import auth_required, auth_optional
+from apps.authentication.security import auth_required, auth_optional, require_teacher
 from .schemas import (
     StreakDataOut,
     StreakRecordOut,
@@ -116,8 +116,11 @@ def get_xp(request: HttpRequest):
 @users_router.post("/xp/award", response=XPOut, auth=auth_required)
 def award_xp(request: HttpRequest, payload: XPAwardInput):
     """
-    Concede XP ao usuário por atividades pedagógicas concluídas.
+    Concede XP manualmente por atividades pedagógicas (exclusivo para professores/administradores).
     """
+    require_teacher(request.auth)
+    if payload.amount <= 0 or payload.amount > 500:
+        raise HttpError(400, "Quantidade de XP inválida (máximo permitido: 500 XP).")
     return XPService.award_xp(request.auth, payload.amount, payload.reason)
 
 
