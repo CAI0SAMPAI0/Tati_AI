@@ -5,17 +5,33 @@ import { GraduationCap } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
-const LOGO_SRC = '/images/tati_logo.jpg';
+const PRIMARY_SRC = '/images/tati_logo.jpg';
+const FALLBACK_SRC = '/images/tati_logo.png';
 
 interface TatiLogoProps {
   size?: number;
   className?: string;
   alt?: string;
+  priority?: boolean;
 }
 
-/** Avatar/logo da Prof. Tatiana com fallback se o arquivo não carregar. */
-export function TatiLogo({ size = 32, className, alt = "Taty's Hub" }: TatiLogoProps) {
+/** Avatar/logo da Prof. Tatiana com fallback duplo se o arquivo não carregar. */
+export function TatiLogo({
+  size = 32,
+  className,
+  alt = "Taty's Hub",
+  priority = false,
+}: TatiLogoProps) {
+  const [src, setSrc] = useState(PRIMARY_SRC);
   const [failed, setFailed] = useState(false);
+
+  const handleError = () => {
+    if (src === PRIMARY_SRC) {
+      setSrc(FALLBACK_SRC);
+    } else {
+      setFailed(true);
+    }
+  };
 
   if (failed) {
     return (
@@ -31,14 +47,16 @@ export function TatiLogo({ size = 32, className, alt = "Taty's Hub" }: TatiLogoP
     );
   }
 
-return (
-  <Image
-    src={LOGO_SRC}
-    alt={alt}
-    width={size}
-    height={size}
-    className={cn('object-cover shrink-0', className)}
-    onError={() => setFailed(true)}
-  />
-);
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      width={size}
+      height={size}
+      unoptimized
+      priority={priority}
+      className={cn('object-cover shrink-0', className)}
+      onError={handleError}
+    />
+  );
 }

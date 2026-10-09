@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { Menu, FileText, Mic, BookMarked, Check, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { NotificationsDropdown } from '@/components/layout/notifications-dropdown';
+import { TatiLogo } from '@/components/ui/tati-logo';
 import { ACCENTS, getStoredAccent, saveStoredAccent } from '@/lib/constants/accents';
 import { useAuth } from '@/hooks/useAuth';
 import { useStreakAndTrophies } from '@/hooks/useStreakAndTrophies';
@@ -117,13 +118,11 @@ export function ChatTopbar({
           <Menu size={20} />
         </button>
 
-        <Image
-          src="/images/tati_logo.jpg"
+        <TatiLogo
+          size={30}
           alt="Taty's Hub"
-          width={30}
-          height={30}
           priority
-          className="hidden md:rounded-full object-cover object-top border-[3px] border-purple-300/50 mb-0 mx-auto"
+          className="hidden md:inline-block rounded-full object-cover object-top border-[3px] border-purple-300/50 mb-0 mx-auto"
         />
         <h1 className="text-[0.875rem] font-bold text-text truncate">
           {title || "Taty's Hub"}

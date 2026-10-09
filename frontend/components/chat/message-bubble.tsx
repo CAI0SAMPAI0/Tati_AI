@@ -10,6 +10,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Pencil, Check, X, Copy, RotateCcw, FileText, Download, ExternalLink, Presentation, FileCode2, File } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/providers/auth-provider';
+import { TatiLogo } from '@/components/ui/tati-logo';
 
 interface MessageBubbleProps {
   message: Message;
@@ -244,8 +245,7 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
     >
       {!isUser && (
         <div className="w-7 h-7 rounded-full border border-border overflow-hidden shrink-0 mt-1 shadow-sm bg-surface">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <Image src="/images/tati_logo.jpg" alt="Tati" width={28} height={28} className="w-full h-full object-cover" />
+          <TatiLogo size={28} className="w-full h-full object-cover" alt="Tati" />
         </div>
       )}
 

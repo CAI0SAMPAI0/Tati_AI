@@ -20,6 +20,7 @@ import { useRouter } from 'next/navigation';
 import { levelLabel } from '@/lib/constants/levels';
 import { canAccessDashboard, cn, isStaff } from '@/lib/utils';
 import { ConversationList } from './conversation-list';
+import { TatiLogo } from '@/components/ui/tati-logo';
 
 import { apiDelete, apiGet } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
@@ -111,13 +112,7 @@ export function Sidebar({
         <div className="flex items-center justify-between p-4 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg overflow-hidden bg-primary/20 flex items-center justify-center text-primary">
-              <Image src="/images/tati_logo.jpg" alt="Tati" width={28} height={28} className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                  (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                }}
-              />
-              <span className="hidden text-xs font-bold">T</span>
+              <TatiLogo size={28} className="w-full h-full object-cover rounded-lg" alt="Tati" />
             </div>
             <span className="font-display text-[0.9rem] font-bold tracking-tight">
               Taty's Hub

@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MessageBubble } from './message-bubble';
+import { TatiLogo } from '@/components/ui/tati-logo';
 
 import WordTooltip from './word-tooltip';
 
@@ -128,15 +129,12 @@ export function MessageList({ messages, isStreaming, streamingContent, conversat
     <div ref={containerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin">
       {showWelcome && (
         <div className="flex flex-col items-center justify-center py-8 md:py-12 text-center animate-fade-in max-w-2xl mx-auto px-4 w-full">
-          <div className="w-16 h-16 rounded-full border-[3px] border-primary/40 shadow-glow overflow-hidden mb-5">
-            <Image
-              src="/images/tati_logo.jpg"
+          <div className="w-16 h-16 rounded-full border-[3px] border-primary/40 shadow-glow overflow-hidden mb-5 flex items-center justify-center">
+            <TatiLogo
+              size={64}
               alt="Logo da Tatiana"
-              width={64}
-              height={64}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover rounded-full"
               priority
-              unoptimized
             />
           </div>
 
