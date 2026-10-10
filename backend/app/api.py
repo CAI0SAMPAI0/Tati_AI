@@ -28,6 +28,27 @@ def global_exception_handler(request, exc):
     )
 
 
+@api.get("/", tags=["System"])
+def root_status(request):
+    """
+    Status raiz da API para balanceadores de carga e health checks.
+    """
+    return {
+        "service": "Teacher Tati AI API",
+        "status": "online",
+        "version": "2.2.0",
+        "docs": "/docs",
+    }
+
+
+@api.get("/gradio_api/info", tags=["System"])
+def gradio_api_info(request):
+    """
+    Responde à sondagem do iframe da Hugging Face Spaces evitando erros 404 nos logs.
+    """
+    return {"named_endpoints": {}, "unnamed_endpoints": {}}
+
+
 @api.get("/health", tags=["System"])
 def health_check(request):
     """

@@ -59,6 +59,7 @@ class PerformanceMiddleware:
             "/health",
             "/healthz",
             "/ping",
+            "/gradio_api/info",
         ):
             return
         slow_threshold = float(os.getenv("PERF_SLOW_THRESHOLD_MS", "800"))
@@ -257,6 +258,7 @@ class StructuredLoggingMiddleware:
             "/health",
             "/healthz",
             "/ping",
+            "/gradio_api/info",
         ):
             return
 
