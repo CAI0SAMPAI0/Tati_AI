@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 import uuid
@@ -143,6 +144,75 @@ class PronunciationVerifyOut(BaseModel):
     recognized: Optional[str] = ""
     is_correct: Optional[bool] = True
     metadata: Optional[Dict[str, Any]] = None
+
+
+class TrimestralExamStatusOut(BaseModel):
+    can_start: bool
+    status: str
+    days_remaining: int
+    next_available_date: Optional[datetime] = None
+    last_exam_date: Optional[datetime] = None
+    active_exam_id: Optional[str] = None
+    current_level: str
+    last_exam_evolution: Optional[Dict[str, Any]] = None
+
+
+class ExamQuestionOut(BaseModel):
+    id: str
+    type: str  # "listening" | "reading" | "grammar" | "vocabulary" | "writing"
+    question: str
+    points: int
+    options: Optional[List[str]] = []
+    audio_url: Optional[str] = None
+    reading_text: Optional[str] = None
+
+
+class TrimestralExamStartInput(BaseModel):
+    num_questions: Optional[int] = 10
+    force: Optional[bool] = False
+
+
+class TrimestralExamStartOut(BaseModel):
+    exam_id: str
+    level: str
+    total_questions: int
+    started_at: datetime
+    questions: List[ExamQuestionOut]
+
+
+class StudentAnswerItem(BaseModel):
+    question_id: str
+    answer: str  # Texto selecionado ou resposta escrita
+
+
+class TrimestralExamSubmitInput(BaseModel):
+    exam_id: str
+    answers: List[StudentAnswerItem]
+
+
+class ExamCorrectionItem(BaseModel):
+    question_id: str
+    question: str
+    type: str
+    student_answer: str
+    correct_answer: str
+    is_correct: bool
+    points_earned: int
+    explanation: str
+
+
+class TrimestralExamResultOut(BaseModel):
+    exam_id: str
+    score: int  # 0 a 100
+    passed: bool
+    recommended_level: Optional[str] = None
+    xp_earned: int
+    next_exam_date: datetime
+    summary_feedback: str
+    can_do_statements: Optional[List[str]] = []
+    points_to_improve: Optional[List[str]] = []
+    skills_breakdown: Optional[Dict[str, Any]] = {}
+    corrections: List[ExamCorrectionItem]
 
 
 class CheckoutInput(BaseModel):

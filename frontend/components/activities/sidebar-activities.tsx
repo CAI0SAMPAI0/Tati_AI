@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, Trophy, ChartBar, MessageSquare, X, TrendingUp, Zap, History, Goal } from 'lucide-react';
+import { BookOpen, Trophy, ChartBar, MessageSquare, X, TrendingUp, Zap, History, Goal, GraduationCap } from 'lucide-react';
 import { memo } from 'react';
 
 import { cn } from '@/lib/utils';
@@ -71,6 +71,7 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
     ? [{ href: '/activities/hub', icon: <Zap size={20} />, label: 'Hub' }]
     : [
         { href: '/activities', icon: <BookOpen size={20} />, label: 'Activities' },
+        { href: '/exams', icon: <GraduationCap size={20} />, label: 'Exame Trimestral' },
         { href: '/history', icon: <History size={20} />, label: 'History' },
         { href: '/activities/hub', icon: <Zap size={20} />, label: 'Hub' },
         { href: '/progress', icon: <TrendingUp size={20} />, label: 'Progress' },
@@ -81,6 +82,7 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
 
   const isItemActive = (href: string) => {
     if (pathname === href) return true;
+    if (href === '/exams' && pathname.startsWith('/exams')) return true;
     if (
       (href === '/achievements' || href === '/activities/achievements/my') &&
       (pathname === '/achievements' || pathname.startsWith('/activities/achievements') || pathname.startsWith('/achievements'))

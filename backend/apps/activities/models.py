@@ -325,3 +325,29 @@ class DeveloperBugReport(models.Model):
     def __str__(self):
         return f"[Bug] {self.title} by {self.student_username}"
 
+
+class TrimestralExam(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    username = models.CharField(max_length=150, db_index=True)
+    level = models.CharField(max_length=20, default="A1")
+    status = models.CharField(max_length=50, default="in_progress")  # in_progress, completed, expired
+    questions = models.JSONField(default=list, blank=True)
+    answers = models.JSONField(default=dict, blank=True)
+    score = models.IntegerField(default=0)
+    passed = models.BooleanField(default=False)
+    feedback = models.JSONField(default=dict, blank=True)
+    total_questions = models.IntegerField(default=10)
+    started_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+
+    class Meta:
+        db_table = "trimestral_exams"
+        managed = False
+        ordering = ["-started_at"]
+
+    def __str__(self):
+        return f"TrimestralExam {self.username} [{self.level}] - {self.status} ({self.score}%)"
+
+

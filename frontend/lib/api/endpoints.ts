@@ -122,6 +122,15 @@ export const ENDPOINTS = {
   PREMIUM_ACCESS: (id: string) => `/activities/premium/${id}/access`,
   PREMIUM_BUY: (id: string) => `/activities/premium/${id}/buy`,
 
+  // Trimestral Exams (Exames Trimestrais a cada 3 meses)
+  EXAMS_TRIMESTRAL_STATUS: '/exams/trimestral/status',
+  EXAMS_TRIMESTRAL_START: '/exams/trimestral/start',
+  EXAMS_TRIMESTRAL_CURRENT: '/exams/trimestral/current',
+  EXAMS_TRIMESTRAL_SUBMIT: '/exams/trimestral/submit',
+  EXAMS_TRIMESTRAL_HISTORY: '/exams/trimestral/history',
+  EXAMS_TRIMESTRAL_RESET: '/exams/trimestral/reset',
+
   // Keep-alive
   CORS_TEST: '/cors-test',
 } as const;
+

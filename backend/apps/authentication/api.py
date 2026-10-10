@@ -1,6 +1,8 @@
+import os
 import json
 import logging
 from urllib.parse import parse_qs
+from typing import Optional, Dict, Any
 from ninja import Router
 from django.http import HttpRequest
 from django.contrib.auth import get_user_model
@@ -36,17 +38,23 @@ profile_router = Router(tags=["Profile"])
 @auth_router.post("/login/", response=TokenResponse)
 @auth_router.post("/login_form", response=TokenResponse)
 @auth_router.post("/login_form/", response=TokenResponse)
-def login(request: HttpRequest):
+def login(request: HttpRequest, payload: Optional[LoginInput] = None):
     """
-    Autentica aceitando tanto JSON (application/json) quanto Form URL-Encoded (apiPostForm).
+    Autentica usuário com username/email e senha.
+    Aceita JSON (application/json) e Form URL-Encoded (apiPostForm).
     """
     username = None
     password = None
 
+    if payload:
+        username = payload.username or payload.email or payload.identifier
+        password = payload.password
+
     # 1. Tenta POST form data nativo do Django
-    if request.POST:
-        username = request.POST.get("username") or request.POST.get("identifier")
-        password = request.POST.get("password")
+    if not username or not password:
+        if request.POST:
+            username = request.POST.get("username") or request.POST.get("identifier")
+            password = request.POST.get("password")
 
     # 2. Tenta decodificar body (JSON ou URL-Encoded)
     if not username or not password:
@@ -85,8 +93,8 @@ def login(request: HttpRequest):
         raise HttpError(422, "Credenciais não fornecidas ou formato inválido.")
 
     print(f"[Auth API] Processando login para '{username}'")
-    payload = LoginInput(username=username, password=password)
-    return AuthService.authenticate_user(payload)
+    auth_payload = LoginInput(username=username, password=password)
+    return AuthService.authenticate_user(auth_payload)
 
 
 @auth_router.post("/register", response={201: TokenResponse})
