@@ -1,5 +1,5 @@
 import type { Message } from '@/lib/api/types';
-import { ArrowRight, AudioLines, ClipboardCheck } from 'lucide-react';
+import { ArrowRight, AudioLines, BookMarked, ClipboardCheck, Mic } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -17,9 +17,21 @@ interface MessageListProps {
   onResend?: (content: string) => void;
   onSendMessage?: (text: string) => void;
   onStartLeveling?: () => void;
+  onSwitchToVoice?: () => void;
+  showLevelingCard?: boolean;
 }
 
-export function MessageList({ messages, isStreaming, streamingContent, conversationId, onEdit, onResend, onStartLeveling }: MessageListProps) {
+export function MessageList({
+  messages,
+  isStreaming,
+  streamingContent,
+  conversationId,
+  onEdit,
+  onResend,
+  onStartLeveling,
+  onSwitchToVoice,
+  showLevelingCard = true,
+}: MessageListProps) {
   const router = useRouter();
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -148,7 +160,7 @@ export function MessageList({ messages, isStreaming, streamingContent, conversat
             </p>
           </header>
 
-          {onStartLeveling && (
+          {onStartLeveling && showLevelingCard && (
             <article className="w-full md:max-w-xl xl:max-w-2xl h-auto rounded-2xl border border-border bg-surface p-6 text-left shadow-sm hover:border-primary/40 transition-all mb-6 mx-auto">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
@@ -177,13 +189,32 @@ export function MessageList({ messages, isStreaming, streamingContent, conversat
             </article>
           )}
 
-          <div className="flex items-center justify-center gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-3">
             <button
+              type="button"
               onClick={() => router.push('/pronunciation-reader')}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-surface border border-border rounded-xl text-xs text-muted hover:text-foreground hover:border-primary/40 transition-all cursor-pointer font-medium"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-surface border border-border rounded-xl text-xs text-muted hover:text-foreground hover:border-primary/40 transition-all cursor-pointer font-medium shadow-xs"
             >
               <AudioLines size={14} className="text-primary" />
               Pronunciation Practice
+            </button>
+
+            <button
+              type="button"
+              onClick={() => (onSwitchToVoice ? onSwitchToVoice() : router.push('/voice'))}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-surface border border-border rounded-xl text-xs text-muted hover:text-foreground hover:border-primary/40 transition-all cursor-pointer font-medium shadow-xs"
+            >
+              <Mic size={14} className="text-primary" />
+              Voice
+            </button>
+
+            <button
+              type="button"
+              onClick={() => router.push('/activities')}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-surface border border-border rounded-xl text-xs text-muted hover:text-foreground hover:border-primary/40 transition-all cursor-pointer font-medium shadow-xs"
+            >
+              <BookMarked size={14} className="text-primary" />
+              Activities
             </button>
           </div>
         </div>

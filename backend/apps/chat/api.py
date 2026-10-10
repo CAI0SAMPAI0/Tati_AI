@@ -94,20 +94,42 @@ def get_leveling_status(request: HttpRequest):
     Retorna o status atual da sessão de nivelamento do aluno, se houver.
     """
     user = request.auth
-    active = (
-        getattr(user, "profile", {}).get("active_leveling")
+    prof = (
+        getattr(user, "profile", {})
         if isinstance(getattr(user, "profile", None), dict)
-        else None
+        else {}
     )
+    active = prof.get("active_leveling")
+    history = prof.get("leveling_history") or []
+    has_completed = bool(
+        (isinstance(history, list) and len(history) > 0)
+        or prof.get("has_completed_leveling")
+    )
+
+    if not has_completed and not active:
+        from .models import Conversation
+
+        if (
+            Conversation.objects.filter(username=user.username, title__icontains="leveling").exists()
+            or Conversation.objects.filter(username=user.username, title__icontains="nivelamento").exists()
+        ):
+            has_completed = True
+
     if isinstance(active, dict) and not active.get("completed", False):
         return {
             "active": True,
+            "has_completed": has_completed,
+            "never_taken": False,
             "conversation_id": active.get("conversation_id"),
             "current_index": active.get("current_index", 0),
             "total_questions": active.get("total_questions", 0),
             "started_at": active.get("started_at"),
         }
-    return {"active": False}
+    return {
+        "active": False,
+        "has_completed": has_completed,
+        "never_taken": not (has_completed or bool(active)),
+    }
 
 
 #    TESTE CEFR PÚBLICO (PARA VISITANTES SEM LOGIN)                    

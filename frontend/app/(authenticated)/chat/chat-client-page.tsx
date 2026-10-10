@@ -17,7 +17,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import MarkdownWrapper from '@/components/chat/markdown-wrapper';
 import { cn } from '@/lib/utils';
 import { useSidebarState } from '@/hooks/useSidebarState';
-import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 export default function ChatClientPage() {
   const router = useRouter();
@@ -34,6 +35,30 @@ export default function ChatClientPage() {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const locale = 'en-US';
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  const { data: levelingStatus } = useQuery({
+    queryKey: ['leveling-status'],
+    queryFn: () => apiGet<{ active?: boolean; has_completed?: boolean; never_taken?: boolean }>(ENDPOINTS.LEVELING_STATUS),
+    staleTime: 60_000,
+  });
+
+  const hasCompletedLeveling = useMemo(() => {
+    const prof = user?.profile;
+    if (prof?.leveling_history && Array.isArray(prof.leveling_history) && prof.leveling_history.length > 0) {
+      return true;
+    }
+    if (prof?.active_leveling) {
+      return true;
+    }
+    if (prof?.has_completed_leveling) {
+      return true;
+    }
+    if (levelingStatus?.has_completed || levelingStatus?.active || levelingStatus?.never_taken === false) {
+      return true;
+    }
+    return false;
+  }, [user, levelingStatus]);
 
   const onConversationCreated = useCallback((newConv: Conversation) => {
     queryClient.setQueryData(['conversations'], (old: any) => {
@@ -225,6 +250,7 @@ export default function ChatClientPage() {
         toast.success(`Leveling Challenge started with ${res.data.total_questions || totalQuestions} questions! Please answer in English.`, { id: 'start-leveling' });
         const newConvId = res.data.conversation_id;
         queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        queryClient.invalidateQueries({ queryKey: ['leveling-status'] });
         setCurrentConvId(newConvId);
         setConvTitle(res.data.title || 'CEFR Leveling Challenge');
         const initialMsg: Message = {
@@ -453,6 +479,9 @@ export default function ChatClientPage() {
     !isLevelingCompleted
   );
 
+  const showLevelingCard = !hasCompletedLeveling && !isLevelingCompleted;
+  const hasChatStarted = messages.length > 0 || isStreaming;
+
   const handleFinishEarly = useCallback(async () => {
     if (!currentConvId) return;
     const confirm = window.confirm(
@@ -491,6 +520,7 @@ export default function ChatClientPage() {
           onShowSummary={handleOpenSummary}
           onSwitchToVoice={() => router.push(currentConvId ? `/voice?conv_id=${currentConvId}` : '/voice')}
           showSummaryBtn={messages.length >= 3}
+          hasChatStarted={hasChatStarted}
         />
 
         <div className="flex-1 overflow-hidden relative flex flex-col">
@@ -503,6 +533,8 @@ export default function ChatClientPage() {
             onResend={handleResend}
             onSendMessage={handleSend}
             onStartLeveling={handleStartLeveling}
+            onSwitchToVoice={() => router.push(currentConvId ? `/voice?conv_id=${currentConvId}` : '/voice')}
+            showLevelingCard={showLevelingCard}
           />
         </div>
         <div className="p-2 md:p-6 bg-gradient-to-t from-bg via-bg/80 to-transparent">

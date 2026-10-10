@@ -20,6 +20,7 @@ interface ChatTopbarProps {
   onShowSummary: () => void;
   onSwitchToVoice: () => void;
   showSummaryBtn: boolean;
+  hasChatStarted?: boolean;
 }
 
 const showActivities = true;
@@ -30,6 +31,7 @@ export function ChatTopbar({
   onShowSummary,
   onSwitchToVoice,
   showSummaryBtn,
+  hasChatStarted = false,
 }: ChatTopbarProps) {
   const { user, updateProfile } = useAuth();
   const [currentAccent, setCurrentAccent] = useState<string>('en-US');
@@ -218,44 +220,48 @@ export function ChatTopbar({
 
         <NotificationsDropdown />
 
-        {showActivities && (
-          <Button
-            variant="secondary"
-            size="sm"
-            title="My Activities"
-            onClick={() => {
-              window.location.href = '/activities';
-            }}
-            className="flex gap-1.5 px-3 py-1.5 h-auto text-xs font-bold"
-          >
-            <BookMarked size={14} className="text-primary" />
-            <span className="hidden sm:inline">Activities</span>
-          </Button>
-        )}
+        {hasChatStarted && (
+          <>
+            {showActivities && (
+              <Button
+                variant="secondary"
+                size="sm"
+                title="My Activities"
+                onClick={() => {
+                  window.location.href = '/activities';
+                }}
+                className="flex gap-1.5 px-3 py-1.5 h-auto text-xs font-bold"
+              >
+                <BookMarked size={14} className="text-primary" />
+                <span className="hidden sm:inline">Activities</span>
+              </Button>
+            )}
 
-        {showSummaryBtn && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={onShowSummary}
-            className="hidden lg:flex gap-1.5 px-3 py-1.5 h-auto text-xs font-bold"
-            title="Summary"
-          >
-            <FileText size={14} className="text-primary" />
-            <span className="hidden sm:inline">Summary</span>
-          </Button>
-        )}
+            {showSummaryBtn && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onShowSummary}
+                className="hidden lg:flex gap-1.5 px-3 py-1.5 h-auto text-xs font-bold"
+                title="Summary"
+              >
+                <FileText size={14} className="text-primary" />
+                <span className="hidden sm:inline">Summary</span>
+              </Button>
+            )}
 
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={onSwitchToVoice}
-          className="flex gap-1.5 px-3 py-1.5 h-auto text-xs font-bold"
-          title="Voice Mode"
-        >
-          <Mic size={14} className="text-primary" />
-          <span className="hidden sm:inline">Voice</span>
-        </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onSwitchToVoice}
+              className="flex gap-1.5 px-3 py-1.5 h-auto text-xs font-bold"
+              title="Voice Mode"
+            >
+              <Mic size={14} className="text-primary" />
+              <span className="hidden sm:inline">Voice</span>
+            </Button>
+          </>
+        )}
       </div>
     </header>
   );
