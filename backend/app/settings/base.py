@@ -22,8 +22,10 @@ for _pg_var in ("PGHOST", "PGDATABASE", "PGUSER", "PGPASSWORD", "PGPORT"):
     if _val and ("${" in _val or "}" in _val or _val.strip() in ("}", "{")):
         os.environ.pop(_pg_var, None)
 
-SECRET_KEY = os.getenv(
-    "JWT_SECRET_KEY", "django-insecure-tati-ai-super-secret-key-2026"
+SECRET_KEY = (
+    os.getenv("JWT_SECRET_KEY")
+    or os.getenv("SECRET_KEY")
+    or "django-insecure-tati-ai-super-secret-key-2026"
 )
 DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "t")
 
@@ -490,6 +492,11 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
+        "http": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
         "structured_json": {
             "handlers": ["console"],
             "level": "INFO",
@@ -498,6 +505,21 @@ LOGGING = {
         "audit": {
             "handlers": ["console"],
             "level": "INFO",
+            "propagate": False,
+        },
+        "httpx": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "httpcore": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "urllib3": {
+            "handlers": ["console"],
+            "level": "WARNING",
             "propagate": False,
         },
     },

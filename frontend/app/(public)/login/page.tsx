@@ -59,7 +59,11 @@ export default function LoginPage() {
     const handleGoogleMessage = (event: MessageEvent) => {
       if (event.data && event.data.type === 'GOOGLE_AUTH_SUCCESS' && event.data.token) {
         const isHub = new URLSearchParams(window.location.search).get('access') === 'hub';
-        saveSession(event.data.token, event.data.user || { username: 'student' })
+        saveSession(
+          event.data.token,
+          event.data.user || { username: 'student' },
+          event.data.refreshToken || event.data.refresh_token
+        )
           .then((savedUser) => {
             if (isHub || event.data.user?.is_hub_only || (savedUser as any)?.is_hub_only) {
               window.location.href = process.env.NEXT_PUBLIC_HUB_SITE_URL || 'http://localhost:3001/materiais';
@@ -130,7 +134,7 @@ export default function LoginPage() {
         setError((res.data as any)?.detail || 'Error authenticating with Google.');
         return;
       }
-      await saveSession(res.data.access_token, res.data.user);
+      await saveSession(res.data.access_token, res.data.user, res.data.refresh_token);
       const user = res.data.user as any;
       if (isHubAccess || user.is_hub_only) {
         window.location.href = process.env.NEXT_PUBLIC_HUB_SITE_URL || 'http://localhost:3001/materiais';
@@ -161,7 +165,7 @@ export default function LoginPage() {
           .then(async (res: any) => {
             try {
               if (res && res.token && res.user) {
-                await saveSession(res.token, res.user);
+                await saveSession(res.token, res.user, res.refreshToken || res.refresh_token);
                 router.push('/chat');
               } else if (res && res.success) {
                 router.push('/chat');
@@ -199,7 +203,7 @@ export default function LoginPage() {
     try {
       const res = await loginWithCredentials(loginId, loginPw);
       if (!res.ok) { setError((res.data as any).detail || 'Invalid credentials.'); return; }
-      await saveSession(res.data.access_token, res.data.user);
+      await saveSession(res.data.access_token, res.data.user, res.data.refresh_token);
 
       const user = res.data.user as any;
       if (isHubAccess || user.is_hub_only) {
@@ -246,7 +250,7 @@ export default function LoginPage() {
       // Faz login automático na hora e entra direto no chat!
       const loginRes = await loginWithCredentials(regUsername, regPassword);
       if (loginRes.ok) {
-        await saveSession(loginRes.data.access_token, loginRes.data.user);
+        await saveSession(loginRes.data.access_token, loginRes.data.user, loginRes.data.refresh_token);
         router.push('/chat');
         return;
       }

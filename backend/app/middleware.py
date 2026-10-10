@@ -54,10 +54,18 @@ class PerformanceMiddleware:
 
     def _log_perf(self, request, response, duration_ms):
         path = getattr(request, "path", "")
-        if not path.startswith(("/static", "/media")):
+        if path.startswith(("/static", "/media", "/favicon.ico")) or path in (
+            "/metrics",
+            "/health",
+            "/healthz",
+            "/ping",
+        ):
+            return
+        slow_threshold = float(os.getenv("PERF_SLOW_THRESHOLD_MS", "800"))
+        if duration_ms >= slow_threshold:
             status = getattr(response, "status_code", "unknown")
             method = getattr(request, "method", "UNKNOWN")
-            print(f"[PERF] {method} {path} -> {status} ({duration_ms:.1f}ms)")
+            logger.warning(f"[PERF SLOW] {method} {path} -> {status} ({duration_ms:.1f}ms)")
 
     def __call__(self, request):
         if self.async_mode:
@@ -226,7 +234,7 @@ class StructuredLoggingMiddleware:
         self.async_mode = iscoroutinefunction(self.get_response)
         if self.async_mode:
             markcoroutinefunction(self)
-        self.json_logger = logging.getLogger("structured_json")
+        self.http_logger = logging.getLogger("http")
         self.audit_logger = logging.getLogger("audit")
 
     def _extract_user_info(self, request):
@@ -244,51 +252,72 @@ class StructuredLoggingMiddleware:
 
     def _log_request(self, request, response, duration_ms, request_id):
         path = getattr(request, "path", "")
-        if path.startswith(("/static", "/media", "/favicon.ico")) or path in ("/health", "/ping"):
+        if path.startswith(("/static", "/media", "/favicon.ico")) or path in (
+            "/metrics",
+            "/health",
+            "/healthz",
+            "/ping",
+        ):
             return
-
-        import json
-        from datetime import datetime, timezone
 
         user_id, username = self._extract_user_info(request)
         status_code = getattr(response, "status_code", 500)
+        method = getattr(request, "method", "GET")
+        ip = self._get_client_ip(request)
 
-        log_data = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "request_id": request_id,
-            "user_id": user_id,
-            "username": username,
-            "method": getattr(request, "method", "GET"),
-            "path": path,
-            "status_code": status_code,
-            "duration_ms": round(duration_ms, 2),
-            "ip": self._get_client_ip(request),
-        }
+        use_json = os.getenv("ENABLE_JSON_LOGS", "false").lower() in ("true", "1")
+        if use_json:
+            import json
+            from datetime import datetime, timezone
 
-        # Emite log JSON estruturado
-        self.json_logger.info(json.dumps(log_data))
+            log_data = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "request_id": request_id,
+                "user_id": user_id,
+                "username": username,
+                "method": method,
+                "path": path,
+                "status_code": status_code,
+                "duration_ms": round(duration_ms, 2),
+                "ip": ip,
+            }
+            self.http_logger.info(json.dumps(log_data))
+        else:
+            self.http_logger.info(
+                f"{method} {path} -> {status_code} ({duration_ms:.1f}ms) [{username} | {ip} | {request_id}]"
+            )
 
         # Auditoria de operações destrutivas ou administrativas
-        method = getattr(request, "method", "GET")
         is_destructive = method in ("DELETE", "PATCH") or (
             method == "POST" and any(k in path for k in ("/delete", "/reset", "/wipe", "/cancel", "/destroy", "/role", "/ban"))
         )
         if is_destructive:
+            import json
+            from datetime import datetime, timezone
+
             audit_data = {
                 "audit_event": "DESTRUCTIVE_OPERATION",
-                **log_data,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "request_id": request_id,
+                "user_id": user_id,
+                "username": username,
+                "method": method,
+                "path": path,
+                "status_code": status_code,
+                "ip": ip,
             }
             self.audit_logger.warning(json.dumps(audit_data))
 
     def _get_or_create_request_id(self, request):
         import uuid
         headers = getattr(request, "headers", {})
-        request_id = (
+        raw_id = (
             headers.get("X-Request-ID")
             or headers.get("x-request-id")
             or getattr(request, "request_id", None)
-            or str(uuid.uuid4())
+            or str(uuid.uuid4())[:8]
         )
+        request_id = str(raw_id).split(",")[0].strip() if "," in str(raw_id) else str(raw_id).strip()
         request.request_id = request_id
         return request_id
 

@@ -19,9 +19,13 @@ import {
   Sparkles,
   PenLine,
   MessageSquare,
+  X,
+  Globe,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
+import { TatiLogo } from '@/components/ui/tati-logo';
+import { ACCENTS, getStoredAccent, saveStoredAccent } from '@/lib/constants/accents';
 
 const MotionDiv = dynamic(() => import('framer-motion').then(m => m.motion.div), { ssr: false });
 const AnimatePresence = dynamic(() => import('framer-motion').then(m => m.AnimatePresence), { ssr: false });
@@ -29,8 +33,9 @@ const AnimatePresence = dynamic(() => import('framer-motion').then(m => m.Animat
 interface WordResult {
   word: string;
   score: number;
-  accuracy: 'correct' | 'incorrect';
+  accuracy: 'correct' | 'incorrect' | 'needs_work' | string;
   error_type?: string;
+  tip?: string;
 }
 
 interface PronunciationResult {
@@ -38,6 +43,8 @@ interface PronunciationResult {
   transcription: string;
   words: WordResult[];
   feedback: string;
+  pedagogical_tip?: string;
+  suggested_sentence?: string;
   correct_audio?: string;
   metadata?: {
     accuracy_score?: number;
@@ -179,11 +186,51 @@ export default function PronunciationReaderClientPage() {
   const { user } = useAuth();
 
   const userLevel = (user as any)?.level || 'A1';
+
+  const getInitialAccent = useCallback(() => {
+    const userProfile = user?.profile as { preferred_accent?: string; accent?: string } | undefined;
+    const profileAccent = (user as any)?.preferred_accent || userProfile?.preferred_accent || userProfile?.accent;
+    return getStoredAccent(profileAccent || 'en-US');
+  }, [user]);
+
+  const [selectedAccent, setSelectedAccent] = useState<string>(() => getInitialAccent());
+  const [isAccentModalOpen, setIsAccentModalOpen] = useState(false);
+
+  useEffect(() => {
+    const handleAccentChange = () => {
+      setSelectedAccent(getInitialAccent());
+    };
+    window.addEventListener('tati_accent_changed', handleAccentChange);
+    window.addEventListener('storage', handleAccentChange);
+    return () => {
+      window.removeEventListener('tati_accent_changed', handleAccentChange);
+      window.removeEventListener('storage', handleAccentChange);
+    };
+  }, [getInitialAccent]);
+
+  const handleSelectAccent = (accId: string) => {
+    setSelectedAccent(accId);
+    saveStoredAccent(accId);
+    setIsAccentModalOpen(false);
+  };
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [result, setResult] = useState<PronunciationResult | null>(null);
+  const [selectedWord, setSelectedWord] = useState<WordResult | null>(null);
+  const [isPlayingWord, setIsPlayingWord] = useState<string | null>(null);
+  const [userAudioUrl, setUserAudioUrl] = useState<string | null>(null);
   const [history, setHistory] = useState<{ sentence: string; score: number }[]>([]);
+
+  const setUserAudioBlobUrl = useCallback((url: string | null) => {
+    setUserAudioUrl(prev => {
+      if (prev) {
+        try { URL.revokeObjectURL(prev); } catch (_) { }
+      }
+      return url;
+    });
+  }, []);
 
   const [inputMode, setInputMode] = useState<InputMode>('preset');
   const [customText, setCustomText] = useState('');
@@ -262,7 +309,7 @@ export default function PronunciationReaderClientPage() {
     const text = getActiveText();
     if (!text) return;
     try {
-      const res = await apiPost<{ audio: string }>(ENDPOINTS.CHAT_TTS, { text });
+      const res = await apiPost<{ audio: string }>(ENDPOINTS.CHAT_TTS, { text, accent: selectedAccent });
       if (res.ok && res.data.audio) {
         const audio = new Audio(`data:audio/mp3;base64,${res.data.audio}`);
         audio.play();
@@ -280,7 +327,7 @@ export default function PronunciationReaderClientPage() {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         try {
           mediaRecorderRef.current.stop();
-        } catch (_) {}
+        } catch (_) { }
       }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
@@ -289,7 +336,7 @@ export default function PronunciationReaderClientPage() {
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         try {
           audioContextRef.current.close();
-        } catch (_) {}
+        } catch (_) { }
         audioContextRef.current = null;
       }
       if (animFrameRef.current) {
@@ -315,7 +362,7 @@ export default function PronunciationReaderClientPage() {
         if (typeof MediaRecorder.isTypeSupported === 'function' && MediaRecorder.isTypeSupported(type)) {
           return type;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
     return '';
   };
@@ -325,13 +372,15 @@ export default function PronunciationReaderClientPage() {
     isOperatingRef.current = true;
 
     setResult(null);
+    setSelectedWord(null);
+    setUserAudioBlobUrl(null);
     setRecordingError(null);
 
     // 1. Limpa qualquer gravação ou stream anterior que ainda esteja em aberto
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       try {
         mediaRecorderRef.current.stop();
-      } catch (_) {}
+      } catch (_) { }
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
@@ -340,7 +389,7 @@ export default function PronunciationReaderClientPage() {
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
       try {
         audioContextRef.current.close();
-      } catch (_) {}
+      } catch (_) { }
       audioContextRef.current = null;
     }
 
@@ -412,7 +461,7 @@ export default function PronunciationReaderClientPage() {
           if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
             try {
               audioContextRef.current.close();
-            } catch (_) {}
+            } catch (_) { }
             audioContextRef.current = null;
           }
           cancelAnimationFrame(animFrameRef.current);
@@ -433,6 +482,8 @@ export default function PronunciationReaderClientPage() {
           // Monta o blob com o tipo retornado pelo MediaRecorder
           const effectiveMime = mediaRecorder.mimeType || mimeType || 'audio/webm';
           const blob = new Blob(audioChunksRef.current, { type: effectiveMime });
+          const audioUrl = URL.createObjectURL(blob);
+          setUserAudioBlobUrl(audioUrl);
 
           // Converte diretamente para base64 sem instanciar novo AudioContext assíncrono (evita NotAllowedError no Safari/iOS)
           const arrayBuffer = await blob.arrayBuffer();
@@ -499,7 +550,7 @@ export default function PronunciationReaderClientPage() {
   const evaluatePronunciation = async (audioBase64: string, referenceText: string) => {
     setIsEvaluating(true);
     try {
-      const body: Record<string, any> = { audio: audioBase64 };
+      const body: Record<string, any> = { audio: audioBase64, accent: selectedAccent };
       if (referenceText) {
         body.reference_text = referenceText;
       }
@@ -530,11 +581,15 @@ export default function PronunciationReaderClientPage() {
 
   const goNext = () => {
     setResult(null);
+    setSelectedWord(null);
+    setUserAudioBlobUrl(null);
     setCurrentIndex(prev => (prev + 1) % filteredSentences.length);
   };
 
   const goPrev = () => {
     setResult(null);
+    setSelectedWord(null);
+    setUserAudioBlobUrl(null);
     setCurrentIndex(prev => (prev - 1 + filteredSentences.length) % filteredSentences.length);
   };
 
@@ -548,18 +603,53 @@ export default function PronunciationReaderClientPage() {
   useEffect(() => {
     if (result?.correct_audio) {
       const audio = new Audio(`data:audio/mp3;base64,${result.correct_audio}`);
-      audio.play();
+      audio.play().catch(e => console.warn('Could not auto-play audio:', e));
     }
   }, [result]);
 
   const playCorrectAudio = useCallback(() => {
     if (result?.correct_audio) {
       const audio = new Audio(`data:audio/mp3;base64,${result.correct_audio}`);
-      audio.play();
+      audio.play().catch(e => console.warn('Could not play correct audio:', e));
     }
   }, [result]);
 
+  const playUserAudio = useCallback(() => {
+    if (userAudioUrl) {
+      const audio = new Audio(userAudioUrl);
+      audio.play().catch(e => console.warn('Could not play user audio:', e));
+    }
+  }, [userAudioUrl]);
+
+  const playWordAudio = useCallback(async (wordToPlay: string) => {
+    setIsPlayingWord(wordToPlay);
+    const clean = wordToPlay.replace(/[^\w\s']/g, '').trim();
+    try {
+      const res = await apiPost<{ audio?: string; audio_b64?: string }>(ENDPOINTS.CHAT_TTS, { text: clean, accent: selectedAccent });
+      const b64 = res.ok && (res.data?.audio || res.data?.audio_b64);
+      if (b64) {
+        const audio = new Audio(`data:audio/mp3;base64,${b64}`);
+        audio.onended = () => setIsPlayingWord(null);
+        audio.onerror = () => setIsPlayingWord(null);
+        await audio.play();
+        return;
+      }
+    } catch (_) {}
+
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      const u = new SpeechSynthesisUtterance(clean);
+      u.lang = selectedAccent || 'en-US';
+      u.rate = 0.85;
+      u.onend = () => setIsPlayingWord(null);
+      u.onerror = () => setIsPlayingWord(null);
+      window.speechSynthesis.speak(u);
+    } else {
+      setIsPlayingWord(null);
+    }
+  }, [selectedAccent]);
+
   const avgScore = history.length > 0 ? Math.round(history.reduce((a, h) => a + h.score, 0) / history.length) : 0;
+  const currentAccentObj = ACCENTS.find(a => a.id === selectedAccent) || ACCENTS[0];
 
   return (
     <div className="min-h-screen bg-bg flex flex-col">
@@ -578,6 +668,18 @@ export default function PronunciationReaderClientPage() {
           </h1>
           <p className="text-xs text-text-muted">Read aloud, write your own text, or just speak freely</p>
         </div>
+
+        {/* Accent Selector Button */}
+        <button
+          onClick={() => setIsAccentModalOpen(true)}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-surface border border-border hover:border-primary/40 text-xs font-bold text-text transition-all shadow-sm active:scale-95 shrink-0"
+          title="Change Teacher Tati's accent"
+        >
+          <span className="text-base">{currentAccentObj.flag}</span>
+          <span className="hidden sm:inline">{currentAccentObj.shortLabel}</span>
+          <Globe size={13} className="text-text-muted ml-0.5" />
+        </button>
+
         {history.length > 0 && (
           <div className="text-right">
             <div className={cn('text-lg font-bold', scoreColor(avgScore))}>{avgScore}%</div>
@@ -588,7 +690,7 @@ export default function PronunciationReaderClientPage() {
 
       <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 max-w-2xl mx-auto w-full">
         {/* Input mode selector */}
-        <div className="flex gap-2 mb-6 w-full">
+        <div className="flex gap-2 mb-3 w-full">
           <button
             onClick={() => setInputMode('preset')}
             className={cn(
@@ -627,6 +729,42 @@ export default function PronunciationReaderClientPage() {
           </button>
         </div>
 
+        {/* Accent Bar */}
+        <div className="w-full flex items-center justify-between gap-2 mb-5 px-1 overflow-x-hidden">
+          <span className="text-[0.7rem] font-bold text-text-subtle uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+            <Globe size={12} className="text-primary" />
+            Accent:
+          </span>
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 max-w-full">
+            {ACCENTS.slice(0, 5).map((acc) => {
+              const isSelected = acc.id === selectedAccent;
+              return (
+                <button
+                  key={acc.id}
+                  onClick={() => handleSelectAccent(acc.id)}
+                  className={cn(
+                    "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all shrink-0 active:scale-95 cursor-pointer",
+                    isSelected
+                      ? "bg-primary text-white shadow-sm shadow-primary/30"
+                      : "bg-surface border border-border text-text-muted hover:text-text hover:border-primary/30"
+                  )}
+                  title={acc.desc}
+                >
+                  <span>{acc.flag}</span>
+                  <span>{acc.shortLabel}</span>
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setIsAccentModalOpen(true)}
+              className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-surface border border-border text-primary hover:bg-surface-hover shrink-0 cursor-pointer"
+              title="View all accents"
+            >
+              More...
+            </button>
+          </div>
+        </div>
+
         {/* Sentence card / Custom input */}
         {inputMode === 'preset' ? (
           <>
@@ -634,9 +772,9 @@ export default function PronunciationReaderClientPage() {
             <div className={cn(
               'px-3 py-1 rounded-full text-xs font-bold mb-6',
               displaySentence.level === 'A1' ? 'bg-green-500/20 text-green-400' :
-              displaySentence.level === 'A2' ? 'bg-green-500/15 text-green-300' :
-              displaySentence.level === 'B1' ? 'bg-blue-500/20 text-blue-400' :
-              'bg-purple-500/20 text-purple-400'
+                displaySentence.level === 'A2' ? 'bg-green-500/15 text-green-300' :
+                  displaySentence.level === 'B1' ? 'bg-blue-500/20 text-blue-400' :
+                    'bg-purple-500/20 text-purple-400'
             )}>
               {displaySentence.level}
             </div>
@@ -814,59 +952,160 @@ export default function PronunciationReaderClientPage() {
                   <div className={cn('text-5xl font-black', scoreColor(result.score))}>
                     {result.score}%
                   </div>
+                  <p className="text-xs text-text-subtle mt-1 font-medium">
+                    {result.score >= 85 ? 'Excelente articulação e clareza!' : result.score >= 60 ? 'Bom esforço! Ajuste os fonemas destacados.' : 'Vamos praticar novamente ouvindo a Teacher Tati.'}
+                  </p>
                 </div>
 
-                {/* Conversational feedback */}
+                {/* 🎧 Player Comparativo: Sua Voz vs Teacher Tati */}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <button
+                    onClick={playUserAudio}
+                    disabled={!userAudioUrl}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary/10 hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed text-primary rounded-xl text-xs font-bold transition-all"
+                  >
+                    <Volume2 size={16} />
+                    Listen to your own voice
+                  </button>
+                  <button
+                    onClick={playCorrectAudio}
+                    disabled={!result.correct_audio}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-500/10 hover:bg-purple-500/20 disabled:opacity-40 disabled:cursor-not-allowed text-purple-600 dark:text-purple-400 rounded-xl text-xs font-bold transition-all"
+                  >
+                    <Volume2 size={16} />
+                    Teacher Tati
+                  </button>
+                </div>
+
+                {/* 💡 Frase sugerida pela Teacher Tati para fala livre ou concordância */}
+                {result.suggested_sentence && (
+                  <div className="p-3.5 bg-blue-500/10 border border-blue-500/25 rounded-2xl flex flex-col gap-1.5 text-left">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[0.68rem] font-bold text-blue-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <Sparkles size={13} />
+                        Sugestão natural da Teacher Tati:
+                      </span>
+                      {result.correct_audio && (
+                        <button
+                          type="button"
+                          onClick={playCorrectAudio}
+                          className="text-xs text-blue-500 hover:text-blue-600 font-semibold flex items-center gap-1 transition-colors"
+                        >
+                          <Volume2 size={13} />
+                          Ouvir frase
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs md:text-sm font-semibold text-text leading-relaxed">
+                      &ldquo;{result.suggested_sentence}&rdquo;
+                    </p>
+                  </div>
+                )}
+
+                {/* 👩‍🏫 Card da Dica da Teacher Tati em Português */}
+                {result.pedagogical_tip && (
+                  <div className="p-4 bg-primary/10 border border-primary/25 rounded-2xl flex flex-col gap-3 text-left">
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 border border-primary/40 mt-0.5">
+                        <TatiLogo size={36} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[0.7rem] font-bold text-primary uppercase tracking-wider">
+                          Dica da Teacher Tati
+                        </p>
+                        <p className="text-xs md:text-sm text-foreground leading-relaxed">
+                          {result.pedagogical_tip}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Lista com TODAS as palavras com atenção ou erro */}
+                    {result.words && result.words.filter(w => w.tip || w.accuracy !== 'correct').length > 0 && (
+                      <div className="pt-3 border-t border-primary/20 space-y-2">
+                        <p className="text-[0.68rem] font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
+                          <Sparkles size={13} />
+                          Pontos para praticar:
+                        </p>
+                        <div className="space-y-1.5">
+                          {result.words.filter(w => w.tip || w.accuracy !== 'correct').map((w, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => setSelectedWord(w)}
+                              className="w-full text-left flex items-start gap-2.5 p-2 rounded-xl bg-surface/70 hover:bg-surface border border-border/70 hover:border-primary/50 transition-all text-xs group"
+                            >
+                              <span className={cn(
+                                "font-bold shrink-0 px-2 py-0.5 rounded text-[0.7rem] font-mono",
+                                w.accuracy === 'needs_work'
+                                  ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                                  : "bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/30"
+                              )}>
+                                {w.word}
+                              </span>
+                              <span className="text-text-muted group-hover:text-text leading-relaxed flex-1">
+                                {w.tip || "Ajuste a pronúncia desta palavra."}
+                              </span>
+                              <span className="text-[0.65rem] text-primary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                Ver detalhe →
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Feedback geral */}
                 {result.feedback && (
-                  <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4">
+                  <div className="bg-surface-hover/50 border border-border rounded-2xl p-4">
                     <div className="flex items-start gap-3">
                       <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
                         <Sparkles size={16} className="text-primary" />
                       </div>
                       <div>
-                        <p className="text-sm text-text leading-relaxed">{result.feedback}</p>
+                        <p className="text-xs text-text-subtle font-semibold uppercase tracking-wider mb-0.5">General Feedback</p>
+                        <p className="text-sm text-text leading-relaxed italic">&quot;{result.feedback}&quot;</p>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Listen to correct pronunciation */}
-                {result.correct_audio && (
-                  <div className="flex justify-center">
-                    <button
-                      onClick={playCorrectAudio}
-                      className="flex items-center gap-2 px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-full text-sm font-bold transition-all"
-                    >
-                      <Volume2 size={16} />
-                      Listen to Correct Pronunciation
-                    </button>
-                  </div>
-                )}
-
-                {/* Word-level breakdown */}
+                {/* Word-level breakdown (clique abre modal com dica e áudio) */}
                 {result.words && result.words.length > 0 && (
                   <div>
-                    <h3 className="text-xs font-bold text-text-subtle uppercase tracking-wider mb-2">Word-by-Word</h3>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-xs font-bold text-text-subtle uppercase tracking-wider">Word-by-Word</h3>
+                      <span className="text-[0.65rem] text-text-muted">Toque na palavra para ver a dica</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
                       {result.words.map((w, i) => (
-                        <span
+                        <button
                           key={i}
+                          type="button"
+                          onClick={() => setSelectedWord(w)}
                           className={cn(
-                            'px-2 py-1 rounded-lg text-sm font-mono',
+                            'flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-sm',
                             w.accuracy === 'correct'
-                              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                              : 'bg-red-500/20 text-red-400 border border-red-500/30 line-through'
+                              ? 'bg-green-500/10 hover:bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/30'
+                              : w.accuracy === 'needs_work'
+                                ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/40 ring-1 ring-amber-500/20'
+                                : 'bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/40 line-through'
                           )}
                         >
-                          {w.word}
-                          {w.accuracy === 'incorrect' && w.score > 0 && (
-                            <span className="text-[0.6rem] ml-1 opacity-60">{w.score}%</span>
+                          <span className="font-bold">{w.word}</span>
+                          <span className="text-[0.65rem] opacity-75 font-sans">
+                            {Math.round(w.score)}%
+                          </span>
+                          {w.tip && (
+                            <span className="text-[0.65rem] text-amber-500">💡</span>
                           )}
-                        </span>
+                        </button>
                       ))}
                     </div>
                   </div>
                 )}
+
 
                 {/* Transcription */}
                 {result.transcription && (
@@ -925,7 +1164,152 @@ export default function PronunciationReaderClientPage() {
             </div>
           </div>
         )}
+
+        {/* 🪟 Modal / Tooltip de Fonética da Palavra */}
+        <AnimatePresence>
+          {selectedWord && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+              onClick={() => setSelectedWord(null)}
+            >
+              <div
+                onClick={e => e.stopPropagation()}
+                className="relative w-full max-w-sm bg-surface border border-border rounded-3xl p-5 shadow-2xl space-y-4"
+              >
+                {/* Header do Modal */}
+                <div className="flex items-center justify-between border-b border-border/60 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl font-black text-text font-mono tracking-tight">
+                      {selectedWord.word}
+                    </span>
+                    <span
+                      className={cn(
+                        'px-2.5 py-0.5 rounded-full text-xs font-bold font-sans',
+                        selectedWord.accuracy === 'correct'
+                          ? 'bg-green-500/15 text-green-500 border border-green-500/30'
+                          : selectedWord.accuracy === 'needs_work'
+                            ? 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
+                            : 'bg-red-500/15 text-red-500 border border-red-500/30'
+                      )}
+                    >
+                      {Math.round(selectedWord.score)}%
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setSelectedWord(null)}
+                    className="p-1.5 rounded-full hover:bg-surface-hover text-text-muted hover:text-text transition-colors"
+                    aria-label="Fechar"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Status da Pronúncia */}
+                <div className="flex items-center gap-2 text-xs font-semibold">
+                  {selectedWord.accuracy === 'correct' ? (
+                    <span className="flex items-center gap-1.5 text-green-500">
+                      <CheckCircle2 size={16} /> Pronúncia natural e clara
+                    </span>
+                  ) : selectedWord.accuracy === 'needs_work' ? (
+                    <span className="flex items-center gap-1.5 text-amber-500">
+                      <Sparkles size={16} /> Compreensível, mas com sotaque
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5 text-red-500">
+                      <XCircle size={16} /> Fonema impreciso ou trocado
+                    </span>
+                  )}
+                </div>
+
+                {/* Dica da Teacher Tati para a palavra */}
+                {selectedWord.tip ? (
+                  <div className="p-3.5 bg-primary/10 border border-primary/25 rounded-2xl flex items-start gap-3 text-left">
+                    <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-primary/40 mt-0.5">
+                      <TatiLogo size={32} className="w-full h-full object-cover" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[0.68rem] font-bold text-primary uppercase tracking-wider">
+                        Dica da Teacher Tati
+                      </p>
+                      <p className="text-xs text-text leading-relaxed font-medium">
+                        {selectedWord.tip}
+                      </p>
+                    </div>
+                  </div>
+                ) : selectedWord.accuracy === 'correct' ? (
+                  <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-2xl text-xs text-text-muted leading-relaxed">
+                    Perfeito! Você articulou esse termo com precisão e clareza acústica.
+                  </div>
+                ) : null}
+
+                {/* Botão de Ouvir Palavra */}
+                <button
+                  type="button"
+                  onClick={() => playWordAudio(selectedWord.word)}
+                  disabled={isPlayingWord === selectedWord.word}
+                  className="w-full py-2.5 px-4 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-md active:scale-98 disabled:opacity-50"
+                >
+                  <Volume2 size={16} className={isPlayingWord === selectedWord.word ? 'animate-pulse' : ''} />
+                  {isPlayingWord === selectedWord.word ? 'Tocando pronúncia...' : `Ouvir pronúncia de "${selectedWord.word}"`}
+                </button>
+              </div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Accent Picker Modal */}
+        <AnimatePresence>
+          {isAccentModalOpen && (
+            <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 dark:bg-black/85 animate-in fade-in duration-200">
+              <div
+                className="fixed inset-0 cursor-pointer"
+                onClick={() => setIsAccentModalOpen(false)}
+              />
+              <div className="relative w-full sm:max-w-md bg-white dark:bg-[#111322] border border-border/80 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 sm:p-6 z-10 max-h-[85vh] flex flex-col space-y-4 animate-in slide-in-from-bottom-5 duration-300">
+                <div className="flex items-center justify-between border-b border-border/40 pb-3 shrink-0">
+                  <div className="space-y-0.5">
+                    <h3 className="text-base sm:text-lg font-black text-text flex items-center gap-2">
+                      <span>🌎</span> English Accents (Edge TTS)
+                    </h3>
+                    <p className="text-xs text-text-muted">Teacher Tati will practice with the selected accent</p>
+                  </div>
+                  <button
+                    onClick={() => setIsAccentModalOpen(false)}
+                    className="p-1.5 rounded-full hover:bg-surface-hover text-text-muted hover:text-text transition-colors cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-y-auto max-h-[60vh] pr-1 custom-scrollbar">
+                  {ACCENTS.map((acc) => {
+                    const isSelected = acc.id === selectedAccent;
+                    return (
+                      <button
+                        key={acc.id}
+                        onClick={() => handleSelectAccent(acc.id)}
+                        className={cn(
+                          "flex items-center gap-3 p-3 rounded-2xl border text-left transition-all active:scale-95 cursor-pointer",
+                          isSelected
+                            ? "bg-primary/10 border-primary shadow-sm text-primary ring-1 ring-primary/40 font-bold"
+                            : "bg-surface border-border hover:border-primary/40 text-text"
+                        )}
+                      >
+                        <span className="text-xl shrink-0">{acc.flag}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold truncate">{acc.label}</p>
+                          <p className="text-[0.65rem] text-text-muted truncate">{acc.desc}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
 }
+

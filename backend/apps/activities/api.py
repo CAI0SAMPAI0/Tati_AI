@@ -489,15 +489,42 @@ def get_listening_materials(request: HttpRequest, level: str = "A1"):
 async def verify_pronunciation(request: HttpRequest, payload: PronunciationVerifyInput):
     """
     Avalia a precisão fonética de uma frase falada pelo aluno.
+    Registra a ofensiva (streak diário) para o aluno sem alterar o XP de ranking.
     """
     try:
-        return await SpeechService.verify_pronunciation_async(
+        user = getattr(request, "auth", None)
+        streak_info = None
+        if user and hasattr(user, "username"):
+            try:
+                from apps.users.services import StreakService
+                from asgiref.sync import sync_to_async
+                rec = await sync_to_async(StreakService.record_activity)(user)
+                streak_info = {
+                    "current_streak": rec.current_streak,
+                    "streak_extended": rec.streak_extended,
+                }
+            except Exception as streak_err:
+                logger.debug(f"[SpeechAPI] Erro ao registrar ofensiva/streak: {streak_err}")
+
+        user_accent = payload.accent
+        if not user_accent and user and hasattr(user, "profile"):
+            prof = user.profile if isinstance(user.profile, dict) else {}
+            user_accent = prof.get("preferred_accent") or prof.get("accent")
+        user_accent = user_accent or "en-US"
+
+        res = await SpeechService.verify_pronunciation_async(
             target=payload.target_phrase,
             spoken=payload.spoken_phrase,
             threshold=payload.accuracy_threshold or 70.0,
             audio_b64=payload.audio,
             reference_text=payload.reference_text,
+            accent=user_accent,
         )
+
+        if streak_info and res.metadata is not None:
+            res.metadata["streak"] = streak_info
+
+        return res
     except Exception as e:
         logger.error(f"[SpeechAPI] Erro ao verificar pronúncia: {e}", exc_info=True)
         target = payload.target_phrase or payload.reference_text or ""
@@ -774,18 +801,22 @@ def get_hub_page(
     ):
         user = request.user
 
-    # Validação obrigatória de autorização para o material solicitado
-    try:
-        HubService.get_content_access(user, content_id)
-    except HttpError as auth_err:
-        return HttpResponse(
-            json.dumps({"detail": getattr(auth_err, "message", "Acesso bloqueado.")}),
-            status=getattr(auth_err, "status_code", 403),
-            content_type="application/json",
-        )
+    is_cover = (page_index == 0)
+    if not is_cover:
+        # Validação obrigatória de autorização para páginas internas (1, 2, ...)
+        try:
+            HubService.get_content_access(user, content_id)
+        except HttpError as auth_err:
+            return HttpResponse(
+                json.dumps({"detail": getattr(auth_err, "message", "Acesso bloqueado.")}),
+                status=getattr(auth_err, "status_code", 403),
+                content_type="application/json",
+            )
 
     if user:
         email = getattr(user, "email", "") or getattr(user, "username", "Tati AI")
+    elif is_cover:
+        email = "Taty's Materials · Preview"
 
     try:
 
@@ -839,10 +870,29 @@ def get_hub_page(
         # 1. Verifica no cache em memória
         file_data = _RAW_IMAGE_CACHE.get(storage_path)
 
-        # 2. Verifica no disco local persistente (MEDIA_ROOT/hub_pages/{content_id}/page_{page_index+1}.webp)
         media_root = getattr(settings, "MEDIA_ROOT", "/app/media")
         local_dir = os.path.join(media_root, "hub_pages", content_id)
         local_file = os.path.join(local_dir, f"page_{page_index + 1}.webp")
+
+        # 2. Se for URL remota (Cloudinary/Supabase/CDN), baixa diretamente e armazena em cache
+        if not file_data and str(storage_path).startswith("http"):
+            try:
+                import httpx
+                with httpx.Client(timeout=15.0) as client:
+                    resp = client.get(storage_path)
+                    if resp.status_code == 200:
+                        file_data = resp.content
+                        _RAW_IMAGE_CACHE[storage_path] = file_data
+                        try:
+                            os.makedirs(local_dir, exist_ok=True)
+                            with open(local_file, "wb") as f:
+                                f.write(file_data)
+                        except Exception:
+                            pass
+            except Exception as net_err:
+                logger.warning(f"[Hub] Erro ao baixar página remota {storage_path}: {net_err}")
+
+        # 3. Verifica no disco local persistente (MEDIA_ROOT/hub_pages/{content_id}/page_{page_index+1}.webp)
         if not file_data and os.path.exists(local_file):
             try:
                 with open(local_file, "rb") as f:
@@ -851,9 +901,7 @@ def get_hub_page(
             except Exception:
                 pass
 
-        # 3. Se não houver arquivo no disco do volume e existir content_source, sincroniza sob demanda.
-        # O sync é protegido por lock por material: as requisições simultâneas das demais
-        # páginas aguardam a mesma conversão (em vez de disparar várias instâncias do LibreOffice).
+        # 4. Se não houver arquivo no disco do volume e existir content_source, sincroniza sob demanda.
         if not file_data and content_source:
             try:
                 from .tasks import sync_material_pages
@@ -863,7 +911,7 @@ def get_hub_page(
                 if m and sync_material_pages(m, wait_timeout=100.0):
                     file_data = _RAW_IMAGE_CACHE.get(
                         f"{content_id}/page_{page_index + 1}.webp"
-                    )
+                    ) or _RAW_IMAGE_CACHE.get(storage_path)
                     if not file_data and os.path.exists(local_file):
                         with open(local_file, "rb") as f:
                             file_data = f.read()
@@ -873,24 +921,25 @@ def get_hub_page(
                     f"[Hub] Erro no auto-sync sob demanda para {content_id}: {sync_err}"
                 )
 
-        # 4. Sem imagem real: nunca devolve placeholder. Responde 503 (sem cache) para o
+        # 5. Sem imagem real: nunca devolve placeholder. Responde 503 (sem cache) para o
         # visualizador exibir "carregando" e re-tentar até a página real ficar pronta.
         if not file_data:
             return _hub_page_unavailable()
 
+        cache_header = "public, max-age=86400" if is_cover else "private, max-age=3600"
         try:
             watermarked = apply_watermark(file_data, email)
             return HttpResponse(
                 watermarked,
                 content_type="image/webp",
-                headers={"Cache-Control": "private, max-age=3600"},
+                headers={"Cache-Control": cache_header},
             )
         except Exception as e:
             logger.warning(f"[Hub] Erro ao aplicar watermark: {e}")
             return HttpResponse(
                 file_data,
                 content_type="image/webp",
-                headers={"Cache-Control": "private, max-age=3600"},
+                headers={"Cache-Control": cache_header},
             )
 
     except Exception as fatal_err:

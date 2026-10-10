@@ -284,6 +284,7 @@ def get_tati_system_prompt(
         + voice_clause
         + time_instruction
         + "\n     c) Se o aluno usar palavras em português (como 'oi', 'tchau', 'obrigado', 'de nada', 'por favor', 'porque', 'como', 'coriza', 'dor de cabeça', 'remédio', 'azia') ou perguntar como se diz algo: ensine o termo correto em inglês com carinho logo no início (ex: \"In English, 'coriza' is called a 'runny nose'!\") e utilize o vocabulário novo na resposta para ele praticar."
+        + "\n     d) PRONÚNCIA E COMPARAÇÃO DE ÁUDIO: Quando o aluno enviar áudio/falar por voz ou cometer um deslize de pronúncia ou fonema, ensine a articulação correta e pergunte calorosamente se ele quer ouvir a sua pronúncia para comparar com a dele (ex: 'Quer ouvir como eu pronuncio para comparar com a sua voz?' ou 'Would you like to hear how I pronounce it and compare with your recording?')."
     )
 
     level_guidelines = {
@@ -626,6 +627,7 @@ class AIService:
         origin: Optional[str] = "chat",
         on_token: Optional[Callable[[str], None]] = None,
         on_doc: Optional[Callable[[dict], None]] = None,
+        user_audio_b64: Optional[str] = None,
     ) -> dict:
         # Verifica se esta conversa é uma sessão de nivelamento ativa
         from .leveling_service import LevelingService
@@ -659,12 +661,13 @@ class AIService:
         if conv and conv.username != user.username and not getattr(user, "is_teacher", False):
             raise HttpError(403, "Acesso não autorizado a esta conversa.")
 
-        # 1. Salva mensagem do usuário
+        # 1. Salva mensagem do usuário com áudio da voz (se houver)
         Message.objects.create(
             session_id=conversation_id,
             username=user.username,
             role="user",
             content=clean_user_text or user_text,
+            audio_b64=user_audio_b64,
         )
 
         # 2. Constrói histórico com Compressão e Retenção de Dados

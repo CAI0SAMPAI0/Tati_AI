@@ -6,11 +6,13 @@ import type { Message } from '@/lib/api/types';
 import { cn, parseAIResponse } from '@/lib/utils';
 import { ClickableText } from './clickable-text';
 import { AudioPlayer } from './audio-player';
-import React, { useState, useMemo, useEffect } from 'react';
-import { Pencil, Check, X, Copy, RotateCcw, FileText, Download, ExternalLink, Presentation, FileCode2, File } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Pencil, Check, X, Copy, RotateCcw, FileText, Download, ExternalLink, Presentation, FileCode2, File, Volume2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/providers/auth-provider';
 import { TatiLogo } from '@/components/ui/tati-logo';
+import { apiPost } from '@/lib/api/client';
+import { ENDPOINTS } from '@/lib/api/endpoints';
 
 interface MessageBubbleProps {
   message: Message;
@@ -27,6 +29,75 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
   const [editContent, setEditContent] = useState(message.content);
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isPlayingUser, setIsPlayingUser] = useState(false);
+  const [isPlayingCorrection, setIsPlayingCorrection] = useState(false);
+  const [isLoadingCorrection, setIsLoadingCorrection] = useState(false);
+
+  const userAudioRef = useRef<HTMLAudioElement | null>(null);
+  const correctionAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (userAudioRef.current) {
+        userAudioRef.current.pause();
+        userAudioRef.current = null;
+      }
+      if (correctionAudioRef.current) {
+        correctionAudioRef.current.pause();
+        correctionAudioRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleToggleUserAudio = () => {
+    if (!message.audio_b64) return;
+    if (isPlayingUser && userAudioRef.current) {
+      userAudioRef.current.pause();
+      setIsPlayingUser(false);
+      return;
+    }
+    if (!userAudioRef.current) {
+      userAudioRef.current = new Audio(`data:audio/mp3;base64,${message.audio_b64}`);
+      userAudioRef.current.onplay = () => setIsPlayingUser(true);
+      userAudioRef.current.onpause = () => setIsPlayingUser(false);
+      userAudioRef.current.onended = () => setIsPlayingUser(false);
+    }
+    if (userAudioRef.current.ended) {
+      userAudioRef.current.currentTime = 0;
+    }
+    userAudioRef.current.play().catch(console.error);
+  };
+
+  const handlePlayCorrectionAudio = async (textToPlay: string) => {
+    if (isPlayingCorrection && correctionAudioRef.current) {
+      correctionAudioRef.current.pause();
+      setIsPlayingCorrection(false);
+      return;
+    }
+
+    if (correctionAudioRef.current) {
+      correctionAudioRef.current.currentTime = 0;
+      correctionAudioRef.current.play().catch(console.error);
+      return;
+    }
+
+    setIsLoadingCorrection(true);
+    try {
+      const res = await apiPost<{ audio: string }>(ENDPOINTS.CHAT_TTS, { text: textToPlay });
+      if (res.ok && res.data.audio) {
+        const audio = new Audio(`data:audio/mp3;base64,${res.data.audio}`);
+        correctionAudioRef.current = audio;
+        audio.onplay = () => setIsPlayingCorrection(true);
+        audio.onpause = () => setIsPlayingCorrection(false);
+        audio.onended = () => setIsPlayingCorrection(false);
+        audio.play().catch(console.error);
+      }
+    } catch (err) {
+      console.error('Error playing correction audio:', err);
+    } finally {
+      setIsLoadingCorrection(false);
+    }
+  };
 
   const parsed = useMemo(() => parseAIResponse(message.content), [message.content]);
 
@@ -305,6 +376,18 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
                       {userAttachmentData.cleanText && (
                         <p className="whitespace-pre-wrap">{userAttachmentData.cleanText}</p>
                       )}
+                      {message.audio_b64 && (
+                        <div className="pt-1">
+                          <button
+                            type="button"
+                            onClick={handleToggleUserAudio}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-semibold backdrop-blur-sm transition-all active:scale-95 shadow-sm"
+                          >
+                            <Volume2 size={13} className={isPlayingUser ? "animate-pulse" : ""} />
+                            <span>{isPlayingUser ? "Pause audio" : "Listen to your voice"}</span>
+                          </button>
+                        </div>
+                      )}
                       {userAttachmentData.attachments.length > 0 && (
                         <div className="flex flex-col gap-1.5 pt-1">
                           {userAttachmentData.attachments.map((att, idx) => {
@@ -388,11 +471,30 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
                       </div>
 
                       {parsed.correction && (
-                        <div className="mt-2 text-xs bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/20 text-amber-700 dark:text-amber-300 rounded-xl p-2.5 flex items-start gap-2 max-w-full text-left">
-                          <span className="text-base select-none">💡</span>
-                          <div className="flex-1">
-                            <span className="font-bold text-amber-800 dark:text-amber-200">Tati noticed: </span>
-                            <span className="italic">{parsed.correction}</span>
+                        <div className="mt-2 text-xs bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/20 text-amber-700 dark:text-amber-300 rounded-xl p-3 flex flex-col gap-2 max-w-full text-left">
+                          <div className="flex items-start gap-2">
+                            <span className="text-base select-none">💡</span>
+                            <div className="flex-1">
+                              <span className="font-bold text-amber-800 dark:text-amber-200">Teacher Tati noticed: </span>
+                              <span className="italic">{parsed.correction}</span>
+                            </div>
+                          </div>
+                          <div className="pt-1.5 border-t border-amber-500/20 flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handlePlayCorrectionAudio(parsed.correction || '')}
+                              disabled={isLoadingCorrection}
+                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 dark:text-amber-200 text-[0.7rem] font-bold transition-all disabled:opacity-50 active:scale-95 shadow-sm"
+                            >
+                              <Volume2 size={12} className={isPlayingCorrection ? "animate-pulse text-amber-600" : ""} />
+                              <span>
+                                {isLoadingCorrection
+                                  ? "Carregando áudio..."
+                                  : isPlayingCorrection
+                                    ? "Pausar pronúncia da Tati"
+                                    : "Ouvir como a Teacher Tati pronuncia"}
+                              </span>
+                            </button>
                           </div>
                         </div>
                       )}

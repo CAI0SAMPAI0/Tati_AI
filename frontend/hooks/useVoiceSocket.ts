@@ -213,6 +213,9 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
           setMessages((prev) => {
             // Remove apenas as mensagens que EXPLICITAMENTE começam com o prefixo temporário
             // Mensagens sem ID ou com IDs normais são mantidas
+            const tempMsg = prev.find(m => m.id && typeof m.id === 'string' && (m.id.startsWith('voice-temp-') || m.id.startsWith('live-temp-')));
+            const prevAudio = tempMsg?.audio_b64;
+
             const filtered = prev.filter(m => {
               if (m.id && typeof m.id === 'string' && (m.id.startsWith('voice-temp-') || m.id.startsWith('live-temp-'))) {
                 return false;
@@ -227,6 +230,7 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
               conversation_id: currentId || '',
               role: 'user',
               content: msg.text || '',
+              audio_b64: prevAudio,
               created_at: new Date().toISOString(),
             };
             return [...filtered, newUserMsg];
@@ -368,6 +372,7 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
       conversation_id: convId,
       role: 'user',
       content: '🎙 Transcribing...',
+      audio_b64: base64,
       created_at: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, tempUserMsg]);

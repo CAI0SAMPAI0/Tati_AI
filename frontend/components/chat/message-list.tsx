@@ -149,7 +149,7 @@ export function MessageList({ messages, isStreaming, streamingContent, conversat
           </header>
 
           {onStartLeveling && (
-            <article className="w-full rounded-2xl border border-border bg-surface p-6 text-left shadow-sm hover:border-primary/40 transition-all mb-6">
+            <article className="w-full md:max-w-xl xl:max-w-2xl h-auto rounded-2xl border border-border bg-surface p-6 text-left shadow-sm hover:border-primary/40 transition-all mb-6 mx-auto">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <span className="p-1.5 rounded-lg bg-primary/10 text-primary">

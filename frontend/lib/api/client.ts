@@ -139,29 +139,52 @@ async function parseResponseBody<T>(res: Response): Promise<T | null> {
   }
 }
 
+let refreshPromise: Promise<boolean> | null = null;
+
 async function tryRefreshToken(): Promise<boolean> {
   if (!REFRESH_PATH) return false;
   const refreshToken = getRefreshToken();
   if (!refreshToken) return false;
 
-  const refreshUrl = resolvePath(REFRESH_PATH);
-  try {
-    const response = await fetch(refreshUrl, {
-      method: 'POST',
-      headers: buildHeaders({ 'Content-Type': 'application/json' }, false),
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    });
-    if (!response.ok) return false;
-
-    const payload = (await parseResponseBody<{ access_token?: string }>(response)) ?? {};
-    if (!payload.access_token) return false;
-    localStorage.setItem('token', payload.access_token);
-    const { setAuthTokenCookie } = await import('./auth-cookie');
-    setAuthTokenCookie(payload.access_token);
-    return true;
-  } catch {
-    return false;
+  // Deduplica requisições concorrentes de renovação: se múltiplas chamadas
+  // receberem 401 juntas, todas aguardam a mesma Promise sem duplicar POSTs
+  if (refreshPromise) {
+    return refreshPromise;
   }
+
+  refreshPromise = (async () => {
+    const refreshUrl = resolvePath(REFRESH_PATH);
+    try {
+      const response = await fetch(refreshUrl, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!response.ok) return false;
+
+      const payload = (await parseResponseBody<{ access_token?: string; refresh_token?: string; user?: unknown }>(response)) ?? {};
+      if (!payload.access_token) return false;
+      localStorage.setItem('token', payload.access_token);
+      if (payload.refresh_token) {
+        localStorage.setItem('refresh_token', payload.refresh_token);
+      }
+      if (payload.user) {
+        localStorage.setItem('user', JSON.stringify(payload.user));
+      }
+      const { setAuthTokenCookie } = await import('./auth-cookie');
+      setAuthTokenCookie(payload.access_token);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
 }
 
 async function request(path: string, options: RequestOptions = {}): Promise<Response> {
@@ -186,17 +209,39 @@ async function request(path: string, options: RequestOptions = {}): Promise<Resp
       });
 
       if (response.status === 401 && auth && retry401 && !_retried) {
-        const refreshed = await tryRefreshToken();
-        if (refreshed) {
-          return request(path, { ...options, _retried: true });
+        // 1. Verifica se outra aba ou requisição concorrente acabou de renovar o token no localStorage
+        const currentToken = getToken();
+        const sentToken = (headers?.Authorization || headers?.authorization || '').replace(/^Bearer\s+/i, '');
+        if (currentToken && sentToken && currentToken !== sentToken) {
+          const freshHeaders = { ...(headers || {}) };
+          delete freshHeaders.Authorization;
+          delete freshHeaders.authorization;
+          const retryRes = await request(path, { ...options, headers: freshHeaders, _retried: true });
+          if (retryRes.status !== 401) {
+            return retryRes;
+          }
         }
 
-        await sleep(800);
-        const retryResponse = await request(path, { ...options, retry401: false, _retried: true });
-        if (retryResponse.status === 401) {
+        // 2. Tenta renovar o token via Refresh Token
+        const refreshed = await tryRefreshToken();
+        if (refreshed) {
+          const freshHeaders = { ...(headers || {}) };
+          delete freshHeaders.Authorization;
+          delete freshHeaders.authorization;
+          return request(path, { ...options, headers: freshHeaders, _retried: true });
+        }
+
+        // 3. Se a renovação falhou, só desconecta se o endpoint for crítico de identidade e sessão.
+        // Falhas transitórias em rotas secundárias (/streak, /due, métricas) nunca devem derrubar a sessão ativa.
+        const isAuthCriticalEndpoint =
+          path.includes('/profile') ||
+          path.includes('/auth/me') ||
+          path.includes('/users/permissions');
+
+        if (isAuthCriticalEndpoint) {
           onUnauthorized?.();
         }
-        return retryResponse;
+        return response;
       }
 
       // Se for erro transitório do proxy da Hugging Face (502 Bad Gateway, 503, 504) e for GET, tenta novamente com backoff

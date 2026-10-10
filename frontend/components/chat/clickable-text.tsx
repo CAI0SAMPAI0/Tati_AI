@@ -10,20 +10,24 @@ interface ClickableTextProps {
   className?: string;
 }
 
+export function splitIntoSentences(input: string): string[] {
+  if (!input) return [];
+  const regex = /(?<!\b(?:e\.g|i\.e|etc|vs|dr|mr|mrs|ms|prof|st|\d)\.)(?<=[.!?]["'”’»\)]*)\s+|\n+/i;
+  return input.split(regex).map(s => s.trim()).filter(Boolean);
+}
+
 export function formatSentenceForTranslation(sentenceText: string): string {
   let clean = sentenceText.trim();
   if (!clean) return '';
-  // Se estiver envolvida em parênteses ou aspas externas (ex: (e.g., "The weather is nice today.")), desempacota
-  clean = clean.replace(/^[\(\["'“‘]+|[\)\]"'”’]+$/g, '').trim();
-  if (!clean) return sentenceText.trim();
-
-  const firstPeriodIdx = clean.indexOf('.');
-  // Regra: se a frase for longa (acima de 100 caracteres) e contiver ponto final,
-  // utiliza o conteúdo desde o início até o primeiro ponto final.
-  if (clean.length > 100 && firstPeriodIdx !== -1) {
-    return clean.slice(0, firstPeriodIdx + 1).trim();
+  // Se toda a frase estiver entre aspas ou parênteses externos (ex: "The weather is nice today."), desempacota
+  if (
+    (/^["'“‘]/.test(clean) && /["'”’]$/.test(clean)) ||
+    (/^\(/.test(clean) && /\)$/.test(clean)) ||
+    (/^\[/.test(clean) && /\]$/.test(clean))
+  ) {
+    clean = clean.slice(1, -1).trim();
   }
-  return clean;
+  return clean || sentenceText.trim();
 }
 
 export const ClickableText = React.memo(function ClickableText({
@@ -99,8 +103,7 @@ export const ClickableText = React.memo(function ClickableText({
 
   if (!isMarkdown) {
     if (tooltipMode === 'sentence') {
-      // Divide em frases protegendo abreviações como e.g., i.e., etc.
-      const sentences = rawContent.split(/(?<!\b(?:e\.g|i\.e|etc|mr|mrs|ms|dr))\s*(?<=[.!?\n])\s+/i);
+      const sentences = splitIntoSentences(rawContent);
       return (
         <div className={cn("whitespace-pre-wrap", className)} onClick={handleClick}>
           {sentences.map((sent, i) => {
@@ -162,7 +165,7 @@ function wrapChildren(children: React.ReactNode, mode: 'sentence' | 'word'): Rea
   return React.Children.map(children, (child) => {
     if (typeof child === 'string') {
       if (mode === 'sentence') {
-        const sentences = child.split(/(?<!\b(?:e\.g|i\.e|etc|mr|mrs|ms|dr))\s*(?<=[.!?])\s+/i);
+        const sentences = splitIntoSentences(child);
         return sentences.map((sent, i) => {
           if (!sent.trim()) return sent;
           return (

@@ -544,7 +544,7 @@ function VoicePageContent() {
                 <button
                   onClick={handleCycleAccent}
                   onWheel={handleWheelAccent}
-                  title="Clique para alternar ou use a roda do mouse para trocar de sotaque"
+                  title="Click to cycle or use mouse wheel to change accent"
                   className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-0.5 sm:py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 border border-primary/30 shadow-sm text-[9px] sm:text-[11px] font-bold text-primary transition-all active:scale-95 cursor-pointer group select-none"
                 >
                   {isChangingAccent ? (
@@ -557,7 +557,7 @@ function VoicePageContent() {
 
                 <button
                   onClick={() => setIsAccentMenuOpen(true)}
-                  title="Ver e escolher todos os sotaques"
+                  title="View and choose all accents"
                   className="p-1 sm:p-1.5 rounded-full bg-white/50 dark:bg-[#1a1c2e]/60 border border-white/60 dark:border-white/10 text-text-muted hover:text-primary transition-all active:scale-95 shadow-md text-xs flex items-center justify-center cursor-pointer"
                 >
                   <Globe size={14} className="text-primary" />
@@ -601,9 +601,9 @@ function VoicePageContent() {
               <div className="flex items-center justify-between border-b border-border/40 pb-3 shrink-0">
                 <div className="space-y-0.5">
                   <h3 className="text-base sm:text-lg font-black text-text flex items-center gap-2">
-                    <span>🌎</span> Sotaques em Inglês (Edge TTS)
+                    <span>🌎</span> English Accents (Edge TTS)
                   </h3>
-                  <p className="text-xs text-text-muted">A Teacher Tati responderá com a pronúncia selecionada</p>
+                  <p className="text-xs text-text-muted">Teacher Tati will respond with the selected accent</p>
                 </div>
                 <button
                   onClick={() => setIsAccentMenuOpen(false)}
@@ -741,28 +741,28 @@ function VoicePageContent() {
           )}
         </div>
 
-        <footer className="p-2 sm:p-4 md:p-6 bg-white/95 dark:bg-[#0a0b14]/95 border-t border-border shrink-0 pb-safe">
-          <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center gap-4 md:gap-8">
-            <div className="flex-1 w-full bg-white/30 dark:bg-white/5 rounded-2xl sm:rounded-3xl p-2 sm:p-4 space-y-2 shadow-lg border border-white/20">
-              <div className="flex items-center gap-2 sm:gap-4">
-                <button onClick={togglePlayback} disabled={!audioRef.current?.src} className={cn("w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center transition-all shadow-md active:scale-90", state === 'speaking' ? "bg-danger text-white" : "bg-primary text-white hover:scale-105")}>
+        <footer className="p-2 sm:p-4 md:p-6 bg-white/95 dark:bg-[#0a0b14]/95 border-t border-border shrink-0 pb-safe max-w-full overflow-x-hidden">
+          <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center gap-4 md:gap-8 w-full max-w-full overflow-x-hidden">
+            <div className="flex-1 w-full max-w-full bg-white/30 dark:bg-white/5 rounded-2xl sm:rounded-3xl p-2 sm:p-4 space-y-2 shadow-lg border border-white/20 overflow-x-hidden">
+              <div className="flex items-center gap-2 sm:gap-4 max-w-full overflow-x-hidden">
+                <button onClick={togglePlayback} disabled={!audioRef.current?.src} className={cn("w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center transition-all shadow-md active:scale-90 shrink-0", state === 'speaking' ? "bg-danger text-white" : "bg-primary text-white hover:scale-105")}>
                   {state === 'speaking' ? <Square size={16} fill="white" /> : <Play size={16} fill="white" className="ml-0.5" />}
                 </button>
-                <div className="flex-1 space-y-1">
+                <div className="flex-1 min-w-0 space-y-1">
                   <div className="flex items-center gap-2 sm:gap-3">
-                    <span className="text-[7px] sm:text-[9px] tabular-nums text-text-muted w-5 sm:w-7">{Math.floor(currentTime / 60)}:{(currentTime % 60).toFixed(0).padStart(2, '0')}</span>
-                    <input type="range" min="0" max={duration || 0} step="0.1" value={currentTime} onChange={(e) => handleSeek(parseFloat(e.target.value))} className="flex-1 h-1 bg-black/10 dark:bg-white/10 rounded-full appearance-none cursor-pointer accent-primary" />
-                    <span className="text-[7px] sm:text-[9px] tabular-nums text-text-muted w-5 sm:w-7">{Math.floor(duration / 60)}:{(duration % 60).toFixed(0).padStart(2, '0')}</span>
+                    <span className="text-[7px] sm:text-[9px] tabular-nums text-text-muted w-5 sm:w-7 shrink-0">{Math.floor(currentTime / 60)}:{(currentTime % 60).toFixed(0).padStart(2, '0')}</span>
+                    <input type="range" min="0" max={duration || 0} step="0.1" value={currentTime} onChange={(e) => handleSeek(parseFloat(e.target.value))} className="flex-1 h-1 bg-black/10 dark:bg-white/10 rounded-full appearance-none cursor-pointer accent-primary min-w-[50px]" />
+                    <span className="text-[7px] sm:text-[9px] tabular-nums text-text-muted w-5 sm:w-7 shrink-0">{Math.floor(duration / 60)}:{(duration % 60).toFixed(0).padStart(2, '0')}</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 sm:gap-4">
-                      <div className="flex items-center gap-1.5 group">
-                        <Volume2 size={10} className="text-text-muted group-hover:text-primary transition-colors" />
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+                      <div className="flex items-center gap-1.5 group shrink-0">
+                        <Volume2 size={10} className="text-text-muted group-hover:text-primary transition-colors shrink-0" />
                         <input type="range" min="0" max="1" step="0.01" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="w-12 sm:w-16 h-0.5 bg-black/10 dark:bg-white/10 rounded-full appearance-none cursor-pointer accent-primary" />
                       </div>
-                      <div className="flex items-center gap-1.5 sm:gap-2">
+                      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                         {[0.75, 1, 1.25, 1.5].map(v => (
-                          <button key={v} onClick={() => setSpeed(v)} className={cn("text-[7px] sm:text-[9px] font-black transition-all px-1 rounded-sm", speed === v ? "text-primary bg-primary/5" : "text-text-muted hover:text-text")}>{v}x</button>
+                          <button key={v} onClick={() => setSpeed(v)} className={cn("text-[7px] sm:text-[9px] font-black transition-all px-1 rounded-sm shrink-0", speed === v ? "text-primary bg-primary/5" : "text-text-muted hover:text-text")}>{v}x</button>
                         ))}
                       </div>
                     </div>

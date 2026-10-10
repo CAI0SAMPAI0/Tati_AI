@@ -464,6 +464,7 @@ export function useChatSocket(conversationId: string | null) {
         conversation_id: currentId || '',
         role: 'user',
         content: '🎙 Transcribing...',
+        audio_b64: base64,
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, newUserMsg]);

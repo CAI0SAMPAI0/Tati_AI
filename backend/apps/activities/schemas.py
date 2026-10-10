@@ -118,6 +118,7 @@ class WordResultOut(BaseModel):
     score: float
     accuracy: str
     error_type: Optional[str] = None
+    tip: Optional[str] = None # dica para alguma palavra, como coloque a língua entre os dentes
 
 
 class PronunciationVerifyInput(BaseModel):
@@ -126,6 +127,8 @@ class PronunciationVerifyInput(BaseModel):
     target_phrase: Optional[str] = None
     spoken_phrase: Optional[str] = None
     accuracy_threshold: Optional[float] = 70.0
+    accent: Optional[str] = "en-US"
+
 
 
 class PronunciationVerifyOut(BaseModel):
@@ -133,6 +136,8 @@ class PronunciationVerifyOut(BaseModel):
     transcription: Optional[str] = ""
     words: Optional[List[WordResultOut]] = []
     feedback: str
+    pedagogical_tip: Optional[str] = "" # Dica prática da Teacher Tati em português/inglês
+    suggested_sentence: Optional[str] = "" # Frase correta e natural sugerida pela Teacher Tati
     correct_audio: Optional[str] = ""
     target: Optional[str] = ""
     recognized: Optional[str] = ""

@@ -6,6 +6,8 @@ import type { Message } from '@/lib/api/types';
 import { cn, parseAIResponse } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { ClickableText } from './clickable-text';
+import { apiPost } from '@/lib/api/client';
+import { ENDPOINTS } from '@/lib/api/endpoints';
 
 interface VoiceMessageBubbleProps {
   message: Message;
@@ -22,7 +24,10 @@ export function VoiceMessageBubble({
 }: VoiceMessageBubbleProps) {
   const isUser = message.role === 'user';
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlayingCorrection, setIsPlayingCorrection] = useState(false);
+  const [isLoadingCorrection, setIsLoadingCorrection] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const correctionAudioRef = useRef<HTMLAudioElement | null>(null);
   const [copied, setCopied] = useState(false);
 
   const parsed = parseAIResponse(message.content);
@@ -35,6 +40,19 @@ export function VoiceMessageBubble({
     toast.success('Copied to clipboard!');
     setTimeout(() => setCopied(false), 2000);
   };
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (correctionAudioRef.current) {
+        correctionAudioRef.current.pause();
+        correctionAudioRef.current = null;
+      }
+    };
+  }, []);
 
   // Sincroniza o áudio se ele mudar (durante o stream ou após carregar)
   useEffect(() => {
@@ -64,11 +82,41 @@ export function VoiceMessageBubble({
     if (isPlaying) {
       audioRef.current.pause();
     } else {
-      // Se já terminou, volta pro início para poder repetir
       if (audioRef.current.ended || audioRef.current.currentTime > 0) {
         audioRef.current.currentTime = 0;
       }
       audioRef.current.play().catch(console.error);
+    }
+  };
+
+  const handlePlayCorrection = async (textToPlay: string) => {
+    if (isPlayingCorrection && correctionAudioRef.current) {
+      correctionAudioRef.current.pause();
+      setIsPlayingCorrection(false);
+      return;
+    }
+
+    if (correctionAudioRef.current) {
+      correctionAudioRef.current.currentTime = 0;
+      correctionAudioRef.current.play().catch(console.error);
+      return;
+    }
+
+    setIsLoadingCorrection(true);
+    try {
+      const res = await apiPost<{ audio: string }>(ENDPOINTS.CHAT_TTS, { text: textToPlay });
+      if (res.ok && res.data.audio) {
+        const audio = new Audio(`data:audio/mp3;base64,${res.data.audio}`);
+        correctionAudioRef.current = audio;
+        audio.onplay = () => setIsPlayingCorrection(true);
+        audio.onpause = () => setIsPlayingCorrection(false);
+        audio.onended = () => setIsPlayingCorrection(false);
+        audio.play().catch(console.error);
+      }
+    } catch (err) {
+      console.error('Error playing correction audio:', err);
+    } finally {
+      setIsLoadingCorrection(false);
     }
   };
 
@@ -89,6 +137,15 @@ export function VoiceMessageBubble({
         </span>
       </div>
       <div className="flex items-end gap-2 relative">
+        {isUser && !isTranscribing && message.audio_b64 && (
+          <button
+            onClick={toggleAudio}
+            className="p-2 rounded-full border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary transition-all duration-300 shadow-md flex items-center justify-center shrink-0 active:scale-90"
+            title="Listen to your voice"
+          >
+            {isPlaying ? <Pause size={12} /> : <Play size={12} />}
+          </button>
+        )}
         {isUser && !isTranscribing && (
           <button
             onClick={handleCopy}
@@ -131,11 +188,30 @@ export function VoiceMessageBubble({
                 />
               </div>
               {parsed.correction && (
-                <div className="mt-2 text-xs bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/20 text-amber-700 dark:text-amber-300 rounded-xl p-2.5 flex items-start gap-2 max-w-full text-left">
-                  <span className="text-base select-none">💡</span>
-                  <div className="flex-1">
-                    <span className="font-bold text-amber-800 dark:text-amber-200">Tati noticed: </span>
-                    <span className="italic">{parsed.correction}</span>
+                <div className="mt-2 text-xs bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/20 text-amber-700 dark:text-amber-300 rounded-xl p-3 flex flex-col gap-2 max-w-full text-left">
+                  <div className="flex items-start gap-2">
+                    <span className="text-base select-none">💡</span>
+                    <div className="flex-1">
+                      <span className="font-bold text-amber-800 dark:text-amber-200">Teacher Tati noticed: </span>
+                      <span className="italic">{parsed.correction}</span>
+                    </div>
+                  </div>
+                  <div className="pt-1.5 border-t border-amber-500/20 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handlePlayCorrection(parsed.correction || '')}
+                      disabled={isLoadingCorrection}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 dark:text-amber-200 text-[0.7rem] font-bold transition-all disabled:opacity-50 active:scale-95 shadow-sm"
+                    >
+                      <Volume2 size={12} className={isPlayingCorrection ? "animate-pulse text-amber-600" : ""} />
+                      <span>
+                        {isLoadingCorrection
+                          ? "Carregando áudio..."
+                          : isPlayingCorrection
+                            ? "Pausar pronúncia da Tati"
+                            : "Ouvir pronúncia da Teacher Tati"}
+                      </span>
+                    </button>
                   </div>
                 </div>
               )}

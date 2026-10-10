@@ -387,7 +387,11 @@ export default function PublicCefrTestPage() {
 
       // Se a conta foi criada e recebemos tokens, salva a sessão e redireciona
       if (wantAccount && data.token_response?.access_token) {
-        await saveSession(data.token_response.access_token, data.token_response.user);
+        await saveSession(
+          data.token_response.access_token,
+          data.token_response.user,
+          data.token_response.refresh_token
+        );
         toast.success('Conta criada com sucesso! Redirecionando para a Teacher Tati...', {
           duration: 3000,
         });

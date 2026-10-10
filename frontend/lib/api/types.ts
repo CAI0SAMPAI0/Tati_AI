@@ -44,6 +44,8 @@ export interface User {
 
 export interface AuthLoginResponse {
   access_token: string;
+  token_type?: string;
+  refresh_token?: string;
   user: User;
 }
 

@@ -265,56 +265,58 @@ class AudioService:
             return ""
 
         try:
-            from google.genai import types
-
-            model = os.getenv("GEMINI_AUDIO_MODEL", "gemini-3.5-transcribe")
-            contents = [
-                types.Part.from_bytes(data=audio_bytes, mime_type=mime_type),
+            models_to_try = [
+                os.getenv("GEMINI_AUDIO_MODEL", "gemini-3.5-flash-lite"),
+                "gemini-3.5-flash-lite",
+                "gemini-3.8-flash",
+                "gemini-3.5-flash",
+                "gemini-3.5-transcribe",
             ]
+            unique_models = []
+            for m in models_to_try:
+                if m and m not in unique_models and "2.5" not in m and "2.0" not in m and "1.5" not in m:
+                    unique_models.append(m)
+
             instruction = (
                 prompt
-                or "Transcribe the audio speech accurately. Preserve the language spoken (English or Portuguese). "
-                "Output only the verbatim transcription without markdown, introductions or commentary."
+                or "Transcribe the audio speech verbatim and accurately, preserving ESL pronunciation, accents, and mixed English/Portuguese without translating or normalizing words. "
+                "Output only the verbatim spoken words without markdown, introductions or commentary."
             )
-            contents.append(instruction)
 
-            resp = await client.aio.models.generate_content(
-                model=model,
-                contents=contents,
-                config=types.GenerateContentConfig(temperature=0.0),
-            )
-            if not resp or not resp.candidates:
-                return ""
+            for model in unique_models:
+                try:
+                    from google.genai import types
 
-            cand = resp.candidates[0]
-            if cand.content and cand.content.parts:
-                for part in cand.content.parts:
-                    if hasattr(part, "audio_transcription") and part.audio_transcription:
-                        return (part.audio_transcription.text or "").strip()
-                    elif getattr(part, "text", None):
-                        return (part.text or "").strip()
-            return ""
-        except Exception as e:
-            logger.warning(f"[AudioService] Gemini STT falhou ({os.getenv('GEMINI_AUDIO_MODEL', 'gemini-3.5-transcribe')}): {e}")
-            # Fallback secundário para gemini-3.5-flash
-            try:
-                from google.genai import types
-                resp = await client.aio.models.generate_content(
-                    model="gemini-3.5-flash",
-                    contents=[
+                    contents = [
                         types.Part.from_bytes(data=audio_bytes, mime_type=mime_type),
-                        prompt or "Transcribe audio speech verbatim. Output text only."
-                    ],
-                    config=types.GenerateContentConfig(temperature=0.0),
-                )
-                if resp and resp.candidates:
+                        instruction,
+                    ]
+
+                    resp = await client.aio.models.generate_content(
+                        model=model,
+                        contents=contents,
+                        config=types.GenerateContentConfig(temperature=0.0),
+                    )
+                    if not resp or not resp.candidates:
+                        continue
+
                     cand = resp.candidates[0]
                     if cand.content and cand.content.parts:
                         for part in cand.content.parts:
-                            if getattr(part, "text", None):
-                                return (part.text or "").strip()
-            except Exception as e2:
-                logger.warning(f"[AudioService] Fallback Gemini Flash também falhou: {e2}")
+                            if hasattr(part, "audio_transcription") and part.audio_transcription:
+                                text_found = (part.audio_transcription.text or "").strip()
+                                if text_found:
+                                    return text_found
+                            elif getattr(part, "text", None):
+                                text_found = (part.text or "").strip()
+                                if text_found:
+                                    return text_found
+                except Exception as mod_err:
+                    logger.warning(f"[AudioService] Gemini STT ({model}) falhou: {mod_err}")
+
+            return ""
+        except Exception as e:
+            logger.warning(f"[AudioService] Erro ao transcrever com Gemini: {e}")
             return ""
 
     @classmethod
@@ -385,13 +387,32 @@ class AudioService:
             logger.warning("[AudioService] Áudio rejeitado por formato inválido")
             return ""
 
-        # 1. Tentar Groq Whisper como motor primário (< 1 segundo até em áudios longos)
+        provider = os.getenv("STT_PROVIDER", "gemini").lower()
+
+        # 1. Se provedor primário for Gemini e o cliente estiver configurado
+        if provider == "gemini" and get_gemini_client():
+            mime_type = detect_audio_mime_type(audio_bytes)
+            logger.info("[AudioService] Utilizando Gemini Multimodal STT como motor primário...")
+            gemini_text = await cls._transcribe_gemini_async(
+                audio_bytes=audio_bytes, mime_type=mime_type, prompt=prompt
+            )
+            if gemini_text and not is_noise_or_hallucination(gemini_text):
+                logger.info(f"[AudioService] Transcrito com Gemini STT: '{gemini_text[:40]}...'")
+                return gemini_text
+
+            # Fallback para Groq Whisper
+            groq_text = await cls._transcribe_groq_async(audio_bytes=audio_bytes, prompt=prompt)
+            if groq_text and not is_noise_or_hallucination(groq_text):
+                logger.info(f"[AudioService] Fallback para Groq Whisper: '{groq_text[:40]}...'")
+                return groq_text
+
+        # 2. Se provedor primário for Groq Whisper (ou Gemini ausente)
         groq_text = await cls._transcribe_groq_async(audio_bytes=audio_bytes, prompt=prompt)
         if groq_text and not is_noise_or_hallucination(groq_text):
             logger.info(f"[AudioService] Transcrito com Groq Whisper: '{groq_text[:40]}...'")
             return groq_text
 
-        # 2. Fallback resiliente para Google Gemini STT
+        # Fallback para Google Gemini STT
         if get_gemini_client():
             mime_type = detect_audio_mime_type(audio_bytes)
             logger.info("[AudioService] Utilizando Gemini STT como fallback de transcrição...")

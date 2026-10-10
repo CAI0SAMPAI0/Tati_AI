@@ -48,6 +48,7 @@ class SimMessageInput(BaseModel):
     conversation_id: Optional[str] = ""
     accent: Optional[str] = "en-US"
     level: Optional[str] = None
+    audio: Optional[str] = None
 
 
 class SimEvaluateInput(BaseModel):
@@ -444,6 +445,7 @@ async def send_simulation_message(request: HttpRequest, payload: SimMessageInput
                 username=username,
                 role="user",
                 content=content,
+                audio_b64=payload.audio if hasattr(payload, "audio") and payload.audio else None,
             )
         except Exception:
             pass
@@ -473,7 +475,8 @@ async def send_simulation_message(request: HttpRequest, payload: SimMessageInput
                 "- Keep answers engaging and concise (2 to 3 sentences, under 65 words).\n"
                 "- ALWAYS complete every sentence you start. NEVER leave a sentence unfinished or cut off mid-thought.\n"
                 "- Encourage the student and end with ONE clear question to pass the turn.\n"
-                "- Punctual, discreet pedagogical feedback: If the student makes a clear grammar, agreement, verb tense, preposition, or vocabulary error, politely and discreetly point it out AT THE VERY END of your response. NEVER use terms like 'Quick Tip' or formal correction labels. Instead, naturally mention that it sounds more natural in another way (e.g., 'By the way, it sounds more natural to say \"...\" instead of \"...\"')."
+                "- Punctual, discreet pedagogical feedback: If the student makes a clear grammar, agreement, verb tense, preposition, or vocabulary error, politely and discreetly point it out AT THE VERY END of your response. NEVER use terms like 'Quick Tip' or formal correction labels. Instead, naturally mention that it sounds more natural in another way (e.g., 'By the way, it sounds more natural to say \"...\" instead of \"...\"').\n"
+                "- Pronunciation comparison: If you notice a pronunciation, phonetic or phrasing issue, explain the natural articulation and invite the student to compare with your voice (e.g., 'Would you like to hear how I pronounce it and compare with your recording?')."
             ),
         }
     ]

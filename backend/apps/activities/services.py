@@ -36,6 +36,132 @@ from apps.users.services import XPService, StreakService
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
+PRONUNCIATION_TEACHER_PROMPT = """
+Você é a Professora Tatiana Duarte, especialista no ensino de pronúncia e fonética do inglês americano para brasileiros.
+O aluno ouviu e tentou pronunciar a seguinte frase de referência:
+"{target_phrase}"
+
+Ouça o áudio gravado pelo aluno atentamente e analise a pronúncia acústica real com máxima fidelidade:
+
+1. PRECISÃO ACÚSTICA RIGOROSA (SEM VIÉS DE AUTOCORREÇÃO):
+   - NUNCA assuma que o aluno falou a palavra correta apenas porque ela está na frase de referência!
+   - Se o aluno falou um som ou palavra diferente, transcreva EXATAMENTE o que ouviu acusticamente em "transcription".
+   - Se o aluno falou algo COMPLETAMENTE DIFERENTE da frase de referência, ou misturou palavras em português (ex: "Tudo", "né", "tipo") ou desconexas (ex: "Hi I am verb 7 Tudo"):
+     * Registre EXATAMENTE o que foi falado na transcrição ("Hi I am verb 7 Tudo").
+     * A nota geral ("score") DEVE SER BAIXÍSSIMA (0 a 25), pois a fala diverge totalmente do objetivo e/ou contém português!
+     * Todas as palavras que não correspondem à frase de referência ou que são português devem receber "accuracy": "incorrect" e score baixo (0 a 20).
+     Exemplos:
+     * Se o aluno disse "know" (/noʊ/) no lugar de "now" (/naʊ/), registre "know" na transcrição!
+     * Se disse "sink" ou "fink" no lugar de "think", registre o som que ouviu!
+     * Se disse "take-ee" ou omitiu o "k", registre com precisão!
+
+2. VÍCIOS FONÉTICOS E MISTURA DE IDIOMAS PARA ANALISAR:
+   - Trocar vogais abertas por fechadas ou vice-versa (ex: som aberto /aʊ/ de "now/cow" trocado por som fechado /oʊ/ de "know/no").
+   - Vogais longas vs curtas (/iː/ em "sheep/beach" vs /ɪ/ em "ship/bitch").
+   - Trocar o som do "TH" /θ/ ou /ð/ por "S", "F" ou "T" (ex: "think" pronunciado como "sink").
+   - Adicionar som de "i" no final de palavras que terminam em consoante ("take-ee", "break-ee", "like-ee").
+   - Pronunciar a terminação "-ed" como sílaba extra ("looked-ee").
+   - Omitir consoantes finais (ex: comer o som de /k/, /t/, /d/).
+   - Usar palavras em português: marcar como "incorrect", nota baixa e alertar no tip.
+
+3. AVALIAÇÃO PALAVRA A PALAVRA:
+   - Para cada palavra da frase de referência (ou das palavras faladas se divergiu completamente):
+     * "word": a palavra avaliada.
+     * "score": nota de 0 a 100 baseada na fidelidade fonética.
+     * "accuracy": "correct" (se foi natural e clara), "needs_work" (se foi compreensível mas com sotaque perceptível ou fonema impreciso) ou "incorrect" (se trocou o fonema, divergiu, ou usou português).
+     * "tip": dica curtíssima e direta em português do fonema (ex: "Som /aʊ/ aberto como 'cow', não 'know'", "Língua entre os dentes").
+     Se a palavra estiver correta, "tip" deve ser null.
+
+4. FEEDBACK E DICA DA TEACHER TATI:
+   - "score": Nota geral ponderada de 0 a 100 baseada na precisão e fluência.
+     * REGRA DE PROPORCIONALIDADE PEDAGÓGICA (MUITO IMPORTANTE):
+       Se o aluno articulou bem a grande maioria das palavras da frase (ex: 80% ou mais das palavras corretas) e cometeu apenas 1 ou 2 erros pontuais de fonema (ex: "now" soando como "know" ou "think" com TH impreciso), a nota geral ("score") DEVE ser PROPORCIONAL (entre 75 e 88), reconhecendo o sucesso global da comunicação! NUNCA dê nota destruidora (20 a 45) para uma frase com quase todas as palavras acertadas!
+       Se a frase teve ritmo razoável mas múltiplos fonemas imprecisos: entre 55 e 74.
+       Notas baixas (< 40) são reservadas estritamente para quando o aluno não falou a frase esperada, falou português, ou a fala foi ininteligível.
+   - "feedback": Resumo honesto e acolhedor em português.
+   - "pedagogical_tip": Dica pedagógica prática da Teacher Tati SEMPRE EM PORTUGUÊS. IMPORTANTE: Se houver mais de uma palavra com atenção ou erro (ex: 'think' e 'now'), mencione e explique o movimento físico da boca/língua para TODAS elas em um parágrafo fluido e acolhedor! Se tudo estiver perfeito, parabenize com entusiasmo!
+
+Responda ESTRITAMENTE em JSON com o formato:
+{
+  "score": 75,
+  "transcription": "transcrição fonética exata do que o aluno falou",
+  "words": [
+    {"word": "I", "score": 100, "accuracy": "correct", "tip": null},
+    {"word": "think", "score": 85, "accuracy": "needs_work", "tip": "Língua entre os dentes para o TH"},
+    {"word": "we", "score": 100, "accuracy": "correct", "tip": null},
+    {"word": "should", "score": 100, "accuracy": "correct", "tip": null},
+    {"word": "take", "score": 100, "accuracy": "correct", "tip": null},
+    {"word": "a", "score": 100, "accuracy": "correct", "tip": null},
+    {"word": "break", "score": 100, "accuracy": "correct", "tip": null},
+    {"word": "now", "score": 40, "accuracy": "incorrect", "tip": "Diga /naʊ/ (aberto como 'au'), não /noʊ/ (know)"}
+  ],
+  "feedback": "Muito bom ritmo! Só atenção à palavra 'now', que soou como 'know'.",
+  "pedagogical_tip": "Para pronunciar 'now' com perfeição, comece abrindo bem a boca com o som de 'a' e depois deslize suavemente para o 'u'. Não faça o som fechado de 'ô' como em 'know'!"
+}
+"""
+
+PRONUNCIATION_FREE_SPEECH_PROMPT = """
+Você é a Professora Tatiana Duarte (Teacher Tati), especialista no ensino de pronúncia, fonética do inglês americano e gramática para brasileiros.
+O aluno gravou um áudio falando LIVREMENTE em inglês (Free Speech / Fala Livre / Improviso), sem uma frase de referência pré-definida.
+
+Ouça atentamente o áudio gravado e realize uma avaliação pedagógica humana, rigorosa, precisa e justa:
+
+1. TRANSCRIÇÃO ACÚSTICA RIGOROSA (SEM VIÉS DE AUTOCORREÇÃO):
+   - Transcreva EXATAMENTE o que ouviu no áudio na chave "transcription".
+   - NUNCA assuma palavras corretas! Se o aluno falou palavras em português (ex: "Tudo", "bom", "né", "tipo", "beleza"), registre exatamente em português!
+   - Se o aluno falou frases desconexas ou números soltos (ex: "Hi I am verb 7 Tudo"), transcreva exatamente o que foi articulado.
+
+2. AVALIAÇÃO DE CONCORDÂNCIA GRAMATICAL, COERÊNCIA E SINTAXE:
+   - Verifique a concordância sujeito-verbo, substantivo-adjetivo, tempos verbais, preposições e sentido real.
+   - Frases desconexas como "Hi I am verb 7" têm GRAVE erro de concordância e sentido e devem ser penalizadas.
+
+3. DETECÇÃO CRÍTICA DE MISTURA DE IDIOMAS (PORTINGLÊS / PALAVRAS EM PORTUGUÊS):
+   - Se o aluno utilizou QUALQUER palavra em português (ex: "Tudo", "obrigado", "beleza", "tipo", "então"):
+     * Na lista "words", marque essa palavra com "score" entre 5 e 20 e "accuracy": "incorrect".
+     * No "tip", dê a tradução direta e natural em inglês (ex: "Palavra em português! Em inglês use 'everything' ou 'all'").
+
+4. AVALIAÇÃO PALAVRA A PALAVRA:
+   - Para CADA palavra falada na transcrição:
+     * "word": a palavra dita.
+     * "score": 0 a 100 baseado na articulação fonética, concordância e adequação.
+     * "accuracy": "correct" (se for inglês correto e bem articulado), "needs_work" (se fonética ou concordância precisar de ajuste), ou "incorrect" (se for palavra em português, erro grosseiro ou desconexo).
+     * "tip": dica curtíssima e direta em português do que melhorar, ou null se estiver excelente.
+
+5. FRASE NATURAL SUGERIDA (SUGGESTED SENTENCE):
+   - Em "suggested_sentence", formule uma frase completa, natural e 100% correta em inglês americano que expressa da melhor forma o que o aluno tentou ou deveria ter dito (ex: para "Hi, how are you? My name is Caio. I am 90 years old." -> "Hi, how are you? My name is Caio. I am nineteen years old. And you?").
+
+6. NOTA GERAL PONDERADA E PROPORCIONALIDADE PEDAGÓGICA (CRÍTICO):
+   - "score": Nota geral de 0 a 100 ponderando pronúncia e articulação, concordância gramatical e coerência, e uso exclusivo do inglês.
+   - REGRA DE PROPORCIONALIDADE E JUSTIÇA:
+     * A nota DEVE ser proporcional ao conjunto da fala do aluno:
+     * Se a frase for fluente, com sentido e a grande maioria das palavras estiver correta (ex: 14 palavras perfeitas e apenas 1 deslize ou confusão numérica pontual como 90 vs nineteen), a nota geral DEVE ficar entre 75 e 88. NUNCA destrua a nota dando 35% quando 90% da frase foi bem articulada!
+     * Se a frase tiver bom ritmo geral com pequenos deslizes de fonemas ou preposição: entre 70 e 84.
+     * Se a frase for compreensível mas com múltiplos erros gramaticais ou desconexões parciais: entre 50 e 69.
+     * NOTAS BAIXAS (15 a 45) são reservadas ESTRITAMENTE para:
+       a) Presença de palavras em PORTUGUÊS misturadas (ex: "Hi I am verb 7 Tudo").
+       b) Frases quase totalmente desconexas, sem sentido ou ininteligíveis.
+   - "feedback": Feedback acolhedor e honesto da Teacher Tati SEMPRE EM PORTUGUÊS destacando os acertos e indicando onde focar.
+   - "pedagogical_tip": Explicação pedagógica detalhada em português ensinando como dizer a frase sugerida com boa concordância e pronúncia.
+
+Responda ESTRITAMENTE em JSON com o formato:
+{
+  "score": 30,
+  "transcription": "Hi I am verb 7 Tudo",
+  "suggested_sentence": "Hi, I'm doing well, and everything is great!",
+  "words": [
+    {"word": "Hi", "score": 95, "accuracy": "correct", "tip": null},
+    {"word": "I", "score": 90, "accuracy": "correct", "tip": null},
+    {"word": "am", "score": 85, "accuracy": "correct", "tip": null},
+    {"word": "verb", "score": 30, "accuracy": "incorrect", "tip": "Estrutura desconexa. Diga como está se sentindo."},
+    {"word": "7", "score": 20, "accuracy": "incorrect", "tip": "Número solto sem sentido na frase."},
+    {"word": "Tudo", "score": 10, "accuracy": "incorrect", "tip": "Palavra em português! Em inglês diga 'everything'."}
+  ],
+  "feedback": "Cuidado com a concordância e a mistura de idiomas! A frase ficou confusa e usou a palavra 'Tudo' em português.",
+  "pedagogical_tip": "Em inglês, evite misturar termos em português como 'Tudo'. Para cumprimentar e dizer que está tudo bem, você pode dizer: 'Hi, I'm doing well, and everything is great!'"
+}
+"""
+
+
 
 def normalize_slug(s: str) -> str:
     return re.sub(r"_+", "_", re.sub(r"[^a-zA-Z0-9]", "_", (s or "").lower())).strip(
@@ -1983,24 +2109,27 @@ class HubService:
                 local_has_pages = False
 
         # Auto-sync sob demanda: se o material é seguro ou possui content_source e não há páginas geradas / salvas em disco
-        if (not secure_pages or not local_has_pages) and (item.content_source or getattr(item, "is_secure", False)):
+        has_remote_pages = bool(
+            secure_pages and any(isinstance(p, str) and p.startswith("http") for p in secure_pages)
+        )
+        needs_source_sync = (not secure_pages) or (not has_remote_pages and not local_has_pages)
+        if needs_source_sync and (item.content_source or getattr(item, "is_secure", False)):
             try:
                 from apps.activities.tasks import sync_material_pages, is_sync_running
-                logger.info(
-                    f"[Hub] Auto-sincronizando sob demanda o material '{item.title}' ({content_id})..."
-                )
-                if secure_pages:
-                    # Quantidade de páginas já conhecida: aquece o cache local em background.
-                    # As requisições de página aguardam o mesmo sync (lock por material).
-                    if not is_sync_running(content_id):
+                if not is_sync_running(content_id):
+                    logger.info(
+                        f"[Hub] Auto-sincronizando sob demanda o material '{item.title}' ({content_id})..."
+                    )
+                    if secure_pages:
+                        # Quantidade de páginas já conhecida: aquece o cache local em background.
                         import threading
 
                         threading.Thread(
                             target=sync_material_pages, args=(item,), daemon=True
                         ).start()
-                    sync_ok = False
-                else:
-                    sync_ok = sync_material_pages(item, force=False)
+                    else:
+                        sync_material_pages(item, force=False)
+                sync_ok = False
                 if sync_ok:
                     item.refresh_from_db()
                     raw_pages = getattr(item, "secure_pages", None)
@@ -2296,13 +2425,15 @@ class HubService:
 
 
 class SpeechService:
-    @staticmethod
+    @classmethod
     async def verify_pronunciation_async(
+        cls,
         target: Optional[str] = None,
         spoken: Optional[str] = None,
         threshold: float = 70.0,
         audio_b64: Optional[str] = None,
         reference_text: Optional[str] = None,
+        accent: str = "en-US",
     ) -> PronunciationVerifyOut:
         import re
         from apps.chat.audio_service import AudioService
@@ -2310,6 +2441,100 @@ class SpeechService:
         target_phrase = (reference_text or target or "").strip()
         spoken_phrase = (spoken or "").strip()
 
+        # 🌟 1. Avaliação fonética e gramatical direta via Google Gemini
+        if audio_b64:
+            try:
+                import base64
+                from apps.chat.audio_service import detect_audio_mime_type
+
+                raw_b64 = audio_b64.split(",")[-1] if "," in audio_b64 else audio_b64
+                audio_bytes = base64.b64decode(raw_b64, validate=True)
+                mime_type = detect_audio_mime_type(audio_bytes)
+
+                gemini_res = await cls._evaluate_with_gemini_async(
+                    audio_bytes=audio_bytes,
+                    mime_type=mime_type,
+                    target_phrase=target_phrase,
+                    accent=accent,
+                )
+
+                if gemini_res and isinstance(gemini_res, dict):
+                    words_out = [
+                        WordResultOut(
+                            word=w.get("word", ""),
+                            score=float(w.get("score", 0.0)),
+                            accuracy=w.get("accuracy", "correct"),
+                            tip=w.get("tip"),
+                        )
+                        for w in gemini_res.get("words", [])
+                    ]
+                    score = float(gemini_res.get("score", 0.0))
+
+                    # ⚖️ Proteção de proporcionalidade pedagógica no score:
+                    # Se o aluno articulou com sucesso a grande maioria das palavras (média >= 60%)
+                    # e não há palavras em português ou fala desconexa, a nota geral não deve ser
+                    # esmagada por um deslize pontual isolado (ex: 14 palavras corretas caindo para 35%).
+                    if words_out:
+                        avg_word_score = sum(w.score for w in words_out) / len(words_out)
+                        pt_markers = {
+                            "tudo", "voce", "você", "nao", "não", "sim", "como", "esta", "está",
+                            "muito", "obrigado", "oi", "ola", "olá", "beleza", "legal", "que",
+                            "mais", "para", "com", "mas", "bem", "falar", "tipo", "né"
+                        }
+                        has_portuguese = any(
+                            (w.tip and "português" in w.tip.lower()) or
+                            (re.sub(r"[^\w]", "", w.word.lower()) in pt_markers)
+                            for w in words_out
+                        )
+                        if not has_portuguese and avg_word_score >= 60.0:
+                            min_fair_score = round(avg_word_score * 0.88, 1)
+                            if score < min_fair_score:
+                                logger.info(
+                                    f"[SpeechService] Calibrating score from {score} to {min_fair_score} "
+                                    f"(word avg: {avg_word_score:.1f})"
+                                )
+                                score = min_fair_score
+
+                    is_correct = score >= threshold
+                    feedback = gemini_res.get("feedback") or "Boa tentativa!"
+                    pedagogical_tip = gemini_res.get("pedagogical_tip") or ""
+                    suggested_sentence = gemini_res.get("suggested_sentence") or ""
+                    transcription = gemini_res.get("transcription") or ""
+
+                    correct_audio = ""
+                    tts_text = target_phrase or suggested_sentence or transcription
+                    if tts_text:
+                        try:
+                            correct_audio = await AudioService.text_to_speech_async(tts_text, accent=accent)
+                        except Exception as tts_err:
+                            logger.warning(f"Error generating correct audio TTS: {tts_err}")
+
+
+                    return PronunciationVerifyOut(
+                        score=score,
+                        transcription=transcription,
+                        words=words_out,
+                        feedback=feedback,
+                        pedagogical_tip=pedagogical_tip,
+                        suggested_sentence=suggested_sentence,
+                        correct_audio=correct_audio,
+                        target=target_phrase or suggested_sentence,
+                        recognized=transcription,
+                        is_correct=is_correct,
+                        metadata={
+                            "accuracy_score": score,
+                            "fluency_score": score,
+                            "evaluator": "gemini-multimodal",
+                            "free_speech": not bool(target_phrase),
+                            "suggested_sentence": suggested_sentence,
+                        },
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"[SpeechService] Erro no fluxo Gemini multimodal, usando fallback: {e}"
+                )
+
+        # 🔄 2. Fallback resiliente (caso não haja áudio ou o Gemini esteja inacessível)
         if audio_b64 and not spoken_phrase:
             try:
                 spoken_phrase = await AudioService.transcribe_audio_async(audio_b64) or ""
@@ -2346,29 +2571,56 @@ class SpeechService:
                 )
             )
 
+        # Detecção de marcadores em português e frases desconexas no fallback
+        pt_markers = {
+            "tudo", "voce", "você", "nao", "não", "sim", "como", "esta", "está",
+            "muito", "obrigado", "oi", "ola", "olá", "beleza", "legal", "que",
+            "mais", "para", "com", "mas", "bem", "falar", "tipo", "né"
+        }
+        spoken_tokens_lower = set(clean_spoken.split())
+        has_pt_word = bool(spoken_tokens_lower.intersection(pt_markers))
+
+        feedback = ""
+        pedagogical_tip = ""
+        suggested_sentence = ""
+
         if clean_target and clean_spoken:
             ratio = difflib.SequenceMatcher(None, clean_target, clean_spoken).ratio()
             score = round(ratio * 100, 1)
+            if has_pt_word:
+                score = min(score, 30.0)
         elif not clean_target and clean_spoken:
-            score = 100.0
+            if has_pt_word:
+                score = 25.0
+                feedback = "Atenção: você usou palavras em português na sua fala livre! Tente formular a frase 100% em inglês."
+                pedagogical_tip = "Evite misturar termos como 'tudo' ou 'né' em frases em inglês para que sua fala soe natural e compreensível."
+            elif len(spoken_words) < 2:
+                score = 50.0
+                feedback = "Fala muito curta. Pratique frases completas em inglês para uma avaliação fonética mais detalhada."
+            else:
+                score = 65.0
+                feedback = "Sua fala foi compreendida. Continue praticando para aprimorar o ritmo e a pronúncia."
         else:
             score = 0.0
+            feedback = "Áudio não compreendido com clareza. Tente falar novamente."
 
         is_correct = score >= threshold
 
-        if score >= 85:
-            feedback = (
-                "Excellent pronunciation! Very clear, natural and well-articulated."
-            )
-        elif score >= 60:
-            feedback = "Good attempt! Keep practicing word stress and vowel sounds."
-        else:
-            feedback = "Sentence was a bit unclear. Listen to Teacher Tati's audio and try repeating once more."
+        if not feedback:
+            if score >= 85:
+                feedback = (
+                    "Excelente pronúncia! Muito clara, natural e bem articulada."
+                )
+            elif score >= 60:
+                feedback = "Boa tentativa! Continue praticando o ritmo e a pronúncia das palavras."
+            else:
+                feedback = "A frase soou confusa ou divergiu do esperado. Ouça o áudio da Teacher Tati e repita."
 
         correct_audio = ""
-        if target_phrase:
+        tts_text = target_phrase or suggested_sentence or spoken_phrase
+        if tts_text:
             try:
-                correct_audio = await AudioService.text_to_speech_async(target_phrase)
+                correct_audio = await AudioService.text_to_speech_async(tts_text, accent=accent)
             except Exception as e:
                 logger.warning(f"Error generating correct audio TTS: {e}")
 
@@ -2377,11 +2629,17 @@ class SpeechService:
             transcription=spoken_phrase,
             words=words_out,
             feedback=feedback,
+            pedagogical_tip=pedagogical_tip,
+            suggested_sentence=suggested_sentence,
             correct_audio=correct_audio,
-            target=target_phrase,
+            target=target_phrase or suggested_sentence,
             recognized=spoken_phrase,
             is_correct=is_correct,
-            metadata={"accuracy_score": score, "fluency_score": max(50.0, score)},
+            metadata={
+                "accuracy_score": score,
+                "fluency_score": max(40.0, score),
+                "free_speech": not bool(target_phrase),
+            },
         )
 
     @classmethod
@@ -2392,6 +2650,7 @@ class SpeechService:
         threshold: float = 70.0,
         audio_b64: Optional[str] = None,
         reference_text: Optional[str] = None,
+        accent: str = "en-US",
     ) -> PronunciationVerifyOut:
         try:
             try:
@@ -2410,6 +2669,7 @@ class SpeechService:
                                 threshold=threshold,
                                 audio_b64=audio_b64,
                                 reference_text=reference_text,
+                                accent=accent,
                             )
                         )
                     )
@@ -2421,6 +2681,7 @@ class SpeechService:
                     threshold=threshold,
                     audio_b64=audio_b64,
                     reference_text=reference_text,
+                    accent=accent,
                 )
         except Exception as e:
             logger.error(f"[SpeechService] Erro ao verificar pronúncia: {e}", exc_info=True)
@@ -2436,6 +2697,71 @@ class SpeechService:
                 is_correct=False,
                 metadata={"accuracy_score": 0.0, "fluency_score": 0.0},
             )
+
+    @classmethod
+    async def _evaluate_with_gemini_async(
+        cls,
+        audio_bytes: bytes,
+        mime_type: str,
+        target_phrase: str = "",
+        accent: str = "en-US",
+    ) -> Optional[dict]:
+        from apps.chat.audio_service import get_gemini_client
+        import json
+
+        client = get_gemini_client()
+        if not client:
+            return None
+
+        clean_target = (target_phrase or "").strip()
+        if clean_target:
+            base_prompt = PRONUNCIATION_TEACHER_PROMPT.replace("{target_phrase}", clean_target)
+        else:
+            base_prompt = PRONUNCIATION_FREE_SPEECH_PROMPT
+
+        if accent and accent != "en-US":
+            base_prompt += f"\n\nObservação de sotaque preferido pelo aluno: {accent}. Adapte a tolerância fonética ao dialeto correspondente."
+
+
+        # Prioriza modelos modernos ativos de alta performance e disponibilidade
+        env_model = os.getenv("GEMINI_AUDIO_MODEL", "gemini-3.5-flash-lite")
+        models_to_try = [
+            env_model,
+            "gemini-3.5-flash-lite",
+            "gemini-3.8-flash",
+            "gemini-3.5-flash",
+        ]
+        unique_models = []
+        for m in models_to_try:
+            if m and m not in unique_models and "2.5" not in m and "2.0" not in m and "1.5" not in m:
+                unique_models.append(m)
+
+        for model in unique_models:
+            try:
+                from google.genai import types
+                prompt = base_prompt
+                contents = [
+                    types.Part.from_bytes(data=audio_bytes, mime_type=mime_type),
+                    prompt,
+                ]
+                config = types.GenerateContentConfig(
+                    temperature=0.2,
+                    response_mime_type="application/json",
+                )
+                resp = await client.aio.models.generate_content(
+                    model=model,
+                    contents=contents,
+                    config=config,
+                )
+
+                if resp and resp.text:
+                    parsed = json.loads(resp.text.strip())
+                    if isinstance(parsed, dict) and "score" in parsed:
+                        return parsed
+            except Exception as e:
+                logger.warning(f"[SpeechService] Tentativa multimodal com modelo {model} falhou: {e}")
+        return None
+
 
 
 class SubmissionService:

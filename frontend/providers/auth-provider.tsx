@@ -71,7 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const freshUser = await apiGet<User>(ENDPOINTS.PROFILE);
       const normalizedUser = normalizeUserAvatar(freshUser);
       setUser(normalizedUser);
-      saveStoredSession({ token, user: normalizedUser });
+      const current = getStoredSession();
+      saveStoredSession({ token, user: normalizedUser, refreshToken: current?.refreshToken });
     } catch (err) {
       if (err instanceof ApiClientError && err.status === 401) {
         logoutRef.current();
@@ -84,18 +85,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Reiniciar o cache do React Query apenas ao logar nova conta
     queryClient.clear();
     let savedUser = normalizeUserAvatar(newUser);
+    const existingRefreshToken = getStoredSession()?.refreshToken;
+    const finalRefreshToken = newRefreshToken !== undefined ? newRefreshToken : existingRefreshToken;
     // Persist token first so /profile can authenticate immediately.
-    saveStoredSession({ token: newToken, user: savedUser, refreshToken: newRefreshToken });
+    saveStoredSession({ token: newToken, user: savedUser, refreshToken: finalRefreshToken });
     try {
       const freshUser = await apiGet<User>(ENDPOINTS.PROFILE);
       savedUser = normalizeUserAvatar(freshUser);
       setUser(savedUser);
-      saveStoredSession({ token: newToken, user: savedUser, refreshToken: newRefreshToken });
+      saveStoredSession({ token: newToken, user: savedUser, refreshToken: finalRefreshToken });
     } catch {
       // Keep login resilient: fallback to user from login payload.
       savedUser = normalizeUserAvatar(newUser);
       setUser(savedUser);
-      saveStoredSession({ token: newToken, user: savedUser, refreshToken: newRefreshToken });
+      saveStoredSession({ token: newToken, user: savedUser, refreshToken: finalRefreshToken });
     } finally {
       setToken(newToken);
       setIsBootstrappingProfile(false);
@@ -108,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const updated = prev ? { ...prev, ...newUser } : newUser;
       const currentSession = getStoredSession();
       if (currentSession?.token) {
-        saveStoredSession({ token: currentSession.token, user: updated });
+        saveStoredSession({ token: currentSession.token, user: updated, refreshToken: currentSession.refreshToken });
       }
       return updated;
     });
@@ -172,20 +175,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Sincroniza sessões entre múltiplas abas abertas no navegador
   useEffect(() => {
-    if (!isLoaded) return;
-    if (token && user) {
-      saveStoredSession({ token, user });
-    } else if (!token) {
-      clearStoredSession();
-    }
-  }, [token, user, isLoaded]);
-
-  useEffect(() => {
-    if (!hasHydrated.current) {
-      // Garantia defensiva caso o fluxo de hidratação seja interrompido.
-      setIsLoaded(true);
-    }
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'token') {
+        if (!e.newValue) {
+          // Usuário efetuou logout em outra aba
+          setToken(null);
+          setUser(null);
+        } else {
+          // Token renovado por outra aba
+          setToken(e.newValue);
+          const current = getStoredSession();
+          if (current?.user) {
+            setUser(normalizeUserAvatar(current.user));
+          }
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const value = useMemo(() => ({

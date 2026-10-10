@@ -225,6 +225,7 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                         origin=origin,
                         on_token=on_token,
                         on_doc=on_doc,
+                        user_audio_b64=raw_audio if is_audio else None,
                     )
                     queue_event({"type": "done", "result": result})
                 except Exception as err:

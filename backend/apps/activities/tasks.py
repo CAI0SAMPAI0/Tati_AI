@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 # em vez de dispararem várias conversões LibreOffice sobre o mesmo arquivo.
 _SYNC_LOCKS: dict[str, threading.Lock] = {}
 _SYNC_LOCKS_GUARD = threading.Lock()
+_ACTIVE_SYNCS: set[str] = set()
 # Evita martelar o LibreOffice quando um material acabou de falhar (as N páginas em espera
 # recebem a falha imediatamente e o frontend re-tenta depois).
 _LAST_SYNC_FAILURE: dict[str, float] = {}
@@ -38,8 +39,11 @@ def _get_sync_lock(content_id: str) -> threading.Lock:
 
 
 def is_sync_running(content_id: str) -> bool:
-    lock = _SYNC_LOCKS.get(str(content_id))
-    return bool(lock and lock.locked())
+    with _SYNC_LOCKS_GUARD:
+        if str(content_id) in _ACTIVE_SYNCS:
+            return True
+        lock = _SYNC_LOCKS.get(str(content_id))
+        return bool(lock and lock.locked())
 
 
 def _list_local_pages(local_dir: str) -> list[str]:
@@ -124,7 +128,8 @@ def _sync_from_source(content: PremiumContent, content_id: str, local_dir: str) 
         )
 
         poppler = os.getenv("POPPLER_PATH")
-        pages = convert_from_path(actual_pdf, 200, poppler_path=poppler)
+        # 130 DPI oferece visualização nítida em alta definição com conversão 3x mais rápida
+        pages = convert_from_path(actual_pdf, 130, poppler_path=poppler)
         if not pages:
             logger.error(f"[HubSync] PDF de '{content.title}' não gerou nenhuma página.")
             return False
@@ -134,7 +139,7 @@ def _sync_from_source(content: PremiumContent, content_id: str, local_dir: str) 
         new_files: list[str] = []
         for i, page in enumerate(pages):
             img_name = f"page_{i + 1}.webp"
-            page.save(os.path.join(pages_dir, img_name), "WEBP", quality=80)
+            page.save(os.path.join(pages_dir, img_name), "WEBP", quality=75)
             new_files.append(img_name)
         del pages
 
@@ -156,6 +161,30 @@ def _sync_from_source(content: PremiumContent, content_id: str, local_dir: str) 
             with open(dest, "rb") as f:
                 _RAW_IMAGE_CACHE[f"{content_id}/{img_name}"] = f.read()
 
+        # Se Cloudinary estiver disponível, persiste as páginas na nuvem para sobreviver a restarts do servidor
+        try:
+            from .assets_service import CloudinaryService
+            CloudinaryService.configure()
+            if CloudinaryService._configured:
+                logger.info(f"[HubSync] Persistindo {len(new_files)} páginas no Cloudinary...")
+                cloud_urls = []
+                for img_name in new_files:
+                    dest = os.path.join(local_dir, img_name)
+                    with open(dest, "rb") as f:
+                        c_url = CloudinaryService.upload_file(
+                            f.read(),
+                            filename=f"{content_id}_{img_name}",
+                            folder=f"tati_ai/hub_pages/{content_id}",
+                        )
+                        if c_url:
+                            cloud_urls.append(c_url)
+                if len(cloud_urls) == len(new_files):
+                    storage_paths = cloud_urls
+                    content.thumbnail_url = cloud_urls[0]
+                    logger.info(f"[HubSync] Todas as páginas salvas no Cloudinary com sucesso.")
+        except Exception as c_err:
+            logger.warning(f"[HubSync] Persistência Cloudinary ignorada: {c_err}")
+
         # Se encontrou links clicáveis, salva no final do array de páginas
         if extracted_links:
             storage_paths.append(json.dumps({"external_links": extracted_links}))
@@ -163,7 +192,8 @@ def _sync_from_source(content: PremiumContent, content_id: str, local_dir: str) 
         # Atualiza secure_pages no banco
         content.processing_status = "ready"
         content.is_secure = True
-        content.thumbnail_url = f"{content_id}/page_1.webp"
+        if not getattr(content, "thumbnail_url", None) or not content.thumbnail_url.startswith("http"):
+            content.thumbnail_url = f"{content_id}/page_1.webp"
         try:
             from django.db import connection
 
@@ -237,6 +267,9 @@ def sync_material_pages(
         )
         return bool(_list_local_pages(local_dir))
 
+    with _SYNC_LOCKS_GUARD:
+        _ACTIVE_SYNCS.add(content_id)
+
     try:
         # Outra thread pode ter concluído (ou falhado) enquanto aguardávamos o lock
         if not force:
@@ -260,6 +293,8 @@ def sync_material_pages(
         )
         return False
     finally:
+        with _SYNC_LOCKS_GUARD:
+            _ACTIVE_SYNCS.discard(content_id)
         lock.release()
         try:
             from django.db import close_old_connections
