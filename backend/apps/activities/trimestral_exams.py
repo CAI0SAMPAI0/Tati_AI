@@ -112,26 +112,29 @@ DIRETRIZES OFICIAIS:
 {cefr_context}
 
 QUANTIDADE DE QUESTÕES:
-O exame DEVE ter exatamente {num_questions} perguntas.
+O exame DEVE ter exatamente {num_questions} perguntas equilibradas entre as modalidades do CEFR.
 
-REGRAS DE CONTEÚDO E FORMATO (MUITO IMPORTANTE):
-1. Exercícios de READING COMPREHENSION (3 a 5 questões):
-   - Apresente um texto de fácil compreensão no campo "reading_text", compatível com o nível {lvl} (entre 50 e 120 palavras).
-   - As perguntas sobre o texto devem ser de MARCAR X (múltipla escolha) com 4 opções em "options".
-   - REGRA DE OURO SOBRE AS ALTERNATIVAS: As opções devem ser CLARAS e INEQUÍVOCAS.
-   - É ESTRITAMENTE PROIBIDO criar pegadinhas ou opções ambíguas que deixem o aluno em dúvida entre 2 ou 3 alternativas.
-   - A resposta correta deve ser diretamente evidente a partir da leitura atenta do texto, e os distratores devem ser claramente incorretos ou não mencionados no texto.
+DISTRIBUIÇÃO OBRIGATÓRIA E REGRAS DE CONTEÚDO:
+1. Exercícios de READING COMPREHENSION (2 questões):
+   - REGRA CRÍTICA: Cada questão de leitura DEVE TER UM TEXTO TOTALMENTE DIFERENTE E INDEPENDENTE no campo "reading_text" (entre 35 e 70 palavras). NUNCA repita o mesmo texto em duas questões!
+   - Pergunta objetiva de marcar X com 4 alternativas inequívocas, sem pegadinhas.
 
-2. Exercícios de GRAMMAR (3 a 4 questões):
-   - Múltipla escolha (4 opções) cobrindo estruturas fundamentais do nível {lvl} (ex: tempos verbais, preposições, pronomes).
-   - Sem ambiguidade nas alternativas.
+2. Exercícios de GRAMMAR (2 questões):
+   - Múltipla escolha (4 opções) cobrindo estruturas centrais do nível {lvl} (ex: verb tenses, prepositions, modals, connectors).
 
-3. Exercícios de VOCABULARY (2 a 3 questões):
-   - Múltipla escolha (4 opções) com vocabulário comum e de alta frequência do nível {lvl}.
+3. Exercícios de VOCABULARY (2 questões):
+   - Múltipla escolha (4 opções) com vocabulário prático do nível {lvl}.
+   - Pode incluir "image_url" com uma imagem ilustrativa da situação (ex: foto de aeroporto, café, escritório ou parque).
 
-4. Exercícios de LISTENING ou DIÁLOGO (1 a 2 questões):
-   - Curto diálogo ou transcrição de fala cotidiana (1 a 3 falas) no campo "audio_text".
-   - Pergunta objetiva com 4 alternativas claras.
+4. Exercício de LISTENING COMPREHENSION (1 ou 2 questões):
+   - No campo "audio_text", forneça um diálogo ou anúncio falado curto em inglês natural (ex: conversa entre 2 pessoas em uma estação, restaurante, hotel ou aeroporto com 2 a 4 falas).
+   - A pergunta em "question" deve ser diretamente respondível a partir do que foi dito no "audio_text".
+
+5. Exercício de SPEAKING / EXPRESSÃO ORAL (1 questão):
+   - "type": "speaking"
+   - No campo "question", apresente um prompt para o aluno falar e gravar sua voz em inglês (ex: "Listen and record your response in English: What is your favorite time of the day and why? Speak for 15 to 30 seconds.").
+   - Em "options", forneça orientações de fala (ex: ["Record your audio in English", "Speak clearly into your microphone"]).
+   - Em "correct_answer", use "Record your audio in English".
 
 ESTRUTURA JSON OBRIGATÓRIA:
 Retorne EXCLUSIVAMENTE um objeto JSON no formato:
@@ -141,27 +144,66 @@ Retorne EXCLUSIVAMENTE um objeto JSON no formato:
       "id": "q1",
       "type": "reading",
       "points": 10,
-      "reading_text": "Texto claro e direto em inglês...",
-      "question": "What is the main topic discussed in the text?",
-      "options": ["Opção correta", "Distrator 1", "Distrator 2", "Distrator 3"],
-      "correct_answer": "Opção correta",
-      "explanation": "Explicação pedagógica clara e encorajadora em português."
+      "reading_text": "Texto curto 1 exclusivo...",
+      "question": "What is the main topic of the text?",
+      "options": ["Correct answer", "Distractor 1", "Distractor 2", "Distractor 3"],
+      "correct_answer": "Correct answer",
+      "explanation": "Explicação em português."
     }},
     {{
       "id": "q2",
+      "type": "reading",
+      "points": 10,
+      "reading_text": "Texto curto 2 totalmente diferente...",
+      "question": "According to the second text, where did she travel?",
+      "options": ["Correct answer", "Distractor 1", "Distractor 2", "Distractor 3"],
+      "correct_answer": "Correct answer",
+      "explanation": "Explicação em português."
+    }},
+    {{
+      "id": "q3",
       "type": "grammar",
       "points": 10,
-      "question": "Complete the sentence with the correct verb...",
-      "options": ["walks", "walk", "walking", "walked"],
-      "correct_answer": "walks",
-      "explanation": "Explicação em português explicando a regra gramatical."
+      "question": "Choose the correct verb form...",
+      "options": ["goes", "go", "going", "went"],
+      "correct_answer": "goes",
+      "explanation": "Explicação em português."
+    }},
+    {{
+      "id": "q4",
+      "type": "vocabulary",
+      "points": 10,
+      "image_url": "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=600&q=80",
+      "question": "Which word best describes this place?",
+      "options": ["Coffee shop", "Airport runway", "Hospital", "Post office"],
+      "correct_answer": "Coffee shop",
+      "explanation": "Explicação em português."
+    }},
+    {{
+      "id": "q5",
+      "type": "listening",
+      "points": 10,
+      "audio_text": "Train Announcer: Attention passengers on platform 3. The express train to Oxford will depart at 5:15 PM.",
+      "question": "What time does the train to Oxford leave?",
+      "options": ["5:15 PM", "5:00 PM", "5:30 PM", "6:00 PM"],
+      "correct_answer": "5:15 PM",
+      "explanation": "O anúncio diz claramente que o trem partirá às 5:15 PM."
+    }},
+    {{
+      "id": "q6",
+      "type": "speaking",
+      "points": 10,
+      "question": "Please speak in English for 15-30 seconds: Describe your daily morning routine.",
+      "options": ["Record your audio in English"],
+      "correct_answer": "Record your audio in English",
+      "explanation": "Prática de fala livre avaliada pelo aluno e pela IA."
     }}
   ]
 }}
-Cada "correct_answer" DEVE ser uma cópia exata de uma das 4 strings em "options".
+Cada "correct_answer" DEVE ser uma cópia exata de uma das opções.
 """
 
-        user_prompt = f"Gere agora o exame trimestral oficial com exatamente {num_questions} questões para o nível {lvl}."
+        user_prompt = f"Gere agora o exame trimestral oficial com exatamente {num_questions} questões equilibradas (Reading com textos diferentes, Grammar, Vocabulary com imagem, Listening com diálogo e Speaking) para o nível {lvl}."
 
         # 1. Tenta via Groq
         groq_client = cls._get_groq_client()
@@ -241,14 +283,19 @@ Cada "correct_answer" DEVE ser uma cópia exata de uma das 4 strings em "options
             explanation = q.get("explanation", "Resposta correta baseada no nível.")
             reading_text = q.get("reading_text")
             audio_text = q.get("audio_text")
+            image_url = q.get("image_url")
+            audio_url = q.get("audio_url")
 
-            # Garante que temos pelo menos 4 opções
-            if not isinstance(options, list) or len(options) < 4:
-                options = [correct, "Alternative B", "Alternative C", "Alternative D"]
-
-            # Assegura que correct_answer está presente nas opções
-            if correct not in options:
-                options[0] = correct
+            # Garante que temos opções adequadas
+            if q_type != "speaking":
+                if not isinstance(options, list) or len(options) < 4:
+                    options = [correct, "Alternative B", "Alternative C", "Alternative D"]
+                if correct not in options:
+                    options[0] = correct
+            else:
+                if not isinstance(options, list) or len(options) == 0:
+                    options = ["Record your response in English"]
+                correct = options[0]
 
             normalized.append({
                 "id": q_id,
@@ -260,6 +307,8 @@ Cada "correct_answer" DEVE ser uma cópia exata de uma das 4 strings em "options
                 "explanation": explanation,
                 "reading_text": reading_text,
                 "audio_text": audio_text,
+                "audio_url": audio_url,
+                "image_url": image_url,
             })
 
         # Se vieram menos do que o total solicitado, complementa com fallback
@@ -289,6 +338,26 @@ Cada "correct_answer" DEVE ser uma cópia exata de uma das 4 strings em "options
                 "explanation": "O texto afirma claramente: 'In the afternoon, she organizes new magazines and enjoys a cup of tea'."
             },
             {
+                "type": "grammar",
+                "question": "Complete the sentence: 'She _______ to the gym every morning before work.'",
+                "options": ["goes", "go", "going", "gone"],
+                "correct_answer": "goes",
+                "explanation": "No Present Simple com a terceira pessoa do singular (she), acrescenta-se 'es' ao verbo go."
+            },
+            {
+                "type": "vocabulary",
+                "image_url": "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=600&q=80",
+                "question": "Look at the photo. Which word best describes this cozy place?",
+                "options": [
+                    "Coffee shop / Cafe",
+                    "Train station",
+                    "Hospital pharmacy",
+                    "Police department"
+                ],
+                "correct_answer": "Coffee shop / Cafe",
+                "explanation": "A foto retrata claramente uma cafeteria acolhedora ('Coffee shop' ou 'Cafe')."
+            },
+            {
                 "type": "reading",
                 "reading_text": "Lucas loves traveling on weekends. Last Saturday, he took a train to Brighton with his friends. The weather was sunny, so they walked along the beach and ate fish and chips.",
                 "question": "How did Lucas and his friends travel to Brighton?",
@@ -303,51 +372,23 @@ Cada "correct_answer" DEVE ser uma cópia exata de uma das 4 strings em "options
             },
             {
                 "type": "grammar",
-                "question": "Complete the sentence: 'She _______ to the gym every morning before work.'",
-                "options": ["goes", "go", "going", "gone"],
-                "correct_answer": "goes",
-                "explanation": "No Present Simple com a terceira pessoa do singular (she), acrescenta-se 'es' ao verbo go."
-            },
-            {
-                "type": "grammar",
                 "question": "Choose the correct question: 'Where _______ you live during your college years?'",
                 "options": ["did", "do", "does", "are"],
                 "correct_answer": "did",
                 "explanation": "Para perguntas no passado com verbos de ação usa-se o auxiliar 'did'."
             },
             {
-                "type": "vocabulary",
-                "question": "Which word is the opposite of 'expensive'?",
-                "options": ["cheap", "heavy", "crowded", "modern"],
-                "correct_answer": "cheap",
-                "explanation": "'Cheap' significa barato, que é o oposto direto de 'expensive' (caro)."
-            },
-            {
-                "type": "vocabulary",
-                "question": "Complete the phrase: 'Please remember to _______ off the lights when leaving.'",
-                "options": ["turn", "make", "put", "take"],
-                "correct_answer": "turn",
-                "explanation": "O phrasal verb comum para apagar a luz é 'turn off'."
-            },
-            {
-                "type": "reading",
-                "reading_text": "David is preparing for an English meeting. He reviewed his notes yesterday and prepared a 10-minute presentation about sales growth in South America.",
-                "question": "How long will David's presentation be?",
+                "type": "listening",
+                "audio_text": "Station Announcer: Attention passengers on platform 3. The express train to Oxford will depart at 5:15 PM. Please have your tickets ready for inspection.",
+                "question": "What time does the express train to Oxford leave?",
                 "options": [
-                    "Ten minutes.",
-                    "Two hours.",
-                    "One full day.",
-                    "Thirty seconds."
+                    "5:15 PM",
+                    "5:00 PM",
+                    "5:30 PM",
+                    "6:00 PM"
                 ],
-                "correct_answer": "Ten minutes.",
-                "explanation": "O texto diz explicitamente: 'prepared a 10-minute presentation'."
-            },
-            {
-                "type": "grammar",
-                "question": "Select the correct option: 'I haven't seen that movie _______.'",
-                "options": ["yet", "already", "still", "ever"],
-                "correct_answer": "yet",
-                "explanation": "Em frases negativas no Present Perfect, 'yet' é usado no final para indicar 'ainda não'."
+                "correct_answer": "5:15 PM",
+                "explanation": "O anúncio em áudio informa: 'The express train to Oxford will depart at 5:15 PM'."
             },
             {
                 "type": "vocabulary",
@@ -357,17 +398,11 @@ Cada "correct_answer" DEVE ser uma cópia exata de uma das 4 strings em "options
                 "explanation": "'Enormous' e 'huge' significam enorme / muito grande."
             },
             {
-                "type": "listening",
-                "audio_text": "Hello Sarah! Are you free for lunch at 1 PM today? Let's meet at the Italian restaurant near the office.",
-                "question": "Where does the speaker want to meet Sarah?",
-                "options": [
-                    "At the Italian restaurant near the office.",
-                    "At Sarah's house.",
-                    "Inside the office cafeteria.",
-                    "At the train station."
-                ],
-                "correct_answer": "At the Italian restaurant near the office.",
-                "explanation": "O falante diz: 'Let's meet at the Italian restaurant near the office'."
+                "type": "speaking",
+                "question": "Speaking Task: Please record your voice in English (15 to 30 seconds). Question: 'What is your favorite day of the week and why?'",
+                "options": ["Record your response in English"],
+                "correct_answer": "Record your response in English",
+                "explanation": "Gravação de áudio realizada pelo aluno demonstrando fluência e pronúncia."
             },
         ]
 
@@ -743,6 +778,7 @@ class TrimestralExamService:
             "grammar": {"correct": 0, "total": 0, "label": "Gramática Aplicada"},
             "vocabulary": {"correct": 0, "total": 0, "label": "Vocabulário & Expressões"},
             "listening": {"correct": 0, "total": 0, "label": "Compreensão Auditiva"},
+            "speaking": {"correct": 0, "total": 0, "label": "Expressão Oral & Speaking"},
         }
 
         for q in questions:
@@ -754,7 +790,11 @@ class TrimestralExamService:
             q_id = q.get("id")
             student_val = answers_map.get(q_id, "").strip().lower()
             correct_val = str(q.get("correct_answer", "")).strip().lower()
-            if student_val and student_val == correct_val:
+
+            if q_type == "speaking":
+                if student_val:
+                    skills[q_type]["correct"] += 1
+            elif student_val and student_val == correct_val:
                 skills[q_type]["correct"] += 1
 
         can_do_statements = []
@@ -791,6 +831,11 @@ class TrimestralExamService:
                         can_do_statements.append("Compreende diálogos cotidianos e instruções diretas de fala.")
                     else:
                         points_to_improve.append("Prática de escuta ativa na área de podcasts e listenings.")
+                elif s_key == "speaking":
+                    if pct >= 70:
+                        can_do_statements.append("Expressa-se oralmente com clareza em situações cotidianas do nível.")
+                    else:
+                        points_to_improve.append("Prática de pronúncia e fluência na área de Pronunciation Practice.")
 
         if not can_do_statements:
             can_do_statements.append(f"Demonstrou participação ativa na avaliação trimestral do nível {level}.")
@@ -842,7 +887,9 @@ class TrimestralExamService:
                 "points": int(q.get("points", 10)),
                 "options": q.get("options", []),
                 "audio_url": q.get("audio_url"),
+                "audio_text": q.get("audio_text"),
                 "reading_text": q.get("reading_text"),
+                "image_url": q.get("image_url"),
             })
 
         return {

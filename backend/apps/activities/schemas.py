@@ -164,7 +164,9 @@ class ExamQuestionOut(BaseModel):
     points: int
     options: Optional[List[str]] = []
     audio_url: Optional[str] = None
+    audio_text: Optional[str] = None
     reading_text: Optional[str] = None
+    image_url: Optional[str] = None
 
 
 class TrimestralExamStartInput(BaseModel):

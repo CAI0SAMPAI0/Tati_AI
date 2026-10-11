@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
 import { MainHeader } from '@/components/layout/main-header';
 import { useSidebarState } from '@/hooks/useSidebarState';
@@ -33,6 +33,13 @@ import {
   BookmarkCheck,
   FileText,
   Headphones,
+  Play,
+  Pause,
+  Mic,
+  Square,
+  RotateCw,
+  Volume2,
+  ImageIcon,
 } from 'lucide-react';
 
 // TYPES
@@ -64,7 +71,9 @@ interface Question {
   points: number;
   options: string[];
   audio_url?: string | null;
+  audio_text?: string | null;
   reading_text?: string | null;
+  image_url?: string | null;
 }
 
 interface ExamActive {
@@ -132,6 +141,119 @@ export default function ExamsClientPage() {
 
   // Estados do resultado
   const [examResult, setExamResult] = useState<ExamResult | null>(null);
+
+  // Estados de áudio (Listening) e gravação de voz (Speaking)
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [audioListenCount, setAudioListenCount] = useState<Record<string, number>>({});
+  const [showTranscript, setShowTranscript] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [recordedAudios, setRecordedAudios] = useState<Record<string, string>>({});
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Reprodução de áudio em inglês nativo (TTS) para listening
+  const handlePlayListeningAudio = (text: string, qId: string) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      toast.error('Audio playback is not supported on this device/browser.');
+      return;
+    }
+
+    if (isPlayingAudio) {
+      window.speechSynthesis.cancel();
+      setIsPlayingAudio(false);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const clean = text.replace(/^(Station Announcer|Speaker\s*\w*|Woman|Man|Announcer):\s*/gim, '').trim();
+    const utterance = new SpeechSynthesisUtterance(clean || text);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.95;
+
+    const voices = window.speechSynthesis.getVoices();
+    const englishVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Daniel') || v.name.includes('English')));
+    if (englishVoice) {
+      utterance.voice = englishVoice;
+    }
+
+    utterance.onstart = () => setIsPlayingAudio(true);
+    utterance.onend = () => {
+      setIsPlayingAudio(false);
+      setAudioListenCount(prev => ({ ...prev, [qId]: (prev[qId] || 0) + 1 }));
+    };
+    utterance.onerror = () => setIsPlayingAudio(false);
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Gravação de microfone para speaking
+  const startRecording = async (qId: string) => {
+    try {
+      if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+        toast.error('Microphone recording is not supported on this device.');
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        setRecordedAudios(prev => ({ ...prev, [qId]: audioUrl }));
+        setAnswers(prev => ({ ...prev, [qId]: 'recorded' }));
+        toast.success('Audio recorded successfully!');
+        stream.getTracks().forEach(t => t.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingSeconds(0);
+
+      timerRef.current = setInterval(() => {
+        setRecordingSeconds(sec => {
+          if (sec >= 45) {
+            stopRecording();
+            return 45;
+          }
+          return sec + 1;
+        });
+      }, 1000);
+    } catch (err) {
+      console.error('Microphone error:', err);
+      toast.error('Microphone access denied or unavailable.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+  };
+
+  // Limpa áudio e gravação ao trocar de questão
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      setIsPlayingAudio(false);
+      setShowTranscript(false);
+    }
+    if (isRecording) {
+      stopRecording();
+    }
+  }, [currentQuestionIndex]);
 
   // Carrega status e histórico
   const fetchStatusAndHistory = async () => {
@@ -289,7 +411,7 @@ export default function ExamsClientPage() {
         <MainHeader onToggleMenu={toggleSidebar} />
 
         <div className="flex-1 flex max-w-5xl w-full mx-auto p-4 md:p-8 flex-col">
-          {/* Header do Exame com Progresso */}
+          {/* Header do Exame com Progresso (em Inglês) */}
           <div className="bg-surface border border-border rounded-2xl p-4 md:p-6 mb-6 shadow-sm">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-3">
@@ -297,16 +419,16 @@ export default function ExamsClientPage() {
                   <GraduationCap size={22} />
                 </div>
                 <div>
-                  <h1 className="font-bold text-lg text-text">Exame Trimestral CEFR</h1>
-                  <p className="text-xs text-text-muted">Nível de Avaliação: <span className="font-bold text-primary">{activeExam.level}</span></p>
+                  <h1 className="font-bold text-lg text-text">Quarterly CEFR Exam</h1>
+                  <p className="text-xs text-text-muted">Assessment Level: <span className="font-bold text-primary">{activeExam.level}</span></p>
                 </div>
               </div>
 
               <div className="flex items-center gap-4 text-xs font-semibold text-text-muted">
-                <span>Questão <strong className="text-primary text-sm">{currentQuestionIndex + 1}</strong> de {activeExam.total_questions}</span>
+                <span>Question <strong className="text-primary text-sm">{currentQuestionIndex + 1}</strong> of {activeExam.total_questions}</span>
                 <span className="hidden sm:inline-block w-1.5 h-1.5 rounded-full bg-border" />
                 <span className="text-success flex items-center gap-1 font-bold">
-                  <Check size={14} /> {Object.keys(answers).length} respondidas
+                  <Check size={14} /> {Object.keys(answers).length} answered
                 </span>
               </div>
             </div>
@@ -327,26 +449,43 @@ export default function ExamsClientPage() {
                 {/* Tipo de Questão (Badge) */}
                 <div className="flex items-center justify-between gap-2 mb-4">
                   <span className={cn(
-                    "text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider",
+                    "text-xs px-3.5 py-1.5 rounded-full font-bold uppercase tracking-wider",
                     currentQ.type === 'reading' && "bg-blue-500/10 text-blue-500 border border-blue-500/20",
                     currentQ.type === 'grammar' && "bg-purple-500/10 text-purple-500 border border-purple-500/20",
                     currentQ.type === 'vocabulary' && "bg-amber-500/10 text-amber-500 border border-amber-500/20",
                     currentQ.type === 'listening' && "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20",
+                    currentQ.type === 'speaking' && "bg-rose-500/10 text-rose-500 border border-rose-500/20",
                   )}>
                     {currentQ.type === 'reading' ? '📖 Reading Comprehension' :
                      currentQ.type === 'grammar' ? '⚡ Grammar' :
                      currentQ.type === 'vocabulary' ? '✨ Vocabulary' :
-                     currentQ.type === 'listening' ? '🎧 Listening & Dialogue' : currentQ.type}
+                     currentQ.type === 'listening' ? '🎧 Listening Comprehension' :
+                     currentQ.type === 'speaking' ? '🎙️ Speaking Task' : currentQ.type}
                   </span>
-                  <span className="text-xs font-bold text-text-muted">10 pontos</span>
+                  <span className="text-xs font-bold text-text-muted">10 points</span>
                 </div>
 
-                {/* Bloco de Reading Comprehension (quando aplicável) */}
+                {/* 1. Imagem de Contexto (quando houver image_url) */}
+                {currentQ.image_url && (
+                  <div className="mb-6 rounded-2xl overflow-hidden border border-border bg-bg-secondary/40 max-h-72 flex flex-col">
+                    <div className="px-4 py-2 border-b border-border/60 text-[11px] font-bold text-text-muted uppercase tracking-wider flex items-center gap-1.5 bg-surface/50">
+                      <ImageIcon size={14} className="text-primary" /> Visual Context:
+                    </div>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={currentQ.image_url}
+                      alt="Question illustration"
+                      className="w-full h-56 object-cover hover:scale-[1.01] transition-transform duration-300"
+                    />
+                  </div>
+                )}
+
+                {/* 2. Bloco de Reading Comprehension (com texto independente para cada questão) */}
                 {currentQ.reading_text && (
                   <div className="bg-bg-secondary/60 border border-border rounded-2xl p-5 md:p-6 mb-6">
                     <div className="flex items-center gap-2 text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
                       <BookOpen size={16} className="text-primary" />
-                      Texto para Leitura e Interpretação:
+                      Reading Passage:
                     </div>
                     <p className="text-sm md:text-base leading-relaxed text-text font-serif italic">
                       &quot;{currentQ.reading_text}&quot;
@@ -354,16 +493,126 @@ export default function ExamsClientPage() {
                   </div>
                 )}
 
-                {/* Bloco de Diálogo / Listening (quando aplicável) */}
-                {(currentQ as any).audio_text && (
-                  <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-5 md:p-6 mb-6">
-                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-500 uppercase tracking-wider mb-2">
-                      <Headphones size={16} />
-                      Diálogo em Inglês:
+                {/* 3. Bloco de Listening com Player de Áudio Interativo */}
+                {currentQ.type === 'listening' && (
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-5 md:p-6 mb-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                      <div className="flex items-center gap-2 text-xs font-bold text-emerald-500 uppercase tracking-wider">
+                        <Headphones size={18} /> Audio Track • Listening Comprehension
+                      </div>
+                      <span className="text-xs text-text-muted font-medium">
+                        Times played: <strong className="text-emerald-500">{audioListenCount[currentQ.id] || 0}</strong>
+                      </span>
                     </div>
-                    <p className="text-sm md:text-base leading-relaxed text-text font-mono">
-                      {(currentQ as any).audio_text}
+
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => handlePlayListeningAudio(currentQ.audio_text || '', currentQ.id)}
+                        className={cn(
+                          "px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2.5 transition-all shadow-md active:scale-95",
+                          isPlayingAudio
+                            ? "bg-danger text-white animate-pulse"
+                            : "bg-emerald-500 text-white hover:bg-emerald-600"
+                        )}
+                      >
+                        {isPlayingAudio ? (
+                          <>
+                            <Pause size={18} /> Stop Audio Playback
+                          </>
+                        ) : (
+                          <>
+                            <Play size={18} /> Play Audio Dialogue
+                          </>
+                        )}
+                      </button>
+
+                      {/* Ondas Sonoras / Equalizador em Reprodução */}
+                      {isPlayingAudio && (
+                        <div className="flex items-center gap-1.5 h-6">
+                          <span className="w-1 bg-emerald-500 rounded-full animate-bounce h-3" />
+                          <span className="w-1 bg-emerald-500 rounded-full animate-bounce h-6 delay-75" />
+                          <span className="w-1 bg-emerald-500 rounded-full animate-bounce h-4 delay-150" />
+                          <span className="w-1 bg-emerald-500 rounded-full animate-bounce h-5 delay-200" />
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => setShowTranscript(prev => !prev)}
+                        className="text-xs font-bold text-text-muted hover:text-emerald-500 underline ml-auto transition-colors"
+                      >
+                        {showTranscript ? 'Hide Audio Transcript' : 'Show Audio Transcript (Practice)'}
+                      </button>
+                    </div>
+
+                    {showTranscript && currentQ.audio_text && (
+                      <div className="mt-4 p-4 rounded-xl bg-surface/90 border border-emerald-500/20 text-xs md:text-sm font-mono text-text animate-fade-in">
+                        <p className="text-text-muted text-[11px] uppercase tracking-wider mb-1 font-sans font-bold">Transcript:</p>
+                        {currentQ.audio_text}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 4. Bloco de Speaking com Gravador de Microfone */}
+                {currentQ.type === 'speaking' && (
+                  <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-5 md:p-6 mb-6">
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className="flex items-center gap-2 text-xs font-bold text-rose-500 uppercase tracking-wider">
+                        <Mic size={18} /> Oral Response • Voice Recording
+                      </div>
+                      {answers[currentQ.id] && (
+                        <span className="text-xs font-bold text-success flex items-center gap-1">
+                          <CheckCircle2 size={14} /> Response Recorded
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-text-muted mb-4">
+                      Click the microphone to record your response in English. Speak clearly for 15 to 30 seconds.
                     </p>
+
+                    <div className="flex flex-col sm:flex-row items-center gap-4">
+                      {!isRecording ? (
+                        <button
+                          type="button"
+                          onClick={() => startRecording(currentQ.id)}
+                          className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2.5 transition-all active:scale-95"
+                        >
+                          <Mic size={18} />
+                          {recordedAudios[currentQ.id] ? 'Re-record Audio (Gravar Novamente)' : 'Start Recording (Gravar Resposta)'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={stopRecording}
+                          className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-danger hover:opacity-90 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2.5 transition-all animate-pulse"
+                        >
+                          <Square size={16} fill="currentColor" />
+                          Stop Recording ({recordingSeconds}s / 45s)
+                        </button>
+                      )}
+
+                      {isRecording && (
+                        <div className="flex items-center gap-2 text-xs font-bold text-danger">
+                          <span className="w-2.5 h-2.5 rounded-full bg-danger animate-ping" />
+                          Recording in progress...
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Player de Reprodução do Áudio Gravado */}
+                    {recordedAudios[currentQ.id] && (
+                      <div className="mt-4 p-3 bg-surface rounded-xl border border-border">
+                        <p className="text-[11px] font-bold text-text-muted uppercase mb-1">Your Recorded Response:</p>
+                        <audio
+                          src={recordedAudios[currentQ.id]}
+                          controls
+                          className="w-full h-10 rounded-lg"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -373,53 +622,55 @@ export default function ExamsClientPage() {
                 </h2>
 
                 {/* Opções de Resposta (Marcar X com visual elegante) */}
-                <div className="space-y-3 mb-8">
-                  {currentQ.options.map((optionText, optIdx) => {
-                    const isSelected = answers[currentQ.id] === optionText;
-                    return (
-                      <button
-                        key={optIdx}
-                        type="button"
-                        onClick={() => setAnswers((prev) => ({ ...prev, [currentQ.id]: optionText }))}
-                        className={cn(
-                          "w-full text-left p-4 md:p-5 rounded-2xl border transition-all flex items-center justify-between group",
-                          isSelected
-                            ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary"
-                            : "border-border bg-bg-secondary/40 hover:bg-surface-hover hover:border-primary/40 text-text"
-                        )}
-                      >
-                        <div className="flex items-center gap-4">
-                          <span className={cn(
-                            "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all",
+                {currentQ.type !== 'speaking' && (
+                  <div className="space-y-3 mb-8">
+                    {currentQ.options.map((optionText, optIdx) => {
+                      const isSelected = answers[currentQ.id] === optionText;
+                      return (
+                        <button
+                          key={optIdx}
+                          type="button"
+                          onClick={() => setAnswers((prev) => ({ ...prev, [currentQ.id]: optionText }))}
+                          className={cn(
+                            "w-full text-left p-4 md:p-5 rounded-2xl border transition-all flex items-center justify-between group",
                             isSelected
-                              ? "bg-primary text-white"
-                              : "bg-surface border border-border text-text-muted group-hover:border-primary group-hover:text-primary"
-                          )}>
-                            {String.fromCharCode(65 + optIdx)}
-                          </span>
-                          <span className={cn(
-                            "text-sm md:text-base font-medium",
-                            isSelected ? "text-primary font-bold" : "text-text"
-                          )}>
-                            {optionText}
-                          </span>
-                        </div>
+                              ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary"
+                              : "border-border bg-bg-secondary/40 hover:bg-surface-hover hover:border-primary/40 text-text"
+                          )}
+                        >
+                          <div className="flex items-center gap-4">
+                            <span className={cn(
+                              "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all",
+                              isSelected
+                                ? "bg-primary text-white"
+                                : "bg-surface border border-border text-text-muted group-hover:border-primary group-hover:text-primary"
+                            )}>
+                              {String.fromCharCode(65 + optIdx)}
+                            </span>
+                            <span className={cn(
+                              "text-sm md:text-base font-medium",
+                              isSelected ? "text-primary font-bold" : "text-text"
+                            )}>
+                              {optionText}
+                            </span>
+                          </div>
 
-                        <div className={cn(
-                          "w-5 h-5 rounded-full border flex items-center justify-center transition-all",
-                          isSelected
-                            ? "border-primary bg-primary text-white"
-                            : "border-border group-hover:border-primary"
-                        )}>
-                          {isSelected && <Check size={12} strokeWidth={3} />}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                          <div className={cn(
+                            "w-5 h-5 rounded-full border flex items-center justify-center transition-all",
+                            isSelected
+                              ? "border-primary bg-primary text-white"
+                              : "border-border group-hover:border-primary"
+                          )}>
+                            {isSelected && <Check size={12} strokeWidth={3} />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
-              {/* Botões de Ação na Base */}
+              {/* Botões de Ação na Base (em Inglês) */}
               <div className="pt-4 border-t border-border flex flex-col-reverse sm:flex-row items-center justify-between gap-3">
                 <button
                   type="button"
@@ -427,7 +678,7 @@ export default function ExamsClientPage() {
                   disabled={currentQuestionIndex === 0}
                   className="w-full sm:w-auto px-5 py-3 rounded-xl border border-border font-bold text-sm text-text-muted hover:bg-surface-hover disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  <ChevronLeft size={18} /> Anterior
+                  <ChevronLeft size={18} /> Previous Question
                 </button>
 
                 <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -437,7 +688,7 @@ export default function ExamsClientPage() {
                       onClick={() => setCurrentQuestionIndex((prev) => Math.min(activeExam.total_questions - 1, prev + 1))}
                       className="w-full sm:w-auto px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm hover:opacity-90 shadow-sm flex items-center justify-center gap-2"
                     >
-                      Próxima <ChevronRight size={18} />
+                      Next Question <ChevronRight size={18} />
                     </button>
                   ) : (
                     <button
@@ -447,10 +698,10 @@ export default function ExamsClientPage() {
                       className="w-full sm:w-auto px-8 py-3 rounded-xl bg-success text-white font-bold text-sm hover:opacity-90 shadow-md flex items-center justify-center gap-2 animate-pulse"
                     >
                       {isSubmitting ? (
-                        <>Processando resultado...</>
+                        <>Processing results...</>
                       ) : (
                         <>
-                          <CheckCircle2 size={18} /> Finalizar e Ver Resultado
+                          <CheckCircle2 size={18} /> Finalize & View Results
                         </>
                       )}
                     </button>
