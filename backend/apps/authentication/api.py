@@ -38,18 +38,13 @@ profile_router = Router(tags=["Profile"])
 @auth_router.post("/login/", response=TokenResponse)
 @auth_router.post("/login_form", response=TokenResponse)
 @auth_router.post("/login_form/", response=TokenResponse)
-def login(request: HttpRequest, payload: Optional[LoginInput] = None):
+def login(request: HttpRequest):
     """
     Autentica usuário com username/email e senha.
     Aceita JSON (application/json) e Form URL-Encoded (apiPostForm).
     """
     username = None
     password = None
-
-    if payload:
-        username = payload.username or payload.email or payload.identifier
-        password = payload.password
-
     # 1. Tenta POST form data nativo do Django
     if not username or not password:
         if request.POST:
