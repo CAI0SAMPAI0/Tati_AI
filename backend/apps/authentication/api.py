@@ -5,7 +5,7 @@ from urllib.parse import parse_qs
 from typing import Optional, Dict, Any
 from ninja import Router
 from django.http import HttpRequest
-from django.contrib.auth import get_user_model
+from .models import User
 from ninja.errors import HttpError
 
 logger = logging.getLogger(__name__)
@@ -24,8 +24,6 @@ from .schemas import (
 )
 from .services import AuthService
 from .security import auth_required
-
-User = get_user_model()
 
 auth_router = Router(tags=["Auth"])
 profile_router = Router(tags=["Profile"])
