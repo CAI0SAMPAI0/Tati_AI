@@ -71,7 +71,7 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
     ? [{ href: '/activities/hub', icon: <Zap size={20} />, label: 'Hub' }]
     : [
         { href: '/activities', icon: <BookOpen size={20} />, label: 'Activities' },
-        { href: '/exams', icon: <GraduationCap size={20} />, label: 'Exame Trimestral' },
+        { href: '/exams', icon: <GraduationCap size={20} />, label: 'Quarterly Exam' },
         { href: '/history', icon: <History size={20} />, label: 'History' },
         { href: '/activities/hub', icon: <Zap size={20} />, label: 'Hub' },
         { href: '/progress', icon: <TrendingUp size={20} />, label: 'Progress' },

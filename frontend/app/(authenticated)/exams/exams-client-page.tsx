@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { apiGet, apiPost } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
 import { cn } from '@/lib/utils';
+import { getStoredAccent } from '@/lib/constants/accents';
 import toast from 'react-hot-toast';
 import {
   GraduationCap,
@@ -15,7 +16,6 @@ import {
   Calendar,
   CheckCircle2,
   XCircle,
-  AlertCircle,
   ArrowRight,
   ChevronRight,
   ChevronLeft,
@@ -25,7 +25,6 @@ import {
   RotateCcw,
   Trophy,
   Flame,
-  ShieldCheck,
   Award,
   Lightbulb,
   Check,
@@ -37,16 +36,14 @@ import {
   Pause,
   Mic,
   Square,
-  RotateCw,
   Volume2,
-  ImageIcon,
 } from 'lucide-react';
 
 // TYPES
 
 interface ExamStatus {
   can_start: boolean;
-  status: 'available' | 'locked' | 'in_progress' | 'forbidden' | string;
+  status: 'available' | 'locked' | 'in_progress' | 'ready' | 'forbidden' | string;
   days_remaining: number;
   next_available_date?: string | null;
   last_exam_date?: string | null;
@@ -73,7 +70,6 @@ interface Question {
   audio_url?: string | null;
   audio_text?: string | null;
   reading_text?: string | null;
-  image_url?: string | null;
 }
 
 interface ExamActive {
@@ -126,23 +122,24 @@ export default function ExamsClientPage() {
   const { sidebarOpen, toggleSidebar, closeSidebar } = useSidebarState();
   const { user } = useAuth();
 
-  // Estados principais da tela
+  // Screen main views
   const [view, setView] = useState<'dashboard' | 'taking' | 'result'>('dashboard');
   const [status, setStatus] = useState<ExamStatus | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loadingStatus, setLoadingStatus] = useState(true);
 
-  // Estados do exame ativo
+  // Active exam states
   const [activeExam, setActiveExam] = useState<ExamActive | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [recordedAudioB64, setRecordedAudioB64] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
 
-  // Estados do resultado
+  // Exam result
   const [examResult, setExamResult] = useState<ExamResult | null>(null);
 
-  // Estados de áudio (Listening) e gravação de voz (Speaking)
+  // Audio (Listening) and voice recording (Speaking)
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [audioListenCount, setAudioListenCount] = useState<Record<string, number>>({});
   const [showTranscript, setShowTranscript] = useState(false);
@@ -153,30 +150,25 @@ export default function ExamsClientPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioCacheRef = useRef<Record<string, string>>({});
 
-  // Reprodução de áudio em inglês nativo (TTS) para listening
-  const handlePlayListeningAudio = (text: string, qId: string) => {
+  // Fallback speech synthesis
+  const fallbackSpeechSynthesis = (phrase: string, studentAccent: string, qId: string) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      toast.error('Audio playback is not supported on this device/browser.');
-      return;
-    }
-
-    if (isPlayingAudio) {
-      window.speechSynthesis.cancel();
       setIsPlayingAudio(false);
       return;
     }
-
     window.speechSynthesis.cancel();
-    const clean = text.replace(/^(Station Announcer|Speaker\s*\w*|Woman|Man|Announcer):\s*/gim, '').trim();
-    const utterance = new SpeechSynthesisUtterance(clean || text);
-    utterance.lang = 'en-US';
+    const utterance = new SpeechSynthesisUtterance(phrase);
+    utterance.lang = studentAccent || 'en-US';
     utterance.rate = 0.95;
 
     const voices = window.speechSynthesis.getVoices();
-    const englishVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Daniel') || v.name.includes('English')));
-    if (englishVoice) {
-      utterance.voice = englishVoice;
+    const prefix = studentAccent.split('-')[0] || 'en';
+    const matchedVoice = voices.find(v => v.lang.startsWith(prefix) && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Jenny') || v.name.includes('Sonia')));
+    if (matchedVoice) {
+      utterance.voice = matchedVoice;
     }
 
     utterance.onstart = () => setIsPlayingAudio(true);
@@ -189,11 +181,77 @@ export default function ExamsClientPage() {
     window.speechSynthesis.speak(utterance);
   };
 
-  // Gravação de microfone para speaking
+  // Play audio dialogue using Edge TTS in student's preferred accent
+  const handlePlayListeningAudio = async (text: string, qId: string) => {
+    // If audio is currently playing, pause it
+    if (isPlayingAudio) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      setIsPlayingAudio(false);
+      return;
+    }
+
+    const clean = text.replace(/^(Station Announcer|Speaker\s*\w*|Woman|Man|Announcer|Flight Attendant|Receptionist):\s*/gim, '').trim();
+    const phrase = clean || text;
+
+    // Student accent
+    const studentAccent = user?.preferred_accent || (user?.profile as any)?.preferred_accent || (user?.profile as any)?.accent || getStoredAccent();
+
+    try {
+      setIsPlayingAudio(true);
+
+      // Check cache first
+      let audioB64 = audioCacheRef.current[qId];
+
+      if (!audioB64) {
+        const res = await apiPost<{ audio?: string; audio_b64?: string }>('/chat/tts', {
+          text: phrase,
+          accent: studentAccent,
+        });
+        if (res.ok && (res.data?.audio || res.data?.audio_b64)) {
+          audioB64 = res.data.audio || res.data.audio_b64 || '';
+          audioCacheRef.current[qId] = audioB64;
+        }
+      }
+
+      if (audioB64) {
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+        const audioSrc = audioB64.startsWith('data:') ? audioB64 : `data:audio/mp3;base64,${audioB64}`;
+        const audio = new Audio(audioSrc);
+        audioRef.current = audio;
+
+        audio.onended = () => {
+          setIsPlayingAudio(false);
+          setAudioListenCount(prev => ({ ...prev, [qId]: (prev[qId] || 0) + 1 }));
+        };
+
+        audio.onerror = () => {
+          setIsPlayingAudio(false);
+          fallbackSpeechSynthesis(phrase, studentAccent, qId);
+        };
+
+        await audio.play();
+        return;
+      }
+
+      throw new Error('TTS response was empty');
+    } catch (err) {
+      console.warn('Backend TTS call failed, using Web Speech API fallback:', err);
+      fallbackSpeechSynthesis(phrase, studentAccent, qId);
+    }
+  };
+
+  // Microphone recording for speaking tasks
   const startRecording = async (qId: string) => {
     try {
       if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-        toast.error('Microphone recording is not supported on this device.');
+        toast.error('Microphone recording is not supported on this browser or device.');
         return;
       }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -211,8 +269,15 @@ export default function ExamsClientPage() {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const audioUrl = URL.createObjectURL(audioBlob);
         setRecordedAudios(prev => ({ ...prev, [qId]: audioUrl }));
-        setAnswers(prev => ({ ...prev, [qId]: 'recorded' }));
-        toast.success('Audio recorded successfully!');
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const b64Data = reader.result as string;
+          setRecordedAudioB64(prev => ({ ...prev, [qId]: b64Data }));
+          setAnswers(prev => ({ ...prev, [qId]: 'Audio recorded' }));
+          toast.success('Spoken audio response recorded in English!');
+        };
+        reader.readAsDataURL(audioBlob);
         stream.getTracks().forEach(t => t.stop());
       };
 
@@ -230,8 +295,8 @@ export default function ExamsClientPage() {
         });
       }, 1000);
     } catch (err) {
-      console.error('Microphone error:', err);
-      toast.error('Microphone access denied or unavailable.');
+      console.error('Microphone access error:', err);
+      toast.error('Microphone access was denied or is unavailable.');
     }
   };
 
@@ -243,19 +308,22 @@ export default function ExamsClientPage() {
     setIsRecording(false);
   };
 
-  // Limpa áudio e gravação ao trocar de questão
+  // Clean audio and recording when changing question
   useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
-      setIsPlayingAudio(false);
-      setShowTranscript(false);
     }
+    setIsPlayingAudio(false);
+    setShowTranscript(false);
     if (isRecording) {
       stopRecording();
     }
   }, [currentQuestionIndex]);
 
-  // Carrega status e histórico
+  // Load status and history
   const fetchStatusAndHistory = async () => {
     try {
       setLoadingStatus(true);
@@ -271,8 +339,8 @@ export default function ExamsClientPage() {
         setHistory(historyData);
       }
     } catch (err) {
-      console.error('[Exams] Erro ao carregar dados:', err);
-      toast.error('Erro ao carregar status do exame trimestral.');
+      console.error('[Exams] Failed to load data:', err);
+      toast.error('Error loading quarterly exam status.');
     } finally {
       setLoadingStatus(false);
     }
@@ -282,7 +350,7 @@ export default function ExamsClientPage() {
     fetchStatusAndHistory();
   }, []);
 
-  // Iniciar Exame
+  // Start Exam
   const handleStartExam = async (force: boolean = false) => {
     try {
       setIsStarting(true);
@@ -295,20 +363,21 @@ export default function ExamsClientPage() {
         setActiveExam(res.data);
         setCurrentQuestionIndex(0);
         setAnswers({});
+        setRecordedAudioB64({});
         setView('taking');
-        toast.success('Exame Trimestral iniciado! Boa sorte!');
+        toast.success('Quarterly CEFR Exam started! Good luck!');
       } else {
-        const errDetail = (res as any)?.data?.detail || 'Não foi possível iniciar o exame.';
+        const errDetail = (res as any)?.data?.detail || 'Unable to start quarterly exam.';
         toast.error(errDetail);
       }
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao conectar ao servidor para gerar o exame.');
+      toast.error(err?.message || 'Error connecting to the server to start the exam.');
     } finally {
       setIsStarting(false);
     }
   };
 
-  // Retomar Exame em Andamento
+  // Resume active or ready exam
   const handleResumeActiveExam = async () => {
     try {
       setIsStarting(true);
@@ -327,7 +396,7 @@ export default function ExamsClientPage() {
     }
   };
 
-  // Submeter Exame
+  // Submit Exam
   const handleSubmitExam = async () => {
     if (!activeExam) return;
 
@@ -336,7 +405,7 @@ export default function ExamsClientPage() {
 
     if (answeredCount < totalCount) {
       const confirmSubmit = window.confirm(
-        `Você respondeu ${answeredCount} de ${totalCount} questões. Deseja finalizar mesmo com questões em branco?`
+        `You answered ${answeredCount} of ${totalCount} questions. Do you want to submit anyway?`
       );
       if (!confirmSubmit) return;
     }
@@ -346,6 +415,7 @@ export default function ExamsClientPage() {
       const payloadAnswers = Object.entries(answers).map(([qId, val]) => ({
         question_id: qId,
         answer: val,
+        audio_data: recordedAudioB64[qId] || undefined,
       }));
 
       const res = await apiPost<ExamResult>(ENDPOINTS.EXAMS_TRIMESTRAL_SUBMIT, {
@@ -356,51 +426,50 @@ export default function ExamsClientPage() {
       if (res.ok && res.data) {
         setExamResult(res.data);
         setView('result');
-        toast.success(`Exame concluído! Você obteve ${res.data.score}% de aproveitamento! 🎉`);
+        toast.success(`Exam completed! You scored ${res.data.score}%! 🎉`);
         fetchStatusAndHistory();
       } else {
-        toast.error('Erro ao submeter as respostas do exame.');
+        toast.error('Failed to submit exam answers.');
       }
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao enviar respostas.');
+      toast.error(err?.message || 'Error submitting exam answers.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Reset para Desenvolvimento
+  // Reset for Development Testing
   const handleResetDev = async () => {
-    if (!window.confirm('Deseja resetar o ciclo de exames para poder testar novamente de imediato?')) return;
+    if (!window.confirm('Do you want to reset the exam cycle to test again immediately?')) return;
     try {
       const res = await apiPost<{ success: boolean; message: string }>(ENDPOINTS.EXAMS_TRIMESTRAL_RESET, {});
       if (res.ok) {
-        toast.success('Exames resetados! Ciclo liberado para novo teste.');
+        toast.success('Exam cycle reset! Background AI will prepare a new exam.');
         setView('dashboard');
         setActiveExam(null);
         setExamResult(null);
         fetchStatusAndHistory();
       }
     } catch {
-      toast.error('Erro ao resetar exames.');
+      toast.error('Error resetting exam cycle.');
     }
   };
 
-  // Helper de formatação de data
+  // Date formatting helper in English
   const formatDate = (isoString?: string | null) => {
     if (!isoString) return '--/--/----';
     try {
       const d = new Date(isoString);
-      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     } catch {
       return isoString;
     }
   };
 
-  // Habilidades consolidadas da última avaliação ou histórico
   const latestEvolution = status?.last_exam_evolution || (history.length > 0 ? history[0] : null);
 
   // ==============================================================================
-  // RENDER: TELA DE REALIZAÇÃO DO EXAME
+  // RENDER: EXAM TAKING VIEW (100% ENGLISH)
   // ==============================================================================
   if (view === 'taking' && activeExam) {
     const currentQ = activeExam.questions[currentQuestionIndex];
@@ -411,7 +480,7 @@ export default function ExamsClientPage() {
         <MainHeader onToggleMenu={toggleSidebar} />
 
         <div className="flex-1 flex max-w-5xl w-full mx-auto p-4 md:p-8 flex-col">
-          {/* Header do Exame com Progresso (em Inglês) */}
+          {/* Header with Progress */}
           <div className="bg-surface border border-border rounded-2xl p-4 md:p-6 mb-6 shadow-sm">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-3">
@@ -420,12 +489,16 @@ export default function ExamsClientPage() {
                 </div>
                 <div>
                   <h1 className="font-bold text-lg text-text">Quarterly CEFR Exam</h1>
-                  <p className="text-xs text-text-muted">Assessment Level: <span className="font-bold text-primary">{activeExam.level}</span></p>
+                  <p className="text-xs text-text-muted">
+                    Assessment Level: <span className="font-bold text-primary">{activeExam.level}</span>
+                  </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-4 text-xs font-semibold text-text-muted">
-                <span>Question <strong className="text-primary text-sm">{currentQuestionIndex + 1}</strong> of {activeExam.total_questions}</span>
+                <span>
+                  Question <strong className="text-primary text-sm">{currentQuestionIndex + 1}</strong> of {activeExam.total_questions}
+                </span>
                 <span className="hidden sm:inline-block w-1.5 h-1.5 rounded-full bg-border" />
                 <span className="text-success flex items-center gap-1 font-bold">
                   <Check size={14} /> {Object.keys(answers).length} answered
@@ -433,7 +506,7 @@ export default function ExamsClientPage() {
               </div>
             </div>
 
-            {/* Barra de Progresso */}
+            {/* Progress Bar */}
             <div className="w-full bg-bg-secondary h-2.5 rounded-full overflow-hidden">
               <div
                 className="bg-primary h-full transition-all duration-300 rounded-full"
@@ -442,11 +515,11 @@ export default function ExamsClientPage() {
             </div>
           </div>
 
-          {/* Card da Questão */}
+          {/* Question Card */}
           {currentQ && (
             <div className="bg-surface border border-border rounded-3xl p-5 md:p-8 shadow-sm flex-1 flex flex-col justify-between">
               <div>
-                {/* Tipo de Questão (Badge) */}
+                {/* Question Type Badge */}
                 <div className="flex items-center justify-between gap-2 mb-4">
                   <span className={cn(
                     "text-xs px-3.5 py-1.5 rounded-full font-bold uppercase tracking-wider",
@@ -456,31 +529,19 @@ export default function ExamsClientPage() {
                     currentQ.type === 'listening' && "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20",
                     currentQ.type === 'speaking' && "bg-rose-500/10 text-rose-500 border border-rose-500/20",
                   )}>
-                    {currentQ.type === 'reading' ? '📖 Reading Comprehension' :
-                     currentQ.type === 'grammar' ? '⚡ Grammar' :
-                     currentQ.type === 'vocabulary' ? '✨ Vocabulary' :
-                     currentQ.type === 'listening' ? '🎧 Listening Comprehension' :
-                     currentQ.type === 'speaking' ? '🎙️ Speaking Task' : currentQ.type}
+                    {currentQ.type === 'reading' && "📖 Reading Comprehension"}
+                    {currentQ.type === 'grammar' && "✏️ Applied Grammar"}
+                    {currentQ.type === 'vocabulary' && "💡 Vocabulary in Context"}
+                    {currentQ.type === 'listening' && "🎧 Listening Comprehension"}
+                    {currentQ.type === 'speaking' && "🎙️ Oral Expression & Speaking"}
                   </span>
-                  <span className="text-xs font-bold text-text-muted">10 points</span>
+
+                  <span className="text-xs font-semibold text-text-muted">
+                    {currentQ.points} points
+                  </span>
                 </div>
 
-                {/* 1. Imagem de Contexto (quando houver image_url) */}
-                {currentQ.image_url && (
-                  <div className="mb-6 rounded-2xl overflow-hidden border border-border bg-bg-secondary/40 max-h-72 flex flex-col">
-                    <div className="px-4 py-2 border-b border-border/60 text-[11px] font-bold text-text-muted uppercase tracking-wider flex items-center gap-1.5 bg-surface/50">
-                      <ImageIcon size={14} className="text-primary" /> Visual Context:
-                    </div>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={currentQ.image_url}
-                      alt="Question illustration"
-                      className="w-full h-56 object-cover hover:scale-[1.01] transition-transform duration-300"
-                    />
-                  </div>
-                )}
-
-                {/* 2. Bloco de Reading Comprehension (com texto independente para cada questão) */}
+                {/* Reading Passage Block (each reading question has its own distinct text) */}
                 {currentQ.reading_text && (
                   <div className="bg-bg-secondary/60 border border-border rounded-2xl p-5 md:p-6 mb-6">
                     <div className="flex items-center gap-2 text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
@@ -493,12 +554,12 @@ export default function ExamsClientPage() {
                   </div>
                 )}
 
-                {/* 3. Bloco de Listening com Player de Áudio Interativo */}
+                {/* Listening Comprehension Audio Player (Edge TTS in Student Accent) */}
                 {currentQ.type === 'listening' && (
                   <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-5 md:p-6 mb-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                       <div className="flex items-center gap-2 text-xs font-bold text-emerald-500 uppercase tracking-wider">
-                        <Headphones size={18} /> Audio Track • Listening Comprehension
+                        <Headphones size={18} /> Audio Track • Listening Dialogue
                       </div>
                       <span className="text-xs text-text-muted font-medium">
                         Times played: <strong className="text-emerald-500">{audioListenCount[currentQ.id] || 0}</strong>
@@ -527,7 +588,7 @@ export default function ExamsClientPage() {
                         )}
                       </button>
 
-                      {/* Ondas Sonoras / Equalizador em Reprodução */}
+                      {/* Sound waves animation */}
                       {isPlayingAudio && (
                         <div className="flex items-center gap-1.5 h-6">
                           <span className="w-1 bg-emerald-500 rounded-full animate-bounce h-3" />
@@ -555,12 +616,12 @@ export default function ExamsClientPage() {
                   </div>
                 )}
 
-                {/* 4. Bloco de Speaking com Gravador de Microfone */}
+                {/* Speaking Task with Voice Recording */}
                 {currentQ.type === 'speaking' && (
                   <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-5 md:p-6 mb-6">
                     <div className="flex items-center justify-between gap-2 mb-3">
                       <div className="flex items-center gap-2 text-xs font-bold text-rose-500 uppercase tracking-wider">
-                        <Mic size={18} /> Oral Response • Voice Recording
+                        <Mic size={18} /> Spoken Task • Voice Recording
                       </div>
                       {answers[currentQ.id] && (
                         <span className="text-xs font-bold text-success flex items-center gap-1">
@@ -581,7 +642,7 @@ export default function ExamsClientPage() {
                           className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2.5 transition-all active:scale-95"
                         >
                           <Mic size={18} />
-                          {recordedAudios[currentQ.id] ? 'Re-record Audio (Gravar Novamente)' : 'Start Recording (Gravar Resposta)'}
+                          {recordedAudios[currentQ.id] ? 'Re-record Spoken Response' : 'Start Recording Voice'}
                         </button>
                       ) : (
                         <button
@@ -602,40 +663,41 @@ export default function ExamsClientPage() {
                       )}
                     </div>
 
-                    {/* Player de Reprodução do Áudio Gravado */}
                     {recordedAudios[currentQ.id] && (
-                      <div className="mt-4 p-3 bg-surface rounded-xl border border-border">
-                        <p className="text-[11px] font-bold text-text-muted uppercase mb-1">Your Recorded Response:</p>
-                        <audio
-                          src={recordedAudios[currentQ.id]}
-                          controls
-                          className="w-full h-10 rounded-lg"
-                        />
+                      <div className="mt-4 pt-4 border-t border-rose-500/20 flex items-center gap-3">
+                        <span className="text-xs text-text-muted font-bold">Listen to your recording:</span>
+                        <audio src={recordedAudios[currentQ.id]} controls className="h-8 max-w-xs" />
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Enunciado da Pergunta */}
-                <h2 className="text-base md:text-xl font-bold text-text mb-6">
+                {/* Question Prompt */}
+                <h2 className="text-base md:text-xl font-bold text-text leading-snug mb-6">
                   {currentQ.question}
                 </h2>
 
-                {/* Opções de Resposta (Marcar X com visual elegante) */}
+                {/* Multiple Choice Options (for reading, grammar, vocabulary, listening) */}
                 {currentQ.type !== 'speaking' && (
                   <div className="space-y-3 mb-8">
                     {currentQ.options.map((optionText, optIdx) => {
                       const isSelected = answers[currentQ.id] === optionText;
+
                       return (
                         <button
                           key={optIdx}
                           type="button"
-                          onClick={() => setAnswers((prev) => ({ ...prev, [currentQ.id]: optionText }))}
+                          onClick={() => {
+                            setAnswers((prev) => ({
+                              ...prev,
+                              [currentQ.id]: optionText,
+                            }));
+                          }}
                           className={cn(
-                            "w-full text-left p-4 md:p-5 rounded-2xl border transition-all flex items-center justify-between group",
+                            "w-full p-4 md:p-5 rounded-2xl border text-left transition-all flex items-center justify-between group",
                             isSelected
-                              ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary"
-                              : "border-border bg-bg-secondary/40 hover:bg-surface-hover hover:border-primary/40 text-text"
+                              ? "border-primary bg-primary/10 shadow-sm"
+                              : "border-border bg-surface hover:border-primary/40 hover:bg-surface-hover"
                           )}
                         >
                           <div className="flex items-center gap-4">
@@ -670,7 +732,7 @@ export default function ExamsClientPage() {
                 )}
               </div>
 
-              {/* Botões de Ação na Base (em Inglês) */}
+              {/* Action Buttons at the Bottom */}
               <div className="pt-4 border-t border-border flex flex-col-reverse sm:flex-row items-center justify-between gap-3">
                 <button
                   type="button"
@@ -698,7 +760,7 @@ export default function ExamsClientPage() {
                       className="w-full sm:w-auto px-8 py-3 rounded-xl bg-success text-white font-bold text-sm hover:opacity-90 shadow-md flex items-center justify-center gap-2 animate-pulse"
                     >
                       {isSubmitting ? (
-                        <>Processing results...</>
+                        <>Processing results with AI...</>
                       ) : (
                         <>
                           <CheckCircle2 size={18} /> Finalize & View Results
@@ -716,7 +778,7 @@ export default function ExamsClientPage() {
   }
 
   // ==============================================================================
-  // RENDER: TELA DE RESULTADO & FEEDBACK PEDAGÓGICO
+  // RENDER: EXAM RESULT & PEDAGOGICAL FEEDBACK (100% ENGLISH)
   // ==============================================================================
   if (view === 'result' && examResult) {
     return (
@@ -724,7 +786,7 @@ export default function ExamsClientPage() {
         <MainHeader onToggleMenu={toggleSidebar} />
 
         <div className="flex-1 max-w-4xl w-full mx-auto p-4 md:p-8">
-          {/* Banner de Resultado */}
+          {/* Result Banner */}
           <div className="bg-surface border border-border rounded-3xl p-6 md:p-10 shadow-sm text-center mb-8 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary via-purple-500 to-success" />
 
@@ -736,34 +798,34 @@ export default function ExamsClientPage() {
               "text-xs px-4 py-1.5 rounded-full font-bold uppercase tracking-wider inline-block mb-3",
               examResult.passed ? "bg-success/10 text-success border border-success/20" : "bg-warning/10 text-warning border border-warning/20"
             )}>
-              {examResult.passed ? '🎉 Aprovado na Avaliação Trimestral' : '📚 Avaliação Concluída'}
+              {examResult.passed ? '🎉 Quarterly Assessment Passed' : '📚 Assessment Completed'}
             </span>
 
             <h1 className="text-3xl md:text-5xl font-black text-text mb-2 tracking-tight">
-              {examResult.score}% <span className="text-xl md:text-2xl font-normal text-text-muted">de aproveitamento</span>
+              {examResult.score}% <span className="text-xl md:text-2xl font-normal text-text-muted">Overall Score</span>
             </h1>
 
             <p className="text-sm md:text-base text-text-muted max-w-xl mx-auto mb-6 leading-relaxed">
               {examResult.summary_feedback}
             </p>
 
-            {/* Badges de Conquistas */}
+            {/* Badges */}
             <div className="flex flex-wrap items-center justify-center gap-3 md:gap-4 mb-6">
               <div className="bg-bg-secondary px-4 py-2 rounded-xl flex items-center gap-2 border border-border text-sm font-bold">
                 <Flame size={18} className="text-amber-500" />
-                <span>+{examResult.xp_earned} XP Conquistados</span>
+                <span>+{examResult.xp_earned} XP Earned</span>
               </div>
 
               {examResult.recommended_level && (
                 <div className="bg-primary/10 text-primary px-4 py-2 rounded-xl flex items-center gap-2 border border-primary/20 text-sm font-bold">
                   <Sparkles size={18} />
-                  <span>Recomendado para o nível {examResult.recommended_level}!</span>
+                  <span>Recommended for Level {examResult.recommended_level}!</span>
                 </div>
               )}
 
               <div className="bg-bg-secondary px-4 py-2 rounded-xl flex items-center gap-2 border border-border text-sm font-bold text-text-muted">
                 <Calendar size={18} className="text-primary" />
-                <span>Próximo teste: {formatDate(examResult.next_exam_date)}</span>
+                <span>Next Exam: {formatDate(examResult.next_exam_date)}</span>
               </div>
             </div>
 
@@ -772,11 +834,11 @@ export default function ExamsClientPage() {
               onClick={() => setView('dashboard')}
               className="px-8 py-3.5 rounded-xl bg-primary text-white font-bold text-sm hover:opacity-90 shadow-md inline-flex items-center gap-2"
             >
-              Ver Meu Painel de Evolução <ArrowRight size={18} />
+              View Evolution Dashboard <ArrowRight size={18} />
             </button>
           </div>
 
-          {/* O Que Você Já Domina (Can-Do Statements) */}
+          {/* Validated CEFR Can-Do Statements */}
           {examResult.can_do_statements && examResult.can_do_statements.length > 0 && (
             <div className="bg-surface border border-border rounded-3xl p-6 md:p-8 mb-8 shadow-sm">
               <div className="flex items-center gap-3 mb-6">
@@ -784,8 +846,8 @@ export default function ExamsClientPage() {
                   <BookmarkCheck size={22} />
                 </div>
                 <div>
-                  <h2 className="text-lg md:text-xl font-bold text-text">Habilidades Demonstradas no Teste</h2>
-                  <p className="text-xs text-text-muted">Competências CEFR validadas neste trimestre</p>
+                  <h2 className="text-lg md:text-xl font-bold text-text">Demonstrated Competencies</h2>
+                  <p className="text-xs text-text-muted">Official CEFR competencies proven in this assessment</p>
                 </div>
               </div>
 
@@ -802,12 +864,12 @@ export default function ExamsClientPage() {
             </div>
           )}
 
-          {/* Gabarito e Correções Detalhadas Questão por Questão */}
+          {/* Question-by-Question Detailed Review & Explanations */}
           <div className="bg-surface border border-border rounded-3xl p-6 md:p-8 shadow-sm">
             <h2 className="text-lg md:text-xl font-bold text-text mb-2 flex items-center gap-2">
-              <FileText size={20} className="text-primary" /> Revisão e Gabarito do Exame
+              <FileText size={20} className="text-primary" /> Exam Review & Pedagogical Feedback
             </h2>
-            <p className="text-xs text-text-muted mb-6">Confira as explicações didáticas da Teacher Tati para cada alternativa</p>
+            <p className="text-xs text-text-muted mb-6">Review Teacher Tati&apos;s explanations and AI evaluations for each question</p>
 
             <div className="space-y-4">
               {examResult.corrections.map((corr, idx) => (
@@ -822,7 +884,7 @@ export default function ExamsClientPage() {
                 >
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-text-muted">
-                      Questão {idx + 1} • {corr.type}
+                      Question {idx + 1} • {corr.type.toUpperCase()}
                     </span>
                     <span className={cn(
                       "text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1",
@@ -831,7 +893,7 @@ export default function ExamsClientPage() {
                         : "bg-danger/10 text-danger border border-danger/20"
                     )}>
                       {corr.is_correct ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
-                      {corr.is_correct ? 'Correta (+10 pts)' : 'Incorreta (0 pts)'}
+                      {corr.is_correct ? `Correct (+${corr.points_earned} pts)` : 'Incorrect (0 pts)'}
                     </span>
                   </div>
 
@@ -839,18 +901,18 @@ export default function ExamsClientPage() {
 
                   <div className="text-xs space-y-1 mb-3">
                     <p className="text-text-muted">
-                      Sua resposta: <strong className={corr.is_correct ? "text-success" : "text-danger"}>{corr.student_answer || '(em branco)'}</strong>
+                      Your answer: <strong className={corr.is_correct ? "text-success" : "text-danger"}>{corr.student_answer || '(not answered)'}</strong>
                     </p>
                     {!corr.is_correct && (
                       <p className="text-text-muted">
-                        Resposta correta: <strong className="text-success">{corr.correct_answer}</strong>
+                        Target answer: <strong className="text-success">{corr.correct_answer}</strong>
                       </p>
                     )}
                   </div>
 
                   <div className="bg-bg/60 p-3 rounded-xl border border-border text-xs text-text-muted flex items-start gap-2">
                     <Lightbulb size={16} className="text-primary shrink-0 mt-0.5" />
-                    <span><strong>Explicação:</strong> {corr.explanation}</span>
+                    <span><strong>Pedagogical Feedback:</strong> {corr.explanation}</span>
                   </div>
                 </div>
               ))}
@@ -862,7 +924,7 @@ export default function ExamsClientPage() {
   }
 
   // ==============================================================================
-  // RENDER: DASHBOARD DO EXAME TRIMESTRAL & PAINEL DE EVOLUÇÃO
+  // RENDER: QUARTERLY EXAM DASHBOARD & EVOLUTION PANEL (100% ENGLISH)
   // ==============================================================================
   return (
     <div className="min-h-screen bg-bg flex flex-col md:flex-row overflow-x-clip text-text">
@@ -872,55 +934,55 @@ export default function ExamsClientPage() {
         <MainHeader onToggleMenu={toggleSidebar} />
 
         <main className="p-4 md:p-8 max-w-7xl w-full mx-auto space-y-8 animate-fade-in">
-          {/* Header da Página */}
+          {/* Page Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-wider mb-1">
-                <GraduationCap size={16} /> Avaliação Periódica • A Cada 3 Meses
+                <GraduationCap size={16} /> Periodic Assessment • Every 3 Months
               </div>
               <h1 className="text-2xl md:text-3xl font-black text-text tracking-tight">
-                Exame Trimestral CEFR
+                Quarterly CEFR Exam
               </h1>
               <p className="text-xs md:text-sm text-text-muted">
-                Acompanhe a sua evolução real em Reading, Grammar e Vocabulary a cada 3 meses com métricas oficiais.
+                Track your actual proficiency in Reading, Grammar, Vocabulary, Listening, and Speaking every 3 months.
               </p>
             </div>
 
-            {/* Ações / Status Badge */}
+            {/* Actions / Status Badge */}
             {status && (
               <div className="flex items-center gap-2">
                 <span className="px-3.5 py-1.5 rounded-xl bg-surface border border-border text-xs font-bold text-text-muted flex items-center gap-2 shadow-sm">
-                  <span>Nível Atual:</span>
+                  <span>Current Level:</span>
                   <strong className="text-primary text-sm">{status.current_level}</strong>
                 </span>
 
-                {/* Botão de Reset (Dev) */}
+                {/* Reset Dev Button */}
                 <button
                   type="button"
                   onClick={handleResetDev}
-                  title="Resetar ciclo de exames para testar novamente (Dev)"
+                  title="Reset exam cycle to test again immediately (Dev)"
                   className="px-3 py-1.5 rounded-xl border border-border text-xs font-bold text-text-muted hover:text-primary hover:border-primary/40 flex items-center gap-1.5 transition-all"
                 >
-                  <RotateCcw size={13} /> Resetar (Dev)
+                  <RotateCcw size={13} /> Reset (Dev)
                 </button>
               </div>
             )}
           </div>
 
-          {/* CARD DE STATUS PRINCIPAL */}
+          {/* MAIN STATUS CARD */}
           {loadingStatus ? (
             <div className="h-44 bg-surface border border-border rounded-3xl animate-pulse flex items-center justify-center">
-              <span className="text-xs text-text-muted font-bold">Carregando status do exame trimestral...</span>
+              <span className="text-xs text-text-muted font-bold">Loading quarterly exam status...</span>
             </div>
           ) : status?.status === 'in_progress' ? (
             <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-surface border border-amber-500/30 rounded-3xl p-6 md:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-sm">
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-xs font-bold text-amber-500 uppercase tracking-wider">
-                  <Clock size={16} /> Exame em Andamento
+                  <Clock size={16} /> Exam in Progress
                 </div>
-                <h2 className="text-xl md:text-2xl font-bold text-text">Você tem uma avaliação trimestral ativa</h2>
+                <h2 className="text-xl md:text-2xl font-bold text-text">You have an active quarterly assessment</h2>
                 <p className="text-xs md:text-sm text-text-muted max-w-xl">
-                  Suas perguntas já foram geradas. Continue de onde parou para registrar sua evolução trimestral e garantir seus pontos de XP!
+                  Your questions are already prepared. Continue where you left off to register your quarterly evolution and claim your XP!
                 </p>
               </div>
 
@@ -930,19 +992,19 @@ export default function ExamsClientPage() {
                 disabled={isStarting}
                 className="px-8 py-3.5 rounded-2xl bg-amber-500 text-white font-bold text-sm hover:opacity-90 shadow-md shrink-0 flex items-center gap-2"
               >
-                {isStarting ? 'Carregando...' : <>Continuar Exame <ArrowRight size={18} /></>}
+                {isStarting ? 'Loading...' : <>Resume Exam <ArrowRight size={18} /></>}
               </button>
             </div>
           ) : status?.can_start ? (
             <div className="bg-gradient-to-r from-primary/15 via-primary/5 to-surface border border-primary/30 rounded-3xl p-6 md:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-sm relative overflow-hidden">
               <div className="space-y-2 relative z-10">
                 <div className="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-wider">
-                  <Sparkles size={16} /> Liberado para Realização
+                  <Sparkles size={16} /> Ready to Take
                 </div>
-                <h2 className="text-xl md:text-2xl font-bold text-text">Seu Exame Trimestral está disponível!</h2>
+                <h2 className="text-xl md:text-2xl font-bold text-text">Your Quarterly Exam is Available!</h2>
                 <p className="text-xs md:text-sm text-text-muted max-w-xl leading-relaxed">
-                  Avaliação oficial com 8 a 15 questões personalizadas para o nível <strong>{status.current_level}</strong>. 
-                  Responda textos de leitura fáceis e questões objetivas sem pegadinhas. Duração média: 15 minutos.
+                  Official CEFR assessment with 8 to 15 questions tailored for level <strong>{status.current_level}</strong>. 
+                  Short reading texts, grammar, listening dialogue, and speaking tasks. Average duration: 15 minutes.
                 </p>
               </div>
 
@@ -952,9 +1014,9 @@ export default function ExamsClientPage() {
                 disabled={isStarting}
                 className="px-8 py-4 rounded-2xl bg-primary text-white font-bold text-sm hover:opacity-90 shadow-lg shadow-primary/20 shrink-0 flex items-center gap-2.5 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
               >
-                {isStarting ? 'Gerando questões...' : (
+                {isStarting ? 'Loading exam questions...' : (
                   <>
-                    <GraduationCap size={20} /> Iniciar Exame Trimestral <ArrowRight size={18} />
+                    <GraduationCap size={20} /> Start Quarterly Exam <ArrowRight size={18} />
                   </>
                 )}
               </button>
@@ -964,13 +1026,13 @@ export default function ExamsClientPage() {
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-xs font-bold text-text-muted uppercase tracking-wider">
-                    <Clock size={16} className="text-primary" /> Ciclo de 3 Meses em Andamento
+                    <Clock size={16} className="text-primary" /> 3-Month Cycle in Progress
                   </div>
                   <h2 className="text-xl md:text-2xl font-bold text-text">
-                    Próximo exame liberado em <span className="text-primary">{status?.days_remaining ?? 90} dias</span>
+                    Next exam unlocked in <span className="text-primary">{status?.days_remaining ?? 90} days</span>
                   </h2>
                   <p className="text-xs md:text-sm text-text-muted max-w-xl">
-                    Data prevista de liberação: <strong>{formatDate(status?.next_available_date)}</strong>. Continue praticando suas atividades diárias e acumulando streak enquanto isso!
+                    Expected unlock date: <strong>{formatDate(status?.next_available_date)}</strong>. Continue practicing your daily activities and building your streak!
                   </p>
 
                   <div className="pt-2 flex items-center gap-3 flex-wrap">
@@ -980,23 +1042,23 @@ export default function ExamsClientPage() {
                       disabled={isStarting}
                       className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:opacity-90 flex items-center gap-2 shadow-sm transition-all"
                     >
-                      <Sparkles size={14} /> {isStarting ? 'Gerando questões...' : 'Iniciar Agora (Bypass Dev)'}
+                      <Sparkles size={14} /> {isStarting ? 'Loading questions...' : 'Start Now (Bypass Dev)'}
                     </button>
                     <button
                       type="button"
                       onClick={handleResetDev}
                       className="px-4 py-2 rounded-xl border border-border text-text-muted hover:text-primary text-xs font-bold transition-all flex items-center gap-1.5"
                     >
-                      <RotateCcw size={13} /> Resetar Ciclo
+                      <RotateCcw size={13} /> Reset Cycle
                     </button>
                   </div>
                 </div>
 
-                {/* Mini Progresso dos 90 dias */}
+                {/* 90-Day Progress */}
                 <div className="w-full md:w-64 bg-bg-secondary p-4 rounded-2xl border border-border">
                   <div className="flex justify-between text-xs font-bold mb-2">
-                    <span className="text-text-muted">Ciclo Trimestral</span>
-                    <span className="text-primary">{Math.max(0, 90 - (status?.days_remaining ?? 90))}/90 dias</span>
+                    <span className="text-text-muted">Quarterly Cycle</span>
+                    <span className="text-primary">{Math.max(0, 90 - (status?.days_remaining ?? 90))}/90 days</span>
                   </div>
                   <div className="w-full bg-surface h-2 rounded-full overflow-hidden">
                     <div
@@ -1009,9 +1071,9 @@ export default function ExamsClientPage() {
             </div>
           )}
 
-          {/* PAINEL DE EVOLUÇÃO DO ALUNO ("O QUE VOCÊ JÁ SABE FAZER") */}
+          {/* STUDENT EVOLUTION PANEL ("WHAT YOU HAVE MASTERED") */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Coluna 1 e 2: Competências Demonstradas & Can-Do Descriptors */}
+            {/* Demonstrated Competencies & Can-Do Descriptors */}
             <div className="lg:col-span-2 bg-surface border border-border rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -1019,14 +1081,14 @@ export default function ExamsClientPage() {
                     <BrainCircuit size={22} />
                   </div>
                   <div>
-                    <h2 className="text-lg md:text-xl font-bold text-text">O Que Você Já Domina</h2>
-                    <p className="text-xs text-text-muted">Habilidades comunicativas comprovadas nos seus testes</p>
+                    <h2 className="text-lg md:text-xl font-bold text-text">What You Have Mastered</h2>
+                    <p className="text-xs text-text-muted">Communicative competencies proven in your assessments</p>
                   </div>
                 </div>
 
                 {latestEvolution && (
                   <span className="text-xs font-bold px-3 py-1 bg-bg-secondary border border-border rounded-xl text-text-muted">
-                    Nível {latestEvolution.level} • {latestEvolution.score}%
+                    Level {latestEvolution.level} • {latestEvolution.score}%
                   </span>
                 )}
               </div>
@@ -1047,21 +1109,21 @@ export default function ExamsClientPage() {
               ) : (
                 <div className="p-8 text-center bg-bg-secondary/30 rounded-2xl border border-dashed border-border text-text-muted text-sm">
                   <Lightbulb size={28} className="mx-auto mb-2 text-primary opacity-60" />
-                  <p className="font-semibold text-text">Nenhuma avaliação trimestral registrada ainda.</p>
-                  <p className="text-xs mt-1">Assim que você concluir seu primeiro teste trimestral, este painel listará exatamente tudo o que você aprendeu a fazer em inglês!</p>
+                  <p className="font-semibold text-text">No quarterly assessments recorded yet.</p>
+                  <p className="text-xs mt-1">As soon as you complete your first quarterly exam, this panel will display everything you can do in English!</p>
                 </div>
               )}
 
-              {/* Dica da Teacher Tati para o Trimestre */}
+              {/* CEFR Pedagogical Guideline Note */}
               <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20 flex items-start gap-3 text-xs text-text-muted">
                 <Lightbulb size={18} className="text-primary shrink-0 mt-0.5" />
                 <span>
-                  <strong>Diretriz Pedagógica CEFR:</strong> Nosso exame trimestral mede sua evolução através dos descritores oficiais do Conselho da Europa. Cada acerto reflete uma habilidade comunicativa real do seu dia a dia.
+                  <strong>CEFR Pedagogical Standard:</strong> Our quarterly exam measures your evolution through official Council of Europe descriptors. Every correct answer reflects a real communicative ability.
                 </span>
               </div>
             </div>
 
-            {/* Coluna 3: Aproveitamento por Competência (Skills Breakdown) */}
+            {/* Skills Breakdown */}
             <div className="bg-surface border border-border rounded-3xl p-6 md:p-8 shadow-sm flex flex-col justify-between space-y-6">
               <div>
                 <div className="flex items-center gap-3 mb-6">
@@ -1069,8 +1131,8 @@ export default function ExamsClientPage() {
                     <TrendingUp size={22} />
                   </div>
                   <div>
-                    <h2 className="text-base md:text-lg font-bold text-text">Domínio por Área</h2>
-                    <p className="text-xs text-text-muted">Aproveitamento no último exame</p>
+                    <h2 className="text-base md:text-lg font-bold text-text">Skills Breakdown</h2>
+                    <p className="text-xs text-text-muted">Proficiency in your latest quarterly assessment</p>
                   </div>
                 </div>
 
@@ -1097,13 +1159,13 @@ export default function ExamsClientPage() {
                   </div>
                 ) : (
                   <div className="py-12 text-center text-xs text-text-muted">
-                    Faça seu teste trimestral para visualizar a divisão gráfica entre Leitura, Gramática e Vocabulário.
+                    Take your quarterly exam to view your visual breakdown across Reading, Grammar, Vocabulary, Listening, and Speaking.
                   </div>
                 )}
               </div>
 
               <div className="bg-bg-secondary p-4 rounded-2xl border border-border text-center">
-                <span className="text-xs text-text-muted block mb-1">Última Nota Geral</span>
+                <span className="text-xs text-text-muted block mb-1">Latest Overall Score</span>
                 <span className="text-2xl font-black text-primary">
                   {latestEvolution?.score !== undefined ? `${latestEvolution.score}%` : '--'}
                 </span>
@@ -1111,7 +1173,7 @@ export default function ExamsClientPage() {
             </div>
           </div>
 
-          {/* LINHA DO TEMPO TRIMESTRAL (HISTÓRICO) */}
+          {/* QUARTERLY TIMELINE (HISTORY) */}
           <div className="bg-surface border border-border rounded-3xl p-6 md:p-8 shadow-sm">
             <div className="flex items-center justify-between gap-4 mb-6">
               <div className="flex items-center gap-3">
@@ -1119,13 +1181,13 @@ export default function ExamsClientPage() {
                   <Award size={22} />
                 </div>
                 <div>
-                  <h2 className="text-lg md:text-xl font-bold text-text">Histórico de Exames Trimestrais</h2>
-                  <p className="text-xs text-text-muted">Sua linha do tempo de evolução a cada 3 meses</p>
+                  <h2 className="text-lg md:text-xl font-bold text-text">Quarterly Exam History</h2>
+                  <p className="text-xs text-text-muted">Your evolution timeline every 3 months</p>
                 </div>
               </div>
 
               <span className="text-xs font-bold text-text-muted">
-                {history.length} {history.length === 1 ? 'exame realizado' : 'exames realizados'}
+                {history.length} {history.length === 1 ? 'exam completed' : 'exams completed'}
               </span>
             </div>
 
@@ -1139,21 +1201,21 @@ export default function ExamsClientPage() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-3">
                         <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-primary/10 text-primary border border-primary/20">
-                          Nível {hItem.level}
+                          Level {hItem.level}
                         </span>
                         <span className="text-xs text-text-muted font-bold flex items-center gap-1">
                           <Calendar size={13} /> {formatDate(hItem.completed_at)}
                         </span>
                       </div>
                       <p className="text-sm font-semibold text-text max-w-xl">
-                        {hItem.feedback || 'Avaliação concluída com sucesso.'}
+                        {hItem.feedback || 'Assessment completed successfully.'}
                       </p>
                     </div>
 
                     <div className="flex items-center gap-4 shrink-0">
                       <div className="text-right">
                         <span className="text-xl font-black text-primary block leading-none">{hItem.score}%</span>
-                        <span className="text-[10px] text-text-muted font-bold uppercase">{hItem.passed ? 'Aprovado' : 'Concluído'}</span>
+                        <span className="text-[10px] text-text-muted font-bold uppercase">{hItem.passed ? 'Passed' : 'Completed'}</span>
                       </div>
                     </div>
                   </div>
@@ -1161,7 +1223,7 @@ export default function ExamsClientPage() {
               </div>
             ) : (
               <div className="p-8 text-center bg-bg-secondary/20 rounded-2xl border border-dashed border-border text-text-muted text-xs">
-                Nenhum histórico passado ainda. Seu primeiro exame aparecerá registrado aqui.
+                No past history yet. Your completed exams will appear here.
               </div>
             )}
           </div>

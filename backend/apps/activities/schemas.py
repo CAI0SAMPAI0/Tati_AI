@@ -185,6 +185,7 @@ class TrimestralExamStartOut(BaseModel):
 class StudentAnswerItem(BaseModel):
     question_id: str
     answer: str  # Texto selecionado ou resposta escrita
+    audio_data: Optional[str] = None  # Base64 do áudio gravado pelo aluno (para questões speaking)
 
 
 class TrimestralExamSubmitInput(BaseModel):
