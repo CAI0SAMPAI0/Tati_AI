@@ -1,6 +1,12 @@
 {
-  "framework": "nextjs",
+  "framework": "vite",
   "installCommand": "npm install --prefix=../..",
-  "buildCommand": "npm run build --workspace @tati/hub-site",
-  "outputDirectory": ".next"
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }

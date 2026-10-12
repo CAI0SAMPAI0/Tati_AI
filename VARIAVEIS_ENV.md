@@ -162,3 +162,23 @@ NEXT_PUBLIC_SUPPORT_EMAIL=contato@tati-ai.com
 # Observabilidade (opcional)
 NEXT_PUBLIC_SENTRY_DSN=
 ```
+
+---
+
+## 3. Hub de Materiais — Vue 3 / Vite (`apps/hub-site/.env` ou Vercel)
+
+> ⚠️ **AVISO DE SEGURANÇA CRÍTICO**: **NUNCA** adicione `VITE_GOOGLE_CLIENT_SECRET` no frontend!
+> Qualquer variável com prefixo `VITE_` é exposta publicamente no bundle JavaScript final do navegador. O `GOOGLE_CLIENT_SECRET` deve ficar **apenas no Backend** (`GOOGLE_CLIENT_SECRET`).
+
+```env
+# URL base da API Django (produção ou local)
+VITE_API_URL=https://caio007-tati-ai-backend.hf.space
+VITE_API_BASE_URL=https://caio007-tati-ai-backend.hf.space
+
+# Google OAuth Client ID (público, apenas ID)
+VITE_GOOGLE_CLIENT_ID=237918390149-kh6ta3o2d011ehkqn2s3iept839asarl.apps.googleusercontent.com
+
+# E-mail de suporte para o botão de ajuda e catálogo
+VITE_SUPPORT_EMAIL=contato@tati-ai.com
+```
+

@@ -27,6 +27,11 @@ from .schemas import (
     PronunciationVerifyInput,
     PronunciationVerifyOut,
     CheckoutInput,
+    TrimestralExamStatusOut,
+    TrimestralExamStartInput,
+    TrimestralExamStartOut,
+    TrimestralExamSubmitInput,
+    TrimestralExamResultOut,
 )
 from .services import (
     FlashcardService,
@@ -45,9 +50,10 @@ activities_router = Router(tags=["Activities & Learning"])
 catalog_router = Router(tags=["Public Catalog"])
 grammar_router = Router(tags=["Grammar"])
 speech_router = Router(tags=["Speech & Pronunciation"])
+exams_router = Router(tags=["Exams"])
 
 
-#    FLASHCARDS & REPETIÇÃO ESPAÇADA (SRS)                             
+# FLASHCARDS & REPETIÇÃO ESPAÇADA (SRS)                             
 
 
 @activities_router.get("/flashcards/my", auth=auth_required)
@@ -1850,3 +1856,111 @@ def resolve_cefr_images_batch(request: HttpRequest, payload: Optional[dict] = No
     terms = (payload or {}).get("terms", [])
     results = ImageResolverService.resolve_batch(terms)
     return {"success": True, "results": results}
+
+
+# EXAMES TRIMESTRAIS (QUARTERLY EXAMS - A CADA 3 MESES)
+
+
+@exams_router.get("/trimestral/status", response=TrimestralExamStatusOut, auth=auth_required)
+@exams_router.get("/exams/trimestral/status", response=TrimestralExamStatusOut, auth=auth_required)
+def get_trimestral_status(request: HttpRequest):
+    """
+    Retorna a elegibilidade do aluno para realizar o teste trimestral.
+    Disponível exatamente após 3 meses desde o último teste concluído.
+    Acesso temporariamente restrito aos usuários autorizados (programador e caio.sampaio).
+    """
+    from .trimestral_exams import TrimestralExamService
+    return TrimestralExamService.get_status(request.auth)
+
+
+@exams_router.post("/trimestral/start", response=TrimestralExamStartOut, auth=auth_required)
+@exams_router.post("/exams/trimestral/start", response=TrimestralExamStartOut, auth=auth_required)
+def start_trimestral_exam(request: HttpRequest, payload: Optional[TrimestralExamStartInput] = None):
+    """
+    Inicia um novo exame trimestral com 8 a 15 questões balanceadas (reading, grammar, vocabulary).
+    Se o aluno já tiver um exame em andamento, recupera o mesmo sem gerar novo.
+    """
+    from .trimestral_exams import TrimestralExamService, is_user_authorized
+
+    if not is_user_authorized(request.auth.username):
+        raise HttpError(403, "Os exames trimestrais estão em fase de testes e serão liberados em breve para todos os alunos.")
+
+    data = payload or TrimestralExamStartInput()
+    num_questions = int(getattr(data, "num_questions", 10) or 10)
+    force = bool(getattr(data, "force", False))
+
+    try:
+        return TrimestralExamService.start_or_get_exam(request.auth, num_questions=num_questions, force=force)
+    except PermissionError as pe:
+        raise HttpError(403, str(pe))
+    except ValueError as ve:
+        raise HttpError(400, str(ve))
+    except Exception as e:
+        logger.error(f"[ExamsAPI] Erro ao iniciar exame trimestral: {e}", exc_info=True)
+        raise HttpError(500, f"Erro ao gerar exame trimestral: {e}")
+
+
+@exams_router.get("/trimestral/current", response=TrimestralExamStartOut, auth=auth_required)
+@exams_router.get("/exams/trimestral/current", response=TrimestralExamStartOut, auth=auth_required)
+def get_current_trimestral_exam(request: HttpRequest):
+    """
+    Recupera o exame em andamento do aluno se ele atualizar a tela.
+    """
+    from .trimestral_exams import TrimestralExamService, is_user_authorized
+
+    if not is_user_authorized(request.auth.username):
+        raise HttpError(403, "Acesso restrito.")
+
+    current = TrimestralExamService.get_current_active_exam(request.auth)
+    if not current:
+        raise HttpError(404, "Nenhum exame trimestral em andamento no momento.")
+    return current
+
+
+@exams_router.post("/trimestral/submit", response=TrimestralExamResultOut, auth=auth_required)
+@exams_router.post("/exams/trimestral/submit", response=TrimestralExamResultOut, auth=auth_required)
+def submit_trimestral_exam(request: HttpRequest, payload: TrimestralExamSubmitInput):
+    """
+    Submete as respostas do exame trimestral, efetua a correção, pontua e agenda o próximo para 3 meses.
+    """
+    from .trimestral_exams import TrimestralExamService, is_user_authorized
+
+    if not is_user_authorized(request.auth.username):
+        raise HttpError(403, "Acesso restrito.")
+
+    try:
+        answers_list = [a.dict() for a in payload.answers]
+        return TrimestralExamService.submit_exam(request.auth, payload.exam_id, answers_list)
+    except PermissionError as pe:
+        raise HttpError(403, str(pe))
+    except ValueError as ve:
+        raise HttpError(400, str(ve))
+    except Exception as e:
+        logger.error(f"[ExamsAPI] Erro ao submeter exame trimestral: {e}", exc_info=True)
+        raise HttpError(500, f"Erro ao processar submissão do exame: {e}")
+
+
+@exams_router.get("/trimestral/history", auth=auth_required)
+@exams_router.get("/exams/trimestral/history", auth=auth_required)
+def get_trimestral_history(request: HttpRequest):
+    """
+    Retorna o histórico de exames trimestrais concluídos pelo aluno.
+    """
+    from .trimestral_exams import TrimestralExamService
+    return TrimestralExamService.get_history(request.auth)
+
+
+@exams_router.post("/trimestral/reset", auth=auth_required)
+@exams_router.post("/exams/trimestral/reset", auth=auth_required)
+def reset_trimestral_exam(request: HttpRequest):
+    """
+    Endpoint de teste para desenvolvedores: reseta os exames do usuário para testar novamente.
+    """
+    from .trimestral_exams import TrimestralExamService, is_user_authorized
+
+    if not is_user_authorized(request.auth.username):
+        raise HttpError(403, "Acesso restrito.")
+
+    TrimestralExamService.reset_user_exams(request.auth)
+    return {"success": True, "message": "Exames trimestrais resetados com sucesso para testes."}
+

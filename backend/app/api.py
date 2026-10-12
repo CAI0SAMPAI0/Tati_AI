@@ -108,6 +108,7 @@ from apps.activities.api import (
     admin_premium_router,
     cefr_admin_router,
     cefr_images_router,
+    exams_router,
 )
 from apps.chat.api import chat_router
 from apps.chat.simulation_api import simulation_router
@@ -123,6 +124,7 @@ api.add_router("/activities", activities_router)
 api.add_router("/catalog", catalog_router)
 api.add_router("/grammar", grammar_router)
 api.add_router("/speech", speech_router)
+api.add_router("/exams", exams_router)
 api.add_router("/chat", chat_router)
 api.add_router("/simulation", simulation_router)
 api.add_router("/payments", payments_router)
