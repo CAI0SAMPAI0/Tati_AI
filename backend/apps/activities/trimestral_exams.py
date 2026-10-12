@@ -18,7 +18,7 @@ from .models import TrimestralExam, CEFRReference, ActivitySubmission
 logger = logging.getLogger(__name__)
 
 # Usuários liberados temporariamente para acesso aos exames trimestrais
-ALLOWED_USERNAMES = {"programador", "caio.sampaio"}
+ALLOWED_USERNAMES = {"programador"}
 
 CEFR_OFFICIAL_GUIDELINES_URL = (
     "https://rm.coe.int/CoERMPublicCommonSearchServices/DisplayDCTMContent?documentId=090000168045bb52",
