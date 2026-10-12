@@ -66,12 +66,13 @@ export function SidebarActivities({ isOpen, onClose }: SidebarActivitiesProps) {
   const { prefetch } = usePrefetch();
 
   const isHubOnly = (user as any)?.is_hub_only;
+  const isProgramador = user?.username === 'programador';
 
   const navItems = isHubOnly
     ? [{ href: '/activities/hub', icon: <Zap size={20} />, label: 'Hub' }]
     : [
         { href: '/activities', icon: <BookOpen size={20} />, label: 'Activities' },
-        { href: '/exams', icon: <GraduationCap size={20} />, label: 'Quarterly Exam' },
+        ...(isProgramador ? [{ href: '/exams', icon: <GraduationCap size={20} />, label: 'Quarterly Exam' }] : []),
         { href: '/history', icon: <History size={20} />, label: 'History' },
         { href: '/activities/hub', icon: <Zap size={20} />, label: 'Hub' },
         { href: '/progress', icon: <TrendingUp size={20} />, label: 'Progress' },

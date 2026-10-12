@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
 import { MainHeader } from '@/components/layout/main-header';
 import { useSidebarState } from '@/hooks/useSidebarState';
@@ -118,8 +119,15 @@ interface HistoryItem {
 }
 
 export default function ExamsClientPage() {
+  const router = useRouter();
   const { sidebarOpen, toggleSidebar, closeSidebar } = useSidebarState();
-  const { user } = useAuth();
+  const { user, isLoaded } = useAuth();
+
+  useEffect(() => {
+    if (isLoaded && user && user.username !== 'programador') {
+      router.replace('/activities');
+    }
+  }, [user, isLoaded, router]);
 
   // Screen main views
   const [view, setView] = useState<'dashboard' | 'taking' | 'result'>('dashboard');
@@ -347,8 +355,10 @@ export default function ExamsClientPage() {
   };
 
   useEffect(() => {
-    fetchStatusAndHistory();
-  }, []);
+    if (user?.username === 'programador') {
+      fetchStatusAndHistory();
+    }
+  }, [user]);
 
   // Start Exam
   const handleStartExam = async (force: boolean = false) => {
@@ -469,6 +479,14 @@ export default function ExamsClientPage() {
   };
 
   const latestEvolution = status?.last_exam_evolution || (history.length > 0 ? history[0] : null);
+
+  if (!isLoaded) {
+    return <div className="min-h-screen bg-bg" />;
+  }
+
+  if (user?.username !== 'programador') {
+    return null;
+  }
 
   // ==============================================================================
   // RENDER: EXAM TAKING VIEW (100% ENGLISH - CONTINUOUS SCROLL LAYOUT)
