@@ -1939,21 +1939,24 @@ class HubService:
             role = str(getattr(user, "role", "") or "").lower()
             if role in ("student", "aluno"):
                 is_student = True
-            elif role in ("programador", "professor", "admin") or user.username in admin_usernames:
+            if role in ("programador", "professor", "admin") or user.username in admin_usernames:
                 can_access_all = True
                 is_student = True
-            else:
+
+            if not can_access_all:
                 try:
                     from apps.payments.models import PremiumPurchase, Order
 
                     purchased_ids.update(
                         str(cid)
                         for cid in PremiumPurchase.objects.filter(
-                            username=user.username, status="confirmed"
+                            username=user.username,
+                            status__in=["confirmed", "completed", "paid", "approved"],
                         ).values_list("content_id", flat=True)
                     )
                     confirmed_orders = Order.objects.filter(
-                        username=user.username, status="confirmed"
+                        username=user.username,
+                        status__in=["confirmed", "paid", "approved"],
                     ).values_list("id", flat=True)
                     if confirmed_orders:
                         from django.db import connection
@@ -2038,11 +2041,12 @@ class HubService:
                     has_purchase = PremiumPurchase.objects.filter(
                         username=user.username,
                         content_id=content_id,
-                        status="confirmed",
+                        status__in=["confirmed", "completed", "paid", "approved"],
                     ).exists()
                     has_order = False
                     confirmed_orders = Order.objects.filter(
-                        username=user.username, status="confirmed"
+                        username=user.username,
+                        status__in=["confirmed", "paid", "approved"],
                     ).values_list("id", flat=True)
                     if confirmed_orders:
                         from django.db import connection
@@ -2304,6 +2308,18 @@ class HubService:
                     [uuid.uuid4(), order_id, item.id, price],
                 )
 
+            from apps.authentication.services import AuthService
+
+            token_res = AuthService.build_token_response(target_user)
+            user_data = {
+                "id": str(target_user.id),
+                "username": target_user.username,
+                "email": target_user.email or "",
+                "name": target_user.name or target_user.username,
+                "role": target_user.role or "buyer",
+                "level": getattr(target_user, "level", "beginner"),
+            }
+
             return {
                 "orderId": str(order_id),
                 "paymentId": str(pix_res.payment_id),
@@ -2314,6 +2330,9 @@ class HubService:
                 },
                 "username": target_user.username,
                 "password": None,
+                "token": token_res.access_token,
+                "access_token": token_res.access_token,
+                "user": user_data,
             }
         else:
             from apps.payments.schemas import CreatePreferenceInput
@@ -2346,6 +2365,18 @@ class HubService:
                     [uuid.uuid4(), order_id, item.id, price],
                 )
 
+            from apps.authentication.services import AuthService
+
+            token_res = AuthService.build_token_response(target_user)
+            user_data = {
+                "id": str(target_user.id),
+                "username": target_user.username,
+                "email": target_user.email or "",
+                "name": target_user.name or target_user.username,
+                "role": target_user.role or "buyer",
+                "level": getattr(target_user, "level", "beginner"),
+            }
+
             return {
                 "orderId": str(order_id),
                 "paymentId": str(pref_res.preference_id),
@@ -2353,6 +2384,9 @@ class HubService:
                 "pix": None,
                 "username": target_user.username,
                 "password": None,
+                "token": token_res.access_token,
+                "access_token": token_res.access_token,
+                "user": user_data,
             }
 
     @classmethod

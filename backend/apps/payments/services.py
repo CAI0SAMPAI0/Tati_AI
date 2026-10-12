@@ -133,15 +133,32 @@ class MercadoPagoService:
             else f"HUB:{user.username}:{data.target_id}"
         )
 
+        payer_data: dict = {
+            "email": user.email or f"{user.username}@tati.ai",
+            "first_name": user.name or user.username,
+        }
+        clean_cpf = "".join(
+            filter(
+                str.isdigit,
+                str(
+                    getattr(user, "cpf", "")
+                    or getattr(user, "cpf_cnpj", "")
+                    or ""
+                ),
+            )
+        )
+        if clean_cpf and len(clean_cpf) in (11, 14):
+            payer_data["identification"] = {
+                "type": "CPF" if len(clean_cpf) == 11 else "CNPJ",
+                "number": clean_cpf,
+            }
+
         payment_data = {
             "transaction_amount": float(data.amount),
             "description": data.description,
             "payment_method_id": "pix",
             "external_reference": external_reference,
-            "payer": {
-                "email": user.email or f"{user.username}@tati.ai",
-                "first_name": user.name or user.username,
-            },
+            "payer": payer_data,
         }
 
         try:
@@ -327,12 +344,25 @@ class MercadoPagoService:
                             )
                             return {"ok": True, "error": "underpaid"}
 
-                    # Libera material do hub
+                    # Libera material do hub com status confirmed
                     PremiumPurchase.objects.create(
                         username=username,
                         content_id=target_id,
-                        status="completed",
+                        status="confirmed",
+                        asaas_payment_id=str(payment_id),
                     )
+
+                    # Atualiza tabela de pedidos vinculada
+                    try:
+                        from django.db import connection
+                        with connection.cursor() as cursor:
+                            cursor.execute(
+                                "UPDATE orders SET status = 'confirmed', confirmed_at = NOW() WHERE asaas_id = %s",
+                                [str(payment_id)],
+                            )
+                    except Exception as ord_err:
+                        logger.warning(f"[MercadoPago] Erro ao atualizar status da order {payment_id}: {ord_err}")
+
                     logger.info(
                         f"[MercadoPago] Material {target_id} liberado para: {username}"
                     )
