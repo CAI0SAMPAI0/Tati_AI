@@ -11,6 +11,8 @@
 
 [![Next.js](https://img.shields.io/badge/Next.js_14-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React_18-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
+[![Vue.js](https://img.shields.io/badge/Vue.js_3-4FC08D?style=for-the-badge&logo=vue.js&logoColor=white)](https://vuejs.org/)
+[![Vite](https://img.shields.io/badge/Vite_6-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Django](https://img.shields.io/badge/Django_5-092E20?style=for-the-badge&logo=django&logoColor=white)](https://www.djangoproject.com/)
@@ -46,7 +48,7 @@ O **Teacher Tati AI** é um ecossistema educacional de última geração voltado
 O projeto é mantido em um **Monorepo gerenciado com NPM Workspaces**, conectando:
 - **Backend ASGI:** Construído com **Django 5**, **Django-Ninja** (para endpoints RESTful de alta tipagem e velocidade), **Django Channels** (para WebSockets bidirecionais de chat e voz) e servidor **Daphne**.
 - **Frontend do Aluno:** Aplicação moderna em **Next.js 14 (App Router)** com suporte a PWA, modo offline e design fluido com Tailwind CSS.
-- **Hub de Materiais (Hub Site):** Portal Next.js 14 dedicado à venda, catálogo e leitura protegida de materiais didáticos.
+- **Hub de Materiais (Hub Site):** Portal moderno em **Vue 3 (Vite + Pinia)** dedicado à venda, catálogo e leitura protegida de materiais didáticos.
 - **Mobile Nativo (Flutter):** App mobile Flutter com 120 FPS, gravação nativa de microfone e notificações push via Firebase (FCM).
 - **Pacote Compartilhado (`@tati/hub-core`):** SDK com tipagens, gerenciamento de sessão/cookies e contratos de API unificados.
 - **Pagamentos Integrados:** Checkout transparente e geração de PIX dinâmico com confirmação instantânea via **Mercado Pago**.
@@ -94,7 +96,7 @@ A IA reage visual e auditivamente conforme a fala do aluno, comutando expressõe
 flowchart TB
     subgraph Clients["📱 Clientes & Interfaces"]
         WEB["App Aluno (Next.js 14)<br/>• App Router, Tailwind, Zustand<br/>• PWA & Suporte Offline"]
-        HUB["Hub Site (Next.js 14)<br/>• Catálogo de Materiais Didáticos<br/>• Leitor Seguro de PDFs"]
+        HUB["Hub Site (Vue 3 + Vite)<br/>• Catálogo de Materiais Didáticos<br/>• Leitor Seguro de PDFs"]
         MOB["Mobile App (Flutter)<br/>• 120 FPS InAppWebView<br/>• Áudio Nativo & Firebase Push (FCM)"]
     end
 
@@ -169,7 +171,7 @@ sequenceDiagram
 ```text
 Tati_AI/
 ├   apps/
-│   └   hub-site/                # Portal público de catálogo e leitura de apostilas (Next.js 14)
+│   └   hub-site/                # Portal público de catálogo e leitura de apostilas (Vue 3 + Vite + Pinia)
 ├   packages/
 │   └   hub-core/                # SDK TypeScript, tipagens unificadas e controle de sessão
 ├   frontend/                    # Aplicação web principal do aluno (Next.js 14 + App Router + PWA)
@@ -272,7 +274,7 @@ A partir da **raiz do projeto**, execute:
   ```
   *Acesso no navegador:* `http://localhost:3000`
 
-* **Iniciar o Hub de Materiais Didáticos (Next.js):**
+* **Iniciar o Hub de Materiais Didáticos (Vue 3 + Vite):**
   ```bash
   npm run dev:hub
   ```
@@ -363,7 +365,7 @@ npm run format
 ## 🚢 Deploy & Produção
 
 * **Backend (Django + Channels ASGI):** Configurado via [Dockerfile](./backend/Dockerfile) multi-stage baseado em Python e servidor ASGI (`app.asgi:application` com Gunicorn + Uvicorn Workers / Daphne), otimizado para **Railway** e **Hugging Face Spaces**.
-* **Frontends (Next.js 14):** Prontos para deploy contínuo na **Vercel** com suporte a SSR e Edge caching.
+* **Frontend do Aluno (Next.js 14) & Hub Site (Vue 3 + Vite):** Prontos para deploy contínuo na **Vercel** com suporte a SSR e Edge caching.
 * **App Mobile (Flutter):** Build de release para distribuição direta via APK Android ou publicação nas lojas Google Play e App Store.
 
 ---

@@ -104,6 +104,14 @@ function handleClose() {
   }, 300);
 }
 
+const qrCodeSrc = computed(() => {
+  const qr = checkoutResult.value?.pix?.qrCode;
+  if (!qr) return '';
+  if (qr.startsWith('data:image')) return qr;
+  if (qr.startsWith('http')) return qr;
+  return `data:image/png;base64,${qr}`;
+});
+
 function startPolling(paymentId: string) {
   pollingStatus.value = 'polling';
   pollCount = 0;
@@ -122,6 +130,19 @@ function startPolling(paymentId: string) {
       const activeToken = authStore.token || currentSession?.token;
       if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`;
 
+      // 1. Consulta o status do checkout no Mercado Pago via backend (dispara verificação instantânea)
+      const statusRes = await fetch(`${resolveApiUrl()}/catalog/checkout/${paymentId}/status`, {
+        headers,
+      });
+      if (statusRes.ok) {
+        const statusJson = await statusRes.json().catch(() => null);
+        if (statusJson?.is_approved || statusJson?.status === 'confirmed') {
+          handlePaymentConfirmed(false);
+          return;
+        }
+      }
+
+      // 2. Fallback: Checa se já tem acesso liberado ao material
       const res = await fetch(`${resolveApiUrl()}/activities/hub/${props.item.id}/access`, {
         headers,
       });
@@ -138,9 +159,9 @@ function startPolling(paymentId: string) {
         return;
       }
     } catch {
-      // Ignora erro e continua tentando
+      // Ignora erro momentâneo de rede e continua tentando
     }
-  }, 5000);
+  }, 4000);
 }
 
 function formatCPF(val: string) {
@@ -179,7 +200,10 @@ async function handleCheckout() {
     const data = await res.json();
     checkoutResult.value = data;
 
-    if (data.username && data.password) {
+    const tokenToSave = data.token || data.access_token;
+    if (tokenToSave && data.user) {
+      authStore.saveSession(tokenToSave, data.user);
+    } else if (data.username && data.password) {
       try {
         const loginRes = await loginWithCredentials(data.username, data.password);
         if (loginRes?.data?.access_token && loginRes?.data?.user) {
@@ -233,8 +257,9 @@ async function handleCancel() {
 }
 
 function copyPixCode() {
-  if (checkoutResult.value?.pix?.copyPaste) {
-    navigator.clipboard.writeText(checkoutResult.value.pix.copyPaste);
+  const code = checkoutResult.value?.pix?.copyPaste || checkoutResult.value?.pix?.qrCode;
+  if (code) {
+    navigator.clipboard.writeText(code);
     alert('Código Pix copiado para a área de transferência!');
   }
 }
@@ -349,9 +374,9 @@ onUnmounted(() => {
               }}
             </p>
 
-            <div v-if="checkoutResult?.pix?.qrCode" class="my-4 flex flex-col items-center">
+            <div v-if="qrCodeSrc" class="my-4 flex flex-col items-center">
               <img
-                :src="`data:image/png;base64,${checkoutResult.pix.qrCode}`"
+                :src="qrCodeSrc"
                 alt="QR Code Pix"
                 class="h-48 w-48 rounded-xl border border-line p-2 shadow-sm"
               />
