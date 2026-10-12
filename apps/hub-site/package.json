@@ -2,32 +2,29 @@
   "name": "@tati/hub-site",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
-    "dev": "next dev --port 3001",
-    "dev:clean": "npm run clean && next dev --port 3001",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "dev": "vite --port 3001 --host",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview --port 3001",
+    "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@primeicons/vue": "^8.0.2",
+    "@tanstack/vue-query": "^5.62.8",
     "@tati/hub-core": "*",
-    "@tanstack/react-query": "^5.100.6",
-    "lucide-react": "^0.468.0",
-    "next": "14.2.35",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "lucide-vue-next": "^0.468.0",
+    "pinia": "^2.3.0",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
   },
   "devDependencies": {
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
-    "autoprefixer": "^10.0.1",
-    "eslint": "^8",
-    "eslint-config-next": "14.2.35",
-    "postcss": "^8",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "vue-tsc": "^2.2.0"
   }
 }

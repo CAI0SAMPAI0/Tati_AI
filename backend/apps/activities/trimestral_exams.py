@@ -1,12 +1,10 @@
 import os
-import re
 import json
 import uuid
 import base64
 import logging
 import threading
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
 
 from django.db import connection
@@ -23,7 +21,8 @@ logger = logging.getLogger(__name__)
 ALLOWED_USERNAMES = {"programador", "caio.sampaio"}
 
 CEFR_OFFICIAL_GUIDELINES_URL = (
-    "https://rm.coe.int/CoERMPublicCommonSearchServices/DisplayDCTMContent?documentId=090000168045bb52"
+    "https://rm.coe.int/CoERMPublicCommonSearchServices/DisplayDCTMContent?documentId=090000168045bb52",
+    "https://www.coe.int/en/web/common-european-framework-reference-languages/table-3-cefr-3.3-common-reference-levels-qualitative-aspects-of-spoken-language-use"
 )
 
 LEVEL_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"]
@@ -46,7 +45,7 @@ def evaluate_speaking_with_gemini(
     Avalia a resposta oral gravada pelo aluno em inglês para uma questão de speaking do exame.
     Utiliza o Google Gemini multimodal ou fallback de STT/Groq com feedback estritamente pedagógico em inglês.
     """
-    if not audio_data or not isinstance(audio_data, str) or audio_data.strip() in ["", "recorded", "[Audio Recorded]"]:
+    if not audio_data or not isinstance(audio_data, str) or audio_data.strip() in ["", "recorded", "[Audio Recorded]", "Audio recorded"]:
         return {
             "passed": False,
             "score": 0,
@@ -69,7 +68,7 @@ def evaluate_speaking_with_gemini(
             "feedback": "Unable to decode audio format. Please check your microphone recording.",
         }
 
-    if len(audio_bytes) < 800:
+    if len(audio_bytes) < 200:
         return {
             "passed": False,
             "score": 0,
@@ -103,7 +102,19 @@ Respond strictly in valid JSON matching this schema:
     if client:
         try:
             from google.genai import types
-            for g_model in ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-3.5-flash-lite"]:
+            gemini_models = [
+                os.getenv("GEMINI_AUDIO_MODEL", "gemini-2.5-flash"),
+                "gemini-2.5-flash",
+                "gemini-2.0-flash",
+                "gemini-3.8-flash",
+                "gemini-3.5-flash-lite",
+            ]
+            unique_models = []
+            for gm in gemini_models:
+                if gm and gm not in unique_models:
+                    unique_models.append(gm)
+
+            for g_model in unique_models:
                 try:
                     part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
                     resp = client.models.generate_content(
@@ -131,7 +142,7 @@ Respond strictly in valid JSON matching this schema:
         except Exception as gemini_err:
             logger.warning(f"[SpeakingEval] Erro geral ao chamar Gemini: {gemini_err}")
 
-    # Fallback via STT (Whisper / Groq)
+    # Fallback via STT (Whisper / Groq / Gemini STT)
     try:
         transcription = AudioService.transcribe_audio(audio_bytes)
         if transcription and len(transcription.strip()) > 3:
@@ -144,7 +155,7 @@ Respond strictly in valid JSON matching this schema:
     except Exception as stt_err:
         logger.warning(f"[SpeakingEval] Erro no STT fallback: {stt_err}")
 
-    # Fallback generoso quando o áudio tem tamanho válido (> 800 bytes)
+    # Fallback quando áudio tem tamanho válido (> 200 bytes)
     return {
         "passed": True,
         "score": 75,
@@ -256,6 +267,10 @@ DISTRIBUTION & RULES:
    - In "options", provide ["Record your voice response in English"].
    - In "correct_answer", provide "Record your voice response in English".
    - In "explanation", provide an English explanation of what the task evaluates (fluency, vocabulary, and grammar).
+
+6. DO NOT include any images, image URLs, or image descriptions. All questions are strictly text-based or audio-based.
+
+7. EVERY SINGLE FIELD (questions, reading texts, audio texts, options, explanations, and feedback) MUST BE 100% IN ENGLISH. Zero Portuguese words.
 
 MANDATORY JSON FORMAT:
 Return EXCLUSIVELY a JSON object with this structure:
@@ -422,16 +437,15 @@ All "correct_answer" values MUST match one of the options exactly.
 
             normalized.append({
                 "id": q_id,
-                "type": q_type,
+                "type": q_type.lower().strip(),
                 "points": int(q.get("points", 10)),
                 "question": question_text,
-                "options": options,
-                "correct_answer": correct,
+                "options": options if q_type != "speaking" else [],
+                "correct_answer": correct if q_type != "speaking" else None,
                 "explanation": explanation,
                 "reading_text": reading_text,
                 "audio_text": audio_text,
-                "audio_url": audio_url,
-                "image_url": None,  # Imagens removidas
+                "audio_url": None,
             })
 
         # Se vieram menos do que o total solicitado, complementa com fallback
@@ -593,6 +607,11 @@ class TrimestralExamService:
                 logger.error(f"[TrimestralExamService] Falha na pré-geração em background para {username}: {e}", exc_info=True)
             finally:
                 cls._pregenerating_users.discard(username)
+                try:
+                    from django.db import connection
+                    connection.close()
+                except Exception:
+                    pass
 
         worker_thread = threading.Thread(target=_worker, daemon=True)
         worker_thread.start()
@@ -842,7 +861,7 @@ class TrimestralExamService:
 
         for q in questions:
             q_id = q.get("id", "")
-            q_type = q.get("type", "general").lower()
+            q_type = str(q.get("type", "")).strip().lower()
             q_text = q.get("question", "")
             correct_val = str(q.get("correct_answer", "")).strip()
             explanation = q.get("explanation", "")
@@ -852,8 +871,14 @@ class TrimestralExamService:
             student_val = answers_map.get(q_id, "")
             audio_val = audio_map.get(q_id, "")
 
-            if q_type == "speaking":
-                # Avaliação de fala com Gemini
+            # Fallback caso o áudio em base64 tenha vindo no campo answer
+            if not audio_val and student_val and ("data:audio" in student_val or len(student_val) > 200):
+                audio_val = student_val
+
+            is_speaking = ("speak" in q_type or "oral" in q_type or "speech" in q_type)
+
+            if is_speaking:
+                # Avaliação de fala com Gemini multimodal
                 speaking_eval = evaluate_speaking_with_gemini(
                     audio_data=audio_val,
                     question_prompt=q_text,
@@ -866,16 +891,21 @@ class TrimestralExamService:
                 item_points = points if is_correct else int(points * (score_pct / 100))
                 earned_points += item_points
 
-                student_display = f'Spoken: "{transcription}" (Score: {score_pct}/100)' if transcription else (student_val or "No audio recorded")
-                correct_display = "Spoken English response answering the prompt"
+                if transcription:
+                    student_display = f'Spoken: "{transcription}" (Score: {score_pct}/100)'
+                elif audio_val and len(audio_val) > 50:
+                    student_display = f"Audio response recorded (Score: {score_pct}/100)"
+                else:
+                    student_display = "No audio recorded"
+
                 explanation_display = speaking_eval.get("feedback") or explanation
 
                 corrections.append({
                     "question_id": q_id,
                     "question": q_text,
-                    "type": q_type,
+                    "type": "speaking",
                     "student_answer": student_display,
-                    "correct_answer": correct_display,
+                    "correct_answer": "Spoken English response answering the prompt",
                     "is_correct": is_correct,
                     "points_earned": item_points,
                     "explanation": explanation_display,

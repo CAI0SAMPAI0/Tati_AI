@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SidebarActivities } from '@/components/activities/sidebar-activities';
 import { MainHeader } from '@/components/layout/main-header';
 import { useSidebarState } from '@/hooks/useSidebarState';
@@ -36,7 +36,6 @@ import {
   Pause,
   Mic,
   Square,
-  Volume2,
 } from 'lucide-react';
 
 // TYPES
@@ -127,6 +126,8 @@ export default function ExamsClientPage() {
   const [status, setStatus] = useState<ExamStatus | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loadingStatus, setLoadingStatus] = useState(true);
+  const studentAccent = user?.preferred_accent || (user?.profile as any)?.preferred_accent || (user?.profile as any)?.accent || getStoredAccent() ||
+  'en-US';
 
   // Active exam states
   const [activeExam, setActiveExam] = useState<ExamActive | null>(null);
@@ -210,7 +211,7 @@ export default function ExamsClientPage() {
       if (!audioB64) {
         const res = await apiPost<{ audio?: string; audio_b64?: string }>('/chat/tts', {
           text: phrase,
-          accent: studentAccent,
+          accent: studentAccent, // pega o sotaque escolhido pelo user
         });
         if (res.ok && (res.data?.audio || res.data?.audio_b64)) {
           audioB64 = res.data.audio || res.data.audio_b64 || '';
@@ -274,8 +275,7 @@ export default function ExamsClientPage() {
         reader.onloadend = () => {
           const b64Data = reader.result as string;
           setRecordedAudioB64(prev => ({ ...prev, [qId]: b64Data }));
-          setAnswers(prev => ({ ...prev, [qId]: 'Audio recorded' }));
-          toast.success('Spoken audio response recorded in English!');
+          setAnswers(prev => ({ ...prev, [qId]: '[Audio recorded]' }));
         };
         reader.readAsDataURL(audioBlob);
         stream.getTracks().forEach(t => t.stop());
@@ -400,7 +400,9 @@ export default function ExamsClientPage() {
   const handleSubmitExam = async () => {
     if (!activeExam) return;
 
-    const answeredCount = Object.keys(answers).length;
+    const answeredCount = activeExam.questions.filter(
+      (q) => Boolean(answers[q.id]) || Boolean(recordedAudioB64[q.id])
+    ).length;
     const totalCount = activeExam.questions.length;
 
     if (answeredCount < totalCount) {
@@ -412,10 +414,10 @@ export default function ExamsClientPage() {
 
     try {
       setIsSubmitting(true);
-      const payloadAnswers = Object.entries(answers).map(([qId, val]) => ({
-        question_id: qId,
-        answer: val,
-        audio_data: recordedAudioB64[qId] || undefined,
+      const payloadAnswers = activeExam.questions.map((q) => ({
+        question_id: q.id,
+        answer: answers[q.id] || (recordedAudioB64[q.id] ? '[Audio Recorded]' : ''),
+        audio_data: recordedAudioB64[q.id] || undefined,
       }));
 
       const res = await apiPost<ExamResult>(ENDPOINTS.EXAMS_TRIMESTRAL_SUBMIT, {
@@ -469,309 +471,360 @@ export default function ExamsClientPage() {
   const latestEvolution = status?.last_exam_evolution || (history.length > 0 ? history[0] : null);
 
   // ==============================================================================
-  // RENDER: EXAM TAKING VIEW (100% ENGLISH)
+  // RENDER: EXAM TAKING VIEW (100% ENGLISH - CONTINUOUS SCROLL LAYOUT)
   // ==============================================================================
   if (view === 'taking' && activeExam) {
-    const currentQ = activeExam.questions[currentQuestionIndex];
-    const progressPercent = Math.round(((currentQuestionIndex + 1) / activeExam.total_questions) * 100);
+    const answeredTotal = activeExam.questions.filter(
+      (q) => Boolean(answers[q.id]) || Boolean(recordedAudioB64[q.id])
+    ).length;
+    const progressPercent = Math.round((answeredTotal / activeExam.total_questions) * 100);
+
+    const scrollToQuestion = (qId: string) => {
+      const el = document.getElementById(`question-card-${qId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
 
     return (
       <div className="min-h-screen bg-bg text-text flex flex-col">
         <MainHeader onToggleMenu={toggleSidebar} />
 
-        <div className="flex-1 flex max-w-5xl w-full mx-auto p-4 md:p-8 flex-col">
-          {/* Header with Progress */}
-          <div className="bg-surface border border-border rounded-2xl p-4 md:p-6 mb-6 shadow-sm">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+        <div className="flex-1 flex max-w-5xl w-full mx-auto p-4 md:p-8 flex-col space-y-6">
+          {/* Sticky Progress & Navigation Bar */}
+          <div className="sticky top-16 z-20 bg-surface/95 backdrop-blur-md border border-border rounded-2xl p-4 shadow-md transition-all">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold">
-                  <GraduationCap size={22} />
+                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold">
+                  <GraduationCap size={20} />
                 </div>
                 <div>
-                  <h1 className="font-bold text-lg text-text">Quarterly CEFR Exam</h1>
+                  <h1 className="font-bold text-base md:text-lg text-text leading-tight">
+                    Quarterly CEFR Exam
+                  </h1>
                   <p className="text-xs text-text-muted">
-                    Assessment Level: <span className="font-bold text-primary">{activeExam.level}</span>
+                    Level <span className="font-bold text-primary">{activeExam.level}</span> • Total {activeExam.total_questions} Questions
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 text-xs font-semibold text-text-muted">
-                <span>
-                  Question <strong className="text-primary text-sm">{currentQuestionIndex + 1}</strong> of {activeExam.total_questions}
+              <div className="flex items-center gap-3 text-xs font-semibold text-text-muted">
+                <span className={cn(
+                  "px-3 py-1 rounded-full font-bold transition-all",
+                  answeredTotal === activeExam.total_questions
+                    ? "bg-success/15 text-success border border-success/30"
+                    : "bg-primary/10 text-primary border border-primary/20"
+                )}>
+                  {answeredTotal} of {activeExam.total_questions} answered ({progressPercent}%)
                 </span>
-                <span className="hidden sm:inline-block w-1.5 h-1.5 rounded-full bg-border" />
-                <span className="text-success flex items-center gap-1 font-bold">
-                  <Check size={14} /> {Object.keys(answers).length} answered
-                </span>
+                <button
+                  type="button"
+                  onClick={handleSubmitExam}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50 cursor-pointer"
+                >
+                  <CheckCircle2 size={14} /> Submit
+                </button>
               </div>
             </div>
 
             {/* Progress Bar */}
-            <div className="w-full bg-bg-secondary h-2.5 rounded-full overflow-hidden">
+            <div className="w-full bg-bg-secondary h-2 rounded-full overflow-hidden mb-3">
               <div
                 className="bg-primary h-full transition-all duration-300 rounded-full"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
+
+            {/* Question Quick Jump Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider shrink-0 mr-1 hidden sm:inline">
+                Jump to:
+              </span>
+              {activeExam.questions.map((q, idx) => {
+                const isAnswered = Boolean(answers[q.id]) || Boolean(recordedAudioB64[q.id]);
+                return (
+                  <button
+                    key={q.id}
+                    type="button"
+                    onClick={() => scrollToQuestion(q.id)}
+                    className={cn(
+                      "w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center justify-center border cursor-pointer",
+                      isAnswered
+                        ? "bg-success/15 border-success/40 text-success"
+                        : "bg-surface border-border text-text-muted hover:border-primary/50 hover:text-primary"
+                    )}
+                    title={`Jump to Question ${idx + 1}`}
+                  >
+                    {idx + 1}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Question Card */}
-          {currentQ && (
-            <div className="bg-surface border border-border rounded-3xl p-5 md:p-8 shadow-sm flex-1 flex flex-col justify-between">
-              <div>
-                {/* Question Type Badge */}
-                <div className="flex items-center justify-between gap-2 mb-4">
-                  <span className={cn(
-                    "text-xs px-3.5 py-1.5 rounded-full font-bold uppercase tracking-wider",
-                    currentQ.type === 'reading' && "bg-blue-500/10 text-blue-500 border border-blue-500/20",
-                    currentQ.type === 'grammar' && "bg-purple-500/10 text-purple-500 border border-purple-500/20",
-                    currentQ.type === 'vocabulary' && "bg-amber-500/10 text-amber-500 border border-amber-500/20",
-                    currentQ.type === 'listening' && "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20",
-                    currentQ.type === 'speaking' && "bg-rose-500/10 text-rose-500 border border-rose-500/20",
-                  )}>
-                    {currentQ.type === 'reading' && "📖 Reading Comprehension"}
-                    {currentQ.type === 'grammar' && "✏️ Applied Grammar"}
-                    {currentQ.type === 'vocabulary' && "💡 Vocabulary in Context"}
-                    {currentQ.type === 'listening' && "🎧 Listening Comprehension"}
-                    {currentQ.type === 'speaking' && "🎙️ Oral Expression & Speaking"}
-                  </span>
+          {/* All Questions Rendered in Sequence */}
+          <div className="space-y-6">
+            {activeExam.questions.map((q, idx) => {
+              const isAnswered = Boolean(answers[q.id]) || Boolean(recordedAudioB64[q.id]);
 
-                  <span className="text-xs font-semibold text-text-muted">
-                    {currentQ.points} points
-                  </span>
-                </div>
-
-                {/* Reading Passage Block (each reading question has its own distinct text) */}
-                {currentQ.reading_text && (
-                  <div className="bg-bg-secondary/60 border border-border rounded-2xl p-5 md:p-6 mb-6">
-                    <div className="flex items-center gap-2 text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
-                      <BookOpen size={16} className="text-primary" />
-                      Reading Passage:
-                    </div>
-                    <p className="text-sm md:text-base leading-relaxed text-text font-serif italic">
-                      &quot;{currentQ.reading_text}&quot;
-                    </p>
-                  </div>
-                )}
-
-                {/* Listening Comprehension Audio Player (Edge TTS in Student Accent) */}
-                {currentQ.type === 'listening' && (
-                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-5 md:p-6 mb-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                      <div className="flex items-center gap-2 text-xs font-bold text-emerald-500 uppercase tracking-wider">
-                        <Headphones size={18} /> Audio Track • Listening Dialogue
-                      </div>
-                      <span className="text-xs text-text-muted font-medium">
-                        Times played: <strong className="text-emerald-500">{audioListenCount[currentQ.id] || 0}</strong>
+              return (
+                <div
+                  key={q.id}
+                  id={`question-card-${q.id}`}
+                  className={cn(
+                    "bg-surface border rounded-3xl p-5 md:p-8 shadow-sm transition-all scroll-mt-36",
+                    isAnswered ? "border-border" : "border-border/80"
+                  )}
+                >
+                  {/* Question Header: Number & Badge */}
+                  <div className="flex items-center justify-between gap-2 mb-4">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className="w-7 h-7 rounded-lg bg-primary/10 text-primary font-black text-xs flex items-center justify-center border border-primary/20">
+                        {idx + 1}
+                      </span>
+                      <span className={cn(
+                        "text-xs px-3.5 py-1 rounded-full font-bold uppercase tracking-wider",
+                        q.type === 'reading' && "bg-blue-500/10 text-blue-500 border border-blue-500/20",
+                        q.type === 'grammar' && "bg-purple-500/10 text-purple-500 border border-purple-500/20",
+                        q.type === 'vocabulary' && "bg-amber-500/10 text-amber-500 border border-amber-500/20",
+                        q.type === 'listening' && "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20",
+                        q.type === 'speaking' && "bg-rose-500/10 text-rose-500 border border-rose-500/20",
+                      )}>
+                        {q.type === 'reading' && "Reading Comprehension"}
+                        {q.type === 'grammar' && "Applied Grammar"}
+                        {q.type === 'vocabulary' && "Vocabulary in Context"}
+                        {q.type === 'listening' && "Listening Comprehension"}
+                        {q.type === 'speaking' && "🎙 Oral Expression & Speaking"}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => handlePlayListeningAudio(currentQ.audio_text || '', currentQ.id)}
-                        className={cn(
-                          "px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2.5 transition-all shadow-md active:scale-95",
-                          isPlayingAudio
-                            ? "bg-danger text-white animate-pulse"
-                            : "bg-emerald-500 text-white hover:bg-emerald-600"
-                        )}
-                      >
-                        {isPlayingAudio ? (
-                          <>
-                            <Pause size={18} /> Stop Audio Playback
-                          </>
-                        ) : (
-                          <>
-                            <Play size={18} /> Play Audio Dialogue
-                          </>
-                        )}
-                      </button>
-
-                      {/* Sound waves animation */}
-                      {isPlayingAudio && (
-                        <div className="flex items-center gap-1.5 h-6">
-                          <span className="w-1 bg-emerald-500 rounded-full animate-bounce h-3" />
-                          <span className="w-1 bg-emerald-500 rounded-full animate-bounce h-6 delay-75" />
-                          <span className="w-1 bg-emerald-500 rounded-full animate-bounce h-4 delay-150" />
-                          <span className="w-1 bg-emerald-500 rounded-full animate-bounce h-5 delay-200" />
-                        </div>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => setShowTranscript(prev => !prev)}
-                        className="text-xs font-bold text-text-muted hover:text-emerald-500 underline ml-auto transition-colors"
-                      >
-                        {showTranscript ? 'Hide Audio Transcript' : 'Show Audio Transcript (Practice)'}
-                      </button>
-                    </div>
-
-                    {showTranscript && currentQ.audio_text && (
-                      <div className="mt-4 p-4 rounded-xl bg-surface/90 border border-emerald-500/20 text-xs md:text-sm font-mono text-text animate-fade-in">
-                        <p className="text-text-muted text-[11px] uppercase tracking-wider mb-1 font-sans font-bold">Transcript:</p>
-                        {currentQ.audio_text}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Speaking Task with Voice Recording */}
-                {currentQ.type === 'speaking' && (
-                  <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-5 md:p-6 mb-6">
-                    <div className="flex items-center justify-between gap-2 mb-3">
-                      <div className="flex items-center gap-2 text-xs font-bold text-rose-500 uppercase tracking-wider">
-                        <Mic size={18} /> Spoken Task • Voice Recording
-                      </div>
-                      {answers[currentQ.id] && (
-                        <span className="text-xs font-bold text-success flex items-center gap-1">
-                          <CheckCircle2 size={14} /> Response Recorded
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-text-muted">
+                        {q.points} pts
+                      </span>
+                      {isAnswered && (
+                        <span className="text-[11px] font-bold text-success flex items-center gap-1 bg-success/10 border border-success/20 px-2 py-0.5 rounded-full">
+                          <Check size={12} strokeWidth={2.5} /> Done
                         </span>
                       )}
                     </div>
+                  </div>
 
-                    <p className="text-xs text-text-muted mb-4">
-                      Click the microphone to record your response in English. Speak clearly for 15 to 30 seconds.
-                    </p>
+                  {/* Reading Passage Block */}
+                  {q.reading_text && (
+                    <div className="bg-bg-secondary/60 border border-border rounded-2xl p-5 md:p-6 mb-6">
+                      <div className="flex items-center gap-2 text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
+                        <BookOpen size={16} className="text-primary" />
+                        Reading Passage:
+                      </div>
+                      <p className="text-sm md:text-base leading-relaxed text-text font-serif italic">
+                        &quot;{q.reading_text}&quot;
+                      </p>
+                    </div>
+                  )}
 
-                    <div className="flex flex-col sm:flex-row items-center gap-4">
-                      {!isRecording ? (
+                  {/* Listening Comprehension Audio Player (Edge TTS in Student Accent) */}
+                  {q.type === 'listening' && (
+                    <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-5 md:p-6 mb-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                        <div className="flex items-center gap-2 text-xs font-bold text-emerald-500 uppercase tracking-wider">
+                          <Headphones size={18} /> Audio Track • Accent: <strong className="text-primary">{studentAccent}</strong>
+                        </div>
+                        <span className="text-xs text-text-muted font-medium">
+                          Times played: <strong className="text-emerald-500">{audioListenCount[q.id] || 0}</strong>
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-4 flex-wrap">
                         <button
                           type="button"
-                          onClick={() => startRecording(currentQ.id)}
-                          className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2.5 transition-all active:scale-95"
+                          onClick={() => handlePlayListeningAudio(q.audio_text || '', q.id)}
+                          className={cn(
+                            "px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2.5 transition-all shadow-md active:scale-95 cursor-pointer",
+                            isPlayingAudio
+                              ? "bg-danger text-white animate-pulse"
+                              : "bg-emerald-500 text-white hover:bg-emerald-600"
+                          )}
                         >
-                          <Mic size={18} />
-                          {recordedAudios[currentQ.id] ? 'Re-record Spoken Response' : 'Start Recording Voice'}
+                          {isPlayingAudio ? (
+                            <>
+                              <Pause size={18} /> Stop Audio Playback
+                            </>
+                          ) : (
+                            <>
+                              <Play size={18} /> Play Audio Dialogue
+                            </>
+                          )}
                         </button>
-                      ) : (
+
                         <button
                           type="button"
-                          onClick={stopRecording}
-                          className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-danger hover:opacity-90 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2.5 transition-all animate-pulse"
+                          onClick={() => setShowTranscript(prev => !prev)}
+                          className="text-xs font-bold text-text-muted hover:text-emerald-500 underline ml-auto transition-colors cursor-pointer"
                         >
-                          <Square size={16} fill="currentColor" />
-                          Stop Recording ({recordingSeconds}s / 45s)
+                          {showTranscript ? 'Hide Audio Transcript' : 'Show Audio Transcript (Practice)'}
                         </button>
-                      )}
+                      </div>
 
-                      {isRecording && (
-                        <div className="flex items-center gap-2 text-xs font-bold text-danger">
-                          <span className="w-2.5 h-2.5 rounded-full bg-danger animate-ping" />
-                          Recording in progress...
+                      {showTranscript && q.audio_text && (
+                        <div className="mt-4 p-4 rounded-xl bg-surface/90 border border-emerald-500/20 text-xs md:text-sm font-mono text-text animate-fade-in">
+                          <p className="text-text-muted text-[11px] uppercase tracking-wider mb-1 font-sans font-bold">Transcript:</p>
+                          {q.audio_text}
                         </div>
                       )}
                     </div>
+                  )}
 
-                    {recordedAudios[currentQ.id] && (
-                      <div className="mt-4 pt-4 border-t border-rose-500/20 flex items-center gap-3">
-                        <span className="text-xs text-text-muted font-bold">Listen to your recording:</span>
-                        <audio src={recordedAudios[currentQ.id]} controls className="h-8 max-w-xs" />
+                  {/* Speaking Task with Voice Recording */}
+                  {q.type === 'speaking' && (
+                    <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-5 md:p-6 mb-6">
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <div className="flex items-center gap-2 text-xs font-bold text-rose-500 uppercase tracking-wider">
+                          <Mic size={18} /> Spoken Task • Voice Recording
+                        </div>
+                        {recordedAudioB64[q.id] && (
+                          <span className="text-xs font-bold text-success flex items-center gap-1">
+                            <CheckCircle2 size={14} /> Response Recorded
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </div>
-                )}
 
-                {/* Question Prompt */}
-                <h2 className="text-base md:text-xl font-bold text-text leading-snug mb-6">
-                  {currentQ.question}
-                </h2>
+                      <p className="text-xs text-text-muted mb-4">
+                        Click the microphone to record your response in English. Speak clearly for 15 to 30 seconds.
+                      </p>
 
-                {/* Multiple Choice Options (for reading, grammar, vocabulary, listening) */}
-                {currentQ.type !== 'speaking' && (
-                  <div className="space-y-3 mb-8">
-                    {currentQ.options.map((optionText, optIdx) => {
-                      const isSelected = answers[currentQ.id] === optionText;
+                      <div className="flex flex-col sm:flex-row items-center gap-4">
+                        {!isRecording ? (
+                          <button
+                            type="button"
+                            onClick={() => startRecording(q.id)}
+                            className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2.5 transition-all active:scale-95 cursor-pointer"
+                          >
+                            <Mic size={18} />
+                            {recordedAudios[q.id] ? 'Re-record Spoken Response' : 'Start Recording Voice'}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={stopRecording}
+                            className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-danger hover:opacity-90 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2.5 transition-all animate-pulse cursor-pointer"
+                          >
+                            <Square size={16} fill="currentColor" />
+                            Stop Recording ({recordingSeconds}s / 45s)
+                          </button>
+                        )}
 
-                      return (
-                        <button
-                          key={optIdx}
-                          type="button"
-                          onClick={() => {
-                            setAnswers((prev) => ({
-                              ...prev,
-                              [currentQ.id]: optionText,
-                            }));
-                          }}
-                          className={cn(
-                            "w-full p-4 md:p-5 rounded-2xl border text-left transition-all flex items-center justify-between group",
-                            isSelected
-                              ? "border-primary bg-primary/10 shadow-sm"
-                              : "border-border bg-surface hover:border-primary/40 hover:bg-surface-hover"
-                          )}
-                        >
-                          <div className="flex items-center gap-4">
-                            <span className={cn(
-                              "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all",
-                              isSelected
-                                ? "bg-primary text-white"
-                                : "bg-surface border border-border text-text-muted group-hover:border-primary group-hover:text-primary"
-                            )}>
-                              {String.fromCharCode(65 + optIdx)}
-                            </span>
-                            <span className={cn(
-                              "text-sm md:text-base font-medium",
-                              isSelected ? "text-primary font-bold" : "text-text"
-                            )}>
-                              {optionText}
-                            </span>
+                        {isRecording && (
+                          <div className="flex items-center gap-2 text-xs font-bold text-danger">
+                            <span className="w-2.5 h-2.5 rounded-full bg-danger animate-ping" />
+                            Recording in progress...
                           </div>
+                        )}
+                      </div>
 
-                          <div className={cn(
-                            "w-5 h-5 rounded-full border flex items-center justify-center transition-all",
-                            isSelected
-                              ? "border-primary bg-primary text-white"
-                              : "border-border group-hover:border-primary"
-                          )}>
-                            {isSelected && <Check size={12} strokeWidth={3} />}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Action Buttons at the Bottom */}
-              <div className="pt-4 border-t border-border flex flex-col-reverse sm:flex-row items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setCurrentQuestionIndex((prev) => Math.max(0, prev - 1))}
-                  disabled={currentQuestionIndex === 0}
-                  className="w-full sm:w-auto px-5 py-3 rounded-xl border border-border font-bold text-sm text-text-muted hover:bg-surface-hover disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  <ChevronLeft size={18} /> Previous Question
-                </button>
-
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                  {currentQuestionIndex < activeExam.total_questions - 1 ? (
-                    <button
-                      type="button"
-                      onClick={() => setCurrentQuestionIndex((prev) => Math.min(activeExam.total_questions - 1, prev + 1))}
-                      className="w-full sm:w-auto px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm hover:opacity-90 shadow-sm flex items-center justify-center gap-2"
-                    >
-                      Next Question <ChevronRight size={18} />
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleSubmitExam}
-                      disabled={isSubmitting}
-                      className="w-full sm:w-auto px-8 py-3 rounded-xl bg-success text-white font-bold text-sm hover:opacity-90 shadow-md flex items-center justify-center gap-2 animate-pulse"
-                    >
-                      {isSubmitting ? (
-                        <>Processing results with AI...</>
-                      ) : (
-                        <>
-                          <CheckCircle2 size={18} /> Finalize & View Results
-                        </>
+                      {recordedAudios[q.id] && (
+                        <div className="mt-4 pt-4 border-t border-rose-500/20 flex items-center gap-3">
+                          <span className="text-xs text-text-muted font-bold">Listen to your recording:</span>
+                          <audio src={recordedAudios[q.id]} controls className="h-8 max-w-xs" />
+                        </div>
                       )}
-                    </button>
+                    </div>
+                  )}
+
+                  {/* Question Prompt */}
+                  <h2 className="text-base md:text-xl font-bold text-text leading-snug mb-6">
+                    {q.question}
+                  </h2>
+
+                  {/* Multiple Choice Options (for reading, grammar, vocabulary, listening) */}
+                  {q.type !== 'speaking' && (
+                    <div className="space-y-3">
+                      {q.options.map((optionText, optIdx) => {
+                        const isSelected = answers[q.id] === optionText;
+
+                        return (
+                          <button
+                            key={optIdx}
+                            type="button"
+                            onClick={() => {
+                              setAnswers((prev) => ({
+                                ...prev,
+                                [q.id]: optionText,
+                              }));
+                            }}
+                            className={cn(
+                              "w-full p-4 md:p-5 rounded-2xl border text-left transition-all flex items-center justify-between group cursor-pointer",
+                              isSelected
+                                ? "border-primary bg-primary/10 shadow-sm"
+                                : "border-border bg-surface hover:border-primary/40 hover:bg-surface-hover"
+                            )}
+                          >
+                            <div className="flex items-center gap-4">
+                              <span className={cn(
+                                "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all shrink-0",
+                                isSelected
+                                  ? "bg-primary text-white"
+                                  : "bg-surface border border-border text-text-muted group-hover:border-primary group-hover:text-primary"
+                              )}>
+                                {String.fromCharCode(65 + optIdx)}
+                              </span>
+                              <span className={cn(
+                                "text-sm md:text-base font-medium",
+                                isSelected ? "text-primary font-bold" : "text-text"
+                              )}>
+                                {optionText}
+                              </span>
+                            </div>
+
+                            <div className={cn(
+                              "w-5 h-5 rounded-full border flex items-center justify-center transition-all shrink-0",
+                              isSelected
+                                ? "border-primary bg-primary text-white"
+                                : "border-border group-hover:border-primary"
+                            )}>
+                              {isSelected && <Check size={12} strokeWidth={3} />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
-              </div>
+              );
+            })}
+          </div>
+
+          {/* Bottom Submission Banner */}
+          <div className="bg-surface border border-border rounded-3xl p-6 md:p-8 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div>
+              <h3 className="text-lg font-bold text-text mb-1">
+                {answeredTotal === activeExam.total_questions
+                  ? 'All questions completed! Ready to finalize?'
+                  : `You answered ${answeredTotal} of ${activeExam.total_questions} questions.`}
+              </h3>
+              <p className="text-xs text-text-muted">
+                {answeredTotal === activeExam.total_questions
+                  ? 'Click the button below to submit and receive Teacher Tati\'s diagnostic evaluation.'
+                  : `You still have ${activeExam.total_questions - answeredTotal} unanswered questions. You can submit now or complete them above.`}
+              </p>
             </div>
-          )}
+
+            <button
+              type="button"
+              onClick={handleSubmitExam}
+              disabled={isSubmitting}
+              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-success text-white font-bold text-sm hover:opacity-90 shadow-md flex items-center justify-center gap-2.5 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+            >
+              {isSubmitting ? (
+                <>Processing results with AI...</>
+              ) : (
+                <>
+                  <CheckCircle2 size={18} /> Finalize & Submit Exam
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     );

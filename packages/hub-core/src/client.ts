@@ -23,14 +23,25 @@ export class ApiClientError<T = unknown> extends Error {
   }
 }
 
-const DEFAULT_LOCAL_API_BASE = 'http://localhost:8001';
+const DEFAULT_LOCAL_API_BASE = 'http://localhost:8000';
 
 export function resolveApiBase(): string {
-  return (
-    process.env.NEXT_PUBLIC_API_URL ??
-    process.env.NEXT_PUBLIC_API_BASE_URL ??
-    (process.env.NODE_ENV === 'development' ? DEFAULT_LOCAL_API_BASE : '')
-  );
+  if (typeof process !== 'undefined' && process.env) {
+    if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+    if (process.env.NEXT_PUBLIC_API_BASE_URL) return process.env.NEXT_PUBLIC_API_BASE_URL;
+  }
+  if (typeof window !== 'undefined') {
+    const metaEnv = (import.meta as any)?.env;
+    if (metaEnv?.VITE_API_URL) return metaEnv.VITE_API_URL;
+    if (metaEnv?.VITE_API_BASE_URL) return metaEnv.VITE_API_BASE_URL;
+
+    // Se estiver rodando em produção (Vercel/domínio público), fallback para backend de produção
+    const host = window.location.hostname;
+    if (host && host !== 'localhost' && host !== '127.0.0.1' && !host.startsWith('192.168.')) {
+      return 'https://caio007-tati-ai-backend.hf.space';
+    }
+  }
+  return DEFAULT_LOCAL_API_BASE;
 }
 
 function resolvePath(path: string): string {

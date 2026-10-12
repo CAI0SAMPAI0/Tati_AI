@@ -310,6 +310,8 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:3000",
+    "http://127.0.0.1:3001",
+    "http://localhost:3001",
     "http://127.0.0.1:8000",
     "http://localhost:8000",
     "http://127.0.0.1:8080",
@@ -405,7 +407,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 SUPERADMIN_EMAILS = [
     e.strip().lower()
     for e in os.getenv(
-        "SUPERADMIN_EMAILS", "dev@tati.ai,programador,caiosampaiov@gmail.com"
+        "SUPERADMIN_EMAILS", ""
     ).split(",")
     if e.strip()
 ]
@@ -430,10 +432,10 @@ AI_CACHE_TTL = int(os.getenv("AI_CACHE_TTL", "86400"))
 
 #    NOTIFICAÇÕES & FEEDBACK EMAILS                                     
 DEV_NOTIFICATION_EMAIL = os.getenv(
-    "DEV_NOTIFICATION_EMAIL", os.getenv("EMAIL_FEEDBACK", "cmsampaio71@gmail.com")
+    "DEV_NOTIFICATION_EMAIL", os.getenv("EMAIL_FEEDBACK", "")
 )
 DEFAULT_FROM_EMAIL = os.getenv(
-    "DEFAULT_FROM_EMAIL", "caio.matos@11607679.brevosend.com"
+    "DEFAULT_FROM_EMAIL", ""
 )
 
 #    GOOGLE OAUTH & REDIRECTS                                           
@@ -441,7 +443,7 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID") or os.getenv(
     "NEXT_PUBLIC_GOOGLE_CLIENT_ID", ""
 )
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "https://tati-ai.vercel.app")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "")
 BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "")
 USE_X_FORWARDED_HOST = True
 
