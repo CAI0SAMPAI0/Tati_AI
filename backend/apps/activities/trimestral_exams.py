@@ -11,14 +11,20 @@ from django.db import connection
 from django.conf import settings
 from django.utils import timezone as django_timezone
 
-from apps.authentication.models import User
+from apps.authentication.models import User, UserRole
 from apps.users.services import XPService, StreakService
 from .models import TrimestralExam, CEFRReference, ActivitySubmission
 
 logger = logging.getLogger(__name__)
 
-# Usuários liberados temporariamente para acesso aos exames trimestrais
-ALLOWED_USERNAMES = {"programador"}
+# Usuários liberados para acesso e testes de exames trimestrais
+_default_allowed = {"programador", "caio.sampaio"}
+_env_allowed = {
+    u.strip().lower()
+    for u in os.getenv("TRIMESTRAL_ALLOWED_USERNAMES", "").split(",")
+    if u.strip()
+}
+ALLOWED_USERNAMES = _default_allowed | _env_allowed
 
 CEFR_OFFICIAL_GUIDELINES_URL = (
     "https://rm.coe.int/CoERMPublicCommonSearchServices/DisplayDCTMContent?documentId=090000168045bb52",
@@ -32,7 +38,20 @@ def is_user_authorized(username: Optional[str]) -> bool:
     """Verifica se o usuário tem acesso permitido aos testes trimestrais."""
     if not username:
         return False
-    return username.strip().lower() in ALLOWED_USERNAMES
+    uname = str(username).strip().lower()
+    if uname in ALLOWED_USERNAMES:
+        return True
+    try:
+        user = User.objects.filter(username=uname).only("role").first()
+        if user and (
+            getattr(user, "is_staff", False)
+            or getattr(user, "is_superuser", False)
+            or getattr(user, "role", "") in (UserRole.PROGRAMADOR, UserRole.PROFESSOR, "admin", "Admin")
+        ):
+            return True
+    except Exception:
+        pass
+    return False
 
 
 def evaluate_speaking_with_gemini(

@@ -15,6 +15,11 @@ def favicon_view(request):
     return HttpResponse(status=204)
 
 
+def robots_txt_view(request):
+    """Retorna robots.txt padrão bloqueando indexação do admin e evitando 404 de crawlers."""
+    return HttpResponse("User-agent: *\nDisallow: /django-admin/\n", content_type="text/plain; charset=utf-8")
+
+
 def protected_media_serve(request, path, document_root=None, show_indexes=False):
     """
     Protege arquivos sensíveis da pasta media.
@@ -34,6 +39,8 @@ def protected_media_serve(request, path, document_root=None, show_indexes=False)
 urlpatterns = [
     # Favicon rápido para evitar 404 em logs
     path("favicon.ico", favicon_view),
+    # Robots.txt rápido para indexadores
+    path("robots.txt", robots_txt_view),
     # Painel Administrativo Nativo do Django
     path("django-admin/", admin.site.urls),
     # Django Debug Toolbar (apenas se habilitado nas settings)

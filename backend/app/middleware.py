@@ -7,6 +7,7 @@ from asgiref.sync import iscoroutinefunction, markcoroutinefunction
 from django.core.cache import cache
 from django.db import connection
 from django.http import JsonResponse
+from django.utils.functional import SimpleLazyObject, empty
 
 logger = logging.getLogger("performance")
 
@@ -239,9 +240,24 @@ class StructuredLoggingMiddleware:
         self.audit_logger = logging.getLogger("audit")
 
     def _extract_user_info(self, request):
-        user = getattr(request, "user", None)
-        if user and getattr(user, "is_authenticated", False):
-            return str(getattr(user, "id", "")), getattr(user, "username", "authenticated")
+        try:
+            user = getattr(request, "auth", None) or getattr(request, "user", None)
+            if not user:
+                return "anonymous", "anonymous"
+
+            # Se for um SimpleLazyObject ainda não avaliado pelo fluxo da requisição,
+            # NÃO force a avaliação pois em contexto ASGI/async isso causa SynchronousOnlyOperation
+            if isinstance(user, SimpleLazyObject):
+                if user._wrapped is empty:
+                    return "anonymous", "anonymous"
+                user = user._wrapped
+
+            if getattr(user, "is_authenticated", False):
+                uid = str(getattr(user, "id", getattr(user, "username", "")))
+                uname = str(getattr(user, "username", "authenticated"))
+                return uid, uname
+        except Exception:
+            pass
         return "anonymous", "anonymous"
 
     def _get_client_ip(self, request):
@@ -252,63 +268,66 @@ class StructuredLoggingMiddleware:
         return meta.get("REMOTE_ADDR", "127.0.0.1")
 
     def _log_request(self, request, response, duration_ms, request_id):
-        path = getattr(request, "path", "")
-        if path.startswith(("/static", "/media", "/favicon.ico")) or path in (
-            "/metrics",
-            "/health",
-            "/healthz",
-            "/ping",
-            "/gradio_api/info",
-        ):
-            return
+        try:
+            path = getattr(request, "path", "")
+            if path.startswith(("/static", "/media", "/favicon.ico")) or path in (
+                "/metrics",
+                "/health",
+                "/healthz",
+                "/ping",
+                "/gradio_api/info",
+            ):
+                return
 
-        user_id, username = self._extract_user_info(request)
-        status_code = getattr(response, "status_code", 500)
-        method = getattr(request, "method", "GET")
-        ip = self._get_client_ip(request)
+            user_id, username = self._extract_user_info(request)
+            status_code = getattr(response, "status_code", 500)
+            method = getattr(request, "method", "GET")
+            ip = self._get_client_ip(request)
 
-        use_json = os.getenv("ENABLE_JSON_LOGS", "false").lower() in ("true", "1")
-        if use_json:
-            import json
-            from datetime import datetime, timezone
+            use_json = os.getenv("ENABLE_JSON_LOGS", "false").lower() in ("true", "1")
+            if use_json:
+                import json
+                from datetime import datetime, timezone
 
-            log_data = {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "request_id": request_id,
-                "user_id": user_id,
-                "username": username,
-                "method": method,
-                "path": path,
-                "status_code": status_code,
-                "duration_ms": round(duration_ms, 2),
-                "ip": ip,
-            }
-            self.http_logger.info(json.dumps(log_data))
-        else:
-            self.http_logger.info(
-                f"{method} {path} -> {status_code} ({duration_ms:.1f}ms) [{username} | {ip} | {request_id}]"
+                log_data = {
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "request_id": request_id,
+                    "user_id": user_id,
+                    "username": username,
+                    "method": method,
+                    "path": path,
+                    "status_code": status_code,
+                    "duration_ms": round(duration_ms, 2),
+                    "ip": ip,
+                }
+                self.http_logger.info(json.dumps(log_data))
+            else:
+                self.http_logger.info(
+                    f"{method} {path} -> {status_code} ({duration_ms:.1f}ms) [{username} | {ip} | {request_id}]"
+                )
+
+            # Auditoria de operações destrutivas ou administrativas
+            is_destructive = method in ("DELETE", "PATCH") or (
+                method == "POST" and any(k in path for k in ("/delete", "/reset", "/wipe", "/cancel", "/destroy", "/role", "/ban"))
             )
+            if is_destructive:
+                import json
+                from datetime import datetime, timezone
 
-        # Auditoria de operações destrutivas ou administrativas
-        is_destructive = method in ("DELETE", "PATCH") or (
-            method == "POST" and any(k in path for k in ("/delete", "/reset", "/wipe", "/cancel", "/destroy", "/role", "/ban"))
-        )
-        if is_destructive:
-            import json
-            from datetime import datetime, timezone
-
-            audit_data = {
-                "audit_event": "DESTRUCTIVE_OPERATION",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "request_id": request_id,
-                "user_id": user_id,
-                "username": username,
-                "method": method,
-                "path": path,
-                "status_code": status_code,
-                "ip": ip,
-            }
-            self.audit_logger.warning(json.dumps(audit_data))
+                audit_data = {
+                    "audit_event": "DESTRUCTIVE_OPERATION",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "request_id": request_id,
+                    "user_id": user_id,
+                    "username": username,
+                    "method": method,
+                    "path": path,
+                    "status_code": status_code,
+                    "ip": ip,
+                }
+                self.audit_logger.warning(json.dumps(audit_data))
+        except Exception as exc:
+            self.http_logger.debug(f"[StructuredLoggingMiddleware] Falha ao registrar log: {exc}")
 
     def _get_or_create_request_id(self, request):
         import uuid
@@ -343,13 +362,19 @@ class StructuredLoggingMiddleware:
             async def _logging_wrap(coro):
                 res = await coro
                 duration_ms = (time.perf_counter() - start_time) * 1000
-                self._log_request(request, res, duration_ms, request_id)
+                try:
+                    self._log_request(request, res, duration_ms, request_id)
+                except Exception:
+                    pass
                 self._attach_request_id(res, request_id)
                 return res
             return _logging_wrap(response)
 
         duration_ms = (time.perf_counter() - start_time) * 1000
-        self._log_request(request, response, duration_ms, request_id)
+        try:
+            self._log_request(request, response, duration_ms, request_id)
+        except Exception:
+            pass
         self._attach_request_id(response, request_id)
         return response
 
@@ -363,7 +388,10 @@ class StructuredLoggingMiddleware:
             raise
         duration_ms = (time.perf_counter() - start_time) * 1000
 
-        self._log_request(request, response, duration_ms, request_id)
+        try:
+            self._log_request(request, response, duration_ms, request_id)
+        except Exception:
+            pass
         self._attach_request_id(response, request_id)
         return response
 
