@@ -24,7 +24,8 @@ export class TatiWebSocket {
     if (!token) return;
 
     const path = '/chat/ws';
-    const wsUrl = `${WS_BASE}${path}`;
+    const base = WS_BASE || (typeof window !== 'undefined' && window.location?.host ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}` : '');
+    const wsUrl = `${base}${path}`;
 
     let finalUrl = `${wsUrl}?token=${token}`;
     if (this.config.simulationId) {
@@ -32,8 +33,9 @@ export class TatiWebSocket {
     }
     
     try {
-      this.ws = new WebSocket(finalUrl);
-    } catch (e) {      console.error('Failed to create WebSocket:', e);
+      this.ws = new WebSocket(finalUrl, ['access_token', token]);
+    } catch (e) {
+      console.error('Failed to create WebSocket:', e);
       return;
     }
 

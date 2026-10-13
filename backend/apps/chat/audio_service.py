@@ -152,6 +152,8 @@ def detect_audio_mime_type(audio_bytes: bytes) -> str:
         return "audio/mp4"
     elif audio_bytes.startswith((b"ID3", b"\xff\xfb", b"\xff\xf3", b"\xff\xf2")):
         return "audio/mp3"
+    elif audio_bytes.startswith((b"\xff\xf1", b"\xff\xf9")):
+        return "audio/aac"
     return "audio/webm"
 
 
@@ -342,15 +344,13 @@ class AudioService:
 
         try:
             models_to_try = [
-                os.getenv("GEMINI_AUDIO_MODEL", "gemini-3.5-flash-lite"),
-                "gemini-3.5-flash-lite",
+                os.getenv("GEMINI_AUDIO_MODEL", "gemini-3.8-flash"),
                 "gemini-3.8-flash",
                 "gemini-3.5-flash",
-                "gemini-3.5-transcribe",
             ]
             unique_models = []
             for m in models_to_try:
-                if m and m not in unique_models and "2.5" not in m and "2.0" not in m and "1.5" not in m:
+                if m and m not in unique_models:
                     unique_models.append(m)
 
             instruction = (
@@ -368,10 +368,13 @@ class AudioService:
                         instruction,
                     ]
 
-                    resp = await client.aio.models.generate_content(
-                        model=model,
-                        contents=contents,
-                        config=types.GenerateContentConfig(temperature=0.0),
+                    resp = await asyncio.wait_for(
+                        client.aio.models.generate_content(
+                            model=model,
+                            contents=contents,
+                            config=types.GenerateContentConfig(temperature=0.0),
+                        ),
+                        timeout=12.0,
                     )
                     if not resp or not resp.candidates:
                         continue
@@ -400,35 +403,51 @@ class AudioService:
         cls, audio_bytes: bytes, prompt: str = ""
     ) -> str:
         """
-        Transcreve áudio com Groq Whisper com failover multi-chaves.
+        Transcreve áudio com Groq Whisper com failover multi-chaves e modelos rápidos.
         """
         keys = get_groq_keys()
         if not keys:
-            logger.warning("[AudioService] Nenhuma GROQ_API_KEY para fallback.")
+            logger.warning("[AudioService] Nenhuma GROQ_API_KEY para transcrição.")
             return ""
 
-        for key in keys:
-            try:
-                async with AsyncGroq(api_key=key) as client:
-                    create_kwargs = {
-                        "file": ("input.webm", audio_bytes),
-                        "model": "whisper-large-v3",
-                        "response_format": "text",
-                        "temperature": 0.0,
-                        "language": "en",
-                    }
-                    if prompt:
-                        create_kwargs["prompt"] = prompt
+        ext = "webm"
+        if audio_bytes.startswith(b"RIFF"):
+            ext = "wav"
+        elif audio_bytes.startswith(b"OggS"):
+            ext = "ogg"
+        elif audio_bytes.startswith((b"ID3", b"\xff\xfb", b"\xff\xf3", b"\xff\xf2")):
+            ext = "mp3"
+        elif b"ftyp" in audio_bytes[:16] or audio_bytes.startswith((b"\xff\xf1", b"\xff\xf9")):
+            ext = "m4a"
 
-                    resp = await client.audio.transcriptions.create(**create_kwargs)
-                    if resp:
-                        text = str(resp).strip()
-                        if is_noise_or_hallucination(text):
-                            logger.info(f"[AudioService] Whisper ruído ignorado: {text}")
-                            return ""
-                        return text
-            except Exception as e:
-                logger.warning(f"[AudioService] Whisper falhou na chave {key[:10]}: {e}")
+        groq_models = ["whisper-large-v3-turbo", "whisper-large-v3"]
+
+        for key in keys:
+            for g_model in groq_models:
+                try:
+                    async with AsyncGroq(api_key=key) as client:
+                        create_kwargs = {
+                            "file": (f"audio.{ext}", audio_bytes),
+                            "model": g_model,
+                            "response_format": "text",
+                            "temperature": 0.0,
+                            "language": "en",
+                        }
+                        if prompt:
+                            create_kwargs["prompt"] = prompt
+
+                        resp = await asyncio.wait_for(
+                            client.audio.transcriptions.create(**create_kwargs),
+                            timeout=8.0,
+                        )
+                        if resp:
+                            text = str(resp).strip()
+                            if is_noise_or_hallucination(text):
+                                logger.info(f"[AudioService] Whisper ruído ignorado: {text}")
+                                return ""
+                            return text
+                except Exception as e:
+                    logger.warning(f"[AudioService] Whisper ({g_model}) falhou na chave {key[:10]}: {e}")
         return ""
 
     @classmethod
@@ -451,53 +470,65 @@ class AudioService:
         else:
             audio_bytes = audio_data
 
-        if not audio_bytes or len(audio_bytes) < 200:
+        if not audio_bytes or len(audio_bytes) < 100:
             return ""
 
         if len(audio_bytes) > 15 * 1024 * 1024:
             logger.warning("[AudioService] Áudio rejeitado por exceder 15 MB")
             return ""
 
-        known_audio_headers = (b"\x1a\x45\xdf\xa3", b"OggS", b"RIFF", b"\x00\x00\x00", b"ID3", b"\xff\xfb")
+        known_audio_headers = (
+            b"\x1a\x45\xdf\xa3",
+            b"OggS",
+            b"RIFF",
+            b"\x00\x00\x00",
+            b"ID3",
+            b"\xff\xfb",
+            b"\xff\xf3",
+            b"\xff\xf2",
+            b"\xff\xf1",
+            b"\xff\xf9",
+        )
         if not (audio_bytes.startswith(known_audio_headers) or b"ftyp" in audio_bytes[:16]):
             logger.warning("[AudioService] Áudio rejeitado por formato inválido")
             return ""
 
-        provider = os.getenv("STT_PROVIDER", "gemini").lower()
+        provider = os.getenv("STT_PROVIDER", "whisper").lower()
 
-        # 1. Se provedor primário for Gemini e o cliente estiver configurado
-        if provider == "gemini" and get_gemini_client():
-            mime_type = detect_audio_mime_type(audio_bytes)
-            logger.info("[AudioService] Utilizando Gemini Multimodal STT como motor primário...")
-            gemini_text = await cls._transcribe_gemini_async(
-                audio_bytes=audio_bytes, mime_type=mime_type, prompt=prompt
-            )
-            if gemini_text and not is_noise_or_hallucination(gemini_text):
-                logger.info(f"[AudioService] Transcrito com Gemini STT: '{gemini_text[:40]}...'")
-                return gemini_text
+        # 1. Se provedor primário for Groq Whisper (padrão de alta performance: ~0.7s)
+        if provider != "gemini":
+            groq_text = await cls._transcribe_groq_async(audio_bytes=audio_bytes, prompt=prompt)
+            if groq_text and not is_noise_or_hallucination(groq_text):
+                logger.info(f"[AudioService] Transcrito com Groq Whisper: '{groq_text[:40]}...'")
+                return groq_text
+
+            # Fallback para Google Gemini STT
+            if get_gemini_client():
+                mime_type = detect_audio_mime_type(audio_bytes)
+                logger.info("[AudioService] Fallback para Google Gemini STT...")
+                gemini_text = await cls._transcribe_gemini_async(
+                    audio_bytes=audio_bytes, mime_type=mime_type, prompt=prompt
+                )
+                if gemini_text and not is_noise_or_hallucination(gemini_text):
+                    logger.info(f"[AudioService] Transcrito com Gemini STT: '{gemini_text[:40]}...'")
+                    return gemini_text
+        else:
+            # Se explicitamente configurado STT_PROVIDER=gemini
+            if get_gemini_client():
+                mime_type = detect_audio_mime_type(audio_bytes)
+                logger.info("[AudioService] Utilizando Gemini STT como motor primário...")
+                gemini_text = await cls._transcribe_gemini_async(
+                    audio_bytes=audio_bytes, mime_type=mime_type, prompt=prompt
+                )
+                if gemini_text and not is_noise_or_hallucination(gemini_text):
+                    logger.info(f"[AudioService] Transcrito com Gemini STT: '{gemini_text[:40]}...'")
+                    return gemini_text
 
             # Fallback para Groq Whisper
             groq_text = await cls._transcribe_groq_async(audio_bytes=audio_bytes, prompt=prompt)
             if groq_text and not is_noise_or_hallucination(groq_text):
                 logger.info(f"[AudioService] Fallback para Groq Whisper: '{groq_text[:40]}...'")
                 return groq_text
-
-        # 2. Se provedor primário for Groq Whisper (ou Gemini ausente)
-        groq_text = await cls._transcribe_groq_async(audio_bytes=audio_bytes, prompt=prompt)
-        if groq_text and not is_noise_or_hallucination(groq_text):
-            logger.info(f"[AudioService] Transcrito com Groq Whisper: '{groq_text[:40]}...'")
-            return groq_text
-
-        # Fallback para Google Gemini STT
-        if get_gemini_client():
-            mime_type = detect_audio_mime_type(audio_bytes)
-            logger.info("[AudioService] Utilizando Gemini STT como fallback de transcrição...")
-            gemini_text = await cls._transcribe_gemini_async(
-                audio_bytes=audio_bytes, mime_type=mime_type, prompt=prompt
-            )
-            if gemini_text and not is_noise_or_hallucination(gemini_text):
-                logger.info(f"[AudioService] Transcrito com Gemini STT: '{gemini_text[:40]}...'")
-                return gemini_text
 
         return ""
 

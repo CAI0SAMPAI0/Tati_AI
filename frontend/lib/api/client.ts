@@ -44,6 +44,8 @@ export const WS_BASE =
     ? API_BASE.replace(/^http/, 'ws')
     : typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
     ? 'ws://127.0.0.1:8000'
+    : typeof window !== 'undefined' && window.location?.host
+    ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`
     : '');
 
 let onUnauthorized: (() => void) | null = null;

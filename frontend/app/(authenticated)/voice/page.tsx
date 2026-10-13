@@ -203,6 +203,7 @@ function VoicePageContent() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
   const {
@@ -238,8 +239,9 @@ function VoicePageContent() {
       timer = setTimeout(() => {
         if (state === 'processing') {
           setState('idle');
+          toast.error('Response timed out. Please try again.', { id: 'voice-timeout' });
         }
-      }, 15000);
+      }, 45000);
     }
     return () => clearTimeout(timer);
   }, [state, setState]);
@@ -357,18 +359,39 @@ function VoicePageContent() {
     }
   }, [messages, transcription]);
 
+  // Sincroniza áudio da última mensagem do assistente caso lastAudio ainda não tenha sido carregado
+  useEffect(() => {
+    if (!lastAudio && messages.length > 0) {
+      const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant' && m.audio_b64);
+      if (lastAssistant?.audio_b64) {
+        const audio = audioRef.current;
+        if (audio && !audio.src) {
+          audio.src = `data:audio/mp3;base64,${lastAssistant.audio_b64}`;
+          audio.load();
+        }
+      }
+    }
+  }, [messages, lastAudio]);
+
   useEffect(() => {
     if (lastAudio && audioRef.current) {
       const audio = audioRef.current;
-      audio.src = `data:audio/mp3;base64,${lastAudio}`;
-      audio.load();
-      audio.play().catch(e => {
-        if (e.name === 'NotAllowedError') {
-          toast('Tap the avatar to listen.', { icon: '📢' });
-        }
-      });
+      const targetSrc = `data:audio/mp3;base64,${lastAudio}`;
+      if (audio.src !== targetSrc) {
+        audio.src = targetSrc;
+        audio.load();
+        audio.play().then(() => {
+          setState('speaking');
+        }).catch(e => {
+          console.warn('Audio autoplay prevented or interrupted:', e);
+          if (e.name === 'NotAllowedError') {
+            toast('Tap Teacher Tati to listen.', { icon: '📢', id: 'voice-autoplay-hint' });
+          }
+          setState('idle');
+        });
+      }
     }
-  }, [lastAudio]);
+  }, [lastAudio, setState]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -410,47 +433,94 @@ function VoicePageContent() {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        }
+      });
+      streamRef.current = stream;
+
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : MediaRecorder.isTypeSupported('audio/mp4')
+        ? 'audio/mp4'
+        : '';
+
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
-      recorder.ondataavailable = (e) => audioChunksRef.current.push(e.data);
-      recorder.onstop = async () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64 = (reader.result as string).split(',')[1];
-          sendAudio(base64, ACCENTS[accentIndex].id);
-        };
-        reader.readAsDataURL(blob);
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
       };
-      recorder.start();
+
+      recorder.onstop = async () => {
+        try {
+          const recordedType = recorder.mimeType || 'audio/webm';
+          const blob = new Blob(audioChunksRef.current, { type: recordedType });
+          if (blob.size > 0) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const result = reader.result as string;
+              if (result && result.includes(',')) {
+                const base64 = result.split(',')[1];
+                if (base64 && base64.trim().length > 0) {
+                  sendAudio(base64, ACCENTS[accentIndex].id);
+                }
+              }
+            };
+            reader.readAsDataURL(blob);
+          } else {
+            console.warn('[VoicePage] Audio blob vazio gravado.');
+            setState('idle');
+          }
+        } finally {
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach(t => t.stop());
+            streamRef.current = null;
+          }
+        }
+      };
+
+      // Fatiamento contínuo em 200ms para garantir dados no buffer
+      recorder.start(200);
       setState('listening');
     } catch (err) {
+      console.error('[VoicePage] Mic error:', err);
       toast.error('Mic error: permission denied.');
+      setState('idle');
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && state === 'listening') {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
       setState('processing');
     }
   };
 
-
-
   const togglePlayback = () => {
     if (!audioRef.current) return;
-    if (state === 'speaking') {
-      audioRef.current.pause();
+    const audio = audioRef.current;
+    if (!audio.paused && !audio.ended) {
+      audio.pause();
       setState('idle');
-    } else if (audioRef.current.src) {
-      if (audioRef.current.ended) {
-        audioRef.current.currentTime = 0;
+    } else if (audio.src) {
+      if (audio.ended) {
+        audio.currentTime = 0;
       }
-      audioRef.current.play().catch(() => { });
-      setState('speaking');
+      audio.play().then(() => {
+        setState('speaking');
+      }).catch(e => {
+        console.warn('Playback error:', e);
+        setState('idle');
+      });
     }
   };
 
@@ -476,7 +546,7 @@ function VoicePageContent() {
 
       <audio
         ref={audioRef}
-        autoPlay
+        playsInline
         onEnded={() => {
           setState('idle');
         }}
@@ -484,7 +554,7 @@ function VoicePageContent() {
           setState('speaking');
         }}
         onPause={() => {
-          setState('idle');
+          setState((curr) => curr === 'speaking' ? 'idle' : curr);
         }}
       />
 
@@ -519,12 +589,10 @@ function VoicePageContent() {
 
         <div className="flex flex-col items-center gap-1 sm:gap-8 mt-auto sm:mt-0 mb-1 sm:mb-0">
           <div className="cursor-pointer hover:scale-105 active:scale-95 transition-all duration-700 w-[84px] h-[84px] sm:w-auto sm:h-auto flex items-center justify-center overflow-visible" onClick={() => {
-            if (!convId) return;
-            if (state === 'idle' && !audioRef.current?.src) startRecording();
-            else if (state === 'speaking') togglePlayback();
-            else if (audioRef.current?.src) {
-              if (audioRef.current.ended) audioRef.current.currentTime = 0;
-              audioRef.current.play().catch(() => { });
+            if (audioRef.current?.src) {
+              togglePlayback();
+            } else if (state === 'idle') {
+              startRecording();
             }
           }}>
             <div className="scale-[0.58] sm:scale-90 md:scale-100 origin-center shrink-0">

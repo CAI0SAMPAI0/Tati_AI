@@ -124,6 +124,10 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
           if (cachedMsgs.length > 0) {
             setMessages(cachedMsgs);
             checkAndPollPendingVoice(cachedMsgs);
+            const lastAssistantMsg = [...cachedMsgs].reverse().find(m => m.role === 'assistant' && m.audio_b64);
+            if (lastAssistantMsg?.audio_b64) {
+              setLastAudio(lastAssistantMsg.audio_b64);
+            }
           }
         });
       }).catch(err => console.error('IndexedDB load error in voice hook:', err));
@@ -135,6 +139,10 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
           if (history && history.length > 0) {
             setMessages(history);
             checkAndPollPendingVoice(history);
+            const lastAssistantMsg = [...history].reverse().find(m => m.role === 'assistant' && m.audio_b64);
+            if (lastAssistantMsg?.audio_b64) {
+              setLastAudio(lastAssistantMsg.audio_b64);
+            }
             
             // Salva no cache local
             import('@/lib/db/indexedDB').then(({ saveMessagesLocal }) => {
@@ -312,7 +320,7 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
 
       case 'stream_end':
         setMessages((prev) => prev.filter(m => !m.id || !m.id.startsWith('voice-temp-')));
-        setState((curr) => curr === 'processing' ? 'idle' : curr);
+        // O estado permanece em 'processing' até que 'audio_response' chegue com o áudio falado
         break;
 
       case 'error':
@@ -343,7 +351,11 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
   }, [token, handleMessage, simulationId]);
 
   const sendAudio = useCallback(async (base64: string, accent?: string) => {
-    if (!socketRef.current) return;
+    if (!socketRef.current || !base64 || !base64.trim()) {
+      console.warn('[VoiceSocket] sendAudio ignorado: base64 vazio ou socket ausente');
+      setState('idle');
+      return;
+    }
 
     // Garante que tem uma conversationId antes de enviar
     let convId = convIdRef.current;
