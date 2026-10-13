@@ -17,6 +17,7 @@ import CompetitionsView from '@/views/CompetitionsView.vue';
 import HistoryView from '@/views/HistoryView.vue';
 import ProfileView from '@/views/ProfileView.vue';
 import SettingsView from '@/views/SettingsView.vue';
+import ExamsView from '@/views/ExamsView.vue';
 import { canAccessDashboard } from '@/utils/permissions';
 
 const routes = [
@@ -121,6 +122,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/exams',
+    name: 'exams',
+    component: ExamsView,
+    meta: { requiresAuth: true, programadorOnly: true },
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/',
   },
@@ -144,6 +151,8 @@ router.beforeEach((to, from, next) => {
     next({ path: '/login', query: { redirect: to.fullPath } });
   } else if (to.path === '/login' && authStore.isAuthenticated) {
     next('/chat');
+  } else if (to.meta.programadorOnly && authStore.user?.username !== 'programador') {
+    next('/activities');
   } else if (to.path.startsWith('/dashboard')) {
     if (!canAccessDashboard(authStore.user)) {
       next('/chat');

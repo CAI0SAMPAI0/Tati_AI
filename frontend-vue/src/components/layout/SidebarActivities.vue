@@ -79,7 +79,7 @@ function handleNavClick() {
 
     <!-- Sidebar Aside -->
     <aside
-      class="fixed inset-y-0 left-0 w-[280px] bg-bgSecondary border-r border-line z-50 flex flex-col transition-transform duration-300 shadow-2xl md:static md:translate-x-0 md:shadow-none"
+      class="fixed inset-y-0 left-0 w-[280px] bg-bgSecondary border-r border-line z-50 flex flex-col transition-transform duration-300 shadow-2xl"
       :class="isOpen ? 'translate-x-0' : '-translate-x-full'"
     >
       <!-- Header -->

@@ -214,21 +214,30 @@ class AudioService:
                 return base64.b64encode(buf.getvalue()).decode()
         except Exception as e:
             logger.warning(
-                f"[AudioService] Erro no TTS com a voz '{voice}': {e}. Tentando fallback en-US-JennyNeural..."
+                f"[AudioService] Edge-TTS indisponível para voz '{voice}' ({e}). Acionando fallback..."
             )
-            if voice != "en-US-JennyNeural":
-                try:
-                    communicate = edge_tts.Communicate(cleaned, "en-US-JennyNeural")
-                    buf = io.BytesIO()
-                    async for chunk in communicate.stream():
-                        if chunk["type"] == "audio":
-                            buf.write(chunk["data"])
-                    if buf.tell() > 0:
-                        return base64.b64encode(buf.getvalue()).decode()
-                except Exception as fb_err:
-                    logger.error(f"[AudioService] Erro no TTS fallback: {fb_err}", exc_info=True)
-            else:
-                logger.error(f"[AudioService] Erro no TTS Assíncrono: {e}", exc_info=True)
+
+        # Fallback resiliente: Google Translate TTS com o sotaque exato do usuário
+        try:
+            import urllib.request
+            import urllib.parse
+            chunks_to_send = [cleaned[i:i+200] for i in range(0, min(len(cleaned), 600), 200)]
+            combined_audio = bytearray()
+            tl_code = norm_accent or "en-US"
+            for c_text in chunks_to_send:
+                if not c_text.strip():
+                    continue
+                encoded = urllib.parse.quote(c_text.strip())
+                gt_url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={encoded}&tl={tl_code}&client=tw-ob"
+                req = urllib.request.Request(gt_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    combined_audio.extend(resp.read())
+            if len(combined_audio) > 0:
+                logger.info(f"[AudioService] Áudio gerado com sucesso via Google TTS ({tl_code}, {len(combined_audio)} bytes)")
+                return base64.b64encode(bytes(combined_audio)).decode()
+        except Exception as g_err:
+            logger.warning(f"[AudioService] Erro no fallback Google TTS: {g_err}")
+
         return ""
 
     @classmethod

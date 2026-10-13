@@ -7,12 +7,26 @@ import ChatTopbar from '../components/chat/ChatTopbar.vue';
 import MessageBubble, { type ChatMessage } from '../components/chat/MessageBubble.vue';
 import ChatInput from '../components/chat/ChatInput.vue';
 import LevelingModal from '../components/chat/LevelingModal.vue';
+import WordTooltip from '../components/chat/WordTooltip.vue';
 import { useAuthStore } from '../stores/auth';
 import { getStoredAccent } from '../constants/accents';
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+
+const activeTooltipWord = ref<string | null>(null);
+const tooltipPosition = ref<{ x: number; y: number } | null>(null);
+
+function handleWordClick(word: string, x: number, y: number) {
+  activeTooltipWord.value = word;
+  tooltipPosition.value = { x, y };
+}
+
+function closeWordTooltip() {
+  activeTooltipWord.value = null;
+  tooltipPosition.value = null;
+}
 
 const isSidebarOpen = ref(typeof window !== 'undefined' ? window.innerWidth >= 768 : true);
 const conversations = ref<ChatConversation[]>([]);
@@ -481,6 +495,7 @@ onMounted(() => {
             :key="msg.id"
             :message="msg"
             :conversation-id="activeConvId"
+            @word-click="handleWordClick"
           />
 
           <!-- Assistant Streaming / Typing Indicator -->
@@ -511,6 +526,13 @@ onMounted(() => {
       :loading="isStartingLeveling"
       @close="isLevelingModalOpen = false"
       @start="handleStartLevelingAssessment"
+    />
+
+    <!-- Word / Sentence Click Tooltip -->
+    <WordTooltip
+      :word="activeTooltipWord"
+      :position="tooltipPosition"
+      @close="closeWordTooltip"
     />
   </div>
 </template>

@@ -637,8 +637,11 @@ class RankingService:
                 scores[u.username] = pts
 
         # 2. Para alunos legados ou registros sem bucket monthly_xp, computa a partir de ActivitySubmission
+        qs = ActivitySubmission.objects.filter(score__gt=0)
+        if not all_time:
+            qs = qs.filter(created_at__year=target_year, created_at__month=target_month)
         rows = list(
-            ActivitySubmission.objects.only(
+            qs.only(
                 "username", "score", "metadata", "created_at", "activity_type"
             )
         )

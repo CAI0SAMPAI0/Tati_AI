@@ -69,6 +69,21 @@ export default defineConfig({
         changeOrigin: true,
         bypass: bypassHtml,
       },
+      '/simulation': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        bypass: bypassHtml,
+      },
+      '/admin-games': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        bypass: bypassHtml,
+      },
+      '/admin-news': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        bypass: bypassHtml,
+      },
       '/ws': {
         target: 'ws://127.0.0.1:8000',
         ws: true,

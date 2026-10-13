@@ -3,49 +3,35 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   BookOpen,
-  Headphones,
+  Lightbulb,
+  Podcast,
   FileText,
+  Music,
   Layers,
   Drama,
   Gamepad2,
   Newspaper,
-  Music,
   Search,
   CheckCircle2,
   ExternalLink,
   Play,
-  RotateCcw,
-  X,
   Loader2,
-  Flame,
-  ArrowLeft,
-  Filter,
+  ChevronDown,
 } from 'lucide-vue-next';
+import StudentLayout from '@/components/layout/StudentLayout.vue';
+import ActivityViewerModal, { type ActivityItem } from '@/components/activities/ActivityViewerModal.vue';
 import { useAuthStore } from '@/stores/auth';
-
-interface ActivityItem {
-  id: string;
-  title: string;
-  description?: string;
-  category: string;
-  level?: string;
-  image?: string;
-  url?: string;
-  route?: string;
-  source?: string;
-  isDone?: boolean;
-}
 
 type TabType =
   | 'grammar'
   | 'vocabulary'
   | 'listenings'
   | 'reading'
+  | 'musics'
   | 'flashcards'
   | 'simulations'
   | 'games'
-  | 'news'
-  | 'musics';
+  | 'news';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -53,38 +39,47 @@ const authStore = useAuthStore();
 const activeTab = ref<TabType>('grammar');
 const searchQuery = ref('');
 const filterLevel = ref('All');
-const filterStatus = ref<'all' | 'pending' | 'done'>('all');
+const statusFilter = ref<'all' | 'pending' | 'done'>('all');
 const isLoading = ref(false);
+const visibleCount = ref(12);
 const selectedActivity = ref<ActivityItem | null>(null);
+const isTogglingDone = ref(false);
 
 const completedIds = ref<Set<string>>(new Set());
 
 const CEFR_LEVELS = ['All', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 
 const TABS: Array<{ id: TabType; label: string; icon: any }> = [
-  { id: 'grammar', label: 'Gramática', icon: BookOpen },
-  { id: 'vocabulary', label: 'Vocabulário', icon: FileText },
-  { id: 'listenings', label: 'Listening & Podcasts', icon: Headphones },
-  { id: 'reading', label: 'Leitura', icon: BookOpen },
+  { id: 'grammar', label: 'Grammar', icon: BookOpen },
+  { id: 'vocabulary', label: 'Vocabulary', icon: Lightbulb },
+  { id: 'listenings', label: 'Listening', icon: Podcast },
+  { id: 'reading', label: 'Reading', icon: FileText },
+  { id: 'musics', label: 'Music', icon: Music },
   { id: 'flashcards', label: 'Flashcards', icon: Layers },
-  { id: 'simulations', label: 'Simulações', icon: Drama },
-  { id: 'games', label: 'Jogos', icon: Gamepad2 },
-  { id: 'news', label: 'Notícias', icon: Newspaper },
-  { id: 'musics', label: 'Músicas', icon: Music },
+  { id: 'simulations', label: 'Simulations', icon: Drama },
+  { id: 'games', label: 'Games', icon: Gamepad2 },
+  { id: 'news', label: 'News', icon: Newspaper },
 ];
 
-// Activity items per category
 const rawItems = ref<Record<TabType, ActivityItem[]>>({
   grammar: [],
   vocabulary: [],
   listenings: [],
   reading: [],
+  musics: [],
   flashcards: [],
   simulations: [],
   games: [],
   news: [],
-  musics: [],
 });
+
+function teImg(url?: string): string {
+  if (!url) return '';
+  if (url.includes('test-english.com')) {
+    return `/activities/test-english/image-proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
 
 async function fetchSubmissions() {
   if (!authStore.token) return;
@@ -101,6 +96,8 @@ async function fetchSubmissions() {
             if (sub.module_id) set.add(sub.module_id);
             if (sub.activity_id) set.add(sub.activity_id);
             if (sub.metadata?.url) set.add(sub.metadata.url);
+            if (sub.metadata?.slug) set.add(sub.metadata.slug);
+            if (sub.metadata?.id) set.add(sub.metadata.id);
           }
         });
       }
@@ -123,11 +120,12 @@ async function fetchTabContent(tab: TabType) {
         const data = await res.json();
         const items = (data.items || []).map((i: any) => ({
           id: i.url || i.slug || Math.random().toString(),
-          title: i.title || `Exercício ${i.slug || ''}`,
-          description: `Exercício prático de ${section} (Nível ${i.level || filterLevel.value})`,
+          slug: i.slug,
+          title: i.title || `Exercise ${i.slug || ''}`,
+          description: `Interactive ${section} exercise from test-english.com (Level ${i.level || filterLevel.value}).`,
           category: tab,
           level: (i.level || 'B1').toUpperCase(),
-          image: i.image || '',
+          image: i.image ? teImg(i.image) : '',
           url: i.url || '',
           source: 'test-english.com',
         }));
@@ -157,7 +155,7 @@ async function fetchTabContent(tab: TabType) {
         rawItems.value.games = (data || []).map((g: any) => ({
           id: g.id,
           title: g.title,
-          description: g.description || 'Jogo interativo no WordWall para reforçar seu vocabulário.',
+          description: g.description || 'Interactive WordWall game to practice vocabulary and grammar.',
           category: 'games',
           level: (g.levels?.[0] || 'ALL').toUpperCase(),
           url: g.wordwall_url,
@@ -173,7 +171,7 @@ async function fetchTabContent(tab: TabType) {
         rawItems.value.news = (data || []).map((n: any) => ({
           id: n.id,
           title: n.title,
-          description: n.description || 'Notícia e conteúdo do mundo real para prática de inglês.',
+          description: n.description || 'Real-world English news article and practice.',
           category: 'news',
           level: (n.levels?.[0] || 'ALL').toUpperCase(),
           image: n.thumbnail_url || '',
@@ -189,24 +187,30 @@ async function fetchTabContent(tab: TabType) {
         rawItems.value.flashcards = (data || []).map((f: any) => ({
           id: f.id,
           title: f.title,
-          description: f.description || `Baralho com ${f.card_count || 10} cartas de memorização.`,
+          description: f.description || `Flashcard deck with ${f.card_count || 10} study cards.`,
           category: 'flashcards',
           level: (f.level || 'B1').toUpperCase(),
         }));
       }
     } else if (tab === 'musics') {
-      const res = await fetch('/data/lingoclip_musics.json');
-      if (res.ok) {
-        const data = await res.json();
-        rawItems.value.musics = (data || []).map((m: any) => ({
-          id: m.id || m.title,
-          title: `${m.title} — ${m.artist || ''}`,
-          description: `Treine listening e dicção com a música de ${m.artist || 'Artista'}.`,
-          category: 'musics',
-          image: m.image || '',
-          url: m.url || m.modes?.karaoke || m.modes?.choice,
-        }));
-      }
+      try {
+        const res = await fetch('/data/lingoclip_musics.json');
+        if (res.ok) {
+          const data = await res.json();
+          rawItems.value.musics = (data || []).map((m: any) => ({
+            id: m.id || m.title,
+            title: m.title,
+            artist: m.artist || '',
+            description: `Practice listening & lyrics with ${m.artist || 'music'}.`,
+            category: 'musics',
+            genre: m.genre || 'Pop',
+            image: m.image || '',
+            url: m.url || m.modes?.karaoke || m.modes?.choice,
+            modes: m.modes,
+            source: 'LingoClip',
+          }));
+        }
+      } catch (_) {}
     }
   } catch (err) {
     console.error('Failed to load tab items:', err);
@@ -218,7 +222,7 @@ async function fetchTabContent(tab: TabType) {
 const filteredItems = computed(() => {
   let list = rawItems.value[activeTab.value] || [];
 
-  if (filterLevel.value !== 'All') {
+  if (filterLevel.value !== 'All' && activeTab.value !== 'musics') {
     const target = filterLevel.value.toUpperCase();
     list = list.filter((i) => !i.level || i.level === target || i.level === 'ALL');
   }
@@ -226,34 +230,62 @@ const filteredItems = computed(() => {
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase();
     list = list.filter(
-      (i) => i.title.toLowerCase().includes(q) || (i.description || '').toLowerCase().includes(q)
+      (i) =>
+        i.title.toLowerCase().includes(q) ||
+        (i.artist || '').toLowerCase().includes(q) ||
+        (i.description || '').toLowerCase().includes(q)
     );
   }
 
-  if (filterStatus.value === 'done') {
-    list = list.filter((i) => completedIds.value.has(i.id));
-  } else if (filterStatus.value === 'pending') {
-    list = list.filter((i) => !completedIds.value.has(i.id));
+  if (statusFilter.value === 'done') {
+    list = list.filter(
+      (i) => completedIds.value.has(i.id) || (i.url && completedIds.value.has(i.url)) || (i.slug && completedIds.value.has(i.slug))
+    );
+  } else if (statusFilter.value === 'pending') {
+    list = list.filter(
+      (i) => !completedIds.value.has(i.id) && (!i.url || !completedIds.value.has(i.url)) && (!i.slug || !completedIds.value.has(i.slug))
+    );
   }
 
   return list;
 });
 
+const paginatedItems = computed(() => {
+  return filteredItems.value.slice(0, visibleCount.value);
+});
+
+const hasMore = computed(() => {
+  return filteredItems.value.length > visibleCount.value;
+});
+
+function loadMore() {
+  visibleCount.value += 12;
+}
+
 function openActivity(item: ActivityItem) {
   if (item.route) {
     router.push(item.route);
-  } else if (item.url) {
+  } else {
     selectedActivity.value = item;
   }
 }
 
 async function toggleMarkDone(item: ActivityItem) {
-  const isDone = completedIds.value.has(item.id);
+  const actId = item.url || item.slug || item.id;
+  const isDone = completedIds.value.has(actId) || completedIds.value.has(item.id);
+  isTogglingDone.value = true;
   try {
     if (isDone) {
+      completedIds.value.delete(actId);
       completedIds.value.delete(item.id);
+      if (item.url) completedIds.value.delete(item.url);
+      if (item.slug) completedIds.value.delete(item.slug);
     } else {
+      completedIds.value.add(actId);
       completedIds.value.add(item.id);
+      if (item.url) completedIds.value.add(item.url);
+      if (item.slug) completedIds.value.add(item.slug);
+
       await fetch('/activities/submissions', {
         method: 'POST',
         headers: {
@@ -261,19 +293,28 @@ async function toggleMarkDone(item: ActivityItem) {
           Authorization: `Bearer ${authStore.token}`,
         },
         body: JSON.stringify({
-          activity_id: item.id,
-          module_id: item.id,
+          activity_id: actId,
+          activity_type: item.category || item.source || 'external',
           score: 100,
-          metadata: { status: 'done', title: item.title, url: item.url },
+          metadata: {
+            id: item.id,
+            title: item.title,
+            url: item.url,
+            slug: item.slug,
+            status: 'done',
+          },
         }),
       });
     }
   } catch (err) {
     console.error('Failed to toggle submission:', err);
+  } finally {
+    isTogglingDone.value = false;
   }
 }
 
 watch([activeTab, filterLevel], () => {
+  visibleCount.value = 12;
   fetchTabContent(activeTab.value);
 });
 
@@ -284,274 +325,217 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-bg flex flex-col font-sans">
-    <!-- Topbar Navigation -->
-    <header class="sticky top-0 z-20 border-b border-line bg-surface/80 backdrop-blur-md px-4 py-3 shrink-0">
-      <div class="max-w-6xl mx-auto flex items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
-          <button
-            type="button"
-            class="p-2 rounded-xl text-muted hover:text-ink hover:bg-bgSecondary transition active:scale-95 cursor-pointer"
-            title="Voltar ao Chat"
-            @click="router.push('/chat')"
-          >
-            <ArrowLeft :size="20" />
-          </button>
-
-          <div>
-            <h1 class="text-base sm:text-lg font-bold text-ink flex items-center gap-2">
-              <BookOpen :size="18" class="text-primary" />
-              <span>Atividades e Exercícios</span>
+  <StudentLayout>
+    <div class="space-y-6">
+      <!-- Canonical Page Header -->
+      <header class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div>
+          <div class="flex items-center gap-3 mb-2">
+            <h1 class="text-2xl md:text-3xl font-display font-bold text-ink">
+              My Activities
             </h1>
-            <p class="text-xs text-muted hidden sm:block">
-              Exercícios interativos, gramática, podcasts e simulações com a Teacher Tati
-            </p>
           </div>
+          <p class="text-muted text-sm md:text-base max-w-2xl hidden lg:block">
+            Practice vocabulary, grammar, reading and listening. Track Completed vs Pending activities!
+          </p>
         </div>
 
-        <div class="flex items-center gap-2">
-          <router-link
-            to="/chat"
-            class="px-3.5 py-1.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primaryHover transition active:scale-95 cursor-pointer shadow-xs"
-          >
-            Ir para o Chat
-          </router-link>
-        </div>
-      </div>
-    </header>
-
-    <!-- Main Container -->
-    <main class="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 flex flex-col gap-6">
-      <!-- Category Tabs (Horizontal Scrollable) -->
-      <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar border-b border-line">
-        <button
-          v-for="t in TABS"
-          :key="t.id"
-          type="button"
-          class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition cursor-pointer"
-          :class="
-            activeTab === t.id
-              ? 'bg-primary text-white shadow-xs'
-              : 'text-muted hover:bg-bgSecondary hover:text-ink'
-          "
-          @click="activeTab = t.id"
-        >
-          <component :is="t.icon" :size="16" />
-          <span>{{ t.label }}</span>
-        </button>
-      </div>
-
-      <!-- Filters & Search Bar Row -->
-      <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        <!-- Search Input -->
-        <div class="relative flex-1 max-w-md">
-          <Search :size="16" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
-          <input
-            type="text"
-            v-model="searchQuery"
-            placeholder="Buscar atividade..."
-            class="w-full pl-10 pr-4 py-2 rounded-xl bg-surface border border-line text-xs sm:text-sm text-ink placeholder:text-muted outline-none focus:border-primary transition"
-          />
-        </div>
-
-        <!-- Level and Status Filters -->
-        <div class="flex flex-wrap items-center gap-2">
-          <!-- Level Chips -->
-          <div class="flex items-center gap-1 bg-bgSecondary/60 p-1 rounded-xl border border-line">
-            <button
-              v-for="lvl in CEFR_LEVELS"
-              :key="lvl"
-              type="button"
-              class="px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer"
-              :class="
-                filterLevel === lvl
-                  ? 'bg-primary text-white shadow-xs'
-                  : 'text-muted hover:text-ink'
-              "
-              @click="filterLevel = lvl"
+        <!-- Filters Row -->
+        <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-stretch sm:items-center flex-wrap">
+          <!-- Level Filter -->
+          <div v-if="activeTab !== 'musics'" class="flex items-center gap-2">
+            <span class="text-xs font-bold text-muted uppercase tracking-wider whitespace-nowrap">
+              Level:
+            </span>
+            <select
+              v-model="filterLevel"
+              class="px-3 py-2 bg-surface border border-line rounded-2xl text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all cursor-pointer text-ink"
             >
-              {{ lvl }}
-            </button>
+              <option value="All">All Levels</option>
+              <option v-for="lvl in CEFR_LEVELS.slice(1)" :key="lvl" :value="lvl">
+                {{ lvl }}
+              </option>
+            </select>
           </div>
 
-          <!-- Status Dropdown / Toggle -->
-          <div class="flex items-center gap-1 bg-bgSecondary/60 p-1 rounded-xl border border-line text-xs font-bold">
-            <button
-              type="button"
-              class="px-2.5 py-1 rounded-lg transition cursor-pointer"
-              :class="filterStatus === 'all' ? 'bg-surface text-ink shadow-xs' : 'text-muted'"
-              @click="filterStatus = 'all'"
+          <!-- Status Filter -->
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-muted uppercase tracking-wider whitespace-nowrap">
+              Status:
+            </span>
+            <select
+              v-model="statusFilter"
+              class="px-3 py-2 bg-surface border border-line rounded-2xl text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all cursor-pointer text-ink"
             >
-              Todas
-            </button>
-            <button
-              type="button"
-              class="px-2.5 py-1 rounded-lg transition cursor-pointer"
-              :class="filterStatus === 'pending' ? 'bg-surface text-ink shadow-xs' : 'text-muted'"
-              @click="filterStatus = 'pending'"
-            >
-              Pendentes
-            </button>
-            <button
-              type="button"
-              class="px-2.5 py-1 rounded-lg transition cursor-pointer"
-              :class="filterStatus === 'done' ? 'bg-surface text-emerald-600 shadow-xs' : 'text-muted'"
-              @click="filterStatus = 'done'"
-            >
-              Concluídas
-            </button>
+              <option value="all">All Status</option>
+              <option value="pending">⏳ Pending</option>
+              <option value="done">✓ Completed</option>
+            </select>
           </div>
-        </div>
-      </div>
 
-      <!-- Loading State -->
-      <div v-if="isLoading" class="py-20 flex flex-col items-center justify-center gap-3 text-muted">
-        <Loader2 :size="32" class="animate-spin text-primary" />
-        <span class="text-xs font-semibold">Carregando atividades...</span>
-      </div>
-
-      <!-- Empty State -->
-      <div
-        v-else-if="filteredItems.length === 0"
-        class="py-16 text-center bg-surface border border-line rounded-2xl p-8"
-      >
-        <BookOpen :size="36" class="text-muted mx-auto mb-3 opacity-60" />
-        <h3 class="text-sm font-bold text-ink">Nenhuma atividade encontrada</h3>
-        <p class="text-xs text-muted mt-1">
-          Tente ajustar os filtros de nível ou o termo de busca para visualizar mais conteúdos.
-        </p>
-      </div>
-
-      <!-- Activity Cards Grid -->
-      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <article
-          v-for="item in filteredItems"
-          :key="item.id"
-          class="group bg-surface border border-line rounded-2xl p-4 flex flex-col gap-3 hover:border-primary/50 transition-all cursor-pointer shadow-xs hover:-translate-y-0.5"
-          @click="openActivity(item)"
-        >
-          <!-- Thumbnail if present -->
-          <div v-if="item.image" class="relative aspect-video rounded-xl overflow-hidden bg-bgSecondary">
-            <img
-              :src="item.image"
-              :alt="item.title"
-              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          <!-- Search Input -->
+          <div class="relative w-full md:w-64">
+            <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-muted" :size="18" />
+            <input
+              type="text"
+              v-model="searchQuery"
+              placeholder="Search activity..."
+              class="w-full pl-10 pr-4 py-2 bg-surface border border-line rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all text-ink placeholder:text-muted"
             />
-            <div class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center shadow-lg">
-                <Play :size="18" class="fill-current ml-0.5" />
+          </div>
+        </div>
+      </header>
+
+      <!-- Category Navigation Tabs -->
+      <nav class="flex flex-row overflow-x-auto pb-2 border-b border-line gap-2 items-center flex-nowrap scrollbar-none">
+        <button
+          v-for="tab in TABS"
+          :key="tab.id"
+          type="button"
+          class="flex items-center shrink-0 gap-2 px-4 py-2.5 sm:px-5 sm:py-3 rounded-xl sm:rounded-t-xl sm:rounded-b-none text-sm font-bold transition-all whitespace-nowrap cursor-pointer"
+          :class="
+            activeTab === tab.id
+              ? 'bg-surface border border-line border-b-surface text-primary shadow-xs'
+              : 'text-muted hover:text-ink hover:bg-surface/50 border border-transparent'
+          "
+          @click="activeTab = tab.id"
+        >
+          <component :is="tab.icon" :size="18" />
+          <span>{{ tab.label }}</span>
+        </button>
+      </nav>
+
+      <!-- Content Area -->
+      <div>
+        <!-- Loading State -->
+        <div v-if="isLoading" class="py-20 flex flex-col items-center justify-center gap-3 text-muted">
+          <Loader2 :size="32" class="animate-spin text-primary" />
+          <span class="text-xs font-semibold">Carregando atividades...</span>
+        </div>
+
+        <!-- Empty State -->
+        <div
+          v-else-if="filteredItems.length === 0"
+          class="py-20 text-center text-muted border border-dashed border-line rounded-3xl bg-surface/30 p-8"
+        >
+          No {{ activeTab }} activities found matching your filters.
+        </div>
+
+        <!-- Activities Grid -->
+        <div v-else class="space-y-8">
+          <p class="text-muted text-sm max-w-2xl">
+            Interactive {{ activeTab }} exercises for level {{ filterLevel }} from Teacher Tati Hub.
+          </p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div
+              v-for="item in paginatedItems"
+              :key="item.id"
+              class="text-left bg-surface border border-line rounded-2xl overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 transition-all group cursor-pointer flex flex-col justify-between shadow-xs"
+              @click="openActivity(item)"
+            >
+              <div>
+                <!-- Thumbnail -->
+                <div v-if="item.image" class="h-36 overflow-hidden bg-bgSecondary relative">
+                  <img
+                    :src="item.image"
+                    :alt="item.title"
+                    loading="lazy"
+                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  <div class="absolute top-2 right-2 flex gap-1">
+                    <span
+                      v-if="completedIds.has(item.id) || (item.url && completedIds.has(item.url)) || (item.slug && completedIds.has(item.slug))"
+                      class="flex items-center gap-1 bg-emerald-600 text-white text-[0.65rem] font-bold px-2 py-0.5 rounded-full shadow"
+                    >
+                      <CheckCircle2 :size="12" /> Done
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Card Body -->
+                <div class="p-5 space-y-2">
+                  <div class="flex items-center justify-between gap-2">
+                    <span
+                      v-if="item.level"
+                      class="text-[0.68rem] font-black uppercase px-2 py-0.5 rounded-full bg-primary/10 text-primary"
+                    >
+                      {{ item.level }}
+                    </span>
+                    <span
+                      v-if="!item.image && (completedIds.has(item.id) || (item.url && completedIds.has(item.url)))"
+                      class="flex items-center gap-1 bg-emerald-600 text-white text-[0.65rem] font-bold px-2 py-0.5 rounded-full shadow"
+                    >
+                      <CheckCircle2 :size="12" /> Done
+                    </span>
+                  </div>
+
+                  <h3 class="font-bold text-ink text-base group-hover:text-primary transition-colors line-clamp-2">
+                    {{ item.title }}
+                  </h3>
+
+                  <p v-if="item.description" class="text-xs text-muted line-clamp-2 leading-relaxed">
+                    {{ item.description }}
+                  </p>
+                </div>
+              </div>
+
+              <!-- Card Footer -->
+              <div class="px-5 py-3 border-t border-line/60 bg-bg/40 flex items-center justify-between">
+                <span class="text-xs font-bold text-primary flex items-center gap-1 group-hover:underline">
+                  <span>{{ item.route ? 'Open Activity' : 'Open Exercise' }}</span>
+                  <ExternalLink :size="12" />
+                </span>
+
+                <button
+                  type="button"
+                  class="p-1 rounded-md text-muted hover:text-emerald-600 transition"
+                  :title="completedIds.has(item.id) ? 'Completed' : 'Mark done'"
+                  @click.stop="toggleMarkDone(item)"
+                >
+                  <CheckCircle2
+                    :size="16"
+                    :class="
+                      completedIds.has(item.id) || (item.url && completedIds.has(item.url))
+                        ? 'text-emerald-600 fill-emerald-600/20'
+                        : 'text-muted'
+                    "
+                  />
+                </button>
               </div>
             </div>
           </div>
 
-          <!-- Card Header & Badges -->
-          <div class="flex items-start justify-between gap-2">
-            <h3 class="text-sm font-bold text-ink group-hover:text-primary transition-colors line-clamp-2">
-              {{ item.title }}
-            </h3>
-            <span
-              v-if="item.level"
-              class="text-[0.65rem] font-bold px-2 py-0.5 rounded-full border border-line bg-bgSecondary text-muted shrink-0"
-            >
-              {{ item.level }}
-            </span>
-          </div>
-
-          <!-- Card Description -->
-          <p class="text-xs text-muted line-clamp-2 leading-relaxed">
-            {{ item.description }}
-          </p>
-
-          <!-- Bottom Action Row -->
-          <div class="mt-auto pt-2 border-t border-line/60 flex items-center justify-between">
+          <!-- Load 10 More Button -->
+          <div v-if="hasMore" class="flex flex-col items-center justify-center pt-4">
             <button
               type="button"
-              class="text-xs font-bold text-primary flex items-center gap-1 group-hover:underline"
+              class="px-6 py-3 bg-surface hover:bg-bgSecondary border border-line hover:border-primary/50 text-ink font-bold text-sm rounded-2xl transition-all shadow-xs flex items-center gap-2 group cursor-pointer"
+              @click="loadMore"
             >
-              <span>Abrir atividade</span>
-              <ExternalLink :size="12" />
+              <span>Load More ({{ filteredItems.length - visibleCount }} remaining)</span>
+              <ChevronDown :size="16" class="group-hover:translate-y-0.5 transition-transform" />
             </button>
-
-            <!-- Done Checkbox -->
-            <button
-              type="button"
-              class="flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-lg border transition cursor-pointer"
-              :class="
-                completedIds.has(item.id)
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600'
-                  : 'border-line text-muted hover:border-primary/40'
-              "
-              @click.stop="toggleMarkDone(item)"
-            >
-              <CheckCircle2 :size="13" />
-              <span>{{ completedIds.has(item.id) ? 'Concluída' : 'Marcar' }}</span>
-            </button>
-          </div>
-        </article>
-      </div>
-    </main>
-
-    <!-- Activity Viewer Modal (Iframe / Viewer) -->
-    <Teleport to="body">
-      <div
-        v-if="selectedActivity"
-        class="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-sm animate-fade-in"
-        @click="selectedActivity = null"
-      >
-        <div
-          class="relative w-full max-w-5xl h-[88vh] bg-surface border border-line rounded-3xl shadow-2xl overflow-hidden flex flex-col"
-          @click.stop
-        >
-          <!-- Modal Header -->
-          <div class="px-5 py-3.5 border-b border-line flex items-center justify-between gap-3 bg-bgSecondary/40">
-            <div class="flex items-center gap-3 truncate">
-              <h3 class="text-sm font-bold text-ink truncate">
-                {{ selectedActivity.title }}
-              </h3>
-              <span
-                v-if="selectedActivity.level"
-                class="text-[0.65rem] font-bold px-2 py-0.5 rounded-full border border-line bg-surface text-muted"
-              >
-                {{ selectedActivity.level }}
-              </span>
-            </div>
-
-            <div class="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer"
-                :class="
-                  completedIds.has(selectedActivity.id)
-                    ? 'bg-emerald-500 text-white border-emerald-600'
-                    : 'bg-surface border-line text-ink hover:border-primary'
-                "
-                @click="toggleMarkDone(selectedActivity)"
-              >
-                <CheckCircle2 :size="14" />
-                <span>{{ completedIds.has(selectedActivity.id) ? 'Concluída' : 'Marcar como Concluída' }}</span>
-              </button>
-
-              <button
-                type="button"
-                class="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-bgSecondary transition cursor-pointer"
-                @click="selectedActivity = null"
-              >
-                <X :size="20" />
-              </button>
-            </div>
-          </div>
-
-          <!-- Modal Body / Iframe -->
-          <div class="flex-1 bg-black/5 relative">
-            <iframe
-              v-if="selectedActivity.url"
-              :src="selectedActivity.url"
-              class="w-full h-full border-none"
-              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-            />
           </div>
         </div>
       </div>
-    </Teleport>
-  </div>
+    </div>
+
+    <!-- Canonical Activity Viewer Modal -->
+    <ActivityViewerModal
+      :is-open="Boolean(selectedActivity)"
+      :activity="selectedActivity"
+      :is-done="
+        Boolean(
+          selectedActivity &&
+            (completedIds.has(selectedActivity.id) ||
+              (selectedActivity.url && completedIds.has(selectedActivity.url)) ||
+              (selectedActivity.slug && completedIds.has(selectedActivity.slug)))
+        )
+      "
+      :loading="isTogglingDone"
+      @close="selectedActivity = null"
+      @toggle-done="toggleMarkDone"
+    />
+  </StudentLayout>
 </template>

@@ -59,6 +59,9 @@ function handleSelectAccent(accId: string) {
   currentAccent.value = accId;
   saveStoredAccent(accId);
   isAccentMenuOpen.value = false;
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('tati_accent_changed', { detail: accId }));
+  }
 }
 
 function handleClickOutside(e: MouseEvent) {

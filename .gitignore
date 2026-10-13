@@ -199,3 +199,6 @@ audits/
 
 .env.local
 hub-site-antigo
+playwright-screenshots/
+test_playwright_e2e.js
+test_word_tooltip.js

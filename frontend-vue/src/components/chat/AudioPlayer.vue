@@ -45,6 +45,30 @@ watch(
   }
 );
 
+function handleAccentChanged() {
+  if (isPlaying.value && audioRef.value) {
+    audioRef.value.pause();
+    isPlaying.value = false;
+  }
+  // Invalidates the current audio so next play synthesizes in the new accent!
+  activeBase64.value = undefined;
+}
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('tati_accent_changed', handleAccentChanged);
+  }
+});
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('tati_accent_changed', handleAccentChanged);
+  }
+  if (audioRef.value) {
+    audioRef.value.pause();
+  }
+});
+
 function onTimeUpdate() {
   if (audioRef.value && audioRef.value.duration) {
     progress.value = Math.min(

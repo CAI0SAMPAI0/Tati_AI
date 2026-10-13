@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { Trophy, Medal, Sparkles, Award, ArrowUp } from 'lucide-vue-next';
 import StudentLayout from '@/components/layout/StudentLayout.vue';
 import { useAuthStore } from '@/stores/auth';
@@ -70,20 +70,29 @@ async function fetchRanking() {
   if (!authStore.token) return;
   isLoading.value = true;
   try {
-    const cycleQuery = selectedCycle.value === 'previous' ? '?cycle=prev' : '';
-    const resGlobal = await fetch(`/users/progress/ranking/top15${cycleQuery}`, {
-      headers: { Authorization: `Bearer ${authStore.token}` },
-    });
+    const prevDate = new Date(currentYear, now.getMonth() - 1, 1);
+    const prevYear = prevDate.getFullYear();
+    const prevMonth = prevDate.getMonth() + 1;
+
+    const queryParams =
+      selectedCycle.value === 'previous'
+        ? `?year=${prevYear}&month=${prevMonth}`
+        : '';
+
+    const headers = { Authorization: `Bearer ${authStore.token}` };
+
+    const [resGlobal, resLevel] = await Promise.all([
+      fetch(`/users/progress/ranking/top15${queryParams}`, { headers }),
+      fetch(`/users/progress/ranking/by-level${queryParams}`, { headers }),
+    ]);
+
     if (resGlobal.ok) {
       const data = await resGlobal.json();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         globalRanking.value = data;
       }
     }
 
-    const resLevel = await fetch(`/users/progress/ranking/by-level${cycleQuery}`, {
-      headers: { Authorization: `Bearer ${authStore.token}` },
-    });
     if (resLevel.ok) {
       const dataLevel = await resLevel.json();
       if (typeof dataLevel === 'object' && dataLevel !== null) {
@@ -95,6 +104,10 @@ async function fetchRanking() {
     isLoading.value = false;
   }
 }
+
+watch(selectedCycle, () => {
+  fetchRanking();
+});
 
 onMounted(() => {
   fetchRanking();

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue';
 import SidebarActivities from './SidebarActivities.vue';
 import MainHeader from './MainHeader.vue';
+import { useSidebarState } from '@/utils/useSidebarState';
 
 withDefaults(
   defineProps<{
@@ -14,27 +14,22 @@ withDefaults(
   }
 );
 
-const isSidebarOpen = ref(false);
-
-function toggleSidebar() {
-  isSidebarOpen.value = !isSidebarOpen.value;
-}
-
-function closeSidebar() {
-  isSidebarOpen.value = false;
-}
+const { sidebarOpen, toggleSidebar, closeSidebar } = useSidebarState();
 </script>
 
 <template>
   <div class="flex min-h-screen bg-bg">
     <!-- Shared Sidebar -->
     <SidebarActivities
-      :is-open="isSidebarOpen"
+      :is-open="sidebarOpen"
       @close="closeSidebar"
     />
 
     <!-- Main Content Area -->
-    <div class="flex-1 flex flex-col min-w-0">
+    <div
+      class="flex-1 flex flex-col min-w-0 transition-all duration-300"
+      :class="sidebarOpen ? 'md:ml-[280px]' : 'md:ml-0'"
+    >
       <MainHeader
         :hide-stats="hideStats"
         :hide-streak-and-trophies="hideStreakAndTrophies"

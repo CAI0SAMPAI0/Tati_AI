@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { Mic, Volume2 } from 'lucide-vue-next';
 import AudioPlayer from './AudioPlayer.vue';
+import ClickableText from './ClickableText.vue';
 
 export interface ChatMessage {
   id: string;
@@ -16,6 +17,10 @@ export interface ChatMessage {
 const props = defineProps<{
   message: ChatMessage;
   conversationId?: string | null;
+}>();
+
+const emit = defineEmits<{
+  (e: 'word-click', word: string, x: number, y: number): void;
 }>();
 
 const router = useRouter();
@@ -75,7 +80,12 @@ function formatTime(isoStr?: string) {
             : 'bg-surface border border-line text-ink rounded-bl-xs hover:border-primary/25'
         "
       >
-        <p class="whitespace-pre-wrap">{{ message.content }}</p>
+        <p v-if="message.role === 'user'" class="whitespace-pre-wrap">{{ message.content }}</p>
+        <ClickableText
+          v-else
+          :content="message.content"
+          @word-click="(word, x, y) => $emit('word-click', word, x, y)"
+        />
       </div>
 
       <!-- AudioPlayer for Assistant messages -->
