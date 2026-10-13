@@ -8,8 +8,36 @@ from asgiref.sync import async_to_sync
 from typing import List
 from groq import AsyncGroq
 import edge_tts
+import edge_tts.constants
+import edge_tts.communicate
+import edge_tts.drm
+from email.utils import parsedate_to_datetime
+from datetime import timezone as tz
 
 logger = logging.getLogger(__name__)
+
+# Patch Edge-TTS para o novo endpoint da Microsoft (api.msedgeservices.com).
+# O endpoint legado speech.platform.bing.com passou a responder 403 Forbidden em Outubro/2026 (upstream PR #491).
+try:
+    _EDGE_TTS_NEW_WSS_URL = (
+        "wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1"
+        f"?Ocp-Apim-Subscription-Key={edge_tts.constants.TRUSTED_CLIENT_TOKEN}"
+    )
+    edge_tts.constants.WSS_URL = _EDGE_TTS_NEW_WSS_URL
+    edge_tts.communicate.WSS_URL = _EDGE_TTS_NEW_WSS_URL
+
+    def _safe_parse_rfc2616_date(date: str):
+        try:
+            parsed = parsedate_to_datetime(date)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=tz.utc)
+            return parsed.timestamp()
+        except Exception:
+            return None
+
+    edge_tts.drm.DRM.parse_rfc2616_date = staticmethod(_safe_parse_rfc2616_date)
+except Exception as _patch_err:
+    logger.warning(f"[AudioService] Falha ao aplicar patch no edge-tts: {_patch_err}")
 
 VOICE_ACCENT_MAP = {
     "en-US": "en-US-JennyNeural",
@@ -155,9 +183,41 @@ def is_noise_or_hallucination(text: str) -> bool:
 
 class AudioService:
     @classmethod
+    def _gtts_fallback(cls, text: str, accent: str = "en-US") -> str:
+        """
+        Fallback resiliente para Google TTS (gTTS) caso o Edge TTS falhe ou fique indisponível.
+        """
+        try:
+            from gtts import gTTS
+            tld = "com"
+            norm = (accent or "").upper()
+            if "GB" in norm or "UK" in norm:
+                tld = "co.uk"
+            elif "CA" in norm:
+                tld = "ca"
+            elif "AU" in norm:
+                tld = "com.au"
+            elif "IN" in norm:
+                tld = "co.in"
+            elif "IE" in norm:
+                tld = "ie"
+            elif "ZA" in norm:
+                tld = "co.za"
+
+            buf = io.BytesIO()
+            tts = gTTS(text=text, lang="en", tld=tld, slow=False)
+            tts.write_to_fp(buf)
+            data = buf.getvalue()
+            if data:
+                return base64.b64encode(data).decode()
+        except Exception as e:
+            logger.error(f"[AudioService] Erro no fallback gTTS: {e}", exc_info=True)
+        return ""
+
+    @classmethod
     async def text_to_speech_async(cls, text: str, accent: str = "en-US") -> str:
         """
-        Gera áudio MP3 em base64 nativamente assíncrono via Edge TTS.
+        Gera áudio MP3 em base64 nativamente assíncrono via Edge TTS (com fallback em gTTS).
         """
         cleaned = clean_tts_text(text)
         if not cleaned:
@@ -204,6 +264,8 @@ class AudioService:
                     break
         if not voice:
             voice = "en-US-JennyNeural"
+
+        # 1. Tentativa primária com a voz solicitada no Edge TTS
         try:
             communicate = edge_tts.Communicate(cleaned, voice)
             buf = io.BytesIO()
@@ -216,6 +278,7 @@ class AudioService:
             logger.warning(
                 f"[AudioService] Erro no TTS com a voz '{voice}': {e}. Tentando fallback en-US-JennyNeural..."
             )
+            # 2. Tentativa secundária com voz padrão en-US-JennyNeural no Edge TTS
             if voice != "en-US-JennyNeural":
                 try:
                     communicate = edge_tts.Communicate(cleaned, "en-US-JennyNeural")
@@ -226,9 +289,19 @@ class AudioService:
                     if buf.tell() > 0:
                         return base64.b64encode(buf.getvalue()).decode()
                 except Exception as fb_err:
-                    logger.error(f"[AudioService] Erro no TTS fallback: {fb_err}", exc_info=True)
+                    logger.error(f"[AudioService] Erro no TTS fallback Edge-TTS: {fb_err}", exc_info=True)
             else:
-                logger.error(f"[AudioService] Erro no TTS Assíncrono: {e}", exc_info=True)
+                logger.error(f"[AudioService] Erro no TTS Assíncrono Edge-TTS: {e}", exc_info=True)
+
+        # 3. Fallback de emergência com gTTS (alta confiabilidade e sem bloqueios 403)
+        try:
+            logger.info(f"[AudioService] Acionando fallback gTTS de emergência para sotaque '{norm_accent}'...")
+            gtts_audio = await asyncio.to_thread(cls._gtts_fallback, cleaned, norm_accent)
+            if gtts_audio:
+                return gtts_audio
+        except Exception as gtts_err:
+            logger.error(f"[AudioService] Erro no fallback emergencial gTTS: {gtts_err}", exc_info=True)
+
         return ""
 
     @classmethod
@@ -251,6 +324,9 @@ class AudioService:
                 return async_to_sync(cls.text_to_speech_async)(text, accent)
         except Exception as e:
             logger.error(f"[AudioService] Erro no TTS síncrono: {e}")
+            cleaned = clean_tts_text(text)
+            if cleaned:
+                return cls._gtts_fallback(cleaned, accent)
             return ""
 
     @classmethod
