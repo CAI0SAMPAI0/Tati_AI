@@ -566,9 +566,14 @@ def update_notification_preferences(
                 clean_phone = f"55{clean_phone}"
             profile["whatsapp_number"] = clean_phone
             user.phone = clean_phone
-        else:
+        elif val == "" and len(data) == 1:
             profile["whatsapp_number"] = ""
             user.phone = None
+
+    if user.phone and not profile.get("whatsapp_number"):
+        profile["whatsapp_number"] = user.phone
+    elif profile.get("whatsapp_number") and not user.phone:
+        user.phone = profile["whatsapp_number"]
     if "preferred_accent" in data:
         profile["preferred_accent"] = data["preferred_accent"]
     if "accent" in data:

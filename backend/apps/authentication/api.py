@@ -645,18 +645,26 @@ def update_profile(request: HttpRequest, payload: ProfileUpdateInput):
     ]:
         if subfield in update_data and update_data[subfield] is not None:
             val = update_data[subfield]
-            if subfield == "whatsapp_number" and val:
-                clean_phone = "".join(c for c in str(val) if c.isdigit())
-                if clean_phone and len(clean_phone) in (10, 11) and not clean_phone.startswith("55"):
-                    clean_phone = f"55{clean_phone}"
-                val = clean_phone
-                user.phone = clean_phone
-            elif subfield == "whatsapp_number" and val == "":
-                user.phone = None
-                val = ""
-            profile_dict[subfield] = val
-            if subfield == "accent":
-                profile_dict["preferred_accent"] = val
+            if subfield == "whatsapp_number":
+                if val:
+                    clean_phone = "".join(c for c in str(val) if c.isdigit())
+                    if clean_phone and len(clean_phone) in (10, 11) and not clean_phone.startswith("55"):
+                        clean_phone = f"55{clean_phone}"
+                    val = clean_phone
+                    user.phone = clean_phone
+                    profile_dict[subfield] = clean_phone
+                elif val == "" and "whatsapp_number" in update_data and len(update_data) == 1:
+                    user.phone = None
+                    profile_dict[subfield] = ""
+            else:
+                profile_dict[subfield] = val
+                if subfield == "accent":
+                    profile_dict["preferred_accent"] = val
+
+    if user.phone and not profile_dict.get("whatsapp_number"):
+        profile_dict["whatsapp_number"] = user.phone
+    elif profile_dict.get("whatsapp_number") and not user.phone:
+        user.phone = profile_dict["whatsapp_number"]
 
     if "profile" in update_data and isinstance(update_data["profile"], dict):
         profile_dict.update(update_data["profile"])

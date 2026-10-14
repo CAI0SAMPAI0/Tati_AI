@@ -117,29 +117,42 @@ export default function ProfileClientPage() {
 
   useEffect(() => {
     if (user) {
+      const savedPhone = (user?.profile as any)?.whatsapp_number || user?.phone || (user as any)?.phone || '';
       setFormData((prev) => ({
         ...prev,
-        name: user.name || '',
-        nickname: user.nickname || '',
-        email: user.email || '',
-        occupation: user.occupation || '',
-        level: normalizeLevel(user.level),
-        focus: user.focus || 'General Conversation',
-        responsible_email: user?.profile?.responsible_email || '',
-        whatsapp_number: user?.profile?.whatsapp_number || (user as any)?.phone || prev.whatsapp_number || '',
-        allow_whatsapp_notifications: user?.profile?.allow_whatsapp_notifications ?? prev.allow_whatsapp_notifications ?? true,
+        name: user.name || prev.name || '',
+        nickname: user.nickname || prev.nickname || '',
+        email: user.email || prev.email || '',
+        occupation: user.occupation || prev.occupation || '',
+        level: normalizeLevel(user.level || prev.level),
+        focus: user.focus || prev.focus || 'General Conversation',
+        responsible_email: (user?.profile as any)?.responsible_email || prev.responsible_email || '',
+        whatsapp_number: savedPhone || prev.whatsapp_number || '',
+        allow_whatsapp_notifications: (user?.profile as any)?.allow_whatsapp_notifications ?? prev.allow_whatsapp_notifications ?? true,
       }));
     }
   }, [user]);
 
-  const autoSaveWhatsApp = async (newNumber: string, newAllowed: boolean) => {
+  const autoSaveProfile = async (dataToSave: typeof formData) => {
     try {
-      const clean = newNumber.replace(/\D/g, '');
-      const formatted = (clean.length === 10 || clean.length === 11) && !clean.startsWith('55') ? `55${clean}` : clean;
-      const res = await apiPut<User>('/profile/', {
-        whatsapp_number: formatted || '',
-        allow_whatsapp_notifications: newAllowed,
-      });
+      const payload: Record<string, any> = {
+        name: dataToSave.name,
+        nickname: dataToSave.nickname,
+        email: dataToSave.email,
+        occupation: dataToSave.occupation,
+        level: dataToSave.level,
+        focus: dataToSave.focus,
+        responsible_email: dataToSave.responsible_email,
+        allow_whatsapp_notifications: dataToSave.allow_whatsapp_notifications,
+      };
+
+      if (dataToSave.whatsapp_number) {
+        const clean = dataToSave.whatsapp_number.replace(/\D/g, '');
+        const formatted = (clean.length === 10 || clean.length === 11) && !clean.startsWith('55') ? `55${clean}` : clean;
+        payload.whatsapp_number = formatted || '';
+      }
+
+      const res = await apiPut<User>('/profile/', payload);
       if (res.ok) {
         if (user && updateProfile) {
           updateProfile({
@@ -148,35 +161,48 @@ export default function ProfileClientPage() {
             profile: {
               ...user.profile,
               ...res.data?.profile,
-              whatsapp_number: formatted || undefined,
-              allow_whatsapp_notifications: newAllowed,
+              whatsapp_number: payload.whatsapp_number || (user.profile as any)?.whatsapp_number,
+              allow_whatsapp_notifications: dataToSave.allow_whatsapp_notifications,
             }
           });
         }
-        toast.success('Preferences saved!', { id: 'wa-save', duration: 2500 });
+
+        if (dataToSave.whatsapp_number !== undefined) {
+          const clean = (dataToSave.whatsapp_number || '').replace(/\D/g, '');
+          const formatted = (clean.length === 10 || clean.length === 11) && !clean.startsWith('55') ? `55${clean}` : clean;
+          apiPut('/users/notification-preferences', {
+            whatsapp_number: formatted || null,
+            allow_whatsapp_notifications: dataToSave.allow_whatsapp_notifications,
+            whatsapp_enabled: dataToSave.allow_whatsapp_notifications,
+          }).catch(() => {});
+        }
+
+        toast.success('Alterações salvas! ✔', { id: 'profile-save', duration: 2000 });
       }
     } catch (e) {
-      console.error('Failed to auto-save whatsapp:', e);
+      console.error('Failed to auto-save profile:', e);
     }
   };
 
-  const handleWhatsAppChange = (val: string) => {
-    setFormData((prev) => ({ ...prev, whatsapp_number: val }));
+  const handleInputChange = (field: keyof typeof formData, value: any) => {
+    const updated = { ...formData, [field]: value };
+    setFormData(updated);
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
-      autoSaveWhatsApp(val, formData.allow_whatsapp_notifications);
+      autoSaveProfile(updated);
     }, 1000);
   };
 
-  const handleWhatsAppBlur = () => {
+  const handleInputBlur = () => {
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    autoSaveWhatsApp(formData.whatsapp_number, formData.allow_whatsapp_notifications);
+    autoSaveProfile(formData);
   };
 
-  const handleWhatsAppToggle = (checked: boolean) => {
-    setFormData((prev) => ({ ...prev, allow_whatsapp_notifications: checked }));
+  const handleSelectOrToggle = (field: keyof typeof formData, value: any) => {
+    const updated = { ...formData, [field]: value };
+    setFormData(updated);
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    autoSaveWhatsApp(formData.whatsapp_number, checked);
+    autoSaveProfile(updated);
   };
 
   // Ranking & Score query
@@ -444,35 +470,57 @@ export default function ProfileClientPage() {
         {tab === 'personal' && (
           <div className="space-y-6">
             <section className="bg-surface border border-border rounded-3xl p-6 md:p-8 space-y-6">
-              <div className="flex items-center gap-2 text-primary font-bold text-base">
-                <UserIcon size={18} />
-                <h2>Personal Information</h2>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-primary font-bold text-base">
+                  <UserIcon size={18} />
+                  <h2>Personal Information</h2>
+                </div>
+                <span className="text-[0.65rem] font-medium text-primary">Salva automaticamente</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[0.7rem] font-bold text-text-muted uppercase tracking-wider">Full Name</label>
-                  <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+                  <Input
+                    value={formData.name}
+                    onChange={(e) => handleInputChange('name', e.target.value)}
+                    onBlur={handleInputBlur}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[0.7rem] font-bold text-text-muted uppercase tracking-wider">Nickname</label>
-                  <Input value={formData.nickname} onChange={(e) => setFormData({ ...formData, nickname: e.target.value })} />
+                  <Input
+                    value={formData.nickname}
+                    onChange={(e) => handleInputChange('nickname', e.target.value)}
+                    onBlur={handleInputBlur}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[0.7rem] font-bold text-text-muted uppercase tracking-wider">Email</label>
-                  <Input value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+                  <Input
+                    value={formData.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    onBlur={handleInputBlur}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[0.7rem] font-bold text-text-muted uppercase tracking-wider">Occupation</label>
-                  <Input value={formData.occupation} onChange={(e) => setFormData({ ...formData, occupation: e.target.value })} />
+                  <Input
+                    value={formData.occupation}
+                    onChange={(e) => handleInputChange('occupation', e.target.value)}
+                    onBlur={handleInputBlur}
+                  />
                 </div>
               </div>
             </section>
 
             <section className="bg-surface border border-border rounded-3xl p-6 md:p-8 space-y-6">
-              <div className="flex items-center gap-2 text-primary font-bold text-base">
-                <Target size={18} />
-                <h2>Study Preferences</h2>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-primary font-bold text-base">
+                  <Target size={18} />
+                  <h2>Study Preferences</h2>
+                </div>
+                <span className="text-[0.65rem] font-medium text-primary">Salva automaticamente</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -480,7 +528,7 @@ export default function ProfileClientPage() {
                   <label className="text-[0.7rem] font-bold text-text-muted uppercase tracking-wider">English Level</label>
                   <Select
                     value={formData.level}
-                    onChange={(e) => setFormData({ ...formData, level: normalizeLevel(e.target.value) })}
+                    onChange={(e) => handleSelectOrToggle('level', normalizeLevel(e.target.value))}
                     options={LEVEL_OPTIONS}
                   />
                 </div>
@@ -488,7 +536,7 @@ export default function ProfileClientPage() {
                   <label className="text-[0.7rem] font-bold text-text-muted uppercase tracking-wider">Learning Focus</label>
                   <Select
                     value={formData.focus}
-                    onChange={(e) => setFormData({ ...formData, focus: e.target.value })}
+                    onChange={(e) => handleSelectOrToggle('focus', e.target.value)}
                     options={[
                       { value: 'General Conversation', label: 'General Conversation' },
                       { value: 'Business English', label: 'Business English' },
@@ -507,7 +555,8 @@ export default function ProfileClientPage() {
                     type="email"
                     placeholder="guardian@example.com"
                     value={formData.responsible_email}
-                    onChange={(e) => setFormData({ ...formData, responsible_email: e.target.value })}
+                    onChange={(e) => handleInputChange('responsible_email', e.target.value)}
+                    onBlur={handleInputBlur}
                   />
                 </div>
 
@@ -522,8 +571,8 @@ export default function ProfileClientPage() {
                     type="tel"
                     placeholder="5511999999999"
                     value={formData.whatsapp_number}
-                    onChange={(e) => handleWhatsAppChange(e.target.value)}
-                    onBlur={handleWhatsAppBlur}
+                    onChange={(e) => handleInputChange('whatsapp_number', e.target.value)}
+                    onBlur={handleInputBlur}
                   />
                 </div>
 
@@ -532,7 +581,7 @@ export default function ProfileClientPage() {
                     type="checkbox"
                     id="allow_whatsapp_notifications"
                     checked={formData.allow_whatsapp_notifications}
-                    onChange={(e) => handleWhatsAppToggle(e.target.checked)}
+                    onChange={(e) => handleSelectOrToggle('allow_whatsapp_notifications', e.target.checked)}
                     className="mt-0.5 accent-primary w-4 h-4 rounded shrink-0 cursor-pointer"
                   />
                   <label htmlFor="allow_whatsapp_notifications" className="space-y-0.5 cursor-pointer">
@@ -547,9 +596,13 @@ export default function ProfileClientPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end pt-2">
-                <Button className="px-8 font-bold" onClick={handleSaveProfile} loading={isSaving}>
-                  Save changes
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-border">
+                <div className="text-xs font-semibold text-emerald-500 flex items-center gap-1.5">
+                  <CheckCircle2 size={16} />
+                  <span>Todas as alterações são salvas automaticamente</span>
+                </div>
+                <Button className="px-6 font-bold" onClick={handleSaveProfile} loading={isSaving}>
+                  Salvar tudo agora
                 </Button>
               </div>
             </section>

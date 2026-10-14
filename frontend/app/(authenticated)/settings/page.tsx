@@ -13,7 +13,8 @@ import {
   Save,
   Smartphone,
   Sun,
-  Volume2
+  Volume2,
+  CheckCircle2,
 } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 
@@ -52,19 +53,70 @@ export default function SettingsPage() {
 
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [allowWhatsappNotifications, setAllowWhatsappNotifications] = useState(false);
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const autoSaveSettings = async (
+    newPrefs: typeof prefs,
+    newNumber: string,
+    newAllowed: boolean,
+    customSettings?: typeof settings
+  ) => {
+    try {
+      const clean = (newNumber || '').replace(/\D/g, '');
+      const formatted = (clean.length === 10 || clean.length === 11) && !clean.startsWith('55') ? `55${clean}` : clean;
+      const effectiveSettings = customSettings || settings;
+
+      await apiPut('/users/notification-preferences', {
+        ...newPrefs,
+        whatsapp_number: formatted || null,
+        allow_whatsapp_notifications: newAllowed,
+        whatsapp_enabled: newAllowed,
+        autoplay_chat_audio: Boolean(effectiveSettings.autoplayChatAudio),
+        preferred_accent: selectedAccent,
+      });
+
+      await apiPut('/profile/', {
+        whatsapp_number: formatted || null,
+        allow_whatsapp_notifications: newAllowed,
+        preferred_accent: selectedAccent,
+        accent: selectedAccent,
+        autoplay_chat_audio: Boolean(effectiveSettings.autoplayChatAudio),
+        notification_preferences: newPrefs,
+      });
+
+      if (user && updateProfile) {
+        updateProfile({
+          ...user,
+          preferred_accent: selectedAccent,
+          profile: {
+            ...user.profile,
+            whatsapp_number: formatted || undefined,
+            allow_whatsapp_notifications: newAllowed,
+            autoplay_chat_audio: Boolean(effectiveSettings.autoplayChatAudio),
+            notification_preferences: newPrefs,
+          }
+        });
+      }
+      toast.success('Settings saved! ✔', { id: 'settings-auto-save', duration: 2000 });
+    } catch (e) {
+      console.error('Failed to auto-save settings:', e);
+    }
+  };
 
   const handlePrefChange = (
     category: 'streaks' | 'challenges' | 'cefr',
     channel: 'email' | 'push',
     value: boolean
   ) => {
-    setPrefs((prev) => ({
-      ...prev,
+    const updated = {
+      ...prefs,
       [category]: {
-        ...prev[category],
+        ...prefs[category],
         [channel]: value,
       },
-    }));
+    };
+    setPrefs(updated);
+    autoSaveSettings(updated, whatsappNumber, allowWhatsappNotifications);
   };
 
   useEffect(() => {
@@ -136,54 +188,23 @@ export default function SettingsPage() {
     }
   }, [user]);
 
-  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const autoSaveWhatsApp = async (newNumber: string, newAllowed: boolean) => {
-    try {
-      const clean = newNumber.replace(/\D/g, '');
-      const formatted = (clean.length === 10 || clean.length === 11) && !clean.startsWith('55') ? `55${clean}` : clean;
-      await apiPut('/users/notification-preferences', {
-        whatsapp_number: formatted || null,
-        allow_whatsapp_notifications: newAllowed,
-        whatsapp_enabled: newAllowed,
-      });
-      await apiPut('/profile/', {
-        whatsapp_number: formatted || null,
-        allow_whatsapp_notifications: newAllowed,
-      });
-      if (user && updateProfile) {
-        updateProfile({
-          ...user,
-          profile: {
-            ...user.profile,
-            whatsapp_number: formatted || undefined,
-            allow_whatsapp_notifications: newAllowed,
-          }
-        });
-      }
-      toast.success('Preferences saved!', { id: 'wa-settings-save', duration: 2500 });
-    } catch (e) {
-      console.error('Failed to auto-save whatsapp in settings:', e);
-    }
-  };
-
   const handleWhatsAppChange = (val: string) => {
     setWhatsappNumber(val);
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
-      autoSaveWhatsApp(val, allowWhatsappNotifications);
+      autoSaveSettings(prefs, val, allowWhatsappNotifications);
     }, 1000);
   };
 
   const handleWhatsAppBlur = () => {
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    autoSaveWhatsApp(whatsappNumber, allowWhatsappNotifications);
+    autoSaveSettings(prefs, whatsappNumber, allowWhatsappNotifications);
   };
 
   const handleWhatsAppToggle = (checked: boolean) => {
     setAllowWhatsappNotifications(checked);
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    autoSaveWhatsApp(whatsappNumber, checked);
+    autoSaveSettings(prefs, whatsappNumber, checked);
   };
 
   const handleAccentSelect = async (accentId: string) => {
@@ -356,6 +377,7 @@ export default function SettingsPage() {
                     setSettings(next);
                     localStorage.setItem('tati_settings', JSON.stringify(next));
                     window.dispatchEvent(new Event('tati_settings_changed'));
+                    autoSaveSettings(prefs, whatsappNumber, allowWhatsappNotifications, next);
                   }}
                 />
               </label>
@@ -500,9 +522,12 @@ export default function SettingsPage() {
 
 
           <section className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
-            <div className="p-6 border-b border-border bg-bg-secondary/30 flex items-center gap-3">
-              <Bell size={20} className="text-primary" />
-              <h2 className="font-bold text-sm uppercase tracking-wider">Notifications</h2>
+            <div className="p-6 border-b border-border bg-bg-secondary/30 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Bell size={20} className="text-primary" />
+                <h2 className="font-bold text-sm uppercase tracking-wider">Notifications</h2>
+              </div>
+              <span className="text-[0.65rem] font-medium text-primary">Salva automaticamente</span>
             </div>
             <div className="p-6 space-y-6">
               <div className="space-y-3 pb-6 border-b border-border">
@@ -688,10 +713,16 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          <Button className="w-full h-14 rounded-2xl text-base font-bold gap-3 shadow-glow" onClick={handleSaveAll}>
-            <Save size={20} />
-            {'Save Changes'}
-          </Button>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 rounded-2xl bg-surface border border-border">
+            <div className="text-xs font-semibold text-emerald-500 flex items-center gap-2">
+              <CheckCircle2 size={18} />
+              <span>Todas as configurações são salvas automaticamente</span>
+            </div>
+            <Button className="w-full sm:w-auto px-8 h-12 font-bold gap-2" onClick={handleSaveAll}>
+              <Save size={18} />
+              Salvar tudo agora
+            </Button>
+          </div>
         </div>
       </main>
     </div>
