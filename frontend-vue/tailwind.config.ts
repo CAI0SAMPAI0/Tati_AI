@@ -22,6 +22,7 @@ const config: Config = {
         surface: {
           DEFAULT: 'var(--surface)',
           hover: 'var(--surface-hover)',
+          'hover-list-chat': 'var(--surface-hover-list-chat, #795b8026)',
         },
         card: 'var(--card)',
         border: {

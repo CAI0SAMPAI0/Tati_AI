@@ -11,7 +11,7 @@ const props = withDefaults(
   {
     disabled: false,
     isStreaming: false,
-    placeholder: 'Envie uma mensagem para a Teacher Tati...',
+    placeholder: 'Type your message...',
   }
 );
 
@@ -49,7 +49,7 @@ function handleSend() {
   text.value = '';
   nextTick(() => {
     if (textareaRef.value) {
-      textareaRef.value.style.height = 'auto';
+      textareaRef.value.style.height = '38px';
     }
   });
 }
@@ -72,8 +72,7 @@ async function startRecording() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     audioStream = stream;
-    
-    // Choose supported mimeType
+
     let mimeType = 'audio/webm';
     if (typeof MediaRecorder !== 'undefined' && typeof MediaRecorder.isTypeSupported === 'function') {
       if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
@@ -147,81 +146,85 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="p-2 sm:p-4 bg-transparent shrink-0">
-    <div class="max-w-3xl mx-auto relative">
-      <label class="block relative">
-        <span class="sr-only">Your message</span>
-        <div
-          class="flex items-end gap-2.5 bg-surface border rounded-2xl p-3 md:p-3.5 border-line shadow-sm focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-all"
-          :class="{ 'border-rose-500/50 ring-2 ring-rose-500/10': isRecording }"
-        >
-          <!-- When Recording Audio -->
-          <div
-            v-if="isRecording"
-            class="flex-1 flex items-center justify-center py-2 h-[42px] text-rose-500 animate-pulse font-medium text-sm"
-          >
-            Recording audio... {{ formatTime(recordingTime) }}
-          </div>
-
-          <!-- Textarea -->
-          <textarea
-            v-else
-            ref="textareaRef"
-            rows="1"
-            v-model="text"
-            :placeholder="placeholder"
-            :disabled="disabled || isStreaming"
-            class="flex-1 bg-transparent border-none outline-none text-base text-ink placeholder:text-muted py-1.5 px-1 resize-none min-h-[38px] max-h-[140px] leading-relaxed"
-            @keydown="handleKeyDown"
-          />
-
-          <!-- Action Buttons -->
-          <div class="flex items-center gap-1.5 shrink-0 pb-0.5">
-            <!-- Recording Controls -->
-            <button
-              v-if="isRecording"
-              type="button"
-              aria-label="Parar gravação"
-              title="Parar gravação"
-              class="p-2.5 rounded-xl bg-rose-500 text-white hover:bg-rose-600 transition-all shadow-sm active:scale-95 cursor-pointer"
-              @click="stopRecording"
+  <div class="p-2 md:p-6 bg-gradient-to-t from-bg via-bg/80 to-transparent">
+    <div class="max-w-4xl mx-auto w-full">
+      <div class="p-2 md:p-4 bg-transparent shrink-0">
+        <div class="max-w-3xl mx-auto relative">
+          <label class="block relative">
+            <span class="sr-only">Your message</span>
+            <div
+              class="flex items-end gap-2.5 bg-surface border rounded-2xl p-3 md:p-3.5 border-border shadow-sm focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-all"
+              :class="{ 'border-rose-500/50 ring-2 ring-rose-500/10': isRecording }"
             >
-              <Square :size="16" class="fill-current" />
-            </button>
+              <!-- When Recording Audio -->
+              <div
+                v-if="isRecording"
+                class="flex-1 flex items-center justify-center py-2 h-[38px] text-rose-500 animate-pulse font-medium text-sm"
+              >
+                Recording audio... {{ formatTime(recordingTime) }}
+              </div>
 
-            <!-- Mic Trigger Button -->
-            <button
-              v-else
-              type="button"
-              aria-label="Gravar áudio"
-              title="Gravar áudio"
-              :disabled="disabled || isStreaming"
-              class="p-2.5 rounded-xl text-muted hover:bg-bgSecondary hover:text-ink transition-colors disabled:opacity-40 cursor-pointer"
-              :class="{ 'hover:text-primary': !text.trim() }"
-              @click="startRecording"
-            >
-              <Mic :size="19" />
-            </button>
+              <!-- Textarea -->
+              <textarea
+                v-else
+                ref="textareaRef"
+                rows="1"
+                v-model="text"
+                :placeholder="placeholder"
+                :disabled="disabled || isStreaming"
+                class="flex-1 bg-transparent border-none outline-none text-base text-foreground placeholder:text-muted py-1.5 px-1 resize-none min-h-[38px] max-h-[140px] scrollbar-none leading-relaxed"
+                style="height: 38px;"
+                @keydown="handleKeyDown"
+              />
 
-            <!-- Send Message Button -->
-            <button
-              v-if="!isRecording"
-              type="button"
-              aria-label="Enviar mensagem"
-              title="Enviar mensagem"
-              :disabled="!text.trim() || disabled || isStreaming"
-              class="p-2.5 rounded-xl bg-primary text-white transition-all active:scale-95 disabled:opacity-30 disabled:scale-100 disabled:pointer-events-none shadow-sm cursor-pointer hover:bg-primaryHover shadow-primary/20"
-              @click="handleSend"
-            >
-              <ArrowUp :size="18" />
-            </button>
-          </div>
+              <!-- Action Buttons -->
+              <div class="flex items-center gap-1.5 shrink-0 pb-0.5">
+                <!-- Recording Controls -->
+                <button
+                  v-if="isRecording"
+                  type="button"
+                  aria-label="Stop recording"
+                  title="Stop recording"
+                  class="p-2.5 rounded-xl bg-rose-500 text-white hover:bg-rose-600 transition-all shadow-sm active:scale-95 cursor-pointer"
+                  @click="stopRecording"
+                >
+                  <Square :size="16" class="fill-current" />
+                </button>
+
+                <!-- Mic Trigger Button -->
+                <button
+                  v-else
+                  type="button"
+                  aria-label="Record audio"
+                  title="Record audio"
+                  :disabled="disabled || isStreaming"
+                  class="p-2.5 rounded-xl text-muted hover:bg-surface-hover hover:text-foreground transition-colors disabled:opacity-40 cursor-pointer hover:text-primary"
+                  @click="startRecording"
+                >
+                  <Mic :size="19" />
+                </button>
+
+                <!-- Send Message Button -->
+                <button
+                  v-if="!isRecording"
+                  type="button"
+                  aria-label="Send message"
+                  title="Send"
+                  :disabled="!text.trim() || disabled || isStreaming"
+                  class="p-2.5 rounded-xl bg-primary text-on-primary transition-all active:scale-95 disabled:opacity-30 disabled:scale-100 disabled:pointer-events-none shadow-sm cursor-pointer"
+                  @click="handleSend"
+                >
+                  <ArrowUp :size="18" />
+                </button>
+              </div>
+            </div>
+          </label>
+
+          <p class="mt-2 text-[0.7rem] text-center text-muted">
+            Taty's Hub practices English with you · Enter to send · Shift+Enter for new line
+          </p>
         </div>
-      </label>
-
-      <p class="mt-2 text-[0.7rem] text-center text-muted">
-        A Teacher Tati pratica inglês com você · Enter para enviar · Shift+Enter para nova linha
-      </p>
+      </div>
     </div>
   </div>
 </template>

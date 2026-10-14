@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Loader2, AudioLines, Mic, BookMarked, ArrowRight, ClipboardCheck, Sparkles } from 'lucide-vue-next';
+import { Loader2, AudioLines, Mic, BookMarked, ClipboardCheck } from 'lucide-vue-next';
 import ChatSidebar, { type ChatConversation } from '../components/chat/ChatSidebar.vue';
 import ChatTopbar from '../components/chat/ChatTopbar.vue';
 import MessageBubble, { type ChatMessage } from '../components/chat/MessageBubble.vue';
@@ -226,7 +226,7 @@ async function deleteConversation(id: string) {
 
 // Delete all conversations
 async function deleteAllConversations() {
-  if (!confirm('⚠️ Deseja realmente excluir TODAS as suas conversas?')) return;
+  if (!confirm('⚠️ Delete ALL conversations?')) return;
   try {
     for (const c of conversations.value) {
       await fetch(`/chat/conversations/${c.id}`, {
@@ -259,7 +259,7 @@ async function handleSendMessage(content: string) {
           Authorization: `Bearer ${authStore.token}`,
         },
         body: JSON.stringify({
-          title: content.slice(0, 30) || 'Conversa com a Teacher Tati',
+          title: content.slice(0, 30) || 'Conversation with Teacher Tati',
         }),
       });
       if (newRes.ok) {
@@ -319,7 +319,7 @@ async function handleSendMessage(content: string) {
       messages.value.push({
         id: `error-${Date.now()}`,
         role: 'assistant',
-        content: 'Tive uma breve instabilidade na conexão. Poderia enviar novamente?',
+        content: 'I had a brief connection issue. Could you send that again?',
       });
     }
   } catch (err) {
@@ -327,7 +327,7 @@ async function handleSendMessage(content: string) {
     messages.value.push({
       id: `error-${Date.now()}`,
       role: 'assistant',
-      content: 'Não foi possível conectar ao servidor. Por favor, verifique sua conexão.',
+      content: 'Could not connect to the server. Please check your connection.',
     });
   } finally {
     isSending.value = false;
@@ -361,7 +361,7 @@ async function handleSendAudio(base64: string) {
     }
 
     isSending.value = false;
-    await handleSendMessage('🎙 [Mensagem de Áudio]');
+    await handleSendMessage('🎙 [Voice Message]');
   } catch (err) {
     console.error('Audio message send error:', err);
     isSending.value = false;
@@ -390,8 +390,8 @@ onMounted(() => {
 
     <!-- Main Chat Workspace with Responsive Padding -->
     <div
-      class="flex-1 flex flex-col min-w-0 relative bg-bg transition-all duration-300 h-screen"
-      :class="isSidebarOpen ? 'md:pl-[280px]' : 'md:pl-0'"
+      class="flex-1 flex flex-col min-w-0 relative bg-bg transition-all duration-300 md:pl-[280px]"
+      :class="isSidebarOpen ? '' : 'md:!pl-0'"
     >
       <!-- Topbar -->
       <ChatTopbar
@@ -403,121 +403,121 @@ onMounted(() => {
       />
 
       <!-- Message History / Welcome Area Container -->
-      <div
-        ref="messagesContainerRef"
-        class="flex-1 overflow-y-auto px-4 py-6 sm:px-6 space-y-5 scroll-smooth"
-      >
-        <!-- Leveling in progress banner -->
+      <div class="flex-1 overflow-hidden relative flex flex-col">
         <div
-          v-if="isLevelingActive"
-          class="max-w-3xl mx-auto p-3 rounded-2xl bg-primary/10 border border-primary/25 flex items-center justify-between gap-3 text-xs shadow-xs animate-fade-in"
+          ref="messagesContainerRef"
+          class="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin"
         >
-          <div class="flex items-center gap-2.5">
-            <ClipboardCheck :size="18" class="text-primary shrink-0" />
-            <span class="text-ink">
-              Desafio de Nivelamento CEFR em andamento. Digite <strong class="font-mono text-primary font-bold">/finish</strong> a qualquer momento para concluir e receber sua nota.
-            </span>
+          <!-- Leveling in progress banner -->
+          <div
+            v-if="isLevelingActive"
+            class="max-w-3xl mx-auto p-3 rounded-2xl bg-primary/10 border border-primary/25 flex items-center justify-between gap-3 text-xs shadow-xs animate-fade-in"
+          >
+            <div class="flex items-center gap-2.5">
+              <ClipboardCheck :size="18" class="text-primary shrink-0" />
+              <span class="text-foreground">
+                CEFR Leveling Assessment in progress. Type <strong class="font-mono text-primary font-bold">/finish</strong> at any time to complete and receive your evaluation.
+              </span>
+            </div>
           </div>
-        </div>
 
-        <!-- Loading State -->
-        <div v-if="isLoadingMessages" class="flex h-full items-center justify-center">
-          <div class="flex flex-col items-center gap-2 text-primary">
-            <Loader2 :size="32" class="animate-spin" />
-            <p class="text-xs font-semibold text-muted">Carregando conversa...</p>
+          <!-- Loading State -->
+          <div v-if="isLoadingMessages" class="flex h-full items-center justify-center">
+            <div class="flex flex-col items-center gap-2 text-primary">
+              <Loader2 :size="32" class="animate-spin" />
+              <p class="text-xs font-semibold text-muted">Loading conversation...</p>
+            </div>
           </div>
-        </div>
 
-        <!-- Canonical Welcome Screen (when no messages) -->
-        <div
-          v-else-if="messages.length === 0"
-          class="flex flex-col items-center justify-center py-8 md:py-16 text-center animate-fade-in max-w-2xl mx-auto px-4 w-full"
-        >
-          <div class="w-16 h-16 rounded-full border-[3px] border-primary/40 shadow-glow overflow-hidden mb-5 flex items-center justify-center">
-            <img
-              src="/images/tati_logo.jpg"
-              alt="Logo da Tatiana"
-              class="w-full h-full object-cover rounded-full"
+          <!-- Canonical Welcome Screen (when no messages) -->
+          <div
+            v-else-if="messages.length === 0"
+            class="flex flex-col items-center justify-center py-8 md:py-12 text-center animate-fade-in max-w-2xl mx-auto px-4 w-full"
+          >
+            <div class="w-16 h-16 rounded-full border-[3px] border-primary/40 shadow-glow overflow-hidden mb-5 flex items-center justify-center">
+              <img
+                src="/images/tati_logo.jpg"
+                alt="Logo da Tatiana"
+                width="64"
+                height="64"
+                class="w-full h-full object-cover rounded-full"
+              />
+            </div>
+
+            <header class="space-y-3 mb-8">
+              <h1 class="font-editorial text-[32px] md:text-[36px] leading-tight text-primary font-normal">
+                Welcome to Taty's Hub
+              </h1>
+
+              <p class="text-[15px] leading-relaxed text-muted max-w-md mx-auto">
+                Your AI English learning hub. Let's practice together?
+              </p>
+            </header>
+
+            <!-- Action Buttons matching design_system/chat.html -->
+            <div class="flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                class="inline-flex items-center gap-2 px-4 py-2 bg-surface border border-border rounded-xl text-xs text-muted hover:text-foreground hover:border-primary/40 transition-all cursor-pointer font-medium shadow-xs"
+                @click="router.push(activeConvId ? `/pronunciation-reader?conv_id=${activeConvId}` : '/pronunciation-reader')"
+              >
+                <AudioLines :size="14" class="text-primary" />
+                <span>Pronunciation Practice</span>
+              </button>
+
+              <button
+                type="button"
+                class="inline-flex items-center gap-2 px-4 py-2 bg-surface border border-border rounded-xl text-xs text-muted hover:text-foreground hover:border-primary/40 transition-all cursor-pointer font-medium shadow-xs"
+                @click="router.push(activeConvId ? `/voice?conv_id=${activeConvId}` : '/voice')"
+              >
+                <Mic :size="14" class="text-primary" />
+                <span>Voice</span>
+              </button>
+
+              <button
+                type="button"
+                class="inline-flex items-center gap-2 px-4 py-2 bg-surface border border-border rounded-xl text-xs text-muted hover:text-foreground hover:border-primary/40 transition-all cursor-pointer font-medium shadow-xs"
+                @click="router.push('/activities')"
+              >
+                <BookMarked :size="14" class="text-primary" />
+                <span>Activities</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Messages List -->
+          <template v-else>
+            <MessageBubble
+              v-for="msg in messages"
+              :key="msg.id"
+              :message="msg"
+              :conversation-id="activeConvId"
+              @word-click="handleWordClick"
             />
-          </div>
 
-          <header class="space-y-3 mb-8">
-            <h1 class="font-editorial text-[32px] md:text-[36px] leading-tight text-primary font-normal">
-              Bem-vindo ao Taty's Hub
-            </h1>
+            <!-- Assistant Streaming / Typing Indicator -->
+            <div v-if="isSending" class="flex items-start gap-3">
+              <div class="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-full border border-primary/20 bg-primarySoft shadow-sm mt-0.5">
+                <img src="/images/tati_logo.jpg" alt="Teacher Tati" class="h-full w-full object-cover" />
+              </div>
+              <div class="rounded-2xl rounded-tl-sm border border-border bg-surface px-4 py-3 text-sm text-muted shadow-sm flex items-center gap-1.5">
+                <span class="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
+                <span class="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
+                <span class="h-2 w-2 rounded-full bg-primary animate-bounce" />
+              </div>
+            </div>
+          </template>
 
-            <p class="text-[15px] leading-relaxed text-muted max-w-md mx-auto">
-              Seu hub completo de aprendizado de inglês com inteligência artificial. Vamos praticar juntos?
-            </p>
-          </header>
-
-          <!-- Action Buttons -->
-          <div class="flex flex-wrap items-center justify-center gap-3">
-            <button
-              type="button"
-              class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary/10 via-primarySoft to-primary/10 border border-primary/40 rounded-xl text-xs text-primary hover:bg-primary/20 transition-all font-bold shadow-xs cursor-pointer"
-              @click="isLevelingModalOpen = true"
-            >
-              <ClipboardCheck :size="14" />
-              <span>Teste de Nivelamento (CEFR)</span>
-            </button>
-
-            <router-link
-              to="/pronunciation-reader"
-              class="inline-flex items-center gap-2 px-4 py-2 bg-surface border border-line rounded-xl text-xs text-muted hover:text-ink hover:border-primary/40 transition-all font-medium shadow-xs"
-            >
-              <AudioLines :size="14" class="text-primary" />
-              <span>Treinar Pronúncia</span>
-            </router-link>
-
-            <router-link
-              to="/voice"
-              class="inline-flex items-center gap-2 px-4 py-2 bg-surface border border-line rounded-xl text-xs text-muted hover:text-ink hover:border-primary/40 transition-all font-medium shadow-xs"
-            >
-              <Mic :size="14" class="text-primary" />
-              <span>Modo de Voz</span>
-            </router-link>
-
-            <router-link
-              to="/activities"
-              class="inline-flex items-center gap-2 px-4 py-2 bg-surface border border-line rounded-xl text-xs text-muted hover:text-ink hover:border-primary/40 transition-all font-medium shadow-xs"
-            >
-              <BookMarked :size="14" class="text-primary" />
-              <span>Atividades</span>
-            </router-link>
-          </div>
+          <div class="h-2" />
         </div>
 
-        <!-- Messages List -->
-        <template v-else>
-          <MessageBubble
-            v-for="msg in messages"
-            :key="msg.id"
-            :message="msg"
-            :conversation-id="activeConvId"
-            @word-click="handleWordClick"
-          />
-
-          <!-- Assistant Streaming / Typing Indicator -->
-          <div v-if="isSending" class="flex items-start gap-3">
-            <div class="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-full border border-primary/20 bg-primarySoft shadow-sm mt-0.5">
-              <img src="/images/tati_logo.jpg" alt="Teacher Tati" class="h-full w-full object-cover" />
-            </div>
-            <div class="rounded-2xl rounded-tl-sm border border-line bg-surface px-4 py-3 text-sm text-muted shadow-sm flex items-center gap-1.5">
-              <span class="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
-              <span class="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
-              <span class="h-2 w-2 rounded-full bg-primary animate-bounce" />
-            </div>
-          </div>
-        </template>
+        <!-- Chat Input Area -->
+        <ChatInput
+          :is-streaming="isSending"
+          @send="handleSendMessage"
+          @send-audio="handleSendAudio"
+        />
       </div>
-
-      <!-- Chat Input Area -->
-      <ChatInput
-        :is-streaming="isSending"
-        @send="handleSendMessage"
-        @send-audio="handleSendAudio"
-      />
     </div>
 
     <!-- Leveling Modal -->
