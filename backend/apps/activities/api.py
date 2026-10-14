@@ -436,6 +436,15 @@ def catalog_checkout_status(request: HttpRequest, payment_id: str):
     return HubService.get_checkout_status(payment_id)
 
 
+@catalog_router.get("/orders", auth=auth_optional)
+def get_catalog_orders(request: HttpRequest):
+    """
+    Retorna o histórico de pedidos do usuário autenticado no catálogo do Hub.
+    """
+    return HubService.get_user_orders(getattr(request, "auth", None))
+
+
+
 #    GRAMÁTICA & EXERCÍCIOS                                             
 
 

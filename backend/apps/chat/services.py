@@ -837,7 +837,7 @@ class AIService:
         def _step_gemini():
             if not (GEMINI_API_KEY and genai):
                 return "", ""
-            gemini_models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]
+            gemini_models = ["gemini-flash-latest", "gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite", "gemini-2.5-flash"]
             for gem_model in gemini_models:
                 try:
                     model = genai.GenerativeModel(gem_model)

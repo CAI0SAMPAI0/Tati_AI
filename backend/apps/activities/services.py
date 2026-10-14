@@ -5,7 +5,7 @@ import difflib
 import uuid
 import asyncio
 from asgiref.sync import async_to_sync
-from typing import Optional
+from typing import Optional, Any
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from django.conf import settings
@@ -260,6 +260,15 @@ class FlashcardService:
                     if normalize_slug(t) == target_slug:
                         matched.append(c)
                         matched_topic = t
+
+                # Fallback: busca cards recém-gerados ainda em rascunho
+                if not matched:
+                    cefr_cards_draft = Flashcard.objects.filter(level__iexact=lvl)
+                    for c in cefr_cards_draft:
+                        t = (c.topic or "General Vocabulary").strip()
+                        if normalize_slug(t) == target_slug:
+                            matched.append(c)
+                            matched_topic = t
 
                 if matched:
                     all_matched_fronts = [c.front for c in matched]
@@ -2460,6 +2469,50 @@ class HubService:
             "paymentId": payment_id,
         }
 
+    @staticmethod
+    def get_user_orders(user: Any) -> list[dict]:
+        if not user or not hasattr(user, "username"):
+            return []
+        try:
+            from apps.payments.models import Order
+            from django.db import connection
+
+            orders = Order.objects.filter(username=user.username).order_by("-created_at")
+            if not orders.exists():
+                return []
+
+            order_ids = [o.id for o in orders]
+            items_by_order = defaultdict(list)
+            content_titles = dict(PremiumContent.objects.values_list("id", "title"))
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT order_id, content_id, price FROM order_items WHERE order_id = ANY(%s)",
+                    [order_ids],
+                )
+                for o_id, c_id, price in cursor.fetchall():
+                    title = content_titles.get(c_id, "Digital Material")
+                    items_by_order[str(o_id)].append({
+                        "content_id": str(c_id),
+                        "price": float(price or 0.0),
+                        "title": title,
+                    })
+
+            res = []
+            for o in orders:
+                res.append({
+                    "id": str(o.id),
+                    "status": o.status,
+                    "total_amount": float(o.total_amount or 0.0),
+                    "payment_method": o.payment_method or "pix",
+                    "created_at": o.created_at.isoformat() if o.created_at else None,
+                    "items": items_by_order.get(str(o.id), []),
+                })
+            return res
+        except Exception as e:
+            logger.warning(f"[Hub] Erro ao buscar pedidos do usuário {getattr(user, 'username', '')}: {e}")
+            return []
+
 
 class SpeechService:
     @classmethod
@@ -2761,14 +2814,15 @@ class SpeechService:
 
 
         # Prioriza modelos modernos ativos de alta performance e disponibilidade
-        env_model = os.getenv("GEMINI_AUDIO_MODEL", "gemini-2.5-flash")
+        env_model = os.getenv("GEMINI_AUDIO_MODEL", "gemini-flash-latest")
         models_to_try = [
             env_model,
-            "gemini-2.5-flash",
-            "gemini-2.0-flash",
-            "gemini-1.5-flash",
+            "gemini-flash-latest",
             "gemini-3.8-flash",
             "gemini-3.5-flash",
+            "gemini-3.1-flash-lite",
+            "gemini-2.5-flash-lite",
+            "gemini-2.5-flash",
         ]
         unique_models = []
         for m in models_to_try:
