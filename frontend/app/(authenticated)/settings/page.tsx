@@ -459,8 +459,8 @@ export default function SettingsPage() {
                         toast.success('Translation mode: Full sentence');
                       }}
                       className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${settings.tooltipMode === 'sentence'
-                          ? 'border-primary bg-primary/10 text-primary shadow-sm ring-2 ring-primary/20'
-                          : 'border-border bg-bg hover:border-text-muted/30 text-text'
+                        ? 'border-primary bg-primary/10 text-primary shadow-sm ring-2 ring-primary/20'
+                        : 'border-border bg-bg hover:border-text-muted/30 text-text'
                         }`}
                     >
                       <div className="flex items-center justify-between mb-1">
@@ -484,8 +484,8 @@ export default function SettingsPage() {
                         toast.success('Translation mode: Individual words');
                       }}
                       className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${settings.tooltipMode === 'word'
-                          ? 'border-primary bg-primary/10 text-primary shadow-sm ring-2 ring-primary/20'
-                          : 'border-border bg-bg hover:border-text-muted/30 text-text'
+                        ? 'border-primary bg-primary/10 text-primary shadow-sm ring-2 ring-primary/20'
+                        : 'border-border bg-bg hover:border-text-muted/30 text-text'
                         }`}
                     >
                       <div className="flex items-center justify-between mb-1">
@@ -714,11 +714,11 @@ export default function SettingsPage() {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 rounded-2xl bg-surface border border-border">
             <div className="text-xs font-semibold text-emerald-500 flex items-center gap-2">
               <CheckCircle2 size={18} />
-              <span>Todas as configurações são salvas automaticamente</span>
+              <span>All changes are saved automatically</span>
             </div>
             <Button className="w-full sm:w-auto px-8 h-12 font-bold gap-2" onClick={handleSaveAll}>
               <Save size={18} />
-              Salvar tudo agora
+              Save everything now
             </Button>
           </div>
         </div>
