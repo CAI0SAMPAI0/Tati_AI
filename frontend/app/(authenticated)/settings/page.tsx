@@ -120,8 +120,9 @@ export default function SettingsPage() {
       }
 
       const prof = user?.profile || {};
-      if (prof.whatsapp_number !== undefined) {
-        setWhatsappNumber((prev) => prev || prof.whatsapp_number || (user as any)?.phone || '');
+      const savedPhone = prof.whatsapp_number || (user as any)?.phone || '';
+      if (savedPhone) {
+        setWhatsappNumber(savedPhone);
       }
       if (prof.allow_whatsapp_notifications !== undefined) {
         setAllowWhatsappNotifications(Boolean(prof.allow_whatsapp_notifications));
@@ -160,7 +161,7 @@ export default function SettingsPage() {
           }
         });
       }
-      toast.success('WhatsApp preferences saved! ✔', { id: 'wa-settings-save', duration: 2500 });
+      toast.success('Preferences saved!', { id: 'wa-settings-save', duration: 2500 });
     } catch (e) {
       console.error('Failed to auto-save whatsapp in settings:', e);
     }
@@ -605,20 +606,20 @@ export default function SettingsPage() {
                   <span className="text-[0.65rem] font-medium text-primary">Salva automaticamente</span>
                 </div>
                 <div className="relative max-w-md">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-text-muted">
-                    +55
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-primary">
+                    <MessageCircle size={18} />
                   </span>
                   <input
                     type="tel"
-                    placeholder="11999999999"
+                    placeholder="5511999999999"
                     value={whatsappNumber}
                     onChange={(e) => handleWhatsAppChange(e.target.value)}
                     onBlur={handleWhatsAppBlur}
-                    className="w-full pl-12 pr-4 py-3 bg-bg border border-border rounded-2xl text-sm font-bold text-text placeholder-text-muted/50 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
+                    className="w-full pl-11 pr-4 py-3 bg-bg border border-border rounded-2xl text-sm font-bold text-text placeholder-text-muted/50 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
                   />
                 </div>
                 <p className="text-[0.65rem] text-text-subtle leading-normal">
-                  Informe o número com DDD (ex: 11999999999 ou 5511999999999).
+                  Informe o número com DDD (ex: 5511999999999 ou 11999999999).
                 </p>
               </div>
 

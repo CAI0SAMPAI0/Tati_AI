@@ -18,6 +18,7 @@ export interface User {
   focus?: string;
   preferred_accent?: string;
   accent?: string;
+  phone?: string | null;
   /**
    * Optional nested profile information returned by the backend.
    * Currently used for `responsible_email` in the profile page.

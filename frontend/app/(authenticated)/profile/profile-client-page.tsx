@@ -25,8 +25,10 @@ import {
   CheckCircle2,
   Clock,
   RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { DialogModal } from '@/components/ui/dialog-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -95,6 +97,25 @@ export default function ProfileClientPage() {
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    async function fetchNotificationPrefs() {
+      try {
+        const data = await apiGet<any>('/users/notification-preferences');
+        if (data) {
+          if (data.whatsapp_number) {
+            setFormData((prev) => ({ ...prev, whatsapp_number: data.whatsapp_number }));
+          }
+          if (typeof data.allow_whatsapp_notifications === 'boolean') {
+            setFormData((prev) => ({ ...prev, allow_whatsapp_notifications: data.allow_whatsapp_notifications }));
+          }
+        }
+      } catch (err) {
+        // silent fallback
+      }
+    }
+    fetchNotificationPrefs();
+  }, []);
+
+  useEffect(() => {
     if (user) {
       setFormData((prev) => ({
         ...prev,
@@ -105,7 +126,7 @@ export default function ProfileClientPage() {
         level: normalizeLevel(user.level),
         focus: user.focus || 'General Conversation',
         responsible_email: user?.profile?.responsible_email || '',
-        whatsapp_number: prev.whatsapp_number || user?.profile?.whatsapp_number || (user as any)?.phone || '',
+        whatsapp_number: user?.profile?.whatsapp_number || (user as any)?.phone || prev.whatsapp_number || '',
         allow_whatsapp_notifications: user?.profile?.allow_whatsapp_notifications ?? prev.allow_whatsapp_notifications ?? true,
       }));
     }
@@ -132,7 +153,7 @@ export default function ProfileClientPage() {
             }
           });
         }
-        toast.success('WhatsApp preferences saved! ✔', { id: 'wa-save', duration: 2500 });
+        toast.success('Preferences saved!', { id: 'wa-save', duration: 2500 });
       }
     } catch (e) {
       console.error('Failed to auto-save whatsapp:', e);
@@ -271,17 +292,16 @@ export default function ProfileClientPage() {
   };
 
   const [isDeleting, setIsDeleting] = useState(false);
-  const handleDeleteAccount = async () => {
-    const confirmed = window.confirm(
-      'Are you sure you want to permanently delete your account and all study progress? This action cannot be undone.'
-    );
-    if (!confirmed) return;
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
 
+  const handleDeleteAccount = async () => {
     setIsDeleting(true);
     try {
       const res = await apiDelete('/profile/');
       if (res.ok) {
         toast.success('Your account has been deleted.');
+        setIsDeleteModalOpen(false);
         logout();
       } else {
         toast.error('Could not delete account. Please try again or contact support.');
@@ -834,7 +854,14 @@ export default function ProfileClientPage() {
                   <LogOut size={16} />
                   Sign out
                 </Button>
-                <Button variant="danger" className="flex-1 font-bold gap-2" onClick={handleDeleteAccount} loading={isDeleting}>
+                <Button
+                  variant="danger"
+                  className="flex-1 font-bold gap-2"
+                  onClick={() => {
+                    setDeleteConfirmInput('');
+                    setIsDeleteModalOpen(true);
+                  }}
+                >
                   <Trash2 size={16} />
                   Delete Account
                 </Button>
@@ -908,6 +935,60 @@ export default function ProfileClientPage() {
           </div>
         )}*/}
       </div>
+
+      <DialogModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          if (!isDeleting) setIsDeleteModalOpen(false);
+        }}
+        title="Delete Account Permanently"
+        size="md"
+      >
+        <div className="space-y-5 p-2">
+          <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-danger/10 border border-danger/20 text-danger">
+            <AlertTriangle className="shrink-0 mt-0.5" size={22} />
+            <div className="text-xs space-y-1">
+              <p className="font-bold text-sm">Warning: This action is permanent!</p>
+              <p className="text-text-muted leading-relaxed">
+                By deleting your account, all your study history, chat conversations, CEFR assessments, trophies, and XP points will be permanently purged. This action cannot be undone.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-text">
+              To confirm, type <span className="font-black text-danger underline">{user?.username || 'DELETE'}</span> below:
+            </label>
+            <Input
+              value={deleteConfirmInput}
+              onChange={(e) => setDeleteConfirmInput(e.target.value)}
+              placeholder={user?.username || 'DELETE'}
+              className="font-mono text-sm"
+              autoFocus
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+            <Button
+              variant="secondary"
+              onClick={() => setIsDeleteModalOpen(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              disabled={deleteConfirmInput.trim() !== (user?.username || 'DELETE') || isDeleting}
+              loading={isDeleting}
+              onClick={handleDeleteAccount}
+              className="gap-2 font-bold"
+            >
+              <Trash2 size={16} />
+              Permanently Delete Account
+            </Button>
+          </div>
+        </div>
+      </DialogModal>
     </div>
   );
 }

@@ -509,7 +509,7 @@ def get_notification_preferences(request: HttpRequest):
         "email_enabled": profile.get("allow_email_notifications", True),
         "daily_reminder": profile.get("daily_reminder", True),
         "streak_alerts": profile.get("streak_alerts", True),
-        "whatsapp_number": profile.get("whatsapp_number", ""),
+        "whatsapp_number": profile.get("whatsapp_number", "") or getattr(user, "phone", "") or "",
         "autoplay_chat_audio": profile.get("autoplay_chat_audio", False),
         "streaks": streaks,
         "challenges": challenges,
