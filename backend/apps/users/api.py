@@ -559,7 +559,16 @@ def update_notification_preferences(
     if "streak_alerts" in data:
         profile["streak_alerts"] = data["streak_alerts"]
     if "whatsapp_number" in data:
-        profile["whatsapp_number"] = data["whatsapp_number"]
+        val = data["whatsapp_number"]
+        if val:
+            clean_phone = "".join(c for c in str(val) if c.isdigit())
+            if clean_phone and len(clean_phone) in (10, 11) and not clean_phone.startswith("55"):
+                clean_phone = f"55{clean_phone}"
+            profile["whatsapp_number"] = clean_phone
+            user.phone = clean_phone
+        else:
+            profile["whatsapp_number"] = ""
+            user.phone = None
     if "preferred_accent" in data:
         profile["preferred_accent"] = data["preferred_accent"]
     if "accent" in data:
@@ -578,7 +587,10 @@ def update_notification_preferences(
         profile["notification_preferences"] = current_prefs
 
     user.profile = profile
-    user.save(update_fields=["profile"])
+    update_fields = ["profile"]
+    if "whatsapp_number" in data:
+        update_fields.append("phone")
+    user.save(update_fields=update_fields)
     return {"success": True, "preferences": profile}
 
 

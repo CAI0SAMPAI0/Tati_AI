@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   User as UserIcon,
   Lock,
@@ -32,7 +32,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { DEFAULT_AVATAR_URL } from '@/lib/constants/user';
-import { apiPut, apiPost, apiUpload, apiGet } from '@/lib/api/client';
+import { apiPut, apiPost, apiUpload, apiGet, apiDelete } from '@/lib/api/client';
 import { User } from '@/lib/api/types';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -83,8 +83,8 @@ export default function ProfileClientPage() {
     level: normalizeLevel(user?.level),
     focus: user?.focus || 'General Conversation',
     responsible_email: user?.profile?.responsible_email || '',
-    whatsapp_number: user?.profile?.whatsapp_number || '',
-    allow_whatsapp_notifications: user?.profile?.allow_whatsapp_notifications ?? false,
+    whatsapp_number: user?.profile?.whatsapp_number || (user as any)?.phone || '',
+    allow_whatsapp_notifications: user?.profile?.allow_whatsapp_notifications ?? true,
   });
 
   const [pwData, setFormDataPw] = useState({
@@ -92,9 +92,12 @@ export default function ProfileClientPage() {
     confirm_pw: '',
   });
 
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     if (user) {
-      setFormData({
+      setFormData((prev) => ({
+        ...prev,
         name: user.name || '',
         nickname: user.nickname || '',
         email: user.email || '',
@@ -102,11 +105,58 @@ export default function ProfileClientPage() {
         level: normalizeLevel(user.level),
         focus: user.focus || 'General Conversation',
         responsible_email: user?.profile?.responsible_email || '',
-        whatsapp_number: user?.profile?.whatsapp_number || '',
-        allow_whatsapp_notifications: user?.profile?.allow_whatsapp_notifications ?? false,
-      });
+        whatsapp_number: prev.whatsapp_number || user?.profile?.whatsapp_number || (user as any)?.phone || '',
+        allow_whatsapp_notifications: user?.profile?.allow_whatsapp_notifications ?? prev.allow_whatsapp_notifications ?? true,
+      }));
     }
   }, [user]);
+
+  const autoSaveWhatsApp = async (newNumber: string, newAllowed: boolean) => {
+    try {
+      const clean = newNumber.replace(/\D/g, '');
+      const formatted = (clean.length === 10 || clean.length === 11) && !clean.startsWith('55') ? `55${clean}` : clean;
+      const res = await apiPut<User>('/profile/', {
+        whatsapp_number: formatted || '',
+        allow_whatsapp_notifications: newAllowed,
+      });
+      if (res.ok) {
+        if (user && updateProfile) {
+          updateProfile({
+            ...user,
+            ...res.data,
+            profile: {
+              ...user.profile,
+              ...res.data?.profile,
+              whatsapp_number: formatted || undefined,
+              allow_whatsapp_notifications: newAllowed,
+            }
+          });
+        }
+        toast.success('WhatsApp preferences saved! ✔', { id: 'wa-save', duration: 2500 });
+      }
+    } catch (e) {
+      console.error('Failed to auto-save whatsapp:', e);
+    }
+  };
+
+  const handleWhatsAppChange = (val: string) => {
+    setFormData((prev) => ({ ...prev, whatsapp_number: val }));
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      autoSaveWhatsApp(val, formData.allow_whatsapp_notifications);
+    }, 1000);
+  };
+
+  const handleWhatsAppBlur = () => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveWhatsApp(formData.whatsapp_number, formData.allow_whatsapp_notifications);
+  };
+
+  const handleWhatsAppToggle = (checked: boolean) => {
+    setFormData((prev) => ({ ...prev, allow_whatsapp_notifications: checked }));
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveWhatsApp(formData.whatsapp_number, checked);
+  };
 
   // Ranking & Score query
   const { data: positionData } = useQuery({
@@ -217,6 +267,29 @@ export default function ProfileClientPage() {
       }
     } catch (err) {
       toast.error('Error. Please try again.');
+    }
+  };
+
+  const [isDeleting, setIsDeleting] = useState(false);
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to permanently delete your account and all study progress? This action cannot be undone.'
+    );
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    try {
+      const res = await apiDelete('/profile/');
+      if (res.ok) {
+        toast.success('Your account has been deleted.');
+        logout();
+      } else {
+        toast.error('Could not delete account. Please try again or contact support.');
+      }
+    } catch (e) {
+      toast.error('Error deleting account.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -419,14 +492,18 @@ export default function ProfileClientPage() {
                 </div>
 
                 <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-[0.7rem] font-bold text-text-muted uppercase tracking-wider">
-                    WhatsApp Number
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[0.7rem] font-bold text-text-muted uppercase tracking-wider">
+                      WhatsApp Number
+                    </label>
+                    <span className="text-[0.65rem] font-medium text-primary">Salva automaticamente</span>
+                  </div>
                   <Input
                     type="tel"
                     placeholder="5511999999999"
                     value={formData.whatsapp_number}
-                    onChange={(e) => setFormData({ ...formData, whatsapp_number: e.target.value })}
+                    onChange={(e) => handleWhatsAppChange(e.target.value)}
+                    onBlur={handleWhatsAppBlur}
                   />
                 </div>
 
@@ -435,7 +512,7 @@ export default function ProfileClientPage() {
                     type="checkbox"
                     id="allow_whatsapp_notifications"
                     checked={formData.allow_whatsapp_notifications}
-                    onChange={(e) => setFormData({ ...formData, allow_whatsapp_notifications: e.target.checked })}
+                    onChange={(e) => handleWhatsAppToggle(e.target.checked)}
                     className="mt-0.5 accent-primary w-4 h-4 rounded shrink-0 cursor-pointer"
                   />
                   <label htmlFor="allow_whatsapp_notifications" className="space-y-0.5 cursor-pointer">
@@ -757,7 +834,7 @@ export default function ProfileClientPage() {
                   <LogOut size={16} />
                   Sign out
                 </Button>
-                <Button variant="danger" className="flex-1 font-bold gap-2">
+                <Button variant="danger" className="flex-1 font-bold gap-2" onClick={handleDeleteAccount} loading={isDeleting}>
                   <Trash2 size={16} />
                   Delete Account
                 </Button>

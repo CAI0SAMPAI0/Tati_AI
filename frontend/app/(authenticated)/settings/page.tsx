@@ -15,7 +15,7 @@ import {
   Sun,
   Volume2
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
@@ -121,7 +121,7 @@ export default function SettingsPage() {
 
       const prof = user?.profile || {};
       if (prof.whatsapp_number !== undefined) {
-        setWhatsappNumber(prof.whatsapp_number || '');
+        setWhatsappNumber((prev) => prev || prof.whatsapp_number || (user as any)?.phone || '');
       }
       if (prof.allow_whatsapp_notifications !== undefined) {
         setAllowWhatsappNotifications(Boolean(prof.allow_whatsapp_notifications));
@@ -134,6 +134,56 @@ export default function SettingsPage() {
       }
     }
   }, [user]);
+
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const autoSaveWhatsApp = async (newNumber: string, newAllowed: boolean) => {
+    try {
+      const clean = newNumber.replace(/\D/g, '');
+      const formatted = (clean.length === 10 || clean.length === 11) && !clean.startsWith('55') ? `55${clean}` : clean;
+      await apiPut('/users/notification-preferences', {
+        whatsapp_number: formatted || null,
+        allow_whatsapp_notifications: newAllowed,
+        whatsapp_enabled: newAllowed,
+      });
+      await apiPut('/profile/', {
+        whatsapp_number: formatted || null,
+        allow_whatsapp_notifications: newAllowed,
+      });
+      if (user && updateProfile) {
+        updateProfile({
+          ...user,
+          profile: {
+            ...user.profile,
+            whatsapp_number: formatted || undefined,
+            allow_whatsapp_notifications: newAllowed,
+          }
+        });
+      }
+      toast.success('WhatsApp preferences saved! ✔', { id: 'wa-settings-save', duration: 2500 });
+    } catch (e) {
+      console.error('Failed to auto-save whatsapp in settings:', e);
+    }
+  };
+
+  const handleWhatsAppChange = (val: string) => {
+    setWhatsappNumber(val);
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      autoSaveWhatsApp(val, allowWhatsappNotifications);
+    }, 1000);
+  };
+
+  const handleWhatsAppBlur = () => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveWhatsApp(whatsappNumber, allowWhatsappNotifications);
+  };
+
+  const handleWhatsAppToggle = (checked: boolean) => {
+    setAllowWhatsappNotifications(checked);
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveWhatsApp(whatsappNumber, checked);
+  };
 
   const handleAccentSelect = async (accentId: string) => {
     setSelectedAccent(accentId);
@@ -550,21 +600,25 @@ export default function SettingsPage() {
             </div>
             <div className="p-6 space-y-6">
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-bold text-text">WhatsApp Number</label>
+                <div className="flex items-center justify-between max-w-md">
+                  <label className="text-sm font-bold text-text">WhatsApp Number</label>
+                  <span className="text-[0.65rem] font-medium text-primary">Salva automaticamente</span>
+                </div>
                 <div className="relative max-w-md">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-text-muted">
                     +55
                   </span>
                   <input
                     type="tel"
-                    placeholder="(11) 99999-9999"
+                    placeholder="11999999999"
                     value={whatsappNumber}
-                    onChange={(e) => setWhatsappNumber(e.target.value)}
+                    onChange={(e) => handleWhatsAppChange(e.target.value)}
+                    onBlur={handleWhatsAppBlur}
                     className="w-full pl-12 pr-4 py-3 bg-bg border border-border rounded-2xl text-sm font-bold text-text placeholder-text-muted/50 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
                   />
                 </div>
                 <p className="text-[0.65rem] text-text-subtle leading-normal">
-                  Informe o número com DDI/DDD (ex: 11999999999).
+                  Informe o número com DDD (ex: 11999999999 ou 5511999999999).
                 </p>
               </div>
 
@@ -577,7 +631,7 @@ export default function SettingsPage() {
                   type="checkbox"
                   className="w-5 h-5 rounded-md border-border text-primary focus:ring-primary/20 transition-all accent-primary"
                   checked={allowWhatsappNotifications}
-                  onChange={(e) => setAllowWhatsappNotifications(e.target.checked)}
+                  onChange={(e) => handleWhatsAppToggle(e.target.checked)}
                 />
               </label>
             </div>

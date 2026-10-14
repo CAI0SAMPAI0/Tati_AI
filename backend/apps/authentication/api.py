@@ -644,9 +644,19 @@ def update_profile(request: HttpRequest, payload: ProfileUpdateInput):
         "notification_preferences",
     ]:
         if subfield in update_data and update_data[subfield] is not None:
-            profile_dict[subfield] = update_data[subfield]
+            val = update_data[subfield]
+            if subfield == "whatsapp_number" and val:
+                clean_phone = "".join(c for c in str(val) if c.isdigit())
+                if clean_phone and len(clean_phone) in (10, 11) and not clean_phone.startswith("55"):
+                    clean_phone = f"55{clean_phone}"
+                val = clean_phone
+                user.phone = clean_phone
+            elif subfield == "whatsapp_number" and val == "":
+                user.phone = None
+                val = ""
+            profile_dict[subfield] = val
             if subfield == "accent":
-                profile_dict["preferred_accent"] = update_data[subfield]
+                profile_dict["preferred_accent"] = val
 
     if "profile" in update_data and isinstance(update_data["profile"], dict):
         profile_dict.update(update_data["profile"])
@@ -662,6 +672,7 @@ def update_profile(request: HttpRequest, payload: ProfileUpdateInput):
         "avatar_url",
         "native_language",
         "timezone",
+        "phone",
     ]:
         if field in update_data and update_data[field] is not None:
             if hasattr(user, field):
@@ -669,3 +680,15 @@ def update_profile(request: HttpRequest, payload: ProfileUpdateInput):
 
     user.save()
     return AuthService._build_user_out(user)
+
+
+@profile_router.delete("", auth=auth_required)
+@profile_router.delete("/", auth=auth_required)
+def delete_own_account(request: HttpRequest):
+    """
+    Permite que o próprio aluno autenticado exclua sua conta e dados pedagógicos (LGPD).
+    """
+    user: User = request.auth
+    from apps.dashboard.services import DashboardService
+    return DashboardService.delete_student(user.username)
+
