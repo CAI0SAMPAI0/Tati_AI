@@ -311,7 +311,7 @@ export default function LoginPage() {
         {/* Voltar para a página inicial */}
         <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-text transition-colors mb-6 group self-start sm:self-center">
           <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
-          <span>Voltar para a página inicial</span>
+          <span>Go to Home Page</span>
         </Link>
 
         {/* Logo / Header com os textos originais */}
