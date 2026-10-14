@@ -1,47 +1,46 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import {
-  User as UserIcon,
-  Lock,
-  LogOut,
-  Camera,
-  Target,
-  Zap,
-  Trash2,
-  Eye,
-  EyeOff,
-  ArrowLeft,
-  Trophy,
-  TrendingUp,
-  Medal,
-  Flame,
-  Award,
-  Bell,
-  Sparkles,
-  ChevronRight,
-  MessageSquareHeart,
-  Star,
-  CheckCircle2,
-  Clock,
-  RefreshCw,
-  AlertTriangle,
-} from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { DialogModal } from '@/components/ui/dialog-modal';
 import { Button } from '@/components/ui/button';
+import { DialogModal } from '@/components/ui/dialog-modal';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { DEFAULT_AVATAR_URL } from '@/lib/constants/user';
-import { apiPut, apiPost, apiUpload, apiGet, apiDelete } from '@/lib/api/client';
-import { User } from '@/lib/api/types';
-import { useQuery } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
-import { cn } from '@/lib/utils';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { LEVEL_OPTIONS, normalizeLevel } from '@/lib/constants/levels';
+import { useAuth } from '@/hooks/useAuth';
+import { apiDelete, apiGet, apiPost, apiPut, apiUpload } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
+import { User } from '@/lib/api/types';
+import { LEVEL_OPTIONS, normalizeLevel } from '@/lib/constants/levels';
+import { DEFAULT_AVATAR_URL } from '@/lib/constants/user';
+import { cn } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Award,
+  Bell,
+  Camera,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  Eye,
+  EyeOff,
+  Flame,
+  Lock,
+  LogOut,
+  Medal,
+  MessageSquareHeart,
+  RefreshCw,
+  Sparkles,
+  Star,
+  Target,
+  Trash2,
+  TrendingUp,
+  Trophy,
+  User as UserIcon
+} from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+import toast from 'react-hot-toast';
 
 type Tab = 'personal' | 'achievements' | 'feedbacks' | 'security' | 'plan';
 
@@ -174,7 +173,7 @@ export default function ProfileClientPage() {
             whatsapp_number: formatted || null,
             allow_whatsapp_notifications: dataToSave.allow_whatsapp_notifications,
             whatsapp_enabled: dataToSave.allow_whatsapp_notifications,
-          }).catch(() => {});
+          }).catch(() => { });
         }
 
         toast.success('Alterações salvas! ✔', { id: 'profile-save', duration: 2000 });
@@ -229,6 +228,7 @@ export default function ProfileClientPage() {
     queryFn: () => apiGet<any>('/users/permissions/subscription'),
   });
 
+  // Terá no futuro, no entanto já deixei a estrutura
   const isUnlocked = sub?.has_subscription || user?.plan_type === 'full';
   const daysLeft = sub?.days_left ?? 0;
   const isGracePeriod = sub?.in_grace_period ?? false;
@@ -260,7 +260,7 @@ export default function ProfileClientPage() {
       const res = await apiPut<User>('/profile/', formData);
       if (res.ok) {
         updateProfile(res.data);
-        toast.success('Profile updated successfully! ✔');
+        toast.success('Profile updated successfully!');
       } else {
         toast.error('Error saving. Please try again.');
       }
@@ -359,7 +359,7 @@ export default function ProfileClientPage() {
       <div className="max-w-4xl mx-auto px-4 py-8 md:py-12 space-y-6 animate-in fade-in duration-500">
         {/* Page header */}
         <div className="flex items-center gap-3">
-          <button 
+          <button
             onClick={() => router.push('/chat')}
             className="w-10 h-10 rounded-xl bg-surface hover:bg-surface-hover border border-border flex items-center justify-center text-text-muted hover:text-text transition-colors shrink-0"
           >
@@ -475,7 +475,7 @@ export default function ProfileClientPage() {
                   <UserIcon size={18} />
                   <h2>Personal Information</h2>
                 </div>
-                <span className="text-[0.65rem] font-medium text-primary">Salva automaticamente</span>
+                <span className="text-[0.65rem] font-medium text-primary">Automatically saves</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -520,7 +520,7 @@ export default function ProfileClientPage() {
                   <Target size={18} />
                   <h2>Study Preferences</h2>
                 </div>
-                <span className="text-[0.65rem] font-medium text-primary">Salva automaticamente</span>
+                <span className="text-[0.65rem] font-medium text-primary">Automatically saves</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -565,7 +565,7 @@ export default function ProfileClientPage() {
                     <label className="text-[0.7rem] font-bold text-text-muted uppercase tracking-wider">
                       WhatsApp Number
                     </label>
-                    <span className="text-[0.65rem] font-medium text-primary">Salva automaticamente</span>
+                    <span className="text-[0.65rem] font-medium text-primary">Automatically saves</span>
                   </div>
                   <Input
                     type="tel"
@@ -599,10 +599,10 @@ export default function ProfileClientPage() {
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-border">
                 <div className="text-xs font-semibold text-emerald-500 flex items-center gap-1.5">
                   <CheckCircle2 size={16} />
-                  <span>Todas as alterações são salvas automaticamente</span>
+                  <span>All changes are saved automatically</span>
                 </div>
                 <Button className="px-6 font-bold" onClick={handleSaveProfile} loading={isSaving}>
-                  Salvar tudo agora
+                  Save everything now
                 </Button>
               </div>
             </section>
@@ -751,7 +751,7 @@ export default function ProfileClientPage() {
                       >
                         {/* Top: Badges & Status */}
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                           <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-surface border border-border text-text">
                               {item.area ? item.area.toUpperCase() : 'GENERAL'}
                             </span>

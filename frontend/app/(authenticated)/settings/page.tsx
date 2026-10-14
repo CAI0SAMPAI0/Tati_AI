@@ -4,6 +4,7 @@ import { MainHeader } from '@/components/layout/main-header';
 import {
   ArrowLeft,
   Bell,
+  CheckCircle2,
   Download,
   MessageCircle,
   Monitor,
@@ -14,9 +15,8 @@ import {
   Smartphone,
   Sun,
   Volume2,
-  CheckCircle2,
 } from 'lucide-react';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
@@ -458,11 +458,10 @@ export default function SettingsPage() {
                         window.dispatchEvent(new Event('tati_settings_changed'));
                         toast.success('Translation mode: Full sentence');
                       }}
-                      className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${
-                        settings.tooltipMode === 'sentence'
+                      className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${settings.tooltipMode === 'sentence'
                           ? 'border-primary bg-primary/10 text-primary shadow-sm ring-2 ring-primary/20'
                           : 'border-border bg-bg hover:border-text-muted/30 text-text'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-bold">Sentence Translation</span>
@@ -484,11 +483,10 @@ export default function SettingsPage() {
                         window.dispatchEvent(new Event('tati_settings_changed'));
                         toast.success('Translation mode: Individual words');
                       }}
-                      className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${
-                        settings.tooltipMode === 'word'
+                      className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${settings.tooltipMode === 'word'
                           ? 'border-primary bg-primary/10 text-primary shadow-sm ring-2 ring-primary/20'
                           : 'border-border bg-bg hover:border-text-muted/30 text-text'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-bold">Word Translation</span>
@@ -527,7 +525,7 @@ export default function SettingsPage() {
                 <Bell size={20} className="text-primary" />
                 <h2 className="font-bold text-sm uppercase tracking-wider">Notifications</h2>
               </div>
-              <span className="text-[0.65rem] font-medium text-primary">Salva automaticamente</span>
+              <span className="text-[0.65rem] font-medium text-primary">Automatically saves</span>
             </div>
             <div className="p-6 space-y-6">
               <div className="space-y-3 pb-6 border-b border-border">
@@ -628,7 +626,7 @@ export default function SettingsPage() {
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between max-w-md">
                   <label className="text-sm font-bold text-text">WhatsApp Number</label>
-                  <span className="text-[0.65rem] font-medium text-primary">Salva automaticamente</span>
+                  <span className="text-[0.65rem] font-medium text-primary">Automatically saves</span>
                 </div>
                 <div className="relative max-w-md">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-primary">
