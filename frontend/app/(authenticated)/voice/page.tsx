@@ -819,8 +819,8 @@ function VoicePageContent() {
 
         <footer className="p-2 sm:p-4 md:p-6 bg-white/95 dark:bg-[#0a0b14]/95 border-t border-border shrink-0 pb-safe max-w-full overflow-x-hidden">
           <div className="max-w-full mx-auto flex flex-col md:flex-row items-center gap-4 md:gap-8 w-full overflow-x-hidden">
-            <div className="flex-1 w-full max-w-full bg-white/30 dark:bg-white/5 rounded-2xl sm:rounded-3xl p-2 sm:p-4 space-y-2 shadow-lg border border-white/20 overflow-x-hidden">
-              <div className="flex items-center gap-2 sm:gap-4 max-w-full overflow-x-hidden">
+            <div className="flex-1 w-full max-w-full min-w-0 bg-white/30 dark:bg-white/5 rounded-2xl sm:rounded-3xl p-2 sm:p-4 space-y-2 shadow-lg border border-white/20 overflow-x-hidden">
+              <div className="flex items-center gap-2 sm:gap-4 max-w-full min-w-0 overflow-x-hidden">
                 <button onClick={togglePlayback} disabled={!audioRef.current?.src} className={cn("w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center transition-all shadow-md active:scale-90 shrink-0", state === 'speaking' ? "bg-danger text-white" : "bg-primary text-white hover:scale-105")}>
                   {state === 'speaking' ? <Square size={16} fill="white" /> : <Play size={16} fill="white" className="ml-0.5" />}
                 </button>
