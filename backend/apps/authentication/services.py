@@ -23,7 +23,10 @@ logger = logging.getLogger(__name__)
 class AuthService:
     @staticmethod
     def _build_user_out(user: User) -> UserOut:
-        prof = user.profile if isinstance(user.profile, dict) else {}
+        prof = dict(user.profile) if isinstance(user.profile, dict) else {}
+        phone_val = getattr(user, "phone", None) or prof.get("whatsapp_number") or ""
+        if phone_val:
+            prof["whatsapp_number"] = phone_val
         focus = (
             prof.get("focus") or getattr(user, "focus", None) or "General Conversation"
         )
@@ -42,6 +45,7 @@ class AuthService:
             timezone=user.timezone,
             focus=focus,
             occupation=occupation,
+            phone=phone_val or None,
             profile=prof,
             streak_count=user.streak_count,
             total_xp=user.total_xp,

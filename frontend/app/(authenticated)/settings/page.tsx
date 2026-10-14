@@ -4,6 +4,7 @@ import { MainHeader } from '@/components/layout/main-header';
 import {
   ArrowLeft,
   Bell,
+  CheckCircle2,
   Download,
   MessageCircle,
   Monitor,
@@ -13,9 +14,9 @@ import {
   Save,
   Smartphone,
   Sun,
-  Volume2
+  Volume2,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
@@ -52,19 +53,70 @@ export default function SettingsPage() {
 
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [allowWhatsappNotifications, setAllowWhatsappNotifications] = useState(false);
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const autoSaveSettings = async (
+    newPrefs: typeof prefs,
+    newNumber: string,
+    newAllowed: boolean,
+    customSettings?: typeof settings
+  ) => {
+    try {
+      const clean = (newNumber || '').replace(/\D/g, '');
+      const formatted = (clean.length === 10 || clean.length === 11) && !clean.startsWith('55') ? `55${clean}` : clean;
+      const effectiveSettings = customSettings || settings;
+
+      await apiPut('/users/notification-preferences', {
+        ...newPrefs,
+        whatsapp_number: formatted || null,
+        allow_whatsapp_notifications: newAllowed,
+        whatsapp_enabled: newAllowed,
+        autoplay_chat_audio: Boolean(effectiveSettings.autoplayChatAudio),
+        preferred_accent: selectedAccent,
+      });
+
+      await apiPut('/profile/', {
+        whatsapp_number: formatted || null,
+        allow_whatsapp_notifications: newAllowed,
+        preferred_accent: selectedAccent,
+        accent: selectedAccent,
+        autoplay_chat_audio: Boolean(effectiveSettings.autoplayChatAudio),
+        notification_preferences: newPrefs,
+      });
+
+      if (user && updateProfile) {
+        updateProfile({
+          ...user,
+          preferred_accent: selectedAccent,
+          profile: {
+            ...user.profile,
+            whatsapp_number: formatted || undefined,
+            allow_whatsapp_notifications: newAllowed,
+            autoplay_chat_audio: Boolean(effectiveSettings.autoplayChatAudio),
+            notification_preferences: newPrefs,
+          }
+        });
+      }
+      toast.success('Settings saved! ✔', { id: 'settings-auto-save', duration: 2000 });
+    } catch (e) {
+      console.error('Failed to auto-save settings:', e);
+    }
+  };
 
   const handlePrefChange = (
     category: 'streaks' | 'challenges' | 'cefr',
     channel: 'email' | 'push',
     value: boolean
   ) => {
-    setPrefs((prev) => ({
-      ...prev,
+    const updated = {
+      ...prefs,
       [category]: {
-        ...prev[category],
+        ...prefs[category],
         [channel]: value,
       },
-    }));
+    };
+    setPrefs(updated);
+    autoSaveSettings(updated, whatsappNumber, allowWhatsappNotifications);
   };
 
   useEffect(() => {
@@ -120,8 +172,9 @@ export default function SettingsPage() {
       }
 
       const prof = user?.profile || {};
-      if (prof.whatsapp_number !== undefined) {
-        setWhatsappNumber(prof.whatsapp_number || '');
+      const savedPhone = prof.whatsapp_number || (user as any)?.phone || '';
+      if (savedPhone) {
+        setWhatsappNumber(savedPhone);
       }
       if (prof.allow_whatsapp_notifications !== undefined) {
         setAllowWhatsappNotifications(Boolean(prof.allow_whatsapp_notifications));
@@ -134,6 +187,25 @@ export default function SettingsPage() {
       }
     }
   }, [user]);
+
+  const handleWhatsAppChange = (val: string) => {
+    setWhatsappNumber(val);
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      autoSaveSettings(prefs, val, allowWhatsappNotifications);
+    }, 1000);
+  };
+
+  const handleWhatsAppBlur = () => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveSettings(prefs, whatsappNumber, allowWhatsappNotifications);
+  };
+
+  const handleWhatsAppToggle = (checked: boolean) => {
+    setAllowWhatsappNotifications(checked);
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveSettings(prefs, whatsappNumber, checked);
+  };
 
   const handleAccentSelect = async (accentId: string) => {
     setSelectedAccent(accentId);
@@ -305,6 +377,7 @@ export default function SettingsPage() {
                     setSettings(next);
                     localStorage.setItem('tati_settings', JSON.stringify(next));
                     window.dispatchEvent(new Event('tati_settings_changed'));
+                    autoSaveSettings(prefs, whatsappNumber, allowWhatsappNotifications, next);
                   }}
                 />
               </label>
@@ -385,11 +458,10 @@ export default function SettingsPage() {
                         window.dispatchEvent(new Event('tati_settings_changed'));
                         toast.success('Translation mode: Full sentence');
                       }}
-                      className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${
-                        settings.tooltipMode === 'sentence'
-                          ? 'border-primary bg-primary/10 text-primary shadow-sm ring-2 ring-primary/20'
-                          : 'border-border bg-bg hover:border-text-muted/30 text-text'
-                      }`}
+                      className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${settings.tooltipMode === 'sentence'
+                        ? 'border-primary bg-primary/10 text-primary shadow-sm ring-2 ring-primary/20'
+                        : 'border-border bg-bg hover:border-text-muted/30 text-text'
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-bold">Sentence Translation</span>
@@ -411,11 +483,10 @@ export default function SettingsPage() {
                         window.dispatchEvent(new Event('tati_settings_changed'));
                         toast.success('Translation mode: Individual words');
                       }}
-                      className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${
-                        settings.tooltipMode === 'word'
-                          ? 'border-primary bg-primary/10 text-primary shadow-sm ring-2 ring-primary/20'
-                          : 'border-border bg-bg hover:border-text-muted/30 text-text'
-                      }`}
+                      className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${settings.tooltipMode === 'word'
+                        ? 'border-primary bg-primary/10 text-primary shadow-sm ring-2 ring-primary/20'
+                        : 'border-border bg-bg hover:border-text-muted/30 text-text'
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-bold">Word Translation</span>
@@ -449,9 +520,12 @@ export default function SettingsPage() {
 
 
           <section className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
-            <div className="p-6 border-b border-border bg-bg-secondary/30 flex items-center gap-3">
-              <Bell size={20} className="text-primary" />
-              <h2 className="font-bold text-sm uppercase tracking-wider">Notifications</h2>
+            <div className="p-6 border-b border-border bg-bg-secondary/30 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Bell size={20} className="text-primary" />
+                <h2 className="font-bold text-sm uppercase tracking-wider">Notifications</h2>
+              </div>
+              <span className="text-[0.65rem] font-medium text-primary">Automatically saves</span>
             </div>
             <div className="p-6 space-y-6">
               <div className="space-y-3 pb-6 border-b border-border">
@@ -550,21 +624,25 @@ export default function SettingsPage() {
             </div>
             <div className="p-6 space-y-6">
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-bold text-text">WhatsApp Number</label>
+                <div className="flex items-center justify-between max-w-md">
+                  <label className="text-sm font-bold text-text">WhatsApp Number</label>
+                  <span className="text-[0.65rem] font-medium text-primary">Automatically saves</span>
+                </div>
                 <div className="relative max-w-md">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-text-muted">
-                    +55
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-primary">
+                    <MessageCircle size={18} />
                   </span>
                   <input
                     type="tel"
-                    placeholder="(11) 99999-9999"
+                    placeholder="5511999999999"
                     value={whatsappNumber}
-                    onChange={(e) => setWhatsappNumber(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-bg border border-border rounded-2xl text-sm font-bold text-text placeholder-text-muted/50 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
+                    onChange={(e) => handleWhatsAppChange(e.target.value)}
+                    onBlur={handleWhatsAppBlur}
+                    className="w-full pl-11 pr-4 py-3 bg-bg border border-border rounded-2xl text-sm font-bold text-text placeholder-text-muted/50 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
                   />
                 </div>
                 <p className="text-[0.65rem] text-text-subtle leading-normal">
-                  Informe o número com DDI/DDD (ex: 11999999999).
+                  Informe o número com DDD (ex: 5511999999999 ou 11999999999).
                 </p>
               </div>
 
@@ -577,7 +655,7 @@ export default function SettingsPage() {
                   type="checkbox"
                   className="w-5 h-5 rounded-md border-border text-primary focus:ring-primary/20 transition-all accent-primary"
                   checked={allowWhatsappNotifications}
-                  onChange={(e) => setAllowWhatsappNotifications(e.target.checked)}
+                  onChange={(e) => handleWhatsAppToggle(e.target.checked)}
                 />
               </label>
             </div>
@@ -633,10 +711,16 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          <Button className="w-full h-14 rounded-2xl text-base font-bold gap-3 shadow-glow" onClick={handleSaveAll}>
-            <Save size={20} />
-            {'Save Changes'}
-          </Button>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 rounded-2xl bg-surface border border-border">
+            <div className="text-xs font-semibold text-emerald-500 flex items-center gap-2">
+              <CheckCircle2 size={18} />
+              <span>All changes are saved automatically</span>
+            </div>
+            <Button className="w-full sm:w-auto px-8 h-12 font-bold gap-2" onClick={handleSaveAll}>
+              <Save size={18} />
+              Save everything now
+            </Button>
+          </div>
         </div>
       </main>
     </div>

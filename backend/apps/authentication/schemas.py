@@ -63,6 +63,7 @@ class UserOut(BaseModel):
     timezone: str = "America/Sao_Paulo"
     focus: Optional[str] = "General Conversation"
     occupation: Optional[str] = ""
+    phone: Optional[str] = None
     profile: Optional[dict] = None
     streak_count: int = 0
     total_xp: int = 0

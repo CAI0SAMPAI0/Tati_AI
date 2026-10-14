@@ -24,7 +24,8 @@ export class TatiWebSocket {
     if (!token) return;
 
     const path = '/chat/ws';
-    const wsUrl = `${WS_BASE}${path}`;
+    const base = WS_BASE || (typeof window !== 'undefined' && window.location?.host ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}` : '');
+    const wsUrl = `${base}${path}`;
 
     let finalUrl = `${wsUrl}?token=${token}`;
     if (this.config.simulationId) {
@@ -33,7 +34,8 @@ export class TatiWebSocket {
     
     try {
       this.ws = new WebSocket(finalUrl);
-    } catch (e) {      console.error('Failed to create WebSocket:', e);
+    } catch (e) {
+      console.error('Failed to create WebSocket:', e);
       return;
     }
 
@@ -76,6 +78,9 @@ export class TatiWebSocket {
 
   waitUntilOpen(timeoutMs = 6000): Promise<void> {
     if (this.ws?.readyState === WebSocket.OPEN) return Promise.resolve();
+    if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
+      this.connect();
+    }
     return new Promise((resolve, reject) => {
       const start = Date.now();
       const timer = setInterval(() => {
@@ -88,7 +93,7 @@ export class TatiWebSocket {
           clearInterval(timer);
           reject(new Error('WebSocket timeout'));
         }
-      }, 120);
+      }, 100);
     });
   }
 

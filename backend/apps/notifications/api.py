@@ -134,8 +134,8 @@ def get_email_status(request: HttpRequest):
     }
 
 
-@notifications_router.post("/test", auth=auth_required)
-@notifications_router.post("/send-all-test", auth=auth_required)
+@notifications_router.post("/test", auth=auth_optional)
+@notifications_router.post("/send-all-test", auth=auth_optional)
 def send_test_notification(
     request: HttpRequest,
     username: Optional[str] = None,
@@ -144,8 +144,10 @@ def send_test_notification(
     """
     Dispara notificação de teste controlada.
     Por padrão envia apenas 1 tipo solicitado ('streak_reminder', 'weekly_report', 'inactivity_nudge', 'streak_broken', 'streak_milestone', 'new_activity' ou 'all').
+    Permite acesso via token seguro de cron/webhook ou via login de professor/admin.
     """
-    require_teacher(request.auth)
+    if not _validate_cron_access(request):
+        require_teacher(request.auth)
     from django.contrib.auth import get_user_model
     from ninja.errors import HttpError
     from .services import NotificationSchedulerService

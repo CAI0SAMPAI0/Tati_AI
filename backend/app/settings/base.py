@@ -88,6 +88,8 @@ if os.getenv("ENABLE_DEBUG_TOOLBAR", "false").lower() in ("true", "1"):
     INTERNAL_IPS = ["127.0.0.1", "localhost"]
 
 ROOT_URLCONF = "app.urls"
+# Silencia aviso de namespace duplicado pois a api é montada em /api/v1/, /api/ e / para compatibilidade legada
+SILENCED_SYSTEM_CHECKS = ["urls.W005"]
 
 TEMPLATES = [
     {

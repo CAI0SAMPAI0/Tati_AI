@@ -1,45 +1,46 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import {
-  User as UserIcon,
-  Lock,
-  LogOut,
-  Camera,
-  Target,
-  Zap,
-  Trash2,
-  Eye,
-  EyeOff,
-  ArrowLeft,
-  Trophy,
-  TrendingUp,
-  Medal,
-  Flame,
-  Award,
-  Bell,
-  Sparkles,
-  ChevronRight,
-  MessageSquareHeart,
-  Star,
-  CheckCircle2,
-  Clock,
-  RefreshCw,
-} from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { DialogModal } from '@/components/ui/dialog-modal';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { DEFAULT_AVATAR_URL } from '@/lib/constants/user';
-import { apiPut, apiPost, apiUpload, apiGet } from '@/lib/api/client';
-import { User } from '@/lib/api/types';
-import { useQuery } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
-import { cn } from '@/lib/utils';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { LEVEL_OPTIONS, normalizeLevel } from '@/lib/constants/levels';
+import { useAuth } from '@/hooks/useAuth';
+import { apiDelete, apiGet, apiPost, apiPut, apiUpload } from '@/lib/api/client';
 import { ENDPOINTS } from '@/lib/api/endpoints';
+import { User } from '@/lib/api/types';
+import { LEVEL_OPTIONS, normalizeLevel } from '@/lib/constants/levels';
+import { DEFAULT_AVATAR_URL } from '@/lib/constants/user';
+import { cn } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Award,
+  Bell,
+  Camera,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  Eye,
+  EyeOff,
+  Flame,
+  Lock,
+  LogOut,
+  Medal,
+  MessageSquareHeart,
+  RefreshCw,
+  Sparkles,
+  Star,
+  Target,
+  Trash2,
+  TrendingUp,
+  Trophy,
+  User as UserIcon
+} from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+import toast from 'react-hot-toast';
 
 type Tab = 'personal' | 'achievements' | 'feedbacks' | 'security' | 'plan';
 
@@ -83,8 +84,8 @@ export default function ProfileClientPage() {
     level: normalizeLevel(user?.level),
     focus: user?.focus || 'General Conversation',
     responsible_email: user?.profile?.responsible_email || '',
-    whatsapp_number: user?.profile?.whatsapp_number || '',
-    allow_whatsapp_notifications: user?.profile?.allow_whatsapp_notifications ?? false,
+    whatsapp_number: user?.profile?.whatsapp_number || (user as any)?.phone || '',
+    allow_whatsapp_notifications: user?.profile?.allow_whatsapp_notifications ?? true,
   });
 
   const [pwData, setFormDataPw] = useState({
@@ -92,21 +93,116 @@ export default function ProfileClientPage() {
     confirm_pw: '',
   });
 
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    async function fetchNotificationPrefs() {
+      try {
+        const data = await apiGet<any>('/users/notification-preferences');
+        if (data) {
+          if (data.whatsapp_number) {
+            setFormData((prev) => ({ ...prev, whatsapp_number: data.whatsapp_number }));
+          }
+          if (typeof data.allow_whatsapp_notifications === 'boolean') {
+            setFormData((prev) => ({ ...prev, allow_whatsapp_notifications: data.allow_whatsapp_notifications }));
+          }
+        }
+      } catch (err) {
+        // silent fallback
+      }
+    }
+    fetchNotificationPrefs();
+  }, []);
+
   useEffect(() => {
     if (user) {
-      setFormData({
-        name: user.name || '',
-        nickname: user.nickname || '',
-        email: user.email || '',
-        occupation: user.occupation || '',
-        level: normalizeLevel(user.level),
-        focus: user.focus || 'General Conversation',
-        responsible_email: user?.profile?.responsible_email || '',
-        whatsapp_number: user?.profile?.whatsapp_number || '',
-        allow_whatsapp_notifications: user?.profile?.allow_whatsapp_notifications ?? false,
-      });
+      const savedPhone = (user?.profile as any)?.whatsapp_number || user?.phone || (user as any)?.phone || '';
+      setFormData((prev) => ({
+        ...prev,
+        name: user.name || prev.name || '',
+        nickname: user.nickname || prev.nickname || '',
+        email: user.email || prev.email || '',
+        occupation: user.occupation || prev.occupation || '',
+        level: normalizeLevel(user.level || prev.level),
+        focus: user.focus || prev.focus || 'General Conversation',
+        responsible_email: (user?.profile as any)?.responsible_email || prev.responsible_email || '',
+        whatsapp_number: savedPhone || prev.whatsapp_number || '',
+        allow_whatsapp_notifications: (user?.profile as any)?.allow_whatsapp_notifications ?? prev.allow_whatsapp_notifications ?? true,
+      }));
     }
   }, [user]);
+
+  const autoSaveProfile = async (dataToSave: typeof formData) => {
+    try {
+      const payload: Record<string, any> = {
+        name: dataToSave.name,
+        nickname: dataToSave.nickname,
+        email: dataToSave.email,
+        occupation: dataToSave.occupation,
+        level: dataToSave.level,
+        focus: dataToSave.focus,
+        responsible_email: dataToSave.responsible_email,
+        allow_whatsapp_notifications: dataToSave.allow_whatsapp_notifications,
+      };
+
+      if (dataToSave.whatsapp_number) {
+        const clean = dataToSave.whatsapp_number.replace(/\D/g, '');
+        const formatted = (clean.length === 10 || clean.length === 11) && !clean.startsWith('55') ? `55${clean}` : clean;
+        payload.whatsapp_number = formatted || '';
+      }
+
+      const res = await apiPut<User>('/profile/', payload);
+      if (res.ok) {
+        if (user && updateProfile) {
+          updateProfile({
+            ...user,
+            ...res.data,
+            profile: {
+              ...user.profile,
+              ...res.data?.profile,
+              whatsapp_number: payload.whatsapp_number || (user.profile as any)?.whatsapp_number,
+              allow_whatsapp_notifications: dataToSave.allow_whatsapp_notifications,
+            }
+          });
+        }
+
+        if (dataToSave.whatsapp_number !== undefined) {
+          const clean = (dataToSave.whatsapp_number || '').replace(/\D/g, '');
+          const formatted = (clean.length === 10 || clean.length === 11) && !clean.startsWith('55') ? `55${clean}` : clean;
+          apiPut('/users/notification-preferences', {
+            whatsapp_number: formatted || null,
+            allow_whatsapp_notifications: dataToSave.allow_whatsapp_notifications,
+            whatsapp_enabled: dataToSave.allow_whatsapp_notifications,
+          }).catch(() => { });
+        }
+
+        toast.success('Alterações salvas! ✔', { id: 'profile-save', duration: 2000 });
+      }
+    } catch (e) {
+      console.error('Failed to auto-save profile:', e);
+    }
+  };
+
+  const handleInputChange = (field: keyof typeof formData, value: any) => {
+    const updated = { ...formData, [field]: value };
+    setFormData(updated);
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      autoSaveProfile(updated);
+    }, 1000);
+  };
+
+  const handleInputBlur = () => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveProfile(formData);
+  };
+
+  const handleSelectOrToggle = (field: keyof typeof formData, value: any) => {
+    const updated = { ...formData, [field]: value };
+    setFormData(updated);
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveProfile(updated);
+  };
 
   // Ranking & Score query
   const { data: positionData } = useQuery({
@@ -132,6 +228,7 @@ export default function ProfileClientPage() {
     queryFn: () => apiGet<any>('/users/permissions/subscription'),
   });
 
+  // Terá no futuro, no entanto já deixei a estrutura
   const isUnlocked = sub?.has_subscription || user?.plan_type === 'full';
   const daysLeft = sub?.days_left ?? 0;
   const isGracePeriod = sub?.in_grace_period ?? false;
@@ -163,7 +260,7 @@ export default function ProfileClientPage() {
       const res = await apiPut<User>('/profile/', formData);
       if (res.ok) {
         updateProfile(res.data);
-        toast.success('Profile updated successfully! ✔');
+        toast.success('Profile updated successfully!');
       } else {
         toast.error('Error saving. Please try again.');
       }
@@ -220,6 +317,28 @@ export default function ProfileClientPage() {
     }
   };
 
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      const res = await apiDelete('/profile/');
+      if (res.ok) {
+        toast.success('Your account has been deleted.');
+        setIsDeleteModalOpen(false);
+        logout();
+      } else {
+        toast.error('Could not delete account. Please try again or contact support.');
+      }
+    } catch (e) {
+      toast.error('Error deleting account.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   // Recent achievements (unlocked first)
   const recentAchievements = (achievements || [])
     .filter((a: any) => a.is_unlocked || a.unlocked)
@@ -240,7 +359,7 @@ export default function ProfileClientPage() {
       <div className="max-w-4xl mx-auto px-4 py-8 md:py-12 space-y-6 animate-in fade-in duration-500">
         {/* Page header */}
         <div className="flex items-center gap-3">
-          <button 
+          <button
             onClick={() => router.push('/chat')}
             className="w-10 h-10 rounded-xl bg-surface hover:bg-surface-hover border border-border flex items-center justify-center text-text-muted hover:text-text transition-colors shrink-0"
           >
@@ -351,35 +470,57 @@ export default function ProfileClientPage() {
         {tab === 'personal' && (
           <div className="space-y-6">
             <section className="bg-surface border border-border rounded-3xl p-6 md:p-8 space-y-6">
-              <div className="flex items-center gap-2 text-primary font-bold text-base">
-                <UserIcon size={18} />
-                <h2>Personal Information</h2>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-primary font-bold text-base">
+                  <UserIcon size={18} />
+                  <h2>Personal Information</h2>
+                </div>
+                <span className="text-[0.65rem] font-medium text-primary">Automatically saves</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[0.7rem] font-bold text-text-muted uppercase tracking-wider">Full Name</label>
-                  <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+                  <Input
+                    value={formData.name}
+                    onChange={(e) => handleInputChange('name', e.target.value)}
+                    onBlur={handleInputBlur}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[0.7rem] font-bold text-text-muted uppercase tracking-wider">Nickname</label>
-                  <Input value={formData.nickname} onChange={(e) => setFormData({ ...formData, nickname: e.target.value })} />
+                  <Input
+                    value={formData.nickname}
+                    onChange={(e) => handleInputChange('nickname', e.target.value)}
+                    onBlur={handleInputBlur}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[0.7rem] font-bold text-text-muted uppercase tracking-wider">Email</label>
-                  <Input value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+                  <Input
+                    value={formData.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    onBlur={handleInputBlur}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[0.7rem] font-bold text-text-muted uppercase tracking-wider">Occupation</label>
-                  <Input value={formData.occupation} onChange={(e) => setFormData({ ...formData, occupation: e.target.value })} />
+                  <Input
+                    value={formData.occupation}
+                    onChange={(e) => handleInputChange('occupation', e.target.value)}
+                    onBlur={handleInputBlur}
+                  />
                 </div>
               </div>
             </section>
 
             <section className="bg-surface border border-border rounded-3xl p-6 md:p-8 space-y-6">
-              <div className="flex items-center gap-2 text-primary font-bold text-base">
-                <Target size={18} />
-                <h2>Study Preferences</h2>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-primary font-bold text-base">
+                  <Target size={18} />
+                  <h2>Study Preferences</h2>
+                </div>
+                <span className="text-[0.65rem] font-medium text-primary">Automatically saves</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -387,7 +528,7 @@ export default function ProfileClientPage() {
                   <label className="text-[0.7rem] font-bold text-text-muted uppercase tracking-wider">English Level</label>
                   <Select
                     value={formData.level}
-                    onChange={(e) => setFormData({ ...formData, level: normalizeLevel(e.target.value) })}
+                    onChange={(e) => handleSelectOrToggle('level', normalizeLevel(e.target.value))}
                     options={LEVEL_OPTIONS}
                   />
                 </div>
@@ -395,7 +536,7 @@ export default function ProfileClientPage() {
                   <label className="text-[0.7rem] font-bold text-text-muted uppercase tracking-wider">Learning Focus</label>
                   <Select
                     value={formData.focus}
-                    onChange={(e) => setFormData({ ...formData, focus: e.target.value })}
+                    onChange={(e) => handleSelectOrToggle('focus', e.target.value)}
                     options={[
                       { value: 'General Conversation', label: 'General Conversation' },
                       { value: 'Business English', label: 'Business English' },
@@ -414,19 +555,24 @@ export default function ProfileClientPage() {
                     type="email"
                     placeholder="guardian@example.com"
                     value={formData.responsible_email}
-                    onChange={(e) => setFormData({ ...formData, responsible_email: e.target.value })}
+                    onChange={(e) => handleInputChange('responsible_email', e.target.value)}
+                    onBlur={handleInputBlur}
                   />
                 </div>
 
                 <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-[0.7rem] font-bold text-text-muted uppercase tracking-wider">
-                    WhatsApp Number
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[0.7rem] font-bold text-text-muted uppercase tracking-wider">
+                      WhatsApp Number
+                    </label>
+                    <span className="text-[0.65rem] font-medium text-primary">Automatically saves</span>
+                  </div>
                   <Input
                     type="tel"
                     placeholder="5511999999999"
                     value={formData.whatsapp_number}
-                    onChange={(e) => setFormData({ ...formData, whatsapp_number: e.target.value })}
+                    onChange={(e) => handleInputChange('whatsapp_number', e.target.value)}
+                    onBlur={handleInputBlur}
                   />
                 </div>
 
@@ -435,7 +581,7 @@ export default function ProfileClientPage() {
                     type="checkbox"
                     id="allow_whatsapp_notifications"
                     checked={formData.allow_whatsapp_notifications}
-                    onChange={(e) => setFormData({ ...formData, allow_whatsapp_notifications: e.target.checked })}
+                    onChange={(e) => handleSelectOrToggle('allow_whatsapp_notifications', e.target.checked)}
                     className="mt-0.5 accent-primary w-4 h-4 rounded shrink-0 cursor-pointer"
                   />
                   <label htmlFor="allow_whatsapp_notifications" className="space-y-0.5 cursor-pointer">
@@ -450,9 +596,13 @@ export default function ProfileClientPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end pt-2">
-                <Button className="px-8 font-bold" onClick={handleSaveProfile} loading={isSaving}>
-                  Save changes
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-border">
+                <div className="text-xs font-semibold text-emerald-500 flex items-center gap-1.5">
+                  <CheckCircle2 size={16} />
+                  <span>All changes are saved automatically</span>
+                </div>
+                <Button className="px-6 font-bold" onClick={handleSaveProfile} loading={isSaving}>
+                  Save everything now
                 </Button>
               </div>
             </section>
@@ -601,7 +751,7 @@ export default function ProfileClientPage() {
                       >
                         {/* Top: Badges & Status */}
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                           <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-surface border border-border text-text">
                               {item.area ? item.area.toUpperCase() : 'GENERAL'}
                             </span>
@@ -757,7 +907,14 @@ export default function ProfileClientPage() {
                   <LogOut size={16} />
                   Sign out
                 </Button>
-                <Button variant="danger" className="flex-1 font-bold gap-2">
+                <Button
+                  variant="danger"
+                  className="flex-1 font-bold gap-2"
+                  onClick={() => {
+                    setDeleteConfirmInput('');
+                    setIsDeleteModalOpen(true);
+                  }}
+                >
                   <Trash2 size={16} />
                   Delete Account
                 </Button>
@@ -831,6 +988,60 @@ export default function ProfileClientPage() {
           </div>
         )}*/}
       </div>
+
+      <DialogModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          if (!isDeleting) setIsDeleteModalOpen(false);
+        }}
+        title="Delete Account Permanently"
+        size="md"
+      >
+        <div className="space-y-5 p-2">
+          <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-danger/10 border border-danger/20 text-danger">
+            <AlertTriangle className="shrink-0 mt-0.5" size={22} />
+            <div className="text-xs space-y-1">
+              <p className="font-bold text-sm">Warning: This action is permanent!</p>
+              <p className="text-text-muted leading-relaxed">
+                By deleting your account, all your study history, chat conversations, CEFR assessments, trophies, and XP points will be permanently purged. This action cannot be undone.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-text">
+              To confirm, type <span className="font-black text-danger underline">{user?.username || 'DELETE'}</span> below:
+            </label>
+            <Input
+              value={deleteConfirmInput}
+              onChange={(e) => setDeleteConfirmInput(e.target.value)}
+              placeholder={user?.username || 'DELETE'}
+              className="font-mono text-sm"
+              autoFocus
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+            <Button
+              variant="secondary"
+              onClick={() => setIsDeleteModalOpen(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              disabled={deleteConfirmInput.trim() !== (user?.username || 'DELETE') || isDeleting}
+              loading={isDeleting}
+              onClick={handleDeleteAccount}
+              className="gap-2 font-bold"
+            >
+              <Trash2 size={16} />
+              Permanently Delete Account
+            </Button>
+          </div>
+        </div>
+      </DialogModal>
     </div>
   );
 }

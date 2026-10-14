@@ -8,8 +8,36 @@ from asgiref.sync import async_to_sync
 from typing import List
 from groq import AsyncGroq
 import edge_tts
+import edge_tts.constants
+import edge_tts.communicate
+import edge_tts.drm
+from email.utils import parsedate_to_datetime
+from datetime import timezone as tz
 
 logger = logging.getLogger(__name__)
+
+# Patch Edge-TTS para o novo endpoint da Microsoft (api.msedgeservices.com).
+# O endpoint legado speech.platform.bing.com passou a responder 403 Forbidden em Outubro/2026 (upstream PR #491).
+try:
+    _EDGE_TTS_NEW_WSS_URL = (
+        "wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1"
+        f"?Ocp-Apim-Subscription-Key={edge_tts.constants.TRUSTED_CLIENT_TOKEN}"
+    )
+    edge_tts.constants.WSS_URL = _EDGE_TTS_NEW_WSS_URL
+    edge_tts.communicate.WSS_URL = _EDGE_TTS_NEW_WSS_URL
+
+    def _safe_parse_rfc2616_date(date: str):
+        try:
+            parsed = parsedate_to_datetime(date)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=tz.utc)
+            return parsed.timestamp()
+        except Exception:
+            return None
+
+    edge_tts.drm.DRM.parse_rfc2616_date = staticmethod(_safe_parse_rfc2616_date)
+except Exception as _patch_err:
+    logger.warning(f"[AudioService] Falha ao aplicar patch no edge-tts: {_patch_err}")
 
 VOICE_ACCENT_MAP = {
     "en-US": "en-US-JennyNeural",
@@ -124,6 +152,8 @@ def detect_audio_mime_type(audio_bytes: bytes) -> str:
         return "audio/mp4"
     elif audio_bytes.startswith((b"ID3", b"\xff\xfb", b"\xff\xf3", b"\xff\xf2")):
         return "audio/mp3"
+    elif audio_bytes.startswith((b"\xff\xf1", b"\xff\xf9")):
+        return "audio/aac"
     return "audio/webm"
 
 
@@ -155,9 +185,41 @@ def is_noise_or_hallucination(text: str) -> bool:
 
 class AudioService:
     @classmethod
+    def _gtts_fallback(cls, text: str, accent: str = "en-US") -> str:
+        """
+        Fallback resiliente para Google TTS (gTTS) caso o Edge TTS falhe ou fique indisponível.
+        """
+        try:
+            from gtts import gTTS
+            tld = "com"
+            norm = (accent or "").upper()
+            if "GB" in norm or "UK" in norm:
+                tld = "co.uk"
+            elif "CA" in norm:
+                tld = "ca"
+            elif "AU" in norm:
+                tld = "com.au"
+            elif "IN" in norm:
+                tld = "co.in"
+            elif "IE" in norm:
+                tld = "ie"
+            elif "ZA" in norm:
+                tld = "co.za"
+
+            buf = io.BytesIO()
+            tts = gTTS(text=text, lang="en", tld=tld, slow=False)
+            tts.write_to_fp(buf)
+            data = buf.getvalue()
+            if data:
+                return base64.b64encode(data).decode()
+        except Exception as e:
+            logger.error(f"[AudioService] Erro no fallback gTTS: {e}", exc_info=True)
+        return ""
+
+    @classmethod
     async def text_to_speech_async(cls, text: str, accent: str = "en-US") -> str:
         """
-        Gera áudio MP3 em base64 nativamente assíncrono via Edge TTS.
+        Gera áudio MP3 em base64 nativamente assíncrono via Edge TTS (com fallback em gTTS).
         """
         cleaned = clean_tts_text(text)
         if not cleaned:
@@ -204,6 +266,8 @@ class AudioService:
                     break
         if not voice:
             voice = "en-US-JennyNeural"
+
+        # 1. Tentativa primária com a voz solicitada no Edge TTS
         try:
             communicate = edge_tts.Communicate(cleaned, voice)
             buf = io.BytesIO()
@@ -216,27 +280,29 @@ class AudioService:
             logger.warning(
                 f"[AudioService] Edge-TTS indisponível para voz '{voice}' ({e}). Acionando fallback..."
             )
+            # 2. Tentativa secundária com voz padrão en-US-JennyNeural no Edge TTS
+            if voice != "en-US-JennyNeural":
+                try:
+                    communicate = edge_tts.Communicate(cleaned, "en-US-JennyNeural")
+                    buf = io.BytesIO()
+                    async for chunk in communicate.stream():
+                        if chunk["type"] == "audio":
+                            buf.write(chunk["data"])
+                    if buf.tell() > 0:
+                        return base64.b64encode(buf.getvalue()).decode()
+                except Exception as fb_err:
+                    logger.error(f"[AudioService] Erro no TTS fallback Edge-TTS: {fb_err}", exc_info=True)
+            else:
+                logger.error(f"[AudioService] Erro no TTS Assíncrono Edge-TTS: {e}", exc_info=True)
 
-        # Fallback resiliente: Google Translate TTS com o sotaque exato do usuário
+        # 3. Fallback de emergência com gTTS (alta confiabilidade e sem bloqueios 403)
         try:
-            import urllib.request
-            import urllib.parse
-            chunks_to_send = [cleaned[i:i+200] for i in range(0, min(len(cleaned), 600), 200)]
-            combined_audio = bytearray()
-            tl_code = norm_accent or "en-US"
-            for c_text in chunks_to_send:
-                if not c_text.strip():
-                    continue
-                encoded = urllib.parse.quote(c_text.strip())
-                gt_url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={encoded}&tl={tl_code}&client=tw-ob"
-                req = urllib.request.Request(gt_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
-                with urllib.request.urlopen(req, timeout=5) as resp:
-                    combined_audio.extend(resp.read())
-            if len(combined_audio) > 0:
-                logger.info(f"[AudioService] Áudio gerado com sucesso via Google TTS ({tl_code}, {len(combined_audio)} bytes)")
-                return base64.b64encode(bytes(combined_audio)).decode()
-        except Exception as g_err:
-            logger.warning(f"[AudioService] Erro no fallback Google TTS: {g_err}")
+            logger.info(f"[AudioService] Acionando fallback gTTS de emergência para sotaque '{norm_accent}'...")
+            gtts_audio = await asyncio.to_thread(cls._gtts_fallback, cleaned, norm_accent)
+            if gtts_audio:
+                return gtts_audio
+        except Exception as gtts_err:
+            logger.error(f"[AudioService] Erro no fallback emergencial gTTS: {gtts_err}", exc_info=True)
 
         return ""
 
@@ -260,6 +326,9 @@ class AudioService:
                 return async_to_sync(cls.text_to_speech_async)(text, accent)
         except Exception as e:
             logger.error(f"[AudioService] Erro no TTS síncrono: {e}")
+            cleaned = clean_tts_text(text)
+            if cleaned:
+                return cls._gtts_fallback(cleaned, accent)
             return ""
 
     @classmethod
@@ -275,15 +344,16 @@ class AudioService:
 
         try:
             models_to_try = [
-                os.getenv("GEMINI_AUDIO_MODEL", "gemini-3.5-flash-lite"),
-                "gemini-3.5-flash-lite",
+                os.getenv("GEMINI_AUDIO_MODEL", "gemini-2.5-flash"),
+                "gemini-2.5-flash",
+                "gemini-2.0-flash",
+                "gemini-1.5-flash",
                 "gemini-3.8-flash",
                 "gemini-3.5-flash",
-                "gemini-3.5-transcribe",
             ]
             unique_models = []
             for m in models_to_try:
-                if m and m not in unique_models and "2.5" not in m and "2.0" not in m and "1.5" not in m:
+                if m and m not in unique_models:
                     unique_models.append(m)
 
             instruction = (
@@ -301,10 +371,13 @@ class AudioService:
                         instruction,
                     ]
 
-                    resp = await client.aio.models.generate_content(
-                        model=model,
-                        contents=contents,
-                        config=types.GenerateContentConfig(temperature=0.0),
+                    resp = await asyncio.wait_for(
+                        client.aio.models.generate_content(
+                            model=model,
+                            contents=contents,
+                            config=types.GenerateContentConfig(temperature=0.0),
+                        ),
+                        timeout=12.0,
                     )
                     if not resp or not resp.candidates:
                         continue
@@ -333,35 +406,51 @@ class AudioService:
         cls, audio_bytes: bytes, prompt: str = ""
     ) -> str:
         """
-        Transcreve áudio com Groq Whisper com failover multi-chaves.
+        Transcreve áudio com Groq Whisper com failover multi-chaves e modelos rápidos.
         """
         keys = get_groq_keys()
         if not keys:
-            logger.warning("[AudioService] Nenhuma GROQ_API_KEY para fallback.")
+            logger.warning("[AudioService] Nenhuma GROQ_API_KEY para transcrição.")
             return ""
 
-        for key in keys:
-            try:
-                async with AsyncGroq(api_key=key) as client:
-                    create_kwargs = {
-                        "file": ("input.webm", audio_bytes),
-                        "model": "whisper-large-v3",
-                        "response_format": "text",
-                        "temperature": 0.0,
-                        "language": "en",
-                    }
-                    if prompt:
-                        create_kwargs["prompt"] = prompt
+        ext = "webm"
+        if audio_bytes.startswith(b"RIFF"):
+            ext = "wav"
+        elif audio_bytes.startswith(b"OggS"):
+            ext = "ogg"
+        elif audio_bytes.startswith((b"ID3", b"\xff\xfb", b"\xff\xf3", b"\xff\xf2")):
+            ext = "mp3"
+        elif b"ftyp" in audio_bytes[:16] or audio_bytes.startswith((b"\xff\xf1", b"\xff\xf9")):
+            ext = "m4a"
 
-                    resp = await client.audio.transcriptions.create(**create_kwargs)
-                    if resp:
-                        text = str(resp).strip()
-                        if is_noise_or_hallucination(text):
-                            logger.info(f"[AudioService] Whisper ruído ignorado: {text}")
-                            return ""
-                        return text
-            except Exception as e:
-                logger.warning(f"[AudioService] Whisper falhou na chave {key[:10]}: {e}")
+        groq_models = ["whisper-large-v3-turbo", "whisper-large-v3"]
+
+        for key in keys:
+            for g_model in groq_models:
+                try:
+                    async with AsyncGroq(api_key=key) as client:
+                        create_kwargs = {
+                            "file": (f"audio.{ext}", audio_bytes),
+                            "model": g_model,
+                            "response_format": "text",
+                            "temperature": 0.0,
+                            "language": "en",
+                        }
+                        if prompt:
+                            create_kwargs["prompt"] = prompt
+
+                        resp = await asyncio.wait_for(
+                            client.audio.transcriptions.create(**create_kwargs),
+                            timeout=8.0,
+                        )
+                        if resp:
+                            text = str(resp).strip()
+                            if is_noise_or_hallucination(text):
+                                logger.info(f"[AudioService] Whisper ruído ignorado: {text}")
+                                return ""
+                            return text
+                except Exception as e:
+                    logger.warning(f"[AudioService] Whisper ({g_model}) falhou na chave {key[:10]}: {e}")
         return ""
 
     @classmethod
@@ -377,60 +466,71 @@ class AudioService:
             if "," in audio_data:
                 audio_data = audio_data.split(",")[-1]
             try:
-                audio_bytes = base64.b64decode(audio_data, validate=True)
+                audio_bytes = base64.b64decode(audio_data.strip(), validate=False)
             except Exception as e:
                 logger.error(f"[AudioService] Erro ao decodificar base64: {e}")
                 return ""
         else:
             audio_bytes = audio_data
 
-        if not audio_bytes or len(audio_bytes) < 200:
+        if not audio_bytes or len(audio_bytes) < 100:
             return ""
 
         if len(audio_bytes) > 15 * 1024 * 1024:
             logger.warning("[AudioService] Áudio rejeitado por exceder 15 MB")
             return ""
 
-        known_audio_headers = (b"\x1a\x45\xdf\xa3", b"OggS", b"RIFF", b"\x00\x00\x00", b"ID3", b"\xff\xfb")
+        known_audio_headers = (
+            b"\x1a\x45\xdf\xa3",
+            b"OggS",
+            b"RIFF",
+            b"\x00\x00\x00",
+            b"ID3",
+            b"\xff\xfb",
+            b"\xff\xf3",
+            b"\xff\xf2",
+            b"\xff\xf1",
+            b"\xff\xf9",
+        )
         if not (audio_bytes.startswith(known_audio_headers) or b"ftyp" in audio_bytes[:16]):
-            logger.warning("[AudioService] Áudio rejeitado por formato inválido")
-            return ""
+            logger.info(f"[AudioService] Formato com cabeçalho incomum ({audio_bytes[:8]!r}), tentando transcrever...")
 
-        provider = os.getenv("STT_PROVIDER", "gemini").lower()
+        provider = os.getenv("STT_PROVIDER", "whisper").lower()
 
-        # 1. Se provedor primário for Gemini e o cliente estiver configurado
-        if provider == "gemini" and get_gemini_client():
-            mime_type = detect_audio_mime_type(audio_bytes)
-            logger.info("[AudioService] Utilizando Gemini Multimodal STT como motor primário...")
-            gemini_text = await cls._transcribe_gemini_async(
-                audio_bytes=audio_bytes, mime_type=mime_type, prompt=prompt
-            )
-            if gemini_text and not is_noise_or_hallucination(gemini_text):
-                logger.info(f"[AudioService] Transcrito com Gemini STT: '{gemini_text[:40]}...'")
-                return gemini_text
+        # 1. Se provedor primário for Groq Whisper (padrão de alta performance: ~0.7s)
+        if provider != "gemini":
+            groq_text = await cls._transcribe_groq_async(audio_bytes=audio_bytes, prompt=prompt)
+            if groq_text and not is_noise_or_hallucination(groq_text):
+                logger.info(f"[AudioService] Transcrito com Groq Whisper: '{groq_text[:40]}...'")
+                return groq_text
+
+            # Fallback para Google Gemini STT
+            if get_gemini_client():
+                mime_type = detect_audio_mime_type(audio_bytes)
+                logger.info("[AudioService] Fallback para Google Gemini STT...")
+                gemini_text = await cls._transcribe_gemini_async(
+                    audio_bytes=audio_bytes, mime_type=mime_type, prompt=prompt
+                )
+                if gemini_text and not is_noise_or_hallucination(gemini_text):
+                    logger.info(f"[AudioService] Transcrito com Gemini STT: '{gemini_text[:40]}...'")
+                    return gemini_text
+        else:
+            # Se explicitamente configurado STT_PROVIDER=gemini
+            if get_gemini_client():
+                mime_type = detect_audio_mime_type(audio_bytes)
+                logger.info("[AudioService] Utilizando Gemini STT como motor primário...")
+                gemini_text = await cls._transcribe_gemini_async(
+                    audio_bytes=audio_bytes, mime_type=mime_type, prompt=prompt
+                )
+                if gemini_text and not is_noise_or_hallucination(gemini_text):
+                    logger.info(f"[AudioService] Transcrito com Gemini STT: '{gemini_text[:40]}...'")
+                    return gemini_text
 
             # Fallback para Groq Whisper
             groq_text = await cls._transcribe_groq_async(audio_bytes=audio_bytes, prompt=prompt)
             if groq_text and not is_noise_or_hallucination(groq_text):
                 logger.info(f"[AudioService] Fallback para Groq Whisper: '{groq_text[:40]}...'")
                 return groq_text
-
-        # 2. Se provedor primário for Groq Whisper (ou Gemini ausente)
-        groq_text = await cls._transcribe_groq_async(audio_bytes=audio_bytes, prompt=prompt)
-        if groq_text and not is_noise_or_hallucination(groq_text):
-            logger.info(f"[AudioService] Transcrito com Groq Whisper: '{groq_text[:40]}...'")
-            return groq_text
-
-        # Fallback para Google Gemini STT
-        if get_gemini_client():
-            mime_type = detect_audio_mime_type(audio_bytes)
-            logger.info("[AudioService] Utilizando Gemini STT como fallback de transcrição...")
-            gemini_text = await cls._transcribe_gemini_async(
-                audio_bytes=audio_bytes, mime_type=mime_type, prompt=prompt
-            )
-            if gemini_text and not is_noise_or_hallucination(gemini_text):
-                logger.info(f"[AudioService] Transcrito com Gemini STT: '{gemini_text[:40]}...'")
-                return gemini_text
 
         return ""
 

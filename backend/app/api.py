@@ -5,7 +5,39 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-api = NinjaAPI(
+
+class AppNinjaAPI(NinjaAPI):
+    """
+    Subclasse da NinjaAPI com geração determinística e única de operation_id
+    evitando colisões de nomes quando a mesma view atende a múltiplos paths/métodos
+    (ex: com/sem barra, aliases e rotas secundárias).
+    """
+
+    def get_openapi_operation_id(self, operation) -> str:
+        name = operation.view_func.__name__
+        module = operation.view_func.__module__
+        base = (module + "_" + name).replace(".", "_")
+        methods = "_".join(m.lower() for m in operation.methods) if operation.methods else "op"
+        raw_path = operation.path
+        if raw_path == "/":
+            path_slug = "root"
+        elif raw_path == "":
+            path_slug = "empty"
+        else:
+            path_slug = (
+                raw_path.strip("/")
+                .replace("/", "_")
+                .replace("-", "_")
+                .replace("{", "")
+                .replace("}", "")
+            )
+            if raw_path.endswith("/"):
+                path_slug += "_slash"
+
+        return f"{base}_{methods}_{path_slug}"
+
+
+api = AppNinjaAPI(
     title="Teacher Tati AI API",
     version="2.2.0",
     description="API RESTful de Alta Performance (Django-Ninja) para Teacher Tati AI",
@@ -28,10 +60,10 @@ def global_exception_handler(request, exc):
     )
 
 
-@api.get("/", tags=["System"])
+@api.api_operation(["GET", "HEAD"], "/", tags=["System"])
 def root_status(request):
     """
-    Status raiz da API para balanceadores de carga e health checks.
+    Status raiz da API para balanceadores de carga e health checks (suporta GET e HEAD).
     """
     return {
         "service": "Teacher Tati AI API",
@@ -47,6 +79,14 @@ def gradio_api_info(request):
     Responde à sondagem do iframe da Hugging Face Spaces evitando erros 404 nos logs.
     """
     return {"named_endpoints": {}, "unnamed_endpoints": {}}
+
+
+@api.api_operation(["GET", "POST"], "/api/predict", tags=["System"])
+def gradio_predict_stub(request):
+    """
+    Responde à sondagem de inferência do Hugging Face Spaces/Gradio evitando erros 404 nos logs.
+    """
+    return {"data": []}
 
 
 @api.get("/health", tags=["System"])

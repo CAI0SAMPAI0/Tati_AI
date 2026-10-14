@@ -509,7 +509,7 @@ def get_notification_preferences(request: HttpRequest):
         "email_enabled": profile.get("allow_email_notifications", True),
         "daily_reminder": profile.get("daily_reminder", True),
         "streak_alerts": profile.get("streak_alerts", True),
-        "whatsapp_number": profile.get("whatsapp_number", ""),
+        "whatsapp_number": profile.get("whatsapp_number", "") or getattr(user, "phone", "") or "",
         "autoplay_chat_audio": profile.get("autoplay_chat_audio", False),
         "streaks": streaks,
         "challenges": challenges,
@@ -559,7 +559,21 @@ def update_notification_preferences(
     if "streak_alerts" in data:
         profile["streak_alerts"] = data["streak_alerts"]
     if "whatsapp_number" in data:
-        profile["whatsapp_number"] = data["whatsapp_number"]
+        val = data["whatsapp_number"]
+        if val:
+            clean_phone = "".join(c for c in str(val) if c.isdigit())
+            if clean_phone and len(clean_phone) in (10, 11) and not clean_phone.startswith("55"):
+                clean_phone = f"55{clean_phone}"
+            profile["whatsapp_number"] = clean_phone
+            user.phone = clean_phone
+        elif val == "" and len(data) == 1:
+            profile["whatsapp_number"] = ""
+            user.phone = None
+
+    if user.phone and not profile.get("whatsapp_number"):
+        profile["whatsapp_number"] = user.phone
+    elif profile.get("whatsapp_number") and not user.phone:
+        user.phone = profile["whatsapp_number"]
     if "preferred_accent" in data:
         profile["preferred_accent"] = data["preferred_accent"]
     if "accent" in data:
@@ -578,7 +592,10 @@ def update_notification_preferences(
         profile["notification_preferences"] = current_prefs
 
     user.profile = profile
-    user.save(update_fields=["profile"])
+    update_fields = ["profile"]
+    if "whatsapp_number" in data:
+        update_fields.append("phone")
+    user.save(update_fields=update_fields)
     return {"success": True, "preferences": profile}
 
 
