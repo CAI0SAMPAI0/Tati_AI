@@ -111,7 +111,7 @@ function formatTime(isoStr?: string) {
           @click="openPracticePronunciation"
         >
           <Mic :size="12" />
-          <span>Treinar pronúncia</span>
+          <span>Practice the pronunciation</span>
         </button>
       </div>
     </div>

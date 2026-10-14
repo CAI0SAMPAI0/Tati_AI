@@ -15,12 +15,10 @@ import {
   ChevronLeft,
   CheckCircle2,
   Sparkles,
-  HelpCircle,
   X,
   Loader2,
-  Flame,
 } from 'lucide-vue-next';
-import { ACCENTS, getStoredAccent, saveStoredAccent, type Accent } from '../constants/accents';
+import { ACCENTS, getStoredAccent, saveStoredAccent } from '../constants/accents';
 import { useAuthStore } from '../stores/auth';
 
 interface WordResult {
@@ -39,6 +37,15 @@ interface PronunciationResult {
   pedagogical_tip?: string;
   suggested_sentence?: string;
   correct_audio?: string;
+  metadata?: {
+    accuracy_score?: number;
+    fluency_score?: number;
+    completeness_score?: number;
+    segments?: any[];
+    language?: string;
+    duration?: number;
+    free_speech?: boolean;
+  };
 }
 
 interface PracticeSentence {
@@ -102,59 +109,63 @@ const PRACTICE_SENTENCES: PracticeSentence[] = [
   { text: "The government's austerity measures have precipitated widespread public dissent.", level: "C1", tip: "Consonant clusters: 'stri-ty', 'pre-CI-pi-ta-ted'." },
   { text: "From a pedagogical standpoint, the curriculum requires a more nuanced approach.", level: "C1", tip: "Stress: 'pe-da-GO-gi-cal', 'NU-an-ced'." },
   { text: "The discrepancy between the two reports is quite alarming.", level: "C1", tip: "Stress 'dis-CRE-pan-cy' on the second syllable." },
+  { text: "The proposed legislation would fundamentally alter the healthcare landscape.", level: "C1", tip: "The 'g' in 'legislation' sounds like 'j'." },
+  { text: "It is imperative that we address these issues without further delay.", level: "C1", tip: "Stress 'im-PE-ra-tive' on the second syllable." },
+  { text: "The correlation between diet and cognitive function is well documented.", level: "C1", tip: "Stress 'cor-re-LA-tion' and 'COG-ni-tive'." },
+  { text: "Her unequivocal stance on the matter surprised many of her colleagues.", level: "C1", tip: "The 'qu' in 'unequivocal' sounds like 'kw'." },
+  { text: "The unprecedented scale of the challenge requires a coordinated global response.", level: "C1", tip: "Stress 'un-PRE-ce-den-ted' — five clear syllables." },
 
   // C2
   { text: "The epistemological foundations of postmodernist discourse are inherently paradoxical.", level: "C2", tip: "Master complex word stress: 'e-pis-te-MO-lo-gi-cal', 'pos-TMO-dern-ist'." },
   { text: "Notwithstanding the aforementioned caveats, the extrapolation remains justifiable.", level: "C2", tip: "Smooth linking between long words — don't pause between them." },
   { text: "The phenomenological approach to research elucidates subjective experiential realities.", level: "C2", tip: "Natural rhythm: 'phe-no-me-no-LO-gi-cal', 'e-LU-ci-dates'." },
+  { text: "A multidisciplinary synthesis of contemporaneous paradigms proves indispensable.", level: "C2", tip: "Intonation patterns in very long sentences — use pitch variation." },
+  { text: "The quintessence of her argument lies in the ontological distinction she draws.", level: "C2", tip: "Stress 'quin-TES-sence' and 'on-to-LO-gi-cal'." },
   { text: "The juxtaposition of these two ideologies creates a fascinating dialectic.", level: "C2", tip: "Stress 'jux-ta-po-SI-tion' on the fourth syllable." },
+  { text: "Her magnum opus constitutes an invaluable contribution to sociolinguistic theory.", level: "C2", tip: "Latin phrases: 'MAG-num O-pus' — maintain original pronunciation." },
+  { text: "The inscrutable nature of the data renders any definitive conclusion untenable.", level: "C2", tip: "Stress 'in-SCRU-ta-ble' and 'un-TE-na-ble'." },
+  { text: "The proliferation of disinformation necessitates a paradigm shift in media literacy.", level: "C2", tip: "Stress 'pro-li-fe-RA-tion' — six syllables with clear rhythm." },
   { text: "His peripatetic career has encompassed a panoply of interdisciplinary endeavors.", level: "C2", tip: "Stress 'pe-ri-pa-TE-tic' and 'PAN-o-ply'." },
 ];
+
+type InputMode = 'preset' | 'custom' | 'free';
 
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
 
-type InputMode = 'preset' | 'custom' | 'free';
-
 const inputMode = ref<InputMode>('preset');
-const customText = ref('');
-const selectedLevel = ref<string>('All');
 const currentIndex = ref(0);
-const selectedAccent = ref<string>(getStoredAccent());
-const isAccentModalOpen = ref(false);
-
+const customText = ref('');
 const isRecording = ref(false);
 const isEvaluating = ref(false);
 const isPlayingTati = ref(false);
 const isPlayingUser = ref(false);
-const recordingDuration = ref(0);
+const isPlayingWord = ref<string | null>(null);
 const recordingError = ref<string | null>(null);
-
 const result = ref<PronunciationResult | null>(null);
 const selectedWord = ref<WordResult | null>(null);
 const userAudioBlobUrl = ref<string | null>(null);
-const userAudioBase64 = ref<string | null>(null);
+const history = ref<{ sentence: string; score: number }[]>([]);
 
-const history = ref<Array<{ sentence: string; score: number }>>([]);
+const selectedAccent = ref<string>(getStoredAccent());
+const isAccentModalOpen = ref(false);
 
+const canvasRef = ref<HTMLCanvasElement | null>(null);
 let mediaRecorder: MediaRecorder | null = null;
 let audioChunks: Blob[] = [];
-let recordingInterval: number | null = null;
 let mediaStream: MediaStream | null = null;
+let audioContext: AudioContext | null = null;
+let analyser: AnalyserNode | null = null;
+let animFrame: number | null = null;
 
 const currentAccentObj = computed(() => {
   return ACCENTS.find((a) => a.id === selectedAccent.value) || ACCENTS[0];
 });
 
-const filteredSentences = computed(() => {
-  if (selectedLevel.value === 'All') return PRACTICE_SENTENCES;
-  return PRACTICE_SENTENCES.filter((s) => s.level === selectedLevel.value);
-});
-
 const currentSentence = computed(() => {
-  if (filteredSentences.value.length === 0) return null;
-  return filteredSentences.value[currentIndex.value % filteredSentences.value.length];
+  if (PRACTICE_SENTENCES.length === 0) return null;
+  return PRACTICE_SENTENCES[currentIndex.value % PRACTICE_SENTENCES.length];
 });
 
 const activeReferenceText = computed(() => {
@@ -175,18 +186,18 @@ onMounted(() => {
     inputMode.value = 'custom';
     customText.value = queryPhrase;
   }
-
-  const handleTestEvaluation = (e: any) => {
-    if (e.detail) {
-      result.value = e.detail;
-      history.value.unshift({
-        sentence: activeReferenceText.value || e.detail.transcription || '(Test)',
-        score: e.detail.score,
-      });
-    }
-  };
-  window.addEventListener('tati_test_evaluation', handleTestEvaluation);
 });
+
+function handleBack() {
+  const convId = (route.query.conv_id || route.query.id) as string;
+  if (convId) {
+    router.push({ path: '/chat', query: { conv_id: convId } });
+  } else if (window.history.length > 1) {
+    router.back();
+  } else {
+    router.push('/chat');
+  }
+}
 
 function handleSelectAccent(accId: string) {
   selectedAccent.value = accId;
@@ -194,18 +205,12 @@ function handleSelectAccent(accId: string) {
   isAccentModalOpen.value = false;
 }
 
-function selectLevel(lvl: string) {
-  selectedLevel.value = lvl;
-  currentIndex.value = 0;
-  result.value = null;
-  selectedWord.value = null;
-}
-
 function nextSentence() {
   result.value = null;
   selectedWord.value = null;
+  recordingError.value = null;
   userAudioBlobUrl.value = null;
-  if (currentIndex.value < filteredSentences.value.length - 1) {
+  if (currentIndex.value < PRACTICE_SENTENCES.length - 1) {
     currentIndex.value++;
   } else {
     currentIndex.value = 0;
@@ -215,11 +220,12 @@ function nextSentence() {
 function prevSentence() {
   result.value = null;
   selectedWord.value = null;
+  recordingError.value = null;
   userAudioBlobUrl.value = null;
   if (currentIndex.value > 0) {
     currentIndex.value--;
   } else {
-    currentIndex.value = filteredSentences.value.length - 1;
+    currentIndex.value = PRACTICE_SENTENCES.length - 1;
   }
 }
 
@@ -238,7 +244,6 @@ async function playReferenceVoice() {
 
   isPlayingTati.value = true;
 
-  // 1. Try Backend TTS
   try {
     const res = await fetch('/chat/tts', {
       method: 'POST',
@@ -267,7 +272,6 @@ async function playReferenceVoice() {
     console.warn('TTS backend failed, using Web Speech fallback:', err);
   }
 
-  // Fallback to Web Speech API
   fallbackSpeak(textToPlay);
 }
 
@@ -278,8 +282,40 @@ function fallbackSpeak(text: string) {
   }
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = selectedAccent.value || 'en-US';
-  utterance.rate = 0.9;
+  const targetAccent = selectedAccent.value || 'en-US';
+  utterance.lang = targetAccent;
+  utterance.rate = 0.85;
+
+  const voices = window.speechSynthesis.getVoices();
+  const femaleVoice = voices.find(
+    (v) =>
+      v.lang.toLowerCase().startsWith(targetAccent.slice(0, 2).toLowerCase()) &&
+      (v.name.includes('Female') ||
+        v.name.includes('Zira') ||
+        v.name.includes('Jenny') ||
+        v.name.includes('Sonia') ||
+        v.name.includes('Natural') ||
+        v.name.includes('Samantha') ||
+        v.name.includes('Victoria') ||
+        v.name.includes('Aria') ||
+        v.name.includes('Ava')) &&
+      !v.name.includes('David') &&
+      !v.name.includes('George') &&
+      !v.name.includes('Male')
+  ) || voices.find((v) => 
+    v.lang.toLowerCase().startsWith('en') && 
+    !v.name.includes('David') && 
+    !v.name.includes('George') && 
+    !v.name.includes('Mark') && 
+    !v.name.includes('Richard') && 
+    !v.name.includes('Male')
+  );
+
+  if (femaleVoice) {
+    utterance.voice = femaleVoice;
+  }
+
+  isPlayingTati.value = true;
   utterance.onend = () => { isPlayingTati.value = false; };
   utterance.onerror = () => { isPlayingTati.value = false; };
   window.speechSynthesis.speak(utterance);
@@ -293,6 +329,99 @@ function playUserAudio() {
   audio.onended = () => { isPlayingUser.value = false; };
   audio.onerror = () => { isPlayingUser.value = false; };
   audio.play().catch(() => { isPlayingUser.value = false; });
+}
+
+// Play correct audio for a specific word
+async function playWordAudio(wordToPlay: string) {
+  isPlayingWord.value = wordToPlay;
+  const clean = wordToPlay.replace(/[^\w\s']/g, '').trim();
+  try {
+    const res = await fetch('/chat/tts', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authStore.token}`,
+      },
+      body: JSON.stringify({
+        text: clean,
+        accent: selectedAccent.value,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const b64 = data.audio || data.audio_b64;
+      if (b64) {
+        const audio = new Audio(`data:audio/mp3;base64,${b64}`);
+        audio.onended = () => { isPlayingWord.value = null; };
+        audio.onerror = () => { isPlayingWord.value = null; };
+        await audio.play();
+        return;
+      }
+    }
+  } catch (_) {}
+
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    const u = new SpeechSynthesisUtterance(clean);
+    u.lang = selectedAccent.value || 'en-US';
+    u.rate = 0.85;
+    const voices = window.speechSynthesis.getVoices();
+    const femaleVoice = voices.find(
+      (v) =>
+        v.lang.toLowerCase().startsWith(selectedAccent.value.slice(0, 2).toLowerCase()) &&
+        !v.name.includes('David') &&
+        !v.name.includes('George') &&
+        !v.name.includes('Male')
+    );
+    if (femaleVoice) u.voice = femaleVoice;
+    u.onend = () => { isPlayingWord.value = null; };
+    u.onerror = () => { isPlayingWord.value = null; };
+    window.speechSynthesis.speak(u);
+  } else {
+    isPlayingWord.value = null;
+  }
+}
+
+function drawWaveform() {
+  if (!canvasRef.value || !analyser) return;
+  const canvas = canvasRef.value;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const bufferLength = analyser.frequencyBinCount;
+  const dataArray = new Uint8Array(bufferLength);
+
+  const draw = () => {
+    if (!isRecording.value) return;
+    animFrame = requestAnimationFrame(draw);
+    analyser!.getByteTimeDomainData(dataArray);
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#8b5cf6';
+    ctx.beginPath();
+
+    const sliceWidth = (canvas.width * 1.0) / bufferLength;
+    let x = 0;
+
+    for (let i = 0; i < bufferLength; i++) {
+      const v = dataArray[i] / 128.0;
+      const y = (v * canvas.height) / 2;
+
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+      x += sliceWidth;
+    }
+
+    ctx.lineTo(canvas.width, canvas.height / 2);
+    ctx.stroke();
+  };
+
+  draw();
 }
 
 // Start audio recording with MediaRecorder
@@ -312,6 +441,24 @@ async function startRecording() {
       },
     });
     mediaStream = stream;
+
+    // Web Audio waveform analyser
+    try {
+      const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtxClass) {
+        audioContext = new AudioCtxClass();
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
+        const source = audioContext.createMediaStreamSource(stream);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+        source.connect(analyser);
+        drawWaveform();
+      }
+    } catch (e) {
+      console.warn('AudioContext waveform not available:', e);
+    }
 
     let mimeType = 'audio/webm';
     if (typeof MediaRecorder !== 'undefined' && typeof MediaRecorder.isTypeSupported === 'function') {
@@ -337,6 +484,14 @@ async function startRecording() {
         mediaStream.getTracks().forEach((track) => track.stop());
         mediaStream = null;
       }
+      if (audioContext && audioContext.state !== 'closed') {
+        try { audioContext.close(); } catch (_) {}
+        audioContext = null;
+      }
+      if (animFrame) {
+        cancelAnimationFrame(animFrame);
+        animFrame = null;
+      }
 
       if (audioChunks.length === 0) {
         recordingError.value = 'Nenhum áudio foi gravado. Tente novamente.';
@@ -346,24 +501,17 @@ async function startRecording() {
       const blob = new Blob(audioChunks, { type: mimeType });
       userAudioBlobUrl.value = URL.createObjectURL(blob);
 
-      // Convert to base64
       const reader = new FileReader();
       reader.onloadend = async () => {
         const resultStr = reader.result as string;
         const b64 = resultStr.includes(',') ? resultStr.split(',')[1] : resultStr;
-        userAudioBase64.value = b64;
         await evaluateRecording(b64);
       };
       reader.readAsDataURL(blob);
     };
 
     recorder.start(250);
-    recordingDuration.value = 0;
     isRecording.value = true;
-
-    recordingInterval = window.setInterval(() => {
-      recordingDuration.value++;
-    }, 1000);
   } catch (err: any) {
     console.error('Mic error:', err);
     recordingError.value = 'Acesso ao microfone negado ou não encontrado. Verifique suas permissões.';
@@ -372,9 +520,9 @@ async function startRecording() {
 }
 
 function stopRecording() {
-  if (recordingInterval) {
-    clearInterval(recordingInterval);
-    recordingInterval = null;
+  if (animFrame) {
+    cancelAnimationFrame(animFrame);
+    animFrame = null;
   }
   if (mediaRecorder && mediaRecorder.state !== 'inactive') {
     mediaRecorder.stop();
@@ -413,7 +561,12 @@ async function evaluateRecording(base64: string) {
     const data: PronunciationResult = await res.json();
     result.value = data;
 
-    // Record into history
+    // Auto-play correct pronunciation if returned
+    if (data.correct_audio) {
+      const audio = new Audio(`data:audio/mp3;base64,${data.correct_audio}`);
+      audio.play().catch((e) => console.warn('Could not auto-play audio:', e));
+    }
+
     history.value.unshift({
       sentence: activeReferenceText.value || data.transcription || '(Free Speech)',
       score: data.score,
@@ -426,26 +579,27 @@ async function evaluateRecording(base64: string) {
   }
 }
 
-function formatDuration(sec: number) {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
+function playCorrectAudio() {
+  if (result.value?.correct_audio) {
+    const audio = new Audio(`data:audio/mp3;base64,${result.value.correct_audio}`);
+    audio.play().catch((e) => console.warn('Could not play correct audio:', e));
+  }
 }
 
 function getWordBadgeClass(acc: string) {
-  if (acc === 'correct') return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20';
-  if (acc === 'needs_work') return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20';
-  return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30 hover:bg-rose-500/20';
+  if (acc === 'correct') return 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
+  if (acc === 'needs_work') return 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/40 ring-1 ring-amber-500/20';
+  return 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-500/40 line-through';
 }
 
 function getScoreColorClass(score: number) {
-  if (score >= 85) return 'text-emerald-500 border-emerald-500/30 bg-emerald-500/10';
-  if (score >= 60) return 'text-amber-500 border-amber-500/30 bg-amber-500/10';
-  return 'text-rose-500 border-rose-500/30 bg-rose-500/10';
+  if (score >= 85) return 'text-emerald-500';
+  if (score >= 60) return 'text-amber-500';
+  return 'text-rose-500';
 }
 
 onUnmounted(() => {
-  if (recordingInterval) clearInterval(recordingInterval);
+  if (animFrame) cancelAnimationFrame(animFrame);
   if (mediaRecorder && mediaRecorder.state !== 'inactive') {
     mediaRecorder.stop();
   }
@@ -460,353 +614,438 @@ onUnmounted(() => {
 
 <template>
   <div class="min-h-screen bg-bg flex flex-col font-sans">
-    <!-- Topbar Header -->
-    <header class="sticky top-0 z-20 border-b border-line bg-surface/80 backdrop-blur-md px-4 py-3">
-      <div class="max-w-5xl mx-auto flex items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
-          <button
-            type="button"
-            class="p-2 rounded-xl text-muted hover:text-ink hover:bg-bgSecondary transition active:scale-95 cursor-pointer"
-            title="Voltar ao Chat"
-            @click="route.query.conv_id ? router.push({ path: '/chat', query: { conv_id: route.query.conv_id } }) : router.push('/chat')"
-          >
-            <ArrowLeft :size="20" />
-          </button>
+    <!-- Header matching design_system/pronunciation.html -->
+    <header class="border-b border-border bg-bg-secondary/50 backdrop-blur-sm px-4 py-3 flex items-center gap-3">
+      <button
+        type="button"
+        class="p-2 rounded-lg hover:bg-surface-hover transition-colors cursor-pointer text-text"
+        title="Voltar ao Chat"
+        @click="handleBack"
+      >
+        <ArrowLeft :size="20" />
+      </button>
 
-          <div>
-            <h1 class="text-base sm:text-lg font-bold text-ink flex items-center gap-2">
-              <BookOpen :size="18" class="text-primary" />
-              Pronunciation Reader
-            </h1>
-            <p class="text-xs text-muted hidden sm:block">
-              Treine sua fala, dicção e entonação com a Teacher Tati
-            </p>
-          </div>
-        </div>
+      <div class="flex-1">
+        <h1 class="text-lg font-bold text-text flex items-center gap-2">
+          <BookOpen :size="20" class="text-primary" />
+          Pronunciation Reader
+        </h1>
+        <p class="text-xs text-text-muted">Read aloud, write your own text, or just speak freely</p>
+      </div>
 
-        <!-- Controls: Accent + Avg Score -->
-        <div class="flex items-center gap-2 sm:gap-3">
-          <!-- Accent Selector Button -->
-          <button
-            type="button"
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface border border-line hover:border-primary/50 text-xs font-semibold text-ink transition shadow-sm active:scale-95 cursor-pointer"
-            title="Alterar sotaque da Teacher Tati"
-            @click="isAccentModalOpen = true"
-          >
-            <span class="text-base">{{ currentAccentObj.flag }}</span>
-            <span class="hidden md:inline">{{ currentAccentObj.shortLabel }}</span>
-            <Globe :size="13" class="text-muted ml-0.5" />
-          </button>
+      <!-- Accent Selector Button in Header -->
+      <button
+        type="button"
+        class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-surface border border-border hover:border-primary/40 text-xs font-bold text-text transition-all shadow-sm active:scale-95 shrink-0 cursor-pointer"
+        title="Change Teacher Tati's accent"
+        @click="isAccentModalOpen = true"
+      >
+        <span class="text-base">{{ currentAccentObj.flag }}</span>
+        <span class="hidden sm:inline">{{ currentAccentObj.shortLabel }}</span>
+        <Globe :size="13" class="text-text-muted ml-0.5" />
+      </button>
 
-          <!-- History Score Average -->
-          <div v-if="history.length > 0" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-line bg-surface shadow-sm">
-            <Flame :size="14" class="text-amber-500 fill-amber-500" />
-            <div class="text-xs">
-              <span class="font-bold" :class="getScoreColorClass(avgScore)">{{ avgScore }}%</span>
-              <span class="text-muted ml-1 hidden sm:inline">média</span>
-            </div>
-          </div>
-        </div>
+      <!-- History Score Average -->
+      <div v-if="history.length > 0" class="text-right">
+        <div class="text-lg font-bold" :class="getScoreColorClass(avgScore)">{{ avgScore }}%</div>
+        <div class="text-[0.6rem] text-text-muted">Avg. Score</div>
       </div>
     </header>
 
-    <!-- Main Content Container -->
-    <main class="flex-1 max-w-3xl w-full mx-auto p-4 sm:p-6 flex flex-col gap-5">
+    <!-- Main Workspace Container -->
+    <div class="flex-1 flex flex-col items-center justify-center p-4 md:p-8 max-w-2xl mx-auto w-full">
       <!-- Mode Selection Tabs -->
-      <div class="grid grid-cols-3 gap-2 p-1.5 rounded-2xl bg-bgSecondary border border-line">
+      <div class="flex gap-2 mb-3 w-full">
         <button
           type="button"
-          class="flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer"
-          :class="inputMode === 'preset' ? 'bg-primary text-white shadow-sm' : 'text-muted hover:text-ink'"
+          class="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer"
+          :class="inputMode === 'preset' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-surface border border-border text-text-muted hover:bg-surface-hover'"
           @click="inputMode = 'preset'"
         >
-          <BookOpen :size="15" />
-          <span class="truncate">Frases Prontas</span>
+          <BookOpen :size="14" />
+          Preset Sentences
         </button>
 
         <button
           type="button"
-          class="flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer"
-          :class="inputMode === 'custom' ? 'bg-primary text-white shadow-sm' : 'text-muted hover:text-ink'"
+          class="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer"
+          :class="inputMode === 'custom' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-surface border border-border text-text-muted hover:bg-surface-hover'"
           @click="inputMode = 'custom'"
         >
-          <PenLine :size="15" />
-          <span class="truncate">Texto Próprio</span>
+          <PenLine :size="14" />
+          Write Your Own
         </button>
 
         <button
           type="button"
-          class="flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer"
-          :class="inputMode === 'free' ? 'bg-primary text-white shadow-sm' : 'text-muted hover:text-ink'"
+          class="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer"
+          :class="inputMode === 'free' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-surface border border-border text-text-muted hover:bg-surface-hover'"
           @click="inputMode = 'free'"
         >
-          <MessageSquare :size="15" />
-          <span class="truncate">Fala Livre</span>
+          <MessageSquare :size="14" />
+          Free Speech
         </button>
       </div>
 
-      <!-- Level Filter (only for Preset mode) -->
-      <div v-if="inputMode === 'preset'" class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-        <span class="text-xs font-semibold text-muted mr-1">Nível:</span>
-        <button
-          v-for="lvl in ['All', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2']"
-          :key="lvl"
-          type="button"
-          class="px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer"
-          :class="selectedLevel === lvl ? 'bg-primarySoft text-primary border border-primary/30' : 'bg-surface border border-line text-muted hover:text-ink'"
-          @click="selectLevel(lvl)"
+      <!-- Accent Quick Selection Bar -->
+      <div class="w-full flex items-center justify-between gap-2 mb-5 px-1 overflow-x-hidden">
+        <span class="text-[0.7rem] font-bold text-text-subtle uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+          <Globe :size="12" class="text-primary" />
+          Accent:
+        </span>
+        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 max-w-full">
+          <button
+            v-for="acc in ACCENTS.slice(0, 5)"
+            :key="acc.id"
+            type="button"
+            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all shrink-0 active:scale-95 cursor-pointer"
+            :class="selectedAccent === acc.id ? 'bg-primary text-white shadow-sm shadow-primary/30' : 'bg-surface border border-border text-text-muted hover:text-text hover:border-primary/30'"
+            :title="acc.desc"
+            @click="handleSelectAccent(acc.id)"
+          >
+            <span>{{ acc.flag }}</span>
+            <span>{{ acc.shortLabel }}</span>
+          </button>
+          <button
+            type="button"
+            class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-surface border border-border text-primary hover:bg-surface-hover shrink-0 cursor-pointer"
+            title="View all accents"
+            @click="isAccentModalOpen = true"
+          >
+            More...
+          </button>
+        </div>
+      </div>
+
+      <!-- MODE 1: Preset Sentences -->
+      <template v-if="inputMode === 'preset'">
+        <div
+          class="px-3 py-1 rounded-full text-xs font-bold mb-6"
+          :class="
+            currentSentence?.level === 'A1' ? 'bg-green-500/20 text-green-400' :
+            currentSentence?.level === 'A2' ? 'bg-green-500/15 text-green-300' :
+            currentSentence?.level === 'B1' ? 'bg-blue-500/20 text-blue-400' :
+            'bg-purple-500/20 text-purple-400'
+          "
         >
-          {{ lvl }}
-        </button>
-      </div>
-
-      <!-- Practice Card Arena -->
-      <section class="rounded-3xl border border-line bg-surface p-5 sm:p-7 shadow-sm flex flex-col gap-5">
-        <!-- MODE 1: Preset Sentences -->
-        <div v-if="inputMode === 'preset' && currentSentence" class="flex flex-col gap-4">
-          <div class="flex items-center justify-between">
-            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-primarySoft text-primary border border-primary/20">
-              Nível {{ currentSentence.level }}
-            </span>
-            <span class="text-xs text-muted">
-              {{ currentIndex + 1 }} de {{ filteredSentences.length }}
-            </span>
-          </div>
-
-          <!-- Sentence text -->
-          <div class="py-2">
-            <p class="text-xl sm:text-2xl font-serif font-medium text-ink leading-relaxed">
-              "{{ currentSentence.text }}"
-            </p>
-          </div>
-
-          <!-- Pedagogical tip & Listen button -->
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-line/60">
-            <div class="flex items-center gap-2 text-xs text-muted">
-              <Sparkles :size="14" class="text-primary shrink-0" />
-              <span><strong>Dica:</strong> {{ currentSentence.tip }}</span>
-            </div>
-
-            <button
-              type="button"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-primary/30 bg-primarySoft text-primary hover:bg-primary/20 font-semibold text-xs transition cursor-pointer shrink-0 self-start sm:self-auto"
-              @click="playReferenceVoice"
-            >
-              <Volume2 :size="14" />
-              <span>{{ isPlayingTati ? 'Pausar' : 'Ouvir Tati' }}</span>
-            </button>
-          </div>
-
-          <!-- Navigation Prev / Next -->
-          <div class="flex items-center justify-between pt-2">
-            <button
-              type="button"
-              class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-line text-xs font-medium text-muted hover:text-ink hover:bg-bgSecondary transition cursor-pointer"
-              @click="prevSentence"
-            >
-              <ChevronLeft :size="15" />
-              Anterior
-            </button>
-            <button
-              type="button"
-              class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-line text-xs font-medium text-muted hover:text-ink hover:bg-bgSecondary transition cursor-pointer"
-              @click="nextSentence"
-            >
-              Próxima
-              <ChevronRight :size="15" />
-            </button>
-          </div>
+          {{ currentSentence?.level || 'A1' }}
         </div>
 
-        <!-- MODE 2: Custom Text -->
-        <div v-else-if="inputMode === 'custom'" class="flex flex-col gap-3">
-          <label class="text-xs font-bold text-muted">Digite qualquer frase ou texto em inglês:</label>
-          <textarea
-            v-model="customText"
-            rows="3"
-            placeholder="Ex: I would like to schedule our next appointment on Tuesday."
-            class="w-full rounded-2xl border border-line bg-bgSecondary/60 p-3.5 text-sm sm:text-base text-ink placeholder:text-muted outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition leading-relaxed resize-none"
-          />
-
-          <div class="flex justify-end">
-            <button
-              v-if="customText.trim()"
-              type="button"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-primary/30 bg-primarySoft text-primary hover:bg-primary/20 font-semibold text-xs transition cursor-pointer"
-              @click="playReferenceVoice"
-            >
-              <Volume2 :size="14" />
-              <span>{{ isPlayingTati ? 'Pausar' : 'Ouvir pronúncia da Tati' }}</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- MODE 3: Free Speech -->
-        <div v-else-if="inputMode === 'free'" class="flex flex-col items-center text-center py-4 gap-2">
-          <div class="h-12 w-12 rounded-2xl bg-primarySoft text-primary flex items-center justify-center mb-1">
-            <MessageSquare :size="24" />
-          </div>
-          <h3 class="text-base font-bold text-ink">Prática de Fala Livre</h3>
-          <p class="text-xs sm:text-sm text-muted max-w-md">
-            Grave qualquer relato, ideia ou responda sobre seu dia em inglês. A Teacher Tati vai transcrever e avaliar sua pronúncia e clareza automaticamente.
+        <div class="w-full bg-surface border border-border rounded-2xl p-6 md:p-8 mb-6 text-center">
+          <p class="text-xl md:text-2xl font-display font-bold text-text leading-relaxed mb-4">
+            {{ currentSentence?.text }}
+          </p>
+          <p class="text-xs text-text-muted italic">
+            💡 {{ currentSentence?.tip }}
           </p>
         </div>
+      </template>
 
-        <!-- Error Alert -->
-        <div v-if="recordingError" class="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs">
+      <!-- MODE 2: Custom Text -->
+      <div v-else-if="inputMode === 'custom'" class="w-full bg-surface border border-border rounded-2xl p-6 md:p-8 mb-6">
+        <label class="text-xs font-bold text-text-subtle uppercase tracking-wider mb-2 block">
+          Type or paste the text you want to practice
+        </label>
+        <textarea
+          v-model="customText"
+          placeholder="e.g. The quick brown fox jumps over the lazy dog..."
+          class="w-full h-32 bg-bg border border-border rounded-xl p-4 text-text text-base resize-none outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
+          maxlength="500"
+        />
+        <div class="flex justify-between items-center mt-2">
+          <p class="text-[0.65rem] text-text-muted">
+            {{ customText.length }}/500 characters
+          </p>
+          <button
+            v-if="customText.trim()"
+            type="button"
+            class="text-[0.65rem] text-primary hover:underline cursor-pointer"
+            @click="customText = ''"
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+
+      <!-- MODE 3: Free Speech -->
+      <div v-else class="w-full bg-surface border border-border rounded-2xl p-6 md:p-8 mb-6 text-center">
+        <div class="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
+          <MessageSquare :size="28" />
+        </div>
+        <p class="text-lg font-bold text-text mb-2">Free Speech Mode</p>
+        <p class="text-sm text-text-muted">
+          Just tap the microphone and speak naturally. Tati will transcribe and analyze your pronunciation.
+        </p>
+      </div>
+
+      <!-- Action Controls Bar -->
+      <div class="flex items-center gap-4 mb-6">
+        <button
+          v-if="inputMode === 'preset'"
+          type="button"
+          class="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-text cursor-pointer"
+          title="Previous sentence"
+          @click="prevSentence"
+        >
+          <ChevronLeft :size="20" />
+        </button>
+
+        <button
+          type="button"
+          class="p-4 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-primary"
+          :class="(!activeReferenceText || isRecording || isEvaluating) ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'"
+          :disabled="!activeReferenceText || isRecording || isEvaluating"
+          title="Listen to Teacher Tati"
+          @click="playReferenceVoice"
+        >
+          <Volume2 :size="24" />
+        </button>
+
+        <button
+          type="button"
+          class="p-5 rounded-full shadow-lg transition-all duration-300 cursor-pointer"
+          :class="[
+            isRecording
+              ? 'bg-red-500 shadow-red-500/30 animate-pulse scale-110'
+              : 'bg-primary shadow-primary/20 hover:scale-105 active:scale-95',
+            isEvaluating ? 'opacity-50 cursor-not-allowed' : ''
+          ]"
+          :disabled="isEvaluating"
+          :title="isRecording ? 'Stop recording' : 'Start speaking'"
+          @click="isRecording ? stopRecording() : startRecording()"
+        >
+          <Square v-if="isRecording" :size="28" class="text-white fill-white" />
+          <Mic v-else :size="28" class="text-white" />
+        </button>
+
+        <button
+          type="button"
+          class="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-text cursor-pointer"
+          title="Reset"
+          @click="result = null; recordingError = null;"
+        >
+          <RotateCcw :size="20" />
+        </button>
+
+        <button
+          v-if="inputMode === 'preset'"
+          type="button"
+          class="p-3 rounded-full bg-surface border border-border hover:bg-surface-hover transition-colors text-text cursor-pointer"
+          title="Next sentence"
+          @click="nextSentence"
+        >
+          <ChevronRight :size="20" />
+        </button>
+      </div>
+
+      <!-- Recording Waveform & Indicator -->
+      <div v-if="isRecording" class="mb-4 flex flex-col items-center animate-fade-in">
+        <div class="flex items-center gap-2 text-red-500 text-sm font-bold">
+          <div class="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+          Recording — speak now...
+        </div>
+        <canvas ref="canvasRef" width="300" height="60" class="mt-2 rounded-lg" />
+      </div>
+
+      <!-- Recording Error Alert -->
+      <div v-if="recordingError" class="mb-4 w-full animate-fade-in">
+        <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-sm text-red-500 text-center">
           {{ recordingError }}
         </div>
+      </div>
 
-        <!-- Record Action Controls -->
-        <div class="flex flex-col items-center justify-center gap-3 pt-3">
-          <!-- Evaluating Spinner -->
-          <div v-if="isEvaluating" class="flex flex-col items-center gap-2 py-4 text-primary">
-            <Loader2 :size="32" class="animate-spin" />
-            <span class="text-sm font-semibold">Analisando fonemas e pronúncia com IA...</span>
-          </div>
+      <!-- Evaluating Spinner -->
+      <div v-if="isEvaluating" class="mb-4 flex items-center gap-2 text-primary text-sm font-semibold animate-fade-in">
+        <Sparkles :size="16" class="animate-spin text-primary" />
+        Analyzing your pronunciation...
+      </div>
 
-          <!-- Record / Stop Button -->
-          <div v-else class="flex flex-col items-center gap-2">
-            <button
-              type="button"
-              class="relative h-16 w-16 sm:h-20 sm:w-20 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg active:scale-95 cursor-pointer"
-              :class="isRecording ? 'bg-rose-500 text-white shadow-rose-500/40 animate-pulse ring-8 ring-rose-500/20' : 'bg-primary text-white shadow-primary/30 hover:bg-primaryHover'"
-              :title="isRecording ? 'Parar gravação' : 'Gravar pronúncia'"
-              @click="isRecording ? stopRecording() : startRecording()"
-            >
-              <Square v-if="isRecording" :size="24" class="fill-current" />
-              <Mic v-else :size="28" />
-            </button>
-
-            <span class="text-xs font-semibold text-muted">
-              {{ isRecording ? `Gravando... ${formatDuration(recordingDuration)} (Clique para parar)` : 'Clique no microfone para falar' }}
-            </span>
-          </div>
-        </div>
-      </section>
-
-      <!-- RESULTS SECTION -->
-      <section v-if="result" class="rounded-3xl border border-line bg-surface p-5 sm:p-7 shadow-sm flex flex-col gap-5">
-        <div class="flex items-center justify-between border-b border-line pb-4">
-          <div>
-            <h2 class="text-base font-bold text-ink">Avaliação de Pronúncia</h2>
-            <p class="text-xs text-muted">Veja seu desempenho fonético e dicas pedagógicas</p>
-          </div>
-
-          <!-- Score Gauge Badge -->
-          <div
-            class="flex items-center gap-2 px-3.5 py-1.5 rounded-2xl border font-bold text-base sm:text-lg"
-            :class="getScoreColorClass(result.score)"
-          >
-            <span>{{ result.score }}%</span>
-            <span class="text-xs font-medium">Pontuação</span>
-          </div>
-        </div>
-
-        <!-- Audio Comparison Bar -->
-        <div class="flex flex-wrap items-center gap-3 p-3 rounded-2xl bg-bgSecondary border border-line">
-          <span class="text-xs font-bold text-muted">Comparar áudios:</span>
-          
-          <button
-            type="button"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-line bg-surface text-ink hover:border-primary/40 text-xs font-semibold transition cursor-pointer"
-            @click="playUserAudio"
-          >
-            <Volume2 :size="14" class="text-primary" />
-            <span>{{ isPlayingUser ? 'Pausando...' : 'Ouvir sua gravação' }}</span>
-          </button>
-
-          <button
-            type="button"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-primary/20 bg-primarySoft text-primary hover:bg-primary/20 text-xs font-semibold transition cursor-pointer"
-            @click="playReferenceVoice"
-          >
-            <Volume2 :size="14" />
-            <span>Ouvir nativo (Tati)</span>
-          </button>
-        </div>
-
-        <!-- Word-by-Word Breakdown -->
-        <div v-if="result.words && result.words.length > 0" class="flex flex-col gap-2">
-          <span class="text-xs font-bold text-muted">Toque em cada palavra para detalhes fonéticos:</span>
-          
-          <div class="flex flex-wrap gap-2 p-3.5 rounded-2xl bg-bgSecondary/40 border border-line">
-            <button
-              v-for="(w, idx) in result.words"
-              :key="idx"
-              type="button"
-              class="px-2.5 py-1 rounded-xl text-sm font-semibold border transition active:scale-95 cursor-pointer"
-              :class="[getWordBadgeClass(w.accuracy), selectedWord?.word === w.word ? 'ring-2 ring-primary' : '']"
-              @click="selectedWord = w"
-            >
-              {{ w.word }}
-            </button>
-          </div>
-        </div>
-
-        <!-- Word Details Modal / Box -->
-        <div
-          v-if="selectedWord"
-          class="p-4 rounded-2xl border border-primary/30 bg-primarySoft flex items-start justify-between gap-3"
-        >
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <span class="text-base font-bold text-ink">"{{ selectedWord.word }}"</span>
-              <span class="text-xs font-semibold px-2 py-0.5 rounded-md" :class="getWordBadgeClass(selectedWord.accuracy)">
-                {{ selectedWord.accuracy === 'correct' ? 'Excelente' : selectedWord.accuracy === 'needs_work' ? 'Pode melhorar' : 'Incorreto' }} ({{ selectedWord.score }}%)
-              </span>
+      <!-- Results Card Arena -->
+      <div v-if="result" class="w-full animate-fade-in">
+        <div class="bg-surface border border-border rounded-2xl p-6 space-y-4 shadow-sm">
+          <!-- Overall Score -->
+          <div class="text-center">
+            <div class="text-5xl font-black" :class="getScoreColorClass(result.score)">
+              {{ result.score }}%
             </div>
-            <p v-if="selectedWord.tip" class="text-xs text-ink/80 leading-relaxed">
-              💡 {{ selectedWord.tip }}
+            <p class="text-xs text-text-subtle mt-1 font-medium">
+              {{ result.score >= 85 ? 'Excelente articulação e clareza!' : result.score >= 60 ? 'Bom esforço! Ajuste os fonemas destacados.' : 'Vamos praticar novamente ouvindo a Teacher Tati.' }}
             </p>
           </div>
 
+          <!-- Comparison Voice Players: Student vs Teacher Tati -->
+          <div class="grid grid-cols-2 gap-3 pt-1">
+            <button
+              type="button"
+              class="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary/10 hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed text-primary rounded-xl text-xs font-bold transition-all cursor-pointer"
+              :disabled="!userAudioBlobUrl"
+              @click="playUserAudio"
+            >
+              <Volume2 :size="16" />
+              Listen to your own voice
+            </button>
+            <button
+              type="button"
+              class="flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-500/10 hover:bg-purple-500/20 disabled:opacity-40 disabled:cursor-not-allowed text-purple-600 dark:text-purple-400 rounded-xl text-xs font-bold transition-all cursor-pointer"
+              :disabled="!result.correct_audio"
+              @click="playCorrectAudio"
+            >
+              <Volume2 :size="16" />
+              Teacher Tati
+            </button>
+          </div>
+
+          <!-- Suggested Sentence from Teacher Tati -->
+          <div v-if="result.suggested_sentence" class="p-3.5 bg-blue-500/10 border border-blue-500/25 rounded-2xl flex flex-col gap-1.5 text-left">
+            <div class="flex items-center justify-between">
+              <span class="text-[0.68rem] font-bold text-blue-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles :size="13" />
+                Sugestão natural da Teacher Tati:
+              </span>
+              <button
+                v-if="result.correct_audio"
+                type="button"
+                class="text-xs text-blue-500 hover:text-blue-600 font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                @click="playCorrectAudio"
+              >
+                <Volume2 :size="13" />
+                Ouvir frase
+              </button>
+            </div>
+            <p class="text-xs md:text-sm font-semibold text-text leading-relaxed">
+              &ldquo;{{ result.suggested_sentence }}&rdquo;
+            </p>
+          </div>
+
+          <!-- Teacher Tati Pedagogical Tip Card in Portuguese -->
+          <div v-if="result.pedagogical_tip" class="p-4 bg-primary/10 border border-primary/25 rounded-2xl flex flex-col gap-3 text-left">
+            <div class="flex items-start gap-3">
+              <div class="w-9 h-9 rounded-full overflow-hidden shrink-0 border border-primary/40 mt-0.5">
+                <img src="/images/tati_logo.jpg" alt="Teacher Tati" class="w-full h-full object-cover" />
+              </div>
+              <div class="space-y-1">
+                <p class="text-[0.7rem] font-bold text-primary uppercase tracking-wider">
+                  Dica da Teacher Tati
+                </p>
+                <p class="text-xs md:text-sm text-foreground leading-relaxed">
+                  {{ result.pedagogical_tip }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Words to Practice List -->
+            <div v-if="result.words && result.words.filter(w => w.tip || w.accuracy !== 'correct').length > 0" class="pt-3 border-t border-primary/20 space-y-2">
+              <p class="text-[0.68rem] font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles :size="13" />
+                Pontos para praticar:
+              </p>
+              <div class="space-y-1.5">
+                <button
+                  v-for="(w, idx) in result.words.filter(w => w.tip || w.accuracy !== 'correct')"
+                  :key="idx"
+                  type="button"
+                  class="w-full text-left flex items-start gap-2.5 p-2 rounded-xl bg-surface/70 hover:bg-surface border border-border/70 hover:border-primary/50 transition-all text-xs group cursor-pointer"
+                  @click="selectedWord = w"
+                >
+                  <span
+                    class="font-bold shrink-0 px-2 py-0.5 rounded text-[0.7rem] font-mono"
+                    :class="w.accuracy === 'needs_work' ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30' : 'bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/30'"
+                  >
+                    {{ w.word }}
+                  </span>
+                  <span class="text-text-muted group-hover:text-text leading-relaxed flex-1">
+                    {{ w.tip || "Ajuste a pronúncia desta palavra." }}
+                  </span>
+                  <span class="text-[0.65rem] text-primary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    Ver detalhe →
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- General Feedback -->
+          <div v-if="result.feedback" class="bg-surface border border-border rounded-2xl p-4">
+            <div class="flex items-start gap-3">
+              <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5 text-primary">
+                <Sparkles :size="16" />
+              </div>
+              <div>
+                <p class="text-xs text-text-subtle font-semibold uppercase tracking-wider mb-0.5">General Feedback</p>
+                <p class="text-sm text-text leading-relaxed italic">&ldquo;{{ result.feedback }}&rdquo;</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Word-by-Word Breakdown Badges -->
+          <div v-if="result.words && result.words.length > 0">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-xs font-bold text-text-subtle uppercase tracking-wider">Word-by-Word</h3>
+              <span class="text-[0.65rem] text-text-muted">Toque na palavra para ver a dica</span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="(w, i) in result.words"
+                :key="i"
+                type="button"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-sm"
+                :class="getWordBadgeClass(w.accuracy)"
+                @click="selectedWord = w"
+              >
+                <span class="font-bold">{{ w.word }}</span>
+                <span class="text-[0.65rem] opacity-75 font-sans">{{ Math.round(w.score) }}%</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Word Detail Modal -->
+    <div
+      v-if="selectedWord"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs"
+      @click.self="selectedWord = null"
+    >
+      <div class="w-full max-w-sm rounded-3xl border border-border bg-surface p-6 shadow-2xl space-y-4">
+        <div class="flex items-center justify-between border-b border-border pb-3">
+          <div class="flex items-center gap-2">
+            <h3 class="text-lg font-bold font-mono text-text">&ldquo;{{ selectedWord.word }}&rdquo;</h3>
+            <span
+              class="px-2 py-0.5 rounded text-[0.7rem] font-bold"
+              :class="selectedWord.accuracy === 'correct' ? 'bg-emerald-500/10 text-emerald-600' : selectedWord.accuracy === 'needs_work' ? 'bg-amber-500/10 text-amber-600' : 'bg-rose-500/10 text-rose-600'"
+            >
+              {{ Math.round(selectedWord.score) }}%
+            </span>
+          </div>
           <button
             type="button"
-            class="p-1 rounded-lg text-muted hover:text-ink cursor-pointer"
+            class="p-1 rounded-lg text-text-muted hover:text-text cursor-pointer"
             @click="selectedWord = null"
           >
-            <X :size="16" />
+            <X :size="18" />
           </button>
         </div>
 
-        <!-- Teacher Feedback / Pedagogical Tip -->
-        <div v-if="result.feedback || result.pedagogical_tip" class="p-4 rounded-2xl border border-line bg-bgSecondary flex flex-col gap-2">
-          <div class="flex items-center gap-1.5 text-xs font-bold text-primary">
-            <Sparkles :size="15" />
-            <span>Feedback da Teacher Tati</span>
-          </div>
-          <p v-if="result.feedback" class="text-xs sm:text-sm text-ink leading-relaxed">
-            {{ result.feedback }}
-          </p>
-          <p v-if="result.pedagogical_tip" class="text-xs text-muted leading-relaxed italic border-t border-line/60 pt-2">
-            📌 {{ result.pedagogical_tip }}
-          </p>
-        </div>
+        <p v-if="selectedWord.tip" class="text-sm text-text leading-relaxed">
+          💡 {{ selectedWord.tip }}
+        </p>
+        <p v-else class="text-sm text-text-muted">
+          Pronúncia correspondente aos padrões do sotaque {{ currentAccentObj.label }}.
+        </p>
 
-        <!-- Try Again / Next buttons -->
-        <div class="flex items-center justify-end gap-3 pt-2">
+        <div class="pt-2 flex justify-end">
           <button
             type="button"
-            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-line bg-surface text-ink text-xs font-semibold hover:bg-bgSecondary transition cursor-pointer"
-            @click="startRecording"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary-hover transition cursor-pointer"
+            @click="playWordAudio(selectedWord.word)"
           >
-            <RotateCcw :size="14" />
-            Tentar novamente
-          </button>
-
-          <button
-            v-if="inputMode === 'preset'"
-            type="button"
-            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primaryHover transition cursor-pointer"
-            @click="nextSentence"
-          >
-            Próxima frase
-            <ChevronRight :size="14" />
+            <Volume2 :size="14" />
+            <span>{{ isPlayingWord === selectedWord.word ? 'Reproduzindo...' : 'Ouvir palavra' }}</span>
           </button>
         </div>
-      </section>
-    </main>
+      </div>
+    </div>
 
     <!-- Accent Selection Modal -->
     <div
@@ -814,22 +1053,22 @@ onUnmounted(() => {
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs"
       @click.self="isAccentModalOpen = false"
     >
-      <div class="w-full max-w-sm rounded-3xl border border-line bg-surface p-5 shadow-2xl space-y-4">
-        <div class="flex items-center justify-between border-b border-line pb-3">
+      <div class="w-full max-w-sm rounded-3xl border border-border bg-surface p-5 shadow-2xl space-y-4">
+        <div class="flex items-center justify-between border-b border-border pb-3">
           <div class="flex items-center gap-2">
             <Globe :size="18" class="text-primary" />
-            <h3 class="text-base font-bold text-ink">Sotaque da Teacher Tati</h3>
+            <h3 class="text-base font-bold text-text">Sotaque da Teacher Tati</h3>
           </div>
           <button
             type="button"
-            class="p-1 rounded-lg text-muted hover:text-ink cursor-pointer"
+            class="p-1 rounded-lg text-text-muted hover:text-text cursor-pointer"
             @click="isAccentModalOpen = false"
           >
             <X :size="18" />
           </button>
         </div>
 
-        <p class="text-xs text-muted">
+        <p class="text-xs text-text-muted">
           Escolha qual variação da língua inglesa você gostaria de treinar na escuta e pronúncia:
         </p>
 
@@ -839,7 +1078,7 @@ onUnmounted(() => {
             :key="acc.id"
             type="button"
             class="flex items-center justify-between p-3 rounded-2xl border text-xs font-semibold transition cursor-pointer"
-            :class="selectedAccent === acc.id ? 'border-primary bg-primarySoft text-primary' : 'border-line bg-surface hover:bg-bgSecondary text-ink'"
+            :class="selectedAccent === acc.id ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-surface hover:bg-bg-secondary text-text'"
             @click="handleSelectAccent(acc.id)"
           >
             <div class="flex items-center gap-2.5">

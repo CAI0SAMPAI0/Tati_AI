@@ -93,7 +93,7 @@ async function loadConversations() {
       const queryConvId = (route.query.conv_id || route.query.id) as string;
       const lastSavedId = sessionStorage.getItem('tati_last_chat_conv_id');
       const targetId =
-        queryConvId && data.some((c) => c.id === queryConvId)
+        queryConvId
           ? queryConvId
           : lastSavedId && data.some((c) => c.id === lastSavedId)
             ? lastSavedId
@@ -243,50 +243,38 @@ async function deleteAllConversations() {
   }
 }
 
-// Send user message
-async function handleSendMessage(content: string) {
-  if (!content.trim() || isSending.value) return;
-
+// Internal assistant requester
+async function sendToAssistant(textPrompt: string) {
+  isSending.value = true;
   let currentId = activeConvId.value;
 
-  // If starting new conversation
-  if (!currentId) {
-    try {
-      const newRes = await fetch('/chat/conversations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authStore.token}`,
-        },
-        body: JSON.stringify({
-          title: content.slice(0, 30) || 'Conversation with Teacher Tati',
-        }),
-      });
-      if (newRes.ok) {
-        const newConv = await newRes.json();
-        currentId = newConv.id;
-        activeConvId.value = newConv.id;
-        sessionStorage.setItem('tati_last_chat_conv_id', newConv.id);
-        conversations.value.unshift(newConv);
-        router.replace({ query: { conv_id: newConv.id } });
-      }
-    } catch (err) {
-      console.error('Failed to create new conversation:', err);
-    }
-  }
-
-  const userMsg: ChatMessage = {
-    id: `user-${Date.now()}`,
-    role: 'user',
-    content,
-    created_at: new Date().toISOString(),
-  };
-
-  messages.value.push(userMsg);
-  await scrollToBottom();
-
-  isSending.value = true;
   try {
+    // If starting new conversation
+    if (!currentId) {
+      try {
+        const newRes = await fetch('/chat/conversations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${authStore.token}`,
+          },
+          body: JSON.stringify({
+            title: textPrompt.slice(0, 30) || 'Conversation with Teacher Tati',
+          }),
+        });
+        if (newRes.ok) {
+          const newConv = await newRes.json();
+          currentId = newConv.id;
+          activeConvId.value = newConv.id;
+          sessionStorage.setItem('tati_last_chat_conv_id', newConv.id);
+          conversations.value.unshift(newConv);
+          router.replace({ query: { conv_id: newConv.id } });
+        }
+      } catch (err) {
+        console.error('Failed to create new conversation:', err);
+      }
+    }
+
     const accent = getStoredAccent();
     const res = await fetch('/chat/message', {
       method: 'POST',
@@ -296,7 +284,7 @@ async function handleSendMessage(content: string) {
       },
       body: JSON.stringify({
         conversation_id: currentId,
-        message: content,
+        message: textPrompt,
         accent,
       }),
     });
@@ -311,6 +299,7 @@ async function handleSendMessage(content: string) {
         created_at: new Date().toISOString(),
       };
       messages.value.push(assistantMsg);
+      await nextTick();
       await scrollToBottom();
 
       // Refresh conversations list in case title was updated
@@ -331,15 +320,49 @@ async function handleSendMessage(content: string) {
     });
   } finally {
     isSending.value = false;
+    await nextTick();
     await scrollToBottom();
   }
+}
+
+// Send user message: appears instantly, then starts AI typing indicator
+async function handleSendMessage(content: string) {
+  if (!content.trim() || isSending.value) return;
+
+  const userMsg: ChatMessage = {
+    id: `user-${Date.now()}`,
+    role: 'user',
+    content,
+    created_at: new Date().toISOString(),
+  };
+
+  // 1. Immediately appears in UI
+  messages.value.push(userMsg);
+  await nextTick();
+  await scrollToBottom();
+
+  // 2. Starts assistant generation
+  await sendToAssistant(content);
 }
 
 // Send audio message recorded from ChatInput
 async function handleSendAudio(base64: string) {
   if (isSending.value) return;
-  isSending.value = true;
 
+  // 1. Show audio placeholder message immediately with transcribing label
+  const tempAudioMsg: ChatMessage = {
+    id: `user-audio-${Date.now()}`,
+    role: 'user',
+    content: '🎙 Transcribing audio...',
+    audio_b64: base64,
+    created_at: new Date().toISOString(),
+  };
+  messages.value.push(tempAudioMsg);
+  await nextTick();
+  await scrollToBottom();
+
+  // 2. Call transcribe without triggering AI dots yet
+  let transcription = '';
   try {
     const trRes = await fetch('/chat/transcribe', {
       method: 'POST',
@@ -352,20 +375,23 @@ async function handleSendAudio(base64: string) {
 
     if (trRes.ok) {
       const trData = await trRes.json();
-      const transcription = trData.transcription || trData.text;
-      if (transcription) {
-        isSending.value = false;
-        await handleSendMessage(transcription);
-        return;
-      }
+      transcription = trData.transcription || trData.text || '';
     }
-
-    isSending.value = false;
-    await handleSendMessage('🎙 [Voice Message]');
   } catch (err) {
     console.error('Audio message send error:', err);
-    isSending.value = false;
   }
+
+  if (!transcription) {
+    transcription = '🎙 [Voice Message]';
+  }
+
+  // 3. Update the user message text with transcription
+  tempAudioMsg.content = transcription;
+  await nextTick();
+  await scrollToBottom();
+
+  // 4. Send to assistant (triggers AI typing indicator only now and only once)
+  await sendToAssistant(transcription);
 }
 
 onMounted(() => {
