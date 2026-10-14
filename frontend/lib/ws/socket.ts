@@ -33,7 +33,7 @@ export class TatiWebSocket {
     }
     
     try {
-      this.ws = new WebSocket(finalUrl, ['access_token', token]);
+      this.ws = new WebSocket(finalUrl);
     } catch (e) {
       console.error('Failed to create WebSocket:', e);
       return;
@@ -78,6 +78,9 @@ export class TatiWebSocket {
 
   waitUntilOpen(timeoutMs = 6000): Promise<void> {
     if (this.ws?.readyState === WebSocket.OPEN) return Promise.resolve();
+    if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
+      this.connect();
+    }
     return new Promise((resolve, reject) => {
       const start = Date.now();
       const timer = setInterval(() => {
@@ -90,7 +93,7 @@ export class TatiWebSocket {
           clearInterval(timer);
           reject(new Error('WebSocket timeout'));
         }
-      }, 120);
+      }, 100);
     });
   }
 

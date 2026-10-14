@@ -344,7 +344,10 @@ class AudioService:
 
         try:
             models_to_try = [
-                os.getenv("GEMINI_AUDIO_MODEL", "gemini-3.8-flash"),
+                os.getenv("GEMINI_AUDIO_MODEL", "gemini-2.5-flash"),
+                "gemini-2.5-flash",
+                "gemini-2.0-flash",
+                "gemini-1.5-flash",
                 "gemini-3.8-flash",
                 "gemini-3.5-flash",
             ]
@@ -463,7 +466,7 @@ class AudioService:
             if "," in audio_data:
                 audio_data = audio_data.split(",")[-1]
             try:
-                audio_bytes = base64.b64decode(audio_data, validate=True)
+                audio_bytes = base64.b64decode(audio_data.strip(), validate=False)
             except Exception as e:
                 logger.error(f"[AudioService] Erro ao decodificar base64: {e}")
                 return ""
@@ -490,8 +493,7 @@ class AudioService:
             b"\xff\xf9",
         )
         if not (audio_bytes.startswith(known_audio_headers) or b"ftyp" in audio_bytes[:16]):
-            logger.warning("[AudioService] Áudio rejeitado por formato inválido")
-            return ""
+            logger.info(f"[AudioService] Formato com cabeçalho incomum ({audio_bytes[:8]!r}), tentando transcrever...")
 
         provider = os.getenv("STT_PROVIDER", "whisper").lower()
 

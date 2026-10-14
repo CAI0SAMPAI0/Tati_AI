@@ -2758,16 +2758,18 @@ class SpeechService:
 
 
         # Prioriza modelos modernos ativos de alta performance e disponibilidade
-        env_model = os.getenv("GEMINI_AUDIO_MODEL", "gemini-3.5-flash-lite")
+        env_model = os.getenv("GEMINI_AUDIO_MODEL", "gemini-2.5-flash")
         models_to_try = [
             env_model,
-            "gemini-3.5-flash-lite",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "gemini-1.5-flash",
             "gemini-3.8-flash",
             "gemini-3.5-flash",
         ]
         unique_models = []
         for m in models_to_try:
-            if m and m not in unique_models and "2.5" not in m and "2.0" not in m and "1.5" not in m:
+            if m and m not in unique_models:
                 unique_models.append(m)
 
         for model in unique_models:
@@ -2782,10 +2784,13 @@ class SpeechService:
                     temperature=0.2,
                     response_mime_type="application/json",
                 )
-                resp = await client.aio.models.generate_content(
-                    model=model,
-                    contents=contents,
-                    config=config,
+                resp = await asyncio.wait_for(
+                    client.aio.models.generate_content(
+                        model=model,
+                        contents=contents,
+                        config=config,
+                    ),
+                    timeout=8.0,
                 )
 
                 if resp and resp.text:

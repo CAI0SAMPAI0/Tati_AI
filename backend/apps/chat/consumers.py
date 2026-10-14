@@ -30,11 +30,16 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
 
         # Verifica header sec-websocket-protocol
         subprotocols = self.scope.get("subprotocols", [])
+        if subprotocols:
+            if "access_token" in subprotocols:
+                subprotocol = "access_token"
+            elif len(subprotocols) > 0:
+                subprotocol = subprotocols[0]
+
         if not token and subprotocols:
             for p in subprotocols:
                 if p != "access_token":
                     token = p
-                    subprotocol = "access_token"
                     break
 
         if not token:
@@ -44,7 +49,8 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                 for p in parts:
                     if p != "access_token":
                         token = p
-                        subprotocol = "access_token"
+                        if not subprotocol:
+                            subprotocol = "access_token"
                         break
 
         payload = decode_token(token) if token else None
@@ -137,7 +143,12 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             from apps.chat.audio_service import AudioService
 
             raw_audio = content.get("audio") or ""
-            text_content = await AudioService.transcribe_audio_async(raw_audio)
+            try:
+                text_content = await AudioService.transcribe_audio_async(raw_audio)
+            except Exception as e:
+                logger.error(f"[ChatWS] Erro inesperado ao transcrever áudio: {e}")
+                text_content = ""
+
             if not text_content:
                 text_content = "(Áudio não compreendido)"
 

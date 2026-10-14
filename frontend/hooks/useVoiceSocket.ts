@@ -340,6 +340,22 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
       origin: 'voice',
       simulationId: simulationId || undefined,
       onMessage: handleMessage,
+      onClose: () => {
+        setState((curr) => {
+          if (curr === 'processing') {
+            setMessages((prev) =>
+              prev.filter(
+                (m) =>
+                  !m.id ||
+                  (!m.id.startsWith('voice-temp-') &&
+                    !m.id.startsWith('live-temp-'))
+              )
+            );
+            return 'idle';
+          }
+          return curr;
+        });
+      },
     });
 
     socketRef.current = ws;
@@ -373,6 +389,9 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
     } catch (e) {
       console.error('[VoiceSocket] Socket not ready:', e);
       setState('idle');
+      import('react-hot-toast').then(({ default: toast }) => {
+        toast.error('Erro de conexão ao enviar áudio. Reconectando...', { id: 'ws-voice-reconnect' });
+      });
       return;
     }
 

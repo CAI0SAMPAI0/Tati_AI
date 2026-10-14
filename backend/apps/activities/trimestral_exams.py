@@ -398,7 +398,7 @@ All "correct_answer" values MUST match one of the options exactly.
             gemini_key = getattr(settings, "GEMINI_API_KEY", None) or os.getenv("GEMINI_API_KEY")
             if gemini_key:
                 client = genai.Client(api_key=gemini_key.strip())
-                for g_model in ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash"]:
+                for g_model in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-3.8-flash", "gemini-3.5-flash"]:
                     try:
                         response = client.models.generate_content(
                             model=g_model,
