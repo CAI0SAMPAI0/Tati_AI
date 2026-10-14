@@ -18,6 +18,7 @@ import HistoryView from '@/views/HistoryView.vue';
 import ProfileView from '@/views/ProfileView.vue';
 import SettingsView from '@/views/SettingsView.vue';
 import ExamsView from '@/views/ExamsView.vue';
+import AtualizarView from '@/views/AtualizarView.vue';
 import { canAccessDashboard } from '@/utils/permissions';
 
 const routes = [
@@ -56,6 +57,11 @@ const routes = [
   {
     path: '/politica-de-privacidade',
     redirect: '/privacy',
+  },
+  {
+    path: '/atualizar',
+    name: 'atualizar',
+    component: AtualizarView,
   },
   {
     path: '/chat',
