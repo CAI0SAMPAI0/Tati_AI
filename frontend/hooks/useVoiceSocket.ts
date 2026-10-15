@@ -16,8 +16,9 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
   const [lastAudio, setLastAudio] = useState<string | null>(null);
   const [transcription, setTranscription] = useState('');
   const socketRef = useRef<TatiWebSocket | null>(null);
-  const [activeConvId, setActiveConvId] = useState<string | null>(conversationId)
+  const [activeConvId, setActiveConvId] = useState<string | null>(conversationId);
   const convIdRef = useRef<string | null>(conversationId);
+  const pendingAudioWsRef = useRef<(() => void) | null>(null);
 
   // Sync ref with state
   useEffect(() => {
@@ -71,7 +72,8 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
     if (!convId || !history || history.length === 0) return;
 
     const lastMsg = history[history.length - 1];
-    if (lastMsg.role === 'user') {
+    const ageMs = Date.now() - new Date(lastMsg.created_at).getTime();
+    if (lastMsg.role === 'user' && !isNaN(ageMs) && ageMs < 30000) {
       setState('processing');
       let attempts = 0;
       const maxAttempts = 18;
@@ -213,19 +215,38 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
 
   const handleMessage = useCallback((msg: WsIncomingMessage) => {
     const currentId = convIdRef.current;
+    if (
+      msg.type === 'transcription' ||
+      msg.type === 'stream_start' ||
+      msg.type === 'audio_response' ||
+      msg.type === 'error'
+    ) {
+      if (pendingAudioWsRef.current) {
+        pendingAudioWsRef.current();
+        pendingAudioWsRef.current = null;
+      }
+    }
+
     switch (msg.type) {
       case 'transcription':
         if (msg.text) {
           setState('processing');
           setTranscription(msg.text);
           setMessages((prev) => {
-            // Remove apenas as mensagens que EXPLICITAMENTE começam com o prefixo temporário
-            // Mensagens sem ID ou com IDs normais são mantidas
-            const tempMsg = prev.find(m => m.id && typeof m.id === 'string' && (m.id.startsWith('voice-temp-') || m.id.startsWith('live-temp-')));
+            const tempMsg = prev.find(
+              (m) =>
+                m.id &&
+                typeof m.id === 'string' &&
+                (m.id.startsWith('voice-temp-') || m.id.startsWith('live-temp-'))
+            );
             const prevAudio = tempMsg?.audio_b64;
 
-            const filtered = prev.filter(m => {
-              if (m.id && typeof m.id === 'string' && (m.id.startsWith('voice-temp-') || m.id.startsWith('live-temp-'))) {
+            const filtered = prev.filter((m) => {
+              if (
+                m.id &&
+                typeof m.id === 'string' &&
+                (m.id.startsWith('voice-temp-') || m.id.startsWith('live-temp-'))
+              ) {
                 return false;
               }
               if (m.role === 'user' && m.content?.includes('Transcribing')) {
@@ -261,13 +282,16 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
               const updated = { ...last, content: last.content + tokenContent };
               return [...prev.slice(0, -1), updated];
             }
-            return [...prev, {
-              id: `ai-${Date.now()}`,
-              conversation_id: currentId || '',
-              role: 'assistant',
-              content: tokenContent,
-              created_at: new Date().toISOString(),
-            }];
+            return [
+              ...prev,
+              {
+                id: `ai-${Date.now()}`,
+                conversation_id: currentId || '',
+                role: 'assistant',
+                content: tokenContent,
+                created_at: new Date().toISOString(),
+              },
+            ];
           });
         }
         break;
@@ -286,16 +310,22 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
                 if (last.content === msg.content) {
                   return [...prev.slice(0, -1), { ...last, audio_b64: msg.audio }];
                 }
-                return [...prev.slice(0, -1), { ...last, content: msg.content || '', audio_b64: msg.audio }];
+                return [
+                  ...prev.slice(0, -1),
+                  { ...last, content: msg.content || '', audio_b64: msg.audio },
+                ];
               }
-              return [...prev, {
-                id: `ai-${Date.now()}`,
-                conversation_id: currentId || '',
-                role: 'assistant',
-                content: msg.content || '',
-                created_at: new Date().toISOString(),
-                audio_b64: msg.audio
-              }];
+              return [
+                ...prev,
+                {
+                  id: `ai-${Date.now()}`,
+                  conversation_id: currentId || '',
+                  role: 'assistant',
+                  content: msg.content || '',
+                  created_at: new Date().toISOString(),
+                  audio_b64: msg.audio,
+                },
+              ];
             });
           }
         }
@@ -311,20 +341,36 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
         if (msg.title) {
           const targetConvId = msg.conversation_id || currentId;
           try {
-            window.dispatchEvent(new CustomEvent('tati_chat_title_updated', {
-              detail: { conversation_id: targetConvId, title: msg.title }
-            }));
+            window.dispatchEvent(
+              new CustomEvent('tati_chat_title_updated', {
+                detail: { conversation_id: targetConvId, title: msg.title },
+              })
+            );
           } catch (_) {}
         }
         break;
 
       case 'stream_end':
-        setMessages((prev) => prev.filter(m => !m.id || !m.id.startsWith('voice-temp-')));
-        // O estado permanece em 'processing' até que 'audio_response' chegue com o áudio falado
+        setMessages((prev) =>
+          prev.filter(
+            (m) =>
+              !m.id ||
+              (!m.id.startsWith('voice-temp-') &&
+                !m.id.startsWith('live-temp-'))
+          )
+        );
         break;
 
       case 'error':
-        setMessages((prev) => prev.filter(m => !m.id || !m.id.startsWith('voice-temp-')));
+        setMessages((prev) =>
+          prev.filter(
+            (m) =>
+              !m.id ||
+              (!m.id.startsWith('voice-temp-') &&
+                !m.id.startsWith('live-temp-') &&
+                !m.content?.includes('Transcribing'))
+          )
+        );
         setState('idle');
         console.error('Voice WS Error:', msg.message);
         break;
@@ -332,7 +378,6 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
   }, []);
 
   // Re-conecta o WebSocket sempre que o token ou a função de mensagem mudar
-  // Agora handleMessage é estável, então só reconecta se simulationId mudar ou token
   useEffect(() => {
     if (!token) return;
 
@@ -341,6 +386,10 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
       simulationId: simulationId || undefined,
       onMessage: handleMessage,
       onClose: () => {
+        if (pendingAudioWsRef.current) {
+          pendingAudioWsRef.current();
+          pendingAudioWsRef.current = null;
+        }
         setState((curr) => {
           if (curr === 'processing') {
             setMessages((prev) =>
@@ -348,7 +397,8 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
                 (m) =>
                   !m.id ||
                   (!m.id.startsWith('voice-temp-') &&
-                    !m.id.startsWith('live-temp-'))
+                    !m.id.startsWith('live-temp-') &&
+                    !m.content?.includes('Transcribing'))
               )
             );
             return 'idle';
@@ -366,99 +416,326 @@ export function useVoiceSocket(conversationId: string | null, simulationId?: str
     };
   }, [token, handleMessage, simulationId]);
 
-  const sendAudio = useCallback(async (base64: string, accent?: string) => {
-    if (!socketRef.current || !base64 || !base64.trim()) {
-      console.warn('[VoiceSocket] sendAudio ignorado: base64 vazio ou socket ausente');
-      setState('idle');
-      return;
-    }
+  // Robust HTTP Fallback for sending audio
+  const sendAudioHttp = useCallback(
+    async (base64: string, convId: string, accent?: string, tempId?: string) => {
+      const activeTempId = tempId || `voice-temp-${Date.now()}`;
+      const resolvedAccent =
+        accent ||
+        (typeof window !== 'undefined'
+          ? localStorage.getItem('tati_voice_accent') || 'en-US'
+          : 'en-US');
 
-    // Garante que tem uma conversationId antes de enviar
-    let convId = convIdRef.current;
-    if (!convId) {
-      convId = await ensureConversation();
-      if (!convId) {
-        console.error('[VoiceSocket] Não foi possível criar conversa');
+      setState('processing');
+
+      // 1. Transcribe via POST /chat/transcribe
+      let transcribedText = '';
+      try {
+        const { apiPost } = await import('@/lib/api/client');
+        const trRes = await apiPost<{ text?: string; transcription?: string }>(
+          '/chat/transcribe',
+          { audio: base64 }
+        );
+        if (trRes.ok && trRes.data) {
+          transcribedText = (
+            trRes.data.transcription ||
+            trRes.data.text ||
+            ''
+          ).trim();
+        }
+      } catch (err) {
+        console.error('[VoiceSocket] HTTP Transcribe error:', err);
+      }
+
+      if (!transcribedText) {
+        // Clean up temp message and reset state
+        setMessages((prev) => prev.filter((m) => m.id !== activeTempId));
+        setState('idle');
+        import('react-hot-toast').then(({ default: toast }) => {
+          toast.error('Could not understand audio. Please speak clearly and try again.', {
+            id: 'voice-stt-empty',
+          });
+        });
+        return;
+      }
+
+      // Update the temporary message with the recognized transcription
+      setTranscription(transcribedText);
+      setMessages((prev) => {
+        const exists = prev.find((m) => m.id === activeTempId);
+        if (exists) {
+          return prev.map((m) =>
+            m.id === activeTempId
+              ? {
+                  ...m,
+                  id: `user-${Date.now()}`,
+                  content: transcribedText,
+                }
+              : m
+          );
+        }
+        return [
+          ...prev,
+          {
+            id: `user-${Date.now()}`,
+            conversation_id: convId,
+            role: 'user',
+            content: transcribedText,
+            audio_b64: base64,
+            created_at: new Date().toISOString(),
+          },
+        ];
+      });
+
+      // 2. Send message & get neural reply with accent via POST /chat/message
+      try {
+        const { apiPost } = await import('@/lib/api/client');
+        const replyRes = await apiPost<{
+          reply?: string;
+          content?: string;
+          audio?: string;
+          audio_b64?: string;
+          completed_objectives?: string[];
+        }>('/chat/message', {
+          conversation_id: convId,
+          message: transcribedText,
+          accent: resolvedAccent,
+          origin: 'voice',
+          user_audio_b64: base64,
+        });
+
+        if (replyRes.ok && replyRes.data) {
+          const replyText =
+            replyRes.data.reply || replyRes.data.content || '';
+          const replyAudio =
+            replyRes.data.audio_b64 || replyRes.data.audio || '';
+          if (replyRes.data.completed_objectives) {
+            setCompletedObjectives(replyRes.data.completed_objectives);
+          }
+
+          const aiMsg: Message = {
+            id: `ai-${Date.now()}`,
+            conversation_id: convId,
+            role: 'assistant',
+            content: replyText,
+            audio_b64: replyAudio,
+            created_at: new Date().toISOString(),
+          };
+
+          setMessages((prev) => [...prev, aiMsg]);
+
+          if (replyAudio) {
+            setLastAudio(replyAudio);
+            setState('speaking');
+          } else {
+            setState('idle');
+          }
+        } else {
+          setState('idle');
+        }
+      } catch (err) {
+        console.error('[VoiceSocket] HTTP Reply error:', err);
+        setState('idle');
+      }
+    },
+    []
+  );
+
+  // Robust HTTP Fallback for sending text
+  const sendMessageHttp = useCallback(
+    async (text: string, convId: string, accent?: string) => {
+      const resolvedAccent =
+        accent ||
+        (typeof window !== 'undefined'
+          ? localStorage.getItem('tati_voice_accent') || 'en-US'
+          : 'en-US');
+      setState('processing');
+      try {
+        const { apiPost } = await import('@/lib/api/client');
+        const replyRes = await apiPost<{
+          reply?: string;
+          content?: string;
+          audio?: string;
+          audio_b64?: string;
+          completed_objectives?: string[];
+        }>('/chat/message', {
+          conversation_id: convId,
+          message: text,
+          accent: resolvedAccent,
+          origin: 'voice',
+        });
+        if (replyRes.ok && replyRes.data) {
+          const replyText =
+            replyRes.data.reply || replyRes.data.content || '';
+          const replyAudio =
+            replyRes.data.audio_b64 || replyRes.data.audio || '';
+          if (replyRes.data.completed_objectives) {
+            setCompletedObjectives(replyRes.data.completed_objectives);
+          }
+          const aiMsg: Message = {
+            id: `ai-${Date.now()}`,
+            conversation_id: convId,
+            role: 'assistant',
+            content: replyText,
+            audio_b64: replyAudio,
+            created_at: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, aiMsg]);
+          if (replyAudio) {
+            setLastAudio(replyAudio);
+            setState('speaking');
+          } else {
+            setState('idle');
+          }
+        } else {
+          setState('idle');
+        }
+      } catch (err) {
+        console.error('[VoiceSocket] HTTP send message error:', err);
+        setState('idle');
+      }
+    },
+    []
+  );
+
+  const sendAudio = useCallback(
+    async (base64: string, accent?: string) => {
+      if (!base64 || !base64.trim()) {
+        console.warn('[VoiceSocket] sendAudio ignorado: base64 vazio');
         setState('idle');
         return;
       }
-    }
 
-    try {
-      await socketRef.current.waitUntilOpen();
-    } catch (e) {
-      console.error('[VoiceSocket] Socket not ready:', e);
-      setState('idle');
-      import('react-hot-toast').then(({ default: toast }) => {
-        toast.error('Erro de conexão ao enviar áudio. Reconectando...', { id: 'ws-voice-reconnect' });
-      });
-      return;
-    }
-
-    setState('processing');
-
-    // Add optimistic user message indicating transcription in progress
-    const tempUserMsg: Message = {
-      id: `voice-temp-${Date.now()}`,
-      conversation_id: convId,
-      role: 'user',
-      content: '🎙 Transcribing...',
-      audio_b64: base64,
-      created_at: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, tempUserMsg]);
-
-    const msg: WsOutgoingMessage = {
-      type: 'audio',
-      audio: base64,
-      conversation_id: convId,
-      origin: 'voice',
-      accent: accent || (typeof window !== 'undefined' ? localStorage.getItem('tati_voice_accent') || 'en-US' : 'en-US'),
-    } as any;
-    socketRef.current.send(msg);
-  }, [ensureConversation]);
-
-  const sendMessage = useCallback(async (text: string, accent?: string) => {
-    if (!socketRef.current) return;
-
-    let convId = convIdRef.current;
-    if (!convId) {
-      convId = await ensureConversation();
+      let convId = convIdRef.current;
       if (!convId) {
-        console.error('[VoiceSocket] Could not create conversation');
+        convId = await ensureConversation();
+        if (!convId) {
+          console.error('[VoiceSocket] Não foi possível criar conversa');
+          setState('idle');
+          return;
+        }
+      }
+
+      setState('processing');
+
+      const tempId = `voice-temp-${Date.now()}`;
+      const tempUserMsg: Message = {
+        id: tempId,
+        conversation_id: convId,
+        role: 'user',
+        content: '🎙 Transcribing...',
+        audio_b64: base64,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, tempUserMsg]);
+
+      // Check if WebSocket is open and connected
+      let isWsOpen = false;
+      try {
+        if (socketRef.current) {
+          await socketRef.current.waitUntilOpen(2000);
+          isWsOpen = true;
+        }
+      } catch (_) {
+        isWsOpen = false;
+      }
+
+      if (!isWsOpen) {
+        console.log('[VoiceSocket] WebSocket unavailable, falling back to HTTP REST');
+        await sendAudioHttp(base64, convId, accent, tempId);
         return;
       }
-    }
 
-    try {
-      await socketRef.current.waitUntilOpen();
-    } catch (e) {
-      console.error('[VoiceSocket] Socket not ready for text message:', e);
-      return;
-    }
+      // WebSocket is connected, attempt WS send with watchdog fallback
+      let answered = false;
+      const wsWatchdog = setTimeout(async () => {
+        if (!answered) {
+          console.warn('[VoiceSocket] WebSocket transcription timed out after 6s. Falling back to HTTP REST...');
+          await sendAudioHttp(base64, convId!, accent, tempId);
+        }
+      }, 6000);
 
-    setState('processing');
+      pendingAudioWsRef.current = () => {
+        answered = true;
+        clearTimeout(wsWatchdog);
+      };
 
-    const userMsg: Message = {
-      id: `user-${Date.now()}`,
-      conversation_id: convId,
-      role: 'user',
-      content: text,
-      created_at: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
+      try {
+        const msg: WsOutgoingMessage = {
+          type: 'audio',
+          audio: base64,
+          conversation_id: convId,
+          origin: 'voice',
+          accent:
+            accent ||
+            (typeof window !== 'undefined'
+              ? localStorage.getItem('tati_voice_accent') || 'en-US'
+              : 'en-US'),
+        } as any;
+        socketRef.current?.send(msg);
+      } catch (e) {
+        clearTimeout(wsWatchdog);
+        console.error('[VoiceSocket] WS send error, falling back to HTTP:', e);
+        await sendAudioHttp(base64, convId, accent, tempId);
+      }
+    },
+    [ensureConversation, sendAudioHttp]
+  );
 
-    const resolvedAccent = accent || (typeof window !== 'undefined' ? localStorage.getItem('tati_voice_accent') || 'en-US' : 'en-US');
+  const sendMessage = useCallback(
+    async (text: string, accent?: string) => {
+      let convId = convIdRef.current;
+      if (!convId) {
+        convId = await ensureConversation();
+        if (!convId) {
+          console.error('[VoiceSocket] Could not create conversation');
+          return;
+        }
+      }
 
-    const msg: WsOutgoingMessage = {
-      type: 'text',
-      content: text,
-      conversation_id: convId,
-      origin: 'voice',
-      accent: resolvedAccent,
-    } as any;
-    socketRef.current.send(msg);
-  }, [ensureConversation]);
+      setState('processing');
+
+      const userMsg: Message = {
+        id: `user-${Date.now()}`,
+        conversation_id: convId,
+        role: 'user',
+        content: text,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, userMsg]);
+
+      let isWsOpen = false;
+      try {
+        if (socketRef.current) {
+          await socketRef.current.waitUntilOpen(2000);
+          isWsOpen = true;
+        }
+      } catch (_) {
+        isWsOpen = false;
+      }
+
+      if (!isWsOpen) {
+        await sendMessageHttp(text, convId, accent);
+        return;
+      }
+
+      const resolvedAccent =
+        accent ||
+        (typeof window !== 'undefined'
+          ? localStorage.getItem('tati_voice_accent') || 'en-US'
+          : 'en-US');
+
+      const msg: WsOutgoingMessage = {
+        type: 'text',
+        content: text,
+        conversation_id: convId,
+        origin: 'voice',
+        accent: resolvedAccent,
+      } as any;
+      socketRef.current?.send(msg);
+    },
+    [ensureConversation, sendMessageHttp]
+  );
 
   return {
     messages,

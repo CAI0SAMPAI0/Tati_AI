@@ -27,6 +27,8 @@ class AuthService:
         phone_val = getattr(user, "phone", None) or prof.get("whatsapp_number") or ""
         if phone_val:
             prof["whatsapp_number"] = phone_val
+        allow_wa = prof.get("allow_whatsapp_notifications", False)
+        resp_email = prof.get("responsible_email", "")
         focus = (
             prof.get("focus") or getattr(user, "focus", None) or "General Conversation"
         )
@@ -46,6 +48,9 @@ class AuthService:
             focus=focus,
             occupation=occupation,
             phone=phone_val or None,
+            whatsapp_number=phone_val or None,
+            allow_whatsapp_notifications=bool(allow_wa),
+            responsible_email=resp_email or None,
             profile=prof,
             streak_count=user.streak_count,
             total_xp=user.total_xp,
@@ -114,13 +119,19 @@ class AuthService:
             user.temp_password = None
             user.save(update_fields=["temp_password"])
 
-        # Auto-promove para programador se configurado em SUPERADMIN_EMAILS
-        superadmins = getattr(settings, "SUPERADMIN_EMAILS", [])
-        programmers = getattr(settings, "PROGRAMMER_USERNAMES", [])
-        if user.email.lower() in superadmins or user.username.lower() in programmers:
-            if user.role != UserRole.PROGRAMADOR:
-                user.role = UserRole.PROGRAMADOR
+        # Garante papel estrito de student para caio.sampaio
+        if user.username == "caio.sampaio":
+            if user.role != UserRole.STUDENT:
+                user.role = UserRole.STUDENT
                 user.save(update_fields=["role"])
+        else:
+            # Auto-promove para programador se configurado em SUPERADMIN_EMAILS
+            superadmins = getattr(settings, "SUPERADMIN_EMAILS", [])
+            programmers = getattr(settings, "PROGRAMMER_USERNAMES", [])
+            if user.email.lower() in superadmins or user.username.lower() in programmers:
+                if user.role != UserRole.PROGRAMADOR:
+                    user.role = UserRole.PROGRAMADOR
+                    user.save(update_fields=["role"])
 
         return cls.build_token_response(user)
 

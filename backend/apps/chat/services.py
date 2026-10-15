@@ -330,6 +330,11 @@ Fatos e tópicos anteriores que você lembra sobre este aluno (use naturalmente 
         except Exception as e:
             logger.debug(f"[RAG] Context retrieval error: {e}")
 
+    frontend_raw = getattr(settings, "FRONTEND_URL", "") or os.getenv("FRONTEND_URL", "") or "tati-ai.vercel.app"
+    frontend_host = frontend_raw.replace("https://", "").replace("http://", "").rstrip("/")
+    if not frontend_host:
+        frontend_host = "tati-ai.vercel.app"
+
     prompt = PromptManager.get_prompt(
         "tati_system_prompt",
         name=name,
@@ -339,6 +344,7 @@ Fatos e tópicos anteriores que você lembra sobre este aluno (use naturalmente 
         correction_guidelines=correction_guidelines,
         rag_context_section=rag_context_section,
         memory_section=memory_section,
+        url=frontend_host,
     )
     if not prompt:
         prompt = f"You are Tatiana Duarte (Teacher Tati) talking with {name} at CEFR Level {level}. {level_guidelines}\n{memory_section}"
@@ -404,7 +410,7 @@ def get_groq_keys() -> List[str]:
 class ConversationService:
     @staticmethod
     def list_conversations(user: User) -> List[ConversationOut]:
-        convs = Conversation.objects.filter(username=user.username).only(
+        convs = Conversation.objects.filter(username=user.username).order_by("-updated_at").only(
             "id", "title", "model", "is_simulation", "created_at", "updated_at"
         )[:50]
         return [
@@ -464,6 +470,65 @@ class ConversationService:
             )
             for m in msgs
         ]
+
+    @staticmethod
+    def edit_message(
+        user: User,
+        conversation_id: str,
+        message_id: str,
+        new_content: str,
+        accent: Optional[str] = None,
+    ) -> dict:
+        conv = Conversation.objects.filter(id=conversation_id).first()
+        if not conv:
+            raise HttpError(404, "Conversa não encontrada.")
+        if conv.username != user.username and not getattr(user, "is_teacher", False) and not getattr(user, "is_staff", False):
+            raise HttpError(403, "Acesso não autorizado a esta conversa.")
+
+        try:
+            msg_uuid = uuid.UUID(str(message_id))
+            msg = Message.objects.filter(session_id=conversation_id, id=msg_uuid).first()
+        except (ValueError, TypeError):
+            msg = Message.objects.filter(session_id=conversation_id, id=message_id).first()
+
+        if not msg:
+            raise HttpError(404, "Mensagem não encontrada.")
+
+        if msg.username != user.username and not getattr(user, "is_teacher", False) and not getattr(user, "is_staff", False):
+            raise HttpError(403, "Apenas o autor pode editar esta mensagem.")
+
+        # 1. Atualiza a mensagem do aluno
+        msg.content = new_content
+        msg.save(update_fields=["content"])
+
+        # 2. Deleta as mensagens posteriores na conversa (incluindo a resposta anterior da IA)
+        Message.objects.filter(
+            session_id=conversation_id,
+            created_at__gt=msg.created_at,
+        ).delete()
+
+        # 3. Gera uma nova resposta contextualizada da Teacher Tati
+        reply_res = AIService.generate_reply(
+            user=user,
+            conversation_id=conversation_id,
+            user_text=new_content,
+            accent=accent,
+            skip_create_user_msg=True,
+        )
+
+        return {
+            "ok": True,
+            "user_message": {
+                "id": str(msg.id),
+                "session_id": msg.session_id,
+                "role": msg.role,
+                "content": msg.content,
+                "created_at": msg.created_at.isoformat() if msg.created_at else None,
+            },
+            "reply": reply_res.get("reply", ""),
+            "audio_b64": reply_res.get("audio_b64"),
+            "assistant_message_id": reply_res.get("id"),
+        }
 
     @staticmethod
     def delete_conversation(user: User, conversation_id: str) -> dict:
@@ -628,6 +693,7 @@ class AIService:
         on_token: Optional[Callable[[str], None]] = None,
         on_doc: Optional[Callable[[dict], None]] = None,
         user_audio_b64: Optional[str] = None,
+        skip_create_user_msg: bool = False,
     ) -> dict:
         # Verifica se esta conversa é uma sessão de nivelamento ativa
         from .leveling_service import LevelingService
@@ -661,14 +727,15 @@ class AIService:
         if conv and conv.username != user.username and not getattr(user, "is_teacher", False):
             raise HttpError(403, "Acesso não autorizado a esta conversa.")
 
-        # 1. Salva mensagem do usuário com áudio da voz (se houver)
-        Message.objects.create(
-            session_id=conversation_id,
-            username=user.username,
-            role="user",
-            content=clean_user_text or user_text,
-            audio_b64=user_audio_b64,
-        )
+        # 1. Salva mensagem do usuário com áudio da voz (se houver, e a menos que já tenha sido salva/editada)
+        if not skip_create_user_msg:
+            Message.objects.create(
+                session_id=conversation_id,
+                username=user.username,
+                role="user",
+                content=clean_user_text or user_text,
+                audio_b64=user_audio_b64,
+            )
 
         # 2. Constrói histórico com Compressão e Retenção de Dados
         memory_summary, active_dialog = build_conversation_context(conversation_id, max_recent=8)

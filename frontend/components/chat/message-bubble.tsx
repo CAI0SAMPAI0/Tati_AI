@@ -366,7 +366,7 @@ export const MessageBubble = React.memo(function MessageBubble({ message, isStre
             <>
               {isUser ? (
                 <div className="flex flex-col gap-2">
-                  {message.content?.includes('Transcribing') || message.id === 'user-audio-temp' ? (
+                  {(message.id === 'user-audio-temp' || (typeof message.id === 'string' && (message.id.startsWith('voice-temp-') || message.id.startsWith('live-temp-')))) ? (
                     <div className="flex items-center gap-2 py-0.5 text-white font-medium text-xs sm:text-sm">
                       <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
                       <span className="italic">Transcribing audio...</span>

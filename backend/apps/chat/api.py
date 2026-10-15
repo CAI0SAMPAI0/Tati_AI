@@ -11,6 +11,7 @@ from .schemas import (
     ConversationOut,
     CreateConversationInput,
     MessageOut,
+    EditMessageInput,
     SendMessageInput,
     PublicLevelingStartInput,
     PublicLevelingStepInput,
@@ -196,6 +197,28 @@ def get_messages(request: HttpRequest, conversation_id: str):
     return ConversationService.get_messages(request.auth, conversation_id)
 
 
+@chat_router.patch(
+    "/conversations/{conversation_id}/messages/{message_id}",
+    auth=auth_required,
+)
+def edit_message(
+    request: HttpRequest,
+    conversation_id: str,
+    message_id: str,
+    payload: EditMessageInput,
+):
+    """
+    Edita o conteúdo de uma mensagem enviada pelo usuário, apaga a resposta anterior e gera uma nova resposta da IA.
+    """
+    return ConversationService.edit_message(
+        request.auth,
+        conversation_id,
+        message_id,
+        payload.content,
+        accent=payload.accent,
+    )
+
+
 @chat_router.delete("/conversations/{conversation_id}", auth=auth_required)
 def delete_conversation(request: HttpRequest, conversation_id: str):
     """
@@ -236,6 +259,7 @@ async def send_chat_message(request: HttpRequest, payload: SendMessageInput):
         user_text=payload.message,
         difficulty=payload.current_difficulty,
         accent=getattr(payload, "accent", None),
+        user_audio_b64=getattr(payload, "user_audio_b64", None),
     )
     reply_text = res.get("reply") if isinstance(res, dict) else str(res)
     audio_b64 = res.get("audio_b64") if isinstance(res, dict) else ""
