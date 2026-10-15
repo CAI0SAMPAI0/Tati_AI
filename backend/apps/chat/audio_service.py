@@ -278,7 +278,7 @@ class AudioService:
                 return base64.b64encode(buf.getvalue()).decode()
         except Exception as e:
             logger.warning(
-                f"[AudioService] Erro no TTS com a voz '{voice}': {e}. Tentando fallback en-US-JennyNeural..."
+                f"[AudioService] Edge-TTS indisponível para voz '{voice}' ({e}). Acionando fallback..."
             )
             # 2. Tentativa secundária com voz padrão en-US-JennyNeural no Edge TTS
             if voice != "en-US-JennyNeural":
@@ -435,10 +435,13 @@ class AudioService:
                             "model": g_model,
                             "response_format": "text",
                             "temperature": 0.0,
-                            "language": "en",
                         }
                         if prompt:
                             create_kwargs["prompt"] = prompt
+                        else:
+                            create_kwargs["prompt"] = (
+                                "English and Brazilian Portuguese conversation practice. Verbatim transcription."
+                            )
 
                         resp = await asyncio.wait_for(
                             client.audio.transcriptions.create(**create_kwargs),

@@ -57,7 +57,24 @@ export async function saveMessagesLocal(conversationId: string, messages: Messag
         for (const key of existingKeys) {
           store.delete(key);
         }
-        messages.forEach((msg) => {
+        // Only persist real, finalized messages to local storage
+        const persistable = messages.filter((msg) => {
+          const idStr = String(msg.id || '');
+          if (
+            idStr.startsWith('voice-temp-') ||
+            idStr.startsWith('live-temp-') ||
+            idStr.startsWith('user-audio-temp') ||
+            idStr.startsWith('temp-')
+          ) {
+            return false;
+          }
+          if (msg.role === 'user' && msg.content && msg.content.includes('Transcribing')) {
+            return false;
+          }
+          return true;
+        });
+
+        persistable.forEach((msg) => {
           const item = {
             ...msg,
             conversation_id: conversationId,
@@ -85,7 +102,24 @@ export async function getMessagesLocal(conversationId: string): Promise<Message[
       const request = index.getAll(conversationId);
 
       request.onsuccess = () => {
-        const msgs = request.result as Message[];
+        let msgs = request.result as Message[];
+        // Filter out any stale temporary/transcribing messages that might have been saved in past sessions
+        msgs = msgs.filter((msg) => {
+          const idStr = String(msg.id || '');
+          if (
+            idStr.startsWith('voice-temp-') ||
+            idStr.startsWith('live-temp-') ||
+            idStr.startsWith('user-audio-temp') ||
+            idStr.startsWith('temp-')
+          ) {
+            return false;
+          }
+          if (msg.role === 'user' && msg.content && msg.content.includes('Transcribing')) {
+            return false;
+          }
+          return true;
+        });
+
         msgs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
         // Deduplicate messages by role + content, preferring real backend IDs over temporary IDs

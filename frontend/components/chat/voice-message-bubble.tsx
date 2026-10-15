@@ -120,10 +120,12 @@ export function VoiceMessageBubble({
     }
   };
 
-  const isTranscribing = isUser && (
-    message.content?.includes('Transcribing') ||
-    message.id.startsWith('live-temp-') ||
-    message.id.startsWith('voice-temp-')
+  const isTranscribing = Boolean(
+    isUser &&
+    typeof message.id === 'string' &&
+    (message.id.startsWith('live-temp-') ||
+      message.id.startsWith('voice-temp-') ||
+      message.id.startsWith('user-audio-temp'))
   );
 
   return (

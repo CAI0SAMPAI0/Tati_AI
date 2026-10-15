@@ -3,7 +3,7 @@ import json
 import logging
 from urllib.parse import parse_qs
 from typing import Optional, Dict, Any
-from ninja import Router
+from ninja import Router, File, UploadedFile
 from django.http import HttpRequest
 from .models import User
 from ninja.errors import HttpError
@@ -120,6 +120,13 @@ def _get_google_redirect_uri(request: HttpRequest) -> str:
     from django.conf import settings
     import os
 
+    # 1. Requisição local (localhost / 127.0.0.1) - o Google Cloud Console requer exatamente http://localhost:8000/auth/google/callback
+    host = request.headers.get("X-Forwarded-Host") or request.get_host()
+    is_local = "localhost" in host or "127.0.0.1" in host
+    if is_local:
+        return "http://localhost:8000/auth/google/callback"
+
+    # 2. Em ambiente de hospedagem/produção, prioriza a URL base configurada
     backend_base = (
         getattr(settings, "BACKEND_BASE_URL", "")
         or os.getenv("BACKEND_BASE_URL", "")
@@ -134,9 +141,7 @@ def _get_google_redirect_uri(request: HttpRequest) -> str:
             url = url.replace("http://", "https://")
         return f"{url}/auth/google/callback"
 
-    host = request.headers.get("X-Forwarded-Host") or request.get_host()
-    is_local = "localhost" in host or "127.0.0.1" in host
-    proto = "http" if is_local else "https"
+    proto = "https"
     return f"{proto}://{host}/auth/google/callback"
 
 
@@ -165,7 +170,11 @@ def _is_allowed_frontend_origin(origin: str) -> bool:
         port_suffix = f":{parsed.port}" if parsed.port else ""
         canonical_origin = f"{parsed.scheme}://{hostname}{port_suffix}"
 
-        # 1. FRONTEND_URL configurado nas settings ou variável de ambiente
+        # 1. Desenvolvimento local sempre aceito
+        if hostname in ("localhost", "127.0.0.1"):
+            return True
+
+        # 2. FRONTEND_URL configurado nas settings ou variável de ambiente
         frontend_url = (
             getattr(settings, "FRONTEND_URL", "")
             or os.getenv("FRONTEND_URL", "")
@@ -174,12 +183,12 @@ def _is_allowed_frontend_origin(origin: str) -> bool:
         if frontend_url and canonical_origin == frontend_url:
             return True
 
-        # 2. CORS_ALLOWED_ORIGINS definido centralizadamente
+        # 3. CORS_ALLOWED_ORIGINS definido centralizadamente
         allowed_origins = getattr(settings, "CORS_ALLOWED_ORIGINS", [])
         if canonical_origin in allowed_origins:
             return True
 
-        # 3. Origens adicionais configuradas no ambiente
+        # 4. Origens adicionais configuradas no ambiente
         env_origins = [
             o.strip().rstrip("/")
             for o in os.getenv("ALLOWED_FRONTEND_ORIGINS", "").split(",")
@@ -188,7 +197,7 @@ def _is_allowed_frontend_origin(origin: str) -> bool:
         if canonical_origin in env_origins:
             return True
 
-        # 4. Domínios providos dinamicamente pela hospedagem (Railway / Vercel)
+        # 5. Domínios providos dinamicamente pela hospedagem (Railway / Vercel)
         railway_domain = (os.getenv("RAILWAY_PUBLIC_DOMAIN") or os.getenv("RAILWAY_STATIC_URL") or "").strip().lower()
         if railway_domain and (hostname == railway_domain or canonical_origin == f"https://{railway_domain}"):
             return True
@@ -197,15 +206,11 @@ def _is_allowed_frontend_origin(origin: str) -> bool:
         if vercel_url and (hostname == vercel_url or canonical_origin == f"https://{vercel_url}"):
             return True
 
-        # 5. Regexes de CORS permitidas definidas centralizadamente no settings
+        # 6. Regexes de CORS permitidas definidas centralizadamente no settings
         origin_regexes = getattr(settings, "CORS_ALLOWED_ORIGIN_REGEXES", [])
         for pattern in origin_regexes:
             if re.match(pattern, canonical_origin):
                 return True
-
-        # 6. Desenvolvimento local apenas se DEBUG estiver ativo
-        if getattr(settings, "DEBUG", False) and hostname in ("localhost", "127.0.0.1") and parsed.scheme == "http":
-            return True
 
         return False
     except Exception:
@@ -213,6 +218,8 @@ def _is_allowed_frontend_origin(origin: str) -> bool:
 
 
 def _build_google_auth_data(request: HttpRequest) -> tuple[str, str]:
+    import base64
+    import json
     import os
     import uuid
     from urllib.parse import urlencode
@@ -229,7 +236,7 @@ def _build_google_auth_data(request: HttpRequest) -> tuple[str, str]:
             503, "Google OAuth não configurado no servidor. Configure GOOGLE_CLIENT_ID."
         )
 
-    state = str(uuid.uuid4())
+    unique_id = str(uuid.uuid4())
     raw_origin = (
         request.GET.get("origin", "").strip()
         or request.headers.get("Origin", "").strip()
@@ -238,9 +245,21 @@ def _build_google_auth_data(request: HttpRequest) -> tuple[str, str]:
     # Valida rigorosamente a origem contra open redirect
     origin = raw_origin if _is_allowed_frontend_origin(raw_origin) else ""
     access = request.GET.get("access", "").strip()
+
+    # Codifica metadados em base64 no state para resiliência entre instâncias sem cache compartilhado
+    meta_payload = json.dumps({"u": unique_id, "o": origin, "a": access})
+    meta_b64 = base64.urlsafe_b64encode(meta_payload.encode()).decode().rstrip("=")
+    state = f"{unique_id}__{meta_b64}"
+
     cache.set(f"google_oauth_state_{state}", {"ready": False}, timeout=600)
+    cache.set(f"google_oauth_state_{unique_id}", {"ready": False}, timeout=600)
     cache.set(
         f"google_oauth_origin_{state}",
+        {"origin": origin, "access": access},
+        timeout=600,
+    )
+    cache.set(
+        f"google_oauth_origin_{unique_id}",
         {"origin": origin, "access": access},
         timeout=600,
     )
@@ -317,6 +336,10 @@ def google_oauth_callback(
 
     # 1. Verifica se esta sessão/state já foi processada com sucesso anteriormente
     cached_state = cache.get(f"google_oauth_state_{state}")
+    if not cached_state and "__" in state:
+        unique_id = state.split("__")[0]
+        cached_state = cache.get(f"google_oauth_state_{unique_id}")
+
     if cached_state and cached_state.get("ready") and cached_state.get("jwt"):
         jwt_token = cached_state["jwt"]
         refresh_token_val = cached_state.get("refresh_token", "")
@@ -352,6 +375,8 @@ def google_oauth_callback(
             logger.error(f"[Google OAuth] Falha ao trocar código ({resp.status_code}): {resp.text}")
             # Segunda chance de leitura do cache caso tenha ocorrido corrida de requisições
             retry_cache = cache.get(f"google_oauth_state_{state}")
+            if not retry_cache and "__" in state:
+                retry_cache = cache.get(f"google_oauth_state_{state.split('__')[0]}")
             if retry_cache and retry_cache.get("ready") and retry_cache.get("jwt"):
                 jwt_token = retry_cache["jwt"]
                 refresh_token_val = retry_cache.get("refresh_token", "")
@@ -381,21 +406,42 @@ def google_oauth_callback(
             jwt_token = token_res.access_token
             refresh_token_val = getattr(token_res, "refresh_token", "") or ""
 
-            cache.set(
-                f"google_oauth_state_{state}",
-                {
-                    "ready": True,
-                    "jwt": jwt_token,
-                    "refresh_token": refresh_token_val,
-                    "user": user_dict,
-                },
-                timeout=600,
-            )
+            cache_data = {
+                "ready": True,
+                "jwt": jwt_token,
+                "refresh_token": refresh_token_val,
+                "user": user_dict,
+            }
+            cache.set(f"google_oauth_state_{state}", cache_data, timeout=600)
+            if "__" in state:
+                cache.set(f"google_oauth_state_{state.split('__')[0]}", cache_data, timeout=600)
 
+    import base64
     import json
     from urllib.parse import quote
 
-    origin_meta = cache.get(f"google_oauth_origin_{state}") or {}
+    origin_meta = cache.get(f"google_oauth_origin_{state}")
+    if not origin_meta and "__" in state:
+        unique_id = state.split("__")[0]
+        origin_meta = cache.get(f"google_oauth_origin_{unique_id}")
+
+    # Fallback: decodifica metadados encapsulados no próprio state do OAuth2
+    if not origin_meta and "__" in state:
+        try:
+            b64_part = state.split("__", 1)[1]
+            padding = len(b64_part) % 4
+            if padding:
+                b64_part += "=" * (4 - padding)
+            decoded = json.loads(base64.urlsafe_b64decode(b64_part.encode()).decode())
+            if isinstance(decoded, dict):
+                origin_meta = {
+                    "origin": decoded.get("o", ""),
+                    "access": decoded.get("a", ""),
+                }
+        except Exception:
+            pass
+
+    origin_meta = origin_meta or {}
     raw_origin = origin_meta.get("origin")
     frontend_origin = raw_origin if _is_allowed_frontend_origin(raw_origin) else ""
     is_hub = (
@@ -641,6 +687,10 @@ def update_profile(request: HttpRequest, payload: ProfileUpdateInput):
         "preferred_accent",
         "accent",
         "autoplay_chat_audio",
+        "audio_speed",
+        "translation_mode",
+        "word_tooltip",
+        "send_with_enter",
         "notification_preferences",
     ]:
         if subfield in update_data and update_data[subfield] is not None:
@@ -650,10 +700,9 @@ def update_profile(request: HttpRequest, payload: ProfileUpdateInput):
                     clean_phone = "".join(c for c in str(val) if c.isdigit())
                     if clean_phone and len(clean_phone) in (10, 11) and not clean_phone.startswith("55"):
                         clean_phone = f"55{clean_phone}"
-                    val = clean_phone
                     user.phone = clean_phone
                     profile_dict[subfield] = clean_phone
-                elif val == "" and "whatsapp_number" in update_data and len(update_data) == 1:
+                else:
                     user.phone = None
                     profile_dict[subfield] = ""
             else:
@@ -688,6 +737,24 @@ def update_profile(request: HttpRequest, payload: ProfileUpdateInput):
 
     user.save()
     return AuthService._build_user_out(user)
+
+
+@profile_router.post("/avatar", auth=auth_required)
+@profile_router.post("/avatar/", auth=auth_required)
+def upload_avatar(request: HttpRequest, file: UploadedFile = File(...)):
+    """
+    Salva foto de perfil enviada pelo aluno e retorna a URL/DataURI da imagem.
+    """
+    import base64
+    content = file.read()
+    mime = file.content_type or "image/jpeg"
+    b64 = base64.b64encode(content).decode("utf-8")
+    data_uri = f"data:{mime};base64,{b64}"
+    user: User = request.auth
+    user.avatar_url = data_uri
+    user.save()
+    return {"avatar_url": user.avatar_url}
+
 
 
 @profile_router.delete("", auth=auth_required)

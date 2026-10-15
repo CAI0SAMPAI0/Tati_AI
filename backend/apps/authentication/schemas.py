@@ -64,6 +64,9 @@ class UserOut(BaseModel):
     focus: Optional[str] = "General Conversation"
     occupation: Optional[str] = ""
     phone: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    allow_whatsapp_notifications: Optional[bool] = False
+    responsible_email: Optional[str] = None
     profile: Optional[dict] = None
     streak_count: int = 0
     total_xp: int = 0
@@ -95,5 +98,10 @@ class ProfileUpdateInput(BaseModel):
     preferred_accent: Optional[str] = None
     accent: Optional[str] = None
     autoplay_chat_audio: Optional[bool] = None
+    audio_speed: Optional[str] = None
+    translation_mode: Optional[str] = None
+    word_tooltip: Optional[bool] = None
+    send_with_enter: Optional[bool] = None
     notification_preferences: Optional[dict] = None
     profile: Optional[dict] = None
+

@@ -220,11 +220,16 @@ function VoicePageContent() {
     setCompletedObjectives
   } = useVoiceSocket(convId, simulationId);
 
-  const isTranscribing = messages.some(
-    (m) =>
-      m.role === 'user' &&
-      ((m.id && typeof m.id === 'string' && (m.id.startsWith('voice-temp-') || m.id.startsWith('live-temp-'))) ||
-        m.content?.includes('Transcribing'))
+  const isTranscribing = Boolean(
+    state === 'processing' &&
+    messages.some(
+      (m) =>
+        m.role === 'user' &&
+        typeof m.id === 'string' &&
+        (m.id.startsWith('voice-temp-') ||
+          m.id.startsWith('live-temp-') ||
+          m.id.startsWith('user-audio-temp'))
+    )
   );
 
   useEffect(() => {
@@ -244,12 +249,14 @@ function VoicePageContent() {
               (m) =>
                 !m.id ||
                 (!m.id.startsWith('voice-temp-') &&
-                  !m.id.startsWith('live-temp-'))
+                  !m.id.startsWith('live-temp-') &&
+                  !m.id.startsWith('user-audio-temp') &&
+                  !m.content?.includes('Transcribing'))
             )
           );
-          toast.error('Response timed out. Please try again.', { id: 'voice-timeout' });
+          toast.error('Voice response timed out. Please try again.', { id: 'voice-timeout' });
         }
-      }, 45000);
+      }, 15000);
     }
     return () => clearTimeout(timer);
   }, [state, setState, setMessages]);

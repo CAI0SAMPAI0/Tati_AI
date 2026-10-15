@@ -90,7 +90,7 @@ ENABLE_NOTIFICATION_SCHEDULER=false
 ### 📲 WhatsApp (WAHA) & Webhooks de Notificação
 ```env
 # Instância do WAHA no Render
-WAHA_API_URL=https://waha-tati.onrender.com
+WAHA_API_URL=sua_url
 WAHA_API_KEY=sua_chave_waha_aqui
 WAHA_SESSION=professor
 

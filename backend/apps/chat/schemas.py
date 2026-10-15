@@ -12,6 +12,11 @@ class MessageOut(BaseModel):
     created_at: Optional[str] = None
 
 
+class EditMessageInput(BaseModel):
+    content: str
+    accent: Optional[str] = None
+
+
 class ConversationOut(BaseModel):
     id: str
     title: str
@@ -34,6 +39,7 @@ class SendMessageInput(BaseModel):
     synthesize_audio: bool = False
     current_difficulty: Optional[str] = None
     accent: Optional[str] = None
+    user_audio_b64: Optional[str] = None
 
 
 class VoiceSynthesisInput(BaseModel):

@@ -18,7 +18,7 @@ from .models import TrimestralExam, CEFRReference, ActivitySubmission
 logger = logging.getLogger(__name__)
 
 # Usuários liberados para acesso e testes de exames trimestrais
-_default_allowed = {"programador", "caio.sampaio"}
+_default_allowed = {"programador"}
 _env_allowed = {
     u.strip().lower()
     for u in os.getenv("TRIMESTRAL_ALLOWED_USERNAMES", "").split(",")
