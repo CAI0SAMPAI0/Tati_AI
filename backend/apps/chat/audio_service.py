@@ -4,6 +4,8 @@ import re
 import base64
 import logging
 import asyncio
+import time
+import hashlib
 from asgiref.sync import async_to_sync
 from typing import List
 from groq import AsyncGroq
@@ -13,8 +15,12 @@ import edge_tts.communicate
 import edge_tts.drm
 from email.utils import parsedate_to_datetime
 from datetime import timezone as tz
+from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
+
+# Cooldown de circuito fechado para Edge-TTS quando a Microsoft responde 429 (throttled) ou erro de conexão
+_edge_tts_cooldown_until = 0.0
 
 # Patch Edge-TTS para o novo endpoint da Microsoft (api.msedgeservices.com).
 # O endpoint legado speech.platform.bing.com passou a responder 403 Forbidden em Outubro/2026 (upstream PR #491).
@@ -219,8 +225,11 @@ class AudioService:
     @classmethod
     async def text_to_speech_async(cls, text: str, accent: str = "en-US") -> str:
         """
-        Gera áudio MP3 em base64 nativamente assíncrono via Edge TTS (com fallback em gTTS).
+        Gera áudio MP3 em base64 nativamente assíncrono via Edge TTS com cache de alto desempenho,
+        circuit breaker resiliente contra rate limits (429) e fallback instantâneo em gTTS.
         """
+        global _edge_tts_cooldown_until
+
         cleaned = clean_tts_text(text)
         if not cleaned:
             return ""
@@ -258,6 +267,15 @@ class AudioService:
         elif lower_acc in ["en-jp", "jp", "japanese", "japones", "ja-jp"]:
             norm_accent = "en-JP"
 
+        # 1. Consulta em Cache de Alto Desempenho (Instantâneo: ~1-3ms)
+        cache_key = f"tts_cache_v2:{hashlib.md5(f'{norm_accent}:{cleaned}'.encode('utf-8')).hexdigest()}"
+        try:
+            cached_audio = cache.get(cache_key)
+            if cached_audio:
+                return cached_audio
+        except Exception as c_err:
+            logger.debug(f"[AudioService] Erro ao consultar cache de TTS: {c_err}")
+
         voice = VOICE_ACCENT_MAP.get(norm_accent)
         if not voice:
             for k, v in VOICE_ACCENT_MAP.items():
@@ -267,44 +285,75 @@ class AudioService:
         if not voice:
             voice = "en-US-JennyNeural"
 
-        # 1. Tentativa primária com a voz solicitada no Edge TTS
-        try:
-            communicate = edge_tts.Communicate(cleaned, voice)
-            buf = io.BytesIO()
-            async for chunk in communicate.stream():
-                if chunk["type"] == "audio":
-                    buf.write(chunk["data"])
-            if buf.tell() > 0:
-                return base64.b64encode(buf.getvalue()).decode()
-        except Exception as e:
-            logger.warning(
-                f"[AudioService] Edge-TTS indisponível para voz '{voice}' ({e}). Acionando fallback..."
-            )
-            # 2. Tentativa secundária com voz padrão en-US-JennyNeural no Edge TTS
-            if voice != "en-US-JennyNeural":
-                try:
-                    communicate = edge_tts.Communicate(cleaned, "en-US-JennyNeural")
-                    buf = io.BytesIO()
+        audio_b64 = ""
+        now_ts = time.time()
+
+        # 2. Tentativa primária no Edge-TTS (somente se não estiver em cooldown por 429 recente)
+        if now_ts >= _edge_tts_cooldown_until:
+            try:
+                communicate = edge_tts.Communicate(cleaned, voice)
+                buf = io.BytesIO()
+
+                async def _stream_edge():
                     async for chunk in communicate.stream():
                         if chunk["type"] == "audio":
                             buf.write(chunk["data"])
-                    if buf.tell() > 0:
-                        return base64.b64encode(buf.getvalue()).decode()
-                except Exception as fb_err:
-                    logger.error(f"[AudioService] Erro no TTS fallback Edge-TTS: {fb_err}", exc_info=True)
-            else:
-                logger.error(f"[AudioService] Erro no TTS Assíncrono Edge-TTS: {e}", exc_info=True)
 
-        # 3. Fallback de emergência com gTTS (alta confiabilidade e sem bloqueios 403)
-        try:
-            logger.info(f"[AudioService] Acionando fallback gTTS de emergência para sotaque '{norm_accent}'...")
-            gtts_audio = await asyncio.to_thread(cls._gtts_fallback, cleaned, norm_accent)
-            if gtts_audio:
-                return gtts_audio
-        except Exception as gtts_err:
-            logger.error(f"[AudioService] Erro no fallback emergencial gTTS: {gtts_err}", exc_info=True)
+                await asyncio.wait_for(_stream_edge(), timeout=3.5)
+                if buf.tell() > 0:
+                    audio_b64 = base64.b64encode(buf.getvalue()).decode()
+            except Exception as e:
+                err_str = str(e)
+                logger.warning(
+                    f"[AudioService] Edge-TTS indisponível para voz '{voice}' ({err_str}). Acionando fallback..."
+                )
+                # Se for 429 (Too Many Requests), 403 ou timeout de rede, aciona cooldown de 60s
+                # e NÃO tenta a mesma conexão para JennyNeural (evitando somar mais 5s de delay inútil)
+                is_throttled = any(
+                    token in err_str.lower()
+                    for token in ["429", "invalid response status", "403", "timed out", "timeout", "connectionreset"]
+                )
+                if is_throttled:
+                    _edge_tts_cooldown_until = time.time() + 60.0
+                    logger.info("[AudioService] Edge-TTS temporariamente throttled (429). Cooldown de 60s ativado; usando gTTS direto.")
+                elif voice != "en-US-JennyNeural":
+                    try:
+                        communicate = edge_tts.Communicate(cleaned, "en-US-JennyNeural")
+                        buf = io.BytesIO()
 
-        return ""
+                        async def _stream_fallback():
+                            async for chunk in communicate.stream():
+                                if chunk["type"] == "audio":
+                                    buf.write(chunk["data"])
+
+                        await asyncio.wait_for(_stream_fallback(), timeout=2.5)
+                        if buf.tell() > 0:
+                            audio_b64 = base64.b64encode(buf.getvalue()).decode()
+                    except Exception as fb_err:
+                        logger.warning(f"[AudioService] Erro no TTS fallback Edge-TTS JennyNeural: {fb_err}")
+                        _edge_tts_cooldown_until = time.time() + 60.0
+        else:
+            logger.info(
+                f"[AudioService] Edge-TTS em cooldown (faltam {int(_edge_tts_cooldown_until - now_ts)}s). Usando fallback gTTS direto."
+            )
+
+        # 3. Fallback de emergência com gTTS (alta confiabilidade e sem bloqueios 429)
+        if not audio_b64:
+            try:
+                gtts_audio = await asyncio.to_thread(cls._gtts_fallback, cleaned, norm_accent)
+                if gtts_audio:
+                    audio_b64 = gtts_audio
+            except Exception as gtts_err:
+                logger.error(f"[AudioService] Erro no fallback emergencial gTTS: {gtts_err}", exc_info=True)
+
+        # 4. Grava no cache por 7 dias para requisições subsequentes serem instantâneas
+        if audio_b64:
+            try:
+                cache.set(cache_key, audio_b64, timeout=86400 * 7)
+            except Exception as cache_err:
+                logger.debug(f"[AudioService] Erro ao persistir no cache: {cache_err}")
+
+        return audio_b64
 
     @classmethod
     def text_to_speech(cls, text: str, accent: str = "en-US") -> str:

@@ -70,7 +70,26 @@ interface Question {
   audio_url?: string | null;
   audio_text?: string | null;
   reading_text?: string | null;
+  min_seconds?: number | null;
+  max_seconds?: number | null;
 }
+
+const getSpeakingLimits = (q?: Question, examLevel?: string) => {
+  if (q?.min_seconds && q?.max_seconds) {
+    return { min: q.min_seconds, max: q.max_seconds };
+  }
+  const lvl = (examLevel || 'A1').toUpperCase();
+  switch (lvl) {
+    case 'A1': return { min: 15, max: 30 };
+    case 'A2': return { min: 20, max: 45 };
+    case 'B1': return { min: 30, max: 60 };
+    case 'B2': return { min: 45, max: 80 };
+    case 'C1': return { min: 60, max: 100 };
+    case 'C2': return { min: 75, max: 120 };
+    default: return { min: 20, max: 45 };
+  }
+};
+
 
 interface ExamActive {
   exam_id: string;
@@ -107,15 +126,20 @@ interface ExamResult {
 
 interface HistoryItem {
   id: string;
+  exam_id?: string;
   level: string;
   score: number;
   passed: boolean;
   completed_at: string;
   total_questions: number;
   feedback?: string;
+  summary_feedback?: string;
   can_do_statements?: string[];
   skills_breakdown?: Record<string, { label: string; correct: number; total: number; percentage: number }>;
   points_to_improve?: string[];
+  corrections?: CorrectionItem[];
+  questions?: Question[];
+  answers?: Record<string, string>;
 }
 
 export default function ExamsClientPage() {
@@ -134,8 +158,9 @@ export default function ExamsClientPage() {
   const [status, setStatus] = useState<ExamStatus | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loadingStatus, setLoadingStatus] = useState(true);
+  const [isReviewingHistory, setIsReviewingHistory] = useState(false);
   const studentAccent = user?.preferred_accent || (user?.profile as any)?.preferred_accent || (user?.profile as any)?.accent || getStoredAccent() ||
-  'en-US';
+    'en-US';
 
   // Active exam states
   const [activeExam, setActiveExam] = useState<ExamActive | null>(null);
@@ -149,23 +174,27 @@ export default function ExamsClientPage() {
   const [examResult, setExamResult] = useState<ExamResult | null>(null);
 
   // Audio (Listening) and voice recording (Speaking)
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const isPlayingAudio = Boolean(playingAudioId);
   const [audioListenCount, setAudioListenCount] = useState<Record<string, number>>({});
-  const [showTranscript, setShowTranscript] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
+  const [showTranscriptMap, setShowTranscriptMap] = useState<Record<string, boolean>>({});
+  const [recordingQuestionId, setRecordingQuestionId] = useState<string | null>(null);
+  const isRecording = Boolean(recordingQuestionId);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [recordedAudios, setRecordedAudios] = useState<Record<string, string>>({});
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const activeLimitRef = useRef<number>(45);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCacheRef = useRef<Record<string, string>>({});
+
 
   // Fallback speech synthesis
   const fallbackSpeechSynthesis = (phrase: string, studentAccent: string, qId: string) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      setIsPlayingAudio(false);
+      setPlayingAudioId(null);
       return;
     }
     window.speechSynthesis.cancel();
@@ -180,47 +209,61 @@ export default function ExamsClientPage() {
       utterance.voice = matchedVoice;
     }
 
-    utterance.onstart = () => setIsPlayingAudio(true);
+    utterance.onstart = () => setPlayingAudioId(qId);
     utterance.onend = () => {
-      setIsPlayingAudio(false);
+      setPlayingAudioId(null);
       setAudioListenCount(prev => ({ ...prev, [qId]: (prev[qId] || 0) + 1 }));
     };
-    utterance.onerror = () => setIsPlayingAudio(false);
+    utterance.onerror = () => setPlayingAudioId(null);
 
     window.speechSynthesis.speak(utterance);
   };
 
   // Play audio dialogue using Edge TTS in student's preferred accent
   const handlePlayListeningAudio = async (text: string, qId: string) => {
-    // If audio is currently playing, pause it
-    if (isPlayingAudio) {
+    // If this specific audio is currently playing, pause it
+    if (playingAudioId === qId) {
       if (audioRef.current) {
         audioRef.current.pause();
       }
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
-      setIsPlayingAudio(false);
+      setPlayingAudioId(null);
       return;
+    }
+
+    // Stop any existing playing audio before starting a new one
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
     }
 
     const clean = text.replace(/^(Station Announcer|Speaker\s*\w*|Woman|Man|Announcer|Flight Attendant|Receptionist):\s*/gim, '').trim();
     const phrase = clean || text;
 
     // Student accent
-    const studentAccent = user?.preferred_accent || (user?.profile as any)?.preferred_accent || (user?.profile as any)?.accent || getStoredAccent();
+    const currentAccent = user?.preferred_accent || (user?.profile as any)?.preferred_accent || (user?.profile as any)?.accent || getStoredAccent() || 'en-US';
 
     try {
-      setIsPlayingAudio(true);
+      setPlayingAudioId(qId);
 
-      // Check cache first
+      // Check client-side memory cache first
       let audioB64 = audioCacheRef.current[qId];
 
       if (!audioB64) {
-        const res = await apiPost<{ audio?: string; audio_b64?: string }>('/chat/tts', {
+        // Race request with a 3.5s timeout so UI never freezes or waits 10s
+        const ttsPromise = apiPost<{ audio?: string; audio_b64?: string }>('/chat/tts', {
           text: phrase,
-          accent: studentAccent, // pega o sotaque escolhido pelo user
+          accent: currentAccent,
         });
+        const timeoutPromise = new Promise<{ ok: false; data: null }>((resolve) =>
+          setTimeout(() => resolve({ ok: false, data: null }), 3500)
+        );
+
+        const res = await Promise.race([ttsPromise, timeoutPromise]);
         if (res.ok && (res.data?.audio || res.data?.audio_b64)) {
           audioB64 = res.data.audio || res.data.audio_b64 || '';
           audioCacheRef.current[qId] = audioB64;
@@ -236,28 +279,56 @@ export default function ExamsClientPage() {
         audioRef.current = audio;
 
         audio.onended = () => {
-          setIsPlayingAudio(false);
+          setPlayingAudioId(null);
           setAudioListenCount(prev => ({ ...prev, [qId]: (prev[qId] || 0) + 1 }));
         };
 
         audio.onerror = () => {
-          setIsPlayingAudio(false);
-          fallbackSpeechSynthesis(phrase, studentAccent, qId);
+          setPlayingAudioId(null);
+          fallbackSpeechSynthesis(phrase, currentAccent, qId);
         };
 
         await audio.play();
         return;
       }
 
-      throw new Error('TTS response was empty');
+      // If backend TTS was slow or failed, fall back to Web Speech API immediately
+      fallbackSpeechSynthesis(phrase, currentAccent, qId);
     } catch (err) {
       console.warn('Backend TTS call failed, using Web Speech API fallback:', err);
-      fallbackSpeechSynthesis(phrase, studentAccent, qId);
+      fallbackSpeechSynthesis(phrase, currentAccent, qId);
     }
   };
 
+  // Prefetch listening question audios in background for instant 0ms playback
+  useEffect(() => {
+    if (!activeExam?.questions) return;
+    const listeningQuestions = activeExam.questions.filter(
+      q => q.type === 'listening' && q.audio_text && !audioCacheRef.current[q.id]
+    );
+    if (listeningQuestions.length === 0) return;
+
+    listeningQuestions.forEach(async (q) => {
+      const phrase = (q.audio_text || '')
+        .replace(/^(Station Announcer|Speaker\s*\w*|Woman|Man|Announcer|Flight Attendant|Receptionist):\s*/gim, '')
+        .trim();
+      if (!phrase) return;
+      try {
+        const res = await apiPost<{ audio?: string; audio_b64?: string }>('/chat/tts', {
+          text: phrase,
+          accent: studentAccent,
+        });
+        if (res.ok && (res.data?.audio || res.data?.audio_b64)) {
+          audioCacheRef.current[q.id] = res.data.audio || res.data.audio_b64 || '';
+        }
+      } catch {
+        // Silently ignore background prefetch errors
+      }
+    });
+  }, [activeExam, studentAccent]);
+
   // Microphone recording for speaking tasks
-  const startRecording = async (qId: string) => {
+  const startRecording = async (qId: string, maxSeconds?: number) => {
     try {
       if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
         toast.error('Microphone recording is not supported on this browser or device.');
@@ -289,15 +360,18 @@ export default function ExamsClientPage() {
         stream.getTracks().forEach(t => t.stop());
       };
 
+      const limit = maxSeconds && maxSeconds > 5 ? maxSeconds : 45;
+      activeLimitRef.current = limit;
+
       mediaRecorder.start();
-      setIsRecording(true);
+      setRecordingQuestionId(qId);
       setRecordingSeconds(0);
 
       timerRef.current = setInterval(() => {
         setRecordingSeconds(sec => {
-          if (sec >= 45) {
+          if (sec >= activeLimitRef.current) {
             stopRecording();
-            return 45;
+            return activeLimitRef.current;
           }
           return sec + 1;
         });
@@ -308,12 +382,13 @@ export default function ExamsClientPage() {
     }
   };
 
+
   const stopRecording = () => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
-    setIsRecording(false);
+    setRecordingQuestionId(null);
   };
 
   // Clean audio and recording when changing question
@@ -324,9 +399,9 @@ export default function ExamsClientPage() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
-    setIsPlayingAudio(false);
-    setShowTranscript(false);
-    if (isRecording) {
+    setPlayingAudioId(null);
+    setShowTranscriptMap({});
+    if (recordingQuestionId) {
       stopRecording();
     }
   }, [currentQuestionIndex]);
@@ -467,6 +542,53 @@ export default function ExamsClientPage() {
     }
   };
 
+  // Review past exam from history
+  const handleReviewPastExam = async (hItem: HistoryItem) => {
+    try {
+      let corrections = hItem.corrections;
+      let summaryFeedback = hItem.summary_feedback || hItem.feedback || '';
+      let canDo = hItem.can_do_statements || [];
+      let skills = hItem.skills_breakdown || {};
+      let pointsToImprove = hItem.points_to_improve || [];
+
+      // If item does not have corrections yet, fetch detail
+      if (!corrections || corrections.length === 0) {
+        try {
+          const detail = await apiGet<HistoryItem>(`/exams/trimestral/${hItem.id}`);
+          if (detail) {
+            corrections = detail.corrections || [];
+            summaryFeedback = detail.summary_feedback || detail.feedback || summaryFeedback;
+            canDo = detail.can_do_statements || canDo;
+            skills = detail.skills_breakdown || skills;
+            pointsToImprove = detail.points_to_improve || pointsToImprove;
+          }
+        } catch (detailErr) {
+          console.warn('[Exams] Failed to fetch exam detail:', detailErr);
+        }
+      }
+
+      setExamResult({
+        exam_id: hItem.id,
+        score: hItem.score,
+        passed: hItem.passed,
+        recommended_level: hItem.level,
+        xp_earned: hItem.passed ? 100 : 40,
+        next_exam_date: status?.next_available_date || hItem.completed_at,
+        summary_feedback: summaryFeedback || 'Assessment completed.',
+        can_do_statements: canDo,
+        points_to_improve: pointsToImprove,
+        skills_breakdown: skills,
+        corrections: corrections || [],
+      });
+      setIsReviewingHistory(true);
+      setView('result');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+      console.error('[Exams] Failed to review past exam:', err);
+      toast.error('Unable to load past exam review.');
+    }
+  };
+
   // Date formatting helper in English
   const formatDate = (isoString?: string | null) => {
     if (!isoString) return '--/--/----';
@@ -585,6 +707,10 @@ export default function ExamsClientPage() {
           <div className="space-y-6">
             {activeExam.questions.map((q, idx) => {
               const isAnswered = Boolean(answers[q.id]) || Boolean(recordedAudioB64[q.id]);
+              const isThisRecording = recordingQuestionId === q.id;
+              const isAnotherRecording = Boolean(recordingQuestionId && !isThisRecording);
+              const isThisAudioPlaying = playingAudioId === q.id;
+              const isTranscriptShown = Boolean(showTranscriptMap[q.id]);
 
               return (
                 <div
@@ -647,7 +773,7 @@ export default function ExamsClientPage() {
                     <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-5 md:p-6 mb-6">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                         <div className="flex items-center gap-2 text-xs font-bold text-emerald-500 uppercase tracking-wider">
-                          <Headphones size={18} /> Audio Track • Accent: <strong className="text-primary">{studentAccent}</strong>
+                          <Headphones size={18} /> Audio Track • CEFR {activeExam?.level || 'A1'} • Accent: <strong className="text-primary">{studentAccent}</strong>
                         </div>
                         <span className="text-xs text-text-muted font-medium">
                           Times played: <strong className="text-emerald-500">{audioListenCount[q.id] || 0}</strong>
@@ -660,12 +786,12 @@ export default function ExamsClientPage() {
                           onClick={() => handlePlayListeningAudio(q.audio_text || '', q.id)}
                           className={cn(
                             "px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2.5 transition-all shadow-md active:scale-95 cursor-pointer",
-                            isPlayingAudio
+                            isThisAudioPlaying
                               ? "bg-danger text-white animate-pulse"
                               : "bg-emerald-500 text-white hover:bg-emerald-600"
                           )}
                         >
-                          {isPlayingAudio ? (
+                          {isThisAudioPlaying ? (
                             <>
                               <Pause size={18} /> Stop Audio Playback
                             </>
@@ -678,14 +804,14 @@ export default function ExamsClientPage() {
 
                         <button
                           type="button"
-                          onClick={() => setShowTranscript(prev => !prev)}
+                          onClick={() => setShowTranscriptMap(prev => ({ ...prev, [q.id]: !prev[q.id] }))}
                           className="text-xs font-bold text-text-muted hover:text-emerald-500 underline ml-auto transition-colors cursor-pointer"
                         >
-                          {showTranscript ? 'Hide Audio Transcript' : 'Show Audio Transcript (Practice)'}
+                          {isTranscriptShown ? 'Hide Audio Transcript' : 'Show Audio Transcript (Practice)'}
                         </button>
                       </div>
 
-                      {showTranscript && q.audio_text && (
+                      {isTranscriptShown && q.audio_text && (
                         <div className="mt-4 p-4 rounded-xl bg-surface/90 border border-emerald-500/20 text-xs md:text-sm font-mono text-text animate-fade-in">
                           <p className="text-text-muted text-[11px] uppercase tracking-wider mb-1 font-sans font-bold">Transcript:</p>
                           {q.audio_text}
@@ -695,60 +821,69 @@ export default function ExamsClientPage() {
                   )}
 
                   {/* Speaking Task with Voice Recording */}
-                  {q.type === 'speaking' && (
-                    <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-5 md:p-6 mb-6">
-                      <div className="flex items-center justify-between gap-2 mb-3">
-                        <div className="flex items-center gap-2 text-xs font-bold text-rose-500 uppercase tracking-wider">
-                          <Mic size={18} /> Spoken Task • Voice Recording
+                  {q.type === 'speaking' && (() => {
+                    const limits = getSpeakingLimits(q, activeExam?.level);
+                    return (
+                      <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-5 md:p-6 mb-6">
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <div className="flex items-center gap-2 text-xs font-bold text-rose-500 uppercase tracking-wider">
+                            <Mic size={18} /> Spoken Task • Voice Recording (CEFR {activeExam?.level || 'A1'})
+                          </div>
+                          {recordedAudioB64[q.id] && (
+                            <span className="text-xs font-bold text-success flex items-center gap-1">
+                              <CheckCircle2 size={14} /> Response Recorded
+                            </span>
+                          )}
                         </div>
-                        {recordedAudioB64[q.id] && (
-                          <span className="text-xs font-bold text-success flex items-center gap-1">
-                            <CheckCircle2 size={14} /> Response Recorded
-                          </span>
-                        )}
-                      </div>
 
-                      <p className="text-xs text-text-muted mb-4">
-                        Click the microphone to record your response in English. Speak clearly for 15 to 30 seconds.
-                      </p>
+                        <p className="text-xs text-text-muted mb-4">
+                          Click the microphone to record your response in English. Speak clearly for {limits.min} to {limits.max} seconds (CEFR Level {activeExam?.level || 'A1'}).
+                        </p>
 
-                      <div className="flex flex-col sm:flex-row items-center gap-4">
-                        {!isRecording ? (
-                          <button
-                            type="button"
-                            onClick={() => startRecording(q.id)}
-                            className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2.5 transition-all active:scale-95 cursor-pointer"
-                          >
-                            <Mic size={18} />
-                            {recordedAudios[q.id] ? 'Re-record Spoken Response' : 'Start Recording Voice'}
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={stopRecording}
-                            className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-danger hover:opacity-90 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2.5 transition-all animate-pulse cursor-pointer"
-                          >
-                            <Square size={16} fill="currentColor" />
-                            Stop Recording ({recordingSeconds}s / 45s)
-                          </button>
-                        )}
+                        <div className="flex flex-col sm:flex-row items-center gap-4">
+                          {!isThisRecording ? (
+                            <button
+                              type="button"
+                              disabled={isAnotherRecording}
+                              onClick={() => startRecording(q.id, limits.max)}
+                              className={cn(
+                                "w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-sm shadow-md flex items-center justify-center gap-2.5 transition-all active:scale-95 cursor-pointer",
+                                isAnotherRecording
+                                  ? "bg-rose-500/40 cursor-not-allowed opacity-60 text-white"
+                                  : "bg-rose-500 hover:bg-rose-600 text-white"
+                              )}
+                            >
+                              <Mic size={18} />
+                              {recordedAudios[q.id] ? 'Re-record Spoken Response' : 'Start Recording Voice'}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={stopRecording}
+                              className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-danger hover:opacity-90 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2.5 transition-all animate-pulse cursor-pointer"
+                            >
+                              <Square size={16} fill="currentColor" />
+                              Stop Recording ({recordingSeconds}s / {limits.max}s)
+                            </button>
+                          )}
 
-                        {isRecording && (
-                          <div className="flex items-center gap-2 text-xs font-bold text-danger">
-                            <span className="w-2.5 h-2.5 rounded-full bg-danger animate-ping" />
-                            Recording in progress...
+                          {isThisRecording && (
+                            <div className="flex items-center gap-2 text-xs font-bold text-danger">
+                              <span className="w-2.5 h-2.5 rounded-full bg-danger animate-ping" />
+                              Recording in progress ({recordingSeconds}s / {limits.max}s)...
+                            </div>
+                          )}
+                        </div>
+
+                        {recordedAudios[q.id] && (
+                          <div className="mt-4 pt-4 border-t border-rose-500/20 flex items-center gap-3">
+                            <span className="text-xs text-text-muted font-bold">Listen to your recording:</span>
+                            <audio src={recordedAudios[q.id]} controls className="h-8 max-w-xs" />
                           </div>
                         )}
                       </div>
-
-                      {recordedAudios[q.id] && (
-                        <div className="mt-4 pt-4 border-t border-rose-500/20 flex items-center gap-3">
-                          <span className="text-xs text-text-muted font-bold">Listen to your recording:</span>
-                          <audio src={recordedAudios[q.id]} controls className="h-8 max-w-xs" />
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* Question Prompt */}
                   <h2 className="text-base md:text-xl font-bold text-text leading-snug mb-6">
@@ -848,19 +983,37 @@ export default function ExamsClientPage() {
     );
   }
 
-  // ==============================================================================
   // RENDER: EXAM RESULT & PEDAGOGICAL FEEDBACK (100% ENGLISH)
-  // ==============================================================================
   if (view === 'result' && examResult) {
     return (
       <div className="min-h-screen bg-bg text-text flex flex-col">
         <MainHeader onToggleMenu={toggleSidebar} />
 
         <div className="flex-1 max-w-4xl w-full mx-auto p-4 md:p-8">
+          {/* Top navigation banner when reviewing historical exams */}
+          {isReviewingHistory && (
+            <div className="mb-6 p-4 rounded-2xl bg-primary/10 border border-primary/30 flex items-center justify-between gap-4 animate-fade-in shadow-sm">
+              <div className="flex items-center gap-2.5 text-xs md:text-sm font-bold text-primary">
+                <BookmarkCheck size={20} className="shrink-0" />
+                <span>
+                  Historical Exam Review • CEFR Level {examResult.recommended_level || status?.current_level || 'B1'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsReviewingHistory(false);
+                  setView('dashboard');
+                }}
+                className="px-4 py-2 rounded-xl bg-surface border border-border text-xs font-bold text-text hover:text-primary transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+              >
+                <ChevronLeft size={15} /> Back to History
+              </button>
+            </div>
+          )}
+
           {/* Result Banner */}
           <div className="bg-surface border border-border rounded-3xl p-6 md:p-10 shadow-sm text-center mb-8 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary via-purple-500 to-success" />
-
             <div className="w-20 h-20 mx-auto rounded-3xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-4 shadow-inner">
               <Trophy size={40} className="text-primary animate-bounce" />
             </div>
@@ -869,7 +1022,7 @@ export default function ExamsClientPage() {
               "text-xs px-4 py-1.5 rounded-full font-bold uppercase tracking-wider inline-block mb-3",
               examResult.passed ? "bg-success/10 text-success border border-success/20" : "bg-warning/10 text-warning border border-warning/20"
             )}>
-              {examResult.passed ? '🎉 Quarterly Assessment Passed' : '📚 Assessment Completed'}
+              {examResult.passed ? 'Quarterly Assessment Passed' : 'Assessment Completed'}
             </span>
 
             <h1 className="text-3xl md:text-5xl font-black text-text mb-2 tracking-tight">
@@ -902,10 +1055,13 @@ export default function ExamsClientPage() {
 
             <button
               type="button"
-              onClick={() => setView('dashboard')}
-              className="px-8 py-3.5 rounded-xl bg-primary text-white font-bold text-sm hover:opacity-90 shadow-md inline-flex items-center gap-2"
+              onClick={() => {
+                setIsReviewingHistory(false);
+                setView('dashboard');
+              }}
+              className="px-8 py-3.5 rounded-xl bg-primary text-white font-bold text-sm hover:opacity-90 shadow-md inline-flex items-center gap-2 cursor-pointer transition-all active:scale-95"
             >
-              View Evolution Dashboard <ArrowRight size={18} />
+              {isReviewingHistory ? 'Back to History & Dashboard' : 'View Evolution Dashboard'} <ArrowRight size={18} />
             </button>
           </div>
 
@@ -1074,7 +1230,7 @@ export default function ExamsClientPage() {
                 </div>
                 <h2 className="text-xl md:text-2xl font-bold text-text">Your Quarterly Exam is Available!</h2>
                 <p className="text-xs md:text-sm text-text-muted max-w-xl leading-relaxed">
-                  Official CEFR assessment with 8 to 15 questions tailored for level <strong>{status.current_level}</strong>. 
+                  Official CEFR assessment with 8 to 15 questions tailored for level <strong>{status.current_level}</strong>.
                   Short reading texts, grammar, listening dialogue, and speaking tasks. Average duration: 15 minutes.
                 </p>
               </div>
@@ -1220,7 +1376,7 @@ export default function ExamsClientPage() {
                             className={cn(
                               "h-full rounded-full transition-all duration-500",
                               skillData.percentage >= 80 ? "bg-success" :
-                              skillData.percentage >= 60 ? "bg-primary" : "bg-warning"
+                                skillData.percentage >= 60 ? "bg-primary" : "bg-warning"
                             )}
                             style={{ width: `${skillData.percentage}%` }}
                           />
@@ -1283,11 +1439,19 @@ export default function ExamsClientPage() {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-4 shrink-0">
+                    <div className="flex items-center gap-4 shrink-0 flex-wrap sm:flex-nowrap">
                       <div className="text-right">
                         <span className="text-xl font-black text-primary block leading-none">{hItem.score}%</span>
                         <span className="text-[10px] text-text-muted font-bold uppercase">{hItem.passed ? 'Passed' : 'Completed'}</span>
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleReviewPastExam(hItem)}
+                        className="px-4 py-2.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                      >
+                        <BookmarkCheck size={14} /> Review Exam & Feedback
+                      </button>
                     </div>
                   </div>
                 ))}

@@ -28,6 +28,8 @@ import re
 from apps.authentication.models import User, UserRole
 from apps.chat.models import Conversation, Message
 from apps.chat.audio_service import AudioService, get_groq_keys, strip_emojis
+from shared.prompt_manager import PromptManager
+
 from apps.notifications.services import BrevoEmailService
 from apps.users.services import XPService, StreakService
 
@@ -712,27 +714,23 @@ class LevelingService:
         Avalia a resposta do aluno com LLM (Groq / Gemini) retornando JSON estruturado.
         Regra estrita: NENHUM emoji. Feedback conciso de no maximo 2 linhas citando o que o aluno falou.
         """
-        prompt = (
-            f"You are Teacher Tatiana Duarte (Teacher Tati), evaluating a student's answer in a CEFR English Leveling Assessment.\n"
-            f"Question (CEFR Level {question_level}): \"{question}\"\n"
-            f"Target Skills / Grammar: {target}\n"
-            f"Student's Answer: \"{student_answer}\"\n\n"
-            f"Evaluate whether the student's answer demonstrates sufficient communicative ability and grammatical control for CEFR Level {question_level}.\n"
-            f"A minor slip should still pass if the meaning is clear and appropriate for {question_level}.\n\n"
-            f"CRITICAL RULES:\n"
-            f"1. In 'pedagogical_feedback', write AT MOST 1 TO 2 CONCISE LINES in English. Specifically acknowledge what the student said in their sentence and provide a brief natural tip or phrasing correction. DO NOT chat, do NOT start conversations, and DO NOT ask questions in 'pedagogical_feedback'.\n"
-            f"2. DO NOT ask follow-up questions. The assessment progresses directly through the selected questions. Always set 'needs_follow_up': false and 'follow_up_question': \"\".\n"
-            f"3. Absolutely DO NOT use any emojis anywhere. No emojis permitted.\n\n"
-            f"Respond ONLY with a valid JSON object matching this schema:\n"
-            f"{{\n"
-            f'  "is_correct": true,\n'
-            f'  "mistakes": ["List specific grammatical or vocabulary mistakes in English, if any"],\n'
-            f'  "corrections": ["Natural and correct English phrasing for the student\'s answer"],\n'
-            f'  "pedagogical_feedback": "At most 1 to 2 concise lines in English with a constructive tip. NO emojis. NO questions.",\n'
-            f'  "needs_follow_up": false,\n'
-            f'  "follow_up_question": ""\n'
-            f"}}"
+        prompt = PromptManager.get_prompt(
+            "leveling_assessment",
+            section="Question Evaluation Prompt",
+            question_level=question_level,
+            question=question,
+            target=target,
+            student_answer=student_answer,
         )
+        if not prompt:
+            prompt = (
+                f"You are Teacher Tatiana Duarte (Teacher Tati), evaluating a student's answer in a CEFR English Leveling Assessment.\n"
+                f"Question (CEFR Level {question_level}): \"{question}\"\n"
+                f"Target Skills / Grammar: {target}\n"
+                f"Student's Answer: \"{student_answer}\"\n\n"
+                f"Evaluate whether the student's answer demonstrates sufficient communicative ability and grammatical control for CEFR Level {question_level}."
+            )
+
 
         keys = get_groq_keys()
         for g_model in ["openai/gpt-oss-20b", "qwen/qwen3.8-27b", "openai/gpt-oss-120b"]:

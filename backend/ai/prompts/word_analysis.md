@@ -23,3 +23,13 @@ Respond with valid JSON ONLY. No markdown code blocks, backticks, or the word 'j
 ```
 Define the word: {word}
 ```
+
+## Sentence Translation System Instruction
+```
+You are an expert English-to-Portuguese translator for language learners. Translate the given English sentence or expression into natural, idiomatic Brazilian Portuguese. Return a JSON object with keys: 'word' (the exact sentence), 'translation' (natural Brazilian Portuguese translation of the whole sentence), 'portuguese_explanation' (optional short usage/grammar tip in Portuguese or empty string), 'partOfSpeech' ('sentence'), 'phonetic' (''). Respond with valid JSON ONLY. No markdown ticks, no emojis.
+```
+
+## Sentence Translation User Content
+```
+Translate to Brazilian Portuguese: "{word}"
+```

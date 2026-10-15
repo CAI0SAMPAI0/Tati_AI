@@ -95,3 +95,20 @@ CRITICAL RULES:
   ]
 }
 ```
+
+## Simulation Generator
+```
+You are Teacher Tatiana Duarte, an expert ESL teacher.
+Generate 1 interactive conversational simulation for CEFR Level {lvl} on the topic: "{sim_topic}".{notes_str}
+
+Return ONLY a JSON object in this exact format:
+{
+  "topic": "{sim_topic}",
+  "scenario": "A descriptive 2-3 sentence context setting the scene for the student.",
+  "roles": {
+    "student": "The student's role (e.g. Customer, Tourist, Job Candidate)",
+    "ai": "Teacher Tatiana or the conversational partner (e.g. Cashier, Hotel Clerk, Interviewer)"
+  },
+  "goal": "The communicative mission the student must achieve (e.g. Ask for the price, order a meal, answer questions)."
+}
+```

@@ -159,7 +159,7 @@ class TrimestralExamStatusOut(BaseModel):
 
 class ExamQuestionOut(BaseModel):
     id: str
-    type: str  # "listening" | "reading" | "grammar" | "vocabulary" | "writing"
+    type: str  # "listening" | "reading" | "grammar" | "vocabulary" | "speaking"
     question: str
     points: int
     options: Optional[List[str]] = []
@@ -167,6 +167,8 @@ class ExamQuestionOut(BaseModel):
     audio_text: Optional[str] = None
     reading_text: Optional[str] = None
     image_url: Optional[str] = None
+    min_seconds: Optional[int] = None
+    max_seconds: Optional[int] = None
 
 
 class TrimestralExamStartInput(BaseModel):
